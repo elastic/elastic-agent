@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	"github.com/otiai10/copy"
@@ -419,7 +421,7 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (Ag
 	if uerr := json.Unmarshal(out, &status); uerr != nil {
 		return AgentStatusOutput{},
 			fmt.Errorf("could not unmarshal agent status output: %w",
-				errors.Join(&ExecErr{
+				multierror.Append(&ExecErr{
 					err:    err,
 					Output: out,
 				}, uerr))
@@ -439,7 +441,7 @@ func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (A
 	if uerr := yaml.Unmarshal(out, &inspect); uerr != nil {
 		return AgentInspectOutput{},
 			fmt.Errorf("could not unmarshal agent inspect output: %w",
-				errors.Join(&ExecErr{
+				multierror.Append(&ExecErr{
 					err:    err,
 					Output: out,
 				}, uerr))

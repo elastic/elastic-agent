@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/multierr"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
@@ -118,15 +119,15 @@ func (p *provisioner) Provision(ctx context.Context, requests []runner.StackRequ
 
 // Clean cleans up all provisioned resources.
 func (p *provisioner) Clean(ctx context.Context, stacks []runner.Stack) error {
-	var errs []error
+	var err error
 	for _, s := range stacks {
 		err := p.destroyDeployment(ctx, s)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to destroy stack %s (%s): %w", s.Version, s.ID, err))
+			err = multierr.Append(err, fmt.Errorf("failed to destroy stack %s (%s): %w", s.Version, s.ID, err))
 		}
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
+	if err != nil {
+		return err
 	}
 	return nil
 }
