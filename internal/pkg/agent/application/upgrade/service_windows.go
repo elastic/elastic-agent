@@ -26,12 +26,12 @@ const (
 func newServiceHandler() (serviceHandler, error) {
 	mgr, err := mgr.Connect()
 	if err != nil {
-		return errors.New("failed to initiate service manager", err)
+		return nil, errors.New("failed to initiate service manager", err)
 	}
 
 	return &pidProvider{
 		winManager: mgr,
-	}
+	}, nil
 }
 
 type pidProvider struct {

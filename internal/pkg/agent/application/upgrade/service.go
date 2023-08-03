@@ -32,18 +32,16 @@ const (
 
 type pidProvider interface {
 	Init() error
-	Close()
-	PID(ctx context.Context) (int, error)
-	Name() string
+	serviceHandler
 }
 
 func newServiceHandler() (serviceHandler, error) {
 	pp := relevantPidProvider()
 	if err := pp.Init(); err != nil {
-		return fmt.Errorf("unable to initialize relevant PID provider: %w", err)
+		return nil, fmt.Errorf("unable to initialize relevant PID provider: %w", err)
 	}
 
-	return pp
+	return pp, nil
 }
 
 func relevantPidProvider() pidProvider {
@@ -149,7 +147,7 @@ func (p *sysvPidProvider) PID(ctx context.Context) (int, error) {
 	return pid, nil
 }
 
-func (p *sysvPidProvider) Restart() error {
+func (p *sysvPidProvider) Restart(ctx context.Context) error {
 	return errors.New("not yet implemented")
 }
 
