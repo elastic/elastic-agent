@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
-	"github.com/stretchr/testify/require"
 )
 
 func TestProvisionGetRegions(t *testing.T) {

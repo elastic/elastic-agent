@@ -120,9 +120,9 @@ func (srv *ServerlessClient) DeploymentIsReady(ctx context.Context) (bool, error
 // DeleteDeployment deletes the deployment
 func (srv *ServerlessClient) DeleteDeployment() error {
 	endpoint := fmt.Sprintf("%s/api/v1/serverless/projects/%s/%s", serverlessURL, srv.proj.Type, srv.proj.ID)
-	req, err := http.NewRequest("DELETE", endpoint, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "DELETE", endpoint, nil)
 	if err != nil {
-		return fmt.Errorf("Error creating HTTP request: %w", err)
+		return fmt.Errorf("error creating HTTP request: %w", err)
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("ApiKey %s", srv.api))
 	resp, err := http.DefaultClient.Do(req)
@@ -229,10 +229,7 @@ func (srv *ServerlessClient) WaitForKibana(ctx context.Context) error {
 			return false
 		}
 		resp.Body.Close()
-		if status.Status.Overall.Level == "available" {
-			return true
-		}
-		return false
+		return status.Status.Overall.Level == "available"
 	}
 
 	err = srv.waitForRemoteState(ctx, req, time.Second*5, readyFunc)
@@ -249,7 +246,7 @@ func (srv *ServerlessClient) waitForRemoteState(ctx context.Context, httpHandler
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("Got context done; Last HTTP Error: %w", lastErr)
+			return fmt.Errorf("got context done; Last HTTP Error: %w", lastErr)
 		case <-timer.C:
 		}
 

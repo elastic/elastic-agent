@@ -151,7 +151,7 @@ func (prov *ServerlessProvision) Clean(ctx context.Context, stacks []runner.Stac
 func (prov *ServerlessProvision) CheckCloudRegion() error {
 	urlPath := fmt.Sprintf("%s/api/v1/serverless/regions", serverlessURL)
 
-	httpHandler, err := http.NewRequest("GET", urlPath, nil)
+	httpHandler, err := http.NewRequestWithContext(context.Background(), "GET", urlPath, nil)
 	if err != nil {
 		return fmt.Errorf("error creating new httpRequest: %w", err)
 	}
