@@ -167,7 +167,7 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version string, pgpSources ...
 			v.log.Infof("Verification with PGP[%d] successful", i)
 			return nil
 		}
-		v.log.Warnf("Verification with PGP[%d] succfailed: %v", i, err)
+		v.log.Warnf("Verification with PGP[%d] failed: %v", i, err)
 	}
 
 	v.log.Warnf("Verification failed")
