@@ -451,13 +451,9 @@ func generateContainerData(
 					if !managed {
 						mappingData := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
 						if len(mappingData.hints) > 0 {
-							//mappingData.processors will hold any additional processors identfied from annotations and we need to update the processors map
 							if len(mappingData.processors) > 0 {
-								for _, processor := range mappingData.processors {
-									processors = append(processors, processor)
-								}
+								processors = updateProcessors(mappingData.processors, processors)
 							}
-
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
@@ -468,6 +464,9 @@ func generateContainerData(
 							// in case of no package detected in the hints fallback to the generic log collection
 							_, _ = mappingData.hints.Put("container_logs.enabled", true)
 							_, _ = mappingData.hints.Put("container_id", c.ID)
+							if len(mappingData.processors) > 0 {
+								processors = updateProcessors(mappingData.processors, processors)
+							}
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
@@ -486,11 +485,8 @@ func generateContainerData(
 				if !managed {
 					mappingData := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
 					if len(mappingData.hints) > 0 {
-						//mappingData.processors will hold any additional processors identfied from annotations and we need to update the processors map
 						if len(mappingData.processors) > 0 {
-							for _, processor := range mappingData.processors {
-								processors = append(processors, processor)
-							}
+							processors = updateProcessors(mappingData.processors, processors)
 						}
 						_ = comm.AddOrUpdate(
 							eventID,
@@ -502,6 +498,9 @@ func generateContainerData(
 						// in case of no package detected in the hints fallback to the generic log collection
 						_, _ = mappingData.hints.Put("container_logs.enabled", true)
 						_, _ = mappingData.hints.Put("container_id", c.ID)
+						if len(mappingData.processors) > 0 {
+							processors = updateProcessors(mappingData.processors, processors)
+						}
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
@@ -538,4 +537,13 @@ func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 
 	}
 	return mappingData
+}
+
+// Updates processors map with any additional processors identfied from annotations
+func updateProcessors(newprocessors []mapstr.M, processors []map[string]interface{}) []map[string]interface{} {
+	for _, processor := range newprocessors {
+		processors = append(processors, processor)
+	}
+
+	return processors
 }
