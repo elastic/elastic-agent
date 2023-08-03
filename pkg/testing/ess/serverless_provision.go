@@ -63,8 +63,8 @@ func NewServerlessProvisioner(cfg ProvisionerConfig) (runner.StackProvisioner, e
 }
 
 // SetLogger sets the logger for the
-func (srv *ServerlessProvision) SetLogger(l runner.Logger) {
-	srv.log = l
+func (prov *ServerlessProvision) SetLogger(l runner.Logger) {
+	prov.log = l
 }
 
 // Provision a new set of serverless instances
@@ -97,8 +97,8 @@ func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runne
 		prov.stacks[req.ID] = stackhandlerData{client: client, stackData: newStack}
 		prov.stacksMut.Unlock()
 
+		upWaiter.Add(1)
 		go func() {
-			upWaiter.Add(1)
 			isUp, err := client.DeploymentIsReady(ctx)
 			if err != nil {
 				depErrs <- err
@@ -185,7 +185,7 @@ func (prov *ServerlessProvision) CheckCloudRegion() error {
 	}
 	if !found {
 		if len(regions) == 0 {
-			return fmt.Errorf("No regions found for cloudless API")
+			return fmt.Errorf("no regions found for cloudless API")
 		}
 		newRegion := regions[0].ID
 		prov.log.Logf("WARNING: Region %s is not available for serverless, selecting %s. Other regions are:", prov.cfg.Region, newRegion)

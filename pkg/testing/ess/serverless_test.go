@@ -12,7 +12,7 @@ import (
 )
 
 func TestProvisionGetRegions(t *testing.T) {
-	logp.DevelopmentSetup()
+	_ = logp.DevelopmentSetup()
 	key, found, err := GetESSAPIKey()
 	if !found {
 		t.Skip("No credentials found for ESS")
@@ -33,7 +33,7 @@ func TestProvisionGetRegions(t *testing.T) {
 }
 
 func TestStackProvisioner(t *testing.T) {
-	logp.DevelopmentSetup()
+	_ = logp.DevelopmentSetup()
 	key, found, err := GetESSAPIKey()
 	if !found {
 		t.Skip("No credentials found for ESS")
@@ -68,7 +68,7 @@ func TestStackProvisioner(t *testing.T) {
 }
 
 func TestStartServerless(t *testing.T) {
-	logp.DevelopmentSetup()
+	_ = logp.DevelopmentSetup()
 	key, found, err := GetESSAPIKey()
 	if !found {
 		t.Skip("No credentials found for ESS")
