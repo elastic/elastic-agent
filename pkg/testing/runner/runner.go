@@ -143,6 +143,10 @@ func NewRunner(cfg Config, ip InstanceProvisioner, sp StackProvisioner, batches 
 	if err != nil {
 		return nil, err
 	}
+	platforms, err := cfg.GetPlatforms()
+	if err != nil {
+		return nil, err
+	}
 
 	logger := &runnerLogger{
 		writer:    os.Stdout,
@@ -153,7 +157,7 @@ func NewRunner(cfg Config, ip InstanceProvisioner, sp StackProvisioner, batches 
 
 	var osBatches []OSBatch
 	for _, b := range batches {
-		lbs, err := createBatches(b, cfg.Matrix)
+		lbs, err := createBatches(b, platforms, cfg.Matrix)
 		if err != nil {
 			return nil, err
 		}
@@ -819,9 +823,9 @@ func findBatchByID(id string, batches []OSBatch) (OSBatch, bool) {
 	return OSBatch{}, false
 }
 
-func createBatches(batch define.Batch, matrix bool) ([]OSBatch, error) {
+func createBatches(batch define.Batch, platforms []define.OS, matrix bool) ([]OSBatch, error) {
 	var batches []OSBatch
-	specifics, err := getSupported(batch.OS)
+	specifics, err := getSupported(batch.OS, platforms)
 	if errors.Is(err, ErrOSNotSupported) {
 		var s SupportedOS
 		s.OS.Type = batch.OS.Type

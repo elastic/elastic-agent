@@ -1721,6 +1721,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		GOVersion:         goVersion,
 		RepoDir:           ".",
 		DiagnosticsDir:    diagDir,
+		Platforms:         testPlatforms(),
 		Matrix:            matrix,
 		SingleTest:        singleTest,
 		VerboseMode:       mg.Verbose(),
@@ -1775,6 +1776,20 @@ func timestampEnabled() bool {
 	}
 	b, _ := strconv.ParseBool(timestamp)
 	return b
+}
+
+func testPlatforms() []string {
+	platformsStr := os.Getenv("TEST_PLATFORMS")
+	if platformsStr == "" {
+		return nil
+	}
+	var platforms []string
+	for _, p := range strings.Split(platformsStr, " ") {
+		if p != "" {
+			platforms = append(platforms, p)
+		}
+	}
+	return platforms
 }
 
 // Pre-requisite: user must have the gcloud CLI installed
