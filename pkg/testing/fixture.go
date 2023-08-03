@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
 
@@ -42,7 +44,8 @@ type Fixture struct {
 	allowErrs       bool
 	connectTimout   time.Duration
 
-	workDir string
+	srcPackage string
+	workDir    string
 
 	installed   bool
 	installOpts *InstallOpts
@@ -153,6 +156,7 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	if err != nil {
 		return err
 	}
+	f.srcPackage = src
 	filename := filepath.Base(src)
 	name, _, err := splitFileType(filename)
 	if err != nil {
@@ -189,6 +193,15 @@ func (f *Fixture) Configure(ctx context.Context, yamlConfig []byte) error {
 // must be called after `Install` is called.
 func (f *Fixture) WorkDir() string {
 	return f.workDir
+}
+
+// SrcPackage returns the location on disk of the elastic agent package used by this fixture.
+func (f *Fixture) SrcPackage(ctx context.Context) (string, error) {
+	err := f.ensurePrepared(ctx)
+	if err != nil {
+		return "", err
+	}
+	return f.srcPackage, nil
 }
 
 func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
@@ -455,7 +468,15 @@ func (f *Fixture) ensurePrepared(ctx context.Context) error {
 }
 
 func (f *Fixture) binaryPath() string {
-	binary := filepath.Join(f.workDir, "elastic-agent")
+	workDir := f.workDir
+	if f.installed {
+		if f.installOpts != nil && f.installOpts.BasePath != "" {
+			workDir = filepath.Join(f.installOpts.BasePath, "Elastic", "Agent")
+		} else {
+			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
+		}
+	}
+	binary := filepath.Join(workDir, "elastic-agent")
 	if f.operatingSystem == "windows" {
 		binary += ".exe"
 	}

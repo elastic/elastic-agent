@@ -9,6 +9,7 @@ steps:
     command: ".buildkite/scripts/steps/unit-tests.sh"
     artifact_paths:
       - "build/TEST-**"
+      - "build/diagnostics/*"
     agents:
       provider: "gcp"
     retry:
