@@ -3,7 +3,11 @@
 // FIXME: once elastic.co docs have been switched over to use `main`, remove
 // the `doc-site-branch` line below as well as any references to it in the code.
 :doc-site-branch: master
+<<<<<<< HEAD
 :go-version: 1.19.10
+=======
+:go-version: 1.20.7
+>>>>>>> 083bf7805a ([Automation] Bump Golang version to 1.20.7 (#3177))
 :release-state: unreleased
 :python: 3.7
 :docker: 1.12
