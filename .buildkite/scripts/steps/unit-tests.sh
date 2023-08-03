@@ -3,5 +3,5 @@ set -euxo pipefail
 
 source .buildkite/scripts/common.sh
 
-echo "--- unit tests"
+echo "--- Unit tests"
 TEST_COVERAGE=true mage unitTest
