@@ -33,20 +33,7 @@ import (
 )
 
 func TestRedactResults(t *testing.T) {
-	exampleConfig := mapstr.M{
-		"root": mapstr.M{
-			"passphrase": "unredacted",
-			"nested1": mapstr.M{
-				"certificate": "unredacted",
-				"nested2": mapstr.M{
-					"passphrase": "unredacted",
-					"password":   "unredacted",
-					"nested3": mapstr.M{
-						"token": "unredacted",
-						"key":   "unredacted",
-					},
-					"ssl": mapstr.M{ // ssh-keygen -f ~/test-key -t rsa -b 4096
-						"key": `-----BEGIN OPENSSH PRIVATE KEY----- 
+	privKey := `-----BEGIN OPENSSH PRIVATE KEY----- 
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAACFwAAAAdzc2gtcn
 NhAAAAAwEAAQAAAgEAnomdLTF3Vp52cT55PealM+qwSQVEkEBsKB3dSXEIvCqvOmDRZic6
 mjhkShOBr6nHUzhdHiNlMTNUaU0AxyuMofFnCCBVhnnC9w+CnTrL+lbVXmMClTrbqIGT8g
@@ -94,7 +81,22 @@ GT3rxNZv+Yk4fnGCYINA2LC/7W9fbDA2z4rVkSBkmmGkdursuWhY4izuR2/dYjWidkuq5D
 Pvs4QoN926c0m4Q5fqd7zS1l76ZIG/iTbDY9k0xrlcfPwybcp5YEFti6Ug0xxrDn3Xm5Y5
 2UlCsPtd3ofmxP1mWurWv6WToCxw81IUBuq0fIZ0i3/McKn5WOxMHqNlliggF9sLjfLTEo
 i4EFZLWrFRsAAAARYWxleGtAZ3JlbWluLm5lc3QBAg==
------END OPENSSH PRIVATE KEY-----`,
+-----END OPENSSH PRIVATE KEY-----`
+
+	exampleConfig := mapstr.M{
+		"root": mapstr.M{
+			"passphrase": "unredacted",
+			"nested1": mapstr.M{
+				"certificate": "unredacted",
+				"nested2": mapstr.M{
+					"passphrase": "unredacted",
+					"password":   "unredacted",
+					"nested3": mapstr.M{
+						"token": "unredacted",
+						"key":   "unredacted",
+					},
+					"ssl": mapstr.M{ // ssh-keygen -f ~/test-key -t rsa -b 4096
+						"key": privKey,
 					},
 				},
 			},
@@ -112,7 +114,7 @@ i4EFZLWrFRsAAAARYWxleGtAZ3JlbWluLm5lc3QBAg==
 
 	require.Empty(t, errOut.String())
 	require.NotContains(t, outWriter.String(), "unredacted")
-	require.NotContains(t, outWriter.String(), "END OPENSSH PRIVATE KEY")
+	require.NotContains(t, outWriter.String(), privKey)
 }
 
 func TestRedactComplexKeys(t *testing.T) {
