@@ -328,7 +328,7 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 	return err
 }
 
-// Redact sensitive values from the underlying map
+// redactMap sensitive values from the underlying map
 // the whole generic function here is out of paranoia. Although extremely unlikely,
 // we have no way of guaranteeing we'll get a "normal" map[string]interface{},
 // since the diagnostic interface is a bit of a free-for-all
