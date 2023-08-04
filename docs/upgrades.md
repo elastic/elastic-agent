@@ -36,7 +36,7 @@ sequenceDiagram
        end
        A->>A: Download new Agent artifact
        A->>A: Extract new Agent artifact
-       A->>A: Replace current Agent artifact with new one
+       A->>A: Change symlink from current Agent binary to new one
        A->>UM: Create
        A->>A: Update active commit file
        A->>UW: Start
@@ -50,7 +50,7 @@ sequenceDiagram
          UW->>UM: Remove
          UW->>UW: Cleanup old Agent files
        else Rollback
-         UW->>UW: Replace current Agent artifact with old one
+         UW->>UW: Change symlink from current Agent binary to new one
          UW->>UW: Update active commit file
          UW->>A: Rexec to start old Agent artifact
          A->>FS: Ack failed upgrade
