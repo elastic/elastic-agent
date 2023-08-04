@@ -462,7 +462,7 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, true)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
 	require.ErrorIs(t, err, ErrNotUpgradable)
 	cancel()
 
@@ -570,7 +570,15 @@ func (f *fakeUpgradeManager) Reload(_ *config.Config) error {
 	return nil
 }
 
+<<<<<<< HEAD
 func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+=======
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+	f.upgradeCalled = true
+	if f.upgradeErr != nil {
+		return nil, f.upgradeErr
+	}
+>>>>>>> 2c9e581944 ([Integration Test] Upgrade failed default verification test (#3101))
 	return func() error { return nil }, nil
 }
 
