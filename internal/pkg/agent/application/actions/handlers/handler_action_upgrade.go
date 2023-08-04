@@ -75,7 +75,7 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 
 	go func() {
 		h.log.Infof("starting upgrade to version %s in background", action.Version)
-		if err := h.coord.Upgrade(asyncCtx, action.Version, action.SourceURI, action, false); err != nil {
+		if err := h.coord.Upgrade(asyncCtx, action.Version, action.SourceURI, action, false, false); err != nil {
 			h.log.Errorf("upgrade to version %s failed: %v", action.Version, err)
 			// If context is cancelled in getAsyncContext, the actions are acked there
 			if !errors.Is(asyncCtx.Err(), context.Canceled) {
