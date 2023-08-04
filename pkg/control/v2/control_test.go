@@ -41,6 +41,7 @@ func TestServerClient_Version(t *testing.T) {
 		Commit:    release.Commit(),
 		BuildTime: release.BuildTime(),
 		Snapshot:  release.Snapshot(),
+		FIPS:      release.FIPS(),
 	}, ver)
 }
 

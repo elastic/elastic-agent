@@ -64,6 +64,8 @@ message VersionResponse {
   string buildTime = 3;
   // Current running version is a snapshot.
   bool snapshot = 4;
+  // Current running version is FIPS enabled.
+  bool fips = 5;
 }
 
 message RestartResponse {

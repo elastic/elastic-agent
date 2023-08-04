@@ -304,6 +304,11 @@ func (b GolangCrossBuilder) Build() error {
 		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
 		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
 	}
+	if os.Getenv("GOEXPERIMENT") != "" {
+		// GOEXPERIMENT is set in the environment, that needs to be propagated into
+		// the docker container so the go builder uses the same experiment settings.
+		args = append(args, "--env", "GOEXPERIMENT="+os.Getenv("GOEXPERIMENT"))
+	}
 
 	args = append(args,
 		"--rm",

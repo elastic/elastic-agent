@@ -148,6 +148,20 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		"source": agentName,
 	})
 
+	// first log line is the version for debugging
+	// second line is specific to fips being enabled (this first line contains this
+	// information as well, but this specific log line makes it very easy to see
+	// that its enabled)
+	l.With(
+		"version", release.Version(),
+		"commit", release.Commit(),
+		"build_time", release.BuildTime(),
+		"snapshot", release.Snapshot(),
+		"fips", release.FIPS()).Infof("Version %s", release.Info().String())
+	if release.FIPS() {
+		l.Info("BoringCrypto FIPS enabled")
+	}
+
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
 		err = errors.New(err, "failed to perform delayed enrollment")

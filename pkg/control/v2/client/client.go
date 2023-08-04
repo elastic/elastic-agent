@@ -67,6 +67,7 @@ type Version struct {
 	Commit    string    `json:"commit" yaml:"commit"`
 	BuildTime time.Time `json:"build_time" yaml:"build_time"`
 	Snapshot  bool      `json:"snapshot" yaml:"snapshot"`
+	FIPS      bool      `json:"fips" yaml:"fips"`
 }
 
 // ComponentVersionInfo is the version information for the component.
@@ -265,6 +266,7 @@ func (c *client) Version(ctx context.Context) (Version, error) {
 		Commit:    res.Commit,
 		BuildTime: bt,
 		Snapshot:  res.Snapshot,
+		FIPS:      res.Fips,
 	}, nil
 }
 

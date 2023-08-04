@@ -124,6 +124,7 @@ func (s *Server) Version(_ context.Context, _ *cproto.Empty) (*cproto.VersionRes
 		Commit:    release.Commit(),
 		BuildTime: release.BuildTime().Format(control.TimeFormat()),
 		Snapshot:  release.Snapshot(),
+		Fips:      release.FIPS(),
 	}, nil
 }
 
