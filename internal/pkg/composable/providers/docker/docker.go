@@ -80,7 +80,7 @@ func (c *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 				delete(stoppers, data.container.ID)
 				continue
 			}
-			err = comm.AddOrUpdate(data.container.ID, ContainerPriority, data.mapping, data.processors)
+			err = comm.AddOrUpdate(data.container.ID, ContainerPriority, data.mapping, data.processors, nil)
 			if err != nil {
 				c.logger.Errorf("%s", err)
 			}

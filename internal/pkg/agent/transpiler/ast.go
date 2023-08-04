@@ -37,6 +37,7 @@ var (
 
 // Processors represent an attached list of processors.
 type Processors []map[string]interface{}
+type Parsers []map[string]interface{}
 
 // Node represents a node in the configuration Tree a Node can point to one or multiples children
 // nodes.
@@ -60,6 +61,9 @@ type Node interface {
 
 	// Processors returns any attached processors, because of variable substitution.
 	Processors() Processors
+
+	// Parsers returns any attached processors, because of variable substitution.
+	Parsers() Parsers
 }
 
 // AST represents a raw configuration which is purely data, only primitives are currently supported,
@@ -79,16 +83,17 @@ func (a *AST) String() string {
 type Dict struct {
 	value      []Node
 	processors []map[string]interface{}
+	parsers    []map[string]interface{}
 }
 
 // NewDict creates a new dict with provided nodes.
 func NewDict(nodes []Node) *Dict {
-	return NewDictWithProcessors(nodes, nil)
+	return NewDictWithProcessors(nodes, nil, nil)
 }
 
 // NewDictWithProcessors creates a new dict with provided nodes and attached processors.
-func NewDictWithProcessors(nodes []Node, processors Processors) *Dict {
-	return &Dict{nodes, processors}
+func NewDictWithProcessors(nodes []Node, processors Processors, parsers Parsers) *Dict {
+	return &Dict{nodes, processors, parsers}
 }
 
 // Find takes a string which is a key and try to find the elements in the associated K/V.
@@ -169,7 +174,7 @@ func (d *Dict) Apply(vars *Vars) (Node, error) {
 		}
 		nodes = append(nodes, n)
 	}
-	return &Dict{nodes, nil}, nil
+	return &Dict{nodes, nil, nil}, nil
 }
 
 // Processors returns any attached processors, because of variable substitution.
@@ -179,6 +184,19 @@ func (d *Dict) Processors() Processors {
 	}
 	for _, v := range d.value {
 		if p := v.Processors(); p != nil {
+			return p
+		}
+	}
+	return nil
+}
+
+// Parsers returns any attached processors, because of variable substitution.
+func (d *Dict) Parsers() Parsers {
+	if d.parsers != nil {
+		return d.parsers
+	}
+	for _, v := range d.value {
+		if p := v.Parsers(); p != nil {
 			return p
 		}
 	}
@@ -292,20 +310,29 @@ func (k *Key) Processors() Processors {
 	return nil
 }
 
+// Processors returns any attached processors, because of variable substitution.
+func (k *Key) Parsers() Parsers {
+	if k.value != nil {
+		return k.value.Parsers()
+	}
+	return nil
+}
+
 // List represents a slice in our Tree.
 type List struct {
 	value      []Node
 	processors Processors
+	parsers    Parsers
 }
 
 // NewList creates a new list with provided nodes.
 func NewList(nodes []Node) *List {
-	return NewListWithProcessors(nodes, nil)
+	return NewListWithProcessors(nodes, nil, nil)
 }
 
 // NewListWithProcessors creates a new list with provided nodes with processors attached.
-func NewListWithProcessors(nodes []Node, processors Processors) *List {
-	return &List{nodes, processors}
+func NewListWithProcessors(nodes []Node, processors Processors, parsers Parsers) *List {
+	return &List{nodes, processors, nil}
 }
 
 func (l *List) String() string {
@@ -393,20 +420,34 @@ func (l *List) Processors() Processors {
 	return nil
 }
 
+// Processors returns any attached processors, because of variable substitution.
+func (l *List) Parsers() Parsers {
+	if l.processors != nil {
+		return l.parsers
+	}
+	for _, v := range l.value {
+		if p := v.Parsers(); p != nil {
+			return p
+		}
+	}
+	return nil
+}
+
 // StrVal represents a string.
 type StrVal struct {
 	value      string
 	processors Processors
+	parsers    Parsers
 }
 
 // NewStrVal creates a new string value node with provided value.
 func NewStrVal(val string) *StrVal {
-	return NewStrValWithProcessors(val, nil)
+	return NewStrValWithProcessors(val, nil, nil)
 }
 
 // NewStrValWithProcessors creates a new string value node with provided value and processors.
-func NewStrValWithProcessors(val string, processors Processors) *StrVal {
-	return &StrVal{val, processors}
+func NewStrValWithProcessors(val string, processors Processors, parsers Parsers) *StrVal {
+	return &StrVal{val, processors, parsers}
 }
 
 // Find receive a key and return false since the node is not a List or Dict.
@@ -444,20 +485,26 @@ func (s *StrVal) Processors() Processors {
 	return s.processors
 }
 
+// Parsers returns any linked processors that are now connected because of Apply.
+func (s *StrVal) Parsers() Parsers {
+	return s.parsers
+}
+
 // IntVal represents an int.
 type IntVal struct {
 	value      int
 	processors Processors
+	parsers    Parsers
 }
 
 // NewIntVal creates a new int value node with provided value.
 func NewIntVal(val int) *IntVal {
-	return NewIntValWithProcessors(val, nil)
+	return NewIntValWithProcessors(val, nil, nil)
 }
 
 // NewIntValWithProcessors creates a new int value node with provided value and attached processors.
-func NewIntValWithProcessors(val int, processors Processors) *IntVal {
-	return &IntVal{val, processors}
+func NewIntValWithProcessors(val int, processors Processors, parsers Parsers) *IntVal {
+	return &IntVal{val, processors, parsers}
 }
 
 // Find receive a key and return false since the node is not a List or Dict.
@@ -493,6 +540,11 @@ func (s *IntVal) Hash() []byte {
 // Processors returns any linked processors that are now connected because of Apply.
 func (s *IntVal) Processors() Processors {
 	return s.processors
+}
+
+// Parsers returns any linked processors that are now connected because of Apply.
+func (s *IntVal) Parsers() Parsers {
+	return s.parsers
 }
 
 // UIntVal represents an int.
@@ -544,6 +596,11 @@ func (s *UIntVal) Apply(_ *Vars) (Node, error) {
 // Processors returns any linked processors that are now connected because of Apply.
 func (s *UIntVal) Processors() Processors {
 	return s.processors
+}
+
+// Parsers returns any linked parsers that are now connected because of Apply.
+func (s *UIntVal) Parsers() Parsers {
+	return s.Parsers()
 }
 
 // FloatVal represents a float.
@@ -598,20 +655,26 @@ func (s *FloatVal) Processors() Processors {
 	return s.processors
 }
 
+// Processors returns any linked processors that are now connected because of Apply.
+func (s *FloatVal) Parsers() Parsers {
+	return s.Parsers()
+}
+
 // BoolVal represents a boolean in our Tree.
 type BoolVal struct {
 	value      bool
 	processors Processors
+	parsers    Parsers
 }
 
 // NewBoolVal creates a new bool value node with provided value.
 func NewBoolVal(val bool) *BoolVal {
-	return NewBoolValWithProcessors(val, nil)
+	return NewBoolValWithProcessors(val, nil, nil)
 }
 
 // NewBoolValWithProcessors creates a new bool value node with provided value with processors attached.
-func NewBoolValWithProcessors(val bool, processors Processors) *BoolVal {
-	return &BoolVal{val, processors}
+func NewBoolValWithProcessors(val bool, processors Processors, parsers Parsers) *BoolVal {
+	return &BoolVal{val, processors, parsers}
 }
 
 // Find receive a key and return false since the node is not a List or Dict.
@@ -653,6 +716,11 @@ func (s *BoolVal) Apply(_ *Vars) (Node, error) {
 // Processors returns any linked processors that are now connected because of Apply.
 func (s *BoolVal) Processors() Processors {
 	return s.processors
+}
+
+// Processors returns any linked processors that are now connected because of Apply.
+func (s *BoolVal) Parsers() Parsers {
+	return s.parsers
 }
 
 // NewAST takes a map and convert it to an internal Tree, allowing us to executes rules on the
@@ -993,7 +1061,7 @@ func Insert(a *AST, node Node, to Selector) error {
 		dValue, ok := d.value.(*Dict)
 		if !ok {
 			// not a dictionary (replace it all)
-			d.value = &Dict{[]Node{node}, nil}
+			d.value = &Dict{[]Node{node}, nil, nil}
 		} else {
 			// remove the duplicate key (if it exists)
 			for i, key := range dValue.value {
@@ -1010,7 +1078,7 @@ func Insert(a *AST, node Node, to Selector) error {
 			dValue.sort()
 		}
 	default:
-		d.value = &Dict{[]Node{node}, nil}
+		d.value = &Dict{[]Node{node}, nil, nil}
 	}
 	return nil
 }

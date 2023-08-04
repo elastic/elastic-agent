@@ -113,7 +113,7 @@ func (s *service) emitRunning(service *kubernetes.Service) {
 	data.mapping["scope"] = s.scope
 
 	// Emit the service
-	_ = s.comm.AddOrUpdate(string(service.GetUID()), ServicePriority, data.mapping, data.processors)
+	_ = s.comm.AddOrUpdate(string(service.GetUID()), ServicePriority, data.mapping, data.processors, nil)
 }
 
 // svcNamespaceAnnotations returns the annotations of the namespace of the service

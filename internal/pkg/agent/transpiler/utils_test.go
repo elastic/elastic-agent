@@ -785,7 +785,7 @@ func TestRenderInputs(t *testing.T) {
 }
 
 func mustMakeVarsP(id string, mapping map[string]interface{}, processorKey string, processors Processors) *Vars {
-	v, err := NewVarsWithProcessors(id, mapping, processorKey, processors, nil)
+	v, err := NewVarsWithProcessors(id, mapping, processorKey, processors, nil, nil)
 	if err != nil {
 		panic(err)
 	}

@@ -226,6 +226,14 @@ func TestVars_ReplaceWithProcessors(t *testing.T) {
 			},
 		},
 	}
+	parsersers := Parsers{
+		{
+			"ndjson": map[string]interface{}{
+				"add_error_key": "false",
+				"message_key":   "log",
+			},
+		},
+	}
 	vars, err := NewVarsWithProcessors(
 		"",
 		map[string]interface{}{
@@ -246,6 +254,7 @@ func TestVars_ReplaceWithProcessors(t *testing.T) {
 		},
 		"dynamic",
 		processers,
+		parsersers,
 		nil)
 	require.NoError(t, err)
 
@@ -255,11 +264,11 @@ func TestVars_ReplaceWithProcessors(t *testing.T) {
 
 	res, err = vars.Replace("${dynamic.key1}")
 	require.NoError(t, err)
-	assert.Equal(t, NewStrValWithProcessors("dynamic1", processers), res)
+	assert.Equal(t, NewStrValWithProcessors("dynamic1", processers, nil), res)
 
 	res, err = vars.Replace("${other.key1|dynamic.key1}")
 	require.NoError(t, err)
-	assert.Equal(t, NewStrValWithProcessors("dynamic1", processers), res)
+	assert.Equal(t, NewStrValWithProcessors("dynamic1", processers, nil), res)
 
 	res, err = vars.Replace("${dynamic.list}")
 	require.NoError(t, err)
@@ -267,7 +276,7 @@ func TestVars_ReplaceWithProcessors(t *testing.T) {
 	assert.Equal(t, NewListWithProcessors([]Node{
 		NewStrVal("array1"),
 		NewStrVal("array2"),
-	}, processers), res)
+	}, processers, nil), res)
 
 	res, err = vars.Replace("${dynamic.dict}")
 	require.NoError(t, err)
@@ -275,7 +284,7 @@ func TestVars_ReplaceWithProcessors(t *testing.T) {
 	assert.Equal(t, NewDictWithProcessors([]Node{
 		NewKey("key1", NewStrVal("value1")),
 		NewKey("key2", NewStrVal("value2")),
-	}, processers), res)
+	}, processers, nil), res)
 }
 
 func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
@@ -286,7 +295,14 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 			},
 		},
 	}
-
+	parsersers := Parsers{
+		{
+			"ndjson": map[string]interface{}{
+				"add_error_key": "false",
+				"message_key":   "log",
+			},
+		},
+	}
 	mockFetchProvider, err := MockContextProviderBuilder()
 	require.NoError(t, err)
 
@@ -313,6 +329,7 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 		},
 		"dynamic",
 		processers,
+		parsersers,
 		fetchContextProviders)
 	require.NoError(t, err)
 
@@ -322,11 +339,11 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 
 	res, err = vars.Replace("${dynamic.key1}")
 	require.NoError(t, err)
-	assert.Equal(t, NewStrValWithProcessors("dynamic1", processers), res)
+	assert.Equal(t, NewStrValWithProcessors("dynamic1", processers, parsersers), res)
 
 	res, err = vars.Replace("${other.key1|dynamic.key1}")
 	require.NoError(t, err)
-	assert.Equal(t, NewStrValWithProcessors("dynamic1", processers), res)
+	assert.Equal(t, NewStrValWithProcessors("dynamic1", processers, parsersers), res)
 
 	res, err = vars.Replace("${dynamic.list}")
 	require.NoError(t, err)
@@ -334,7 +351,7 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 	assert.Equal(t, NewListWithProcessors([]Node{
 		NewStrVal("array1"),
 		NewStrVal("array2"),
-	}, processers), res)
+	}, processers, parsersers), res)
 
 	res, err = vars.Replace("${dynamic.dict}")
 	require.NoError(t, err)
@@ -342,7 +359,7 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 	assert.Equal(t, NewDictWithProcessors([]Node{
 		NewKey("key1", NewStrVal("value1")),
 		NewKey("key2", NewStrVal("value2")),
-	}, processers), res)
+	}, processers, parsersers), res)
 
 	res, err = vars.Replace("${kubernetes_secrets.test_namespace.testing_secret.secret_value}")
 	require.NoError(t, err)

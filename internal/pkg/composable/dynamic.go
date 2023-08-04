@@ -22,7 +22,7 @@ type DynamicProviderComm interface {
 	// `priority` ensures that order is maintained when adding the mapping to the current state
 	// for the processor. Lower priority mappings will always be sorted before higher priority mappings
 	// to ensure that matching of variables occurs on the lower priority mappings first.
-	AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}) error
+	AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}, parsers []map[string]interface{}) error
 	// Remove removes a mapping by given ID.
 	Remove(id string)
 }

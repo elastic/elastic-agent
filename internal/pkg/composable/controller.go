@@ -222,7 +222,7 @@ func (c *controller) Run(ctx context.Context) error {
 				local[name] = mappings.mapping
 				id := fmt.Sprintf("%s-%s", name, mappings.id)
 				// this is ensured not to error, by how the mappings states are verified
-				v, _ := transpiler.NewVarsWithProcessors(id, local, name, mappings.processors, fetchContextProviders)
+				v, _ := transpiler.NewVarsWithProcessors(id, local, name, mappings.processors, mappings.parsers, fetchContextProviders)
 				vars = append(vars, v)
 			}
 		}
@@ -339,6 +339,7 @@ type dynamicProviderMapping struct {
 	priority   int
 	mapping    map[string]interface{}
 	processors transpiler.Processors
+	parsers    transpiler.Parsers
 }
 
 type dynamicProviderState struct {
@@ -355,7 +356,7 @@ type dynamicProviderState struct {
 // `priority` ensures that order is maintained when adding the mapping to the current state
 // for the processor. Lower priority mappings will always be sorted before higher priority mappings
 // to ensure that matching of variables occurs on the lower priority mappings first.
-func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}) error {
+func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}, parsers []map[string]interface{}) error {
 	var err error
 	mapping, err = cloneMap(mapping)
 	if err != nil {
@@ -365,6 +366,12 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 	if err != nil {
 		return err
 	}
+
+	parsers, err = cloneMapArray(parsers)
+	if err != nil {
+		return err
+	}
+
 	// ensure creating vars will not error
 	_, err = transpiler.NewVars("", mapping, nil)
 	if err != nil {
@@ -383,6 +390,7 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 		priority:   priority,
 		mapping:    mapping,
 		processors: processors,
+		parsers:    parsers,
 	}
 
 	select {

@@ -377,11 +377,12 @@ type MockDynamicComm struct {
 }
 
 // AddOrUpdate adds or updates a current mapping.
-func (t *MockDynamicComm) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}) error {
+func (t *MockDynamicComm) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}, parsers []map[string]interface{}) error {
 	t.providerDataChan <- providerData{
 		id,
 		mapping,
 		processors,
+		parsers,
 	}
 	return nil
 }

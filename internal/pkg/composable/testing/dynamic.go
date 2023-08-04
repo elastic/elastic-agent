@@ -14,6 +14,7 @@ type DynamicState struct {
 	Priority   int
 	Mapping    map[string]interface{}
 	Processors []map[string]interface{}
+	Parsers    []map[string]interface{}
 }
 
 // DynamicComm is used in tests for DynamicProviderComm.
@@ -35,13 +36,18 @@ func NewDynamicComm(ctx context.Context) *DynamicComm {
 }
 
 // AddOrUpdate adds or updates a current mapping.
-func (t *DynamicComm) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}) error {
+func (t *DynamicComm) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}, parsers []map[string]interface{}) error {
 	var err error
 	mapping, err = CloneMap(mapping)
 	if err != nil {
 		return err
 	}
 	processors, err = CloneMapArray(processors)
+	if err != nil {
+		return err
+	}
+
+	parsers, err = CloneMapArray(parsers)
 	if err != nil {
 		return err
 	}
@@ -57,6 +63,7 @@ func (t *DynamicComm) AddOrUpdate(id string, priority int, mapping map[string]in
 		Priority:   priority,
 		Mapping:    mapping,
 		Processors: processors,
+		Parsers:    parsers,
 	}
 	return nil
 }

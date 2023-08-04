@@ -35,6 +35,7 @@ type nodeData struct {
 	node       *kubernetes.Node
 	mapping    map[string]interface{}
 	processors []map[string]interface{}
+	parsers    []map[string]interface{}
 }
 
 // NewNodeEventer creates an eventer that can discover and process node objects
@@ -81,7 +82,7 @@ func (n *node) emitRunning(node *kubernetes.Node) {
 	data.mapping["scope"] = n.scope
 
 	// Emit the node
-	_ = n.comm.AddOrUpdate(string(node.GetUID()), NodePriority, data.mapping, data.processors)
+	_ = n.comm.AddOrUpdate(string(node.GetUID()), NodePriority, data.mapping, data.processors, data.parsers)
 }
 
 func (n *node) emitStopped(node *kubernetes.Node) {
@@ -227,6 +228,7 @@ func generateNodeData(node *kubernetes.Node, kubeMetaGen metadata.MetaGen) *node
 	k8sMapping["annotations"] = annotations
 
 	processors := []map[string]interface{}{}
+	parsers := []map[string]interface{}{}
 	// meta map includes metadata that go under kubernetes.*
 	// but also other ECS fields like orchestrator.*
 	for field, metaMap := range meta {
@@ -242,5 +244,6 @@ func generateNodeData(node *kubernetes.Node, kubeMetaGen metadata.MetaGen) *node
 		node:       node,
 		mapping:    k8sMapping,
 		processors: processors,
+		parsers:    parsers,
 	}
 }

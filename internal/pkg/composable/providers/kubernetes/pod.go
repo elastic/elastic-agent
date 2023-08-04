@@ -26,6 +26,7 @@ import (
 
 const (
 	processorhints = "hints/processors"
+	parserhints    = "hints/parsers"
 )
 
 type pod struct {
@@ -52,12 +53,14 @@ type providerData struct {
 	uid        string
 	mapping    map[string]interface{}
 	processors []map[string]interface{}
+	parsers    []map[string]interface{}
 }
 
 // Will hold the generated mapping data needed for hints based autodsicovery
 type mappingsData struct {
 	hints      mapstr.M
 	processors []mapstr.M
+	parsers    []mapstr.M
 }
 
 // NewPodEventer creates an eventer that can discover and process pod objects
@@ -226,6 +229,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 						PodPriority,
 						map[string]interface{}{"hints": hintsMapping},
 						data.processors,
+						data.parsers,
 					)
 				}
 			}
@@ -235,7 +239,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 		// Emit the pod
 		// We emit Pod + containers to ensure that configs matching Pod only
 		// get Pod metadata (not specific to any container)
-		_ = p.comm.AddOrUpdate(data.uid, PodPriority, data.mapping, data.processors)
+		_ = p.comm.AddOrUpdate(data.uid, PodPriority, data.mapping, data.processors, data.parsers)
 	}
 
 	// Emit all containers in the pod
@@ -332,6 +336,8 @@ func generatePodData(
 	k8sMapping["labels"] = labels
 
 	processors := []map[string]interface{}{}
+	parsers := []map[string]interface{}{}
+
 	// meta map includes metadata that go under kubernetes.*
 	// but also other ECS fields like orchestrator.*
 	for field, metaMap := range meta {
@@ -348,6 +354,7 @@ func generatePodData(
 		uid:        string(pod.GetUID()),
 		mapping:    k8sMapping,
 		processors: processors,
+		parsers:    parsers,
 	}
 }
 
@@ -411,6 +418,8 @@ func generateContainerData(
 			},
 		}
 
+		//Initialise maps of Parsers and Processors that will be updated by emmition of data
+		parsers := []map[string]interface{}{}
 		processors := []map[string]interface{}{
 			{
 				"add_fields": map[string]interface{}{
@@ -451,32 +460,37 @@ func generateContainerData(
 					if !managed {
 						mappingData := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
 						if len(mappingData.hints) > 0 {
+							//mappingData.processors will hold any additional processors identfied from annotations and we need to update the processors map
 							if len(mappingData.processors) > 0 {
 								processors = updateProcessors(mappingData.processors, processors)
 							}
+
+							if len(mappingData.parsers) > 0 {
+								parsers = updateParsers(mappingData.parsers, parsers)
+							}
+
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
 								map[string]interface{}{"hints": mappingData.hints},
 								processors,
+								parsers,
 							)
 						} else if config.Hints.DefaultContainerLogs {
 							// in case of no package detected in the hints fallback to the generic log collection
 							_, _ = mappingData.hints.Put("container_logs.enabled", true)
 							_, _ = mappingData.hints.Put("container_id", c.ID)
-							if len(mappingData.processors) > 0 {
-								processors = updateProcessors(mappingData.processors, processors)
-							}
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
 								map[string]interface{}{"hints": mappingData.hints},
 								processors,
+								parsers,
 							)
 						}
 					}
 				} else { // This is the "template-based autodiscovery" flow
-					_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+					_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors, parsers)
 				}
 			}
 		} else {
@@ -485,32 +499,36 @@ func generateContainerData(
 				if !managed {
 					mappingData := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
 					if len(mappingData.hints) > 0 {
+						//mappingData.processors will hold any additional processors identfied from annotations and we need to update the processors map
 						if len(mappingData.processors) > 0 {
 							processors = updateProcessors(mappingData.processors, processors)
+						}
+
+						if len(mappingData.parsers) > 0 {
+							parsers = updateParsers(mappingData.parsers, parsers)
 						}
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
 							map[string]interface{}{"hints": mappingData.hints},
 							processors,
+							parsers,
 						)
 					} else if config.Hints.DefaultContainerLogs {
 						// in case of no package detected in the hints fallback to the generic log collection
 						_, _ = mappingData.hints.Put("container_logs.enabled", true)
 						_, _ = mappingData.hints.Put("container_id", c.ID)
-						if len(mappingData.processors) > 0 {
-							processors = updateProcessors(mappingData.processors, processors)
-						}
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
 							map[string]interface{}{"hints": mappingData.hints},
 							processors,
+							parsers,
 						)
 					}
 				}
 			} else { // This is the "template-based autodiscovery" flow
-				_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+				_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors, parsers)
 			}
 		}
 	}
@@ -521,6 +539,7 @@ func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 	mappingData := mappingsData{
 		hints:      mapstr.M{},
 		processors: []mapstr.M{},
+		parsers:    []mapstr.M{},
 	}
 
 	if ann, ok := k8sMapping["annotations"]; ok {
@@ -533,6 +552,9 @@ func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 
 			mappingData.processors = utils.GetConfigs(annotations, prefix, processorhints)
 			logger.Debugf("Generated Processors are :%v", mappingData.processors)
+
+			mappingData.parsers = utils.GetConfigs(annotations, prefix, parserhints)
+			logger.Debugf("Generated Processors are :%v", mappingData.parsers)
 		}
 
 	}
@@ -546,4 +568,13 @@ func updateProcessors(newprocessors []mapstr.M, processors []map[string]interfac
 	}
 
 	return processors
+}
+
+// Updates parsers map with any additional processors identfied from annotations
+func updateParsers(newparsers []mapstr.M, parsers []map[string]interface{}) []map[string]interface{} {
+	for _, processor := range newparsers {
+		parsers = append(parsers, processor)
+	}
+
+	return parsers
 }

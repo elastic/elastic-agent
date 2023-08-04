@@ -25,21 +25,22 @@ type Vars struct {
 	tree                  *AST
 	processorsKey         string
 	processors            Processors
+	parsers               Parsers
 	fetchContextProviders mapstr.M
 }
 
 // NewVars returns a new instance of vars.
 func NewVars(id string, mapping map[string]interface{}, fetchContextProviders mapstr.M) (*Vars, error) {
-	return NewVarsWithProcessors(id, mapping, "", nil, fetchContextProviders)
+	return NewVarsWithProcessors(id, mapping, "", nil, nil, fetchContextProviders)
 }
 
 // NewVarsWithProcessors returns a new instance of vars with attachment of processors.
-func NewVarsWithProcessors(id string, mapping map[string]interface{}, processorKey string, processors Processors, fetchContextProviders mapstr.M) (*Vars, error) {
+func NewVarsWithProcessors(id string, mapping map[string]interface{}, processorKey string, processors Processors, parsers Parsers, fetchContextProviders mapstr.M) (*Vars, error) {
 	tree, err := NewAST(mapping)
 	if err != nil {
 		return nil, err
 	}
-	return &Vars{id, tree, processorKey, processors, fetchContextProviders}, nil
+	return &Vars{id, tree, processorKey, processors, parsers, fetchContextProviders}, nil
 }
 
 // Replace returns a new value based on variable replacement.
@@ -89,7 +90,7 @@ func (v *Vars) Replace(value string) (Node, error) {
 			lastIndex = r[1]
 		}
 	}
-	return NewStrValWithProcessors(result+value[lastIndex:], processors), nil
+	return NewStrValWithProcessors(result+value[lastIndex:], processors, nil), nil
 }
 
 // ID returns the unique ID for the vars.
