@@ -480,6 +480,13 @@ func generateContainerData(
 							// in case of no package detected in the hints fallback to the generic log collection
 							_, _ = mappingData.hints.Put("container_logs.enabled", true)
 							_, _ = mappingData.hints.Put("container_id", c.ID)
+							if len(mappingData.processors) > 0 {
+								processors = updateProcessors(mappingData.processors, processors)
+							}
+
+							if len(mappingData.parsers) > 0 {
+								parsers = updateParsers(mappingData.parsers, parsers)
+							}
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
@@ -518,6 +525,13 @@ func generateContainerData(
 						// in case of no package detected in the hints fallback to the generic log collection
 						_, _ = mappingData.hints.Put("container_logs.enabled", true)
 						_, _ = mappingData.hints.Put("container_id", c.ID)
+						if len(mappingData.processors) > 0 {
+							processors = updateProcessors(mappingData.processors, processors)
+						}
+
+						if len(mappingData.parsers) > 0 {
+							parsers = updateParsers(mappingData.parsers, parsers)
+						}
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
@@ -554,7 +568,7 @@ func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 			logger.Debugf("Generated Processors are :%v", mappingData.processors)
 
 			mappingData.parsers = utils.GetConfigs(annotations, prefix, parserhints)
-			logger.Debugf("Generated Processors are :%v", mappingData.parsers)
+			logger.Debugf("Generated Parsers are :%v", mappingData.parsers)
 		}
 
 	}
@@ -572,8 +586,8 @@ func updateProcessors(newprocessors []mapstr.M, processors []map[string]interfac
 
 // Updates parsers map with any additional processors identfied from annotations
 func updateParsers(newparsers []mapstr.M, parsers []map[string]interface{}) []map[string]interface{} {
-	for _, processor := range newparsers {
-		parsers = append(parsers, processor)
+	for _, parser := range newparsers {
+		parsers = append(parsers, parser)
 	}
 
 	return parsers
