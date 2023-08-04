@@ -7,6 +7,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -21,7 +22,7 @@ import (
 type DebianRunner struct{}
 
 // Prepare the test
-func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPaths []string) error {
+func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger Logger, arch string, goVersion string) error {
 	// prepare build-essential and unzip
 	//
 	// apt-get update and install are so terrible that we have to place this in a loop, because in some cases the
@@ -84,19 +85,26 @@ func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger L
 		return fmt.Errorf("failed to symlink /usr/local/go/bin/gofmt to /usr/bin/gofmt: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
+	return nil
+}
+
+// Copy places the required files on the host.
+func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logger, repoArchive string, build Build) error {
 	// copy the archive and extract it on the host
 	logger.Logf("Copying repo")
 	destRepoName := filepath.Base(repoArchive)
-	err = sshSCP(sshClient, repoArchive, destRepoName)
+	err := sshSCP(sshClient, repoArchive, destRepoName)
 	if err != nil {
 		return fmt.Errorf("failed to SCP repo archive %s: %w", repoArchive, err)
 	}
-	stdOut, errOut, err = sshRunCommand(ctx, sshClient, "unzip", []string{destRepoName, "-d", "agent"}, nil)
+	// ensure that agent directory is removed (possible it already exists if instance already used)
+	_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-rf", "agent"}, nil)
+	stdOut, errOut, err := sshRunCommand(ctx, sshClient, "unzip", []string{destRepoName, "-d", "agent"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to unzip %s to agent directory: %w (stdout: %s, stderr: %s)", destRepoName, err, stdOut, errOut)
 	}
 
-	// install mage and prepare for testing
+	// prepare for testing
 	logger.Logf("Running make mage and prepareOnRemote")
 	envs := `GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH"`
 	installMage := strings.NewReader(fmt.Sprintf(`cd agent && %s make mage && %s mage integration:prepareOnRemote`, envs, envs))
@@ -105,21 +113,46 @@ func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger L
 		return fmt.Errorf("failed to to perform make mage and prepareOnRemote: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
-	// place the build for the agent on the host
-	for _, buildPath := range buildPaths {
-		logger.Logf("Copying agent build %s", filepath.Base(buildPath))
-		err = sshSCP(sshClient, buildPath, filepath.Base(buildPath))
-		if err != nil {
-			return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
+	// determine if the build needs to be replaced on the host
+	// if it already exists and the SHA512 are the same contents, then
+	// there is no reason to waste time uploading the build
+	copyBuild := true
+	localSHA512, err := os.ReadFile(build.SHA512Path)
+	if err != nil {
+		return fmt.Errorf("failed to read local SHA52 contents %s: %w", build.SHA512Path, err)
+	}
+	hostSHA512Path := filepath.Base(build.SHA512Path)
+	hostSHA512, err := sshGetFileContents(ctx, sshClient, hostSHA512Path)
+	if err == nil {
+		if string(localSHA512) == string(hostSHA512) {
+			logger.Logf("Skipping copy agent build %s; already the same", filepath.Base(build.Path))
+			copyBuild = false
+		}
+	}
+
+	if copyBuild {
+		// ensure the existing copies are removed first
+		_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-f", filepath.Base(build.Path)}, nil)
+		_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-f", filepath.Base(build.SHA512Path)}, nil)
+
+		logger.Logf("Copying agent build %s", filepath.Base(build.Path))
+	}
+
+	for _, buildPath := range []string{build.Path, build.SHA512Path} {
+		if copyBuild {
+			err = sshSCP(sshClient, buildPath, filepath.Base(buildPath))
+			if err != nil {
+				return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
+			}
 		}
 		insideAgentDir := filepath.Join("agent", buildPath)
 		stdOut, errOut, err = sshRunCommand(ctx, sshClient, "mkdir", []string{"-p", filepath.Dir(insideAgentDir)}, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create %s directory: %w (stdout: %s, stderr: %s)", filepath.Dir(insideAgentDir), err, stdOut, errOut)
 		}
-		stdOut, errOut, err = sshRunCommand(ctx, sshClient, "mv", []string{filepath.Base(buildPath), insideAgentDir}, nil)
+		stdOut, errOut, err = sshRunCommand(ctx, sshClient, "ln", []string{filepath.Base(buildPath), insideAgentDir}, nil)
 		if err != nil {
-			return fmt.Errorf("failed to move %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
+			return fmt.Errorf("failed to hard link %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
 		}
 	}
 
@@ -172,6 +205,43 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient *ssh.Client
 	}
 
 	return result, nil
+}
+
+// Diagnostics gathers any diagnostics from the host.
+func (DebianRunner) Diagnostics(ctx context.Context, c *ssh.Client, logger Logger, destination string) error {
+	// take ownership, as sudo tests will create with root permissions (allow to fail in the case it doesn't exist)
+	diagnosticDir := "$HOME/agent/build/diagnostics"
+	_, _, _ = sshRunCommand(ctx, c, "sudo", []string{"chown", "-R", "$USER:$USER", diagnosticDir}, nil)
+	stdOut, _, err := sshRunCommand(ctx, c, "ls", []string{"-1", diagnosticDir}, nil)
+	if err != nil {
+		//nolint:nilerr // failed to list the directory, probably don't have any diagnostics (do nothing)
+		return nil
+	}
+	eachDiagnostic := strings.Split(string(stdOut), "\n")
+	for _, filename := range eachDiagnostic {
+		filename = strings.TrimSpace(filename)
+		if filename == "" {
+			continue
+		}
+
+		// don't use filepath.Join as we need this to work in Windows as well
+		// this is because if we use `filepath.Join` on a Windows host connected to a Linux host
+		// it will use a `\` and that will be incorrect for Linux
+		fp := fmt.Sprintf("%s/%s", diagnosticDir, filename)
+		// use filepath.Join on this path because it's a path on this specific host platform
+		dp := filepath.Join(destination, filename)
+		logger.Logf("Copying diagnostic %s", filename)
+		out, err := os.Create(dp)
+		if err != nil {
+			return fmt.Errorf("failed to create file %s: %w", dp, err)
+		}
+		err = sshGetFileContentsOutput(ctx, c, fp, out)
+		_ = out.Close()
+		if err != nil {
+			return fmt.Errorf("failed to copy file from remote host to %s: %w", dp, err)
+		}
+	}
+	return nil
 }
 
 func runTests(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient *ssh.Client, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {

@@ -41,6 +41,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	bversion "github.com/elastic/elastic-agent/version"
 
@@ -917,9 +918,10 @@ func packageAgent(platforms []string, packagingFn func()) {
 		defer os.Unsetenv(agentDropPath)
 
 		if devtools.ExternalBuild == true {
+			// for external go for all dependencies
 			externalBinaries := []string{
 				"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat",
-				// "cloudbeat", // TODO: add once working
+				"cloudbeat", // only supporting linux/amd64 or linux/arm64
 				"cloud-defend",
 				"elastic-agent-shipper",
 				"apm-server",
@@ -1436,12 +1438,13 @@ func majorMinor() string {
 func (Integration) Clean() error {
 	_ = os.RemoveAll(".agent-testing")
 
-	// Clean out .ogc-cache always
+	// Clean out .integration-cache/.ogc-cache always
+	defer os.RemoveAll(".integration-cache")
 	defer os.RemoveAll(".ogc-cache")
 
-	_, err := os.Stat(".ogc-cache")
+	_, err := os.Stat(".integration-cache")
 	if err == nil {
-		// .ogc-cache exists; need to run `Clean` from the runner
+		// .integration-cache exists; need to run `Clean` from the runner
 		r, err := createTestRunner(false, "", "")
 		if err != nil {
 			return fmt.Errorf("error creating test runner: %w", err)
@@ -1511,19 +1514,16 @@ func (Integration) Auth(ctx context.Context) error {
 
 // Test runs integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
-	mg.CtxDeps(ctx, Integration.Clean)
 	return integRunner(ctx, false, "")
 }
 
 // Matrix runs integration tests on a matrix of all supported remote hosts
 func (Integration) Matrix(ctx context.Context) error {
-	mg.CtxDeps(ctx, Integration.Clean)
 	return integRunner(ctx, true, "")
 }
 
 // Single runs single integration test on remote host
 func (Integration) Single(ctx context.Context, testName string) error {
-	mg.CtxDeps(ctx, Integration.Clean)
 	return integRunner(ctx, false, testName)
 }
 
@@ -1606,34 +1606,49 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 }
 
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
+	for {
+		failedCount, err := integRunnerOnce(ctx, matrix, singleTest)
+		if err != nil {
+			return err
+		}
+		if failedCount > 0 {
+			os.Exit(1)
+		}
+		if !hasRunUntilFailure() {
+			return nil
+		}
+	}
+}
+
+func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, error) {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 
 	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
 	if err != nil {
-		return fmt.Errorf("failed to determine batches: %w", err)
+		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
 	r, err := createTestRunner(matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
-		return fmt.Errorf("error creating test runner: %w", err)
+		return 0, fmt.Errorf("error creating test runner: %w", err)
 	}
 	results, err := r.Run(ctx)
 	if err != nil {
-		return fmt.Errorf("error running test: %w", err)
+		return 0, fmt.Errorf("error running test: %w", err)
 	}
 	_ = os.Remove("build/TEST-go-integration.out")
 	_ = os.Remove("build/TEST-go-integration.out.json")
 	_ = os.Remove("build/TEST-go-integration.xml")
 	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out file: %w", err)
+		return 0, fmt.Errorf("error writing test out file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.out.json", results.JSONOutput, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out json file: %w", err)
+		return 0, fmt.Errorf("error writing test out json file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out xml file: %w", err)
+		return 0, fmt.Errorf("error writing test out xml file: %w", err)
 	}
 	if results.Failures > 0 {
 		r.Logger().Logf("Testing completed (%d failures, %d successful)", results.Failures, results.Tests-results.Failures)
@@ -1643,10 +1658,8 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	r.Logger().Logf("Console output written here: build/TEST-go-integration.out")
 	r.Logger().Logf("Console JSON output written here: build/TEST-go-integration.out.json")
 	r.Logger().Logf("JUnit XML written here: build/TEST-go-integration.xml")
-	if results.Failures > 0 {
-		os.Exit(1)
-	}
-	return nil
+	r.Logger().Logf("Diagnostic output (if present) here: build/diagnostics")
+	return results.Failures, nil
 }
 
 func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
@@ -1701,26 +1714,55 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		essRegion = "gcp-us-central1"
 	}
 	timestamp := timestampEnabled()
-	r, err := runner.NewRunner(runner.Config{
+
+	extraEnv := map[string]string{}
+	if os.Getenv("AGENT_COLLECT_DIAG") != "" {
+		extraEnv["AGENT_COLLECT_DIAG"] = os.Getenv("AGENT_COLLECT_DIAG")
+	}
+	if os.Getenv("AGENT_KEEP_INSTALLED") != "" {
+		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
+	}
+
+	diagDir := filepath.Join("build", "diagnostics")
+	_ = os.MkdirAll(diagDir, 0755)
+
+	cfg := runner.Config{
 		AgentVersion:      agentVersion,
 		AgentStackVersion: agentStackVersion,
 		BuildDir:          agentBuildDir,
 		GOVersion:         goVersion,
 		RepoDir:           ".",
-		ESS: &runner.ESSConfig{
-			APIKey: essToken,
-			Region: essRegion,
-		},
-		GCE: &runner.GCEConfig{
-			ServiceTokenPath: serviceTokenPath,
-			Datacenter:       datacenter,
-		},
-		Matrix:      matrix,
-		SingleTest:  singleTest,
-		VerboseMode: mg.Verbose(),
-		Timestamp:   timestamp,
-		TestFlags:   goTestFlags,
-	}, batches...)
+		DiagnosticsDir:    diagDir,
+		Platforms:         testPlatforms(),
+		Matrix:            matrix,
+		SingleTest:        singleTest,
+		VerboseMode:       mg.Verbose(),
+		Timestamp:         timestamp,
+		TestFlags:         goTestFlags,
+		ExtraEnv:          extraEnv,
+	}
+	ogcCfg := ogc.Config{
+		ServiceTokenPath: serviceTokenPath,
+		Datacenter:       datacenter,
+	}
+	ogcProvisioner, err := ogc.NewProvisioner(ogcCfg)
+	if err != nil {
+		return nil, err
+	}
+	email, err := ogcCfg.ClientEmail()
+	if err != nil {
+		return nil, err
+	}
+	essProvisioner, err := ess.NewProvisioner(ess.ProvisionerConfig{
+		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
+		APIKey:     essToken,
+		Region:     essRegion,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := runner.NewRunner(cfg, ogcProvisioner, essProvisioner, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}
@@ -1746,6 +1788,20 @@ func timestampEnabled() bool {
 	}
 	b, _ := strconv.ParseBool(timestamp)
 	return b
+}
+
+func testPlatforms() []string {
+	platformsStr := os.Getenv("TEST_PLATFORMS")
+	if platformsStr == "" {
+		return nil
+	}
+	var platforms []string
+	for _, p := range strings.Split(platformsStr, " ") {
+		if p != "" {
+			platforms = append(platforms, p)
+		}
+	}
+	return platforms
 }
 
 // Pre-requisite: user must have the gcloud CLI installed
@@ -2054,5 +2110,11 @@ func hasSnapshotEnv() bool {
 		return false
 	}
 	b, _ := strconv.ParseBool(snapshot)
+	return b
+}
+
+func hasRunUntilFailure() bool {
+	runUntil := os.Getenv("TEST_RUN_UNTIL_FAILURE")
+	b, _ := strconv.ParseBool(runUntil)
 	return b
 }

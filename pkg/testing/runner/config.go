@@ -5,10 +5,11 @@
 package runner
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"strings"
+
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 // Config provides the configuration for running the runner.
@@ -18,8 +19,12 @@ type Config struct {
 	BuildDir          string
 	GOVersion         string
 	RepoDir           string
-	ESS               *ESSConfig
-	GCE               *GCEConfig
+	DiagnosticsDir    string
+
+	// Platforms filters the tests to only run on the provided list
+	// of platforms even if the tests supports more than what is
+	// defined in this list.
+	Platforms []string
 
 	// Matrix enables matrix testing. This explodes each test to
 	// run on all supported platforms the runner supports.
@@ -36,6 +41,9 @@ type Config struct {
 
 	// Testflags contains extra go test flags to be set when running tests
 	TestFlags string
+
+	// ExtraEnv contains extra environment flags to pass to the runner.
+	ExtraEnv map[string]string
 }
 
 // Validate returns an error if the information is invalid.
@@ -55,115 +63,53 @@ func (c *Config) Validate() error {
 	if c.RepoDir == "" {
 		return errors.New("field RepoDir must be set")
 	}
-	if c.ESS == nil {
-		// in the future we could adjust to work on different providers
-		// making this selectable (at the moment we just do ESS)
-		return errors.New("config requires ESS to be set")
-	}
-	err := c.ESS.Validate()
-	if err != nil {
-		return fmt.Errorf("error validating ESS: %w", err)
-	}
-	if c.GCE == nil {
-		// in the future we could adjust to work on different providers
-		// making this selectable (at the moment we just do GCE)
-		return errors.New("config requires GCE to be set")
-	}
-	err = c.GCE.Validate()
-	if err != nil {
-		return fmt.Errorf("error validating GCE: %w", err)
-	}
-	return err
-}
-
-// ESSConfig is the configuration for communicating with ESS.
-type ESSConfig struct {
-	APIKey string
-	Region string
-}
-
-// Validate returns an error if the information is invalid.
-func (ess *ESSConfig) Validate() error {
-	if ess.APIKey == "" {
-		return errors.New("field APIKey must be set")
-	}
-	if ess.Region == "" {
-		return errors.New("field Region must be set")
-	}
-	return nil
-}
-
-// GCEConfig is the configuration for communicating with Google Compute Engine.
-type GCEConfig struct {
-	ServiceTokenPath string
-	Datacenter       string
-
-	content *serviceTokenContent
-}
-
-// Validate returns an error if the information is invalid.
-func (gce *GCEConfig) Validate() error {
-	if gce.ServiceTokenPath == "" {
-		return errors.New("field ServiceTokenPath must be set")
-	}
-	if gce.Datacenter == "" {
-		return errors.New("field Datacenter must be set")
-	}
-	return gce.ensureParsed()
-}
-
-// ProjectID returns the project ID from the service token.
-func (gce *GCEConfig) ProjectID() (string, error) {
-	err := gce.ensureParsed()
-	if err != nil {
-		return "", err
-	}
-	return gce.content.ProjectID, nil
-}
-
-// ClientEmail returns the client email from the service token.
-func (gce *GCEConfig) ClientEmail() (string, error) {
-	err := gce.ensureParsed()
-	if err != nil {
-		return "", err
-	}
-	return gce.content.ClientEmail, nil
-}
-
-func (gce *GCEConfig) ensureParsed() error {
-	if gce.content != nil {
-		// already parsed
-		return nil
-	}
-	c, err := gce.parse()
+	_, err := c.GetPlatforms()
 	if err != nil {
 		return err
 	}
-	gce.content = c
 	return nil
 }
 
-func (gce *GCEConfig) parse() (*serviceTokenContent, error) {
-	var content serviceTokenContent
-	raw, err := os.ReadFile(gce.ServiceTokenPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read contents of %s: %w", gce.ServiceTokenPath, err)
+// GetPlatforms returns the defined platforms for the configuration.
+func (c *Config) GetPlatforms() ([]define.OS, error) {
+	var each []define.OS
+	for _, platform := range c.Platforms {
+		o, err := parsePlatform(platform)
+		if err != nil {
+			return nil, err
+		}
+		each = append(each, o)
 	}
-	err = json.Unmarshal(raw, &content)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON contents of %s: %w", gce.ServiceTokenPath, err)
-	}
-	if content.Type != "service_account" {
-		return nil, fmt.Errorf("not a service account token at %s; type != service_account", gce.ServiceTokenPath)
-	}
-	return &content, nil
+	return each, nil
 }
 
-// serviceTokenContent is parsed content from a service token file.
-type serviceTokenContent struct {
-	Type        string `json:"type"`
-	ProjectID   string `json:"project_id"`
-	ClientEmail string `json:"client_email"`
-
-	// more fields exists but we only need the provided information
+func parsePlatform(platform string) (define.OS, error) {
+	separated := strings.Split(platform, "/")
+	var os define.OS
+	switch len(separated) {
+	case 0:
+		return define.OS{}, fmt.Errorf("failed to parse platform string %q: empty string", platform)
+	case 1:
+		os = define.OS{Type: separated[0]}
+	case 2:
+		os = define.OS{Type: separated[0], Arch: separated[1]}
+	case 3:
+		if separated[0] == define.Linux {
+			os = define.OS{Type: separated[0], Arch: separated[1], Distro: separated[2]}
+		} else {
+			os = define.OS{Type: separated[0], Arch: separated[1], Version: separated[2]}
+		}
+	case 4:
+		if separated[0] == define.Linux {
+			os = define.OS{Type: separated[0], Arch: separated[1], Distro: separated[2], Version: separated[3]}
+		} else {
+			return define.OS{}, fmt.Errorf("failed to parse platform string %q: more than 2 separators", platform)
+		}
+	default:
+		return define.OS{}, fmt.Errorf("failed to parse platform string %q: more than 3 separators", platform)
+	}
+	if err := os.Validate(); err != nil {
+		return define.OS{}, fmt.Errorf("failed to parse platform string %q: %w", platform, err)
+	}
+	return os, nil
 }

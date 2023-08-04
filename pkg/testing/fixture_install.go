@@ -11,7 +11,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -106,19 +108,43 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
-		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true})
-		f.setClient(nil)
-		if err != nil &&
-			(errors.Is(err, ErrNotInstalled) ||
-				strings.Contains(
-					err.Error(),
-					"elastic-agent: no such file or directory")) {
-			// Agent fixture has already been uninstalled, perhaps by
-			// an explicit call to fixture.Uninstall, so nothing needs
-			// to be done here.
+		if !f.installed {
+			// not installed; no need to clean up or collect diagnostics
 			return
 		}
-		require.NoErrorf(f.t, err, "uninstalling agent failed. Output: %q", out)
+
+		// diagnostics is collected when either the environment variable
+		// AGENT_KEEP_INSTALLED=true or the test is marked failed
+		collect := collectDiag()
+		failed := f.t.Failed()
+		if collect || failed {
+			if collect {
+				f.t.Logf("collecting diagnostics; AGENT_COLLECT_DIAG=true")
+			} else if failed {
+				f.t.Logf("collecting diagnostics; test failed")
+			}
+			f.collectDiagnostics()
+		}
+
+		// environment variable AGENT_KEEP_INSTALLED=true will skip the uninstall
+		// useful to debug the issue with the Elastic Agent
+		if keepInstalled() {
+			f.t.Logf("skipping uninstall; AGENT_KEEP_INSTALLED=true")
+		} else {
+			out, err := f.Uninstall(ctx, &UninstallOpts{Force: true})
+			f.setClient(nil)
+			if err != nil &&
+				(errors.Is(err, ErrNotInstalled) ||
+					strings.Contains(
+						err.Error(),
+						"elastic-agent: no such file or directory")) {
+				// Agent fixture has already been uninstalled, perhaps by
+				// an explicit call to fixture.Uninstall, so nothing needs
+				// to be done here.
+				return
+			}
+			require.NoErrorf(f.t, err, "uninstalling agent failed. Output: %q", out)
+		}
 	})
 
 	return out, nil
@@ -173,4 +199,39 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	}
 
 	return out, nil
+}
+
+func (f *Fixture) collectDiagnostics() {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	dir, err := findProjectRoot(f.caller)
+	if err != nil {
+		f.t.Logf("failed to collect diagnostics; failed to find project root: %s", err)
+		return
+	}
+	diagPath := filepath.Join(dir, "build", "diagnostics")
+	err = os.MkdirAll(diagPath, 0755)
+	if err != nil {
+		f.t.Logf("failed to collect diagnostics; failed to create %s: %s", diagPath, err)
+		return
+	}
+	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", f.t.Name(), time.Now().Format(time.RFC3339)))
+
+	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
+	if err != nil {
+		f.t.Logf("failed to collect diagnostics to %s (%s): %s", outputPath, err, output)
+	}
+}
+
+func collectDiag() bool {
+	// failure reports false (ignore error)
+	v, _ := strconv.ParseBool(os.Getenv("AGENT_COLLECT_DIAG"))
+	return v
+}
+
+func keepInstalled() bool {
+	// failure reports false (ignore error)
+	v, _ := strconv.ParseBool(os.Getenv("AGENT_KEEP_INSTALLED"))
+	return v
 }

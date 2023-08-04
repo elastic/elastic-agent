@@ -49,19 +49,23 @@ pass `[testName]` to `go test` as `--run=[testName]`.
 
 - `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
-### Manually running the tests
+#### Selecting specific platform
 
-If you want to run the tests manually, skipping the test runner, set the
-`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
-with `go test`. E.g.:
+By default, the runner will deploy to every combination of operating system and architecture that the tests define
+as supporting. When working on tests and debugging an issue it's better to limit the operating system and architecture
+to a specific one. This can be done inside a test but requires the test code to be modified. An easier way is available
+using the `TEST_PLATFORMS="linux/amd64"` environment variable. This variable can take multiple definitions with a space
+between, and it can be very specific or not very specific.
 
-```shell
-TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
-```
+- `TEST_PLATFORMS="linux" mage integration:test` to execute tests only on Linux using both AMD64 and ARM64.
+- `TEST_PLATFORMS="linux/amd64" mage integration:test` to execute tests only on Linux AMD64.
+- `TEST_PLATFORMS="linux/arm64/ubuntu mage integration:test` to execute tests only on Ubuntu ARM64.
+- `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
+- `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
+- `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
 
-Tests with external dependencies might need more environment variables to be set
-when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
-`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
+> **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
+> the test defines as supporting it.
 
 #### Passing additional go test flags
 
@@ -98,6 +102,54 @@ We pass a `-test.run` flag along with the names of the tests we want to run in O
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
 is split on space, so not all combination of flags and their values may be correctly split.
+
+### Cleaning up resources
+
+The test run will keep provisioned resources (instances and stacks) around after the tests have been ran. This allows
+following `mage integration:*` commands to re-use the already provisioned resources.
+
+- `mage integration:clean` will de-provision the allocated resources and cleanup any local state.
+
+Tests with external dependencies might need more environment variables to be set
+when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
+`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
+
+### Debugging tests
+
+#### Auto diagnostics retrieval
+When an integration test fails the testing fixture will try its best to automatically collect the diagnostic
+information of the installed Elastic Agent. In the case that diagnostics is collected the test runner will
+automatically transfer any collected diagnostics from the instance back to the running host. The results of the
+diagnostic collection are placed in `build/diagnostics`.
+
+#### Gather diagnostics manually
+In the case that you want to run the integration testing suite and have it gather the diagnostics at the end of
+every tests you can use the environment variable `AGENT_COLLECT_DIAG=true`. When that environment variable is defined
+it will cause the testing fixture to always collect diagnostics before the uninstall in the cleanup step of a test.
+
+#### Keeping Elastic Agent installed
+When the testing fixture installs the Elastic Agent it will automatically uninstall the Elastic Agent during the
+cleanup process of the test. In the case that you do not want that to happen you can disable the auto-uninstallation
+using `AGENT_KEEP_INSTALLED=true` environment variable. It is recommend to only do this when inspecting a single test.
+
+- `AGENT_KEEP_INSTALLED=true mage integration:single [testName]`
+
+#### Run until failure
+In the case that you're tracking down a flaky test it is helpful to have it keep running until it fails. The testing
+suite has this ability built into it. Using the `TEST_RUN_UNTIL_FAILURE=true` will keep running the testing suite
+until it reports a failure.
+
+- `TEST_RUN_UNTIL_FAILURE=true mage integration:single [testName]`
+
+## Manually running the tests
+
+If you want to run the tests manually, skipping the test runner, set the
+`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
+with `go test`. E.g.:
+
+```shell
+TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
+```
 
 ## Writing tests
 
@@ -153,6 +205,14 @@ whereas the package names in the error message do not, either omit `SNAPSHOT=tru
 the `mage package` command OR set the `AGENT_VERSION` environment variable to a version
 that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 `mage integration:local`.
+
+### Failures on reused resources
+The integration framework tries to re-use resource when it can. This improves the speed at
+which the tests can run, but also means its possible for a failed test to leave state behind
+that can break future runs.
+
+Run `mage integration:clean` before running `mage integration:test` to ensure the tests are
+being run with fresh instances and stack.
 
 ### OGC-related errors
 If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
