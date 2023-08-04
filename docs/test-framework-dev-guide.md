@@ -49,6 +49,24 @@ The test are run with mage using the `integration` namespace:
 
 - `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
+#### Selecting specific platform
+
+By default, the runner will deploy to every combination of operating system and architecture that the tests define
+as supporting. When working on tests and debugging an issue it's better to limit the operating system and architecture
+to a specific one. This can be done inside a test but requires the test code to be modified. An easier way is available
+using the `TEST_PLATFORMS="linux/amd64"` environment variable. This variable can take multiple definitions with a space
+between, and it can be very specific or not very specific.
+
+- `TEST_PLATFORMS="linux" mage integration:test` to execute tests only on Linux using both AMD64 and ARM64.
+- `TEST_PLATFORMS="linux/amd64" mage integration:test` to execute tests only on Linux AMD64.
+- `TEST_PLATFORMS="linux/arm64/ubuntu mage integration:test` to execute tests only on Ubuntu ARM64.
+- `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
+- `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
+- `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
+
+> **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
+> the test defines as supporting it.
+
 #### Passing additional go test flags
 
 When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.
