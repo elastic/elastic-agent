@@ -1462,34 +1462,49 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 }
 
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
+	for {
+		failedCount, err := integRunnerOnce(ctx, matrix, singleTest)
+		if err != nil {
+			return err
+		}
+		if failedCount > 0 {
+			os.Exit(1)
+		}
+		if !hasRunUntilFailure() {
+			return nil
+		}
+	}
+}
+
+func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, error) {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 
 	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
 	if err != nil {
-		return fmt.Errorf("failed to determine batches: %w", err)
+		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
 	r, err := createTestRunner(matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
-		return fmt.Errorf("error creating test runner: %w", err)
+		return 0, fmt.Errorf("error creating test runner: %w", err)
 	}
 	results, err := r.Run(ctx)
 	if err != nil {
-		return fmt.Errorf("error running test: %w", err)
+		return 0, fmt.Errorf("error running test: %w", err)
 	}
 	_ = os.Remove("build/TEST-go-integration.out")
 	_ = os.Remove("build/TEST-go-integration.out.json")
 	_ = os.Remove("build/TEST-go-integration.xml")
 	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out file: %w", err)
+		return 0, fmt.Errorf("error writing test out file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.out.json", results.JSONOutput, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out json file: %w", err)
+		return 0, fmt.Errorf("error writing test out json file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out xml file: %w", err)
+		return 0, fmt.Errorf("error writing test out xml file: %w", err)
 	}
 	if results.Failures > 0 {
 		r.Logger().Logf("Testing completed (%d failures, %d successful)", results.Failures, results.Tests-results.Failures)
@@ -1500,10 +1515,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	r.Logger().Logf("Console JSON output written here: build/TEST-go-integration.out.json")
 	r.Logger().Logf("JUnit XML written here: build/TEST-go-integration.xml")
 	r.Logger().Logf("Diagnostic output (if present) here: build/diagnostics")
-	if results.Failures > 0 {
-		os.Exit(1)
-	}
-	return nil
+	return results.Failures, nil
 }
 
 func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
@@ -1954,5 +1966,11 @@ func hasSnapshotEnv() bool {
 		return false
 	}
 	b, _ := strconv.ParseBool(snapshot)
+	return b
+}
+
+func hasRunUntilFailure() bool {
+	runUntil := os.Getenv("TEST_RUN_UNTIL_FAILURE")
+	b, _ := strconv.ParseBool(runUntil)
 	return b
 }
