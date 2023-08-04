@@ -117,7 +117,7 @@ using `AGENT_KEEP_INSTALLED=true` environment variable. It is recommend to only 
 - `AGENT_KEEP_INSTALLED=true mage integration:single [testName]`
 
 #### Run until failure
-In the case that your tracking down a flaky test it is helpful to have it keep running until it fails. The testing
+In the case that you're tracking down a flaky test it is helpful to have it keep running until it fails. The testing
 suite has this ability built into it. Using the `TEST_RUN_UNTIL_FAILURE=true` will keep running the testing suite
 until it reports a failure.
 

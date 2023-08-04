@@ -2100,9 +2100,6 @@ func hasSnapshotEnv() bool {
 
 func hasRunUntilFailure() bool {
 	runUntil := os.Getenv("TEST_RUN_UNTIL_FAILURE")
-	if runUntil == "" {
-		return false
-	}
 	b, _ := strconv.ParseBool(runUntil)
 	return b
 }
