@@ -257,7 +257,9 @@ func (srv *ServerlessClient) waitForRemoteState(ctx context.Context, httpHandler
 		resp, err := http.DefaultClient.Do(httpHandler)
 		if err != nil {
 			errMsg := fmt.Errorf("request error: %w", err)
-			srv.log.Logf(errMsg.Error())
+			// Logger interface doesn't have a debug level and we don't want to auto-log these;
+			// as most of the time it's just spam.
+			//srv.log.Logf(errMsg.Error())
 			lastErr = errMsg
 			timer.Reset(time.Second * 5)
 			continue
@@ -265,7 +267,7 @@ func (srv *ServerlessClient) waitForRemoteState(ctx context.Context, httpHandler
 		if resp.StatusCode != http.StatusOK {
 			errBody, _ := io.ReadAll(resp.Body)
 			errMsg := fmt.Errorf("unexpected status code %d in request to %s, body: %s", resp.StatusCode, httpHandler.URL.String(), string(errBody))
-			srv.log.Logf(errMsg.Error())
+			//srv.log.Logf(errMsg.Error())
 			lastErr = errMsg
 			resp.Body.Close()
 			timer.Reset(time.Second * 5)

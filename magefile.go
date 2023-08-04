@@ -1700,6 +1700,15 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if essRegion == "" {
 		essRegion = "gcp-us-central1"
 	}
+	provisionerMode := os.Getenv("STACK")
+	if provisionerMode == "" {
+		provisionerMode = "ess"
+	}
+	if provisionerMode != "ess" && provisionerMode != "serverless" {
+		return nil, errors.New("STACK environment variable must be one of 'serverless' or 'ess'")
+	}
+	fmt.Printf(">>>> Using %s ESS deployment\n", provisionerMode)
+
 	timestamp := timestampEnabled()
 
 	cfg := runner.Config{
@@ -1740,9 +1749,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		return nil, err
 	}
 
-	provisionerMode := os.Getenv("TEST_INTEG_SERVERLESS")
-	if provisionerMode != "" {
-		fmt.Println(">>>> Using serverless ESS deployment")
+	if provisionerMode == "serverless" {
 		essProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
 		if err != nil {
 			return nil, fmt.Errorf("error creating serverless provisioner: %w", err)
