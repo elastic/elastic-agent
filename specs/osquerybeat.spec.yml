@@ -13,6 +13,7 @@ inputs:
     outputs:
       - elasticsearch
       - logstash
+      - kafka
     command:
       restart_monitoring_period: 5s
       maximum_restarts_per_period: 1

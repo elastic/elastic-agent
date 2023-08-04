@@ -4,7 +4,7 @@ env:
   BEAT_NAME: "elastic-agent"
   # after moving elastic-agent out of beats, we should update the URL of the packaging.
   BEAT_URL: "https://www.elastic.co/elastic-agent"
-  DRA_PROJECT: "elastic-agent-core"
+  DRA_PROJECT_ID: "elastic-agent-core"
   DRA_PROJECT_ARTIFACT_ID: "agent-core"
 
 steps:
@@ -22,7 +22,7 @@ steps:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
-        WORKFLOW: "snapshot"
+        DRA_WORKFLOW: "snapshot"
 
     - wait
 
@@ -33,17 +33,13 @@ steps:
         echo "+++ Changing permissions for the release manager"
         sudo chown -R :1000 build/distributions/
         echo "+++ Running DRA publish step"
-        DRA_COMMIT=$BUILDKITE_COMMIT
-        export DRA_COMMIT
-        DRA_BRANCH=$BUILDKITE_BRANCH
-        export DRA_BRANCH
         .buildkite/scripts/steps/dra-publish.sh
       key: "publish-dra-snapshot"
       agents:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
-        WORKFLOW: "snapshot"
+        DRA_WORKFLOW: "snapshot"
 
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
     key: "dra-core-staging"
@@ -59,7 +55,7 @@ steps:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
-        WORKFLOW: "staging"
+        DRA_WORKFLOW: "staging"
 
     - wait
 
@@ -70,17 +66,13 @@ steps:
         echo "+++ Changing permissions for the release manager"
         sudo chown -R :1000 build/distributions/
         echo "+++ Running DRA publish step"
-        DRA_COMMIT=$BUILDKITE_COMMIT
-        export DRA_COMMIT
-        DRA_BRANCH=$BUILDKITE_BRANCH
-        export DRA_BRANCH
         .buildkite/scripts/steps/dra-publish.sh
       key: "publish-dra-staging"
       agents:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
-        WORKFLOW: "staging"
+        DRA_WORKFLOW: "staging"
 
 notify:
   - slack: "#ingest-notifications"

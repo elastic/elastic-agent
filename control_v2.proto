@@ -97,6 +97,11 @@ message UpgradeRequest {
   //
   // If provided Elastic Agent package is checked against these pgp keys as well.
   repeated string pgpBytes = 4;
+
+  // (Optional) Overrides predefined behavior for agent package verification.
+  //
+  // If provided Elastic Agent package embedded PGP key is not checked for signature during upgrade.
+  bool skipDefaultPgp = 5;
 }
 
 // A upgrade response message.

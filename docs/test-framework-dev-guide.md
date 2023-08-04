@@ -49,20 +49,6 @@ pass `[testName]` to `go test` as `--run=[testName]`.
 
 - `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
-### Manually running the tests
-
-If you want to run the tests manually, skipping the test runner, set the
-`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
-with `go test`. E.g.:
-
-```shell
-TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
-```
-
-Tests with external dependencies might need more environment variables to be set
-when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
-`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
-
 #### Passing additional go test flags
 
 When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.
@@ -98,6 +84,47 @@ We pass a `-test.run` flag along with the names of the tests we want to run in O
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
 is split on space, so not all combination of flags and their values may be correctly split.
+
+### Cleaning up resources
+
+The test run will keep provisioned resources (instances and stacks) around after the tests have been ran. This allows
+following `mage integration:*` commands to re-use the already provisioned resources.
+
+- `mage integration:clean` will de-provision the allocated resources and cleanup any local state.
+
+Tests with external dependencies might need more environment variables to be set
+when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
+`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
+
+### Debugging tests
+
+#### Auto diagnostics retrieval
+When an integration test fails the testing fixture will try its best to automatically collect the diagnostic
+information of the installed Elastic Agent. In the case that diagnostics is collected the test runner will
+automatically transfer any collected diagnostics from the instance back to the running host. The results of the
+diagnostic collection are placed in `build/diagnostics`.
+
+#### Gather diagnostics manually
+In the case that you want to run the integration testing suite and have it gather the diagnostics at the end of
+every tests you can use the environment variable `AGENT_COLLECT_DIAG=true`. When that environment variable is defined
+it will cause the testing fixture to always collect diagnostics before the uninstall in the cleanup step of a test.
+
+#### Keeping Elastic Agent installed
+When the testing fixture installs the Elastic Agent it will automatically uninstall the Elastic Agent during the
+cleanup process of the test. In the case that you do not want that to happen you can disable the auto-uninstallation
+using `AGENT_KEEP_INSTALLED=true` environment variable. It is recommend to only do this when inspecting a single test.
+
+- `AGENT_KEEP_INSTALLED=true mage integration:single [testName]`
+
+## Manually running the tests
+
+If you want to run the tests manually, skipping the test runner, set the
+`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
+with `go test`. E.g.:
+
+```shell
+TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
+```
 
 ## Writing tests
 
@@ -153,6 +180,14 @@ whereas the package names in the error message do not, either omit `SNAPSHOT=tru
 the `mage package` command OR set the `AGENT_VERSION` environment variable to a version
 that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 `mage integration:local`.
+
+### Failures on reused resources
+The integration framework tries to re-use resource when it can. This improves the speed at
+which the tests can run, but also means its possible for a failed test to leave state behind
+that can break future runs.
+
+Run `mage integration:clean` before running `mage integration:test` to ensure the tests are
+being run with fresh instances and stack.
 
 ### OGC-related errors
 If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then

@@ -103,9 +103,8 @@ type Manager struct {
 	listener net.Listener
 	server   *grpc.Server
 
-	// waitMx synchronizes the access to waitReady only
-	waitMx    sync.RWMutex
-	waitReady map[string]waitForReady
+	// Set when the RPC server is ready to receive requests, for use by tests.
+	serverReady *atomic.Bool
 
 	// updateMx protects the call to update to ensure that
 	// only one call to update occurs at a time
@@ -151,13 +150,13 @@ func NewManager(
 		listenAddr:    listenAddr,
 		agentInfo:     agentInfo,
 		tracer:        tracer,
-		waitReady:     make(map[string]waitForReady),
 		current:       make(map[string]*componentRuntimeState),
 		shipperConns:  make(map[string]*shipperConn),
 		subscriptions: make(map[string][]*Subscription),
 		errCh:         make(chan error),
 		monitor:       monitor,
 		grpcConfig:    grpcConfig,
+		serverReady:   atomic.NewBool(false),
 	}
 	return m, nil
 }
@@ -216,6 +215,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		m.serverReady.Store(true)
 		for {
 			err := server.Serve(lis)
 			if err != nil {
@@ -240,73 +240,6 @@ func (m *Manager) Run(ctx context.Context) error {
 	m.server = nil
 	m.netMx.Unlock()
 	return ctx.Err()
-}
-
-// waitForReady waits until the manager is ready to be used.
-// Used for testing.
-//
-// This verifies that the GRPC server is up and running.
-func (m *Manager) waitForReady(ctx context.Context) error {
-	tk, err := uuid.NewV4()
-	if err != nil {
-		return err
-	}
-	token := tk.String()
-	name, err := genServerName()
-	if err != nil {
-		return err
-	}
-	pair, err := m.ca.GeneratePairWithName(name)
-	if err != nil {
-		return err
-	}
-	cert, err := tls.X509KeyPair(pair.Crt, pair.Key)
-	if err != nil {
-		return err
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(m.ca.Crt())
-	trans := credentials.NewTLS(&tls.Config{
-		ServerName:   name,
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      caCertPool,
-		MinVersion:   tls.VersionTLS12,
-	})
-
-	m.waitMx.Lock()
-	m.waitReady[token] = waitForReady{
-		name: name,
-		cert: pair,
-	}
-	m.waitMx.Unlock()
-
-	defer func() {
-		m.waitMx.Lock()
-		delete(m.waitReady, token)
-		m.waitMx.Unlock()
-	}()
-
-	for {
-		m.netMx.RLock()
-		lis := m.listener
-		srv := m.server
-		m.netMx.RUnlock()
-		if lis != nil && srv != nil {
-			addr := m.getListenAddr()
-			c, err := grpc.Dial(addr, grpc.WithTransportCredentials(trans))
-			if err == nil {
-				_ = c.Close()
-				return nil
-			}
-		}
-
-		t := time.NewTimer(100 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-t.C:
-		}
-	}
 }
 
 // Errors returns channel that errors are reported on.
@@ -917,18 +850,6 @@ func (m *Manager) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, er
 		return cert, nil
 	}
 
-	m.waitMx.RLock()
-	for _, waiter := range m.waitReady {
-		if waiter.name == chi.ServerName {
-			cert = waiter.cert.Certificate
-			break
-		}
-	}
-	m.waitMx.RUnlock()
-	if cert != nil {
-		return cert, nil
-	}
-
 	return nil, errors.New("no supported TLS certificate")
 }
 
@@ -1056,9 +977,4 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
 	}
 	return res.Diagnostic, nil
-}
-
-type waitForReady struct {
-	name string
-	cert *authority.Pair
 }
