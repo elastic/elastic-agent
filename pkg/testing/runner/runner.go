@@ -252,8 +252,10 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 
 // Clean performs a cleanup to ensure anything that could have been left running is removed.
 func (r *Runner) Clean() error {
-	r.stateMx.Lock()
-	defer r.stateMx.Unlock()
+	err := r.loadState()
+	if err != nil {
+		return err
+	}
 
 	var instances []Instance
 	for _, i := range r.state.Instances {
@@ -263,7 +265,7 @@ func (r *Runner) Clean() error {
 	stacks := make([]Stack, len(r.state.Stacks))
 	copy(stacks, r.state.Stacks)
 	r.state.Stacks = nil
-	err := r.writeState()
+	err = r.writeState()
 	if err != nil {
 		return err
 	}

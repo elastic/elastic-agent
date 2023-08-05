@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/testing/multipass"
+
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/pkg/version"
 
@@ -1733,14 +1735,24 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		ServiceTokenPath: serviceTokenPath,
 		Datacenter:       datacenter,
 	}
-	ogcProvisioner, err := ogc.NewProvisioner(ogcCfg)
-	if err != nil {
-		return nil, err
-	}
 	email, err := ogcCfg.ClientEmail()
 	if err != nil {
 		return nil, err
 	}
+
+	var instanceProvisioner runner.InstanceProvisioner
+	envInstance := os.Getenv("INSTANCE")
+	if envInstance == "multipass" {
+		instanceProvisioner = multipass.NewProvisioner()
+	} else if envInstance == "ogc" || envInstance == "" {
+		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("unknown instance provisioner: %s", envInstance)
+	}
+
 	essProvisioner, err := ess.NewProvisioner(ess.ProvisionerConfig{
 		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
 		APIKey:     essToken,
@@ -1750,7 +1762,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		return nil, err
 	}
 
-	r, err := runner.NewRunner(cfg, ogcProvisioner, essProvisioner, batches...)
+	r, err := runner.NewRunner(cfg, instanceProvisioner, essProvisioner, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}
