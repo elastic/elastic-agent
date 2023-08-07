@@ -177,6 +177,17 @@ Some examples of where namespaces should be used:
 :warning: Not using namespaces when accessing data in a shared persistent store can cause tests to
 be flaky.
 
+## Alternative Providers
+
+### Multipass Instance Provisioner
+By default the integration testing suite uses OGC with GKE to provision instances. In the case that you
+want to use a local VM instead of a remote VM, you can use the [Multipass](https://multipass.run/) provisioner.
+
+- `INSTANCE="multipass" mage integration:test`
+
+It is always best to run `mage integration:clean` before using the `INSTANCE="multipass"` option because it will
+not cause already provisioned resources to be replaced with an instance created by a different provisioner.
+
 ## Troubleshooting Tips
 
 ### Error: GCE service token missing; run 'mage integration:auth'
