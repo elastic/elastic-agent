@@ -19,6 +19,7 @@ type Config struct {
 	BuildDir          string
 	GOVersion         string
 	RepoDir           string
+	StateDir          string
 	DiagnosticsDir    string
 
 	// Platforms filters the tests to only run on the provided list
@@ -62,6 +63,9 @@ func (c *Config) Validate() error {
 	}
 	if c.RepoDir == "" {
 		return errors.New("field RepoDir must be set")
+	}
+	if c.StateDir == "" {
+		return errors.New("field StateDir must be set")
 	}
 	_, err := c.GetPlatforms()
 	if err != nil {
