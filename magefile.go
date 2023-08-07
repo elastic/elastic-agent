@@ -22,8 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/testing/multipass"
-
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/pkg/version"
 
@@ -43,6 +41,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	bversion "github.com/elastic/elastic-agent/version"
