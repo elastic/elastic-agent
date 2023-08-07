@@ -147,23 +147,22 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		s.stop(ctx, comm, lastCheckin, am == actionTeardown)
 	}
 
-	processTeardown := func(am actionMode, signed *component.Signed) error {
+	processTeardown := func(am actionMode, signed *component.Signed) {
 		s.log.Debugf("start teardown for %s service", s.name())
 		// Inject new signed
 		newComp, err := injectSigned(s.comp, signed)
 		if err != nil {
 			s.log.Errorf("failed to inject signed configuration for %s service, err: %v", s.name(), err)
-			return err
 		}
 
+		s.log.Debugf("set teardown timer %v for %s service", teardownCheckinTimeout, s.name())
 		// Set teardown timeout timer
 		teardownCheckinTimer.Reset(teardownCheckinTimeout)
 
 		// Process newComp update
 		// This should send component update that should cause service checkin
 		s.log.Debugf("process new comp config for %s service", s.name())
-		s.processNewComp(newComp, comm)
-		return nil
+		s.processNewComp(newComp, comm, false)
 	}
 
 	onTeardown := func(as actionModeSigned) {
@@ -178,7 +177,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 		if !tearingDown {
 			tearingDown = true
-			err = processTeardown(as.actionMode, as.signed)
+			processTeardown(as.actionMode, as.signed)
 		}
 
 	}
@@ -226,7 +225,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				s.forceCompState(client.UnitStateFailed, err.Error())
 			}
 		case newComp := <-s.compCh:
-			s.processNewComp(newComp, comm)
+			s.processNewComp(newComp, comm, true)
 		case checkin := <-comm.CheckinObserved():
 			s.log.Debugf("got check-in for %s service, tearingDown=%v", s.name(), tearingDown)
 			s.processCheckin(checkin, comm, &lastCheckin)
@@ -287,9 +286,9 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", name))
 
 	// Call the check command of the service
-	s.log.Infof("check if %s service is installed", name)
+	s.log.Debugf("check if %s service is installed", name)
 	err = s.check(ctx)
-	s.log.Infof("after check if %s service is installed, err: %v", name, err)
+	s.log.Debugf("after check if %s service is installed, err: %v", name, err)
 	if err != nil {
 		// Check failed, call the install command of the service
 		s.log.Infof("failed check %s service: %v, try install", name, err)
@@ -306,7 +305,7 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastCheckin time.Time, teardown bool) {
 	name := s.name()
 
-	s.log.Infof("stopping %s service runtime", name)
+	s.log.Debugf("stopping %s service runtime", name)
 
 	checkedIn := !lastCheckin.IsZero()
 
@@ -316,21 +315,21 @@ func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 			// If never checked in await for the checkin with the timeout
 			if !checkedIn {
 				timeout := s.checkinPeriod()
-				s.log.Infof("%s service had never checked in, await for check-in for %v", name, timeout)
+				s.log.Debugf("%s service had never checked in, await for check-in for %v", name, timeout)
 				checkedIn = s.awaitCheckin(ctx, comm, timeout)
 			}
 
 			// Received check in send STOPPING
 			if checkedIn {
-				s.log.Infof("%s service has checked in, send stopping state to service", name)
+				s.log.Debugf("%s service has checked in, send stopping state to service", name)
 				s.state.forceExpectedState(client.UnitStateStopping)
 				comm.CheckinExpected(s.state.toCheckinExpected(), nil)
 			} else {
-				s.log.Infof("%s service had never checked in, proceed to uninstall", name)
+				s.log.Debugf("%s service had never checked in, proceed to uninstall", name)
 			}
 		}
 
-		s.log.Infof("uninstall %s service", name)
+		s.log.Debugf("uninstall %s service", name)
 		err := s.uninstall(ctx)
 		if err != nil {
 			s.log.Errorf("failed %s service uninstall, err: %v", name, err)
@@ -338,7 +337,7 @@ func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 	}
 
 	// Force component stopped state
-	s.log.Debug("set %s service runtime to stopped state", name)
+	s.log.Debugf("set %s service runtime to stopped state", name)
 	s.forceCompState(client.UnitStateStopped, fmt.Sprintf("Stopped: %s service runtime", name))
 }
 
@@ -364,14 +363,14 @@ func (s *serviceRuntime) awaitCheckin(ctx context.Context, comm Communicator, ti
 	}
 }
 
-func (s *serviceRuntime) processNewComp(newComp component.Component, comm Communicator) {
+func (s *serviceRuntime) processNewComp(newComp component.Component, comm Communicator, sendObs bool) {
 	s.log.Debugf("observed component update for %s service", s.name())
 	sendExpected := s.state.syncExpected(&newComp)
 	changed := s.state.syncUnits(&newComp)
 	if sendExpected || s.state.unsettled() {
 		comm.CheckinExpected(s.state.toCheckinExpected(), nil)
 	}
-	if changed {
+	if sendObs && changed {
 		s.sendObserved()
 	}
 }
