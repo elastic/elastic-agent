@@ -40,6 +40,7 @@ func TestFQDN(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
+	t.Skip("Flaky test, see https://github.com/elastic/elastic-agent/issues/3154")
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
