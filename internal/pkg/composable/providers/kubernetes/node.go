@@ -43,7 +43,8 @@ func NewNodeEventer(
 	cfg *Config,
 	logger *logp.Logger,
 	client k8s.Interface,
-	scope string) (Eventer, error) {
+	scope string,
+	managed bool) (Eventer, error) {
 	watcher, err := kubernetes.NewNamedWatcher("agent-node", client, &kubernetes.Node{}, kubernetes.WatchOptions{
 		SyncTimeout:  cfg.SyncPeriod,
 		Node:         cfg.Node,

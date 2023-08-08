@@ -16,7 +16,9 @@ type ContextComm struct {
 	lock     sync.Mutex
 	previous map[string]interface{}
 	current  map[string]interface{}
-	onSet    func()
+	// Set calls onSet with the new value, so tests can
+	// verify data from the provider.
+	onSet func(map[string]interface{})
 }
 
 // NewContextComm creates a new ContextComm.
@@ -41,8 +43,9 @@ func (t *ContextComm) Set(mapping map[string]interface{}) error {
 	t.lock.Unlock()
 
 	if onSet != nil {
-		onSet()
+		onSet(mapping)
 	}
+
 	return nil
 }
 
@@ -61,7 +64,7 @@ func (t *ContextComm) Current() map[string]interface{} {
 }
 
 // CallOnSet sets the OnSet callback.
-func (t *ContextComm) CallOnSet(f func()) {
+func (t *ContextComm) CallOnSet(f func(map[string]interface{})) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.onSet = f

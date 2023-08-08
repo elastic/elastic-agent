@@ -15,6 +15,7 @@ import (
 	"github.com/hectane/go-acl"
 
 	"github.com/elastic/elastic-agent-libs/file"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -78,7 +79,7 @@ func (d *EncryptedDiskStore) ensureKey() error {
 	if d.key == nil {
 		key, err := secret.GetAgentSecret(secret.WithVaultPath(d.vaultPath))
 		if err != nil {
-			return err
+			return fmt.Errorf("could not get agent key: %w", err)
 		}
 		d.key = key.Value
 	}
@@ -91,7 +92,7 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 	// Ensure has agent key
 	err := d.ensureKey()
 	if err != nil {
-		return err
+		return errors.New(err, "failed to ensure key")
 	}
 
 	tmpFile := d.target + ".tmp"
@@ -111,7 +112,7 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 	w, err := crypto.NewWriterWithDefaults(fd, d.key)
 	if err != nil {
 		fd.Close()
-		return err
+		return errors.New(err, "failed to open crypto writers")
 	}
 
 	if _, err := io.Copy(w, in); err != nil {
@@ -180,7 +181,7 @@ func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
 	// Ensure has agent key
 	err = d.ensureKey()
 	if err != nil {
-		return nil, err
+		return nil, errors.New(err, "failed to ensure key during encrypted disk store Load")
 	}
 
 	return crypto.NewReaderWithDefaults(fd, d.key)

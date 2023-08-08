@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"go/format"
-	"io/ioutil"
 	"os"
 	"text/template"
 
@@ -25,9 +24,7 @@ var (
 
 func init() {
 	flag.StringVar(&input, "in", "", "Source of input. \"-\" means reading from stdin")
-	if flag.Lookup("out") == nil {
-		flag.StringVar(&output, "out", "-", "Output path. \"-\" means writing to stdout")
-	}
+	flag.StringVar(&output, "output", "-", "Output path. \"-\" means writing to stdout")
 	flag.StringVar(&license, "license", "Elastic", "License header for generated file.")
 }
 
@@ -83,7 +80,11 @@ func main() {
 		os.Stdout.Write(data)
 		return
 	} else {
-		ioutil.WriteFile(output, data, 0640)
+		err := os.WriteFile(output, data, 0640)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	return
@@ -96,7 +97,7 @@ func gen(path string, l string) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	tmplPgp.Execute(&buf, struct {
+	err = tmplPgp.Execute(&buf, struct {
 		Pack    string
 		Files   []string
 		License string
@@ -105,6 +106,9 @@ func gen(path string, l string) ([]byte, error) {
 		Files:   files,
 		License: l,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {

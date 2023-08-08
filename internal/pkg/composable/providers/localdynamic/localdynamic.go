@@ -18,7 +18,7 @@ import (
 const ItemPriority = 0
 
 func init() {
-	composable.Providers.AddDynamicProvider("local_dynamic", DynamicProviderBuilder)
+	composable.Providers.MustAddDynamicProvider("local_dynamic", DynamicProviderBuilder)
 }
 
 type dynamicItem struct {
@@ -41,7 +41,7 @@ func (c *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 }
 
 // DynamicProviderBuilder builds the dynamic provider.
-func DynamicProviderBuilder(_ *logger.Logger, c *config.Config) (composable.DynamicProvider, error) {
+func DynamicProviderBuilder(_ *logger.Logger, c *config.Config, _ bool) (composable.DynamicProvider, error) {
 	p := &dynamicProvider{}
 	if c != nil {
 		err := c.Unpack(p)

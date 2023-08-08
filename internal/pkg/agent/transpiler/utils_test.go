@@ -363,6 +363,7 @@ func TestRenderInputs(t *testing.T) {
 		"vars with processors": {
 			input: NewKey("inputs", NewList([]Node{
 				NewDict([]Node{
+					NewKey("id", NewStrVal("initial")),
 					NewKey("type", NewStrVal("logfile")),
 					NewKey("streams", NewList([]Node{
 						NewDict([]Node{
@@ -385,6 +386,7 @@ func TestRenderInputs(t *testing.T) {
 			})),
 			expected: NewList([]Node{
 				NewDict([]Node{
+					NewKey("id", NewStrVal("initial-value1")),
 					NewKey("type", NewStrVal("logfile")),
 					NewKey("streams", NewList([]Node{
 						NewDict([]Node{
@@ -411,8 +413,10 @@ func TestRenderInputs(t *testing.T) {
 							})),
 						}),
 					})),
+					NewKey("original_id", NewStrVal("initial")),
 				}),
 				NewDict([]Node{
+					NewKey("id", NewStrVal("initial-value2")),
 					NewKey("type", NewStrVal("logfile")),
 					NewKey("streams", NewList([]Node{
 						NewDict([]Node{
@@ -439,10 +443,11 @@ func TestRenderInputs(t *testing.T) {
 							})),
 						}),
 					})),
+					NewKey("original_id", NewStrVal("initial")),
 				}),
 			}),
 			varsArray: []*Vars{
-				mustMakeVarsP(map[string]interface{}{
+				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value1",
 					},
@@ -458,7 +463,7 @@ func TestRenderInputs(t *testing.T) {
 							},
 						},
 					}),
-				mustMakeVarsP(map[string]interface{}{
+				mustMakeVarsP("value2", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value2",
 					},
@@ -499,6 +504,7 @@ func TestRenderInputs(t *testing.T) {
 							})),
 						}),
 					})),
+					NewKey("id", NewStrVal("value1")),
 					NewKey("processors", NewList([]Node{
 						NewDict([]Node{
 							NewKey("add_fields", NewDict([]Node{
@@ -519,6 +525,7 @@ func TestRenderInputs(t *testing.T) {
 							})),
 						}),
 					})),
+					NewKey("id", NewStrVal("value2")),
 					NewKey("processors", NewList([]Node{
 						NewDict([]Node{
 							NewKey("add_fields", NewDict([]Node{
@@ -532,7 +539,7 @@ func TestRenderInputs(t *testing.T) {
 				}),
 			}),
 			varsArray: []*Vars{
-				mustMakeVarsP(map[string]interface{}{
+				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value1",
 					},
@@ -548,7 +555,7 @@ func TestRenderInputs(t *testing.T) {
 							},
 						},
 					}),
-				mustMakeVarsP(map[string]interface{}{
+				mustMakeVarsP("value2", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value2",
 					},
@@ -599,6 +606,7 @@ func TestRenderInputs(t *testing.T) {
 							NewKey("invalid", NewStrVal("value")),
 						})),
 					})),
+					NewKey("id", NewStrVal("value1")),
 				}),
 				NewDict([]Node{
 					NewKey("type", NewStrVal("logfile")),
@@ -614,10 +622,11 @@ func TestRenderInputs(t *testing.T) {
 							NewKey("invalid", NewStrVal("value")),
 						})),
 					})),
+					NewKey("id", NewStrVal("value2")),
 				}),
 			}),
 			varsArray: []*Vars{
-				mustMakeVarsP(map[string]interface{}{
+				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value1",
 					},
@@ -633,7 +642,7 @@ func TestRenderInputs(t *testing.T) {
 							},
 						},
 					}),
-				mustMakeVarsP(map[string]interface{}{
+				mustMakeVarsP("value2", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value2",
 					},
@@ -674,6 +683,7 @@ func TestRenderInputs(t *testing.T) {
 							})),
 						}),
 					})),
+					NewKey("id", NewStrVal("value1")),
 					NewKey("processors", NewList([]Node{
 						NewDict([]Node{
 							NewKey("add_fields", NewDict([]Node{
@@ -687,7 +697,7 @@ func TestRenderInputs(t *testing.T) {
 				}),
 			}),
 			varsArray: []*Vars{
-				mustMakeVarsP(map[string]interface{}{
+				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value1",
 					},
@@ -703,7 +713,7 @@ func TestRenderInputs(t *testing.T) {
 							},
 						},
 					}),
-				mustMakeVarsP(map[string]interface{}{
+				mustMakeVarsP("value2", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value1",
 					},
@@ -721,6 +731,44 @@ func TestRenderInputs(t *testing.T) {
 					}),
 			},
 		},
+		"input removal with stream conditions": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("type", NewStrVal("logfile")),
+					NewKey("streams", NewList([]Node{
+						NewDict([]Node{
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var1.name}.log"),
+							})),
+							NewKey("condition", NewStrVal("${var1.name} != 'value1'")),
+						}),
+						NewDict([]Node{
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var1.name}.log"),
+							})),
+							NewKey("condition", NewStrVal("${var1.name} != 'value1'")),
+						}),
+					})),
+				}),
+			})),
+			expected: NewList([]Node{}),
+			varsArray: []*Vars{
+				mustMakeVarsP("value1", map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				},
+					"var1",
+					nil),
+				mustMakeVarsP("value2", map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				},
+					"var1",
+					nil),
+			},
+		},
 	}
 
 	for name, test := range testcases {
@@ -736,8 +784,8 @@ func TestRenderInputs(t *testing.T) {
 	}
 }
 
-func mustMakeVarsP(mapping map[string]interface{}, processorKey string, processors Processors) *Vars {
-	v, err := NewVarsWithProcessors(mapping, processorKey, processors, nil)
+func mustMakeVarsP(id string, mapping map[string]interface{}, processorKey string, processors Processors) *Vars {
+	v, err := NewVarsWithProcessors(id, mapping, processorKey, processors, nil)
 	if err != nil {
 		panic(err)
 	}

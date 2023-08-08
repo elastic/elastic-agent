@@ -1,0 +1,50 @@
+inputs:
+    - name: netflow-netflow
+      id: netflow-netflow-${kubernetes.hints.container_id}
+      type: netflow
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.netflow.log.enabled} == true or ${kubernetes.hints.netflow.enabled} == true
+          data_stream:
+            dataset: netflow.log
+            type: logs
+          detect_sequence_reset: true
+          expiration_timeout: 30m
+          host: localhost:2055
+          max_message_size: 10KiB
+          protocols:
+            - v1
+            - v5
+            - v6
+            - v7
+            - v8
+            - v9
+            - ipfix
+          queue_size: 8192
+          tags:
+            - netflow
+            - forwarded
+          timeout: ${kubernetes.hints.netflow.log.timeout|kubernetes.hints.netflow.timeout|'}
+      data_stream.namespace: default
+    - name: filestream-netflow
+      id: filestream-netflow-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.netflow.container_logs.enabled} == true
+          data_stream:
+            dataset: netflow.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

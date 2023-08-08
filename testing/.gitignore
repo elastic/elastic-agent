@@ -1,0 +1,10 @@
+e2e/cluster-digest.yml
+e2e/cluster-info.json
+e2e_testing
+e2e/elastic-agent-*/
+!elastic-agent.yml.tpl
+e2e/*.gz
+e2e/infra
+.integration-cache
+.ogc-cache
+e2e/e2e_artifacts

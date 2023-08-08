@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/basecmd"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/version"
 )
 
 func troubleshootMessage() string {
@@ -35,6 +36,15 @@ func NewCommand() *cobra.Command {
 func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "elastic-agent [subcommand]",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return tryContainerLoadPaths()
+		},
+	}
+
+	// Init version information contained in package version file
+	err := version.InitVersionInformation()
+	if err != nil {
+		cmd.PrintErrf("Error initializing version information: %v\n", err)
 	}
 
 	// path flags
@@ -67,13 +77,16 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newContainerCommand(args, streams))
 	cmd.AddCommand(newStatusCommand(args, streams))
 	cmd.AddCommand(newDiagnosticsCommand(args, streams))
+	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
+	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
 
-	// windows special hidden sub-command (only added on windows)
+	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
 	if reexec != nil {
 		cmd.AddCommand(reexec)
 	}
 	cmd.Run = run.Run
+	cmd.RunE = run.RunE
 
 	return cmd
 }

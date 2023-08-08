@@ -1,0 +1,89 @@
+inputs:
+    - name: mysql/metrics-mysql
+      id: mysql/metrics-mysql-${kubernetes.hints.container_id}
+      type: mysql/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.mysql.galera_status.enabled} == true and ${kubernetes.hints.mysql.enabled} == true
+          data_stream:
+            dataset: mysql.galera_status
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mysql.galera_status.host|kubernetes.hints.mysql.host|'tcp(127.0.0.1:3306)/'}
+          metricsets:
+            - galera_status
+          password: ${kubernetes.hints.mysql.galera_status.password|kubernetes.hints.mysql.password|'test'}
+          period: ${kubernetes.hints.mysql.galera_status.period|kubernetes.hints.mysql.period|'10s'}
+          username: ${kubernetes.hints.mysql.galera_status.username|kubernetes.hints.mysql.username|'root'}
+        - condition: ${kubernetes.hints.mysql.performance.enabled} == true or ${kubernetes.hints.mysql.enabled} == true
+          data_stream:
+            dataset: mysql.performance
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mysql.performance.host|kubernetes.hints.mysql.host|'tcp(127.0.0.1:3306)/'}
+          metricsets:
+            - performance
+          password: ${kubernetes.hints.mysql.performance.password|kubernetes.hints.mysql.password|'test'}
+          period: ${kubernetes.hints.mysql.performance.period|kubernetes.hints.mysql.period|'10s'}
+          username: ${kubernetes.hints.mysql.performance.username|kubernetes.hints.mysql.username|'root'}
+        - condition: ${kubernetes.hints.mysql.status.enabled} == true or ${kubernetes.hints.mysql.enabled} == true
+          data_stream:
+            dataset: mysql.status
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mysql.status.host|kubernetes.hints.mysql.host|'tcp(127.0.0.1:3306)/'}
+          metricsets:
+            - status
+          password: ${kubernetes.hints.mysql.status.password|kubernetes.hints.mysql.password|'test'}
+          period: ${kubernetes.hints.mysql.status.period|kubernetes.hints.mysql.period|'10s'}
+          username: ${kubernetes.hints.mysql.status.username|kubernetes.hints.mysql.username|'root'}
+      data_stream.namespace: default
+    - name: filestream-mysql
+      id: filestream-mysql-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.mysql.error.enabled} == true or ${kubernetes.hints.mysql.enabled} == true
+          data_stream:
+            dataset: mysql.error
+            type: logs
+          exclude_files:
+            - .gz$
+          multiline:
+            match: after
+            negate: true
+            pattern: ^([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{6})
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.mysql.error.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale: null
+          prospector:
+            scanner:
+                symlinks: true
+        - condition: ${kubernetes.hints.mysql.slowlog.enabled} == true or ${kubernetes.hints.mysql.enabled} == true
+          data_stream:
+            dataset: mysql.slowlog
+            type: logs
+          exclude_files:
+            - .gz$
+          exclude_lines:
+            - '^[\/\w\.]+, Version: .* started with:.*'
+            - ^# Time:.*
+          multiline:
+            match: after
+            negate: true
+            pattern: '^(# User@Host: |# Time: )'
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.mysql.slowlog.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+      data_stream.namespace: default

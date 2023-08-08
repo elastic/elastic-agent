@@ -1,0 +1,58 @@
+inputs:
+    - name: filestream-stan
+      id: filestream-stan-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.stan.log.enabled} == true or ${kubernetes.hints.stan.enabled} == true
+          data_stream:
+            dataset: stan.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.stan.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - stan-log
+      data_stream.namespace: default
+    - name: stan/metrics-stan
+      id: stan/metrics-stan-${kubernetes.hints.container_id}
+      type: stan/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.stan.channels.enabled} == true or ${kubernetes.hints.stan.enabled} == true
+          data_stream:
+            dataset: stan.channels
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.stan.channels.host|kubernetes.hints.stan.host|'localhost:8222'}
+          metricsets:
+            - channels
+          period: ${kubernetes.hints.stan.channels.period|kubernetes.hints.stan.period|'60s'}
+        - condition: ${kubernetes.hints.stan.stats.enabled} == true or ${kubernetes.hints.stan.enabled} == true
+          data_stream:
+            dataset: stan.stats
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.stan.stats.host|kubernetes.hints.stan.host|'localhost:8222'}
+          metricsets:
+            - stats
+          period: ${kubernetes.hints.stan.stats.period|kubernetes.hints.stan.period|'60s'}
+        - condition: ${kubernetes.hints.stan.subscriptions.enabled} == true or ${kubernetes.hints.stan.enabled} == true
+          data_stream:
+            dataset: stan.subscriptions
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.stan.subscriptions.host|kubernetes.hints.stan.host|'localhost:8222'}
+          metricsets:
+            - subscriptions
+          period: ${kubernetes.hints.stan.subscriptions.period|kubernetes.hints.stan.period|'60s'}
+      data_stream.namespace: default

@@ -15,34 +15,35 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// ActionStore receives multiples actions to persist to disk, the implementation of the store only
+// actionStore receives multiples actions to persist to disk, the implementation of the store only
 // take care of action policy change every other action are discarded. The store will only keep the
 // last good action on disk, we assume that the action is added to the store after it was ACK with
 // Fleet. The store is not threadsafe.
 // ATTN!!!: THE actionStore is deprecated, please use and extend the stateStore instead. The actionStore will be eventually removed.
-type ActionStore struct {
+type actionStore struct {
 	log    *logger.Logger
 	store  storeLoad
 	dirty  bool
 	action action
 }
 
-// NewActionStore creates a new action store.
-func NewActionStore(log *logger.Logger, store storeLoad) (*ActionStore, error) {
-	// If the store exists we will read it, if any errors is returned we assume we do not have anything
-	// persisted and we return an empty store.
+// newActionStore creates a new action store.
+func newActionStore(log *logger.Logger, store storeLoad) (*actionStore, error) {
+	// If the store exists we will read it, if an error is returned we log it
+	// and return an empty store.
 	reader, err := store.Load()
 	if err != nil {
-		return &ActionStore{log: log, store: store}, nil
+		log.Errorf("failed to load action store, returning empty contents: %v", err.Error())
+		return &actionStore{log: log, store: store}, nil
 	}
 	defer reader.Close()
 
-	var action ActionPolicyChangeSerializer
+	var action actionPolicyChangeSerializer
 
 	dec := yaml.NewDecoder(reader)
 	err = dec.Decode(&action)
 	if errors.Is(err, io.EOF) {
-		return &ActionStore{
+		return &actionStore{
 			log:   log,
 			store: store,
 		}, nil
@@ -53,16 +54,16 @@ func NewActionStore(log *logger.Logger, store storeLoad) (*ActionStore, error) {
 
 	apc := fleetapi.ActionPolicyChange(action)
 
-	return &ActionStore{
+	return &actionStore{
 		log:    log,
 		store:  store,
 		action: &apc,
 	}, nil
 }
 
-// Add is only taking care of ActionPolicyChange for now and will only keep the last one it receive,
+// add is only taking care of ActionPolicyChange for now and will only keep the last one it receive,
 // any other type of action will be silently ignored.
-func (s *ActionStore) Add(a action) {
+func (s *actionStore) add(a action) {
 	switch v := a.(type) {
 	case *fleetapi.ActionPolicyChange, *fleetapi.ActionUnenroll:
 		// Only persist the action if the action is different.
@@ -74,8 +75,8 @@ func (s *ActionStore) Add(a action) {
 	}
 }
 
-// Save saves actions to backing store.
-func (s *ActionStore) Save() error {
+// save saves actions to backing store.
+func (s *actionStore) save() error {
 	defer func() { s.dirty = false }()
 	if !s.dirty {
 		return nil
@@ -83,7 +84,7 @@ func (s *ActionStore) Save() error {
 
 	var reader io.Reader
 	if apc, ok := s.action.(*fleetapi.ActionPolicyChange); ok {
-		serialize := ActionPolicyChangeSerializer(*apc)
+		serialize := actionPolicyChangeSerializer(*apc)
 
 		r, err := yamlToReader(&serialize)
 		if err != nil {
@@ -113,9 +114,9 @@ func (s *ActionStore) Save() error {
 	return nil
 }
 
-// Actions returns a slice of action to execute in order, currently only a action policy change is
+// actions returns a slice of action to execute in order, currently only a action policy change is
 // persisted.
-func (s *ActionStore) Actions() []action {
+func (s *actionStore) actions() []action {
 	if s.action == nil {
 		return []action{}
 	}
@@ -123,7 +124,7 @@ func (s *ActionStore) Actions() []action {
 	return []action{s.action}
 }
 
-// ActionPolicyChangeSerializer is a struct that adds a YAML serialization, I don't think serialization
+// actionPolicyChangeSerializer is a struct that adds a YAML serialization, I don't think serialization
 // is a concern of the fleetapi package. I went this route so I don't have to do much refactoring.
 //
 // There are four ways to achieve the same results:
@@ -133,21 +134,22 @@ func (s *ActionStore) Actions() []action {
 // 4. We have two sets of type.
 //
 // This could be done in a refactoring.
-type ActionPolicyChangeSerializer struct {
+type actionPolicyChangeSerializer struct {
 	ActionID   string                 `yaml:"action_id"`
 	ActionType string                 `yaml:"action_type"`
 	Policy     map[string]interface{} `yaml:"policy"`
 }
 
-// Add a guards between the serializer structs and the original struct.
-var _ ActionPolicyChangeSerializer = ActionPolicyChangeSerializer(fleetapi.ActionPolicyChange{})
+// add a guards between the serializer structs and the original struct.
+var _ actionPolicyChangeSerializer = actionPolicyChangeSerializer(fleetapi.ActionPolicyChange{})
 
 // actionUnenrollSerializer is a struct that adds a YAML serialization,
 type actionUnenrollSerializer struct {
-	ActionID   string `yaml:"action_id"`
-	ActionType string `yaml:"action_type"`
-	IsDetected bool   `yaml:"is_detected"`
+	ActionID   string           `yaml:"action_id"`
+	ActionType string           `yaml:"action_type"`
+	IsDetected bool             `yaml:"is_detected"`
+	Signed     *fleetapi.Signed `yaml:"signed,omitempty"`
 }
 
-// Add a guards between the serializer structs and the original struct.
+// add a guards between the serializer structs and the original struct.
 var _ actionUnenrollSerializer = actionUnenrollSerializer(fleetapi.ActionUnenroll{})

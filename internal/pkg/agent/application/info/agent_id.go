@@ -71,7 +71,7 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, error) 
 	agentConfigFile := paths.AgentConfigFile()
 	reader, err := s.Load()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load from ioStore: %w", err)
 	}
 
 	// reader is closed by this function
@@ -118,7 +118,9 @@ func updateAgentInfo(s ioStore, agentInfo *persistentAgentInfo) error {
 	agentConfigFile := paths.AgentConfigFile()
 	reader, err := s.Load()
 	if err != nil {
-		return err
+		return errors.New(err, "failed loading from store",
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, agentConfigFile))
 	}
 
 	// reader is closed by this function
@@ -151,10 +153,16 @@ func updateAgentInfo(s ioStore, agentInfo *persistentAgentInfo) error {
 
 	r, err := yamlToReader(configMap)
 	if err != nil {
-		return err
+		return errors.New(err, "failed creating yaml reader")
 	}
 
-	return s.Save(r)
+	if err := s.Save(r); err != nil {
+		return errors.New(err, "failed saving agent info",
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, agentConfigFile))
+	}
+
+	return nil
 }
 
 func yamlToReader(in interface{}) (io.Reader, error) {
@@ -195,20 +203,20 @@ func loadAgentInfo(forceUpdate bool, logLevel string, createAgentID bool) (*pers
 	agentConfigFile := paths.AgentConfigFile()
 	diskStore := storage.NewEncryptedDiskStore(agentConfigFile)
 
-	agentinfo, err := getInfoFromStore(diskStore, logLevel)
+	agentInfo, err := getInfoFromStore(diskStore, logLevel)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get agent info from store: %w", err)
 	}
 
-	if agentinfo != nil && !forceUpdate && (agentinfo.ID != "" || !createAgentID) {
-		return agentinfo, nil
+	if agentInfo != nil && !forceUpdate && (agentInfo.ID != "" || !createAgentID) {
+		return agentInfo, nil
 	}
 
-	if err := updateID(agentinfo, diskStore); err != nil {
-		return nil, err
+	if err := updateID(agentInfo, diskStore); err != nil {
+		return nil, fmt.Errorf("could not update agent ID on disk store: %w", err)
 	}
 
-	return agentinfo, nil
+	return agentInfo, nil
 }
 
 func updateID(agentInfo *persistentAgentInfo, s ioStore) error {

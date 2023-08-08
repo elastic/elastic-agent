@@ -1,0 +1,24 @@
+inputs:
+    - name: filestream-keycloak
+      id: filestream-keycloak-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.keycloak.log.enabled} == true or ${kubernetes.hints.keycloak.enabled} == true
+          data_stream:
+            dataset: keycloak.log
+            type: logs
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale: null
+            - add_fields:
+                fields:
+                    only_user_events: false
+                    tz_offset: local
+                target: _tmp
+          prospector.scanner.exclude_files:
+            - \.gz$
+          tags:
+            - keycloak-log
+      data_stream.namespace: default

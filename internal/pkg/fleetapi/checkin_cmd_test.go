@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,7 @@ func (*agentinfo) AgentID() string { return "id" }
 
 func TestCheckin(t *testing.T) {
 	const withAPIKey = "secret"
+	const requestDelay = time.Millisecond
 	ctx := context.Background()
 	agentInfo := &agentinfo{}
 
@@ -39,6 +41,8 @@ func TestCheckin(t *testing.T) {
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprint(w, raw)
+				// Introduce a small delay to test the request time measurment.
+				time.Sleep(requestDelay)
 			}, withAPIKey))
 			return mux
 		}, withAPIKey,
@@ -47,8 +51,10 @@ func TestCheckin(t *testing.T) {
 
 			request := CheckinRequest{}
 
-			_, err := cmd.Execute(ctx, &request)
+			_, took, err := cmd.Execute(ctx, &request)
 			require.Error(t, err)
+			// Ensure the request took at least as long as the artificial delay.
+			require.GreaterOrEqual(t, took, requestDelay)
 		},
 	))
 
@@ -96,7 +102,7 @@ func TestCheckin(t *testing.T) {
 
 			request := CheckinRequest{}
 
-			r, err := cmd.Execute(ctx, &request)
+			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
 			require.Equal(t, 1, len(r.Actions))
@@ -157,7 +163,7 @@ func TestCheckin(t *testing.T) {
 
 			request := CheckinRequest{}
 
-			r, err := cmd.Execute(ctx, &request)
+			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
 			require.Equal(t, 2, len(r.Actions))
@@ -173,7 +179,7 @@ func TestCheckin(t *testing.T) {
 		},
 	))
 
-	t.Run("When we receive no action", withServerWithAuthClient(
+	t.Run("When we receive no action with delay", withServerWithAuthClient(
 		func(t *testing.T) *http.ServeMux {
 			raw := `{ "actions": [] }`
 			mux := http.NewServeMux()
@@ -189,7 +195,7 @@ func TestCheckin(t *testing.T) {
 
 			request := CheckinRequest{}
 
-			r, err := cmd.Execute(ctx, &request)
+			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
 			require.Equal(t, 0, len(r.Actions))
@@ -223,7 +229,7 @@ func TestCheckin(t *testing.T) {
 
 			request := CheckinRequest{Metadata: testMetadata()}
 
-			r, err := cmd.Execute(ctx, &request)
+			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
 			require.Equal(t, 0, len(r.Actions))
@@ -257,7 +263,7 @@ func TestCheckin(t *testing.T) {
 
 			request := CheckinRequest{}
 
-			r, err := cmd.Execute(ctx, &request)
+			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
 			require.Equal(t, 0, len(r.Actions))

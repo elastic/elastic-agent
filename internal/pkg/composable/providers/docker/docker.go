@@ -23,7 +23,7 @@ import (
 const ContainerPriority = 0
 
 func init() {
-	_ = composable.Providers.AddDynamicProvider("docker", DynamicProviderBuilder)
+	composable.Providers.MustAddDynamicProvider("docker", DynamicProviderBuilder)
 }
 
 type dockerContainerData struct {
@@ -54,58 +54,55 @@ func (c *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 		c.logger.Infof("Docker provider skipped, unable to connect: %s", err)
 		return nil
 	}
+	defer watcher.Stop()
 
-	go func() {
-		for {
-			select {
-			case <-comm.Done():
-				startListener.Stop()
-				stopListener.Stop()
+	for {
+		select {
+		case <-comm.Done():
+			startListener.Stop()
+			stopListener.Stop()
 
-				// Stop all timers before closing the channel
-				for _, stopper := range stoppers {
-					stopper.Stop()
-				}
-				close(stopTrigger)
-				return
-			case event := <-startListener.Events():
-				data, err := generateData(event)
-				if err != nil {
-					c.logger.Errorf("%s", err)
-					continue
-				}
-				if stopper, ok := stoppers[data.container.ID]; ok {
-					c.logger.Debugf("container %s is restarting, aborting pending stop", data.container.ID)
-					stopper.Stop()
-					delete(stoppers, data.container.ID)
-					return
-				}
-				err = comm.AddOrUpdate(data.container.ID, ContainerPriority, data.mapping, data.processors)
-				if err != nil {
-					c.logger.Errorf("%s", err)
-				}
-			case event := <-stopListener.Events():
-				data, err := generateData(event)
-				if err != nil {
-					c.logger.Errorf("%s", err)
-					continue
-				}
-				stopper := time.AfterFunc(c.config.CleanupTimeout, func() {
-					stopTrigger <- data
-				})
-				stoppers[data.container.ID] = stopper
-			case data := <-stopTrigger:
-				delete(stoppers, data.container.ID)
-				comm.Remove(data.container.ID)
+			// Stop all timers before closing the channel
+			for _, stopper := range stoppers {
+				stopper.Stop()
 			}
+			close(stopTrigger)
+			return comm.Err()
+		case event := <-startListener.Events():
+			data, err := generateData(event)
+			if err != nil {
+				c.logger.Errorf("%s", err)
+				continue
+			}
+			if stopper, ok := stoppers[data.container.ID]; ok {
+				c.logger.Debugf("container %s is restarting, aborting pending stop", data.container.ID)
+				stopper.Stop()
+				delete(stoppers, data.container.ID)
+				continue
+			}
+			err = comm.AddOrUpdate(data.container.ID, ContainerPriority, data.mapping, data.processors)
+			if err != nil {
+				c.logger.Errorf("%s", err)
+			}
+		case event := <-stopListener.Events():
+			data, err := generateData(event)
+			if err != nil {
+				c.logger.Errorf("%s", err)
+				continue
+			}
+			stopper := time.AfterFunc(c.config.CleanupTimeout, func() {
+				stopTrigger <- data
+			})
+			stoppers[data.container.ID] = stopper
+		case data := <-stopTrigger:
+			delete(stoppers, data.container.ID)
+			comm.Remove(data.container.ID)
 		}
-	}()
-
-	return nil
+	}
 }
 
 // DynamicProviderBuilder builds the dynamic provider.
-func DynamicProviderBuilder(logger *logger.Logger, c *config.Config) (composable.DynamicProvider, error) {
+func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (composable.DynamicProvider, error) {
 	var cfg Config
 	if c == nil {
 		c = config.New()
@@ -134,9 +131,11 @@ func generateData(event bus.Event) (*dockerContainerData, error) {
 		container: container,
 		mapping: map[string]interface{}{
 			"container": map[string]interface{}{
-				"id":     container.ID,
-				"name":   container.Name,
-				"image":  container.Image,
+				"id":   container.ID,
+				"name": container.Name,
+				"image": map[string]interface{}{
+					"name": container.Image,
+				},
 				"labels": labelMap,
 			},
 		},
@@ -144,12 +143,12 @@ func generateData(event bus.Event) (*dockerContainerData, error) {
 			{
 				"add_fields": map[string]interface{}{
 					"fields": map[string]interface{}{
-						"id":     container.ID,
-						"name":   container.Name,
-						"image":  container.Image,
-						"labels": processorLabelMap,
+						"id":         container.ID,
+						"name":       container.Name,
+						"image.name": container.Image,
+						"labels":     processorLabelMap,
 					},
-					"to": "container",
+					"target": "container",
 				},
 			},
 		},

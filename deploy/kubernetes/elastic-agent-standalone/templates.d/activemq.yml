@@ -1,0 +1,98 @@
+inputs:
+    - name: filestream-activemq
+      id: filestream-activemq-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.activemq.audit.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
+          data_stream:
+            dataset: activemq.audit
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.activemq.audit.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - activemq-audit
+        - condition: ${kubernetes.hints.activemq.log.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
+          data_stream:
+            dataset: activemq.log
+            type: logs
+          exclude_files:
+            - .gz$
+          multiline:
+            match: after
+            negate: true
+            pattern: '^\d{4}-\d{2}-\d{2} '
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.activemq.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - activemq-log
+      data_stream.namespace: default
+    - name: activemq/metrics-activemq
+      id: activemq/metrics-activemq-${kubernetes.hints.container_id}
+      type: activemq/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.activemq.broker.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
+          data_stream:
+            dataset: activemq.broker
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.activemq.broker.host|kubernetes.hints.activemq.host|'localhost:8161'}
+          metricsets:
+            - broker
+          password: ${kubernetes.hints.activemq.broker.password|kubernetes.hints.activemq.password|'admin'}
+          path: /api/jolokia/?ignoreErrors=true&amp;canonicalNaming=false
+          period: ${kubernetes.hints.activemq.broker.period|kubernetes.hints.activemq.period|'10s'}
+          tags:
+            - forwarded
+            - activemq-broker
+          username: ${kubernetes.hints.activemq.broker.username|kubernetes.hints.activemq.username|'admin'}
+        - condition: ${kubernetes.hints.activemq.queue.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
+          data_stream:
+            dataset: activemq.queue
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.activemq.queue.host|kubernetes.hints.activemq.host|'localhost:8161'}
+          metricsets:
+            - queue
+          password: ${kubernetes.hints.activemq.queue.password|kubernetes.hints.activemq.password|'admin'}
+          path: /api/jolokia/?ignoreErrors=true&amp;canonicalNaming=false
+          period: ${kubernetes.hints.activemq.queue.period|kubernetes.hints.activemq.period|'10s'}
+          tags:
+            - forwarded
+            - activemq-queue
+          username: ${kubernetes.hints.activemq.queue.username|kubernetes.hints.activemq.username|'admin'}
+        - condition: ${kubernetes.hints.activemq.topic.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
+          data_stream:
+            dataset: activemq.topic
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.activemq.topic.host|kubernetes.hints.activemq.host|'localhost:8161'}
+          metricsets:
+            - topic
+          password: ${kubernetes.hints.activemq.topic.password|kubernetes.hints.activemq.password|'admin'}
+          path: /api/jolokia/?ignoreErrors=true&amp;canonicalNaming=false
+          period: ${kubernetes.hints.activemq.topic.period|kubernetes.hints.activemq.period|'10s'}
+          tags:
+            - forwarded
+            - activemq-topic
+          username: ${kubernetes.hints.activemq.topic.username|kubernetes.hints.activemq.username|'admin'}
+      data_stream.namespace: default

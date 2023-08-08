@@ -6,8 +6,10 @@ package application
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -15,37 +17,53 @@ import (
 
 type once struct {
 	log      *logger.Logger
-	discover discoverFunc
+	discover config.DiscoverFunc
 	loader   *config.Loader
-	emitter  pipeline.EmitterFunc
+	ch       chan coordinator.ConfigChange
+	errCh    chan error
 }
 
-func newOnce(log *logger.Logger, discover discoverFunc, loader *config.Loader, emitter pipeline.EmitterFunc) *once {
-	return &once{log: log, discover: discover, loader: loader, emitter: emitter}
+func newOnce(log *logger.Logger, discover config.DiscoverFunc, loader *config.Loader) *once {
+	return &once{log: log, discover: discover, loader: loader, ch: make(chan coordinator.ConfigChange), errCh: make(chan error)}
 }
 
-func (o *once) Start() error {
+func (o *once) Run(ctx context.Context) error {
 	files, err := o.discover()
 	if err != nil {
 		return errors.New(err, "could not discover configuration files", errors.TypeConfig)
 	}
 
 	if len(files) == 0 {
-		return ErrNoConfiguration
+		return config.ErrNoConfiguration
 	}
 
-	return readfiles(context.Background(), files, o.loader, o.emitter)
+	cfg, err := readfiles(files, o.loader)
+	if err != nil {
+		return err
+	}
+	o.ch <- &localConfigChange{cfg}
+	<-ctx.Done()
+	return ctx.Err()
 }
 
-func (o *once) Stop() error {
+func (o *once) Errors() <-chan error {
+	return o.errCh
+}
+
+// ActionErrors returns the error channel for actions.
+// Returns nil channel.
+func (o *once) ActionErrors() <-chan error {
 	return nil
 }
 
-func readfiles(ctx context.Context, files []string, loader *config.Loader, emitter pipeline.EmitterFunc) error {
+func (o *once) Watch() <-chan coordinator.ConfigChange {
+	return o.ch
+}
+
+func readfiles(files []string, loader *config.Loader) (*config.Config, error) {
 	c, err := loader.Load(files)
 	if err != nil {
-		return errors.New(err, "could not load or merge configuration", errors.TypeConfig)
+		return nil, fmt.Errorf("failed to load or merge configuration: %w", err)
 	}
-
-	return emitter(ctx, c)
+	return c, nil
 }

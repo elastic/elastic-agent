@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build linux
-// +build linux
 
 package vault
 
@@ -11,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -29,28 +29,39 @@ type Vault struct {
 	mx   sync.Mutex
 }
 
-// Open initializes the vault store
-func New(path string) (*Vault, error) {
+// New creates the vault store
+func New(path string, opts ...OptionFunc) (v *Vault, err error) {
+	options := applyOptions(opts...)
 	dir := filepath.Dir(path)
 
 	// If there is no specific path then get the executable directory
 	if dir == "." {
 		exefp, err := os.Executable()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not get executable path: %w", err)
 		}
 		dir = filepath.Dir(exefp)
 		path = filepath.Join(dir, path)
 	}
 
-	err := os.MkdirAll(path, 0750)
-	if err != nil {
-		return nil, err
+	if options.readonly {
+		fi, err := os.Stat(path)
+		if err != nil {
+			return nil, err
+		}
+		if !fi.IsDir() {
+			return nil, fs.ErrNotExist
+		}
+	} else {
+		err := os.MkdirAll(path, 0750)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create vault path: %v, err: %w", path, err)
+		}
 	}
 
-	key, err := getSeed(path)
+	key, err := getOrCreateSeed(path, options.readonly)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get seed to create new valt: %w", err)
 	}
 
 	return &Vault{

@@ -5,42 +5,39 @@
 package configuration
 
 import (
-	"path/filepath"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/process"
-	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/core/server"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
-
-// ExternalInputsPattern is a glob that matches the paths of external configuration files.
-var ExternalInputsPattern = filepath.Join("inputs.d", "*.yml")
 
 // SettingsConfig is an collection of agent settings configuration.
 type SettingsConfig struct {
+	ID               string                          `yaml:"id" config:"id" json:"id"`
 	DownloadConfig   *artifact.Config                `yaml:"download" config:"download" json:"download"`
 	ProcessConfig    *process.Config                 `yaml:"process" config:"process" json:"process"`
-	GRPC             *server.Config                  `yaml:"grpc" config:"grpc" json:"grpc"`
-	RetryConfig      *retry.Config                   `yaml:"retry" config:"retry" json:"retry"`
+	GRPC             *GRPCConfig                     `yaml:"grpc" config:"grpc" json:"grpc"`
 	MonitoringConfig *monitoringCfg.MonitoringConfig `yaml:"monitoring" config:"monitoring" json:"monitoring"`
 	LoggingConfig    *logger.Config                  `yaml:"logging,omitempty" config:"logging,omitempty" json:"logging,omitempty"`
+	Upgrade          *UpgradeConfig                  `yaml:"upgrade" config:"upgrade" json:"upgrade"`
 
 	// standalone config
-	Reload *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`
-	Path   string        `config:"path" yaml:"path" json:"path"`
+	Reload              *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`
+	Path                string        `config:"path" yaml:"path" json:"path"`
+	V1MonitoringEnabled bool          `config:"v1_monitoring_enabled" yaml:"v1_monitoring_enabled" json:"v1_monitoring_enabled"`
 }
 
 // DefaultSettingsConfig creates a config with pre-set default values.
 func DefaultSettingsConfig() *SettingsConfig {
 	return &SettingsConfig{
-		ProcessConfig:    process.DefaultConfig(),
-		RetryConfig:      retry.DefaultConfig(),
-		DownloadConfig:   artifact.DefaultConfig(),
-		LoggingConfig:    logger.DefaultLoggingConfig(),
-		MonitoringConfig: monitoringCfg.DefaultConfig(),
-		GRPC:             server.DefaultGRPCConfig(),
-		Reload:           DefaultReloadConfig(),
+		ProcessConfig:       process.DefaultConfig(),
+		DownloadConfig:      artifact.DefaultConfig(),
+		LoggingConfig:       logger.DefaultLoggingConfig(),
+		MonitoringConfig:    monitoringCfg.DefaultConfig(),
+		GRPC:                DefaultGRPCConfig(),
+		Upgrade:             DefaultUpgradeConfig(),
+		Reload:              DefaultReloadConfig(),
+		V1MonitoringEnabled: true,
 	}
 }

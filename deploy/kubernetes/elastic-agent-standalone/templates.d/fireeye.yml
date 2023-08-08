@@ -1,0 +1,62 @@
+inputs:
+    - name: filestream-fireeye
+      id: filestream-fireeye-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.fireeye.nx.enabled} == true or ${kubernetes.hints.fireeye.enabled} == true
+          data_stream:
+            dataset: fireeye.nx
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.fireeye.nx.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale: null
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - fireeye-nx
+      data_stream.namespace: default
+    - name: udp-fireeye
+      id: udp-fireeye-${kubernetes.hints.container_id}
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.fireeye.nx.enabled} == true or ${kubernetes.hints.fireeye.enabled} == true
+          data_stream:
+            dataset: fireeye.nx
+            type: logs
+          fields_under_root: true
+          host: localhost:9523
+          processors:
+            - add_locale: null
+          tags:
+            - fireeye-nx
+            - forwarded
+          udp: null
+      data_stream.namespace: default
+    - name: tcp-fireeye
+      id: tcp-fireeye-${kubernetes.hints.container_id}
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.fireeye.nx.enabled} == true or ${kubernetes.hints.fireeye.enabled} == true
+          data_stream:
+            dataset: fireeye.nx
+            type: logs
+          fields_under_root: true
+          host: localhost:9523
+          processors:
+            - add_locale: null
+          tags:
+            - fireeye-nx
+            - forwarded
+          tcp: null
+      data_stream.namespace: default

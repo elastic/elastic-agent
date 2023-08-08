@@ -1,0 +1,87 @@
+inputs:
+    - name: filestream-redis
+      id: filestream-redis-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.redis.log.enabled} == true or ${kubernetes.hints.redis.enabled} == true
+          data_stream:
+            dataset: redis.log
+            type: logs
+          exclude_files:
+            - .gz$
+          exclude_lines:
+            - ^\s+[\-`('.|_]
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.redis.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - redis-log
+      data_stream.namespace: default
+    - name: redis-redis
+      id: redis-redis-${kubernetes.hints.container_id}
+      type: redis
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.redis.slowlog.enabled} == true or ${kubernetes.hints.redis.enabled} == true
+          data_stream:
+            dataset: redis.slowlog
+            type: logs
+          hosts:
+            - ${kubernetes.hints.redis.slowlog.host|kubernetes.hints.redis.host|'127.0.0.1:6379'}
+          password: ${kubernetes.hints.redis.slowlog.password|kubernetes.hints.redis.password|''}
+      data_stream.namespace: default
+    - name: redis/metrics-redis
+      id: redis/metrics-redis-${kubernetes.hints.container_id}
+      type: redis/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.redis.info.enabled} == true or ${kubernetes.hints.redis.enabled} == true
+          data_stream:
+            dataset: redis.info
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.redis.info.host|kubernetes.hints.redis.host|'127.0.0.1:6379'}
+          idle_timeout: 20s
+          maxconn: 10
+          metricsets:
+            - info
+          network: tcp
+          password: ${kubernetes.hints.redis.info.password|kubernetes.hints.redis.password|''}
+          period: ${kubernetes.hints.redis.info.period|kubernetes.hints.redis.period|'10s'}
+        - condition: ${kubernetes.hints.redis.key.enabled} == true or ${kubernetes.hints.redis.enabled} == true
+          data_stream:
+            dataset: redis.key
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.redis.key.host|kubernetes.hints.redis.host|'127.0.0.1:6379'}
+          idle_timeout: 20s
+          key.patterns:
+            - limit: 20
+              pattern: '*'
+          maxconn: 10
+          metricsets:
+            - key
+          network: tcp
+          password: ${kubernetes.hints.redis.key.password|kubernetes.hints.redis.password|''}
+          period: ${kubernetes.hints.redis.key.period|kubernetes.hints.redis.period|'10s'}
+        - condition: ${kubernetes.hints.redis.keyspace.enabled} == true or ${kubernetes.hints.redis.enabled} == true
+          data_stream:
+            dataset: redis.keyspace
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.redis.keyspace.host|kubernetes.hints.redis.host|'127.0.0.1:6379'}
+          idle_timeout: 20s
+          maxconn: 10
+          metricsets:
+            - keyspace
+          network: tcp
+          password: ${kubernetes.hints.redis.keyspace.password|kubernetes.hints.redis.password|''}
+          period: ${kubernetes.hints.redis.keyspace.period|kubernetes.hints.redis.period|'10s'}
+      data_stream.namespace: default

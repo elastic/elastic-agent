@@ -1,0 +1,141 @@
+inputs:
+    - name: httpjson-snyk
+      id: httpjson-snyk-${kubernetes.hints.container_id}
+      type: httpjson
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.snyk.audit.enabled} == true or ${kubernetes.hints.snyk.enabled} == true
+          config_version: 2
+          cursor:
+            interval:
+                value: -24h
+          data_stream:
+            dataset: snyk.audit
+            type: logs
+          interval: 10s
+          request.body:
+            filters: null
+          request.method: POST
+          request.transforms:
+            - set:
+                target: header.Authorization
+                value: token
+            - set:
+                target: url.params.to
+                value: '[[ formatDate (now) "2006-01-02" ]]'
+            - set:
+                default: '[[ formatDate (now (parseDuration "-720h")) "2006-01-02" ]]'
+                target: url.params.from
+                value: '[[ formatDate (now (parseDuration .cursor.interval)) "2006-01-02" ]]'
+          request.url: https://snyk.io/api/v1/org//audit?page=1&sortOrder=ASC
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.page
+                value: '[[if (ne (len .last_response.body.response) 0)]][[add .last_response.page 1]][[end]]'
+          response.request_body_on_pagination: true
+          tags:
+            - forwarded
+            - snyk-audit
+        - condition: ${kubernetes.hints.snyk.vulnerabilities.enabled} == true or ${kubernetes.hints.snyk.enabled} == true
+          config_version: 2
+          cursor:
+            interval:
+                value: -24h
+          data_stream:
+            dataset: snyk.vulnerabilities
+            type: logs
+          interval: 24h
+          request.body:
+            filters:
+                exploitMaturity:
+                    - mature
+                    - proof-of-concept
+                    - no-known-exploit
+                    - no-data
+                fixable: false
+                identifier: null
+                ignored: false
+                isFixed: false
+                isPatchable: false
+                isPinnable: false
+                isUpgradable: false
+                languages:
+                    - javascript
+                    - ruby
+                    - java
+                    - scala
+                    - python
+                    - golang
+                    - php
+                    - dotnet
+                    - swift-objective-c
+                    - elixir
+                    - docker
+                    - terraform
+                    - kubernetes
+                    - helm
+                    - cloudformation
+                orgs: null
+                patched: false
+                priorityScore:
+                    max: 1000
+                    min: 0
+                projects: null
+                severity:
+                    - critical
+                    - high
+                    - medium
+                    - low
+                types:
+                    - vuln
+                    - license
+                    - configuration
+          request.method: POST
+          request.timeout: 120s
+          request.transforms:
+            - set:
+                target: header.Authorization
+                value: token
+            - set:
+                target: url.params.to
+                value: '[[ formatDate (now) "2006-01-02" ]]'
+            - set:
+                default: '[[ formatDate (now (parseDuration "-24h")) "2006-01-02" ]]'
+                target: url.params.from
+                value: '[[ formatDate (now (parseDuration .cursor.interval)) "2006-01-02" ]]'
+          request.url: https://snyk.io/api/v1/reporting/issues/?page=1&perPage=10&sortBy=issueTitle&order=asc&groupBy=issue
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.page
+                value: '[[if (ne (len .last_response.body.response) 0)]][[add .last_response.page 1]][[end]]'
+          response.request_body_on_pagination: true
+          response.split:
+            target: body.results
+          tags:
+            - forwarded
+            - snyk-vulnerabilities
+      data_stream.namespace: default
+    - name: filestream-snyk
+      id: filestream-snyk-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.snyk.container_logs.enabled} == true
+          data_stream:
+            dataset: snyk.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

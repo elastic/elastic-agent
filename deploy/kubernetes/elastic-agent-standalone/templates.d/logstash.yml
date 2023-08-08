@@ -1,0 +1,81 @@
+inputs:
+    - name: logstash/metrics-logstash
+      id: logstash/metrics-logstash-${kubernetes.hints.container_id}
+      type: logstash/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.logstash.node.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
+          data_stream:
+            dataset: logstash.stack_monitoring.node
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.logstash.node.host|kubernetes.hints.logstash.host|'http://localhost:9600'}
+          metricsets:
+            - node
+          password: ${kubernetes.hints.logstash.node.password|kubernetes.hints.logstash.password|''}
+          period: ${kubernetes.hints.logstash.node.period|kubernetes.hints.logstash.period|'10s'}
+          username: ${kubernetes.hints.logstash.node.username|kubernetes.hints.logstash.username|''}
+        - condition: ${kubernetes.hints.logstash.node_stats.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
+          data_stream:
+            dataset: logstash.stack_monitoring.node_stats
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.logstash.node_stats.host|kubernetes.hints.logstash.host|'http://localhost:9600'}
+          metricsets:
+            - node_stats
+          password: ${kubernetes.hints.logstash.node_stats.password|kubernetes.hints.logstash.password|''}
+          period: ${kubernetes.hints.logstash.node_stats.period|kubernetes.hints.logstash.period|'10s'}
+          username: ${kubernetes.hints.logstash.node_stats.username|kubernetes.hints.logstash.username|''}
+      data_stream.namespace: default
+    - name: filestream-logstash
+      id: filestream-logstash-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.logstash.log.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
+          data_stream:
+            dataset: logstash.log
+            type: logs
+          exclude_files:
+            - .gz$
+          multiline:
+            match: after
+            negate: true
+            pattern: ^((\[[0-9]{4}-[0-9]{2}-[0-9]{2}[^\]]+\])|({.+}))
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.logstash.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale.when.not.regexp.message: ^{
+            - add_fields:
+                fields:
+                    ecs.version: 1.10.0
+                target: ""
+          prospector:
+            scanner:
+                symlinks: true
+        - condition: ${kubernetes.hints.logstash.slowlog.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
+          data_stream:
+            dataset: logstash.slowlog
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.logstash.slowlog.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale.when.not.regexp.message: ^{
+            - add_fields:
+                fields:
+                    ecs.version: 1.10.0
+                target: ""
+          prospector:
+            scanner:
+                symlinks: true
+      data_stream.namespace: default

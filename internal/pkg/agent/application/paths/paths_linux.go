@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build linux
-// +build linux
 
 package paths
 
@@ -14,5 +13,5 @@ const defaultAgentVaultPath = "vault"
 
 // AgentVaultPath is the directory that contains all the files for the value
 func AgentVaultPath() string {
-	return filepath.Join(Home(), defaultAgentVaultPath)
+	return filepath.Join(Config(), defaultAgentVaultPath)
 }

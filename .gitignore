@@ -1,4 +1,7 @@
 # Directories
+/.agent-testing
+/.integration-cache
+/.ogc-cache
 /.vagrant
 /.idea
 /.vscode
@@ -21,6 +24,8 @@ go_env.properties
 mage_output_file.go
 elastic_agent
 fleet.yml
+fleet.enc
+fleet.enc.lock
 
 # Editor swap files
 *.swp
@@ -43,7 +48,6 @@ fleet.yml
 # Files generated with the bump version automations
 *.bck
 
-
 # agent
 build/
 elastic-agent
@@ -52,14 +56,5 @@ elastic-agent.yml.*
 fleet.yml
 fleet.yml.lock
 fleet.yml.old
-internal/pkg/agent/operation/tests/scripts/short--1.0.yml
-internal/pkg/agent/operation/tests/scripts/configurable-1.0-darwin-x86/configurable
-internal/pkg/agent/operation/tests/scripts/servicable-1.0-darwin-x86/configurable
-internal/pkg/agent/operation/tests/scripts/configurable-1.0-darwin-x86_64/configurable
-internal/pkg/agent/operation/tests/scripts/serviceable-1.0-darwin-x86_64/serviceable
-internal/pkg/agent/application/fleet.yml
-internal/pkg/agent/transpiler/tests/exec-1.0-darwin-x86_64/exec
-
-# VSCode
-/.vscode
-
+pkg/component/fake/component/component
+pkg/component/fake/shipper/shipper

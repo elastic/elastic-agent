@@ -1,0 +1,27 @@
+version: 2
+inputs:
+  - name: apm
+    description: "APM Server"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+    outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+    command:
+      args:
+        - "-E"
+        - "management.enabled=true"
+        - "-E"
+        - "gc_percent=${APMSERVER_GOGC:100}"
+        - "-E"
+        - "logging.level=info"
+        - "-E"
+        - "logging.to_stderr=true"

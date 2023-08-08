@@ -1,0 +1,44 @@
+inputs:
+    - name: filestream-hid_bravura_monitor
+      id: filestream-hid_bravura_monitor-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.hid_bravura_monitor.log.enabled} == true or ${kubernetes.hints.hid_bravura_monitor.enabled} == true
+          data_stream:
+            dataset: hid_bravura_monitor.log
+            type: logs
+          line_terminator: carriage_return_line_feed
+          parsers:
+            - multiline:
+                match: after
+                negate: true
+                pattern: ^[[:cntrl:]]
+                type: pattern
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_fields:
+                fields:
+                    event.timezone: UTC
+                    hid_bravura_monitor.environment: PRODUCTION
+                    hid_bravura_monitor.instancename: default
+                    hid_bravura_monitor.instancetype: Privilege-Identity-Password
+                    hid_bravura_monitor.node: 0.0.0.0
+                target: ""
+          prospector.scanner.exclude_files:
+            - .gz$
+          tags: null
+      data_stream.namespace: default
+    - name: winlog-hid_bravura_monitor
+      id: winlog-hid_bravura_monitor-${kubernetes.hints.container_id}
+      type: winlog
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.hid_bravura_monitor.winlog.enabled} == true or ${kubernetes.hints.hid_bravura_monitor.enabled} == true
+          data_stream:
+            dataset: hid_bravura_monitor.winlog
+            type: logs
+          name: Hitachi-Hitachi ID Systems-Hitachi ID Suite/Operational
+          tags: null
+      data_stream.namespace: default

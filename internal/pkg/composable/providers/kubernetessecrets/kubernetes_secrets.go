@@ -7,6 +7,7 @@ package kubernetessecrets
 import (
 	"context"
 	"strings"
+	"sync"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
@@ -23,18 +24,19 @@ var _ corecomp.FetchContextProvider = (*contextProviderK8sSecrets)(nil)
 var getK8sClientFunc = getK8sClient
 
 func init() {
-	_ = composable.Providers.AddContextProvider("kubernetes_secrets", ContextProviderBuilder)
+	composable.Providers.MustAddContextProvider("kubernetes_secrets", ContextProviderBuilder)
 }
 
 type contextProviderK8sSecrets struct {
 	logger *logger.Logger
 	config *Config
 
-	client k8sclient.Interface
+	clientMx sync.Mutex
+	client   k8sclient.Interface
 }
 
 // ContextProviderBuilder builds the context provider.
-func ContextProviderBuilder(logger *logger.Logger, c *config.Config) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (corecomp.ContextProvider, error) {
 	var cfg Config
 	if c == nil {
 		c = config.New()
@@ -43,12 +45,18 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config) (corecomp.C
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
-	return &contextProviderK8sSecrets{logger, &cfg, nil}, nil
+	return &contextProviderK8sSecrets{
+		logger: logger,
+		config: &cfg,
+	}, nil
 }
 
 func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
 	// key = "kubernetes_secrets.somenamespace.somesecret.value"
-	if p.client == nil {
+	p.clientMx.Lock()
+	client := p.client
+	p.clientMx.Unlock()
+	if client == nil {
 		return "", false
 	}
 	tokens := strings.Split(key, ".")
@@ -67,7 +75,7 @@ func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
 	secretName := tokens[2]
 	secretVar := tokens[3]
 
-	secretIntefrace := p.client.CoreV1().Secrets(ns)
+	secretIntefrace := client.CoreV1().Secrets(ns)
 	ctx := context.TODO()
 	secret, err := secretIntefrace.Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
@@ -89,8 +97,14 @@ func (p *contextProviderK8sSecrets) Run(comm corecomp.ContextProviderComm) error
 		p.logger.Debugf("Kubernetes_secrets provider skipped, unable to connect: %s", err)
 		return nil
 	}
+	p.clientMx.Lock()
 	p.client = client
-	return nil
+	p.clientMx.Unlock()
+	<-comm.Done()
+	p.clientMx.Lock()
+	p.client = nil
+	p.clientMx.Unlock()
+	return comm.Err()
 }
 
 func getK8sClient(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {

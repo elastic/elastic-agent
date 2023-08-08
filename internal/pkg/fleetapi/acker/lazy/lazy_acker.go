@@ -80,18 +80,18 @@ func (f *Acker) Commit(ctx context.Context) (err error) {
 	actions := f.queue
 	f.queue = make([]fleetapi.Action, 0)
 
-	f.log.Debugf("lazy acker: ackbatch: %#v", actions)
+	f.log.Debugf("lazy acker: ack batch: %s", actions)
 	var resp *fleetapi.AckResponse
 	resp, err = f.acker.AckBatch(ctx, actions)
 
 	// If request failed enqueue all actions with retrier if it is set
 	if err != nil {
 		if f.retrier != nil {
-			f.log.Errorf("lazy acker: failed ack batch, enqueue for retry: %#v", actions)
+			f.log.Errorf("lazy acker: failed ack batch, enqueue for retry: %s", actions)
 			f.retrier.Enqueue(actions)
 			return nil
 		}
-		f.log.Errorf("lazy acker: failed ack batch, no retrier set, fail with err: %v", err)
+		f.log.Errorf("lazy acker: failed ack batch, no retrier set, fail with err: %s", err)
 		return err
 	}
 
@@ -107,7 +107,7 @@ func (f *Acker) Commit(ctx context.Context) (err error) {
 			}
 		}
 		if len(failed) > 0 {
-			f.log.Infof("lazy acker: partially failed ack batch, enqueue for retry: %#v", failed)
+			f.log.Infof("lazy acker: partially failed ack batch, enqueue for retry: %s", failed)
 			f.retrier.Enqueue(failed)
 		}
 	}

@@ -12,11 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
@@ -31,33 +32,35 @@ const (
 )
 
 // Rollback rollbacks to previous version which was functioning before upgrade.
-func Rollback(ctx context.Context, prevHash, currentHash string) error {
+func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentHash string) error {
 	// change symlink
-	if err := ChangeSymlink(ctx, prevHash); err != nil {
+	if err := ChangeSymlink(ctx, log, prevHash); err != nil {
 		return err
 	}
 
 	// revert active commit
-	if err := UpdateActiveCommit(prevHash); err != nil {
+	if err := UpdateActiveCommit(log, prevHash); err != nil {
 		return err
 	}
 
 	// Restart
+	log.Info("Restarting the agent after rollback")
 	if err := restartAgent(ctx); err != nil {
 		return err
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(prevHash, true)
+	return Cleanup(log, prevHash, true, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
-func Cleanup(currentHash string, removeMarker bool) error {
+func Cleanup(log *logger.Logger, currentHash string, removeMarker bool, keepLogs bool) error {
+	log.Debugw("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
 	<-time.After(afterRestartDelay)
 
 	// remove upgrade marker
 	if removeMarker {
-		if err := CleanMarker(); err != nil {
+		if err := CleanMarker(log); err != nil {
 			return err
 		}
 	}
@@ -74,7 +77,9 @@ func Cleanup(currentHash string, removeMarker bool) error {
 	}
 
 	// remove symlink to avoid upgrade failures, ignore error
-	_ = os.Remove(prevSymlinkPath())
+	prevSymlink := prevSymlinkPath()
+	log.Debugw("Removing previous symlink path", "file.path", prevSymlinkPath())
+	_ = os.Remove(prevSymlink)
 
 	dirPrefix := fmt.Sprintf("%s-", agentName)
 	currentDir := fmt.Sprintf("%s-%s", agentName, currentHash)
@@ -88,7 +93,12 @@ func Cleanup(currentHash string, removeMarker bool) error {
 		}
 
 		hashedDir := filepath.Join(paths.Data(), dir)
-		if cleanupErr := install.RemovePath(hashedDir); cleanupErr != nil {
+		log.Debugw("Removing hashed data directory", "file.path", hashedDir)
+		var ignoredDirs []string
+		if keepLogs {
+			ignoredDirs = append(ignoredDirs, "logs")
+		}
+		if cleanupErr := install.RemoveBut(hashedDir, true, ignoredDirs...); cleanupErr != nil {
 			err = multierror.Append(err, cleanupErr)
 		}
 	}
@@ -104,15 +114,15 @@ func InvokeWatcher(log *logger.Logger) error {
 		return nil
 	}
 
-	versionedHome := paths.VersionedHome(paths.Top())
-	cmd := invokeCmd(versionedHome)
+	cmd := invokeCmd()
 	defer func() {
 		if cmd.Process != nil {
 			log.Debugf("releasing watcher %v", cmd.Process.Pid)
-			cmd.Process.Release()
+			_ = cmd.Process.Release()
 		}
 	}()
 
+	log.Debugw("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
 	return cmd.Start()
 }
 

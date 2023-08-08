@@ -1,0 +1,39 @@
+inputs:
+    - name: filestream-traefik
+      id: filestream-traefik-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.traefik.access.enabled} == true or ${kubernetes.hints.traefik.enabled} == true
+          data_stream:
+            dataset: traefik.access
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.traefik.access.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+      data_stream.namespace: default
+    - name: traefik/metrics-traefik
+      id: traefik/metrics-traefik-${kubernetes.hints.container_id}
+      type: traefik/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.traefik.health.enabled} == true or ${kubernetes.hints.traefik.enabled} == true
+          data_stream:
+            dataset: traefik.health
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.traefik.health.host|kubernetes.hints.traefik.host|'localhost:8080'}
+          metricsets:
+            - health
+          period: ${kubernetes.hints.traefik.health.period|kubernetes.hints.traefik.period|'10s'}
+      data_stream.namespace: default

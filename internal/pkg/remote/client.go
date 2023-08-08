@@ -6,14 +6,17 @@ package remote
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/hashicorp/go-multierror"
 
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -26,33 +29,42 @@ const (
 	retryOnBadConnTimeout = 5 * time.Minute
 )
 
-type requestFunc func(string, string, url.Values, io.Reader) (*http.Request, error)
 type wrapperFunc func(rt http.RoundTripper) (http.RoundTripper, error)
 
 type requestClient struct {
-	request    requestFunc
+	host       string
 	client     http.Client
 	lastUsed   time.Time
 	lastErr    error
 	lastErrOcc time.Time
 }
 
-// Client wraps an http.Client and takes care of making the raw calls, the client should
-// stay simple and specificals should be implemented in external action instead of adding new methods
-// to the client. For authenticated calls or sending fields on every request, create customer RoundTripper
-// implementations that will take care of the boiler plates.
+func (r *requestClient) SetLastError(err error) {
+	r.lastUsed = time.Now().UTC()
+	r.lastErr = err
+	if err != nil {
+		r.lastErrOcc = r.lastUsed
+	} else {
+		r.lastErrOcc = time.Time{}
+	}
+}
+
+// Client wraps a http.Client and takes care of making the raw calls, the client should
+// stay simple and specifics should be implemented in external action instead of adding new methods
+// to the client. For authenticated calls or sending fields on every request, create a custom RoundTripper
+// implementation that will take care of the boilerplate.
 type Client struct {
-	log     *logger.Logger
-	lock    sync.Mutex
-	clients []*requestClient
-	config  Config
+	log        *logger.Logger
+	clientLock sync.Mutex
+	clients    []*requestClient
+	config     Config
 }
 
 // NewConfigFromURL returns a Config based on a received host.
 func NewConfigFromURL(URL string) (Config, error) {
 	u, err := url.Parse(URL)
 	if err != nil {
-		return Config{}, errors.Wrap(err, "could not parse url")
+		return Config{}, fmt.Errorf("could not parse url: %w", err)
 	}
 
 	c := DefaultClientConfig()
@@ -76,7 +88,7 @@ func NewWithRawConfig(log *logger.Logger, config *config.Config, wrapper wrapper
 
 	cfg := Config{}
 	if err := config.Unpack(&cfg); err != nil {
-		return nil, errors.Wrap(err, "invalidate configuration")
+		return nil, fmt.Errorf("invalidate configuration: %w", err)
 	}
 
 	return NewWithConfig(l, cfg, wrapper)
@@ -97,11 +109,14 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 	}
 
 	hosts := cfg.GetHosts()
-	clients := make([]*requestClient, len(hosts))
-	for i, host := range cfg.GetHosts() {
-		connStr, err := urlutil.MakeURL(string(cfg.Protocol), p, host, 0)
+	hostCount := len(hosts)
+	log.With("hosts", hosts).Debugf(
+		"creating remote client with %d hosts", hostCount)
+	clients := make([]*requestClient, hostCount)
+	for i, host := range hosts {
+		baseURL, err := urlutil.MakeURL(string(cfg.Protocol), p, host, 0)
 		if err != nil {
-			return nil, errors.Wrap(err, "invalid fleet-server endpoint")
+			return nil, fmt.Errorf("invalid fleet-server endpoint: %w", err)
 		}
 
 		transport, err := cfg.Transport.RoundTripper(
@@ -115,7 +130,7 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 		if wrapper != nil {
 			transport, err = wrapper(transport)
 			if err != nil {
-				return nil, errors.Wrap(err, "fail to create transport client")
+				return nil, fmt.Errorf("fail to create transport client: %w", err)
 			}
 		}
 
@@ -125,17 +140,17 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 		}
 
 		clients[i] = &requestClient{
-			request: prefixRequestFactory(connStr),
-			client:  httpClient,
+			host:   baseURL,
+			client: httpClient,
 		}
 	}
 
-	return new(log, cfg, clients...)
+	return newClient(log, cfg, clients...)
 }
 
-// Send executes a direct calls against the API, the method will takes cares of cloning
-// also add necessary headers for likes: "Content-Type", "Accept", and "kbn-xsrf".
-// No assumptions is done on the response concerning the received format, this will be the responsibility
+// Send executes a direct calls against the API, the method will take care of cloning and
+// also adding the necessary headers likes: "Content-Type", "Accept", and "kbn-xsrf".
+// No assumptions are done on the response concerning the received format, this will be the responsibility
 // of the implementation to correctly unpack any received data.
 //
 // NOTE:
@@ -155,45 +170,61 @@ func (c *Client) Send(
 	}
 
 	c.log.Debugf("Request method: %s, path: %s, reqID: %s", method, path, reqID)
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	requester := c.nextRequester()
 
-	req, err := requester.request(method, path, params, body)
-	if err != nil {
-		return nil, errors.Wrapf(err, "fail to create HTTP request using method %s to %s", method, path)
-	}
+	var resp *http.Response
+	var multiErr error
 
-	// Add generals headers to the request, we are dealing exclusively with JSON.
-	// Content-Type / Accepted type can be override from the called.
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Add("Accept", "application/json")
-	// This header should be specific to fleet-server or remove it
-	req.Header.Set("kbn-xsrf", "1") // Without this Kibana will refuse to answer the request.
+	clients := c.sortClients()
 
-	// If available, add the request id as an HTTP header
-	if reqID != "" {
-		req.Header.Add("X-Request-ID", reqID)
-	}
-
-	// copy headers.
-	for header, values := range headers {
-		for _, v := range values {
-			req.Header.Add(header, v)
+	for i, requester := range clients {
+		req, err := requester.newRequest(method, path, params, body)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"fail to create HTTP request using method %s to %s: %w",
+				method, path, err)
 		}
+		c.log.Debugf("Creating new request to request URL %s", req.URL.String())
+
+		// Add generals headers to the request, we are dealing exclusively with JSON.
+		// Content-Type / Accepted type can be overridden by the caller.
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Add("Accept", "application/json")
+		// This header should be specific to fleet-server or remove it
+		req.Header.Set("kbn-xsrf", "1") // Without this Kibana will refuse to answer the request.
+
+		// If available, add the request id as an HTTP header
+		if reqID != "" {
+			req.Header.Add("X-Request-ID", reqID)
+		}
+
+		// copy headers.
+		for header, values := range headers {
+			for _, v := range values {
+				req.Header.Add(header, v)
+			}
+		}
+
+		resp, err = requester.client.Do(req.WithContext(ctx))
+
+		// Using the same lock that was used for sorting above
+		c.clientLock.Lock()
+		requester.SetLastError(err)
+		c.clientLock.Unlock()
+
+		if err != nil {
+			msg := fmt.Sprintf("requester %d/%d to host %s errored",
+				i, len(clients), requester.host)
+			multiErr = multierror.Append(multiErr, fmt.Errorf("%s: %w", msg, err))
+
+			// Using debug level as the error is only relevant if all clients fail.
+			c.log.With("error", err).Debugf(msg)
+			continue
+		}
+
+		return resp, nil
 	}
 
-	requester.lastUsed = time.Now().UTC()
-
-	resp, err := requester.client.Do(req.WithContext(ctx))
-	if err != nil {
-		requester.lastErr = err
-		requester.lastErrOcc = time.Now().UTC()
-	} else {
-		requester.lastErr = nil
-		requester.lastErrOcc = time.Time{}
-	}
-	return resp, err
+	return nil, fmt.Errorf("all hosts failed: %w", multiErr)
 }
 
 // URI returns the remote URI.
@@ -202,67 +233,87 @@ func (c *Client) URI() string {
 	return string(c.config.Protocol) + "://" + host + "/" + c.config.Path
 }
 
-// new creates new API client.
-func new(
+// newClient creates a new API client.
+func newClient(
 	log *logger.Logger,
 	cfg Config,
-	httpClients ...*requestClient,
+	clients ...*requestClient,
 ) (*Client, error) {
+	// Shuffle so all the agents don't access the hosts in the same order
+	rand.Shuffle(len(clients), func(i, j int) {
+		clients[i], clients[j] = clients[j], clients[i]
+	})
+
 	c := &Client{
 		log:     log,
-		clients: httpClients,
+		clients: clients,
 		config:  cfg,
 	}
 	return c, nil
 }
 
-// nextRequester returns the requester to use.
+// sortClients sort the clients according to the following priority:
+//   - never used
+//   - without errors, last used first when more than one does not have errors
+//   - last errored.
 //
-// It excludes clients that have errored in the last 5 minutes.
-func (c *Client) nextRequester() *requestClient {
-	var selected *requestClient
+// It also removes the last error after retryOnBadConnTimeout has elapsed.
+func (c *Client) sortClients() []*requestClient {
+	c.clientLock.Lock()
+	defer c.clientLock.Unlock()
 
 	now := time.Now().UTC()
-	for _, requester := range c.clients {
-		if requester.lastErr != nil && now.Sub(requester.lastErrOcc) > retryOnBadConnTimeout {
-			requester.lastErr = nil
-			requester.lastErrOcc = time.Time{}
+
+	sort.Slice(c.clients, func(i, j int) bool {
+		// First, set them good if the timout has elapsed
+		if c.clients[i].lastErr != nil &&
+			now.Sub(c.clients[i].lastErrOcc) > retryOnBadConnTimeout {
+			c.clients[i].lastErr = nil
+			c.clients[i].lastErrOcc = time.Time{}
 		}
-		if requester.lastErr != nil {
-			continue
+		if c.clients[j].lastErr != nil &&
+			now.Sub(c.clients[j].lastErrOcc) > retryOnBadConnTimeout {
+			c.clients[j].lastErr = nil
+			c.clients[j].lastErrOcc = time.Time{}
 		}
-		if requester.lastUsed.IsZero() {
-			// never been used, instant winner!
-			selected = requester
-			break
+
+		// Pick not yet used first, but if both haven't been used yet,
+		// we return false to comply with the sort.Interface definition.
+		if c.clients[i].lastUsed.IsZero() &&
+			c.clients[j].lastUsed.IsZero() {
+			return false
 		}
-		if selected == nil {
-			selected = requester
-			continue
+
+		// Pick not yet used first
+		if c.clients[i].lastUsed.IsZero() {
+			return true
 		}
-		if requester.lastUsed.Before(selected.lastUsed) {
-			selected = requester
+
+		// If none has errors, pick the last used
+		// Then, the one without errors
+		if c.clients[i].lastErr == nil &&
+			c.clients[j].lastErr == nil {
+			return c.clients[i].lastUsed.Before(c.clients[j].lastUsed)
 		}
-	}
-	if selected == nil {
-		// all are erroring; select the oldest one that errored
-		for _, requester := range c.clients {
-			if selected == nil {
-				selected = requester
-				continue
-			}
-			if requester.lastErrOcc.Before(selected.lastErrOcc) {
-				selected = requester
-			}
+
+		// Then, the one without error
+		if c.clients[i].lastErr == nil {
+			return true
 		}
-	}
-	return selected
+
+		// Lastly, the one that errored last
+		return c.clients[i].lastUsed.Before(c.clients[j].lastUsed)
+	})
+
+	// return a copy of the slice so we can iterate over it without the lock
+	res := make([]*requestClient, len(c.clients))
+	copy(res, c.clients)
+	return res
 }
 
-func prefixRequestFactory(URL string) requestFunc {
-	return func(method, path string, params url.Values, body io.Reader) (*http.Request, error) {
-		path = strings.TrimPrefix(path, "/")
-		newPath := strings.Join([]string{URL, path, "?", params.Encode()}, "")
-		return http.NewRequest(method, newPath, body) //nolint:noctx // keep old behaviour
-	}
+func (r requestClient) newRequest(method string, path string, params url.Values, body io.Reader) (*http.Request, error) {
+	path = strings.TrimPrefix(path, "/")
+	newPath := strings.Join([]string{r.host, path, "?", params.Encode()}, "")
+
+	return http.NewRequestWithContext(context.TODO(), method, newPath, body)
 }

@@ -33,6 +33,8 @@ const (
 	ActionTypeInputAction = "INPUT_ACTION"
 	// ActionTypeCancel specifies a cancel action.
 	ActionTypeCancel = "CANCEL"
+	// ActionTypeDiagnostics specifies a diagnostics action.
+	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
 )
 
 // Error values that the Action interface can return
@@ -46,12 +48,44 @@ type Action interface {
 	fmt.Stringer
 	Type() string
 	ID() string
-	// StartTime returns the earliest time an action should start (for schduled actions)
-	// Only ActionUpgrade implements this at the moment
+	AckEvent() AckEvent
+}
+
+// ScheduledAction is an Action that may be executed at a later date
+// Only ActionUpgrade implements this at the moment
+type ScheduledAction interface {
+	Action
+	// StartTime returns the earliest time an action should start.
 	StartTime() (time.Time, error)
-	// Expiration returns the time where an action is expired and should not be ran (for scheduled actions)
-	// Only ActionUpgrade implements this at the moment
+	// Expiration returns the time where an action is expired and should not be ran.
 	Expiration() (time.Time, error)
+}
+
+// RetryableAction is an Action that may be scheduled for a retry.
+type RetryableAction interface {
+	ScheduledAction
+	// RetryAttempt returns the retry-attempt number of the action
+	// the retry_attempt number is meant to be an interal counter for the elastic-agent and not communicated to fleet-server or ES.
+	// If RetryAttempt returns > 1, and GetError is not nil the acker should signal that the action is being retried.
+	// If RetryAttempt returns < 1, and GetError is not nil the acker should signal that the action has failed.
+	RetryAttempt() int
+	// SetRetryAttempt sets the retry-attempt number of the action
+	// the retry_attempt number is meant to be an interal counter for the elastic-agent and not communicated to fleet-server or ES.
+	SetRetryAttempt(int)
+	// SetStartTime sets the start_time of the action to the specified value.
+	// this is used by the action-retry mechanism.
+	SetStartTime(t time.Time)
+	// GetError returns the error that is associated with the retry.
+	// If it is a retryable action fleet-server should mark it as such.
+	// Otherwise fleet-server should mark the action as failed.
+	GetError() error
+	// SetError sets the retryable action error
+	SetError(error)
+}
+
+type Signed struct {
+	Data      string `yaml:"data" json:"data" mapstructure:"data"`
+	Signature string `yaml:"signature" json:"signature" mapstructure:"signature"`
 }
 
 // FleetAction represents an action from fleet-server.
@@ -64,10 +98,21 @@ type FleetAction struct {
 	ActionStartTime  string          `yaml:"start_time,omitempty" json:"start_time,omitempty"`
 	Timeout          int64           `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	Data             json.RawMessage `yaml:"data,omitempty" json:"data,omitempty"`
+	Retry            int             `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty"` // used internally for serialization by elastic-agent.
 	//Agents []string // disabled, fleet-server uses this to generate each agent's actions
 	//Timestamp string // disabled, agent does not care when the document was created
 	//UserID string // disabled, agent does not care
 	//MinimumExecutionDuration int64 // disabled, used by fleet-server for scheduling
+	Signed *Signed `yaml:"signed,omitempty" json:"signed,omitempty"`
+}
+
+func newAckEvent(id, aType string) AckEvent {
+	return AckEvent{
+		EventType: "ACTION_RESULT",
+		SubType:   "ACKNOWLEDGED",
+		ActionID:  id,
+		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", id, aType),
+	}
 }
 
 // ActionUnknown is an action that is not know by the current version of the Agent and we don't want
@@ -91,16 +136,6 @@ func (a *ActionUnknown) ID() string {
 	return a.ActionID
 }
 
-// StartTime returns ErrNoStartTime
-func (a *ActionUnknown) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionUnknown) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
-}
-
 func (a *ActionUnknown) String() string {
 	var s strings.Builder
 	s.WriteString("action_id: ")
@@ -116,6 +151,16 @@ func (a *ActionUnknown) String() string {
 // OriginalType returns the original type of the action as returned by the API.
 func (a *ActionUnknown) OriginalType() string {
 	return a.originalType
+}
+
+func (a *ActionUnknown) AckEvent() AckEvent {
+	return AckEvent{
+		EventType: "ACTION_RESULT", // TODO Discuss EventType/SubType needed - by default only ACTION_RESULT was used - what is (or was) the intended purpose of these attributes? Are they documented? Can we change them to better support acking an error or a retry?
+		SubType:   "ACKNOWLEDGED",
+		ActionID:  a.ActionID,
+		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
+		Error:     fmt.Sprintf("Action %q of type %q is unknown to the elastic-agent", a.ActionID, a.originalType),
+	}
 }
 
 // ActionPolicyReassign is a request to apply a new
@@ -143,14 +188,8 @@ func (a *ActionPolicyReassign) ID() string {
 	return a.ActionID
 }
 
-// StartTime returns ErrNoStartTime
-func (a *ActionPolicyReassign) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionPolicyReassign) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
+func (a *ActionPolicyReassign) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionPolicyChange is a request to apply a new
@@ -179,24 +218,21 @@ func (a *ActionPolicyChange) ID() string {
 	return a.ActionID
 }
 
-// StartTime returns ErrNoStartTime
-func (a *ActionPolicyChange) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionPolicyChange) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
+func (a *ActionPolicyChange) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionUpgrade is a request for agent to upgrade.
 type ActionUpgrade struct {
-	ActionID         string `yaml:"action_id"`
-	ActionType       string `yaml:"type"`
-	ActionStartTime  string `json:"start_time" yaml:"start_time,omitempty"` // TODO change to time.Time in unmarshal
-	ActionExpiration string `json:"expiration" yaml:"expiration,omitempty"`
-	Version          string `json:"version" yaml:"version,omitempty"`
-	SourceURI        string `json:"source_uri,omitempty" yaml:"source_uri,omitempty"`
+	ActionID         string  `yaml:"action_id" mapstructure:"id"`
+	ActionType       string  `yaml:"type" mapstructure:"type"`
+	ActionStartTime  string  `json:"start_time" yaml:"start_time,omitempty" mapstructure:"-"` // TODO change to time.Time in unmarshal
+	ActionExpiration string  `json:"expiration" yaml:"expiration,omitempty" mapstructure:"-"`
+	Version          string  `json:"version" yaml:"version,omitempty" mapstructure:"-"`
+	SourceURI        string  `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
+	Retry            int     `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
+	Signed           *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+	Err              error   `json:"-" yaml:"-" mapstructure:"-"`
 }
 
 func (a *ActionUpgrade) String() string {
@@ -206,6 +242,26 @@ func (a *ActionUpgrade) String() string {
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
 	return s.String()
+}
+
+func (a *ActionUpgrade) AckEvent() AckEvent {
+	event := newAckEvent(a.ActionID, a.ActionType)
+	if a.Err != nil {
+		// FIXME Do we want to change EventType/SubType here?
+		event.Error = a.Err.Error()
+		var payload struct {
+			Retry   bool `json:"retry"`
+			Attempt int  `json:"retry_attempt,omitempty"`
+		}
+		payload.Retry = true
+		payload.Attempt = a.Retry
+		if a.Retry < 1 { // retry is set to -1 if it will not re attempt
+			payload.Retry = false
+		}
+		p, _ := json.Marshal(payload)
+		event.Payload = p
+	}
+	return event
 }
 
 // Type returns the type of the Action.
@@ -242,11 +298,44 @@ func (a *ActionUpgrade) Expiration() (time.Time, error) {
 	return ts.UTC(), nil
 }
 
+// RetryAttempt will return the retry_attempt of the action
+func (a *ActionUpgrade) RetryAttempt() int {
+	return a.Retry
+}
+
+// SetRetryAttempt sets the retry_attempt of the action
+func (a *ActionUpgrade) SetRetryAttempt(n int) {
+	a.Retry = n
+}
+
+// GetError returns the error associated with the attempt to run the action.
+func (a *ActionUpgrade) GetError() error {
+	return a.Err
+}
+
+// SetError sets the error associated with the attempt to run the action.
+func (a *ActionUpgrade) SetError(err error) {
+	a.Err = err
+}
+
+// SetStartTime sets the start time of the action.
+func (a *ActionUpgrade) SetStartTime(t time.Time) {
+	a.ActionStartTime = t.Format(time.RFC3339)
+}
+
+// MarshalMap marshals ActionUpgrade into a corresponding map
+func (a *ActionUpgrade) MarshalMap() (map[string]interface{}, error) {
+	var res map[string]interface{}
+	err := mapstructure.Decode(a, &res)
+	return res, err
+}
+
 // ActionUnenroll is a request for agent to unhook from fleet.
 type ActionUnenroll struct {
-	ActionID   string `yaml:"action_id"`
-	ActionType string `yaml:"type"`
-	IsDetected bool   `json:"is_detected,omitempty" yaml:"is_detected,omitempty"`
+	ActionID   string  `yaml:"action_id" mapstructure:"id"`
+	ActionType string  `yaml:"type" mapstructure:"type"`
+	IsDetected bool    `json:"is_detected,omitempty" yaml:"is_detected,omitempty" mapstructure:"-"`
+	Signed     *Signed `json:"signed,omitempty" mapstructure:"signed,omitempty"`
 }
 
 func (a *ActionUnenroll) String() string {
@@ -268,14 +357,15 @@ func (a *ActionUnenroll) ID() string {
 	return a.ActionID
 }
 
-// StartTime returns ErrNoStartTime
-func (a *ActionUnenroll) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
+func (a *ActionUnenroll) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
-// Expiration returns ErrNoExpiration
-func (a *ActionUnenroll) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
+// MarshalMap marshals ActionUnenroll into a corresponding map
+func (a *ActionUnenroll) MarshalMap() (map[string]interface{}, error) {
+	var res map[string]interface{}
+	err := mapstructure.Decode(a, &res)
+	return res, err
 }
 
 // ActionSettings is a request to change agent settings.
@@ -295,16 +385,6 @@ func (a *ActionSettings) Type() string {
 	return a.ActionType
 }
 
-// StartTime returns ErrNoStartTime
-func (a *ActionSettings) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionSettings) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
-}
-
 func (a *ActionSettings) String() string {
 	var s strings.Builder
 	s.WriteString("action_id: ")
@@ -314,6 +394,10 @@ func (a *ActionSettings) String() string {
 	s.WriteString(", log_level: ")
 	s.WriteString(a.LogLevel)
 	return s.String()
+}
+
+func (a *ActionSettings) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionCancel is a request to cancel an action.
@@ -333,16 +417,6 @@ func (a *ActionCancel) Type() string {
 	return a.ActionType
 }
 
-// StartTime returns ErrNoStartTime
-func (a *ActionCancel) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionCancel) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
-}
-
 func (a *ActionCancel) String() string {
 	var s strings.Builder
 	s.WriteString("action_id: ")
@@ -352,6 +426,54 @@ func (a *ActionCancel) String() string {
 	s.WriteString(", target_id: ")
 	s.WriteString(a.TargetID)
 	return s.String()
+}
+
+func (a *ActionCancel) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
+}
+
+// ActionDiagnostics is a request to gather and upload a diagnostics bundle.
+type ActionDiagnostics struct {
+	ActionID   string `json:"action_id"`
+	ActionType string `json:"type"`
+	UploadID   string `json:"-"`
+	Err        error  `json:"-"`
+}
+
+// ID returns the ID of the action.
+func (a *ActionDiagnostics) ID() string {
+	return a.ActionID
+}
+
+// Type returns the type of the action.
+func (a *ActionDiagnostics) Type() string {
+	return a.ActionType
+}
+
+func (a *ActionDiagnostics) String() string {
+	var s strings.Builder
+	s.WriteString("action_id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	return s.String()
+}
+
+func (a *ActionDiagnostics) AckEvent() AckEvent {
+	event := newAckEvent(a.ActionID, a.ActionType)
+	if a.Err != nil {
+		event.Error = a.Err.Error()
+	}
+	if a.UploadID != "" {
+		var data struct {
+			UploadID string `json:"upload_id"`
+		}
+		data.UploadID = a.UploadID
+		p, _ := json.Marshal(data)
+		event.Data = p
+	}
+
+	return event
 }
 
 // ActionApp is the application action request.
@@ -364,6 +486,7 @@ type ActionApp struct {
 	Response    map[string]interface{} `json:"response,omitempty" mapstructure:"response,omitempty"`
 	StartedAt   string                 `json:"started_at,omitempty" mapstructure:"started_at,omitempty"`
 	CompletedAt string                 `json:"completed_at,omitempty" mapstructure:"completed_at,omitempty"`
+	Signed      *Signed                `json:"signed,omitempty" mapstructure:"signed,omitempty"`
 	Error       string                 `json:"error,omitempty" mapstructure:"error,omitempty"`
 }
 
@@ -388,14 +511,19 @@ func (a *ActionApp) Type() string {
 	return a.ActionType
 }
 
-// StartTime returns ErrNoStartTime
-func (a *ActionApp) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrExpiration
-func (a *ActionApp) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
+func (a *ActionApp) AckEvent() AckEvent {
+	return AckEvent{
+		EventType:       "ACTION_RESULT",
+		SubType:         "ACKNOWLEDGED",
+		ActionID:        a.ActionID,
+		Message:         fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
+		ActionInputType: a.InputType,
+		ActionData:      a.Data,
+		ActionResponse:  a.Response,
+		StartedAt:       a.StartedAt,
+		CompletedAt:     a.CompletedAt,
+		Error:           a.Error,
+	}
 }
 
 // MarshalMap marshals ActionApp into a corresponding map
@@ -437,17 +565,20 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 				ActionType: response.ActionType,
 			}
 		case ActionTypeInputAction:
+			// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
 			action = &ActionApp{
 				ActionID:   response.ActionID,
 				ActionType: response.ActionType,
 				InputType:  response.InputType,
 				Timeout:    response.Timeout,
 				Data:       response.Data,
+				Signed:     response.Signed,
 			}
 		case ActionTypeUnenroll:
 			action = &ActionUnenroll{
 				ActionID:   response.ActionID,
 				ActionType: response.ActionType,
+				Signed:     response.Signed,
 			}
 		case ActionTypeUpgrade:
 			action = &ActionUpgrade{
@@ -455,6 +586,7 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 				ActionType:       response.ActionType,
 				ActionStartTime:  response.ActionStartTime,
 				ActionExpiration: response.ActionExpiration,
+				Signed:           response.Signed,
 			}
 
 			if err := json.Unmarshal(response.Data, action); err != nil {
@@ -481,6 +613,16 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 			if err := json.Unmarshal(response.Data, action); err != nil {
 				return errors.New(err,
 					"fail to decode CANCEL_ACTION action",
+					errors.TypeConfig)
+			}
+		case ActionTypeDiagnostics:
+			action = &ActionDiagnostics{
+				ActionID:   response.ActionID,
+				ActionType: response.ActionType,
+			}
+			if err := json.Unmarshal(response.Data, action); err != nil {
+				return errors.New(err,
+					"fail to decode REQUEST_DIAGNOSTICS_ACTION action",
 					errors.TypeConfig)
 			}
 		default:
@@ -532,11 +674,13 @@ func (a *Actions) UnmarshalYAML(unmarshal func(interface{}) error) error {
 				InputType:  n.InputType,
 				Timeout:    n.Timeout,
 				Data:       n.Data,
+				Signed:     n.Signed,
 			}
 		case ActionTypeUnenroll:
 			action = &ActionUnenroll{
 				ActionID:   n.ActionID,
 				ActionType: n.ActionType,
+				Signed:     n.Signed,
 			}
 		case ActionTypeUpgrade:
 			action = &ActionUpgrade{
@@ -544,6 +688,7 @@ func (a *Actions) UnmarshalYAML(unmarshal func(interface{}) error) error {
 				ActionType:       n.ActionType,
 				ActionStartTime:  n.ActionStartTime,
 				ActionExpiration: n.ActionExpiration,
+				Retry:            n.Retry,
 			}
 			if err := yaml.Unmarshal(n.Data, &action); err != nil {
 				return errors.New(err,
@@ -568,6 +713,16 @@ func (a *Actions) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			if err := yaml.Unmarshal(n.Data, action); err != nil {
 				return errors.New(err,
 					"fail to decode CANCEL_ACTION action",
+					errors.TypeConfig)
+			}
+		case ActionTypeDiagnostics:
+			action = &ActionDiagnostics{
+				ActionID:   n.ActionID,
+				ActionType: n.ActionType,
+			}
+			if err := yaml.Unmarshal(n.Data, action); err != nil {
+				return errors.New(err,
+					"fail to decode REQUEST_DIAGNOSTICS_ACTION action",
 					errors.TypeConfig)
 			}
 		default:

@@ -6,11 +6,12 @@ package composable
 
 import "context"
 
-// FetchContextProvider is the interface that a context provider uses so as to be able to be called
-// explicitly on demand by vars framework in order to fetch specific target values like a k8s secret.
+// FetchContextProvider is the interface that a context provider uses allow variable values to be determined when the
+// configuration is rendered versus it being known in advanced.
 type FetchContextProvider interface {
 	ContextProvider
-	// Run runs the inventory provider.
+
+	// Fetch tries to fetch a value for a variable.
 	Fetch(string) (string, bool)
 }
 
@@ -26,4 +27,12 @@ type ContextProviderComm interface {
 type ContextProvider interface {
 	// Run runs the context provider.
 	Run(ContextProviderComm) error
+}
+
+// CloseableProvider is an interface that providers may choose to implement
+// if it makes sense for them, e.g. if they have any resources that need
+// cleaning up after the provider's (final) run.
+type CloseableProvider interface {
+	// Close is called after all runs of the provider have finished.
+	Close() error
 }

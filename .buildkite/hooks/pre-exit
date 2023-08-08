@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -eo pipefail
+
+if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+  if test -f "$GOOGLE_APPLICATION_CREDENTIALS"; then
+    rm $GOOGLE_APPLICATION_CREDENTIALS
+  fi
+fi
+
+if [ -n "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE" ]; then
+  if test -f "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE"; then
+    rm $TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE
+  fi
+fi
+
+unset GOOGLE_APPLICATION_GCP_SECRET API_KEY_TOKEN
+
+if command -v docker &>/dev/null; then
+  DOCKER_REGISTRY="docker.elastic.co"
+  docker logout $DOCKER_REGISTRY
+fi

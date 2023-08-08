@@ -1,0 +1,49 @@
+version: 2
+inputs:
+  - name: audit/auditd
+    description: "Auditd"
+    platforms: &platforms
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+    outputs: &outputs
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+    command: &command
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
+      timeouts:
+        restart: 1s
+      args:
+        - "-E"
+        - "setup.ilm.enabled=false"
+        - "-E"
+        - "setup.template.enabled=false"
+        - "-E"
+        - "management.enabled=true"
+        - "-E"
+        - "management.restart_on_output_change=true"
+        - "-E"
+        - "logging.level=info"
+        - "-E"
+        - "logging.to_stderr=true"
+        - "-E"
+        - "gc_percent=${AUDITBEAT_GOGC:100}"
+        - "-E"
+        - "auditbeat.config.modules.enabled=false"
+  - name: audit/file_integrity
+    description: "Audit File Integrity"
+    platforms: *platforms
+    outputs: *outputs
+    command: *command
+  - name: audit/system
+    description: "Audit System"
+    platforms: *platforms
+    outputs: *outputs
+    command: *command

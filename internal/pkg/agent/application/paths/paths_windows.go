@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build windows
-// +build windows
 
 package paths
 
@@ -16,11 +15,15 @@ const (
 	// BinaryName is the name of the installed binary.
 	BinaryName = "elastic-agent.exe"
 
-	// InstallPath is the installation path using for install command.
-	InstallPath = `C:\Program Files\Elastic\Agent`
+	// DefaultBasePath is the base path used by the install command
+	// for installing Elastic Agent's files.
+	DefaultBasePath = `C:\Program Files`
 
-	// SocketPath is the socket path used when installed.
-	SocketPath = `\\.\pipe\elastic-agent-system`
+	// ControlSocketPath is the control socket path used when installed.
+	ControlSocketPath = `\\.\pipe\elastic-agent-system`
+
+	// ShipperSocketPipePattern is the socket path used when installed for a shipper pipe.
+	ShipperSocketPipePattern = `\\.\pipe\elastic-agent-%s-pipe.sock`
 
 	// ServiceName is the service name when installed.
 	ServiceName = "Elastic Agent"
@@ -42,5 +45,5 @@ func ArePathsEqual(expected, actual string) bool {
 
 // AgentVaultPath is the directory that contains all the files for the value
 func AgentVaultPath() string {
-	return filepath.Join(Home(), defaultAgentVaultPath)
+	return filepath.Join(Config(), defaultAgentVaultPath)
 }

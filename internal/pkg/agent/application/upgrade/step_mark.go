@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const markerFilename = ".update-marker"
@@ -91,7 +92,7 @@ func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func (u *Upgrader) markUpgrade(_ context.Context, hash string, action Action) error {
+func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash string, action *fleetapi.ActionUpgrade) error {
 	prevVersion := release.Version()
 	prevHash := release.Commit()
 	if len(prevHash) > hashLen {
@@ -103,7 +104,7 @@ func (u *Upgrader) markUpgrade(_ context.Context, hash string, action Action) er
 		UpdatedOn:   time.Now(),
 		PrevVersion: prevVersion,
 		PrevHash:    prevHash,
-		Action:      action.FleetAction(),
+		Action:      action,
 	}
 
 	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
@@ -112,11 +113,12 @@ func (u *Upgrader) markUpgrade(_ context.Context, hash string, action Action) er
 	}
 
 	markerPath := markerFilePath()
+	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", prevHash)
 	if err := ioutil.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
 	}
 
-	if err := UpdateActiveCommit(hash); err != nil {
+	if err := UpdateActiveCommit(log, hash); err != nil {
 		return err
 	}
 
@@ -124,8 +126,9 @@ func (u *Upgrader) markUpgrade(_ context.Context, hash string, action Action) er
 }
 
 // UpdateActiveCommit updates active.commit file to point to active version.
-func UpdateActiveCommit(hash string) error {
+func UpdateActiveCommit(log *logger.Logger, hash string) error {
 	activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
+	log.Infow("Updating active commit", "file.path", activeCommitPath, "hash", hash)
 	if err := ioutil.WriteFile(activeCommitPath, []byte(hash), 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath))
 	}
@@ -134,8 +137,9 @@ func UpdateActiveCommit(hash string) error {
 }
 
 // CleanMarker removes a marker from disk.
-func CleanMarker() error {
+func CleanMarker(log *logger.Logger) error {
 	markerFile := markerFilePath()
+	log.Debugw("Removing marker file", "file.path", markerFile)
 	if err := os.Remove(markerFile); !os.IsNotExist(err) {
 		return err
 	}

@@ -22,25 +22,35 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// VarsCallback is callback called when the current vars state changes.
-type VarsCallback func([]*transpiler.Vars)
-
 // Controller manages the state of the providers current context.
 type Controller interface {
 	// Run runs the controller.
 	//
 	// Cancelling the context stops the controller.
-	Run(ctx context.Context, cb VarsCallback) error
+	Run(ctx context.Context) error
+
+	// Errors returns the channel to watch for reported errors.
+	Errors() <-chan error
+
+	// Watch returns the channel to watch for variable changes.
+	Watch() <-chan []*transpiler.Vars
+
+	// Close closes the controller, allowing for any resource
+	// cleanup and such.
+	Close()
 }
 
 // controller manages the state of the providers current context.
 type controller struct {
+	logger           *logger.Logger
+	ch               chan []*transpiler.Vars
+	errCh            chan error
 	contextProviders map[string]*contextProviderState
 	dynamicProviders map[string]*dynamicProviderState
 }
 
 // New creates a new controller.
-func New(log *logger.Logger, c *config.Config) (Controller, error) {
+func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error) {
 	l := log.Named("composable")
 
 	var providersCfg Config
@@ -59,11 +69,13 @@ func New(log *logger.Logger, c *config.Config) (Controller, error) {
 			// explicitly disabled; skipping
 			continue
 		}
-		provider, err := builder(l, pCfg)
+		provider, err := builder(l, pCfg, managed)
 		if err != nil {
 			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 		}
 		contextProviders[name] = &contextProviderState{
+			// Safe for Context to be nil here because it will be filled in
+			// by (*controller).Run before the provider is started.
 			provider: provider,
 		}
 	}
@@ -76,7 +88,7 @@ func New(log *logger.Logger, c *config.Config) (Controller, error) {
 			// explicitly disabled; skipping
 			continue
 		}
-		provider, err := builder(l.Named(strings.Join([]string{"providers", name}, ".")), pCfg)
+		provider, err := builder(l.Named(strings.Join([]string{"providers", name}, ".")), pCfg, managed)
 		if err != nil {
 			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 		}
@@ -87,28 +99,40 @@ func New(log *logger.Logger, c *config.Config) (Controller, error) {
 	}
 
 	return &controller{
+		logger:           l,
+		ch:               make(chan []*transpiler.Vars, 1),
+		errCh:            make(chan error),
 		contextProviders: contextProviders,
 		dynamicProviders: dynamicProviders,
 	}, nil
 }
 
 // Run runs the controller.
-func (c *controller) Run(ctx context.Context, cb VarsCallback) error {
-	// large number not to block performing Run on the provided providers
-	notify := make(chan bool, 5000)
+func (c *controller) Run(ctx context.Context) error {
+	c.logger.Debugf("Starting controller for composable inputs")
+	defer c.logger.Debugf("Stopped controller for composable inputs")
+
+	stateChangedChan := make(chan bool, 1) // sized so we can store 1 notification or proceed
 	localCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	fetchContextProviders := mapstr.M{}
+
+	var wg sync.WaitGroup
+	wg.Add(len(c.contextProviders) + len(c.dynamicProviders))
 
 	// run all the enabled context providers
 	for name, state := range c.contextProviders {
 		state.Context = localCtx
-		state.signal = notify
-		err := state.provider.Run(state)
-		if err != nil {
-			cancel()
-			return errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
-		}
+		state.signal = stateChangedChan
+		go func(name string, state *contextProviderState) {
+			defer wg.Done()
+			err := state.provider.Run(state)
+			if err != nil && !errors.Is(err, context.Canceled) {
+				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
+				c.logger.Errorf("%s", err)
+			}
+		}(name, state)
 		if p, ok := state.provider.(corecomp.FetchContextProvider); ok {
 			_, _ = fetchContextProviders.Put(name, p)
 		}
@@ -117,66 +141,148 @@ func (c *controller) Run(ctx context.Context, cb VarsCallback) error {
 	// run all the enabled dynamic providers
 	for name, state := range c.dynamicProviders {
 		state.Context = localCtx
-		state.signal = notify
-		err := state.provider.Run(state)
-		if err != nil {
-			cancel()
-			return errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
+		state.signal = stateChangedChan
+		go func(name string, state *dynamicProviderState) {
+			defer wg.Done()
+			err := state.provider.Run(state)
+			if err != nil && !errors.Is(err, context.Canceled) {
+				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
+				c.logger.Errorf("%s", err)
+			}
+		}(name, state)
+	}
+
+	c.logger.Debugf("Started controller for composable inputs")
+
+	t := time.NewTimer(100 * time.Millisecond)
+	cleanupFn := func() {
+		c.logger.Debugf("Stopping controller for composable inputs")
+		t.Stop()
+		cancel()
+
+		// wait for all providers to stop (but its possible they still send notifications over notify
+		// channel, and we cannot block them sending)
+		emptyChan, emptyCancel := context.WithCancel(context.Background())
+		defer emptyCancel()
+		go func() {
+			for {
+				select {
+				case <-emptyChan.Done():
+					return
+				case <-stateChangedChan:
+				}
+			}
+		}()
+
+		close(c.ch)
+		wg.Wait()
+	}
+
+	// performs debounce of notifies; accumulates them into 100 millisecond chunks
+	for {
+	DEBOUNCE:
+		for {
+			select {
+			case <-ctx.Done():
+				cleanupFn()
+				return ctx.Err()
+			case <-stateChangedChan:
+				t.Reset(100 * time.Millisecond)
+				c.logger.Debugf("Variable state changed for composable inputs; debounce started")
+				drainChan(stateChangedChan)
+				break DEBOUNCE
+			}
+		}
+
+		// notification received, wait for batch
+		select {
+		case <-ctx.Done():
+			cleanupFn()
+			return ctx.Err()
+		case <-t.C:
+			drainChan(stateChangedChan)
+			// batching done, gather results
+		}
+
+		c.logger.Debugf("Computing new variable state for composable inputs")
+
+		// build the vars list of mappings
+		vars := make([]*transpiler.Vars, 1)
+		mapping := map[string]interface{}{}
+		for name, state := range c.contextProviders {
+			mapping[name] = state.Current()
+		}
+		// this is ensured not to error, by how the mappings states are verified
+		vars[0], _ = transpiler.NewVars("", mapping, fetchContextProviders)
+
+		// add to the vars list for each dynamic providers mappings
+		for name, state := range c.dynamicProviders {
+			for _, mappings := range state.Mappings() {
+				local, _ := cloneMap(mapping) // will not fail; already been successfully cloned once
+				local[name] = mappings.mapping
+				id := fmt.Sprintf("%s-%s", name, mappings.id)
+				// this is ensured not to error, by how the mappings states are verified
+				v, _ := transpiler.NewVarsWithProcessors(id, local, name, mappings.processors, fetchContextProviders)
+				vars = append(vars, v)
+			}
+		}
+
+	UPDATEVARS:
+		for {
+			select {
+			case c.ch <- vars:
+				break UPDATEVARS
+			case <-ctx.Done():
+				// coordinator is handling cancellation it won't drain the channel
+			default:
+				// c.ch is size of 1, nothing is reading and there's already a signal
+				select {
+				case <-c.ch:
+					// Vars not pushed, cleaning channel
+				default:
+					// already read
+				}
+			}
+		}
+	}
+}
+
+// Errors returns the channel to watch for reported errors.
+func (c *controller) Errors() <-chan error {
+	return c.errCh
+}
+
+// Watch returns the channel for variable changes.
+func (c *controller) Watch() <-chan []*transpiler.Vars {
+	return c.ch
+}
+
+// Close closes the controller, allowing for any resource
+// cleanup and such.
+func (c *controller) Close() {
+	// Attempt to close all closeable context providers.
+	for name, state := range c.contextProviders {
+		cp, ok := state.provider.(corecomp.CloseableProvider)
+		if !ok {
+			continue
+		}
+
+		if err := cp.Close(); err != nil {
+			c.logger.Errorf("unable to close context provider %q: %s", name, err.Error())
 		}
 	}
 
-	go func() {
-		for {
-			// performs debounce of notifies; accumulates them into 100 millisecond chunks
-			changed := false
-			t := time.NewTimer(100 * time.Millisecond)
-			for {
-				exitloop := false
-				select {
-				case <-ctx.Done():
-					cancel()
-					return
-				case <-notify:
-					changed = true
-				case <-t.C:
-					exitloop = true
-				}
-				if exitloop {
-					break
-				}
-			}
-
-			t.Stop()
-			if !changed {
-				continue
-			}
-
-			// build the vars list of mappings
-			vars := make([]*transpiler.Vars, 1)
-			mapping := map[string]interface{}{}
-			for name, state := range c.contextProviders {
-				mapping[name] = state.Current()
-			}
-			// this is ensured not to error, by how the mappings states are verified
-			vars[0], _ = transpiler.NewVars(mapping, fetchContextProviders)
-
-			// add to the vars list for each dynamic providers mappings
-			for name, state := range c.dynamicProviders {
-				for _, mappings := range state.Mappings() {
-					local, _ := cloneMap(mapping) // will not fail; already been successfully cloned once
-					local[name] = mappings.mapping
-					// this is ensured not to error, by how the mappings states are verified
-					v, _ := transpiler.NewVarsWithProcessors(local, name, mappings.processors, fetchContextProviders)
-					vars = append(vars, v)
-				}
-			}
-
-			// execute the callback
-			cb(vars)
+	// Attempt to close all closeable dynamic providers.
+	for name, state := range c.dynamicProviders {
+		cp, ok := state.provider.(corecomp.CloseableProvider)
+		if !ok {
+			continue
 		}
-	}()
 
-	return nil
+		if err := cp.Close(); err != nil {
+			c.logger.Errorf("unable to close dynamic provider %q: %s", name, err.Error())
+		}
+	}
 }
 
 type contextProviderState struct {
@@ -196,7 +302,7 @@ func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 		return err
 	}
 	// ensure creating vars will not error
-	_, err = transpiler.NewVars(mapping, nil)
+	_, err = transpiler.NewVars("", mapping, nil)
 	if err != nil {
 		return err
 	}
@@ -209,7 +315,15 @@ func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 		return nil
 	}
 	c.mapping = mapping
-	c.signal <- true
+
+	// Notify the controller Run loop that a state has changed. The notification
+	// channel has buffer size 1 so this ensures that an update will always
+	// happen after this change, while coalescing multiple simultaneous changes
+	// into a single controller update.
+	select {
+	case c.signal <- true:
+	default:
+	}
 	return nil
 }
 
@@ -221,6 +335,7 @@ func (c *contextProviderState) Current() map[string]interface{} {
 }
 
 type dynamicProviderMapping struct {
+	id         string
 	priority   int
 	mapping    map[string]interface{}
 	processors transpiler.Processors
@@ -230,7 +345,7 @@ type dynamicProviderState struct {
 	context.Context
 
 	provider DynamicProvider
-	lock     sync.RWMutex
+	lock     sync.Mutex
 	mappings map[string]dynamicProviderMapping
 	signal   chan bool
 }
@@ -251,7 +366,7 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 		return err
 	}
 	// ensure creating vars will not error
-	_, err = transpiler.NewVars(mapping, nil)
+	_, err = transpiler.NewVars("", mapping, nil)
 	if err != nil {
 		return err
 	}
@@ -264,11 +379,16 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 		return nil
 	}
 	c.mappings[id] = dynamicProviderMapping{
+		id:         id,
 		priority:   priority,
 		mapping:    mapping,
 		processors: processors,
 	}
-	c.signal <- true
+
+	select {
+	case c.signal <- true:
+	default:
+	}
 	return nil
 }
 
@@ -280,32 +400,40 @@ func (c *dynamicProviderState) Remove(id string) {
 	if exists {
 		// existed; remove and signal
 		delete(c.mappings, id)
-		c.signal <- true
+
+		select {
+		case c.signal <- true:
+		default:
+		}
 	}
 }
 
 // Mappings returns the current mappings.
 func (c *dynamicProviderState) Mappings() []dynamicProviderMapping {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	c.lock.Lock()
+	originalMapping := make(map[string]dynamicProviderMapping)
+	for k, v := range c.mappings {
+		originalMapping[k] = v
+	}
+	c.lock.Unlock()
 
 	// add the mappings sorted by (priority,id)
 	mappings := make([]dynamicProviderMapping, 0)
 	priorities := make([]int, 0)
-	for _, mapping := range c.mappings {
+	for _, mapping := range originalMapping {
 		priorities = addToSet(priorities, mapping.priority)
 	}
 	sort.Ints(priorities)
 	for _, priority := range priorities {
 		ids := make([]string, 0)
-		for name, mapping := range c.mappings {
+		for name, mapping := range originalMapping {
 			if mapping.priority == priority {
 				ids = append(ids, name)
 			}
 		}
 		sort.Strings(ids)
 		for _, name := range ids {
-			mappings = append(mappings, c.mappings[name])
+			mappings = append(mappings, originalMapping[name])
 		}
 	}
 	return mappings
@@ -350,4 +478,14 @@ func addToSet(set []int, i int) []int {
 		}
 	}
 	return append(set, i)
+}
+
+func drainChan(ch chan bool) {
+	for {
+		select {
+		case <-ch:
+		default:
+			return
+		}
+	}
 }

@@ -3,19 +3,20 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build linux || windows
-// +build linux windows
 
 package vault
 
 import (
 	"context"
 	"encoding/hex"
+	"io/fs"
 	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -24,12 +25,45 @@ func TestGetSeed(t *testing.T) {
 
 	fp := filepath.Join(dir, seedFile)
 
-	assert.NoFileExists(t, fp)
+	require.NoFileExists(t, fp)
 
-	b, err := getSeed(dir)
+	// seed is not yet created
+	_, err := getSeed(dir)
+
+	// should be not found
+	require.ErrorIs(t, err, fs.ErrNotExist)
+
+	b, err := createSeedIfNotExists(dir)
 	assert.NoError(t, err)
 
-	assert.FileExists(t, fp)
+	require.FileExists(t, fp)
+
+	diff := cmp.Diff(int(AES256), len(b))
+	if diff != "" {
+		t.Error(diff)
+	}
+
+	// try get seed
+	gotSeed, err := getSeed(dir)
+	assert.NoError(t, err)
+
+	diff = cmp.Diff(b, gotSeed)
+	if diff != "" {
+		t.Error(diff)
+	}
+}
+
+func TestCreateSeedIfNotExists(t *testing.T) {
+	dir := t.TempDir()
+
+	fp := filepath.Join(dir, seedFile)
+
+	assert.NoFileExists(t, fp)
+
+	b, err := createSeedIfNotExists(dir)
+	assert.NoError(t, err)
+
+	require.FileExists(t, fp)
 
 	diff := cmp.Diff(int(AES256), len(b))
 	if diff != "" {
@@ -37,7 +71,7 @@ func TestGetSeed(t *testing.T) {
 	}
 }
 
-func TestGetSeedRace(t *testing.T) {
+func TestCreateSeedIfNotExistsRace(t *testing.T) {
 	var err error
 
 	dir := t.TempDir()
@@ -51,7 +85,7 @@ func TestGetSeedRace(t *testing.T) {
 	for i := 0; i < count; i++ {
 		g.Go(func(idx int) func() error {
 			return func() error {
-				seed, err := getSeed(dir)
+				seed, err := createSeedIfNotExists(dir)
 				mx.Lock()
 				res[idx] = seed
 				mx.Unlock()

@@ -1,0 +1,216 @@
+version: 2
+inputs:
+  - name: aws-cloudwatch
+    description: "AWS Cloudwatch"
+    platforms: &platforms
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+    outputs: &outputs
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+    shippers: &shippers
+      - shipper
+    command: &command
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
+      timeouts:
+        restart: 1s
+      args:
+        - "-E"
+        - "setup.ilm.enabled=false"
+        - "-E"
+        - "setup.template.enabled=false"
+        - "-E"
+        - "management.enabled=true"
+        - "-E"
+        - "management.restart_on_output_change=true"
+        - "-E"
+        - "logging.level=info"
+        - "-E"
+        - "logging.to_stderr=true"
+        - "-E"
+        - "gc_percent=${FILEBEAT_GOGC:100}"
+        - "-E"
+        - "filebeat.config.modules.enabled=false"
+  - name: aws-s3
+    description: "AWS S3"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: azure-blob-storage
+    description: "Azure Blob Storage"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: azure-eventhub
+    description: "Azure Eventhub"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: cel
+    description: "Common Expression Language Input"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: cloudfoundry
+    description: "PCF Cloudfoundry"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: cometd
+    description: "CometD input"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: container
+    description: "Container logs"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: docker
+    aliases:
+      - log/docker
+    description: "Docker logs"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: entity-analytics
+    description: "Entity Analytics"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: gcp-pubsub
+    description: "GCP Pub-Sub"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: gcs
+    description: "Google Cloud Storage"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: http_endpoint
+    description: "HTTP Endpoint"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: httpjson
+    description: "HTTP JSON Endpoint"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: journald
+    description: "Journald"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: kafka
+    description: "Kafka"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: log
+    aliases:
+      - logfile
+      - event/file
+    description: "Logfile"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: lumberjack
+    description: "Lumberjack"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: mqtt
+    description: "MQTT"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: netflow
+    description: "Netflow"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: o365audit
+    description: "Office 365 Audit"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: redis
+    aliases:
+      - log/redis_slowlog
+    description: "Redis"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: syslog
+    aliases:
+      - log/syslog
+    description: "Syslog"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: tcp
+    aliases:
+      - event/tcp
+    description: "TCP"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: udp
+    aliases:
+      - event/udp
+    description: "UDP"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: unix
+    description: "Unix Socket"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: winlog
+    description: "Winlog"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: filestream
+    description: "Filestream"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command

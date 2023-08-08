@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -23,7 +24,6 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"github.com/mitchellh/hashstructure"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -35,7 +35,27 @@ const (
 	packageStagingDir = "build/package"
 
 	// defaultBinaryName specifies the output file for zip and tar.gz.
-	defaultBinaryName = "{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+	defaultBinaryName = "{{.Name}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+
+	// defaultRootDir is the default name of the root directory contained inside of zip and
+	// tar.gz packages.
+	// NOTE: This uses .BeatName instead of .Name because we wanted the internal
+	// directory to not include "-oss".
+	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+
+	componentConfigMode os.FileMode = 0600
+
+	rpm     = "rpm"
+	deb     = "deb"
+	zipExt  = "zip"
+	targz   = "tar.gz"
+	docker  = "docker"
+	invalid = "invalid"
+)
+
+var (
+	configFilePattern          = regexp.MustCompile(`.*\.yml$|.*\.yml\.disabled$`)
+	componentConfigFilePattern = regexp.MustCompile(`.*beat\.spec\.yml$|.*beat\.yml$|apm-server\.yml$|apm-server\.spec\.yml$|elastic-agent\.yml$`)
 )
 
 // PackageType defines the file format of the package (e.g. zip, rpm, etc).
@@ -74,6 +94,7 @@ type PackageSpec struct {
 	PreInstallScript  string                 `yaml:"pre_install_script,omitempty"`
 	PostInstallScript string                 `yaml:"post_install_script,omitempty"`
 	Files             map[string]PackageFile `yaml:"files"`
+	Qualifier         string                 `yaml:"qualifier,omitempty"`   // Optional
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
 	ExtraVars         map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
 
@@ -85,11 +106,12 @@ type PackageSpec struct {
 
 // PackageFile represents a file or directory within a package.
 type PackageFile struct {
-	Source        string                  `yaml:"source,omitempty"`          // Regular source file or directory.
-	Content       string                  `yaml:"content,omitempty"`         // Inline template string.
-	Template      string                  `yaml:"template,omitempty"`        // Input template file.
-	Target        string                  `yaml:"target,omitempty"`          // Target location in package. Relative paths are added to a package specific directory (e.g. metricbeat-7.0.0-linux-x86_64).
-	Mode          os.FileMode             `yaml:"mode,omitempty"`            // Target mode for file. Does not apply when source is a directory.
+	Source        string                  `yaml:"source,omitempty"`   // Regular source file or directory.
+	Content       string                  `yaml:"content,omitempty"`  // Inline template string.
+	Template      string                  `yaml:"template,omitempty"` // Input template file.
+	Target        string                  `yaml:"target,omitempty"`   // Target location in package. Relative paths are added to a package specific directory (e.g. metricbeat-7.0.0-linux-x86_64).
+	Mode          os.FileMode             `yaml:"mode,omitempty"`     // Target mode for file. Does not apply when source is a directory.
+	ConfigMode    os.FileMode             `yaml:"config_mode,omitempty"`
 	Config        bool                    `yaml:"config"`                    // Mark file as config in the package (deb and rpm only).
 	Modules       bool                    `yaml:"modules"`                   // Mark directory as directory with modules.
 	Dep           func(PackageSpec) error `yaml:"-" hash:"-" json:"-"`       // Dependency to invoke during Evaluate.
@@ -100,22 +122,22 @@ type PackageFile struct {
 
 // OSArchNames defines the names of architectures for use in packages.
 var OSArchNames = map[string]map[PackageType]map[string]string{
-	"windows": map[PackageType]map[string]string{
-		Zip: map[string]string{
+	"windows": {
+		Zip: {
 			"386":   "x86",
 			"amd64": "x86_64",
 		},
 	},
-	"darwin": map[PackageType]map[string]string{
-		TarGz: map[string]string{
+	"darwin": {
+		TarGz: {
 			"386":   "x86",
 			"amd64": "x86_64",
 			"arm64": "aarch64",
 			// "universal": "universal",
 		},
 	},
-	"linux": map[PackageType]map[string]string{
-		RPM: map[string]string{
+	"linux": {
+		RPM: {
 			"386":      "i686",
 			"amd64":    "x86_64",
 			"armv7":    "armhfp",
@@ -127,7 +149,7 @@ var OSArchNames = map[string]map[PackageType]map[string]string{
 			"s390x":    "s390x",
 		},
 		// https://www.debian.org/ports/
-		Deb: map[string]string{
+		Deb: {
 			"386":      "i386",
 			"amd64":    "amd64",
 			"armv5":    "armel",
@@ -140,7 +162,7 @@ var OSArchNames = map[string]map[PackageType]map[string]string{
 			"ppc64le":  "ppc64el",
 			"s390x":    "s390x",
 		},
-		TarGz: map[string]string{
+		TarGz: {
 			"386":      "x86",
 			"amd64":    "x86_64",
 			"armv5":    "armv5",
@@ -155,13 +177,13 @@ var OSArchNames = map[string]map[PackageType]map[string]string{
 			"ppc64le":  "ppc64le",
 			"s390x":    "s390x",
 		},
-		Docker: map[string]string{
+		Docker: {
 			"amd64": "amd64",
 			"arm64": "arm64",
 		},
 	},
-	"aix": map[PackageType]map[string]string{
-		TarGz: map[string]string{
+	"aix": {
+		TarGz: {
 			"ppc64": "ppc64",
 		},
 	},
@@ -171,19 +193,19 @@ var OSArchNames = map[string]map[PackageType]map[string]string{
 func getOSArchName(platform BuildPlatform, t PackageType) (string, error) {
 	names, found := OSArchNames[platform.GOOS()]
 	if !found {
-		return "", errors.Errorf("arch names for os=%v are not defined",
+		return "", fmt.Errorf("arch names for os=%v are not defined",
 			platform.GOOS())
 	}
 
 	archMap, found := names[t]
 	if !found {
-		return "", errors.Errorf("arch names for %v on os=%v are not defined",
+		return "", fmt.Errorf("arch names for %v on os=%v are not defined",
 			t, platform.GOOS())
 	}
 
 	arch, found := archMap[platform.Arch()]
 	if !found {
-		return "", errors.Errorf("arch name associated with %v for %v on "+
+		return "", fmt.Errorf("arch name associated with %v for %v on "+
 			"os=%v is not defined", platform.Arch(), t, platform.GOOS())
 	}
 
@@ -194,17 +216,17 @@ func getOSArchName(platform BuildPlatform, t PackageType) (string, error) {
 func (typ PackageType) String() string {
 	switch typ {
 	case RPM:
-		return "rpm"
+		return rpm
 	case Deb:
-		return "deb"
+		return deb
 	case Zip:
-		return "zip"
+		return zipExt
 	case TarGz:
-		return "tar.gz"
+		return targz
 	case Docker:
-		return "docker"
+		return docker
 	default:
-		return "invalid"
+		return invalid
 	}
 }
 
@@ -216,18 +238,18 @@ func (typ PackageType) MarshalText() ([]byte, error) {
 // UnmarshalText returns a PackageType based on the given text.
 func (typ *PackageType) UnmarshalText(text []byte) error {
 	switch strings.ToLower(string(text)) {
-	case "rpm":
+	case rpm:
 		*typ = RPM
-	case "deb":
+	case deb:
 		*typ = Deb
-	case "tar.gz", "tgz", "targz":
+	case targz, "tgz", "targz":
 		*typ = TarGz
-	case "zip":
+	case zipExt:
 		*typ = Zip
-	case "docker":
+	case docker:
 		*typ = Docker
 	default:
-		return errors.Errorf("unknown package type: %v", string(text))
+		return fmt.Errorf("unknown package type: %v", string(text))
 	}
 	return nil
 }
@@ -272,7 +294,7 @@ func (typ PackageType) Build(spec PackageSpec) error {
 	case Docker:
 		return PackageDocker(spec)
 	default:
-		return errors.Errorf("unknown package type: %v", typ)
+		return fmt.Errorf("unknown package type: %v", typ)
 	}
 }
 
@@ -295,7 +317,7 @@ func (s PackageSpec) Clone() PackageSpec {
 func (s PackageSpec) ReplaceFile(target string, file PackageFile) {
 	_, found := s.Files[target]
 	if !found {
-		panic(errors.Errorf("failed to ReplaceFile because target=%v does not exist", target))
+		panic(fmt.Errorf("failed to ReplaceFile because target=%v does not exist", target))
 	}
 
 	s.Files[target] = file
@@ -393,7 +415,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		// Execute the dependency if it exists.
 		if f.Dep != nil {
 			if err := f.Dep(s); err != nil {
-				panic(errors.Wrapf(err, "failed executing package file dependency for target=%v", target))
+				panic(fmt.Errorf("failed executing package file dependency for target=%v: %w", target, err))
 			}
 		}
 
@@ -408,21 +430,20 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		case f.Content != "":
 			content, err := s.Expand(f.Content)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to expand content template for target=%v", target))
+				panic(fmt.Errorf("failed to expand content template for target=%v: %w", target, err))
 			}
 
 			f.Source = filepath.Join(s.packageDir, filepath.Base(f.Target))
-			//nolint:gosec,G306 // 0644 is fine.
 			if err = ioutil.WriteFile(CreateDir(f.Source), []byte(content), 0644); err != nil {
-				panic(errors.Wrapf(err, "failed to write file containing content for target=%v", target))
+				panic(fmt.Errorf("failed to write file containing content for target=%v: %w", target, err))
 			}
 		case f.Template != "":
 			f.Source = filepath.Join(s.packageDir, filepath.Base(f.Template))
 			if err := s.ExpandFile(f.Template, CreateDir(f.Source)); err != nil {
-				panic(errors.Wrapf(err, "failed to expand template file for target=%v", target))
+				panic(fmt.Errorf("failed to expand template file for target=%v: %w", target, err))
 			}
 		default:
-			panic(errors.Errorf("package file with target=%v must have either source, content, or template", target))
+			panic(fmt.Errorf("package file with target=%v must have either source, content, or template", target))
 		}
 
 		evaluatedFiles[f.Target] = f
@@ -443,10 +464,10 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 // ImageName computes the image name from the spec. A template for the image
 // name can be configured by adding image_name to extra_vars.
 func (s PackageSpec) ImageName() (string, error) {
-	if name, _ := s.ExtraVars["image_name"]; name != "" {
+	if name := s.ExtraVars["image_name"]; name != "" {
 		imageName, err := s.Expand(name)
 		if err != nil {
-			return "", errors.Wrapf(err, "failed to expand image_name")
+			return "", fmt.Errorf("failed to expand image_name: %w", err)
 		}
 		return imageName, nil
 	}
@@ -468,11 +489,11 @@ func copyInstallScript(spec PackageSpec, script string, local *string) error {
 	}
 
 	if err := spec.ExpandFile(script, createDir(*local)); err != nil {
-		return errors.Wrap(err, "failed to copy install script to package dir")
+		return fmt.Errorf("failed to copy install script to package dir: %w", err)
 	}
 
 	if err := os.Chmod(*local, 0755); err != nil {
-		return errors.Wrap(err, "failed to chmod install script")
+		return fmt.Errorf("failed to chmod install script: %w", err)
 	}
 
 	return nil
@@ -481,7 +502,7 @@ func copyInstallScript(spec PackageSpec, script string, local *string) error {
 func (s PackageSpec) hash() string {
 	h, err := hashstructure.Hash(s, nil)
 	if err != nil {
-		panic(errors.Wrap(err, "failed to compute hash of spec"))
+		panic(fmt.Errorf("failed to compute hash of spec: %w", err))
 	}
 
 	hash := strconv.FormatUint(h, 10)
@@ -514,9 +535,7 @@ func (s PackageSpec) rootDir() string {
 		return filepath.Base(s.OutputFile)
 	}
 
-	// NOTE: This uses .BeatName instead of .Name because we wanted the internal
-	// directory to not include "-oss".
-	return s.MustExpand("{{.BeatName}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}")
+	return s.MustExpand(defaultRootDir)
 }
 
 // PackageZip packages a zip file.
@@ -537,7 +556,7 @@ func PackageZip(spec PackageSpec) error {
 
 		if err := addFileToZip(w, baseDir, pkgFile); err != nil {
 			p, _ := filepath.Abs(pkgFile.Source)
-			return errors.Wrapf(err, "failed adding file=%+v to zip", p)
+			return fmt.Errorf("failed adding file=%+v to zip: %w", p, err)
 		}
 	}
 
@@ -556,9 +575,8 @@ func PackageZip(spec PackageSpec) error {
 	spec.OutputFile = Zip.AddFileExtension(spec.OutputFile)
 
 	// Write the zip file.
-	//nolint:gosec,G306 // 0644 is fine.
 	if err := ioutil.WriteFile(CreateDir(spec.OutputFile), buf.Bytes(), 0644); err != nil {
-		return errors.Wrap(err, "failed to write zip file")
+		return fmt.Errorf("failed to write zip file: %w", err)
 	}
 
 	// Any packages beginning with "tmp-" are temporary by nature so don't have
@@ -567,7 +585,10 @@ func PackageZip(spec PackageSpec) error {
 		return nil
 	}
 
-	return errors.Wrap(CreateSHA512File(spec.OutputFile), "failed to create .sha512 file")
+	if err := CreateSHA512File(spec.OutputFile); err != nil {
+		return fmt.Errorf("failed to create .sha512 file: %w", err)
+	}
+	return nil
 }
 
 // PackageTarGz packages a gzipped tar file.
@@ -607,7 +628,7 @@ func PackageTarGz(spec PackageSpec) error {
 		}
 
 		if err := addFileToTar(w, baseDir, pkgFile); err != nil {
-			return errors.Wrapf(err, "failed adding file=%+v to tar", pkgFile)
+			return fmt.Errorf("failed adding file=%+v to tar: %w", pkgFile, err)
 		}
 	}
 
@@ -624,7 +645,7 @@ func PackageTarGz(spec PackageSpec) error {
 		defer os.RemoveAll(tmpdir)
 
 		if err := addSymlinkToTar(tmpdir, w, baseDir, pkgFile); err != nil {
-			return errors.Wrapf(err, "failed adding file=%+v to tar", pkgFile)
+			return fmt.Errorf("failed adding file=%+v to tar: %w", pkgFile, err)
 		}
 	}
 
@@ -667,15 +688,10 @@ func PackageTarGz(spec PackageSpec) error {
 		return nil
 	}
 
-	return errors.Wrap(CreateSHA512File(spec.OutputFile), "failed to create .sha512 file")
-}
-
-func replaceFileArch(filename string, pkgFile PackageFile, arch string) (string, PackageFile) {
-	filename = strings.ReplaceAll(filename, "universal", arch)
-	pkgFile.Source = strings.ReplaceAll(pkgFile.Source, "universal", arch)
-	pkgFile.Target = strings.ReplaceAll(pkgFile.Target, "universal", arch)
-
-	return filename, pkgFile
+	if err := CreateSHA512File(spec.OutputFile); err != nil {
+		return fmt.Errorf("failed to create .sha512 file: %w", err)
+	}
+	return nil
 }
 
 // PackageDeb packages a deb file. This requires Docker to execute FPM.
@@ -694,7 +710,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	case RPM, Deb:
 		fpmPackageType = packageType.String()
 	default:
-		return errors.Errorf("unsupported package type=%v for runFPM", fpmPackageType)
+		return fmt.Errorf("unsupported package type=%v for runFPM", fpmPackageType)
 	}
 
 	if err := HaveDocker(); err != nil {
@@ -775,10 +791,13 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	)
 
 	if err = dockerRun(args...); err != nil {
-		return errors.Wrap(err, "failed while running FPM in docker")
+		return fmt.Errorf("failed while running FPM in docker: %w", err)
 	}
 
-	return errors.Wrap(CreateSHA512File(spec.OutputFile), "failed to create .sha512 file")
+	if err := CreateSHA512File(spec.OutputFile); err != nil {
+		return fmt.Errorf("failed to create .sha512 file: %w", err)
+	}
+	return nil
 }
 
 func addUIDGidEnvArgs(args []string) ([]string, error) {
@@ -788,7 +807,7 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 
 	info, err := GetDockerInfo()
 	if err != nil {
-		return args, errors.Wrap(err, "failed to get docker info")
+		return args, fmt.Errorf("failed to get docker info: %w", err)
 	}
 
 	uid, gid := os.Getuid(), os.Getgid()
@@ -821,9 +840,14 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return err
 		}
 
-		if info.Mode().IsRegular() && pkgFile.Mode > 0 {
+		switch {
+		case componentConfigFilePattern.MatchString(info.Name()):
+			header.SetMode(componentConfigMode & os.ModePerm)
+		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
+			header.SetMode(pkgFile.ConfigMode & os.ModePerm)
+		case info.Mode().IsRegular() && pkgFile.Mode > 0:
 			header.SetMode(pkgFile.Mode & os.ModePerm)
-		} else if info.IsDir() {
+		case info.IsDir():
 			header.SetMode(0755)
 		}
 
@@ -888,9 +912,14 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		header.Uname, header.Gname = "root", "root"
 		header.Uid, header.Gid = 0, 0
 
-		if info.Mode().IsRegular() && pkgFile.Mode > 0 {
+		switch {
+		case componentConfigFilePattern.MatchString(info.Name()):
+			header.Mode = int64(componentConfigMode & os.ModePerm)
+		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
+			header.Mode = int64(pkgFile.ConfigMode & os.ModePerm)
+		case info.Mode().IsRegular() && pkgFile.Mode > 0:
 			header.Mode = int64(pkgFile.Mode & os.ModePerm)
-		} else if info.IsDir() {
+		case info.IsDir():
 			header.Mode = int64(0755)
 		}
 
@@ -957,9 +986,14 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		header.Uname, header.Gname = "root", "root"
 		header.Uid, header.Gid = 0, 0
 
-		if info.Mode().IsRegular() && pkgFile.Mode > 0 {
+		switch {
+		case componentConfigFilePattern.MatchString(info.Name()):
+			header.Mode = int64(componentConfigMode & os.ModePerm)
+		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
+			header.Mode = int64(pkgFile.ConfigMode & os.ModePerm)
+		case info.Mode().IsRegular() && pkgFile.Mode > 0:
 			header.Mode = int64(pkgFile.Mode & os.ModePerm)
-		} else if info.IsDir() {
+		case info.IsDir():
 			header.Mode = int64(0755)
 		}
 
@@ -985,7 +1019,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 // PackageDocker packages the Beat into a docker image.
 func PackageDocker(spec PackageSpec) error {
 	if err := HaveDocker(); err != nil {
-		return errors.Errorf("docker daemon required to build images: %s", err)
+		return fmt.Errorf("docker daemon required to build images: %w", err)
 	}
 
 	b, err := newDockerBuilder(spec)

@@ -59,10 +59,11 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 	// checkin
 	agentID := f.agentInfo.AgentID()
 	cmd := fleetapi.NewAckCmd(f.agentInfo, f.client)
+	event := action.AckEvent()
+	event.AgentID = agentID
+	event.Timestamp = time.Now().Format(fleetTimeFormat)
 	req := &fleetapi.AckRequest{
-		Events: []fleetapi.AckEvent{
-			constructEvent(action, agentID),
-		},
+		Events: []fleetapi.AckEvent{event},
 	}
 
 	_, err = cmd.Execute(ctx, req)
@@ -88,7 +89,10 @@ func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *f
 	events := make([]fleetapi.AckEvent, 0, len(actions))
 	ids := make([]string, 0, len(actions))
 	for _, action := range actions {
-		events = append(events, constructEvent(action, agentID))
+		event := action.AckEvent()
+		event.AgentID = agentID
+		event.Timestamp = time.Now().Format(fleetTimeFormat)
+		events = append(events, event)
 		ids = append(ids, action.ID())
 	}
 
@@ -115,25 +119,4 @@ func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *f
 // Commit commits ack actions.
 func (f *Acker) Commit(ctx context.Context) error {
 	return nil
-}
-
-func constructEvent(action fleetapi.Action, agentID string) fleetapi.AckEvent {
-	ackev := fleetapi.AckEvent{
-		EventType: "ACTION_RESULT",
-		SubType:   "ACKNOWLEDGED",
-		Timestamp: time.Now().Format(fleetTimeFormat),
-		ActionID:  action.ID(),
-		AgentID:   agentID,
-		Message:   fmt.Sprintf("Action '%s' of type '%s' acknowledged.", action.ID(), action.Type()),
-	}
-
-	if a, ok := action.(*fleetapi.ActionApp); ok {
-		ackev.ActionInputType = a.InputType
-		ackev.ActionData = a.Data
-		ackev.ActionResponse = a.Response
-		ackev.StartedAt = a.StartedAt
-		ackev.CompletedAt = a.CompletedAt
-		ackev.Error = a.Error
-	}
-	return ackev
 }

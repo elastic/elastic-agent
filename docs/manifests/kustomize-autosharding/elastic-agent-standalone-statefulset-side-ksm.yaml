@@ -1,0 +1,620 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-node-datastreams
+  namespace: kube-system
+  labels:
+    k8s-app: elastic-agent
+data:
+  agent.yml: |-
+    outputs:
+      default:
+        type: elasticsearch
+        hosts:
+          - >-
+            ${ES_HOST}
+        username: '${ES_USERNAME}'
+        password: '${ES_PASSWORD}'
+    providers.kubernetes:
+      enabled: false
+    inputs:
+      - id: >-
+          kubernetes/metrics-kube-state-metrics-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+        revision: 1
+        name: kubernetes-41
+        type: kubernetes/metrics
+        data_stream:
+          namespace: default
+        use_output: default
+        package_policy_id: 3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+        streams:
+          - id: >-
+              kubernetes/metrics-kubernetes.state_deployment-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_deployment
+            metricsets:
+              - state_deployment
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_container-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_container
+            metricsets:
+              - state_container
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_cronjob-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_cronjob
+            metricsets:
+              - state_cronjob
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_daemonset-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_daemonset
+            metricsets:
+              - state_daemonset
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_persistentvolume-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_persistentvolume
+            metricsets:
+              - state_persistentvolume
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_resourcequota-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_resourcequota
+            metricsets:
+              - state_resourcequota
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_node-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_node
+            metricsets:
+              - state_node
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_replicaset-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_replicaset
+            metricsets:
+              - state_replicaset
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_pod-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_pod
+            metricsets:
+              - state_pod
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_persistentvolumeclaim-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_persistentvolumeclaim
+            metricsets:
+              - state_persistentvolumeclaim
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_storageclass-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_storageclass
+            metricsets:
+              - state_storageclass
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_job-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_job
+            metricsets:
+              - state_job
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_statefulset-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_statefulset
+            metricsets:
+              - state_statefulset
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - id: >-
+              kubernetes/metrics-kubernetes.state_service-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
+            data_stream:
+              type: metrics
+              dataset: kubernetes.state_service
+            metricsets:
+              - state_service
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        meta:
+          package:
+            name: kubernetes
+            version: 1.36.0
+    revision: 3
+    agent:
+      download:
+        sourceURI: 'https://artifacts.elastic.co/downloads/'
+      monitoring:
+        namespace: default
+        use_output: default
+        enabled: true
+        logs: true
+        metrics: true
+    output_permissions:
+      default:
+        _elastic_agent_monitoring:
+          indices:
+            - names:
+                - logs-elastic_agent.auditbeat-default
+              privileges: &ref_0
+                - auto_configure
+                - create_doc
+            - names:
+                - metrics-elastic_agent.endpoint_security-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.filebeat_input-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.auditbeat-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.osquerybeat-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.filebeat-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.cloudbeat-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.metricbeat-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.heartbeat-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.filebeat_input-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.fleet_server-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.apm_server-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.cloud_defend-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.packetbeat-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.apm_server-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.metricbeat-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.elastic_agent-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.fleet_server-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.packetbeat-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.endpoint_security-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.osquerybeat-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.filebeat-default
+              privileges: *ref_0
+            - names:
+                - metrics-elastic_agent.cloudbeat-default
+              privileges: *ref_0
+            - names:
+                - logs-elastic_agent.heartbeat-default
+              privileges: *ref_0
+        _elastic_agent_checks:
+          cluster:
+            - monitor
+        3fb98bfb-4fd0-4842-be84-0dc7b8dbd071:
+          indices:
+            - names:
+                - metrics-kubernetes.state_deployment-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_container-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_cronjob-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_daemonset-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_persistentvolume-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_resourcequota-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_node-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_replicaset-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_pod-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_persistentvolumeclaim-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_storageclass-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_job-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_statefulset-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.state_service-default
+              privileges: *ref_0
+
+---
+# For more information refer https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elastic-agent
+  namespace: kube-system
+  labels:
+    app: elastic-agent
+spec:
+  selector:
+    matchLabels:
+      app: elastic-agent
+  template:
+    metadata:
+      labels:
+        app: elastic-agent
+    spec:
+      # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
+      # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      serviceAccountName: elastic-agent
+      hostNetwork: false
+      dnsPolicy: ClusterFirstWithHostNet
+      # Uncomment if using hints feature
+      #initContainers:
+      #  - name: k8s-templates-downloader
+      #    image: busybox:1.28
+      #    command: ['sh']
+      #    args:
+      #      - -c
+      #      - >-
+      #        mkdir -p /etc/elastic-agent/inputs.d &&
+      #        wget -O - https://github.com/elastic/elastic-agent/archive/main.tar.gz | tar xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-main/deploy/kubernetes/elastic-agent/templates.d"
+      #    volumeMounts:
+      #      - name: external-inputs
+      #        mountPath: /etc/elastic-agent/inputs.d
+      containers:
+        - name: elastic-agent
+          image: docker.elastic.co/beats/elastic-agent:8.7.0-SNAPSHOT
+          args: [
+            "-c", "/etc/elastic-agent/agent.yml",
+            "-e",
+          ]
+          env:
+            # The basic authentication username used to connect to Elasticsearch
+            # This user needs the privileges required to publish events to Elasticsearch.
+            - name: ES_USERNAME
+              value: "elastic"
+            # The basic authentication password used to connect to Elasticsearch
+            - name: ES_PASSWORD
+              value: "changeme"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: STATE_PATH
+              value: "/etc/elastic-agent"
+          securityContext:
+            runAsUser: 0
+          resources:
+            limits:
+              memory: 700Mi
+            requests:
+              cpu: 100m
+              memory: 400Mi
+          volumeMounts:
+            - name: datastreams
+              mountPath: /etc/elastic-agent/agent.yml
+              readOnly: true
+              subPath: agent.yml
+            # Uncomment if using hints feature
+            #- name: external-inputs
+            #  mountPath: /etc/elastic-agent/inputs.d
+            - name: proc
+              mountPath: /hostfs/proc
+              readOnly: true
+            - name: cgroup
+              mountPath: /hostfs/sys/fs/cgroup
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: etc-full
+              mountPath: /hostfs/etc
+              readOnly: true
+            - name: var-lib
+              mountPath: /hostfs/var/lib
+              readOnly: true
+      volumes:
+        - name: datastreams
+          configMap:
+            defaultMode: 0640
+            name: agent-node-datastreams
+        # Uncomment if using hints feature
+        #- name: external-inputs
+        #  emptyDir: {}
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: varlog
+          hostPath:
+            path: /var/log
+        # The following volumes are needed for Cloud Security Posture integration (cloudbeat)
+        # If you are not using this integration, then these volumes and the corresponding
+        # mounts can be removed.
+        - name: etc-full
+          hostPath:
+            path: /etc
+        - name: var-lib
+          hostPath:
+            path: /var/lib
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: elastic-agent
+subjects:
+  - kind: ServiceAccount
+    name: elastic-agent
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: elastic-agent
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: kube-system
+  name: elastic-agent
+subjects:
+  - kind: ServiceAccount
+    name: elastic-agent
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: elastic-agent
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: elastic-agent-kubeadm-config
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: elastic-agent
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: elastic-agent-kubeadm-config
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: elastic-agent
+  labels:
+    k8s-app: elastic-agent
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - namespaces
+      - events
+      - pods
+      - services
+      - configmaps
+      # Needed for cloudbeat
+      - serviceaccounts
+      - persistentvolumes
+      - persistentvolumeclaims
+    verbs: ["get", "list", "watch"]
+  # Enable this rule only if planing to use kubernetes_secrets provider
+  #- apiGroups: [""]
+  #  resources:
+  #  - secrets
+  #  verbs: ["get"]
+  - apiGroups: ["extensions"]
+    resources:
+      - replicasets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources:
+      - statefulsets
+      - deployments
+      - replicasets
+      - daemonsets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/stats
+    verbs:
+      - get
+  # Needed for apiserver
+  - nonResourceURLs:
+      - "/metrics"
+    verbs:
+      - get
+  # Needed for cloudbeat
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - clusterrolebindings
+      - clusterroles
+      - rolebindings
+      - roles
+    verbs: ["get", "list", "watch"]
+  # Needed for cloudbeat
+  - apiGroups: ["policy"]
+    resources:
+      - podsecuritypolicies
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [ "storage.k8s.io" ]
+    resources:
+      - storageclasses
+    verbs: [ "get", "list", "watch" ]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: elastic-agent
+  # Should be the namespace where elastic-agent is running
+  namespace: kube-system
+  labels:
+    k8s-app: elastic-agent
+rules:
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs: ["get", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: elastic-agent-kubeadm-config
+  namespace: kube-system
+  labels:
+    k8s-app: elastic-agent
+rules:
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    resourceNames:
+      - kubeadm-config
+    verbs: ["get"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: elastic-agent
+  namespace: kube-system
+  labels:
+    k8s-app: elastic-agent
+---

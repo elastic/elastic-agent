@@ -1,0 +1,84 @@
+inputs:
+    - name: nats/metrics-nats
+      id: nats/metrics-nats-${kubernetes.hints.container_id}
+      type: nats/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.nats.connection.enabled} == true and ${kubernetes.hints.nats.enabled} == true
+          data_stream:
+            dataset: nats.connection
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.nats.connection.host|kubernetes.hints.nats.host|'localhost:8222'}
+          metricsets:
+            - connection
+          period: ${kubernetes.hints.nats.connection.period|kubernetes.hints.nats.period|'10s'}
+        - condition: ${kubernetes.hints.nats.connections.enabled} == true or ${kubernetes.hints.nats.enabled} == true
+          data_stream:
+            dataset: nats.connections
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.nats.connections.host|kubernetes.hints.nats.host|'localhost:8222'}
+          metricsets:
+            - connections
+          period: ${kubernetes.hints.nats.connections.period|kubernetes.hints.nats.period|'10s'}
+        - condition: ${kubernetes.hints.nats.route.enabled} == true and ${kubernetes.hints.nats.enabled} == true
+          data_stream:
+            dataset: nats.route
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.nats.route.host|kubernetes.hints.nats.host|'localhost:8222'}
+          metricsets:
+            - route
+          period: ${kubernetes.hints.nats.route.period|kubernetes.hints.nats.period|'10s'}
+        - condition: ${kubernetes.hints.nats.routes.enabled} == true or ${kubernetes.hints.nats.enabled} == true
+          data_stream:
+            dataset: nats.routes
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.nats.routes.host|kubernetes.hints.nats.host|'localhost:8222'}
+          metricsets:
+            - routes
+          period: ${kubernetes.hints.nats.routes.period|kubernetes.hints.nats.period|'10s'}
+        - condition: ${kubernetes.hints.nats.stats.enabled} == true or ${kubernetes.hints.nats.enabled} == true
+          data_stream:
+            dataset: nats.stats
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.nats.stats.host|kubernetes.hints.nats.host|'localhost:8222'}
+          metricsets:
+            - stats
+          period: ${kubernetes.hints.nats.stats.period|kubernetes.hints.nats.period|'10s'}
+        - condition: ${kubernetes.hints.nats.subscriptions.enabled} == true or ${kubernetes.hints.nats.enabled} == true
+          data_stream:
+            dataset: nats.subscriptions
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.nats.subscriptions.host|kubernetes.hints.nats.host|'localhost:8222'}
+          metricsets:
+            - subscriptions
+          period: ${kubernetes.hints.nats.subscriptions.period|kubernetes.hints.nats.period|'10s'}
+      data_stream.namespace: default
+    - name: filestream-nats
+      id: filestream-nats-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.nats.log.enabled} == true or ${kubernetes.hints.nats.enabled} == true
+          data_stream:
+            dataset: nats.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.nats.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - nats-log
+      data_stream.namespace: default

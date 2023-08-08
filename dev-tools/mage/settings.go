@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"errors"
 	"fmt"
 	"go/build"
 	"io/ioutil"
@@ -17,8 +18,10 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 	"golang.org/x/tools/go/vcs"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
@@ -35,6 +38,13 @@ const (
 	elasticAgentImportPath = "github.com/elastic/elastic-agent"
 
 	elasticAgentModulePath = "github.com/elastic/elastic-agent"
+
+	// Env vars
+	// agent package version
+	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
+
+	// Mapped functions
+	agentPackageVersionMappedFunc = "agent_package_version"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -73,22 +83,35 @@ var (
 	versionQualified bool
 	versionQualifier string
 
+	// Env var to set the agent package version
+	agentPackageVersion string
+
+	// PackagingFromManifest This value is set to tru when we have defined a ManifestURL variable
+	PackagingFromManifest bool
+	// ManifestURL Location of the manifest file to package
+	ManifestURL string
+
 	FuncMap = map[string]interface{}{
-		"beat_doc_branch":   BeatDocBranch,
-		"beat_version":      BeatQualifiedVersion,
-		"commit":            CommitHash,
-		"commit_short":      CommitHashShort,
-		"date":              BuildDate,
-		"elastic_beats_dir": ElasticBeatsDir,
-		"go_version":        GoVersion,
-		"repo":              GetProjectRepoInfo,
-		"title":             strings.Title,
-		"tolower":           strings.ToLower,
-		"contains":          strings.Contains,
+		"beat_doc_branch":             BeatDocBranch,
+		"beat_version":                BeatQualifiedVersion,
+		"commit":                      CommitHash,
+		"commit_short":                CommitHashShort,
+		"date":                        BuildDate,
+		"elastic_beats_dir":           ElasticBeatsDir,
+		"go_version":                  GoVersion,
+		"repo":                        GetProjectRepoInfo,
+		"title":                       func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
+		"tolower":                     strings.ToLower,
+		"contains":                    strings.Contains,
+		agentPackageVersionMappedFunc: AgentPackageVersion,
 	}
 )
 
 func init() {
+	initGlobals()
+}
+
+func initGlobals() {
 	if GOOS == "windows" {
 		BinaryExt = ".exe"
 	}
@@ -96,30 +119,35 @@ func init() {
 	var err error
 	RaceDetector, err = strconv.ParseBool(EnvOr("RACE_DETECTOR", "false"))
 	if err != nil {
-		panic(errors.Wrap(err, "failed to parse RACE_DETECTOR env value"))
+		panic(fmt.Errorf("failed to parse RACE_DETECTOR env value: %w", err))
 	}
 
 	TestCoverage, err = strconv.ParseBool(EnvOr("TEST_COVERAGE", "false"))
 	if err != nil {
-		panic(errors.Wrap(err, "failed to parse TEST_COVERAGE env value"))
+		panic(fmt.Errorf("failed to parse TEST_COVERAGE env value: %w", err))
 	}
 
 	Snapshot, err = strconv.ParseBool(EnvOr("SNAPSHOT", "false"))
 	if err != nil {
-		panic(errors.Wrap(err, "failed to parse SNAPSHOT env value"))
+		panic(fmt.Errorf("failed to parse SNAPSHOT env value: %w", err))
 	}
 
 	DevBuild, err = strconv.ParseBool(EnvOr("DEV", "false"))
 	if err != nil {
-		panic(errors.Wrap(err, "failed to parse DEV env value"))
+		panic(fmt.Errorf("failed to parse DEV env value: %w", err))
 	}
 
 	ExternalBuild, err = strconv.ParseBool(EnvOr("EXTERNAL", "false"))
 	if err != nil {
-		panic(errors.Wrap(err, "failed to parse EXTERNAL env value"))
+		panic(fmt.Errorf("failed to parse EXTERNAL env value: %w", err))
 	}
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
+
+	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
+
+	ManifestURL = EnvOr("ManifestURL", "")
+	PackagingFromManifest = ManifestURL != ""
 }
 
 // ProjectType specifies the type of project (OSS vs X-Pack).
@@ -220,6 +248,7 @@ repo.CanonicalRootImportPath = {{ repo.CanonicalRootImportPath }}
 repo.RootDir                 = {{ repo.RootDir }}
 repo.ImportPath              = {{ repo.ImportPath }}
 repo.SubDir                  = {{ repo.SubDir }}
+agent_package_version        = {{ agent_package_version}}
 `
 
 	return Expand(dumpTemplate)
@@ -257,6 +286,15 @@ func CommitHashShort() (string, error) {
 		shortHash = shortHash[:6]
 	}
 	return shortHash, err
+}
+
+func AgentPackageVersion() (string, error) {
+
+	if agentPackageVersion != "" {
+		return agentPackageVersion, nil
+	}
+
+	return BeatQualifiedVersion()
 }
 
 var (
@@ -372,10 +410,11 @@ func beatVersion() (string, error) {
 }
 
 var (
-	beatDocBranchRegex = regexp.MustCompile(`(?m)doc-branch:\s*([^\s]+)\r?$`)
-	beatDocBranchValue string
-	beatDocBranchErr   error
-	beatDocBranchOnce  sync.Once
+	beatDocBranchRegex     = regexp.MustCompile(`(?m)doc-branch:\s*([^\s]+)\r?$`)
+	beatDocSiteBranchRegex = regexp.MustCompile(`(?m)doc-site-branch:\s*([^\s]+)\r?$`)
+	beatDocBranchValue     string
+	beatDocBranchErr       error
+	beatDocBranchOnce      sync.Once
 )
 
 // BeatDocBranch returns the documentation branch name associated with the
@@ -434,7 +473,7 @@ func getBuildVariableSources() *BuildVariableSources {
 		return buildVariableSources
 	}
 
-	panic(errors.Errorf("magefile must call devtools.SetBuildVariableSources() "+
+	panic(fmt.Errorf("magefile must call devtools.SetBuildVariableSources() "+
 		"because it is not an elastic beat (repo=%+v)", repo.RootImportPath))
 }
 
@@ -479,7 +518,7 @@ func (s *BuildVariableSources) GetBeatVersion() (string, error) {
 
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to read beat version file=%v", file)
+		return "", fmt.Errorf("failed to read beat version file=%v: %w", file, err)
 	}
 
 	if s.BeatVersionParser == nil {
@@ -497,7 +536,7 @@ func (s *BuildVariableSources) GetGoVersion() (string, error) {
 
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to read go version file=%v", file)
+		return "", fmt.Errorf("failed to read go version file=%v: %w", file, err)
 	}
 
 	if s.GoVersionParser == nil {
@@ -515,7 +554,7 @@ func (s *BuildVariableSources) GetDocBranch() (string, error) {
 
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to read doc branch file=%v", file)
+		return "", fmt.Errorf("failed to read doc branch file=%v: %w", file, err)
 	}
 
 	if s.DocBranchParser == nil {
@@ -538,7 +577,12 @@ func parseGoVersion(data []byte) (string, error) {
 }
 
 func parseDocBranch(data []byte) (string, error) {
-	matches := beatDocBranchRegex.FindSubmatch(data)
+	matches := beatDocSiteBranchRegex.FindSubmatch(data)
+	if len(matches) == 2 {
+		return string(matches[1]), nil
+	}
+
+	matches = beatDocBranchRegex.FindSubmatch(data)
 	if len(matches) == 2 {
 		return string(matches[1]), nil
 	}
@@ -631,7 +675,7 @@ func getProjectRepoInfoWithModules() (*ProjectRepoInfo, error) {
 	}
 
 	if rootDir == "" {
-		return nil, errors.Errorf("failed to find root dir of module file: %v", errs)
+		return nil, fmt.Errorf("failed to find root dir of module file: %v", errs)
 	}
 
 	rootImportPath, err := gotool.GetModuleName()
@@ -685,12 +729,13 @@ func getProjectRepoInfoUnderGopath() (*ProjectRepoInfo, error) {
 	}
 
 	if rootDir == "" {
-		return nil, errors.Errorf("error while determining root directory: %v", errs)
+		return nil, fmt.Errorf("error while determining root directory: %v", errs)
 	}
 
 	subDir, err := filepath.Rel(rootDir, cwd)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get relative path to repo root")
+		err = errors.Unwrap(err)
+		return nil, fmt.Errorf("failed to get relative path to repo root: %w", err)
 	}
 
 	rootImportPath, err := gotool.GetModuleName()
@@ -742,7 +787,7 @@ func listSrcGOPATHs() ([]string, error) {
 	}
 
 	if len(srcDirs) == 0 {
-		return srcDirs, errors.Errorf("failed to find any GOPATH %v", errs)
+		return srcDirs, fmt.Errorf("failed to find any GOPATH %v", errs)
 	}
 
 	return srcDirs, nil

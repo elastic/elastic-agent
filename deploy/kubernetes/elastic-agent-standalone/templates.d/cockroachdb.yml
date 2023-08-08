@@ -1,0 +1,46 @@
+inputs:
+    - name: prometheus/metrics-cockroachdb
+      id: prometheus/metrics-cockroachdb-${kubernetes.hints.container_id}
+      type: prometheus/metrics
+      use_output: default
+      streams:
+        - bearer_token_file: null
+          condition: ${kubernetes.hints.cockroachdb.status.enabled} == true or ${kubernetes.hints.cockroachdb.enabled} == true
+          data_stream:
+            dataset: cockroachdb.status
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.cockroachdb.status.host|kubernetes.hints.cockroachdb.host|'localhost:8080'}
+          metrics_filters.exclude: null
+          metrics_filters.include: null
+          metrics_path: /_status/vars
+          metricsets:
+            - collector
+          password: ${kubernetes.hints.cockroachdb.status.password|kubernetes.hints.cockroachdb.password|''}
+          period: ${kubernetes.hints.cockroachdb.status.period|kubernetes.hints.cockroachdb.period|'10s'}
+          ssl.certificate_authorities: null
+          use_types: true
+          username: ${kubernetes.hints.cockroachdb.status.username|kubernetes.hints.cockroachdb.username|''}
+      data_stream.namespace: default
+    - name: filestream-cockroachdb
+      id: filestream-cockroachdb-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cockroachdb.container_logs.enabled} == true
+          data_stream:
+            dataset: cockroachdb.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

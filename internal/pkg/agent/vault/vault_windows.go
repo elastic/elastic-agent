@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build windows
-// +build windows
 
 package vault
 
@@ -27,7 +26,8 @@ type Vault struct {
 }
 
 // Open initializes the vault store
-func New(path string) (*Vault, error) {
+func New(path string, opts ...OptionFunc) (v *Vault, err error) {
+	options := applyOptions(opts...)
 	dir := filepath.Dir(path)
 
 	// If there is no specific path then get the executable directory
@@ -40,16 +40,26 @@ func New(path string) (*Vault, error) {
 		path = filepath.Join(dir, path)
 	}
 
-	err := os.MkdirAll(path, 0750)
-	if err != nil {
-		return nil, err
-	}
-	err = systemAdministratorsOnly(path, false)
-	if err != nil {
-		return nil, err
+	if options.readonly {
+		fi, err := os.Stat(path)
+		if err != nil {
+			return nil, err
+		}
+		if !fi.IsDir() {
+			return nil, fs.ErrNotExist
+		}
+	} else {
+		err := os.MkdirAll(path, 0750)
+		if err != nil {
+			return nil, err
+		}
+		err = systemAdministratorsOnly(path, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	entropy, err := getSeed(path)
+	entropy, err := getOrCreateSeed(path, options.readonly)
 	if err != nil {
 		return nil, err
 	}

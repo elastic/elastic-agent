@@ -34,6 +34,9 @@ type Config struct {
 
 	LabelsDedot      bool `config:"labels.dedot"`
 	AnnotationsDedot bool `config:"annotations.dedot"`
+
+	Hints  Hints  `config:"hints"`
+	Prefix string `config:"prefix"`
 }
 
 // Resources config section for resources' config blocks
@@ -41,6 +44,12 @@ type Resources struct {
 	Pod     Enabled `config:"pod"`
 	Node    Enabled `config:"node"`
 	Service Enabled `config:"service"`
+}
+
+// Hints config section for hints' config blocks
+type Hints struct {
+	Enabled              bool `config:"enabled"`
+	DefaultContainerLogs bool `config:"default_container_logs"`
 }
 
 // Enabled config section for resources' config blocks
@@ -56,6 +65,8 @@ func (c *Config) InitDefaults() {
 	c.LabelsDedot = true
 	c.AnnotationsDedot = true
 	c.AddResourceMetadata = metadata.GetDefaultResourceMetadataConfig()
+	c.Prefix = "co.elastic"
+	c.Hints.DefaultContainerLogs = true
 }
 
 // Validate ensures correctness of config

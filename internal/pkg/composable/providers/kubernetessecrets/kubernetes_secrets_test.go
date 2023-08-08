@@ -7,6 +7,9 @@ package kubernetessecrets
 import (
 	"context"
 	"testing"
+	"time"
+
+	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +22,6 @@ import (
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 )
 
 const (
@@ -49,16 +51,34 @@ func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]string{"a": "b"})
 	require.NoError(t, err)
 
-	p, err := ContextProviderBuilder(logger, cfg)
+	p, err := ContextProviderBuilder(logger, cfg, true)
 	require.NoError(t, err)
 
-	fp, _ := p.(corecomp.FetchContextProvider)
+	fp, _ := p.(*contextProviderK8sSecrets)
 
 	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
 		return client, nil
 	}
 	require.NoError(t, err)
-	_ = fp.Run(nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := ctesting.NewContextComm(ctx)
+
+	go func() {
+		_ = fp.Run(comm)
+	}()
+
+	for {
+		fp.clientMx.Lock()
+		client := fp.client
+		fp.clientMx.Unlock()
+		if client != nil {
+			break
+		}
+		<-time.After(10 * time.Millisecond)
+	}
+
 	val, found := fp.Fetch("kubernetes_secrets.test_namespace.testing_secret.secret_value")
 	assert.True(t, found)
 	assert.Equal(t, val, pass)
@@ -86,16 +106,34 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]string{"a": "b"})
 	require.NoError(t, err)
 
-	p, err := ContextProviderBuilder(logger, cfg)
+	p, err := ContextProviderBuilder(logger, cfg, true)
 	require.NoError(t, err)
 
-	fp, _ := p.(corecomp.FetchContextProvider)
+	fp, _ := p.(*contextProviderK8sSecrets)
 
 	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
 		return client, nil
 	}
 	require.NoError(t, err)
-	_ = fp.Run(nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := ctesting.NewContextComm(ctx)
+
+	go func() {
+		_ = fp.Run(comm)
+	}()
+
+	for {
+		fp.clientMx.Lock()
+		client := fp.client
+		fp.clientMx.Unlock()
+		if client != nil {
+			break
+		}
+		<-time.After(10 * time.Millisecond)
+	}
+
 	val, found := fp.Fetch("kubernetes_secrets.test_namespace.testing_secretHACK.secret_value")
 	assert.False(t, found)
 	assert.EqualValues(t, val, "")

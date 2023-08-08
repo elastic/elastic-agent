@@ -60,7 +60,7 @@ func TestContextProvider(t *testing.T) {
 	})
 	require.NoError(t, err)
 	builder, _ := composable.Providers.GetDynamicProvider("local_dynamic")
-	provider, err := builder(nil, cfg)
+	provider, err := builder(nil, cfg, true)
 	require.NoError(t, err)
 
 	comm := ctesting.NewDynamicComm(context.Background())

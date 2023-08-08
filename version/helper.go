@@ -4,7 +4,13 @@
 
 package version
 
-import "time"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
 
 // GetDefaultVersion returns the current libbeat version.
 // This method is in a separate file as the version.go file is auto generated
@@ -16,10 +22,63 @@ func GetDefaultVersion() string {
 }
 
 var (
-	buildTime = "unknown"
-	commit    = "unknown"
-	qualifier = ""
+	buildTime      = "unknown"
+	commit         = "unknown"
+	qualifier      = ""
+	packageVersion = ""
 )
+
+const PackageVersionFileName = ".package.version"
+
+// InitVersionInformation initialize the package version string reading from the
+// corresponding file. This function is not thread-safe and should be called once
+// before any calls to Version() has been done
+func InitVersionInformation() error {
+	packageVersionFilePath, err := GetAgentPackageVersionFilePath()
+	if err != nil {
+		// fallback to default binary version
+		packageVersion = GetDefaultVersion()
+		return fmt.Errorf("retrieving package version file path: %w", err)
+	}
+	versionBytes, err := os.ReadFile(packageVersionFilePath)
+	if err != nil {
+		// fallback to default binary version
+		packageVersion = GetDefaultVersion()
+		return fmt.Errorf("reading package version from file %q: %w", packageVersionFilePath, err)
+	}
+	packageVersion = strings.TrimSpace(string(versionBytes))
+	return nil
+}
+
+// GetAgentPackageVersion retrieves the version saved in .package.version in the same
+// directory as the agent executable.
+// This function must be called AFTER InitVersionInformation() has initialized the module vars
+func GetAgentPackageVersion() string {
+	return packageVersion
+}
+
+// GetAgentPackageVersionFilePath returns the path where the package version file
+// should be located (side by side with the currently executing binary)
+func GetAgentPackageVersionFilePath() (string, error) {
+	execPath, err := getCurrentExecutablePath()
+	if err != nil {
+		return "", fmt.Errorf("detecting current executable path: %w", err)
+	}
+	return filepath.Join(filepath.Dir(execPath), PackageVersionFileName), nil
+}
+
+func getCurrentExecutablePath() (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("retrieving current process executable: %w", err)
+	}
+	evalPath, err := filepath.EvalSymlinks(execPath)
+	if err != nil {
+		return "", fmt.Errorf("evaluating symlinks to current process executable: %w", err)
+	}
+
+	return evalPath, nil
+}
 
 // BuildTime exposes the compile-time build time information.
 // It will represent the zero time instant if parsing fails.

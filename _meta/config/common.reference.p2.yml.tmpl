@@ -5,27 +5,45 @@ outputs:
   default:
     type: elasticsearch
     hosts: [127.0.0.1:9200]
-    api-key: "example-key"
+    api_key: "example-key"
     # username: "elastic"
     # password: "changeme"
 
 inputs:
   - type: system/metrics
-
+    # Each input must have a unique ID.
+    id: unique-system-metrics-input
     # Namespace name must conform to the naming conventions for Elasticsearch indices, cannot contain dashes (-), and cannot exceed 100 bytes
     # For index naming restrictions, see https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-create-index.html#indices-create-api-path-params
     data_stream.namespace: default
     use_output: default
     streams:
-      - metricset: cpu
+      - metricsets:
+        - cpu
         # Dataset name must conform to the naming conventions for Elasticsearch indices, cannot contain dashes (-), and cannot exceed 100 bytes
         data_stream.dataset: system.cpu
-      - metricset: memory
+      - metricsets:
+        - memory
         data_stream.dataset: system.memory
-      - metricset: network
+      - metricsets:
+        - network
         data_stream.dataset: system.network
-      - metricset: filesystem
+      - metricsets:
+        - filesystem
         data_stream.dataset: system.filesystem
+
+#   # Collecting log files
+#   - type: filestream
+#     # Input ID allowing Elastic Agent to track the state of this input. Must be unique.
+#     id: your-input-id
+#     streams:
+#       # Stream ID for this data stream allowing Filebeat to track the state of the ingested files. Must be unique.
+#       # Each filestream data stream creates a separate instance of the Filebeat filestream input.
+#       - id: your-filestream-stream-id
+#         data_stream:
+#           dataset: generic
+#         paths:
+#           - /var/log/*.log
 
 # management:
 #   # Mode of management, the Elastic Agent support two modes of operation:
@@ -64,12 +82,12 @@ inputs:
 #   target_directory: "${path.data}/downloads"
 #   # timeout for downloading package
 #   timeout: 120s
-#   # file path to a public key used for verifying downloaded artifacts
-#   # if not file is present agent will try to load public key from elastic.co website.
-#   pgpfile: "${path.data}/elastic.pgp"
 #   # install_path describes the location of installed packages/programs. It is also used
 #   # for reading program specifications.
 #   install_path: "${path.data}/install"
+#   # retry_sleep_init_duration is the duration to sleep for before the first retry attempt. This
+#   # duration will increase for subsequent retry attempts in a randomized exponential backoff manner.
+#   retry_sleep_init_duration: 30s
 
 # agent.process:
 #   # timeout for creating new processes. when process is not successfully created by this timeout
@@ -84,6 +102,9 @@ inputs:
 #   address: localhost
 #   # port for the GRPC server that spawned processes connect back to.
 #   port: 6789
+#   # max_message_size limits the message size in agent internal communication
+#   # default is 100MB
+#   max_message_size: 104857600
 
 # agent.retry:
 #   # Enabled determines whether retry is possible. Default is false.
@@ -110,6 +131,8 @@ inputs:
 #   # exposes /debug/pprof/ endpoints
 #   # recommended that these endpoints are only enabled if the monitoring endpoint is set to localhost
 #   pprof.enabled: false
+#   # The name of the output to use for monitoring data.
+#   use_output: monitoring
 #   # exposes agent metrics using http, by default sockets and named pipes are used
 #   http:
 #       # enables http endpoint
@@ -121,6 +144,22 @@ inputs:
 #       port: 6791
 #       # Metrics buffer endpoint
 #       buffer.enabled: false
+#   # Configuration for the diagnostics action handler
+#   diagnostics:
+#       # Rate limit for the action handler. Does not affect diagnostics collected through the CLI.
+#       limit:
+#           # Rate limit interval.
+#           interval: 1m
+#           # Rate limit burst.
+#           burst: 1
+#       # Configuration for the file-upload client. Client may retry failed requests with an exponential backoff.
+#       uploader:
+#           # Max retries allowed when uploading a chunk.
+#           max_retries: 10
+#           # Initial duration of the backoff.
+#           init_dur: 1s
+#           # Max duration of the backoff.
+#           max_dur: 1m
 
 # # Allow fleet to reload its configuration locally on disk.
 # # Notes: Only specific process configuration and external input configurations will be reloaded.
@@ -132,6 +171,13 @@ inputs:
 
 #   # period define how frequent we should look for changes in the configuration.
 #   period: 10s
+
+# Feature Flags
+
+# This section enables or disables feature flags supported by Agent and its components.
+#agent.features:
+#  fqdn:
+#    enabled: false
 
 # Logging
 
@@ -179,7 +225,7 @@ agent.logging.to_stderr: true
 
   # Configure log file size limit. If limit is reached, log file will be
   # automatically rotated
-  #rotateeverybytes: 10485760 # = 10MB
+  #rotateeverybytes: 20971520 # = 20MB
 
   # Number of rotated log files to keep. Oldest files will be deleted first.
   #keepfiles: 7

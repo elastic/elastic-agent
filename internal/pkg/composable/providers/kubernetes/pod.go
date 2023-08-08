@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elastic/elastic-agent-autodiscover/utils"
+
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
 	c "github.com/elastic/elastic-agent-libs/config"
@@ -23,15 +25,18 @@ import (
 )
 
 type pod struct {
-	logger           *logp.Logger
-	cleanupTimeout   time.Duration
-	comm             composable.DynamicProviderComm
-	scope            string
-	config           *Config
-	metagen          metadata.MetaGen
-	watcher          kubernetes.Watcher
-	nodeWatcher      kubernetes.Watcher
-	namespaceWatcher kubernetes.Watcher
+	watcher           kubernetes.Watcher
+	nodeWatcher       kubernetes.Watcher
+	comm              composable.DynamicProviderComm
+	metagen           metadata.MetaGen
+	namespaceWatcher  kubernetes.Watcher
+	replicasetWatcher kubernetes.Watcher
+	jobWatcher        kubernetes.Watcher
+	config            *Config
+	logger            *logp.Logger
+	scope             string
+	managed           bool
+	cleanupTimeout    time.Duration
 
 	// Mutex used by configuration updates not triggered by the main watcher,
 	// to avoid race conditions between cross updates and deletions.
@@ -51,7 +56,8 @@ func NewPodEventer(
 	cfg *Config,
 	logger *logp.Logger,
 	client k8s.Interface,
-	scope string) (Eventer, error) {
+	scope string,
+	managed bool) (Eventer, error) {
 	watcher, err := kubernetes.NewNamedWatcher("agent-pod", client, &kubernetes.Pod{}, kubernetes.WatchOptions{
 		SyncTimeout:  cfg.SyncPeriod,
 		Node:         cfg.Node,
@@ -61,6 +67,8 @@ func NewPodEventer(
 	if err != nil {
 		return nil, errors.New(err, "couldn't create kubernetes watcher")
 	}
+
+	var replicaSetWatcher, jobWatcher kubernetes.Watcher
 
 	options := kubernetes.WatchOptions{
 		SyncTimeout: cfg.SyncPeriod,
@@ -79,22 +87,46 @@ func NewPodEventer(
 		logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
 	}
 
+	// Resource is Pod so we need to create watchers for Replicasets and Jobs that it might belong to
+	// in order to be able to retrieve 2nd layer Owner metadata like in case of:
+	// Deployment -> Replicaset -> Pod
+	// CronJob -> job -> Pod
+	if metaConf.Deployment {
+		replicaSetWatcher, err = kubernetes.NewNamedWatcher("resource_metadata_enricher_rs", client, &kubernetes.ReplicaSet{}, kubernetes.WatchOptions{
+			SyncTimeout: cfg.SyncPeriod,
+		}, nil)
+		if err != nil {
+			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
+		}
+	}
+	if metaConf.CronJob {
+		jobWatcher, err = kubernetes.NewNamedWatcher("resource_metadata_enricher_job", client, &kubernetes.Job{}, kubernetes.WatchOptions{
+			SyncTimeout: cfg.SyncPeriod,
+		}, nil)
+		if err != nil {
+			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Job{}, err)
+		}
+	}
+
 	rawConfig, err := c.NewConfigFrom(cfg)
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
-	metaGen := metadata.GetPodMetaGen(rawConfig, watcher, nodeWatcher, namespaceWatcher, metaConf)
+	metaGen := metadata.GetPodMetaGen(rawConfig, watcher, nodeWatcher, namespaceWatcher, replicaSetWatcher, jobWatcher, metaConf)
 
 	p := &pod{
-		logger:           logger,
-		cleanupTimeout:   cfg.CleanupTimeout,
-		comm:             comm,
-		scope:            scope,
-		config:           cfg,
-		metagen:          metaGen,
-		watcher:          watcher,
-		nodeWatcher:      nodeWatcher,
-		namespaceWatcher: namespaceWatcher,
+		logger:            logger,
+		cleanupTimeout:    cfg.CleanupTimeout,
+		comm:              comm,
+		scope:             scope,
+		config:            cfg,
+		metagen:           metaGen,
+		watcher:           watcher,
+		nodeWatcher:       nodeWatcher,
+		namespaceWatcher:  namespaceWatcher,
+		replicasetWatcher: replicaSetWatcher,
+		jobWatcher:        jobWatcher,
+		managed:           managed,
 	}
 
 	watcher.AddEventHandler(p)
@@ -127,6 +159,18 @@ func (p *pod) Start() error {
 		}
 	}
 
+	if p.replicasetWatcher != nil {
+		if err := p.replicasetWatcher.Start(); err != nil {
+			return err
+		}
+	}
+
+	if p.jobWatcher != nil {
+		if err := p.jobWatcher.Start(); err != nil {
+			return err
+		}
+	}
+
 	return p.watcher.Start()
 }
 
@@ -141,6 +185,14 @@ func (p *pod) Stop() {
 	if p.nodeWatcher != nil {
 		p.nodeWatcher.Stop()
 	}
+
+	if p.replicasetWatcher != nil {
+		p.replicasetWatcher.Stop()
+	}
+
+	if p.jobWatcher != nil {
+		p.jobWatcher.Stop()
+	}
 }
 
 func (p *pod) emitRunning(pod *kubernetes.Pod) {
@@ -149,10 +201,32 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 
 	data := generatePodData(pod, p.metagen, namespaceAnnotations)
 	data.mapping["scope"] = p.scope
-	// Emit the pod
-	// We emit Pod + containers to ensure that configs matching Pod only
-	// get Pod metadata (not specific to any container)
-	_ = p.comm.AddOrUpdate(data.uid, PodPriority, data.mapping, data.processors)
+
+	if p.config.Hints.Enabled { // This is "hints based autodiscovery flow"
+		if !p.managed {
+			if ann, ok := data.mapping["annotations"]; ok {
+				annotations, _ := ann.(mapstr.M)
+				hints := utils.GenerateHints(annotations, "", p.config.Prefix)
+				if len(hints) > 0 {
+					p.logger.Debugf("Extracted hints are :%v", hints)
+					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")
+					p.logger.Debugf("Generated hints mappings are :%v", hintsMapping)
+					_ = p.comm.AddOrUpdate(
+						data.uid,
+						PodPriority,
+						map[string]interface{}{"hints": hintsMapping},
+						data.processors,
+					)
+				}
+			}
+		}
+	} else { // This is the "template-based autodiscovery" flow
+		// emit normal mapping to be used in dynamic variable resolution
+		// Emit the pod
+		// We emit Pod + containers to ensure that configs matching Pod only
+		// get Pod metadata (not specific to any container)
+		_ = p.comm.AddOrUpdate(data.uid, PodPriority, data.mapping, data.processors)
+	}
 
 	// Emit all containers in the pod
 	// We should deal with init containers stopping after initialization
@@ -160,7 +234,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 }
 
 func (p *pod) emitContainers(pod *kubernetes.Pod, namespaceAnnotations mapstr.M) {
-	generateContainerData(p.comm, pod, p.metagen, namespaceAnnotations)
+	generateContainerData(p.comm, pod, p.metagen, namespaceAnnotations, p.logger, p.managed, p.config)
 }
 
 func (p *pod) emitStopped(pod *kubernetes.Pod) {
@@ -240,6 +314,12 @@ func generatePodData(
 		_ = safemapstr.Put(annotations, k, v)
 	}
 	k8sMapping["annotations"] = annotations
+	// Pass labels(not dedoted) to all events so that they can be used in templating.
+	labels := mapstr.M{}
+	for k, v := range pod.GetObjectMeta().GetLabels() {
+		_ = safemapstr.Put(labels, k, v)
+	}
+	k8sMapping["labels"] = labels
 
 	processors := []map[string]interface{}{}
 	// meta map includes metadata that go under kubernetes.*
@@ -265,7 +345,10 @@ func generateContainerData(
 	comm composable.DynamicProviderComm,
 	pod *kubernetes.Pod,
 	kubeMetaGen metadata.MetaGen,
-	namespaceAnnotations mapstr.M) {
+	namespaceAnnotations mapstr.M,
+	logger *logp.Logger,
+	managed bool,
+	config *Config) {
 
 	containers := kubernetes.GetContainersInPod(pod)
 
@@ -273,6 +356,12 @@ func generateContainerData(
 	annotations := mapstr.M{}
 	for k, v := range pod.GetObjectMeta().GetAnnotations() {
 		_ = safemapstr.Put(annotations, k, v)
+	}
+
+	// Pass labels to all events so that it can be used in templating.
+	labels := mapstr.M{}
+	for k, v := range pod.GetObjectMeta().GetLabels() {
+		_ = safemapstr.Put(labels, k, v)
 	}
 
 	for _, c := range containers {
@@ -299,8 +388,9 @@ func generateContainerData(
 		if len(namespaceAnnotations) != 0 {
 			k8sMapping["namespace_annotations"] = namespaceAnnotations
 		}
-		// add annotations to be discoverable by templates
+		// add annotations and labels to be discoverable by templates
 		k8sMapping["annotations"] = annotations
+		k8sMapping["labels"] = labels
 
 		//container ECS fields
 		cmeta := mapstr.M{
@@ -344,11 +434,74 @@ func generateContainerData(
 				_, _ = containerMeta.Put("port", fmt.Sprintf("%v", port.ContainerPort))
 				_, _ = containerMeta.Put("port_name", port.Name)
 				k8sMapping["container"] = containerMeta
-				_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+
+				if config.Hints.Enabled { // This is "hints based autodiscovery flow"
+					if !managed {
+						hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+						if len(hintsMapping) > 0 {
+							_ = comm.AddOrUpdate(
+								eventID,
+								PodPriority,
+								map[string]interface{}{"hints": hintsMapping},
+								processors,
+							)
+						} else if config.Hints.DefaultContainerLogs {
+							// in case of no package detected in the hints fallback to the generic log collection
+							_, _ = hintsMapping.Put("container_logs.enabled", true)
+							_, _ = hintsMapping.Put("container_id", c.ID)
+							_ = comm.AddOrUpdate(
+								eventID,
+								PodPriority,
+								map[string]interface{}{"hints": hintsMapping},
+								processors,
+							)
+						}
+					}
+				} else { // This is the "template-based autodiscovery" flow
+					_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+				}
 			}
 		} else {
 			k8sMapping["container"] = containerMeta
-			_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+			if config.Hints.Enabled { // This is "hints based autodiscovery flow"
+				if !managed {
+					hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+					if len(hintsMapping) > 0 {
+						_ = comm.AddOrUpdate(
+							eventID,
+							PodPriority,
+							map[string]interface{}{"hints": hintsMapping},
+							processors,
+						)
+					} else if config.Hints.DefaultContainerLogs {
+						// in case of no package detected in the hints fallback to the generic log collection
+						_, _ = hintsMapping.Put("container_logs.enabled", true)
+						_, _ = hintsMapping.Put("container_id", c.ID)
+						_ = comm.AddOrUpdate(
+							eventID,
+							PodPriority,
+							map[string]interface{}{"hints": hintsMapping},
+							processors,
+						)
+					}
+				}
+			} else { // This is the "template-based autodiscovery" flow
+				_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+			}
 		}
 	}
+}
+
+func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) mapstr.M {
+	hintsMapping := mapstr.M{}
+	if ann, ok := k8sMapping["annotations"]; ok {
+		annotations, _ := ann.(mapstr.M)
+		hints := utils.GenerateHints(annotations, "", prefix)
+		if len(hints) > 0 {
+			logger.Debugf("Extracted hints are :%v", hints)
+			hintsMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
+			logger.Debugf("Generated hints mappings are :%v", hintsMapping)
+		}
+	}
+	return hintsMapping
 }

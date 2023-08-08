@@ -7,9 +7,10 @@ package kubernetes
 import (
 	"fmt"
 
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+
 	k8s "k8s.io/client-go/kubernetes"
 
-	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -30,16 +31,17 @@ const (
 const nodeScope = "node"
 
 func init() {
-	_ = composable.Providers.AddDynamicProvider("kubernetes", DynamicProviderBuilder)
+	composable.Providers.MustAddDynamicProvider("kubernetes", DynamicProviderBuilder)
 }
 
 type dynamicProvider struct {
-	logger *logger.Logger
-	config *Config
+	logger  *logger.Logger
+	config  *Config
+	managed bool
 }
 
 // DynamicProviderBuilder builds the dynamic provider.
-func DynamicProviderBuilder(logger *logger.Logger, c *config.Config) (composable.DynamicProvider, error) {
+func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (composable.DynamicProvider, error) {
 	var cfg Config
 	if c == nil {
 		c = config.New()
@@ -49,42 +51,60 @@ func DynamicProviderBuilder(logger *logger.Logger, c *config.Config) (composable
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
 
-	return &dynamicProvider{logger, &cfg}, nil
+	return &dynamicProvider{logger, &cfg, managed}, nil
 }
 
 // Run runs the kubernetes context provider.
 func (p *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
+	if p.config.Hints.Enabled {
+		betalogger := p.logger.Named("cfgwarn")
+		betalogger.Warnf("BETA: Hints' feature is beta.")
+	}
+	eventers := make([]Eventer, 0, 3)
 	if p.config.Resources.Pod.Enabled {
-		err := p.watchResource(comm, "pod")
+		eventer, err := p.watchResource(comm, "pod")
 		if err != nil {
 			return err
+		}
+		if eventer != nil {
+			eventers = append(eventers, eventer)
 		}
 	}
 	if p.config.Resources.Node.Enabled {
-		err := p.watchResource(comm, nodeScope)
+		eventer, err := p.watchResource(comm, nodeScope)
 		if err != nil {
 			return err
+		}
+		if eventer != nil {
+			eventers = append(eventers, eventer)
 		}
 	}
 	if p.config.Resources.Service.Enabled {
-		err := p.watchResource(comm, "service")
+		eventer, err := p.watchResource(comm, "service")
 		if err != nil {
 			return err
 		}
+		if eventer != nil {
+			eventers = append(eventers, eventer)
+		}
 	}
-	return nil
+	<-comm.Done()
+	for _, eventer := range eventers {
+		eventer.Stop()
+	}
+	return comm.Err()
 }
 
 // watchResource initializes the proper watcher according to the given resource (pod, node, service)
 // and starts watching for such resource's events.
 func (p *dynamicProvider) watchResource(
 	comm composable.DynamicProviderComm,
-	resourceType string) error {
+	resourceType string) (Eventer, error) {
 	client, err := kubernetes.GetKubernetesClient(p.config.KubeConfig, p.config.KubeClientOptions)
 	if err != nil {
 		// info only; return nil (do nothing)
 		p.logger.Debugf("Kubernetes provider for resource %s skipped, unable to connect: %s", resourceType, err)
-		return nil
+		return nil, nil
 	}
 
 	// Ensure that node is set correctly whenever the scope is set to "node". Make sure that node is empty
@@ -105,7 +125,7 @@ func (p *dynamicProvider) watchResource(
 		p.config.Node, err = kubernetes.DiscoverKubernetesNode(p.logger, nd)
 		if err != nil {
 			p.logger.Debugf("Kubernetes provider skipped, unable to discover node: %w", err)
-			return nil
+			return nil, nil
 		}
 
 	} else {
@@ -114,15 +134,15 @@ func (p *dynamicProvider) watchResource(
 
 	eventer, err := p.newEventer(resourceType, comm, client)
 	if err != nil {
-		return errors.New(err, "couldn't create kubernetes watcher for resource %s", resourceType)
+		return nil, errors.New(err, "couldn't create kubernetes watcher for resource %s", resourceType)
 	}
 
 	err = eventer.Start()
 	if err != nil {
-		return errors.New(err, "couldn't start kubernetes eventer for resource %s", resourceType)
+		return nil, errors.New(err, "couldn't start kubernetes eventer for resource %s", resourceType)
 	}
 
-	return nil
+	return eventer, nil
 }
 
 // Eventer allows defining ways in which kubernetes resource events are observed and processed
@@ -139,19 +159,19 @@ func (p *dynamicProvider) newEventer(
 	client k8s.Interface) (Eventer, error) {
 	switch resourceType {
 	case "pod":
-		eventer, err := NewPodEventer(comm, p.config, p.logger, client, p.config.Scope)
+		eventer, err := NewPodEventer(comm, p.config, p.logger, client, p.config.Scope, p.managed)
 		if err != nil {
 			return nil, err
 		}
 		return eventer, nil
 	case nodeScope:
-		eventer, err := NewNodeEventer(comm, p.config, p.logger, client, p.config.Scope)
+		eventer, err := NewNodeEventer(comm, p.config, p.logger, client, p.config.Scope, p.managed)
 		if err != nil {
 			return nil, err
 		}
 		return eventer, nil
 	case "service":
-		eventer, err := NewServiceEventer(comm, p.config, p.logger, client, p.config.Scope)
+		eventer, err := NewServiceEventer(comm, p.config, p.logger, client, p.config.Scope, p.managed)
 		if err != nil {
 			return nil, err
 		}

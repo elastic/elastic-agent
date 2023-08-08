@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:dupl // duplicate code is in test cases
 package fleetapi
 
 import (
@@ -97,6 +98,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		assert.Empty(t, action.ActionExpiration)
 		assert.Equal(t, "1.2.3", action.Version)
 		assert.Equal(t, "http://example.com", action.SourceURI)
+		assert.Equal(t, 0, action.Retry)
 	})
 	t.Run("ActionUpgrade with start time", func(t *testing.T) {
 		p := []byte(`[{"id":"testid","type":"UPGRADE","start_time":"2022-01-02T12:00:00Z","expiration":"2022-01-02T13:00:00Z","data":{"version":"1.2.3","source_uri":"http://example.com"}}]`)
@@ -111,6 +113,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		assert.Equal(t, "2022-01-02T13:00:00Z", action.ActionExpiration)
 		assert.Equal(t, "1.2.3", action.Version)
 		assert.Equal(t, "http://example.com", action.SourceURI)
+		assert.Equal(t, 0, action.Retry)
 	})
 	t.Run("ActionPolicyChange no start time", func(t *testing.T) {
 		p := []byte(`[{"id":"testid","type":"POLICY_CHANGE","data":{"policy":{"key":"value"}}}]`)
@@ -134,4 +137,76 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		assert.Equal(t, ActionTypePolicyChange, action.ActionType)
 		assert.NotNil(t, action.Policy)
 	})
+	t.Run("ActionUpgrade with retry_attempt", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"UPGRADE","data":{"version":"1.2.3","source_uri":"http://example.com","retry_attempt":1}}]`)
+		a := &Actions{}
+		err := a.UnmarshalJSON(p)
+		require.Nil(t, err)
+		action, ok := (*a)[0].(*ActionUpgrade)
+		require.True(t, ok, "unable to cast action to specific type")
+		assert.Equal(t, "testid", action.ActionID)
+		assert.Equal(t, ActionTypeUpgrade, action.ActionType)
+		assert.Empty(t, action.ActionStartTime)
+		assert.Empty(t, action.ActionExpiration)
+		assert.Equal(t, "1.2.3", action.Version)
+		assert.Equal(t, "http://example.com", action.SourceURI)
+		assert.Equal(t, 1, action.Retry)
+	})
+}
+
+func TestActionUnenrollMarshalMap(t *testing.T) {
+	action := ActionUnenroll{
+		ActionID:   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		ActionType: "UNENROLL",
+		Signed: &Signed{
+			Data:      "eyJAdGltZXN0YW1wIjoiMjAy",
+			Signature: "MEQCIGxsrI742xKL6OSI",
+		},
+	}
+
+	m, err := action.MarshalMap()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	diff := cmp.Diff(m, map[string]interface{}{
+		"id":   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		"type": "UNENROLL",
+		"signed": map[string]interface{}{
+			"data":      "eyJAdGltZXN0YW1wIjoiMjAy",
+			"signature": "MEQCIGxsrI742xKL6OSI",
+		},
+	})
+
+	if diff != "" {
+		t.Fatal(diff)
+	}
+}
+
+func TestActionUpgradeMarshalMap(t *testing.T) {
+	action := ActionUpgrade{
+		ActionID:   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		ActionType: "UPGRADE",
+		Signed: &Signed{
+			Data:      "eyJAdGltZXN0YW1wIjoiMjAy",
+			Signature: "MEQCIGxsrI742xKL6OSI",
+		},
+	}
+	m, err := action.MarshalMap()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	diff := cmp.Diff(m, map[string]interface{}{
+		"id":   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		"type": "UPGRADE",
+		"signed": map[string]interface{}{
+			"data":      "eyJAdGltZXN0YW1wIjoiMjAy",
+			"signature": "MEQCIGxsrI742xKL6OSI",
+		},
+	})
+
+	if diff != "" {
+		t.Fatal(diff)
+	}
 }
