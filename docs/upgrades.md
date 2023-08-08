@@ -36,21 +36,28 @@ sequenceDiagram
        end
        A->>A: Download new Agent artifact
        A->>A: Extract new Agent artifact
-       A->>A: Replace current Agent artifact with new one
+       A->>A: Change symlink from current Agent binary to new one
        A->>UM: Create
+       A->>A: Update active commit file
        A->>UW: Start
        A->>A: Rexec to start new Agent artifact
        A->>FS: Ack successful upgrade
-       UW->>UM: Remove
        FS->>ES: Write successful ack in `.fleet-actions-results`
        FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at` = <now><br />`upgrade_started_at` = null
        UI->>UI: Show Agent status as "healthy"
-   end
-   opt Rollback
-       UW->>A: Start
-       A->>FS: Ack failed upgrade
-       FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at = <now>
-       UI->>UI: Show Agent status as "healthy"
-       UW->>UM: Remove
-   end
+       UW->>UW: Start watching new Agent
+       alt New Agent is OK
+         UW->>UM: Remove
+         UW->>UW: Cleanup old Agent files
+       else Rollback
+         UW->>UW: Change symlink from current Agent binary to new one
+         UW->>UW: Update active commit file
+         UW->>A: Rexec to start old Agent artifact
+         A->>FS: Ack failed upgrade
+         FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at = <now>
+         UI->>UI: Show Agent status as "healthy"
+         UW->>UM: Remove
+         UW->>UW: Cleanup new Agent files
+       end
+    end
 ```

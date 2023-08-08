@@ -66,6 +66,8 @@ type OSRunner interface {
 	Copy(ctx context.Context, c *ssh.Client, logger Logger, repoArchive string, build Build) error
 	// Run runs the actual tests and provides the result.
 	Run(ctx context.Context, verbose bool, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
+	// Diagnostics gathers any diagnostics from the host.
+	Diagnostics(ctx context.Context, c *ssh.Client, logger Logger, destination string) error
 }
 
 // Logger is a simple logging interface used by each runner type.
@@ -141,6 +143,10 @@ func NewRunner(cfg Config, ip InstanceProvisioner, sp StackProvisioner, batches 
 	if err != nil {
 		return nil, err
 	}
+	platforms, err := cfg.GetPlatforms()
+	if err != nil {
+		return nil, err
+	}
 
 	logger := &runnerLogger{
 		writer:    os.Stdout,
@@ -151,7 +157,7 @@ func NewRunner(cfg Config, ip InstanceProvisioner, sp StackProvisioner, batches 
 
 	var osBatches []OSBatch
 	for _, b := range batches {
-		lbs, err := createBatches(b, cfg.Matrix)
+		lbs, err := createBatches(b, platforms, cfg.Matrix)
 		if err != nil {
 			return nil, err
 		}
@@ -350,8 +356,14 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		return OSRunnerResult{}, fmt.Errorf("failed to copy files to instance %s: %w", instance.Name, err)
 	}
 
-	// ensure that we have all the requirements for the stack if required
+	// start with the ExtraEnv first preventing the other environment flags below
+	// from being overwritten
 	env := map[string]string{}
+	for k, v := range r.cfg.ExtraEnv {
+		env[k] = v
+	}
+
+	// ensure that we have all the requirements for the stack if required
 	if batch.Batch.Stack != nil {
 		// wait for the stack to be ready before continuing
 		r.stacksReady.Wait()
@@ -380,6 +392,17 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		logger.Logf("Failed to execute tests on instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
 	}
+
+	// fetch any diagnostics
+	if r.cfg.DiagnosticsDir != "" {
+		err = batch.OS.Runner.Diagnostics(ctx, client, logger, r.cfg.DiagnosticsDir)
+		if err != nil {
+			logger.Logf("Failed to fetch diagnostics: %s", err)
+		}
+	} else {
+		logger.Logf("Skipping diagnostics fetch as DiagnosticsDir was not set")
+	}
+
 	return result, nil
 }
 
@@ -800,9 +823,9 @@ func findBatchByID(id string, batches []OSBatch) (OSBatch, bool) {
 	return OSBatch{}, false
 }
 
-func createBatches(batch define.Batch, matrix bool) ([]OSBatch, error) {
+func createBatches(batch define.Batch, platforms []define.OS, matrix bool) ([]OSBatch, error) {
 	var batches []OSBatch
-	specifics, err := getSupported(batch.OS)
+	specifics, err := getSupported(batch.OS, platforms)
 	if errors.Is(err, ErrOSNotSupported) {
 		var s SupportedOS
 		s.OS.Type = batch.OS.Type

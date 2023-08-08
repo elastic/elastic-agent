@@ -6,6 +6,10 @@ package runner
 
 import (
 	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 // Config provides the configuration for running the runner.
@@ -15,6 +19,12 @@ type Config struct {
 	BuildDir          string
 	GOVersion         string
 	RepoDir           string
+	DiagnosticsDir    string
+
+	// Platforms filters the tests to only run on the provided list
+	// of platforms even if the tests supports more than what is
+	// defined in this list.
+	Platforms []string
 
 	// Matrix enables matrix testing. This explodes each test to
 	// run on all supported platforms the runner supports.
@@ -31,6 +41,9 @@ type Config struct {
 
 	// Testflags contains extra go test flags to be set when running tests
 	TestFlags string
+
+	// ExtraEnv contains extra environment flags to pass to the runner.
+	ExtraEnv map[string]string
 }
 
 // Validate returns an error if the information is invalid.
@@ -50,5 +63,53 @@ func (c *Config) Validate() error {
 	if c.RepoDir == "" {
 		return errors.New("field RepoDir must be set")
 	}
+	_, err := c.GetPlatforms()
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+// GetPlatforms returns the defined platforms for the configuration.
+func (c *Config) GetPlatforms() ([]define.OS, error) {
+	var each []define.OS
+	for _, platform := range c.Platforms {
+		o, err := parsePlatform(platform)
+		if err != nil {
+			return nil, err
+		}
+		each = append(each, o)
+	}
+	return each, nil
+}
+
+func parsePlatform(platform string) (define.OS, error) {
+	separated := strings.Split(platform, "/")
+	var os define.OS
+	switch len(separated) {
+	case 0:
+		return define.OS{}, fmt.Errorf("failed to parse platform string %q: empty string", platform)
+	case 1:
+		os = define.OS{Type: separated[0]}
+	case 2:
+		os = define.OS{Type: separated[0], Arch: separated[1]}
+	case 3:
+		if separated[0] == define.Linux {
+			os = define.OS{Type: separated[0], Arch: separated[1], Distro: separated[2]}
+		} else {
+			os = define.OS{Type: separated[0], Arch: separated[1], Version: separated[2]}
+		}
+	case 4:
+		if separated[0] == define.Linux {
+			os = define.OS{Type: separated[0], Arch: separated[1], Distro: separated[2], Version: separated[3]}
+		} else {
+			return define.OS{}, fmt.Errorf("failed to parse platform string %q: more than 2 separators", platform)
+		}
+	default:
+		return define.OS{}, fmt.Errorf("failed to parse platform string %q: more than 3 separators", platform)
+	}
+	if err := os.Validate(); err != nil {
+		return define.OS{}, fmt.Errorf("failed to parse platform string %q: %w", platform, err)
+	}
+	return os, nil
 }

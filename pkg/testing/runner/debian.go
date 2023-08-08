@@ -207,6 +207,43 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient *ssh.Client
 	return result, nil
 }
 
+// Diagnostics gathers any diagnostics from the host.
+func (DebianRunner) Diagnostics(ctx context.Context, c *ssh.Client, logger Logger, destination string) error {
+	// take ownership, as sudo tests will create with root permissions (allow to fail in the case it doesn't exist)
+	diagnosticDir := "$HOME/agent/build/diagnostics"
+	_, _, _ = sshRunCommand(ctx, c, "sudo", []string{"chown", "-R", "$USER:$USER", diagnosticDir}, nil)
+	stdOut, _, err := sshRunCommand(ctx, c, "ls", []string{"-1", diagnosticDir}, nil)
+	if err != nil {
+		//nolint:nilerr // failed to list the directory, probably don't have any diagnostics (do nothing)
+		return nil
+	}
+	eachDiagnostic := strings.Split(string(stdOut), "\n")
+	for _, filename := range eachDiagnostic {
+		filename = strings.TrimSpace(filename)
+		if filename == "" {
+			continue
+		}
+
+		// don't use filepath.Join as we need this to work in Windows as well
+		// this is because if we use `filepath.Join` on a Windows host connected to a Linux host
+		// it will use a `\` and that will be incorrect for Linux
+		fp := fmt.Sprintf("%s/%s", diagnosticDir, filename)
+		// use filepath.Join on this path because it's a path on this specific host platform
+		dp := filepath.Join(destination, filename)
+		logger.Logf("Copying diagnostic %s", filename)
+		out, err := os.Create(dp)
+		if err != nil {
+			return fmt.Errorf("failed to create file %s: %w", dp, err)
+		}
+		err = sshGetFileContentsOutput(ctx, c, fp, out)
+		_ = out.Close()
+		if err != nil {
+			return fmt.Errorf("failed to copy file from remote host to %s: %w", dp, err)
+		}
+	}
+	return nil
+}
+
 func runTests(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient *ssh.Client, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {
 	execTest := strings.NewReader(script)
 
