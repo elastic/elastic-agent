@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,8 +52,12 @@ func GetPackageSuffix(operatingSystem string, architecture string) (string, erro
 type FetcherResult interface {
 	// Name is the name of the fetched result.
 	Name() string
+
 	// Fetch performs the actual fetch into the provided directory.
 	Fetch(ctx context.Context, l Logger, dir string) error
+
+	// FetchHash fetches the hash file for the artefact.
+	FetchHash(ctx context.Context, l Logger, dir string) error
 }
 
 // Fetcher provides a path for fetching the Elastic Agent compressed archive
@@ -85,16 +90,57 @@ type fetcherCache struct {
 func (c *fetcherCache) fetch(ctx context.Context, l Logger, res FetcherResult) (string, error) {
 	name := res.Name()
 	src := filepath.Join(c.dir, name)
-	_, err := os.Stat(src)
-	if err == nil || os.IsExist(err) {
-		l.Logf("Using existing artifact %s", name)
-		return src, nil
+
+	if c.isSameArtefact(ctx, src, res, l) {
+		_, err := os.Stat(src)
+		if err == nil || os.IsExist(err) {
+			l.Logf("Using existing artifact %s", name)
+			return src, nil
+		}
 	}
-	err = res.Fetch(ctx, l, c.dir)
+
+	err := res.Fetch(ctx, l, c.dir)
 	if err != nil {
 		return "", err
 	}
 	return src, nil
+}
+
+func (c *fetcherCache) isSameArtefact(ctx context.Context, path string, res FetcherResult, l Logger) bool {
+	// Only SNAPSHOT versions have the same name and might be different.
+	if strings.Contains(path, "SNAPSHOT") {
+		return true
+	}
+
+	hashPath := path + hashExt
+	_, err := os.Stat(hashPath)
+	if err != nil && !errors.Is(err, fs.ErrExist) {
+		return false
+	}
+
+	cachedHash, err := os.ReadFile(hashPath)
+	if err != nil {
+		l.Logf("fetcher cache could not open cached hash file to ensure the cached artefact"+
+			"is valid: %v. Not using cache", err)
+		return false
+	}
+
+	err = res.FetchHash(ctx, l, c.dir)
+	if err != nil {
+		l.Logf("fetcher cache could fetch hash file to ensure the cached artefact"+
+			"is valid: %v. Not using cache", err)
+		return false
+	}
+
+	// the res.FetchHash above overrides the hash file.
+	newHash, err := os.ReadFile(hashPath)
+	if err != nil {
+		l.Logf("fetcher cache could not open hash file to ensure the cached artefact"+
+			"is valid: %v. Not using cache", err)
+		return false
+	}
+
+	return string(newHash) == string(cachedHash)
 }
 
 func splitFileType(name string) (string, string, error) {

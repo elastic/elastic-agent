@@ -88,7 +88,7 @@ func (r *localFetcherResult) Name() string {
 }
 
 // Fetch performs the actual fetch into the provided directory.
-func (r *localFetcherResult) Fetch(_ context.Context, _ Logger, dir string) error {
+func (r *localFetcherResult) Fetch(ctx context.Context, l Logger, dir string) error {
 	fullPath := filepath.Join(r.src, r.path)
 	path := filepath.Join(dir, r.path)
 
@@ -97,10 +97,17 @@ func (r *localFetcherResult) Fetch(_ context.Context, _ Logger, dir string) erro
 		return fmt.Errorf("error copying file: %w", err)
 	}
 
-	// fetch artifact hash
-	err = copyFile(fullPath+hashExt, path+hashExt)
+	return r.FetchHash(ctx, l, dir)
+}
+
+// FetchHash fetches the hash file for the artefact.
+func (r *localFetcherResult) FetchHash(_ context.Context, _ Logger, dir string) error {
+	fullPath := filepath.Join(r.src, r.path)
+	path := filepath.Join(dir, r.path)
+
+	err := copyFile(fullPath+hashExt, path+hashExt)
 	if err != nil {
-		return fmt.Errorf("error copying file: %w", err)
+		return fmt.Errorf("error copying hash file: %w", err)
 	}
 
 	return nil

@@ -99,11 +99,21 @@ func (r *artifactResult) Name() string {
 func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error {
 	err := DownloadPackage(ctx, l, r.doer, r.src, filepath.Join(dir, r.path))
 	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", r.src, err)
+		return fmt.Errorf("failed to fetch package %s: %w", r.src, err)
 	}
 
 	// fetch package hash
-	err = DownloadPackage(ctx, l, r.doer, r.src+hashExt, filepath.Join(dir, r.path+hashExt))
+	err = r.FetchHash(ctx, l, dir)
+	if err != nil {
+		return fmt.Errorf("failed to fetch hash file %s: %w", r.src, err)
+	}
+
+	return nil
+}
+
+// FetchHash fetches the hash file for the artefact.
+func (r *artifactResult) FetchHash(ctx context.Context, l Logger, dir string) error {
+	err := DownloadPackage(ctx, l, r.doer, r.src+hashExt, filepath.Join(dir, r.path+hashExt))
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
