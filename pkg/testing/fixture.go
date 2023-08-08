@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
 
@@ -474,7 +476,15 @@ func (f *Fixture) ensurePrepared(ctx context.Context) error {
 }
 
 func (f *Fixture) binaryPath() string {
-	binary := filepath.Join(f.workDir, "elastic-agent")
+	workDir := f.workDir
+	if f.installed {
+		if f.installOpts != nil && f.installOpts.BasePath != "" {
+			workDir = filepath.Join(f.installOpts.BasePath, "Elastic", "Agent")
+		} else {
+			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
+		}
+	}
+	binary := filepath.Join(workDir, "elastic-agent")
 	if f.operatingSystem == "windows" {
 		binary += ".exe"
 	}

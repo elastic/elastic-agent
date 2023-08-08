@@ -5,11 +5,18 @@
 package tools
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
 // GetAgentByHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
@@ -126,4 +133,22 @@ func GetDefaultFleetServerURL(client *kibana.Client) (string, error) {
 	}
 
 	return "", errors.New("unable to determine default fleet server host")
+}
+
+func WaitForAgent(ctx context.Context, t *testing.T, c client.Client) {
+	require.Eventually(t, func() bool {
+		err := c.Connect(ctx)
+		if err != nil {
+			t.Logf("connecting client to agent: %v", err)
+			return false
+		}
+		defer c.Disconnect()
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("agent state: %+v", state)
+		return state.State == cproto.State_HEALTHY
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 }

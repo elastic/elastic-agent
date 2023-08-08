@@ -1606,34 +1606,49 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 }
 
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
+	for {
+		failedCount, err := integRunnerOnce(ctx, matrix, singleTest)
+		if err != nil {
+			return err
+		}
+		if failedCount > 0 {
+			os.Exit(1)
+		}
+		if !hasRunUntilFailure() {
+			return nil
+		}
+	}
+}
+
+func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, error) {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 
 	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
 	if err != nil {
-		return fmt.Errorf("failed to determine batches: %w", err)
+		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
 	r, err := createTestRunner(matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
-		return fmt.Errorf("error creating test runner: %w", err)
+		return 0, fmt.Errorf("error creating test runner: %w", err)
 	}
 	results, err := r.Run(ctx)
 	if err != nil {
-		return fmt.Errorf("error running test: %w", err)
+		return 0, fmt.Errorf("error running test: %w", err)
 	}
 	_ = os.Remove("build/TEST-go-integration.out")
 	_ = os.Remove("build/TEST-go-integration.out.json")
 	_ = os.Remove("build/TEST-go-integration.xml")
 	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out file: %w", err)
+		return 0, fmt.Errorf("error writing test out file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.out.json", results.JSONOutput, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out json file: %w", err)
+		return 0, fmt.Errorf("error writing test out json file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out xml file: %w", err)
+		return 0, fmt.Errorf("error writing test out xml file: %w", err)
 	}
 	if results.Failures > 0 {
 		r.Logger().Logf("Testing completed (%d failures, %d successful)", results.Failures, results.Tests-results.Failures)
@@ -1643,10 +1658,8 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	r.Logger().Logf("Console output written here: build/TEST-go-integration.out")
 	r.Logger().Logf("Console JSON output written here: build/TEST-go-integration.out.json")
 	r.Logger().Logf("JUnit XML written here: build/TEST-go-integration.xml")
-	if results.Failures > 0 {
-		os.Exit(1)
-	}
-	return nil
+	r.Logger().Logf("Diagnostic output (if present) here: build/diagnostics")
+	return results.Failures, nil
 }
 
 func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
@@ -1702,17 +1715,31 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 	timestamp := timestampEnabled()
 
+	extraEnv := map[string]string{}
+	if os.Getenv("AGENT_COLLECT_DIAG") != "" {
+		extraEnv["AGENT_COLLECT_DIAG"] = os.Getenv("AGENT_COLLECT_DIAG")
+	}
+	if os.Getenv("AGENT_KEEP_INSTALLED") != "" {
+		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
+	}
+
+	diagDir := filepath.Join("build", "diagnostics")
+	_ = os.MkdirAll(diagDir, 0755)
+
 	cfg := runner.Config{
 		AgentVersion:      agentVersion,
 		AgentStackVersion: agentStackVersion,
 		BuildDir:          agentBuildDir,
 		GOVersion:         goVersion,
 		RepoDir:           ".",
+		DiagnosticsDir:    diagDir,
+		Platforms:         testPlatforms(),
 		Matrix:            matrix,
 		SingleTest:        singleTest,
 		VerboseMode:       mg.Verbose(),
 		Timestamp:         timestamp,
 		TestFlags:         goTestFlags,
+		ExtraEnv:          extraEnv,
 	}
 	ogcCfg := ogc.Config{
 		ServiceTokenPath: serviceTokenPath,
@@ -1761,6 +1788,20 @@ func timestampEnabled() bool {
 	}
 	b, _ := strconv.ParseBool(timestamp)
 	return b
+}
+
+func testPlatforms() []string {
+	platformsStr := os.Getenv("TEST_PLATFORMS")
+	if platformsStr == "" {
+		return nil
+	}
+	var platforms []string
+	for _, p := range strings.Split(platformsStr, " ") {
+		if p != "" {
+			platforms = append(platforms, p)
+		}
+	}
+	return platforms
 }
 
 // Pre-requisite: user must have the gcloud CLI installed
@@ -2069,5 +2110,11 @@ func hasSnapshotEnv() bool {
 		return false
 	}
 	b, _ := strconv.ParseBool(snapshot)
+	return b
+}
+
+func hasRunUntilFailure() bool {
+	runUntil := os.Getenv("TEST_RUN_UNTIL_FAILURE")
+	b, _ := strconv.ParseBool(runUntil)
 	return b
 }

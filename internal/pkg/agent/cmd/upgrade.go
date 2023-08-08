@@ -21,11 +21,12 @@ import (
 )
 
 const (
-	flagSourceURI    = "source-uri"
-	flagSkipVerify   = "skip-verify"
-	flagPGPBytes     = "pgp"
-	flagPGPBytesPath = "pgp-path"
-	flagPGPBytesURI  = "pgp-uri"
+	flagSourceURI      = "source-uri"
+	flagSkipVerify     = "skip-verify"
+	flagSkipDefaultPgp = "skip-default-pgp"
+	flagPGPBytes       = "pgp"
+	flagPGPBytesPath   = "pgp-path"
+	flagPGPBytesURI    = "pgp-uri"
 )
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -44,6 +45,7 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 
 	cmd.Flags().StringP(flagSourceURI, "s", "", "Source URI to download the new version from")
 	cmd.Flags().BoolP(flagSkipVerify, "", false, "Skips package verification")
+	cmd.Flags().BoolP(flagSkipDefaultPgp, "", false, "Skips package verification with embedded key")
 	cmd.Flags().String(flagPGPBytes, "", "PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesURI, "", "Path to a web location containing PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
@@ -92,8 +94,8 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 			pgpChecks = append(pgpChecks, download.PgpSourceURIPrefix+pgpUri)
 		}
 	}
-
-	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, pgpChecks...)
+	skipDefaultPgp, _ := cmd.Flags().GetBool(flagSkipDefaultPgp)
+	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, skipDefaultPgp, pgpChecks...)
 	if err != nil {
 		return errors.New(err, "Failed trigger upgrade of daemon")
 	}
