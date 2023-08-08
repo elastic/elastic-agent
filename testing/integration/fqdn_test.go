@@ -32,6 +32,7 @@ import (
 )
 
 func TestFQDN(t *testing.T) {
+	t.Skip("Flaky test, see https://github.com/elastic/elastic-agent/issues/3154")
 	info := define.Require(t, define.Requirements{
 		OS: []define.OS{
 			{Type: define.Linux},
