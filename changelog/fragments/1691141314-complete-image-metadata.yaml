@@ -11,12 +11,12 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: Add complete image to agent metadata.
+summary: Add additional flag -complete- to agent metadata, to signal an instance running as synthetics-capable.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: Add a new flag -complete- to agent metadata that signals the instance running as synthetics-capable, to be queried from Synthetics UI and used to provide early confirmation on successful enrollment.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
