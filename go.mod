@@ -62,6 +62,7 @@ require (
 	google.golang.org/grpc v1.46.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/gotestsum v1.7.0
 	k8s.io/api v0.23.4
@@ -144,7 +145,6 @@ require (
 	google.golang.org/genproto v0.0.0-20220426171045-31bebdecfb46 // indirect
 	google.golang.org/grpc/examples v0.0.0-20220304170021-431ea809a767 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
 	sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 // indirect
