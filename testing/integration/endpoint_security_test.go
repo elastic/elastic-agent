@@ -398,7 +398,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 }
 
 // This is a subset of kibana.AgentPolicyUpdateRequest, using until elastic-agent-libs PR https://github.com/elastic/elastic-agent-libs/pull/141 is merged
-// TODO: replace with the elastic-agent-libs when avaiable
+// TODO: replace with the elastic-agent-libs when available
 type agentPolicyUpdateRequest struct {
 	// Name of the policy. Required in an update request.
 	Name string `json:"name"`
