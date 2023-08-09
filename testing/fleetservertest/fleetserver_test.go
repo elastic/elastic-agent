@@ -270,6 +270,7 @@ func ExampleNewServer_enroll() {
 	//       "elastic": {
 	//         "agent": {
 	//           "build.original": "",
+	//           "complete": false,
 	//           "id": "agentID",
 	//           "log_level": "",
 	//           "snapshot": false,

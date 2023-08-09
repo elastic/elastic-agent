@@ -141,10 +141,6 @@ spec:
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       repository: elastic/elastic-agent
       schedules:
-        Daily 8_9:
-          branch: '8.9'
-          cronline: '@daily'
-          message: Builds daily `8.9` dra
         Daily main:
           branch: main
           cronline: '@daily'
