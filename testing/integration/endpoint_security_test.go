@@ -89,17 +89,15 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 }
 
 // buildPolicyWithTamperProtection helper function to build the policy request with or without tamper protection
-func buildPolicyWithTamperProtection(policy kibana.AgentPolicy, protected bool) tools.ExpandedAgentPolicy {
+func buildPolicyWithTamperProtection(policy kibana.AgentPolicy, protected bool) kibana.AgentPolicy {
 	if protected {
 		policy.AgentFeatures = append(policy.AgentFeatures, map[string]interface{}{
 			"name":    "tamper_protection",
 			"enabled": true,
 		})
 	}
-	return tools.ExpandedAgentPolicy{
-		AgentPolicy: policy,
-		IsProtected: protected,
-	}
+	policy.IsProtected = protected
+	return policy
 }
 
 func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.Info, protected bool) {
@@ -133,7 +131,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	defer cn()
 
 	// Create policy
-	policy, err := tools.InstallAgentWithExpandedPolicy(t, ctx, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	policy, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
@@ -208,7 +206,10 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 		Force:          true,
 	}
 
-	policy, err := tools.InstallAgentWithExpandedPolicy(t, context.Background(), installOpts, fixture, info.KibanaClient, createPolicyReq)
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
+	policy, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
@@ -239,7 +240,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, hostname)
 	require.NoError(t, err)
 
-	_, err = info.KibanaClient.UnEnrollAgent(kibana.UnEnrollAgentRequest{ID: agentID})
+	_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{ID: agentID})
 	require.NoError(t, err)
 
 	t.Log("Waiting for inputs to stop")
@@ -344,7 +345,10 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 		Force:          true,
 	}
 
-	policy, err := tools.InstallAgentWithExpandedPolicy(t, context.Background(), installOpts, fixture, info.KibanaClient, createPolicyReq)
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
+	policy, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
@@ -368,7 +372,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 	t.Log("Verified endpoint component and units are healthy")
 
 	t.Logf("Removing Elastic Defend: %v", fmt.Sprintf("/api/fleet/package_policies/%v", pkgPolicyResp.Item.ID))
-	_, err = tools.DeleteFleetPackage(ctx, info.KibanaClient, pkgPolicyResp.Item.ID)
+	_, err = info.KibanaClient.DeleteFleetPackage(ctx, pkgPolicyResp.Item.ID)
 	require.NoError(t, err)
 
 	t.Log("Waiting for endpoint to stop")
@@ -408,7 +412,7 @@ type agentPolicyUpdateRequest struct {
 }
 
 // Installs the Elastic Defend package to cause the agent to install the endpoint-security service.
-func installElasticDefendPackage(t *testing.T, info *define.Info, policyID string) (r tools.PackagePolicyResponse, err error) {
+func installElasticDefendPackage(t *testing.T, info *define.Info, policyID string) (r kibana.PackagePolicyResponse, err error) {
 	t.Helper()
 
 	t.Log("Templating endpoint package policy request")
@@ -434,7 +438,7 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 
 	// Make sure the templated value is actually valid JSON before making the API request.
 	// Using json.Unmarshal will give us the actual syntax error, calling json.Valid() would not.
-	packagePolicyReq := tools.PackagePolicyRequest{}
+	packagePolicyReq := kibana.PackagePolicyRequest{}
 	err = json.Unmarshal(pkgPolicyBuf.Bytes(), &packagePolicyReq)
 	if err != nil {
 		return r, fmt.Errorf("templated package policy is not valid JSON: %s, %w", pkgPolicyBuf.String(), err)
@@ -444,7 +448,7 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	pkgResp, err := tools.InstallFleetPackage(ctx, info.KibanaClient, &packagePolicyReq)
+	pkgResp, err := info.KibanaClient.InstallFleetPackage(ctx, packagePolicyReq)
 	if err != nil {
 		t.Logf("Error installing fleet package: %v", err)
 		return r, fmt.Errorf("error installing fleet package: %w", err)
@@ -462,6 +466,9 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 		Isolate: false,
 		Sudo:    true, // requires Agent installation
 	})
+
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
 
 	// Get path to agent executable.
 	fixture, err := define.NewFixture(t, define.Version())
@@ -483,7 +490,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 		Force:          true,
 		BasePath:       filepath.Join(paths.DefaultBasePath, "not_default"),
 	}
-	policyResp, err := tools.InstallAgentWithPolicy(t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	policyResp, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
 
 	t.Log("Installing Elastic Defend")

@@ -21,7 +21,7 @@ import (
 
 // GetAgentByHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
 func GetAgentByHostnameFromList(client *kibana.Client, hostname string) (*kibana.AgentExisting, error) {
-	listAgentsResp, err := client.ListAgents(kibana.ListAgentsRequest{})
+	listAgentsResp, err := client.ListAgents(context.Background(), kibana.ListAgentsRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func UnEnrollAgent(client *kibana.Client) error {
 		ID:     agentID,
 		Revoke: true,
 	}
-	_, err = client.UnEnrollAgent(unEnrollAgentReq)
+	_, err = client.UnEnrollAgent(context.Background(), unEnrollAgentReq)
 	if err != nil {
 		return fmt.Errorf("unable to unenroll agent with ID [%s]: %w", agentID, err)
 	}
@@ -108,7 +108,7 @@ func UpgradeAgent(client *kibana.Client, version string) error {
 		ID:      agentID,
 		Version: version,
 	}
-	_, err = client.UpgradeAgent(upgradeAgentReq)
+	_, err = client.UpgradeAgent(context.Background(), upgradeAgentReq)
 	if err != nil {
 		return fmt.Errorf("unable to upgrade agent with ID [%s]: %w", agentID, err)
 	}
@@ -118,7 +118,7 @@ func UpgradeAgent(client *kibana.Client, version string) error {
 
 func GetDefaultFleetServerURL(client *kibana.Client) (string, error) {
 	req := kibana.ListFleetServerHostsRequest{}
-	resp, err := client.ListFleetServerHosts(req)
+	resp, err := client.ListFleetServerHosts(context.Background(), req)
 	if err != nil {
 		return "", fmt.Errorf("unable to list fleet server hosts: %w", err)
 	}

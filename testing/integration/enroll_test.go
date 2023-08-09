@@ -7,6 +7,7 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -80,7 +81,7 @@ func (runner *EnrollRunner) TestEnroll() {
 		NonInteractive: true,
 		Force:          true,
 	}
-	policy, err := tools.InstallAgentWithPolicy(t, installOpts, runner.agentFixture, kibClient, createPolicyReq)
+	policy, err := tools.InstallAgentWithPolicy(t, context.Background(), installOpts, runner.agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 

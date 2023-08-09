@@ -131,7 +131,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 		if keepInstalled() {
 			f.t.Logf("skipping uninstall; AGENT_KEEP_INSTALLED=true")
 		} else {
-			out, err := f.Uninstall(ctx, &UninstallOpts{Force: true})
+			out, err := f.Uninstall(ctx, &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
 			f.setClient(nil)
 			if err != nil &&
 				(errors.Is(err, ErrNotInstalled) ||

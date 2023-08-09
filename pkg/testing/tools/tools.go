@@ -43,7 +43,7 @@ func WaitForAgentStatus(t *testing.T, client *kibana.Client, expectedStatus stri
 func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, expectedPolicyRevision int) func() bool {
 	return func() bool {
 		getAgentReq := kibana.GetAgentRequest{ID: agentID}
-		updatedPolicyAgent, err := client.GetAgent(getAgentReq)
+		updatedPolicyAgent, err := client.GetAgent(context.Background(), getAgentReq)
 		require.NoError(t, err)
 
 		return updatedPolicyAgent.PolicyRevision == expectedPolicyRevision
@@ -53,41 +53,27 @@ func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, 
 // InstallAgentWithPolicy creates the given policy, enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.
-func InstallAgentWithPolicy(t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (*kibana.PolicyResponse, error) {
-	t.Helper()
-
-	policy, err := kibClient.CreatePolicy(createPolicyReq)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create policy: %w", err)
-	}
-
-	return policy, InstallAgentForPolicy(t, installOpts, agentFixture, kibClient, policy.ID)
-}
-
-// InstallAgentWithPolicy creates the given policy, enrolls the given agent
-// fixture in Fleet using the default Fleet Server, waits for the agent to be
-// online, and returns the created policy.
-func InstallAgentWithExpandedPolicy(t *testing.T, ctx context.Context, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq ExpandedAgentPolicy) (*kibana.PolicyResponse, error) {
+func InstallAgentWithPolicy(t *testing.T, ctx context.Context, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (kibana.PolicyResponse, error) {
 	t.Helper()
 
 	// Create policy
-	policy, err := CreatePolicy(ctx, kibClient, createPolicyReq)
+	policy, err := kibClient.CreatePolicy(ctx, createPolicyReq)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create policy: %w", err)
+		return policy, fmt.Errorf("unable to create policy: %w", err)
 	}
 
 	if createPolicyReq.IsProtected {
 		// If protected fetch uninstall token and set it for the fixture
-		resp, err := GetPolicyUninstallTokens(ctx, kibClient, policy.ID)
+		resp, err := kibClient.GetPolicyUninstallTokens(ctx, policy.ID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch uninstal tokens: %w", err)
+			return policy, fmt.Errorf("failed to fetch uninstal tokens: %w", err)
 		}
 		if len(resp.Items) == 0 {
-			return nil, fmt.Errorf("expected non-zero number of tokens: %w", err)
+			return policy, fmt.Errorf("expected non-zero number of tokens: %w", err)
 		}
 
 		if len(resp.Items[0].Token) == 0 {
-			return nil, fmt.Errorf("expected non-empty token: %w", err)
+			return policy, fmt.Errorf("expected non-empty token: %w", err)
 		}
 
 		uninstallToken := resp.Items[0].Token
@@ -96,7 +82,7 @@ func InstallAgentWithExpandedPolicy(t *testing.T, ctx context.Context, installOp
 	}
 
 	err = InstallAgentForPolicy(t, installOpts, agentFixture, kibClient, policy.ID)
-	return &policy, err
+	return policy, err
 }
 
 // InstallAgentForPolicy enrolls the given agent
@@ -111,7 +97,7 @@ func InstallAgentForPolicy(t *testing.T, installOpts atesting.InstallOpts, agent
 	}
 
 	t.Logf("Creating enrollment API key...")
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentAPIKeyReq)
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(context.Background(), createEnrollmentAPIKeyReq)
 	if err != nil {
 		return fmt.Errorf("unable to create enrollment API key: %w", err)
 	}

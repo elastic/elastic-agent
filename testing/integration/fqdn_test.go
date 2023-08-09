@@ -97,7 +97,7 @@ func TestFQDN(t *testing.T) {
 		NonInteractive: true,
 		Force:          true,
 	}
-	policy, err := tools.InstallAgentWithPolicy(t, installOpts, agentFixture, kibClient, createPolicyReq)
+	policy, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Verify that agent name is short hostname")
@@ -119,7 +119,7 @@ func TestFQDN(t *testing.T) {
 		Namespace:     info.Namespace,
 		AgentFeatures: policy.AgentFeatures,
 	}
-	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
+	_, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")
@@ -150,7 +150,7 @@ func TestFQDN(t *testing.T) {
 		Namespace:     info.Namespace,
 		AgentFeatures: policy.AgentFeatures,
 	}
-	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
+	_, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")

@@ -96,12 +96,12 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
-			testUpgradeFleetManagedElasticAgent(t, info, agentFixture, parsedVersion, define.Version())
+			testUpgradeFleetManagedElasticAgent(t, ctx, info, agentFixture, parsedVersion, define.Version())
 		})
 	}
 }
 
-func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentFixture *atesting.Fixture, parsedFromVersion *version.ParsedSemVer, toVersion string) {
+func testUpgradeFleetManagedElasticAgent(t *testing.T, ctx context.Context, info *define.Info, agentFixture *atesting.Fixture, parsedFromVersion *version.ParsedSemVer, toVersion string) {
 	kibClient := info.KibanaClient
 	policyUUID := uuid.New().String()
 
@@ -115,14 +115,14 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentF
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-	policy, err := kibClient.CreatePolicy(createPolicyReq)
+	policy, err := kibClient.CreatePolicy(ctx, createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Creating Agent enrollment API key...")
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policy.ID,
 	}
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, createEnrollmentApiKeyReq)
 	require.NoError(t, err)
 
 	t.Log("Getting default Fleet Server URL...")
