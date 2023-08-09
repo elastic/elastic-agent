@@ -180,7 +180,7 @@ replace (
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
 
-replace github.com/otiai10/copy => github.com/ycombinator/copy v0.0.0-20230809005343-92c1d4260c60
+replace github.com/otiai10/copy => github.com/ycombinator/copy v0.0.0-20230809005733-074f0558d7a3
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
