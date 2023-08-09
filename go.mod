@@ -15,7 +15,7 @@ require (
 	github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0
 	github.com/elastic/elastic-agent-autodiscover v0.6.2
 	github.com/elastic/elastic-agent-client/v7 v7.2.0
-	github.com/elastic/elastic-agent-libs v0.3.9-0.20230608184016-1f368a55a6ac
+	github.com/elastic/elastic-agent-libs v0.3.11
 	github.com/elastic/elastic-agent-system-metrics v0.6.1
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
 	github.com/elastic/go-elasticsearch/v8 v8.8.2
@@ -23,7 +23,7 @@ require (
 	github.com/elastic/go-sysinfo v1.11.0
 	github.com/elastic/go-ucfg v0.8.6
 	github.com/gofrs/flock v0.8.1
-	github.com/gofrs/uuid v4.2.0+incompatible
+	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.5.9
 	github.com/google/pprof v0.0.0-20230426061923-93006964c1fc
 	github.com/google/uuid v1.3.0
@@ -45,7 +45,7 @@ require (
 	github.com/rs/zerolog v1.27.0
 	github.com/shirou/gopsutil/v3 v3.21.12
 	github.com/sirupsen/logrus v1.9.0
-	github.com/spf13/cobra v1.3.0
+	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.2
 	github.com/tsg/go-daemon v0.0.0-20200207173439-e704b93fd89b
 	go.elastic.co/apm/module/apmgorilla v1.15.0
@@ -55,7 +55,7 @@ require (
 	golang.org/x/crypto v0.5.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.7.0
+	golang.org/x/sys v0.9.0
 	golang.org/x/text v0.9.0
 	golang.org/x/time v0.3.0
 	golang.org/x/tools v0.7.0
@@ -100,7 +100,7 @@ require (
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jcchavezs/porto v0.1.0 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/karrick/godirwalk v1.15.8 // indirect
@@ -129,6 +129,7 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	github.com/tklauser/numcpus v0.3.0 // indirect
+	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.elastic.co/apm/module/apmhttp v1.15.0 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.0.0 // indirect
