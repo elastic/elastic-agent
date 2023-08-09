@@ -15,9 +15,6 @@ const (
 
 	// interval between checks for new (upgraded) Agent crashing.
 	defaultCrashCheckInterval = 10 * time.Second
-
-	// interval between checks for Agent uninstall.
-	defaultInstallCheckInterval = 10 * time.Second
 )
 
 // UpgradeConfig is the configuration related to Agent upgrades.
@@ -26,10 +23,9 @@ type UpgradeConfig struct {
 }
 
 type UpgradeWatcherConfig struct {
-	GracePeriod  time.Duration             `yaml:"grace_period" config:"grace_period" json:"grace_period"`
-	ErrorCheck   UpgradeWatcherCheckConfig `yaml:"error_check" config:"error_check" json:"error_check"`
-	CrashCheck   UpgradeWatcherCheckConfig `yaml:"crash_check" config:"crash_check" json:"crash_check"`
-	InstallCheck UpgradeWatcherCheckConfig `yaml:"install_check" config:"install_check" json:"install_check"`
+	GracePeriod time.Duration             `yaml:"grace_period" config:"grace_period" json:"grace_period"`
+	ErrorCheck  UpgradeWatcherCheckConfig `yaml:"error_check" config:"error_check" json:"error_check"`
+	CrashCheck  UpgradeWatcherCheckConfig `yaml:"crash_check" config:"crash_check" json:"crash_check"`
 }
 type UpgradeWatcherCheckConfig struct {
 	Interval time.Duration `yaml:"interval" config:"interval" json:"interval"`
@@ -44,9 +40,6 @@ func DefaultUpgradeConfig() *UpgradeConfig {
 			},
 			CrashCheck: UpgradeWatcherCheckConfig{
 				Interval: defaultCrashCheckInterval,
-			},
-			InstallCheck: UpgradeWatcherCheckConfig{
-				Interval: defaultInstallCheckInterval,
 			},
 		},
 	}

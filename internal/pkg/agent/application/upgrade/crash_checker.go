@@ -75,7 +75,6 @@ func (ch *CrashChecker) Run(ctx context.Context) {
 			pid, err := ch.sc.PID(ctx)
 			if err != nil {
 				ch.log.Error(err)
-				continue
 			}
 
 			ch.q.Push(pid)
