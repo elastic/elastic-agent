@@ -162,7 +162,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		// Process newComp update
 		// This should send component update that should cause service checkin
 		s.log.Debugf("process new comp config for %s service", s.name())
-		s.processNewComp(newComp, comm, false)
+		s.updateCompConfig(newComp, comm)
 	}
 
 	onTeardown := func(as actionModeSigned) {
@@ -225,7 +225,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				s.forceCompState(client.UnitStateFailed, err.Error())
 			}
 		case newComp := <-s.compCh:
-			s.processNewComp(newComp, comm, true)
+			s.processNewComp(newComp, comm)
 		case checkin := <-comm.CheckinObserved():
 			s.log.Debugf("got check-in for %s service, tearingDown=%v", s.name(), tearingDown)
 			s.processCheckin(checkin, comm, &lastCheckin)
@@ -363,15 +363,28 @@ func (s *serviceRuntime) awaitCheckin(ctx context.Context, comm Communicator, ti
 	}
 }
 
-func (s *serviceRuntime) processNewComp(newComp component.Component, comm Communicator, sendObs bool) {
+// processNewComp Proccesses component configuration change.
+// Sends the configuration to the service with expectation of check-in from service after.
+// Sends the observed change change back to the Agent components runtime management.
+func (s *serviceRuntime) processNewComp(newComp component.Component, comm Communicator) {
 	s.log.Debugf("observed component update for %s service", s.name())
 	sendExpected := s.state.syncExpected(&newComp)
 	changed := s.state.syncUnits(&newComp)
 	if sendExpected || s.state.unsettled() {
 		comm.CheckinExpected(s.state.toCheckinExpected(), nil)
 	}
-	if sendObs && changed {
+	if changed {
 		s.sendObserved()
+	}
+}
+
+// updateCompConfig Updates the component configuration.
+// Sends the configuration to the service with expectation of check-in from service after.
+func (s *serviceRuntime) updateCompConfig(newComp component.Component, comm Communicator) {
+	s.log.Debugf("update component configuration for %s service", s.name())
+	sendExpected := s.state.syncExpected(&newComp)
+	if sendExpected || s.state.unsettled() {
+		comm.CheckinExpected(s.state.toCheckinExpected(), nil)
 	}
 }
 
