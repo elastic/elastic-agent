@@ -45,14 +45,21 @@ func newService(topPath string) (service.Service, error) {
 		WorkingDirectory: topPath,
 		Option: map[string]interface{}{
 			// Linux (systemd) always restart on failure
-			"Restart":        "always",
-			"TimeoutStopSec": 610,
+			"Restart": "always",
 
 			// Windows setup restart on failure
 			"OnFailure":              "restart",
 			"OnFailureDelayDuration": "1s",
 			"OnFailureResetPeriod":   10,
 		},
+	}
+
+	if runtime.GOOS == "linux" {
+		// The github.com/kardianos/service library doesn't support TimeoutStopSec in their prebuilt template.
+		// This option allows to pass our own template for the systemd unit configuration, which is a copy
+		// of the prebuilt template with added TimeoutStopSec option
+		cfg.Option["SystemdScript"] = linuxSystemdScript
+		cfg.Option["TimeoutStopSec"] = 610
 	}
 
 	if runtime.GOOS == "darwin" {
@@ -106,4 +113,36 @@ const darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
 
   </dict>
 </plist>
+`
+
+// A copy of the systemd config template from github.com/kardianos/service
+// with added .Config.Option.TimeoutStopSec option
+const linuxSystemdScript = `[Unit]
+Description={{.Description}}
+ConditionFileIsExecutable={{.Path|cmdEscape}}
+{{range $i, $dep := .Dependencies}}
+{{$dep}} {{end}}
+
+[Service]
+StartLimitInterval=5
+StartLimitBurst=10
+ExecStart={{.Path|cmdEscape}}{{range .Arguments}} {{.|cmd}}{{end}}
+{{if .ChRoot}}RootDirectory={{.ChRoot|cmd}}{{end}}
+{{if .WorkingDirectory}}WorkingDirectory={{.WorkingDirectory|cmdEscape}}{{end}}
+{{if .UserName}}User={{.UserName}}{{end}}
+{{if .ReloadSignal}}ExecReload=/bin/kill -{{.ReloadSignal}} "$MAINPID"{{end}}
+{{if .PIDFile}}PIDFile={{.PIDFile|cmd}}{{end}}
+{{if and .LogOutput .HasOutputFileSupport -}}
+StandardOutput=file:/var/log/{{.Name}}.out
+StandardError=file:/var/log/{{.Name}}.err
+{{- end}}
+{{if gt .LimitNOFILE -1 }}LimitNOFILE={{.LimitNOFILE}}{{end}}
+{{if .Restart}}Restart={{.Restart}}{{end}}
+{{if .SuccessExitStatus}}SuccessExitStatus={{.SuccessExitStatus}}{{end}}
+{{if .TimeoutStopSec}}TimeoutStopSec={{.TimeoutStopSec}}{{end}}
+RestartSec=120
+EnvironmentFile=-/etc/sysconfig/{{.Name}}
+
+[Install]
+WantedBy=multi-user.target
 `
