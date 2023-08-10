@@ -1613,9 +1613,15 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 			return err
 		}
 		if failedCount > 0 {
+			if hasCleanOnExit() {
+				mg.Deps(Integration.Clean)
+			}
 			os.Exit(1)
 		}
 		if !hasRunUntilFailure() {
+			if hasCleanOnExit() {
+				mg.Deps(Integration.Clean)
+			}
 			return nil
 		}
 	}
@@ -1750,6 +1756,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		BuildDir:          agentBuildDir,
 		GOVersion:         goVersion,
 		RepoDir:           ".",
+		StateDir:          ".integration-cache",
 		DiagnosticsDir:    diagDir,
 		Platforms:         testPlatforms(),
 		Matrix:            matrix,
@@ -2123,5 +2130,11 @@ func hasSnapshotEnv() bool {
 func hasRunUntilFailure() bool {
 	runUntil := os.Getenv("TEST_RUN_UNTIL_FAILURE")
 	b, _ := strconv.ParseBool(runUntil)
+	return b
+}
+
+func hasCleanOnExit() bool {
+	clean := os.Getenv("TEST_INTEG_CLEAN_ON_EXIT")
+	b, _ := strconv.ParseBool(clean)
 	return b
 }
