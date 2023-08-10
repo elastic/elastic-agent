@@ -1714,20 +1714,20 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if essRegion == "" {
 		essRegion = "gcp-us-central1"
 	}
-	instanceProvisionerMode := os.Getenv("INSTANCE")
+	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
 	if instanceProvisionerMode == "" {
 		instanceProvisionerMode = "ogc"
 	}
 	if instanceProvisionerMode != "ogc" && instanceProvisionerMode != "multipass" {
-		return nil, errors.New("INSTANCE environment variable must be one of 'ogc' or 'multipass'")
+		return nil, errors.New("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass'")
 	}
 	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
-	stackProvisionerMode := os.Getenv("STACK")
+	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
 	if stackProvisionerMode == "" {
 		stackProvisionerMode = "ess"
 	}
 	if stackProvisionerMode != "ess" && stackProvisionerMode != "serverless" {
-		return nil, errors.New("STACK environment variable must be one of 'serverless' or 'ess'")
+		return nil, errors.New("STACK_PROVISIONER environment variable must be one of 'serverless' or 'ess'")
 	}
 	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
