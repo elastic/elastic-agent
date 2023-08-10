@@ -59,7 +59,7 @@ func newService(topPath string) (service.Service, error) {
 		// This option allows to pass our own template for the systemd unit configuration, which is a copy
 		// of the prebuilt template with added TimeoutStopSec option
 		cfg.Option["SystemdScript"] = linuxSystemdScript
-		cfg.Option["TimeoutStopSec"] = 610
+		cfg.Option["KillMode"] = "process"
 	}
 
 	if runtime.GOOS == "darwin" {
@@ -139,7 +139,7 @@ StandardError=file:/var/log/{{.Name}}.err
 {{if gt .LimitNOFILE -1 }}LimitNOFILE={{.LimitNOFILE}}{{end}}
 {{if .Restart}}Restart={{.Restart}}{{end}}
 {{if .SuccessExitStatus}}SuccessExitStatus={{.SuccessExitStatus}}{{end}}
-{{if .Config.Option.TimeoutStopSec}}TimeoutStopSec={{.Config.Option.TimeoutStopSec}}{{end}}
+{{if .Config.Option.KillMode}}KillMode={{.Config.Option.KillMode}}{{end}}
 RestartSec=120
 EnvironmentFile=-/etc/sysconfig/{{.Name}}
 
