@@ -139,7 +139,7 @@ StandardError=file:/var/log/{{.Name}}.err
 {{if gt .LimitNOFILE -1 }}LimitNOFILE={{.LimitNOFILE}}{{end}}
 {{if .Restart}}Restart={{.Restart}}{{end}}
 {{if .SuccessExitStatus}}SuccessExitStatus={{.SuccessExitStatus}}{{end}}
-{{if .TimeoutStopSec}}TimeoutStopSec={{.TimeoutStopSec}}{{end}}
+{{if .Config.Option.TimeoutStopSec}}TimeoutStopSec={{.Config.Option.TimeoutStopSec}}{{end}}
 RestartSec=120
 EnvironmentFile=-/etc/sysconfig/{{.Name}}
 
