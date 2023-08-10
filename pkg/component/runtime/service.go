@@ -286,9 +286,9 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", name))
 
 	// Call the check command of the service
-	s.log.Debugf("check if %s service is installed", name)
+	s.log.Infof("check if %s service is installed", name)
 	err = s.check(ctx)
-	s.log.Debugf("after check if %s service is installed, err: %v", name, err)
+	s.log.Infof("after check if %s service is installed, err: %v", name, err)
 	if err != nil {
 		// Check failed, call the install command of the service
 		s.log.Infof("failed check %s service: %v, try install", name, err)
@@ -305,7 +305,7 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastCheckin time.Time, teardown bool) {
 	name := s.name()
 
-	s.log.Debugf("stopping %s service runtime", name)
+	s.log.Infof("stopping %s service runtime", name)
 
 	checkedIn := !lastCheckin.IsZero()
 
@@ -315,21 +315,21 @@ func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 			// If never checked in await for the checkin with the timeout
 			if !checkedIn {
 				timeout := s.checkinPeriod()
-				s.log.Debugf("%s service had never checked in, await for check-in for %v", name, timeout)
+				s.log.Infof("%s service had never checked in, await for check-in for %v", name, timeout)
 				checkedIn = s.awaitCheckin(ctx, comm, timeout)
 			}
 
 			// Received check in send STOPPING
 			if checkedIn {
-				s.log.Debugf("%s service has checked in, send stopping state to service", name)
+				s.log.Infof("%s service has checked in, send stopping state to service", name)
 				s.state.forceExpectedState(client.UnitStateStopping)
 				comm.CheckinExpected(s.state.toCheckinExpected(), nil)
 			} else {
-				s.log.Debugf("%s service had never checked in, proceed to uninstall", name)
+				s.log.Infof("%s service had never checked in, proceed to uninstall", name)
 			}
 		}
 
-		s.log.Debugf("uninstall %s service", name)
+		s.log.Infof("uninstall %s service", name)
 		err := s.uninstall(ctx)
 		if err != nil {
 			s.log.Errorf("failed %s service uninstall, err: %v", name, err)
