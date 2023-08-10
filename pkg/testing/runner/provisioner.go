@@ -41,10 +41,10 @@ type InstanceProvisioner interface {
 	// Provision brings up the machines.
 	//
 	// The provision should re-use already prepared instances when possible.
-	Provision(ctx context.Context, batches []OSBatch) ([]Instance, error)
+	Provision(ctx context.Context, cfg Config, batches []OSBatch) ([]Instance, error)
 
 	// Clean cleans up all provisioned resources.
-	Clean(ctx context.Context, instances []Instance) error
+	Clean(ctx context.Context, cfg Config, instances []Instance) error
 }
 
 // Stack is a created stack.
