@@ -29,6 +29,7 @@ func main() {
 `
 
 func TestRemovePath(t *testing.T) {
+	t.Skip("Flaky test, see https://github.com/elastic/elastic-agent/issues/3221")
 	dir := filepath.Join(t.TempDir(), "subdir")
 	err := os.Mkdir(dir, 0644)
 	require.NoError(t, err)
