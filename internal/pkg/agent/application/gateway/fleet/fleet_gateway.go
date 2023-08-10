@@ -387,6 +387,19 @@ func agentStateToString(state agentclient.State) string {
 		return fleetStateError
 	case agentclient.Starting:
 		return fleetStateStarting
+	case agentclient.Configuring:
+		return fleetStateOnline
+	case agentclient.Stopping:
+		return fleetStateOnline
+	case agentclient.Stopped:
+		return fleetStateOnline
+	case agentclient.Upgrading:
+		return fleetStateOnline
+	case agentclient.Rollback:
+		return fleetStateDegraded
+	case agentclient.Degraded:
+		return fleetStateDegraded
 	}
+	// Unknown states map to degraded.
 	return fleetStateDegraded
 }
