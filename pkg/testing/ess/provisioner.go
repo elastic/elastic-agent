@@ -146,6 +146,7 @@ func (p *provisioner) createDeployment(ctx context.Context, r runner.StackReques
 		p.logger.Logf("Failed to create ESS cloud %s: %s", r.Version, err)
 		return nil, fmt.Errorf("failed to create ESS cloud for version %s: %w", r.Version, err)
 	}
+	p.logger.Logf("Creating stack %s (%s) [id: %s]", r.Version, r.ID, resp.ID)
 	return resp, nil
 }
 
