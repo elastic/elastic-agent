@@ -97,8 +97,8 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 // to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
 // seconds if it keeps getting that error.
 func RemovePath(path string) error {
-	const arbitraryTimeout = 2 * time.Second
-	var start time.Time
+	const arbitraryTimeout = 5 * time.Second
+	start := time.Now()
 	nextSleep := 1 * time.Millisecond
 	for {
 		err := os.RemoveAll(path)
@@ -115,9 +115,8 @@ func RemovePath(path string) error {
 		if !isRetryableError(err) {
 			return err
 		}
-		if start.IsZero() {
-			start = time.Now()
-		} else if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
+		
+		if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
 			return err
 		}
 	}
