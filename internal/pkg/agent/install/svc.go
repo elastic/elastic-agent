@@ -45,7 +45,8 @@ func newService(topPath string) (service.Service, error) {
 		WorkingDirectory: topPath,
 		Option: map[string]interface{}{
 			// Linux (systemd) always restart on failure
-			"Restart": "always",
+			"Restart":        "always",
+			"TimeoutStopSec": 610,
 
 			// Windows setup restart on failure
 			"OnFailure":              "restart",
