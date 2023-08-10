@@ -38,9 +38,9 @@ func (p *provisioner) SetLogger(l runner.Logger) {
 	p.logger = l
 }
 
-// Supported returns true multipass supports this OS.
+// Supported returns true if multipass supports this OS.
 //
-// multipass only supports Ubuntu on the same architecture on the running host.
+// multipass only supports Ubuntu on the same architecture as the running host.
 func (p *provisioner) Supported(os define.OS) bool {
 	if os.Type != define.Linux {
 		return false
@@ -204,7 +204,7 @@ func (p *provisioner) list(ctx context.Context) (map[string]instance, error) {
 	}
 
 	// yaml output from multipass gives a list of instances for each instance name,
-	// even though there is only every 1 entry in the list
+	// even though there is only ever 1 entry in the list
 	var instancesMulti map[string][]instance
 	err = yaml.Unmarshal(result, &instancesMulti)
 	if err != nil {
