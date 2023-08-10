@@ -58,15 +58,15 @@ func (p *provisioner) Supported(os define.OS) bool {
 	return true
 }
 
-func (p *provisioner) Provision(ctx context.Context, batches []runner.OSBatch) ([]runner.Instance, error) {
-	// this don't provision the instances in parallel on purpose
+func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {
+	// this doesn't provision the instances in parallel on purpose
 	// multipass cannot handle it, it either results in instances sharing the same IP address
 	// or some instances stuck in Starting state
 	for _, batch := range batches {
 		err := func(batch runner.OSBatch) error {
 			launchCtx, launchCancel := context.WithTimeout(ctx, 5*time.Minute)
 			defer launchCancel()
-			err := p.launch(launchCtx, batch)
+			err := p.launch(launchCtx, cfg, batch)
 			if err != nil {
 				return fmt.Errorf("instance %s failed: %w", batch.ID, err)
 			}
@@ -103,7 +103,7 @@ func (p *provisioner) Provision(ctx context.Context, batches []runner.OSBatch) (
 }
 
 // Clean cleans up all provisioned resources.
-func (p *provisioner) Clean(ctx context.Context, instances []runner.Instance) error {
+func (p *provisioner) Clean(ctx context.Context, _ runner.Config, instances []runner.Instance) error {
 	// doesn't execute in parallel for the same reasons in Provision
 	// multipass just cannot handle it
 	for _, instance := range instances {
@@ -121,7 +121,7 @@ func (p *provisioner) Clean(ctx context.Context, instances []runner.Instance) er
 }
 
 // launch creates an instance.
-func (p *provisioner) launch(ctx context.Context, batch runner.OSBatch) error {
+func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runner.OSBatch) error {
 	args := []string{
 		"launch",
 		"-c", "2",
@@ -132,15 +132,15 @@ func (p *provisioner) launch(ctx context.Context, batch runner.OSBatch) error {
 		batch.OS.Version,
 	}
 
-	publicKeyPath := filepath.Join(".integration-cache", "id_rsa.pub")
+	publicKeyPath := filepath.Join(cfg.StateDir, "id_rsa.pub")
 	publicKey, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		return fmt.Errorf("failed to read SSH key to send to multipass instance at %s: %w", publicKeyPath, err)
 	}
 
-	var cfg cloudinitConfig
-	cfg.SSHAuthorizedKeys = []string{string(publicKey)}
-	cfgData, err := yaml.Marshal(&cfg)
+	var cloudCfg cloudinitConfig
+	cloudCfg.SSHAuthorizedKeys = []string{string(publicKey)}
+	cloudCfgData, err := yaml.Marshal(&cloudCfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal cloud-init configuration: %w", err)
 	}
@@ -151,7 +151,7 @@ func (p *provisioner) launch(ctx context.Context, batch runner.OSBatch) error {
 	if err != nil {
 		return fmt.Errorf("failed to run multipass launch: %w", err)
 	}
-	_, err = proc.Stdin.Write([]byte(fmt.Sprintf("#cloud-config\n%s", cfgData)))
+	_, err = proc.Stdin.Write([]byte(fmt.Sprintf("#cloud-config\n%s", cloudCfgData)))
 	if err != nil {
 		_ = proc.Stdin.Close()
 		_ = proc.Kill()
