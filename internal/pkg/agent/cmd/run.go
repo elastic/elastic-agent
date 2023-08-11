@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spf13/cobra"
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
 	"gopkg.in/yaml.v2"
@@ -24,7 +23,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
-
 	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -48,6 +46,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/version"
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -579,6 +578,12 @@ func handleUpgrade() error {
 		return nil
 	}
 
+	if err := ensureInstallMarkerPresent(); err != nil {
+		return err
+	}
+}
+
+func ensureInstallMarkerPresent() error {
 	// In v8.8.0, we introduced a new installation marker file to indicate that
 	// an Agent was running as installed. When an installed Agent that's older
 	// than v8.8.0 is upgraded, this installation marker file is not present.
