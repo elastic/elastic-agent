@@ -476,18 +476,21 @@ func TestDiagnosticStateForAPM(t *testing.T) {
 						Name:    "version name",
 						Version: "version value",
 					},
-					APMConfig: &proto.APMConfig{
-						Elastic: &proto.ElasticAPM{
-							Environment: "diag-state-ut",
-							SecretToken: &token,
-							Hosts:       []string{"apmhost"},
-							Tls: &proto.ElasticAPMTLS{
-								SkipVerify: true,
-								ServerCert: "sc",
-								ServerCa:   "sca",
+					Component: &proto.Component{
+						ApmConfig: &proto.APMConfig{
+							Elastic: &proto.ElasticAPM{
+								Environment: "diag-state-ut",
+								SecretToken: &token,
+								Hosts:       []string{"apmhost"},
+								Tls: &proto.ElasticAPMTLS{
+									SkipVerify: true,
+									ServerCert: "sc",
+									ServerCa:   "sca",
+								},
 							},
 						},
 					},
+					ComponentIdx: 1,
 				},
 			},
 		},
@@ -509,16 +512,19 @@ components:
       version_info:
         name: "version name"
         version: "version value"
-      apm:
-        elastic:
-          apikey: null
-          environment: diag-state-ut
-          hosts: [apmhost]
-          secrettoken: st
-          tls:
-            skipverify: true
-            serverca: sca
-            servercert: sc
+      component:
+        apmconfig:
+          elastic:
+            apikey: null
+            environment: diag-state-ut
+            hosts: [apmhost]
+            secrettoken: st
+            tls:
+              skipverify: true
+              serverca: sca
+              servercert: sc
+        limits: null
+      component_idx: 1
 `
 
 	coord := &Coordinator{

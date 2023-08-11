@@ -119,9 +119,10 @@ func New(
 
 	var configMgr coordinator.ConfigManager
 	var managed *managedConfigManager
-	var compModifiers []coordinator.ComponentsModifier
+	var compModifiers = []coordinator.ComponentsModifier{InjectAPMConfig}
 	var composableManaged bool
 	var isManaged bool
+
 	if testingMode {
 		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
 
@@ -140,7 +141,7 @@ func New(
 			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
 		}
 
-		compModifiers = append(compModifiers, InjectAPMConfig)
+		compModifiers = append(compModifiers)
 	} else {
 		isManaged = true
 		var store storage.Store
@@ -152,8 +153,8 @@ func New(
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
-			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server), InjectAPMConfig)
-			configMgr = newFleetServerBootstrapManager(log)
+			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
+			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, rawConfig))
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
@@ -161,14 +162,13 @@ func New(
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
 				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo),
 				EndpointSignedComponentModifier(),
-				InjectAPMConfig,
 			)
 
 			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout)
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			configMgr = managed
+			configMgr = coordinator.NewConfigPatchManager(managed, PatchAPMConfig(log, rawConfig))
 		}
 	}
 
