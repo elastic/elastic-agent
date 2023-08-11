@@ -55,9 +55,9 @@ func newService(topPath string) (service.Service, error) {
 	}
 
 	if runtime.GOOS == "linux" {
-		// The github.com/kardianos/service library doesn't support TimeoutStopSec in their prebuilt template.
+		// The github.com/kardianos/service library doesn't support KillMode in their prebuilt template.
 		// This option allows to pass our own template for the systemd unit configuration, which is a copy
-		// of the prebuilt template with added TimeoutStopSec option
+		// of the prebuilt template with added KillMode option
 		cfg.Option["SystemdScript"] = linuxSystemdScript
 		cfg.Option["KillMode"] = "process"
 	}
@@ -116,7 +116,7 @@ const darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
 `
 
 // A copy of the systemd config template from github.com/kardianos/service
-// with added .Config.Option.TimeoutStopSec option
+// with added .Config.Option.KillMode option
 const linuxSystemdScript = `[Unit]
 Description={{.Description}}
 ConditionFileIsExecutable={{.Path|cmdEscape}}
