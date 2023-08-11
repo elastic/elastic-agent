@@ -14,7 +14,7 @@ require (
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0
 	github.com/elastic/elastic-agent-autodiscover v0.6.2
-	github.com/elastic/elastic-agent-client/v7 v7.2.0
+	github.com/elastic/elastic-agent-client/v7 v7.3.0
 	github.com/elastic/elastic-agent-libs v0.3.11
 	github.com/elastic/elastic-agent-system-metrics v0.6.1
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
