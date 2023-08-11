@@ -387,6 +387,23 @@ func agentStateToString(state agentclient.State) string {
 		return fleetStateError
 	case agentclient.Starting:
 		return fleetStateStarting
+	case agentclient.Configuring:
+		return fleetStateOnline
+	case agentclient.Upgrading:
+		return fleetStateOnline
+	case agentclient.Rollback:
+		return fleetStateDegraded
+	case agentclient.Degraded:
+		return fleetStateDegraded
+	// Report Stopping and Stopped as online since Fleet doesn't understand these states yet.
+	// Usually Stopping and Stopped mean the agent is going to stop checking in at which point Fleet
+	// will update the state to offline. Use the online state here since there isn't anything better
+	// at the moment, and the agent will end up in the expected offline state eventually.
+	case agentclient.Stopping:
+		return fleetStateOnline
+	case agentclient.Stopped:
+		return fleetStateOnline
 	}
+	// Unknown states map to degraded.
 	return fleetStateDegraded
 }
