@@ -59,6 +59,12 @@ func newService(topPath string) (service.Service, error) {
 		// This option allows to pass our own template for the systemd unit configuration, which is a copy
 		// of the prebuilt template with added KillMode option
 		cfg.Option["SystemdScript"] = linuxSystemdScript
+
+		// By setting KillMode=process in Elastic Agent's systemd unit configuration file, we ensure
+		// that in a scenario where the upgraded Agent's process is repeatedly crashing, systemd keeps
+		// the Upgrade Watcher process running so it can monitor the Agent process for long enough to
+		// initiate a rollback.
+		// See also https://github.com/elastic/elastic-agent/pull/3220#issuecomment-1673935694.
 		cfg.Option["KillMode"] = "process"
 	}
 
