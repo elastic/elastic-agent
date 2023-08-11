@@ -10,9 +10,8 @@ DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=
 # Run integration tests
 echo "--- Integration tests"
 set +e
-SNAPSHOT=true mage integration:test
+TEST_INTEG_CLEAN_ON_EXIT=true SNAPSHOT=true mage integration:test
 TESTS_EXIT_STATUS=$?
-mage integration:clean
 set -e
 
 # HTML report

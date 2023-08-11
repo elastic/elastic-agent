@@ -5,6 +5,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -42,7 +43,7 @@ func WaitForAgentStatus(t *testing.T, client *kibana.Client, expectedStatus stri
 func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, expectedPolicyRevision int) func() bool {
 	return func() bool {
 		getAgentReq := kibana.GetAgentRequest{ID: agentID}
-		updatedPolicyAgent, err := client.GetAgent(getAgentReq)
+		updatedPolicyAgent, err := client.GetAgent(context.Background(), getAgentReq)
 		require.NoError(t, err)
 
 		return updatedPolicyAgent.PolicyRevision == expectedPolicyRevision
@@ -52,29 +53,59 @@ func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, 
 // InstallAgentWithPolicy creates the given policy, enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.
-func InstallAgentWithPolicy(t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (*kibana.PolicyResponse, error) {
+func InstallAgentWithPolicy(t *testing.T, ctx context.Context, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (kibana.PolicyResponse, error) {
 	t.Helper()
 
-	policy, err := kibClient.CreatePolicy(createPolicyReq)
+	// Create policy
+	policy, err := kibClient.CreatePolicy(ctx, createPolicyReq)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create policy: %w", err)
+		return policy, fmt.Errorf("unable to create policy: %w", err)
 	}
+
+	if createPolicyReq.IsProtected {
+		// If protected fetch uninstall token and set it for the fixture
+		resp, err := kibClient.GetPolicyUninstallTokens(ctx, policy.ID)
+		if err != nil {
+			return policy, fmt.Errorf("failed to fetch uninstal tokens: %w", err)
+		}
+		if len(resp.Items) == 0 {
+			return policy, fmt.Errorf("expected non-zero number of tokens: %w", err)
+		}
+
+		if len(resp.Items[0].Token) == 0 {
+			return policy, fmt.Errorf("expected non-empty token: %w", err)
+		}
+
+		uninstallToken := resp.Items[0].Token
+		t.Logf("Protected with uninstall token: %v", uninstallToken)
+		agentFixture.SetUninstallToken(uninstallToken)
+	}
+
+	err = InstallAgentForPolicy(t, installOpts, agentFixture, kibClient, policy.ID)
+	return policy, err
+}
+
+// InstallAgentForPolicy enrolls the given agent
+// fixture in Fleet using the default Fleet Server, waits for the agent to be
+// online, and returns error or nil.
+func InstallAgentForPolicy(t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, policyID string) error {
+	t.Helper()
 
 	// Create enrollment API key
 	createEnrollmentAPIKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
-		PolicyID: policy.ID,
+		PolicyID: policyID,
 	}
 
 	t.Logf("Creating enrollment API key...")
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentAPIKeyReq)
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(context.Background(), createEnrollmentAPIKeyReq)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create enrollment API key: %w", err)
+		return fmt.Errorf("unable to create enrollment API key: %w", err)
 	}
 
 	// Get default Fleet Server URL
 	fleetServerURL, err := GetDefaultFleetServerURL(kibClient)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get default Fleet Server URL: %w", err)
+		return fmt.Errorf("unable to get default Fleet Server URL: %w", err)
 	}
 
 	// Enroll agent
@@ -86,7 +117,7 @@ func InstallAgentWithPolicy(t *testing.T, installOpts atesting.InstallOpts, agen
 	output, err := InstallAgent(installOpts, agentFixture)
 	if err != nil {
 		t.Log(string(output))
-		return nil, fmt.Errorf("unable to enroll Elastic Agent: %w", err)
+		return fmt.Errorf("unable to enroll Elastic Agent: %w", err)
 	}
 	t.Logf(">>> Ran Enroll. Output: %s", output)
 
@@ -99,5 +130,5 @@ func InstallAgentWithPolicy(t *testing.T, installOpts atesting.InstallOpts, agen
 		"Elastic Agent status is not online",
 	)
 
-	return policy, nil
+	return nil
 }

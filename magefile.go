@@ -1606,34 +1606,55 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 }
 
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
+	for {
+		failedCount, err := integRunnerOnce(ctx, matrix, singleTest)
+		if err != nil {
+			return err
+		}
+		if failedCount > 0 {
+			if hasCleanOnExit() {
+				mg.Deps(Integration.Clean)
+			}
+			os.Exit(1)
+		}
+		if !hasRunUntilFailure() {
+			if hasCleanOnExit() {
+				mg.Deps(Integration.Clean)
+			}
+			return nil
+		}
+	}
+}
+
+func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, error) {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 
 	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
 	if err != nil {
-		return fmt.Errorf("failed to determine batches: %w", err)
+		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
 	r, err := createTestRunner(matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
-		return fmt.Errorf("error creating test runner: %w", err)
+		return 0, fmt.Errorf("error creating test runner: %w", err)
 	}
 	results, err := r.Run(ctx)
 	if err != nil {
-		return fmt.Errorf("error running test: %w", err)
+		return 0, fmt.Errorf("error running test: %w", err)
 	}
 	_ = os.Remove("build/TEST-go-integration.out")
 	_ = os.Remove("build/TEST-go-integration.out.json")
 	_ = os.Remove("build/TEST-go-integration.xml")
 	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out file: %w", err)
+		return 0, fmt.Errorf("error writing test out file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.out.json", results.JSONOutput, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out json file: %w", err)
+		return 0, fmt.Errorf("error writing test out json file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing test out xml file: %w", err)
+		return 0, fmt.Errorf("error writing test out xml file: %w", err)
 	}
 	if results.Failures > 0 {
 		r.Logger().Logf("Testing completed (%d failures, %d successful)", results.Failures, results.Tests-results.Failures)
@@ -1644,10 +1665,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	r.Logger().Logf("Console JSON output written here: build/TEST-go-integration.out.json")
 	r.Logger().Logf("JUnit XML written here: build/TEST-go-integration.xml")
 	r.Logger().Logf("Diagnostic output (if present) here: build/diagnostics")
-	if results.Failures > 0 {
-		os.Exit(1)
-	}
-	return nil
+	return results.Failures, nil
 }
 
 func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
@@ -1679,7 +1697,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")
 	}
-	essToken, ok, err := getESSAPIKey()
+	essToken, ok, err := ess.GetESSAPIKey()
 	if err != nil {
 		return nil, err
 	}
@@ -1701,6 +1719,15 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if essRegion == "" {
 		essRegion = "gcp-us-central1"
 	}
+	provisionerMode := os.Getenv("STACK")
+	if provisionerMode == "" {
+		provisionerMode = "ess"
+	}
+	if provisionerMode != "ess" && provisionerMode != "serverless" {
+		return nil, errors.New("STACK environment variable must be one of 'serverless' or 'ess'")
+	}
+	fmt.Printf(">>>> Using %s ESS deployment\n", provisionerMode)
+
 	timestamp := timestampEnabled()
 
 	extraEnv := map[string]string{}
@@ -1720,7 +1747,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		BuildDir:          agentBuildDir,
 		GOVersion:         goVersion,
 		RepoDir:           ".",
+		StateDir:          ".integration-cache",
 		DiagnosticsDir:    diagDir,
+		Platforms:         testPlatforms(),
 		Matrix:            matrix,
 		SingleTest:        singleTest,
 		VerboseMode:       mg.Verbose(),
@@ -1732,21 +1761,33 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		ServiceTokenPath: serviceTokenPath,
 		Datacenter:       datacenter,
 	}
+
 	ogcProvisioner, err := ogc.NewProvisioner(ogcCfg)
 	if err != nil {
 		return nil, err
 	}
+
 	email, err := ogcCfg.ClientEmail()
 	if err != nil {
 		return nil, err
 	}
-	essProvisioner, err := ess.NewProvisioner(ess.ProvisionerConfig{
+
+	provisionCfg := ess.ProvisionerConfig{
 		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
 		APIKey:     essToken,
 		Region:     essRegion,
-	})
+	}
+
+	essProvisioner, err := ess.NewProvisioner(provisionCfg)
 	if err != nil {
 		return nil, err
+	}
+
+	if provisionerMode == "serverless" {
+		essProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
+		if err != nil {
+			return nil, fmt.Errorf("error creating serverless provisioner: %w", err)
+		}
 	}
 
 	r, err := runner.NewRunner(cfg, ogcProvisioner, essProvisioner, batches...)
@@ -1775,6 +1816,20 @@ func timestampEnabled() bool {
 	}
 	b, _ := strconv.ParseBool(timestamp)
 	return b
+}
+
+func testPlatforms() []string {
+	platformsStr := os.Getenv("TEST_PLATFORMS")
+	if platformsStr == "" {
+		return nil
+	}
+	var platforms []string
+	for _, p := range strings.Split(platformsStr, " ") {
+		if p != "" {
+			platforms = append(platforms, p)
+		}
+	}
+	return platforms
 }
 
 // Pre-requisite: user must have the gcloud CLI installed
@@ -1962,7 +2017,7 @@ func getGCEServiceTokenPath() (string, bool, error) {
 }
 
 func authESS(ctx context.Context) error {
-	essAPIKeyFile, err := getESSAPIKeyFilePath()
+	essAPIKeyFile, err := ess.GetESSAPIKeyFilePath()
 	if err != nil {
 		return err
 	}
@@ -2038,37 +2093,6 @@ func stringPrompt(prompt string) (string, error) {
 	return "", nil
 }
 
-func getESSAPIKey() (string, bool, error) {
-	essAPIKeyFile, err := getESSAPIKeyFilePath()
-	if err != nil {
-		return "", false, err
-	}
-	_, err = os.Stat(essAPIKeyFile)
-	if os.IsNotExist(err) {
-		return "", false, nil
-	} else if err != nil {
-		return "", false, fmt.Errorf("unable to check if ESS config directory exists: %w", err)
-	}
-	data, err := os.ReadFile(essAPIKeyFile)
-	if err != nil {
-		return "", true, fmt.Errorf("unable to read ESS API key: %w", err)
-	}
-	essAPIKey := strings.TrimSpace(string(data))
-	return essAPIKey, true, nil
-}
-
-func getESSAPIKeyFilePath() (string, error) {
-	essAPIKeyFile := os.Getenv("TEST_INTEG_AUTH_ESS_APIKEY_FILE")
-	if essAPIKeyFile == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("unable to determine user's home directory: %w", err)
-		}
-		essAPIKeyFile = filepath.Join(homeDir, ".config", "ess", "api_key.txt")
-	}
-	return essAPIKeyFile, nil
-}
-
 func writeFile(name string, data []byte, perm os.FileMode) error {
 	err := os.WriteFile(name, data, perm)
 	if err != nil {
@@ -2083,5 +2107,17 @@ func hasSnapshotEnv() bool {
 		return false
 	}
 	b, _ := strconv.ParseBool(snapshot)
+	return b
+}
+
+func hasRunUntilFailure() bool {
+	runUntil := os.Getenv("TEST_RUN_UNTIL_FAILURE")
+	b, _ := strconv.ParseBool(runUntil)
+	return b
+}
+
+func hasCleanOnExit() bool {
+	clean := os.Getenv("TEST_INTEG_CLEAN_ON_EXIT")
+	b, _ := strconv.ParseBool(clean)
 	return b
 }

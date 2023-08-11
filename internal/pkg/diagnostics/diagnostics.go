@@ -21,7 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -303,18 +303,18 @@ func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
 	return nil
 }
 
-func writeRedacted(errOut, w io.Writer, fullFilePath string, fr client.DiagnosticFileResult) error {
-	out := &fr.Content
+func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResult client.DiagnosticFileResult) error {
+	out := &fileResult.Content
 
 	// Should we support json too?
-	if fr.ContentType == "application/yaml" {
+	if fileResult.ContentType == "application/yaml" {
 		unmarshalled := map[interface{}]interface{}{}
-		err := yaml.Unmarshal(fr.Content, &unmarshalled)
+		err := yaml.Unmarshal(fileResult.Content, &unmarshalled)
 		if err != nil {
 			// Best effort, output a warning but still include the file
 			fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
 		} else {
-			redacted, err := yaml.Marshal(redactMap(unmarshalled))
+			redacted, err := yaml.Marshal(redactMap(errOut, unmarshalled))
 			if err != nil {
 				// Best effort, output a warning but still include the file
 				fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
@@ -324,23 +324,46 @@ func writeRedacted(errOut, w io.Writer, fullFilePath string, fr client.Diagnosti
 		}
 	}
 
-	_, err := w.Write(*out)
+	_, err := resultWriter.Write(*out)
 	return err
 }
 
-func redactMap(m map[interface{}]interface{}) map[interface{}]interface{} {
-	for k, v := range m {
-		if v != nil && reflect.TypeOf(v).Kind() == reflect.Map {
-			v = redactMap(v.(map[interface{}]interface{}))
-		}
-		if s, ok := k.(string); ok {
-			if redactKey(s) {
-				v = REDACTED
-			}
-			m[k] = v
-		}
+// redactMap sensitive values from the underlying map
+// the whole generic function here is out of paranoia. Although extremely unlikely,
+// we have no way of guaranteeing we'll get a "normal" map[string]interface{},
+// since the diagnostic interface is a bit of a free-for-all
+func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K]interface{} {
+	if inputMap == nil {
+		return nil
 	}
-	return m
+	for rootKey, rootValue := range inputMap {
+		if rootValue != nil {
+			switch cast := rootValue.(type) {
+			case map[string]interface{}:
+				rootValue = redactMap(errOut, cast)
+			case map[interface{}]interface{}:
+				rootValue = redactMap(errOut, cast)
+			case map[int]interface{}:
+				rootValue = redactMap(errOut, cast)
+			case string:
+				if keyString, ok := any(rootKey).(string); ok {
+					if redactKey(keyString) {
+						rootValue = REDACTED
+					}
+				}
+			default:
+				// in cases where we got some weird kind of map we couldn't parse, print a warning
+				if reflect.TypeOf(rootValue).Kind() == reflect.Map {
+					fmt.Fprintf(errOut, "[WARNING]: file may be partly redacted, could not cast value %v of type %T", rootKey, rootValue)
+				}
+
+			}
+		}
+
+		inputMap[rootKey] = rootValue
+
+	}
+	return inputMap
 }
 
 func redactKey(k string) bool {
