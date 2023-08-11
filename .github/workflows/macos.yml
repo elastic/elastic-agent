@@ -1,7 +1,7 @@
 name: macos
 
 on:
-  pull_request:
+  # pull_request:
   push:
     branches:
       - main
@@ -11,13 +11,13 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-go@v3
-      with:
-        go-version-file: .go-version
-    - name: Install dependencies
-      run:  go install github.com/magefile/mage
-    - name: Run build
-      run: mage build
-    - name: Run test
-      run: mage unitTest
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version-file: .go-version
+      - name: Install dependencies
+        run: go install github.com/magefile/mage
+      - name: Run build
+        run: mage build
+      - name: Run test
+        run: mage unitTest
