@@ -6,7 +6,6 @@ package application
 
 import (
 	"fmt"
-	"runtime"
 	"testing"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/limits"
 )
 
 func TestMergeFleetConfig(t *testing.T) {
@@ -46,8 +46,8 @@ func TestMergeFleetConfig(t *testing.T) {
 	assert.Equal(t, conf.Settings.GRPC.Port, cfg["agent"].(map[string]interface{})["grpc"].(map[string]interface{})["port"].(uint16))
 }
 
-func TestGoMaxProcs(t *testing.T) {
-	log, obs := logger.NewTesting("TestGoMaxProcs")
+func TestLimitsLog(t *testing.T) {
+	log, obs := logger.NewTesting("TestLimitsLog")
 	_, _, _, err := New(
 		log,
 		log,
@@ -61,7 +61,22 @@ func TestGoMaxProcs(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	expLogLine := fmt.Sprintf("GOMAXPROCS for the agent is set to %d", runtime.NumCPU())
+	old := limits.LimitsConfig{
+		GoMaxProcs: 0,
+	}
+	new := limits.LimitsConfig{
+		GoMaxProcs: 99,
+	}
+
+	// apply is also called inside `New`, however there is no log line because the config file
+	// does not define `agent.limits.go_max_procs` and the default value does not change.
+	// so, no callback, no log line.
+
+	// now we trigger the log line
+	err = limits.Apply(config.MustNewConfigFrom(`agent.limits.go_max_procs: 99`))
+	require.NoError(t, err)
+
+	expLogLine := fmt.Sprintf("agent limits have changed: %+v -> %+v", old, new)
 	logs := obs.FilterMessageSnippet(expLogLine)
-	require.Equalf(t, 1, logs.Len(), "expected one log message about GOMAXPROCS")
+	require.Equalf(t, 1, logs.Len(), "expected one log message about limits change")
 }

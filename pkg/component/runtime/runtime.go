@@ -12,7 +12,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/atomic"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -59,14 +58,13 @@ func newComponentRuntime(
 	comp component.Component,
 	logger *logger.Logger,
 	monitor MonitoringManager,
-	limitsConfig *configuration.LimitsConfig,
 ) (componentRuntime, error) {
 	if comp.Err != nil {
 		return newFailedRuntime(comp)
 	}
 	if comp.InputSpec != nil {
 		if comp.InputSpec.Spec.Command != nil {
-			return newCommandRuntime(comp, logger, monitor, limitsConfig)
+			return newCommandRuntime(comp, logger, monitor)
 		}
 		if comp.InputSpec.Spec.Service != nil {
 			return newServiceRuntime(comp, logger)
@@ -75,7 +73,7 @@ func newComponentRuntime(
 	}
 	if comp.ShipperSpec != nil {
 		if comp.ShipperSpec.Spec.Command != nil {
-			return newCommandRuntime(comp, logger, monitor, limitsConfig)
+			return newCommandRuntime(comp, logger, monitor)
 		}
 		return nil, errors.New("components for shippers can only support command runtime")
 	}
@@ -101,12 +99,12 @@ type componentRuntimeState struct {
 	actions   map[string]func(*proto.ActionResponse)
 }
 
-func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor MonitoringManager, comp component.Component, limitsConfig *configuration.LimitsConfig) (*componentRuntimeState, error) {
+func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor MonitoringManager, comp component.Component) (*componentRuntimeState, error) {
 	comm, err := newRuntimeComm(logger, m.getListenAddr(), m.ca, m.agentInfo)
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := newComponentRuntime(comp, logger, monitor, limitsConfig)
+	runtime, err := newComponentRuntime(comp, logger, monitor)
 	if err != nil {
 		return nil, err
 	}

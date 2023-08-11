@@ -89,15 +89,14 @@ type ComponentDiagnostic struct {
 type Manager struct {
 	proto.UnimplementedElasticAgentServer
 
-	logger       *logger.Logger
-	baseLogger   *logger.Logger
-	ca           *authority.CertificateAuthority
-	listenAddr   string
-	agentInfo    *info.AgentInfo
-	tracer       *apm.Tracer
-	monitor      MonitoringManager
-	grpcConfig   *configuration.GRPCConfig
-	limitsConfig *configuration.LimitsConfig
+	logger     *logger.Logger
+	baseLogger *logger.Logger
+	ca         *authority.CertificateAuthority
+	listenAddr string
+	agentInfo  *info.AgentInfo
+	tracer     *apm.Tracer
+	monitor    MonitoringManager
+	grpcConfig *configuration.GRPCConfig
 
 	// netMx synchronizes the access to listener and server only
 	netMx    sync.RWMutex
@@ -139,7 +138,6 @@ func NewManager(
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
 	grpcConfig *configuration.GRPCConfig,
-	limitsConfig *configuration.LimitsConfig,
 ) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
@@ -158,7 +156,6 @@ func NewManager(
 		errCh:         make(chan error),
 		monitor:       monitor,
 		grpcConfig:    grpcConfig,
-		limitsConfig:  limitsConfig,
 		serverReady:   atomic.NewBool(false),
 	}
 	return m, nil
@@ -730,7 +727,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 	for _, comp := range newComponents {
 		// new component; create its runtime
 		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-		state, err := newComponentRuntimeState(m, logger, m.monitor, comp, m.limitsConfig)
+		state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
 		if err != nil {
 			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 		}

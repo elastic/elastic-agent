@@ -11,7 +11,7 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: Add support for setting GOMAXPROCS
+summary: Add support for setting GOMAXPROCS via the policy
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
@@ -19,7 +19,7 @@ summary: Add support for setting GOMAXPROCS
 #description:
 
 # Affected component; a word indicating the component this changeset affects.
-component: runtime
+component: agent
 
 # PR URL; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
