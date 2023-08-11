@@ -127,7 +127,7 @@ func InvokeWatcher(log *logger.Logger) error {
 }
 
 func restartAgent(ctx context.Context, log *logger.Logger) error {
-	restartFn := func(ctx context.Context) error {
+	restartViaDaemonFn := func(ctx context.Context) error {
 		c := client.New()
 		err := c.Connect(ctx)
 		if err != nil {
@@ -143,24 +143,44 @@ func restartAgent(ctx context.Context, log *logger.Logger) error {
 		return nil
 	}
 
+	restartViaServiceFn := func(ctx context.Context) error {
+		topPath := paths.Top()
+		install.StopService(topPath)
+		err := install.StartService(topPath)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
 	signal := make(chan struct{})
 	backExp := backoff.NewExpBackoff(signal, restartBackoffInit, restartBackoffMax)
 
 	for restartAttempt := 1; restartAttempt <= maxRestartCount; restartAttempt++ {
 		backExp.Wait()
 		log.Infof("Restarting Agent via control protocol; attempt %d of %d", restartAttempt, maxRestartCount)
+		// First, try to restart Agent by sending a restart command
+		// to its daemon (via GRPC).
+		err := restartViaDaemonFn(ctx)
+		if err == nil {
+			break
+		}
+		log.Warnf("Failed to restart agent via control protocol: %s", err.Error())
 
-		err := restartFn(ctx)
+		// Next, try to restart Agent via the service.
+		log.Infof("Restarting Agent via service; attempt %d of %d", restartAttempt, maxRestartCount)
+		err = restartViaServiceFn(ctx)
 		if err == nil {
 			break
 		}
 
 		if restartAttempt == maxRestartCount {
-			log.Error("Failed to restart agent via control protocol after final attempt")
+			log.Error("Failed to restart agent after final attempt")
 			return err
 		}
 
-		log.Warnf("Failed to restart agent via control protocol: %s; will try again in %v", err.Error(), backExp.NextWait())
+		log.Warnf("Failed to restart agent via service: %s; will try again in %v", err.Error(), backExp.NextWait())
 	}
 
 	close(signal)
