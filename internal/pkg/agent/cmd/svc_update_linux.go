@@ -27,6 +27,8 @@ func ensureServiceConfigUpToDate() error {
 }
 
 func ensureSystemdServiceConfigUpToDate(unitFilePath string) error {
+	// It is safe to use an INI file parser/writer for systemd unit files.
+	// See https://www.freedesktop.org/software/systemd/man/systemd.syntax.html
 	cfg, err := ini.Load(unitFilePath)
 	if err != nil {
 		return fmt.Errorf("error opening systemd unit file [%s]: %w", unitFilePath, err)
