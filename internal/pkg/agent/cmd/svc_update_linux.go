@@ -11,8 +11,9 @@ import (
 
 	"gopkg.in/ini.v1"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/kardianos/service"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 func ensureServiceConfigUpToDate() error {
