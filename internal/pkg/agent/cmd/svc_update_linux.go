@@ -21,7 +21,16 @@ func ensureServiceConfigUpToDate() error {
 	switch service.ChosenSystem().String() {
 	case "linux-systemd":
 		unitFilePath := "/etc/systemd/system/" + paths.ServiceName + ".service"
-		return ensureSystemdServiceConfigUpToDate(unitFilePath)
+		if err := ensureSystemdServiceConfigUpToDate(unitFilePath); err != nil {
+			return err
+		}
+
+		// Reload systemd unit configuration files
+		cmd := exec.Command("systemctl", "daemon-reload")
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("error reloading systemd unit configuration files: %w", err)
+		}
+
 	}
 
 	return nil
@@ -46,12 +55,6 @@ func ensureSystemdServiceConfigUpToDate(unitFilePath string) error {
 	cfg.Section("Service").Key("KillMode").SetValue("process")
 	if err := cfg.SaveTo(unitFilePath); err != nil {
 		return fmt.Errorf("error writing updated systemd unit file [%s]: %w", unitFilePath, err)
-	}
-
-	// Reload systemd unit configuration files
-	cmd := exec.Command("systemctl", "daemon-reload")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error reloading systemd unit configuration files: %w", err)
 	}
 
 	return nil
