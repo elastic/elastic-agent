@@ -109,9 +109,6 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		return fmt.Errorf("error checking for and handling upgrade: %w", err)
 	}
 
-	// FIXME: Remove the following line; it is just for testing!
-	return errors.New("deliberately crashing agent")
-
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	if err := locker.TryLock(); err != nil {
 		return err
