@@ -581,6 +581,12 @@ func handleUpgrade() error {
 	if err := ensureInstallMarkerPresent(); err != nil {
 		return err
 	}
+
+	if err := ensureServiceConfigUpToDate(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func ensureInstallMarkerPresent() error {
