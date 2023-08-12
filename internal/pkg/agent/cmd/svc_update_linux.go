@@ -8,6 +8,7 @@ package cmd
 
 import (
 	"fmt"
+	"os/exec"
 
 	"gopkg.in/ini.v1"
 
@@ -45,6 +46,12 @@ func ensureSystemdServiceConfigUpToDate(unitFilePath string) error {
 	cfg.Section("Service").Key("KillMode").SetValue("process")
 	if err := cfg.SaveTo(unitFilePath); err != nil {
 		return fmt.Errorf("error writing updated systemd unit file [%s]: %w", unitFilePath, err)
+	}
+
+	// Reload systemd unit configuration files
+	cmd := exec.Command("systemctl", "daemon-reload")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("error reloading systemd unit configuration files: %w", err)
 	}
 
 	return nil
