@@ -8,10 +8,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/kardianos/service"
 
@@ -63,13 +63,8 @@ func Uninstall(cfgFile, topPath string) error {
 	}
 
 	// remove existing directory
-	err = os.RemoveAll(topPath)
+	err = RemovePath(topPath)
 	if err != nil {
-		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
-			// possible to fail on Windows, because elastic-agent.exe is running from
-			// this directory.
-			return nil
-		}
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
@@ -80,16 +75,15 @@ func Uninstall(cfgFile, topPath string) error {
 }
 
 // RemovePath helps with removal path where there is a probability
-// of running into self which might prevent removal.
-// Removal will be initiated 2 seconds after a call.
+// of running into an executable running that might prevent removal
+// on Windows.
+//
+// On Windows it is possible that a removal can spuriously error due
+// to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
+// seconds if it keeps getting that error.
 func RemovePath(path string) error {
-<<<<<<< HEAD
-	cleanupErr := os.RemoveAll(path)
-	if cleanupErr != nil && isBlockingOnSelf(cleanupErr) {
-		delayedRemoval(path)
-=======
-	const arbitraryTimeout = 5 * time.Second
-	start := time.Now()
+	const arbitraryTimeout = 2 * time.Second
+	var start time.Time
 	nextSleep := 1 * time.Millisecond
 	for {
 		err := os.RemoveAll(path)
@@ -106,14 +100,12 @@ func RemovePath(path string) error {
 		if !isRetryableError(err) {
 			return err
 		}
-
-		if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
+		if start.IsZero() {
+			start = time.Now()
+		} else if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
 			return err
 		}
->>>>>>> 05ef753d37 (increase internal/pkg/agent/install.RemovePath arbitrary timeout (#3222))
 	}
-
-	return cleanupErr
 }
 
 func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
