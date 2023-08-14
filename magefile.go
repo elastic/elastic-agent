@@ -37,6 +37,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 
@@ -1575,6 +1576,26 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if essRegion == "" {
 		essRegion = "gcp-us-central1"
 	}
+<<<<<<< HEAD
+=======
+	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
+	if instanceProvisionerMode == "" {
+		instanceProvisionerMode = "ogc"
+	}
+	if instanceProvisionerMode != "ogc" && instanceProvisionerMode != "multipass" {
+		return nil, errors.New("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass'")
+	}
+	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
+	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
+	if stackProvisionerMode == "" {
+		stackProvisionerMode = "ess"
+	}
+	if stackProvisionerMode != "ess" && stackProvisionerMode != "serverless" {
+		return nil, errors.New("STACK_PROVISIONER environment variable must be one of 'serverless' or 'ess'")
+	}
+	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
+
+>>>>>>> c3a6416d90 (Adds an instance provisioner for multipass for integration testing locally (#3202))
 	timestamp := timestampEnabled()
 
 	extraEnv := map[string]string{}
@@ -1608,6 +1629,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		ServiceTokenPath: serviceTokenPath,
 		Datacenter:       datacenter,
 	}
+<<<<<<< HEAD
 	ogcProvisioner, err := ogc.NewProvisioner(ogcCfg)
 	if err != nil {
 		return nil, err
@@ -1615,17 +1637,54 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	email, err := ogcCfg.ClientEmail()
 	if err != nil {
 		return nil, err
+=======
+	email, err := ogcCfg.ClientEmail()
+	if err != nil {
+		return nil, err
+	}
+
+	var instanceProvisioner runner.InstanceProvisioner
+	if instanceProvisionerMode == "multipass" {
+		instanceProvisioner = multipass.NewProvisioner()
+	} else if instanceProvisionerMode == "ogc" {
+		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("unknown instance provisioner: %s", instanceProvisionerMode)
+>>>>>>> c3a6416d90 (Adds an instance provisioner for multipass for integration testing locally (#3202))
 	}
 	essProvisioner, err := ess.NewProvisioner(ess.ProvisionerConfig{
 		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
 		APIKey:     essToken,
 		Region:     essRegion,
+<<<<<<< HEAD
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	r, err := runner.NewRunner(cfg, ogcProvisioner, essProvisioner, batches...)
+=======
+	}
+	var stackProvisioner runner.StackProvisioner
+	if stackProvisionerMode == "ess" {
+		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
+		if err != nil {
+			return nil, err
+		}
+	} else if stackProvisionerMode == "serverless" {
+		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("unknown stack provisioner: %s", stackProvisionerMode)
+	}
+
+	r, err := runner.NewRunner(cfg, instanceProvisioner, stackProvisioner, batches...)
+>>>>>>> c3a6416d90 (Adds an instance provisioner for multipass for integration testing locally (#3202))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}
