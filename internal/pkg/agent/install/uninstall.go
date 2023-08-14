@@ -83,9 +83,34 @@ func Uninstall(cfgFile, topPath string) error {
 // of running into self which might prevent removal.
 // Removal will be initiated 2 seconds after a call.
 func RemovePath(path string) error {
+<<<<<<< HEAD
 	cleanupErr := os.RemoveAll(path)
 	if cleanupErr != nil && isBlockingOnSelf(cleanupErr) {
 		delayedRemoval(path)
+=======
+	const arbitraryTimeout = 5 * time.Second
+	start := time.Now()
+	nextSleep := 1 * time.Millisecond
+	for {
+		err := os.RemoveAll(path)
+		if err == nil {
+			return nil
+		}
+		if isBlockingOnExe(err) {
+			// try to remove the blocking exe
+			err = removeBlockingExe(err)
+		}
+		if err == nil {
+			return nil
+		}
+		if !isRetryableError(err) {
+			return err
+		}
+
+		if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
+			return err
+		}
+>>>>>>> 05ef753d37 (increase internal/pkg/agent/install.RemovePath arbitrary timeout (#3222))
 	}
 
 	return cleanupErr
