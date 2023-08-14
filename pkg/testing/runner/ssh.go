@@ -68,7 +68,7 @@ func sshConnect(ctx context.Context, ip string, username string, sshAuth ssh.Aut
 		}
 		config := &ssh.ClientConfig{
 			User:            username,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec // it's the tests framework test
 			Auth:            []ssh.AuthMethod{sshAuth},
 			Timeout:         30 * time.Second,
 		}
