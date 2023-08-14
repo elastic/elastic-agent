@@ -4,8 +4,13 @@
 
 package vault
 
+import "time"
+
+const defaultRetryDelay = 10 * time.Millisecond
+
 type Options struct {
-	readonly bool
+	readonly   bool
+	retryDelay time.Duration
 }
 
 type OptionFunc func(o *Options)
@@ -16,9 +21,19 @@ func WithReadonly(readonly bool) OptionFunc {
 	}
 }
 
+func WithRetryDelay(retryDelay time.Duration) OptionFunc {
+	return func(o *Options) {
+		if retryDelay > 0 {
+			o.retryDelay = retryDelay
+		}
+	}
+}
+
 //nolint:unused // not used on darwin
 func applyOptions(opts ...OptionFunc) Options {
-	var options Options
+	options := Options{
+		retryDelay: defaultRetryDelay,
+	}
 
 	for _, opt := range opts {
 		opt(&options)

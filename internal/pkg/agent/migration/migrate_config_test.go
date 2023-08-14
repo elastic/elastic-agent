@@ -8,6 +8,7 @@ package migration
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"io/fs"
 	"os"
@@ -32,6 +33,9 @@ type configfile struct {
 }
 
 func TestMigrateToEncryptedConfig(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
 	testcases := []struct {
 		name                     string
 		unencryptedConfig        configfile
@@ -107,12 +111,12 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 			paths.SetTop(top)
 
 			vaultPath := paths.AgentVaultPath()
-			err := secret.CreateAgentSecret(secret.WithVaultPath(vaultPath))
+			err := secret.CreateAgentSecret(ctx, secret.WithVaultPath(vaultPath))
 
 			require.NoError(t, err)
 
-			createAndPersistStore(t, top, tc.unencryptedConfig, false)
-			encryptedStore := createAndPersistStore(t, top, tc.encryptedConfig, true)
+			createAndPersistStore(t, ctx, top, tc.unencryptedConfig, false)
+			encryptedStore := createAndPersistStore(t, ctx, top, tc.encryptedConfig, true)
 
 			absUnencryptedFile := path.Join(top, tc.unencryptedConfig.name)
 			absEncryptedFile := path.Join(top, tc.encryptedConfig.name)
@@ -132,7 +136,7 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 			log := logp.NewLogger("test_migrate_config")
 			// setup end
 
-			err = MigrateToEncryptedConfig(log, absUnencryptedFile, absEncryptedFile)
+			err = MigrateToEncryptedConfig(ctx, log, absUnencryptedFile, absEncryptedFile)
 
 			assert.NoError(t, err)
 			if len(tc.expectedEncryptedContent) > 0 {
@@ -158,6 +162,9 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("cannot reliably reproduce permission errors on windows")
 	}
+
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
 
 	testcases := []struct {
 		name              string
@@ -199,12 +206,12 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 			paths.SetTop(top)
 
 			vaultPath := paths.AgentVaultPath()
-			err := secret.CreateAgentSecret(secret.WithVaultPath(vaultPath))
+			err := secret.CreateAgentSecret(ctx, secret.WithVaultPath(vaultPath))
 
 			require.NoError(t, err)
 
-			createAndPersistStore(t, top, tc.unencryptedConfig, false)
-			createAndPersistStore(t, top, tc.encryptedConfig, true)
+			createAndPersistStore(t, ctx, top, tc.unencryptedConfig, false)
+			createAndPersistStore(t, ctx, top, tc.encryptedConfig, true)
 
 			err = os.Chmod(top, 0555&os.ModePerm)
 			require.NoError(t, err)
@@ -231,7 +238,7 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 			log := logp.NewLogger("test_migrate_config")
 			// setup end
 
-			err = MigrateToEncryptedConfig(log, absUnencryptedFile, absEncryptedFile)
+			err = MigrateToEncryptedConfig(ctx, log, absUnencryptedFile, absEncryptedFile)
 
 			assert.Error(t, err)
 		})
@@ -239,13 +246,13 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 
 }
 
-func createAndPersistStore(t *testing.T, baseDir string, cf configfile, encrypted bool) storage.Storage {
+func createAndPersistStore(t *testing.T, ctx context.Context, baseDir string, cf configfile, encrypted bool) storage.Storage {
 	var store storage.Storage
 
 	asbFilePath := path.Join(baseDir, cf.name)
 
 	if encrypted {
-		store = storage.NewEncryptedDiskStore(asbFilePath)
+		store = storage.NewEncryptedDiskStore(ctx, asbFilePath)
 	} else {
 		store = storage.NewDiskStore(asbFilePath)
 	}

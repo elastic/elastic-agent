@@ -5,6 +5,7 @@
 package info
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"strings"
@@ -125,8 +126,8 @@ const (
 )
 
 // Metadata loads metadata from disk.
-func Metadata(l *logger.Logger) (*ECSMeta, error) {
-	agentInfo, err := NewAgentInfo(false)
+func Metadata(ctx context.Context, l *logger.Logger) (*ECSMeta, error) {
+	agentInfo, err := NewAgentInfo(ctx, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new agent info: %w", err)
 	}

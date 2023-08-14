@@ -33,7 +33,11 @@ import (
 func TestPolicyChange(t *testing.T) {
 	log, _ := logger.New("", false)
 	ack := noopacker.New()
-	agentInfo, _ := info.NewAgentInfo(true)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	agentInfo, _ := info.NewAgentInfo(ctx, true)
 	nullStore := &storage.NullStore{}
 
 	t.Run("Receive a config change and successfully emits a raw configuration", func(t *testing.T) {
@@ -59,7 +63,10 @@ func TestPolicyChange(t *testing.T) {
 
 func TestPolicyAcked(t *testing.T) {
 	log, _ := logger.New("", false)
-	agentInfo, _ := info.NewAgentInfo(true)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	agentInfo, _ := info.NewAgentInfo(ctx, true)
 	nullStore := &storage.NullStore{}
 
 	t.Run("Config change should ACK", func(t *testing.T) {

@@ -7,26 +7,31 @@
 package vault
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/billgraziano/dpapi"
+	"github.com/gofrs/flock"
 	"github.com/hectane/go-acl"
 	"golang.org/x/sys/windows"
 )
 
+const lockFile = `.lock`
+
 type Vault struct {
 	path    string
 	entropy []byte
-	mx      sync.Mutex
+
+	lock *flock.Flock
 }
 
 // Open initializes the vault store
-func New(path string, opts ...OptionFunc) (v *Vault, err error) {
+func New(ctx context.Context, path string, opts ...OptionFunc) (v *Vault, err error) {
 	options := applyOptions(opts...)
 	dir := filepath.Dir(path)
 
@@ -59,15 +64,53 @@ func New(path string, opts ...OptionFunc) (v *Vault, err error) {
 		}
 	}
 
-	entropy, err := getOrCreateSeed(path, options.readonly)
+	r := &Vault{
+		path:       path,
+		retryDelay: options.retryDelay,
+		lock:       flock.New(filepath.Join(path, lockFile)),
+	}
+
+	err = r.tryLock(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = r.unlock(err)
+	}()
+
+	r.entropy, err = getOrCreateSeed(path, options.readonly)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Vault{
-		path:    path,
-		entropy: entropy,
-	}, nil
+	return r, nil
+}
+
+// try to acquire exclusive lock
+func (v *Vault) tryLock(ctx context.Context) error {
+	_, err := v.lock.TryLockContext(ctx, v.retryDelay)
+	if err != nil {
+		return fmt.Errorf("failed to acquire exclusive lock: %v, err: %w", v.lock.Path(), err)
+	}
+	return err
+}
+
+// try to acquire shared lock
+func (v *Vault) tryRLock(ctx context.Context) error {
+	_, err := v.lock.TryRLockContext(ctx, v.retryDelay)
+	if err != nil {
+		return fmt.Errorf("failed to acquire shared lock: %v, err: %w", v.lock.Path(), err)
+	}
+	return err
+}
+
+// unlock unlocks the file lock and preserves the original error if there was a error
+func (v *Vault) unlock(err error) error {
+	unerr := v.lock.Unlock()
+	if err != nil {
+		return err
+	}
+	return unerr
 }
 
 // Close closes the valut store
@@ -77,22 +120,32 @@ func (v *Vault) Close() error {
 }
 
 // Set stores the key in the vault store
-func (v *Vault) Set(key string, data []byte) error {
+func (v *Vault) Set(ctx context.Context, key string, data []byte) error {
 	enc, err := v.encrypt(data)
 	if err != nil {
 		return err
 	}
 
-	v.mx.Lock()
-	defer v.mx.Unlock()
+	err = v.tryLock(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = v.unlock(err)
+	}()
 
 	return ioutil.WriteFile(v.filepathFromKey(key), enc, 0600)
 }
 
 // Get retrieves the key from the vault store
-func (v *Vault) Get(key string) ([]byte, error) {
-	v.mx.Lock()
-	defer v.mx.Unlock()
+func (v *Vault) Get(ctx context.Context, key string) ([]byte, error) {
+	err = v.tryRLock(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = v.unlock(err)
+	}()
 
 	enc, err := ioutil.ReadFile(v.filepathFromKey(key))
 	if err != nil {
@@ -103,9 +156,14 @@ func (v *Vault) Get(key string) ([]byte, error) {
 }
 
 // Exists checks if the key exists
-func (v *Vault) Exists(key string) (ok bool, err error) {
-	v.mx.Lock()
-	defer v.mx.Unlock()
+func (v *Vault) Exists(ctx context.Context, key string) (ok bool, err error) {
+	err = v.tryRLock(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		err = v.unlock(err)
+	}()
 
 	if _, err = os.Stat(v.filepathFromKey(key)); err == nil {
 		ok = true
@@ -116,9 +174,14 @@ func (v *Vault) Exists(key string) (ok bool, err error) {
 }
 
 // Remove removes the key
-func (v *Vault) Remove(key string) error {
-	v.mx.Lock()
-	defer v.mx.Unlock()
+func (v *Vault) Remove(ctx context.Context, key string) error {
+	err = v.tryLock(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = v.unlock(err)
+	}()
 
 	return os.RemoveAll(v.filepathFromKey(key))
 }

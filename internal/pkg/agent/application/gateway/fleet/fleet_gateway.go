@@ -308,7 +308,7 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 }
 
 func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
-	ecsMeta, err := info.Metadata(f.log)
+	ecsMeta, err := info.Metadata(ctx, f.log)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
 	}

@@ -5,6 +5,7 @@
 package application
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,7 +32,7 @@ func TestMergeFleetConfig(t *testing.T) {
 	}
 
 	rawConfig := config.MustNewConfigFrom(cfg)
-	storage, conf, err := mergeFleetConfig(rawConfig)
+	storage, conf, err := mergeFleetConfig(context.Background(), rawConfig)
 	require.NoError(t, err)
 	assert.NotNil(t, storage)
 	assert.NotNil(t, conf)

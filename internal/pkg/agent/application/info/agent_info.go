@@ -5,6 +5,8 @@
 package info
 
 import (
+	"context"
+
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -25,8 +27,8 @@ type AgentInfo struct {
 // new unique identifier for agent.
 // If agent config file does not exist it gets created.
 // Initiates log level to predefined value.
-func NewAgentInfoWithLog(level string, createAgentID bool) (*AgentInfo, error) {
-	agentInfo, err := loadAgentInfoWithBackoff(false, level, createAgentID)
+func NewAgentInfoWithLog(ctx context.Context, level string, createAgentID bool) (*AgentInfo, error) {
+	agentInfo, err := loadAgentInfoWithBackoff(ctx, false, level, createAgentID)
 	if err != nil {
 		return nil, err
 	}
@@ -43,8 +45,8 @@ func NewAgentInfoWithLog(level string, createAgentID bool) (*AgentInfo, error) {
 // this created ID otherwise it generates
 // new unique identifier for agent.
 // If agent config file does not exist it gets created.
-func NewAgentInfo(createAgentID bool) (*AgentInfo, error) {
-	return NewAgentInfoWithLog(defaultLogLevel, createAgentID)
+func NewAgentInfo(ctx context.Context, createAgentID bool) (*AgentInfo, error) {
+	return NewAgentInfoWithLog(ctx, defaultLogLevel, createAgentID)
 }
 
 // LogLevel retrieves a log level.
@@ -56,8 +58,8 @@ func (i *AgentInfo) LogLevel() string {
 }
 
 // SetLogLevel updates log level of agent.
-func (i *AgentInfo) SetLogLevel(level string) error {
-	if err := updateLogLevel(level); err != nil {
+func (i *AgentInfo) SetLogLevel(ctx context.Context, level string) error {
+	if err := updateLogLevel(ctx, level); err != nil {
 		return err
 	}
 
@@ -66,8 +68,8 @@ func (i *AgentInfo) SetLogLevel(level string) error {
 }
 
 // ReloadID reloads agent info ID from configuration file.
-func (i *AgentInfo) ReloadID() error {
-	newInfo, err := NewAgentInfoWithLog(i.logLevel, false)
+func (i *AgentInfo) ReloadID(ctx context.Context) error {
+	newInfo, err := NewAgentInfoWithLog(ctx, i.logLevel, false)
 	if err != nil {
 		return err
 	}

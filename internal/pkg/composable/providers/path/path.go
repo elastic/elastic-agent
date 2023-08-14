@@ -5,6 +5,8 @@
 package path
 
 import (
+	"context"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
@@ -20,7 +22,7 @@ func init() {
 type contextProvider struct{}
 
 // Run runs the Agent context provider.
-func (*contextProvider) Run(comm corecomp.ContextProviderComm) error {
+func (*contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
 	err := comm.Set(map[string]interface{}{
 		"home":   paths.Home(),
 		"data":   paths.Data(),

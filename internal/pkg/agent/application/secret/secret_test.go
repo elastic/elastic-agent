@@ -7,6 +7,7 @@
 package secret
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,10 +32,13 @@ func getTestOptions(t *testing.T) []OptionFunc {
 func TestCreate(t *testing.T) {
 	opts := getTestOptions(t)
 
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
 	start := time.Now().UTC()
 	keys := []string{"secret1", "secret2", "secret3"}
 	for _, key := range keys {
-		err := Create(key, opts...)
+		err := Create(ctx, key, opts...)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -42,7 +46,7 @@ func TestCreate(t *testing.T) {
 	end := time.Now().UTC()
 
 	for _, key := range keys {
-		secret, err := Get(key, opts...)
+		secret, err := Get(ctx, key, opts...)
 		if err != nil {
 			t.Error(err)
 		}
@@ -58,7 +62,7 @@ func TestCreate(t *testing.T) {
 	}
 
 	for _, key := range keys {
-		err := Remove(key, opts...)
+		err := Remove(ctx, key, opts...)
 		if err != nil {
 			t.Fatal(err)
 		}
