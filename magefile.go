@@ -41,6 +41,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	bversion "github.com/elastic/elastic-agent/version"
@@ -1719,14 +1720,22 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if essRegion == "" {
 		essRegion = "gcp-us-central1"
 	}
-	provisionerMode := os.Getenv("STACK")
-	if provisionerMode == "" {
-		provisionerMode = "ess"
+	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
+	if instanceProvisionerMode == "" {
+		instanceProvisionerMode = "ogc"
 	}
-	if provisionerMode != "ess" && provisionerMode != "serverless" {
-		return nil, errors.New("STACK environment variable must be one of 'serverless' or 'ess'")
+	if instanceProvisionerMode != "ogc" && instanceProvisionerMode != "multipass" {
+		return nil, errors.New("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass'")
 	}
-	fmt.Printf(">>>> Using %s ESS deployment\n", provisionerMode)
+	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
+	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
+	if stackProvisionerMode == "" {
+		stackProvisionerMode = "ess"
+	}
+	if stackProvisionerMode != "ess" && stackProvisionerMode != "serverless" {
+		return nil, errors.New("STACK_PROVISIONER environment variable must be one of 'serverless' or 'ess'")
+	}
+	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
 	timestamp := timestampEnabled()
 
@@ -1761,15 +1770,21 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		ServiceTokenPath: serviceTokenPath,
 		Datacenter:       datacenter,
 	}
-
-	ogcProvisioner, err := ogc.NewProvisioner(ogcCfg)
+	email, err := ogcCfg.ClientEmail()
 	if err != nil {
 		return nil, err
 	}
 
-	email, err := ogcCfg.ClientEmail()
-	if err != nil {
-		return nil, err
+	var instanceProvisioner runner.InstanceProvisioner
+	if instanceProvisionerMode == "multipass" {
+		instanceProvisioner = multipass.NewProvisioner()
+	} else if instanceProvisionerMode == "ogc" {
+		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("unknown instance provisioner: %s", instanceProvisionerMode)
 	}
 
 	provisionCfg := ess.ProvisionerConfig{
@@ -1777,20 +1792,22 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		APIKey:     essToken,
 		Region:     essRegion,
 	}
-
-	essProvisioner, err := ess.NewProvisioner(provisionCfg)
-	if err != nil {
-		return nil, err
-	}
-
-	if provisionerMode == "serverless" {
-		essProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
+	var stackProvisioner runner.StackProvisioner
+	if stackProvisionerMode == "ess" {
+		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
 		if err != nil {
-			return nil, fmt.Errorf("error creating serverless provisioner: %w", err)
+			return nil, err
 		}
+	} else if stackProvisionerMode == "serverless" {
+		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("unknown stack provisioner: %s", stackProvisionerMode)
 	}
 
-	r, err := runner.NewRunner(cfg, ogcProvisioner, essProvisioner, batches...)
+	r, err := runner.NewRunner(cfg, instanceProvisioner, stackProvisioner, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}
