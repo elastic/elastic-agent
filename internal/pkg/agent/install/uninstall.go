@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -146,27 +145,6 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	}
 
 	return false
-}
-
-func isBlockingOnSelf(err error) bool {
-	// cannot remove self, this is expected on windows
-	// fails with  remove {path}}\elastic-agent.exe: Access is denied
-	return runtime.GOOS == "windows" &&
-		err != nil &&
-		strings.Contains(err.Error(), "elastic-agent.exe") &&
-		strings.Contains(err.Error(), "Access is denied")
-}
-
-func delayedRemoval(path string) {
-	// The installation path will still exists because we are executing from that
-	// directory. So cmd.exe is spawned that sleeps for 2 seconds (using ping, recommend way from
-	// from Windows) then rmdir is performed.
-	//nolint:gosec // it's not tainted
-	rmdir := exec.Command(
-		filepath.Join(os.Getenv("windir"), "system32", "cmd.exe"),
-		"/C", "ping", "-n", "2", "127.0.0.1", "&&", "rmdir", "/s", "/q", path)
-	_ = rmdir.Start()
-
 }
 
 func uninstallComponents(ctx context.Context, cfgFile string) error {
