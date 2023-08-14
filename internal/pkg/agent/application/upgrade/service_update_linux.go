@@ -17,6 +17,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
+// EnsureServiceConfigUpToDate modifies, if necessary, Elastic Agent's service
+// configuration file to its latest definition. This change is NOT rolled back
+// if the Agent is rolled back to a previous version.
 func EnsureServiceConfigUpToDate() error {
 	switch service.ChosenSystem().String() {
 	case "linux-systemd":
