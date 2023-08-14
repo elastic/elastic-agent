@@ -1,0 +1,36 @@
+---
+version: "1.0"
+
+accounts:
+  - name: "elastic-platform-ingest"
+    driver: "gce"
+    options:
+      key: "${ACCOUNT_KEY}"
+      secret: "${ACCOUNT_SECRET}"
+      project: "${ACCOUNT_PROJECT}"
+
+scanners:
+  - account_name: "${ACCOUNT_PROJECT}"
+    resources:
+      - type: "node"
+        regions:
+          - "us-central1"
+        filters:
+          - type: "<"
+            pointer: "/extra/creationTimestamp"
+            param: "${CREATION_DATE}"
+            converters:
+              param: "date"
+              value: "date"
+          - type: "="
+            pointer: "/extra/labels/project"
+            param: "elastic-agent"
+          - type: "regex"
+            pointer: "/name"
+            param: "^ogc(.*)"
+          - type: "!="
+            pointer: "/state"
+            param: "unknown"
+          - type: "!="
+            pointer: "/state"
+            param: "terminated"
