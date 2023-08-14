@@ -115,7 +115,7 @@ func RemovePath(path string) error {
 		if !isRetryableError(err) {
 			return err
 		}
-		
+
 		if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
 			return err
 		}
