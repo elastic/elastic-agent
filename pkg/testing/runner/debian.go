@@ -102,7 +102,7 @@ func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logg
 	stdout, stderr, err := sshRunCommand(ctx,
 		sshClient, "sudo", []string{"rm", "-rf", "agent"}, nil)
 	if err != nil {
-		_ = fmt.Errorf(
+		return fmt.Errorf(
 			"failed to remove agent directory before unziping new one: %w. stdout: %q, stderr: %q",
 			err, stdout, stderr)
 	}
