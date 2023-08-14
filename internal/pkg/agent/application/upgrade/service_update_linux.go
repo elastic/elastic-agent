@@ -4,7 +4,7 @@
 
 //go:build linux
 
-package cmd
+package upgrade
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
-func ensureServiceConfigUpToDate() error {
+func EnsureServiceConfigUpToDate() error {
 	switch service.ChosenSystem().String() {
 	case "linux-systemd":
 		unitFilePath := "/etc/systemd/system/" + paths.ServiceName + ".service"

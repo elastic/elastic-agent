@@ -583,7 +583,7 @@ func handleUpgrade() error {
 		return err
 	}
 
-	if err := ensureServiceConfigUpToDate(); err != nil {
+	if err := upgrade.EnsureServiceConfigUpToDate(); err != nil {
 		return err
 	}
 

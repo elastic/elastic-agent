@@ -4,7 +4,7 @@
 
 //go:build linux
 
-package cmd
+package upgrade
 
 import (
 	"os"

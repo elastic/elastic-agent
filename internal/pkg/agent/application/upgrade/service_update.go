@@ -4,9 +4,9 @@
 
 //go:build !linux
 
-package cmd
+package upgrade
 
-func ensureServiceConfigUpToDate() error {
+func EnsureServiceConfigUpToDate() error {
 	// Noop on non-Linux systems
 	return nil
 }
