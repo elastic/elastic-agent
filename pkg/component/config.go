@@ -5,6 +5,7 @@
 package component
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -14,11 +15,49 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/pkg/limits"
 )
 
 const (
 	sourceFieldName = "source"
 )
+
+// For now the component limits match the agent limits.
+// This might change in the future.
+type ComponentLimits limits.LimitsConfig
+
+func (c ComponentLimits) AsProto() *proto.ComponentLimits {
+	// Use JSON marshaling-unmarshaling to convert cfg to mapstr
+	data, err := json.Marshal(c)
+	if err != nil {
+		return nil
+	}
+
+	var s map[string]interface{}
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil
+	}
+
+	source, err := structpb.NewStruct(s)
+	if err != nil {
+		return nil
+	}
+
+	return &proto.ComponentLimits{
+		GoMaxProcs: uint64(c.GoMaxProcs),
+		Source:     source,
+	}
+}
+
+type ComponentConfig struct {
+	Limits ComponentLimits
+}
+
+func (c ComponentConfig) AsProto() *proto.Component {
+	return &proto.Component{
+		Limits: c.Limits.AsProto(),
+	}
+}
 
 // MustExpectedConfig returns proto.UnitExpectedConfig.
 //
