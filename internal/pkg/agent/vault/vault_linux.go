@@ -224,3 +224,40 @@ func deriveKey(pw []byte, salt []byte) ([]byte, []byte, error) {
 func (v *Vault) filepathFromKey(key string) string {
 	return filepath.Join(v.path, fileNameFromKey(v.key, key))
 }
+
+// writeFile "atomic" file write, utilizes temp file and replace
+// os.CreateTemp creates the file with 0600 mask, which is what we need
+func writeFile(fp string, data []byte) (err error) {
+	dir, fn := filepath.Split(fp)
+	if dir == "" {
+		dir = "."
+	}
+
+	f, err := os.CreateTemp(dir, fn)
+	if err != nil {
+		return fmt.Errorf("failed creating temp file: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = os.Remove(f.Name())
+		}
+	}()
+	defer f.Close()
+
+	_, err = f.Write(data)
+	if err != nil {
+		return fmt.Errorf("failed writing temp file: %w", err)
+	}
+
+	err = f.Sync()
+	if err != nil {
+		return fmt.Errorf("failed syncing temp file: %w", err)
+	}
+
+	err = f.Close()
+	if err != nil {
+		return fmt.Errorf("failed closing temp file: %w", err)
+	}
+
+	return os.Rename(f.Name(), fp)
+}
