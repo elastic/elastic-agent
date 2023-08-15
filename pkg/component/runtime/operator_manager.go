@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/atomic"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"gopkg.in/yaml.v2"
 )
@@ -142,6 +143,12 @@ func (m *OperatorManager) SubscribeAll(context.Context) *SubscriptionAll {
 // it performs diagnostics for all current units.
 func (m *OperatorManager) PerformDiagnostics(context.Context, ...ComponentUnitDiagnosticRequest) []ComponentUnitDiagnostic {
 	return nil
+}
+
+// PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
+// then it performs the diagnostics for all current units.
+func (m *OperatorManager) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]ComponentDiagnostic, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (m *OperatorManager) Watch() WatchChan {
