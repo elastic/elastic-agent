@@ -31,6 +31,8 @@ const (
 var ExternalInputsPattern = filepath.Join("inputs.d", "*.yml")
 
 var (
+	mu = sync.Mutex{}
+
 	topPath         string
 	configPath      string
 	configFilePath  string
@@ -78,6 +80,9 @@ func Top() string {
 // Used by the container subcommand to adjust the overall top path allowing state can be maintained between container
 // restarts.
 func SetTop(path string) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	topPath = path
 }
 
@@ -85,7 +90,7 @@ func SetTop(path string) {
 func TempDir() string {
 	tmpDir := filepath.Join(Data(), tempSubdir)
 	tmpCreator.Do(func() {
-		// create tempdir as it probably don't exists
+		// create tempdir as it probably doesn't exist
 		_ = os.MkdirAll(tmpDir, tempSubdirPerms)
 	})
 	return tmpDir
@@ -109,6 +114,9 @@ func IsVersionHome() bool {
 // Used by the container subcommand to adjust the home path allowing state can be maintained between container
 // restarts.
 func SetVersionHome(version bool) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	unversionedHome = !version
 }
 
@@ -122,6 +130,8 @@ func Config() string {
 // Used by the container subcommand to adjust the overall config path allowing state can be maintained between container
 // restarts.
 func SetConfig(path string) {
+	mu.Lock()
+	defer mu.Unlock()
 	configPath = path
 }
 
@@ -167,6 +177,9 @@ func Logs() string {
 
 // SetLogs updates the path for the logs.
 func SetLogs(path string) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	logsPath = path
 }
 
@@ -182,6 +195,9 @@ func Downloads() string {
 
 // SetDownloads updates the path for the downloads.
 func SetDownloads(path string) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	downloadsPath = path
 }
 
@@ -193,8 +209,11 @@ func Install() string {
 	return installPath
 }
 
-// SetInstall updates the path for the install.
+// SetInstall updates the path for the installation.
 func SetInstall(path string) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	installPath = path
 }
 
