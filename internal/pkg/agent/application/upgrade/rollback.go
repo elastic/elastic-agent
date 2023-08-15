@@ -45,7 +45,7 @@ func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentH
 
 	// Restart
 	log.Info("Restarting the agent after rollback")
-	if err := restartAgent(ctx); err != nil {
+	if err := restartAgent(ctx, log); err != nil {
 		return err
 	}
 
@@ -126,7 +126,7 @@ func InvokeWatcher(log *logger.Logger) error {
 	return cmd.Start()
 }
 
-func restartAgent(ctx context.Context) error {
+func restartAgent(ctx context.Context, log *logger.Logger) error {
 	restartFn := func(ctx context.Context) error {
 		c := client.New()
 		err := c.Connect(ctx)
@@ -148,12 +148,18 @@ func restartAgent(ctx context.Context) error {
 
 	for i := maxRestartCount; i >= 1; i-- {
 		backExp.Wait()
+
+		attempt := maxRestartCount - i + 1
+		log.Infof("Restarting Agent; attempt %d of %d", attempt, maxRestartCount)
+
 		err := restartFn(ctx)
 		if err == nil {
+			log.Warnf("Failed to restart agent: %s", err.Error())
 			break
 		}
 
 		if i == 1 {
+			log.Error("Failed to restart agent after final attempt")
 			return err
 		}
 	}
