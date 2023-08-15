@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/billgraziano/dpapi"
 	"github.com/gofrs/flock"
@@ -27,7 +28,8 @@ type Vault struct {
 	path    string
 	entropy []byte
 
-	lock *flock.Flock
+	retryDelay time.Duration
+	lock       *flock.Flock
 }
 
 // Open initializes the vault store
