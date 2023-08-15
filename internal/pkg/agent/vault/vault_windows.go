@@ -113,7 +113,7 @@ func (v *Vault) unlock(err error) error {
 	return unerr
 }
 
-// Close closes the valut store
+// Close closes the vault store
 // Noop on windows
 func (v *Vault) Close() error {
 	return nil
