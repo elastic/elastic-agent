@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -978,6 +979,11 @@ func (c *Coordinator) generateAST(cfg *config.Config) (err error) {
 		return fmt.Errorf("could not create the AST from the configuration: %w", err)
 	}
 
+	// applying updated agent process limits
+	if err := limits.Apply(cfg); err != nil {
+		return fmt.Errorf("could not update limits config: %w", err)
+	}
+
 	if err := features.Apply(cfg); err != nil {
 		return fmt.Errorf("could not update feature flags config: %w", err)
 	}
@@ -1139,11 +1145,11 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 	for _, component := range comps {
 		// If this is an input component (not a shipper), make sure its type is allowed
 		if component.InputSpec != nil && !c.caps.AllowInput(component.InputType) {
-			c.logger.Info("Component %q with input type %q filtered by capabilities.yml", component.InputType)
+			c.logger.Info("Component '%v' with input type '%v' filtered by capabilities.yml", component.InputType)
 			continue
 		}
 		if !c.caps.AllowOutput(component.OutputType) {
-			c.logger.Info("Component %q with output type %q filtered by capabilities.yml", component.ID, component.OutputType)
+			c.logger.Info("Component '%v' with output type '%v' filtered by capabilities.yml", component.ID, component.OutputType)
 			continue
 		}
 		result = append(result, component)

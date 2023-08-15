@@ -97,9 +97,17 @@ func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logg
 	if err != nil {
 		return fmt.Errorf("failed to SCP repo archive %s: %w", repoArchive, err)
 	}
-	// ensure that base directories are removed (possible it already exists if instance already used)
-	_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-rf", "agent"}, nil)
-	_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-rf", "beats"}, nil)
+
+	// ensure that agent directory is removed (possible it already exists if instance already used)
+	stdout, stderr, err := sshRunCommand(ctx,
+		sshClient, "sudo", []string{"rm", "-rf", "agent"}, nil)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to remove agent directory before unziping new one: %w. stdout: %q, stderr: %q",
+			err, stdout, stderr)
+	}
+	_, _, _ = sshRunCommand(ctx, sshClient, "sudo", []string{"rm", "-rf", "beats"}, nil)
+
 	stdOut, errOut, err := sshRunCommand(ctx, sshClient, "unzip", []string{destRepoName, "-d", "agent"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to unzip %s to agent directory: %w (stdout: %s, stderr: %s)", destRepoName, err, stdOut, errOut)
@@ -111,7 +119,7 @@ func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logg
 	installMage := strings.NewReader(fmt.Sprintf(`cd agent && %s make mage && %s mage integration:prepareOnRemote`, envs, envs))
 	stdOut, errOut, err = sshRunCommand(ctx, sshClient, "bash", nil, installMage)
 	if err != nil {
-		return fmt.Errorf("failed to to perform make mage and prepareOnRemote: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
+		return fmt.Errorf("failed to perform make mage and prepareOnRemote: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
 	// determine if the build needs to be replaced on the host
@@ -133,8 +141,21 @@ func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logg
 
 	if copyBuild {
 		// ensure the existing copies are removed first
-		_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-f", filepath.Base(build.Path)}, nil)
-		_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-f", filepath.Base(build.SHA512Path)}, nil)
+		toRemove := filepath.Base(build.Path)
+		stdOut, errOut, err = sshRunCommand(ctx,
+			sshClient, "sudo", []string{"rm", "-f", toRemove}, nil)
+		if err != nil {
+			return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
+				toRemove, err, stdOut, errOut)
+		}
+
+		toRemove = filepath.Base(build.SHA512Path)
+		stdOut, errOut, err = sshRunCommand(ctx,
+			sshClient, "sudo", []string{"rm", "-f", toRemove}, nil)
+		if err != nil {
+			return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
+				toRemove, err, stdOut, errOut)
+		}
 
 		logger.Logf("Copying agent build %s", filepath.Base(build.Path))
 	}

@@ -264,5 +264,5 @@ func InstallPath(basePath string) string {
 //
 // This always points to the symlink that points to the latest Elastic Agent version.
 func TopBinaryPath() string {
-	return BinaryPath(Top(), BinaryName)
+	return filepath.Join(Top(), BinaryName)
 }

@@ -131,7 +131,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 		if keepInstalled() {
 			f.t.Logf("skipping uninstall; AGENT_KEEP_INSTALLED=true")
 		} else {
-			out, err := f.Uninstall(ctx, &UninstallOpts{Force: true})
+			out, err := f.Uninstall(ctx, &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
 			f.setClient(nil)
 			if err != nil &&
 				(errors.Is(err, ErrNotInstalled) ||
@@ -151,13 +151,18 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 }
 
 type UninstallOpts struct {
-	Force bool // --force
+	Force          bool // --force
+	UninstallToken string
 }
 
 func (i UninstallOpts) toCmdArgs() []string {
 	var args []string
 	if i.Force {
 		args = append(args, "--force")
+	}
+
+	if i.UninstallToken != "" {
+		args = append(args, "--uninstall-token", i.UninstallToken)
 	}
 
 	return args

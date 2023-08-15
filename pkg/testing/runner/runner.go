@@ -171,14 +171,20 @@ func NewRunner(cfg Config, ip InstanceProvisioner, sp StackProvisioner, batches 
 	}
 	osBatches = filterSupportedOS(osBatches, ip)
 
-	return &Runner{
+	r := &Runner{
 		cfg:          cfg,
 		logger:       logger,
 		ip:           ip,
 		sp:           sp,
 		batches:      osBatches,
 		batchToStack: make(map[string]Stack),
-	}, nil
+	}
+
+	err = r.loadState()
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
 }
 
 // Logger returns the logger used by the runner.
@@ -188,14 +194,8 @@ func (r *Runner) Logger() Logger {
 
 // Run runs all the tests.
 func (r *Runner) Run(ctx context.Context) (Result, error) {
-	// load the state
-	err := r.loadState()
-	if err != nil {
-		return Result{}, err
-	}
-
 	// validate tests can even be performed
-	err = r.validate()
+	err := r.validate()
 	if err != nil {
 		return Result{}, err
 	}
@@ -228,7 +228,7 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 		}
 	}
 	if len(batches) > 0 {
-		provisionedInstances, err := r.ip.Provision(ctx, batches)
+		provisionedInstances, err := r.ip.Provision(ctx, r.cfg, batches)
 		if err != nil {
 			return Result{}, err
 		}
@@ -272,7 +272,7 @@ func (r *Runner) Clean() error {
 	g.Go(func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		return r.ip.Clean(ctx, instances)
+		return r.ip.Clean(ctx, r.cfg, instances)
 	})
 	g.Go(func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -316,7 +316,7 @@ func (r *Runner) runInstances(ctx context.Context, sshAuth ssh.AuthMethod, repoA
 
 // runInstance runs the batch on the machine.
 func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger Logger, repoArchive string, batch OSBatch, instance StateInstance) (OSRunnerResult, error) {
-	sshPrivateKeyPath, err := filepath.Abs(filepath.Join(".integration-cache", "id_rsa"))
+	sshPrivateKeyPath, err := filepath.Abs(filepath.Join(r.cfg.StateDir, "id_rsa"))
 	if err != nil {
 		return OSRunnerResult{}, fmt.Errorf("failed to determine OGC SSH private key path: %w", err)
 	}
@@ -469,7 +469,7 @@ func (r *Runner) prepare(ctx context.Context) (ssh.AuthMethod, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	cacheDir := filepath.Join(wd, ".integration-cache")
+	cacheDir := filepath.Join(wd, r.cfg.StateDir)
 	_, err = os.Stat(cacheDir)
 	if errors.Is(err, os.ErrNotExist) {
 		err = os.Mkdir(cacheDir, 0755)
@@ -735,7 +735,7 @@ func (r *Runner) writeState() error {
 }
 
 func (r *Runner) getStatePath() string {
-	return filepath.Join(".integration-cache", "state.yml")
+	return filepath.Join(r.cfg.StateDir, "state.yml")
 }
 
 func (r *Runner) mergeResults(results map[string]OSRunnerResult) (Result, error) {

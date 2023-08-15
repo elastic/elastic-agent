@@ -14,12 +14,15 @@ import (
 
 // Config provides the configuration for running the runner.
 type Config struct {
-	ReleaseVersion string
-	StackVersion   string
-	BuildDir       string
-	GOVersion      string
-	RepoDir        string
-	DiagnosticsDir string
+	AgentVersion      string
+	AgentStackVersion string
+	StateDir          string
+	ReleaseVersion    string
+	StackVersion      string
+	BuildDir          string
+	GOVersion         string
+	RepoDir           string
+	DiagnosticsDir    string
 
 	// Platforms filters the tests to only run on the provided list
 	// of platforms even if the tests supports more than what is
@@ -66,6 +69,9 @@ func (c *Config) Validate() error {
 	}
 	if c.RepoDir == "" {
 		return errors.New("field RepoDir must be set")
+	}
+	if c.StateDir == "" {
+		return errors.New("field StateDir must be set")
 	}
 	_, err := c.GetPlatforms()
 	if err != nil {

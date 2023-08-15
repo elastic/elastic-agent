@@ -392,7 +392,10 @@ const createDeploymentRequestTemplate = `
             }
           ],
           "kibana": {
-            "version": "{{ .Version }}"
+            "version": "{{ .Version }}",
+			"user_settings_json": {
+				"xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"]
+			}
           }
         },
         "ref_id": "main-kibana"
