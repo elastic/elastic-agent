@@ -6,7 +6,6 @@ package vault
 
 import "time"
 
-//nolint:unused // not used on darwin
 const defaultRetryDelay = 10 * time.Millisecond
 
 type Options struct {
@@ -30,7 +29,6 @@ func WithRetryDelay(retryDelay time.Duration) OptionFunc {
 	}
 }
 
-//nolint:unused // not used on darwin
 func applyOptions(opts ...OptionFunc) Options {
 	options := Options{
 		retryDelay: defaultRetryDelay,
