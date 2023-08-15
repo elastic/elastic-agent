@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/version"
 
 	"go.elastic.co/apm"
@@ -177,6 +178,15 @@ func New(
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
 		managed.coord = coord
+	}
+
+	// every time we change the limits we'll see the log message
+	limits.AddLimitsOnChangeCallback(func(new, old limits.LimitsConfig) {
+		log.Debugf("agent limits have changed: %+v -> %+v", old, new)
+	}, "application.go")
+	// applying the initial limits for the agent process
+	if err := limits.Apply(rawConfig); err != nil {
+		return nil, nil, nil, fmt.Errorf("could not parse and apply limits config: %w", err)
 	}
 
 	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
