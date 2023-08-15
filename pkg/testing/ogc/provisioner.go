@@ -52,7 +52,7 @@ func (p *provisioner) Supported(os define.OS) bool {
 	return ok
 }
 
-func (p *provisioner) Provision(ctx context.Context, batches []runner.OSBatch) ([]runner.Instance, error) {
+func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {
 	// ensure the latest version
 	pullCtx, pullCancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer pullCancel()
@@ -64,7 +64,7 @@ func (p *provisioner) Provision(ctx context.Context, batches []runner.OSBatch) (
 	// import the calculated layouts
 	importCtx, importCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer importCancel()
-	err = p.ogcImport(importCtx, batches)
+	err = p.ogcImport(importCtx, cfg, batches)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (p *provisioner) Provision(ctx context.Context, batches []runner.OSBatch) (
 }
 
 // Clean cleans up all provisioned resources.
-func (p *provisioner) Clean(ctx context.Context, _ []runner.Instance) error {
+func (p *provisioner) Clean(ctx context.Context, cfg runner.Config, _ []runner.Instance) error {
 	return p.ogcDown(ctx)
 }
 
@@ -142,10 +142,10 @@ func (p *provisioner) ogcPull(ctx context.Context) error {
 }
 
 // ogcImport imports all the required batches into OGC.
-func (p *provisioner) ogcImport(ctx context.Context, batches []runner.OSBatch) error {
+func (p *provisioner) ogcImport(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) error {
 	var layouts []Layout
 	for _, ob := range batches {
-		layouts = append(layouts, osBatchToOGC(ob))
+		layouts = append(layouts, osBatchToOGC(cfg.StateDir, ob))
 	}
 	layoutData, err := yaml.Marshal(struct {
 		Layouts []Layout `yaml:"layouts"`
@@ -279,7 +279,7 @@ func (p *provisioner) ogcRun(ctx context.Context, args []string, interactive boo
 	return process.Start("docker", opts...)
 }
 
-func osBatchToOGC(batch runner.OSBatch) Layout {
+func osBatchToOGC(cacheDir string, batch runner.OSBatch) Layout {
 	tags := []string{
 		LayoutIntegrationTag,
 		batch.OS.Type,
@@ -305,8 +305,8 @@ func osBatchToOGC(batch runner.OSBatch) Layout {
 		RemotePath:    los.RemotePath,
 		Scale:         1,
 		Username:      los.Username,
-		SSHPrivateKey: ".integration-cache/id_rsa",
-		SSHPublicKey:  ".integration-cache/id_rsa.pub",
+		SSHPrivateKey: cacheDir + "/id_rsa",
+		SSHPublicKey:  cacheDir + "/id_rsa.pub",
 		Ports:         []string{"22:22"},
 		Tags:          tags,
 		Labels: map[string]string{

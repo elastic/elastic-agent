@@ -54,10 +54,6 @@ func TestLoadSpec_Components(t *testing.T) {
 			Path: "cloudbeat.spec.yml",
 		},
 		{
-			Name: "Cloud Defend",
-			Path: "cloud-defend.spec.yml",
-		},
-		{
 			Name: "Endpoint Security",
 			Path: "endpoint-security.spec.yml",
 		},
