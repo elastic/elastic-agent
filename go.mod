@@ -61,6 +61,7 @@ require (
 	golang.org/x/tools v0.7.0
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.29.1
+	gopkg.in/ini.v1 v1.66.2
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools v2.2.0+incompatible

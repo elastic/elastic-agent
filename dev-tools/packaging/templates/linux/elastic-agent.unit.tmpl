@@ -15,5 +15,11 @@ Environment="BEAT_CONFIG_OPTS=-c /etc/{{.BeatName}}/{{.BeatName}}.yml"
 ExecStart=/usr/bin/{{.BeatName}} run --environment systemd $BEAT_CONFIG_OPTS
 Restart=always
 
+# By setting KillMode=process, we ensure that in a scenario where the upgraded Agent's
+# process is repeatedly crashing, systemd keeps the Upgrade Watcher process running so
+# it can monitor the Agent process for long enough to initiate a rollback.
+# See also https://github.com/elastic/elastic-agent/pull/3220#issuecomment-1673935694.
+KillMode=process
+
 [Install]
 WantedBy=multi-user.target
