@@ -8,10 +8,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/kardianos/service"
 
@@ -78,13 +78,8 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	}
 
 	// remove existing directory
-	err = os.RemoveAll(topPath)
+	err = RemovePath(topPath)
 	if err != nil {
-		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
-			// possible to fail on Windows, because elastic-agent.exe is running from
-			// this directory.
-			return nil
-		}
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
@@ -95,15 +90,36 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 }
 
 // RemovePath helps with removal path where there is a probability
-// of running into self which might prevent removal.
-// Removal will be initiated 2 seconds after a call.
+// of running into an executable running that might prevent removal
+// on Windows.
+//
+// On Windows it is possible that a removal can spuriously error due
+// to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
+// seconds if it keeps getting that error.
 func RemovePath(path string) error {
-	cleanupErr := os.RemoveAll(path)
-	if cleanupErr != nil && isBlockingOnSelf(cleanupErr) {
-		delayedRemoval(path)
-	}
+	const arbitraryTimeout = 5 * time.Second
+	start := time.Now()
+	nextSleep := 1 * time.Millisecond
+	for {
+		err := os.RemoveAll(path)
+		if err == nil {
+			return nil
+		}
+		if isBlockingOnExe(err) {
+			// try to remove the blocking exe
+			err = removeBlockingExe(err)
+		}
+		if err == nil {
+			return nil
+		}
+		if !isRetryableError(err) {
+			return err
+		}
 
-	return cleanupErr
+		if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
+			return err
+		}
+	}
 }
 
 func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
@@ -144,27 +160,6 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	}
 
 	return false
-}
-
-func isBlockingOnSelf(err error) bool {
-	// cannot remove self, this is expected on windows
-	// fails with  remove {path}}\elastic-agent.exe: Access is denied
-	return runtime.GOOS == "windows" &&
-		err != nil &&
-		strings.Contains(err.Error(), "elastic-agent.exe") &&
-		strings.Contains(err.Error(), "Access is denied")
-}
-
-func delayedRemoval(path string) {
-	// The installation path will still exists because we are executing from that
-	// directory. So cmd.exe is spawned that sleeps for 2 seconds (using ping, recommend way from
-	// from Windows) then rmdir is performed.
-	//nolint:gosec // it's not tainted
-	rmdir := exec.Command(
-		filepath.Join(os.Getenv("windir"), "system32", "cmd.exe"),
-		"/C", "ping", "-n", "2", "127.0.0.1", "&&", "rmdir", "/s", "/q", path)
-	_ = rmdir.Start()
-
 }
 
 func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string) error {

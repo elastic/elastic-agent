@@ -68,7 +68,7 @@ func sshConnect(ctx context.Context, ip string, username string, sshAuth ssh.Aut
 		}
 		config := &ssh.ClientConfig{
 			User:            username,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec // it's the tests framework test
 			Auth:            []ssh.AuthMethod{sshAuth},
 			Timeout:         30 * time.Second,
 		}
@@ -80,10 +80,12 @@ func sshConnect(ctx context.Context, ip string, username string, sshAuth ssh.Aut
 	}
 }
 
-// sshRunCommand runs a command on the SSH client connection
+// sshRunCommand runs a command on the SSH client connection.
+// It returns stdout, stderr and an error if any. stdout and stderr might be nil
+// if an error happens before running cmd.
 func sshRunCommand(ctx context.Context, c *ssh.Client, cmd string, args []string, stdin io.Reader) ([]byte, []byte, error) {
 	if ctx.Err() != nil {
-		return nil, nil, ctx.Err()
+		return nil, nil, fmt.Errorf("sshRunCommand: %w", ctx.Err())
 	}
 
 	cmdArgs := []string{cmd}
@@ -91,7 +93,7 @@ func sshRunCommand(ctx context.Context, c *ssh.Client, cmd string, args []string
 	cmdStr := strings.Join(cmdArgs, " ")
 	session, err := c.NewSession()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("could not create new SSH session: %w", err)
 	}
 	defer session.Close()
 
@@ -103,7 +105,12 @@ func sshRunCommand(ctx context.Context, c *ssh.Client, cmd string, args []string
 		session.Stdin = stdin
 	}
 	err = session.Run(cmdStr)
-	return stdout.Bytes(), stderr.Bytes(), err
+	if err != nil {
+		return stdout.Bytes(), stderr.Bytes(), fmt.Errorf("could not run %q though SSH: %w",
+			cmdStr, err)
+	}
+
+	return stdout.Bytes(), stderr.Bytes(), nil
 }
 
 // sshRunCommandWithRetry runs the command on loop waiting the interval between calls
@@ -204,4 +211,24 @@ func sshGetFileContents(ctx context.Context, c *ssh.Client, filename string) ([]
 		return nil, err
 	}
 	return stdout.Bytes(), nil
+}
+
+// sshGetFileContentsOutput writes the file contents into output.
+func sshGetFileContentsOutput(ctx context.Context, c *ssh.Client, filename string, output io.Writer) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	session, err := c.NewSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	session.Stdout = output
+	err = session.Run(fmt.Sprintf("cat %s", filename))
+	if err != nil {
+		return err
+	}
+	return nil
 }

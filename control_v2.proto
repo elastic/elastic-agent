@@ -97,6 +97,11 @@ message UpgradeRequest {
   //
   // If provided Elastic Agent package is checked against these pgp keys as well.
   repeated string pgpBytes = 4;
+
+  // (Optional) Overrides predefined behavior for agent package verification.
+  //
+  // If provided Elastic Agent package embedded PGP key is not checked for signature during upgrade.
+  bool skipDefaultPgp = 5;
 }
 
 // A upgrade response message.
@@ -164,19 +169,23 @@ message StateAgentInfo {
 }
 
 // StateResponse is the current state of Elastic Agent.
+// Next unused id: 7
 message StateResponse {
   // Overall information of Elastic Agent.
   StateAgentInfo info = 1;
-  // Overall state of Elastic Agent.
+
+  // Overall state + message of Elastic Agent, aggregating errors in other
+  // states and components
   State state = 2;
-  // Overall state message of Elastic Agent.
   string message = 3;
+
+  // Fleet state: healthy / "Connected" if the last RPC call to Fleet
+  // succeeded, otherwise failed with the associated error string.
+  State fleetState = 5;
+  string fleetMessage = 6;
+
   // State of each component in Elastic Agent.
   repeated ComponentState components = 4;
-  // Fleet connectivity state of Elastic Agent.
-  State fleetState = 5;
-  // Fleet connectivity state message of Elastic Agent.
-  string fleetMessage = 6;
 }
 
 // DiagnosticFileResult is a file result from a diagnostic result.
@@ -197,6 +206,24 @@ message DiagnosticFileResult {
 
 // DiagnosticAgentRequest is request to gather diagnostic information about the Elastic Agent.
 message DiagnosticAgentRequest {
+  repeated AdditionalDiagnosticRequest additional_metrics = 1;
+}
+
+// DiagnosticAgentRequestAdditional is an enum of additional diagnostic metrics that can be requested from Elastic Agent.
+enum AdditionalDiagnosticRequest {
+  CPU = 0;
+}
+
+// DiagnosticComponentsRequest is the message to request diagnostics from individual components. 
+message DiagnosticComponentsRequest {
+  repeated DiagnosticComponentRequest components  = 1;
+  repeated AdditionalDiagnosticRequest additional_metrics = 2;
+}
+
+// DiagnosticComponentRequest specifies the component to send a diagnostic request to.
+message DiagnosticComponentRequest {
+  // ID of the component.
+  string component_id = 1;
 }
 
 // DiagnosticAgentResponse is response to gathered diagnostic information about the Elastic Agent.
@@ -229,6 +256,16 @@ message DiagnosticUnitResponse {
   UnitType unit_type = 2;
   // ID of the unit.
   string unit_id = 3;
+  // Error message for the failure fetching diagnostic information for this unit.
+  string error = 4;
+  // Diagnostic results for the unit.
+  repeated DiagnosticFileResult results = 5;
+}
+
+// DiagnosticComponentResponse is the response diagnostic information for a component-level diagnostic request
+message DiagnosticComponentResponse {
+  // ID of the component.
+  string component_id = 1;
   // Error message for the failure fetching diagnostic information for this unit.
   string error = 4;
   // Diagnostic results for the unit.
@@ -271,6 +308,9 @@ service ElasticAgentControl {
 
   // Gather diagnostic information for the running units.
   rpc DiagnosticUnits(DiagnosticUnitsRequest) returns (stream DiagnosticUnitResponse);
+
+  // Gather diagnostic information for the running components.
+  rpc DiagnosticComponents(DiagnosticComponentsRequest) returns (stream DiagnosticComponentResponse);
 
   // Configure adjusts the running Elastic Agent configuration with the configuration
   // provided over the RPC.

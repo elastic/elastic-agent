@@ -147,23 +147,22 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		s.stop(ctx, comm, lastCheckin, am == actionTeardown)
 	}
 
-	processTeardown := func(am actionMode, signed *component.Signed) error {
+	processTeardown := func(am actionMode, signed *component.Signed) {
 		s.log.Debugf("start teardown for %s service", s.name())
 		// Inject new signed
 		newComp, err := injectSigned(s.comp, signed)
 		if err != nil {
 			s.log.Errorf("failed to inject signed configuration for %s service, err: %v", s.name(), err)
-			return err
 		}
 
+		s.log.Debugf("set teardown timer %v for %s service", teardownCheckinTimeout, s.name())
 		// Set teardown timeout timer
 		teardownCheckinTimer.Reset(teardownCheckinTimeout)
 
 		// Process newComp update
 		// This should send component update that should cause service checkin
 		s.log.Debugf("process new comp config for %s service", s.name())
-		s.processNewComp(newComp, comm)
-		return nil
+		s.updateCompConfig(newComp, comm)
 	}
 
 	onTeardown := func(as actionModeSigned) {
@@ -178,7 +177,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 		if !tearingDown {
 			tearingDown = true
-			err = processTeardown(as.actionMode, as.signed)
+			processTeardown(as.actionMode, as.signed)
 		}
 
 	}
@@ -338,7 +337,7 @@ func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 	}
 
 	// Force component stopped state
-	s.log.Debug("set %s service runtime to stopped state", name)
+	s.log.Debugf("set %s service runtime to stopped state", name)
 	s.forceCompState(client.UnitStateStopped, fmt.Sprintf("Stopped: %s service runtime", name))
 }
 
@@ -364,6 +363,9 @@ func (s *serviceRuntime) awaitCheckin(ctx context.Context, comm Communicator, ti
 	}
 }
 
+// processNewComp Proccesses component configuration change.
+// Sends the configuration to the service with expectation of check-in from service after.
+// Sends the observed change change back to the Agent components runtime management.
 func (s *serviceRuntime) processNewComp(newComp component.Component, comm Communicator) {
 	s.log.Debugf("observed component update for %s service", s.name())
 	sendExpected := s.state.syncExpected(&newComp)
@@ -373,6 +375,16 @@ func (s *serviceRuntime) processNewComp(newComp component.Component, comm Commun
 	}
 	if changed {
 		s.sendObserved()
+	}
+}
+
+// updateCompConfig Updates the component configuration.
+// Sends the configuration to the service with expectation of check-in from service after.
+func (s *serviceRuntime) updateCompConfig(newComp component.Component, comm Communicator) {
+	s.log.Debugf("update component configuration for %s service", s.name())
+	sendExpected := s.state.syncExpected(&newComp)
+	if sendExpected || s.state.unsettled() {
+		comm.CheckinExpected(s.state.toCheckinExpected(), nil)
 	}
 }
 

@@ -102,6 +102,8 @@ spec:
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
+        release-eng:
+          access_level: BUILD_AND_READ
         everyone:
           access_level: READ_ONLY
 
@@ -138,6 +140,11 @@ spec:
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       repository: elastic/elastic-agent
+      schedules:
+        Daily main:
+          branch: main
+          cronline: '@daily'
+          message: Builds daily `main` dra
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ

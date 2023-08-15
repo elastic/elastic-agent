@@ -3,7 +3,7 @@ COVERAGE_DIR=$(BUILD_DIR)/coverage
 BEATS?=elastic-agent
 PROJECTS= $(BEATS)
 PYTHON_ENV?=$(BUILD_DIR)/python-env
-MAGE_VERSION     ?= v1.13.0
+MAGE_VERSION     ?= v1.14.0
 MAGE_PRESENT     := $(shell mage --version 2> /dev/null | grep $(MAGE_VERSION))
 MAGE_IMPORT_PATH ?= github.com/magefile/mage
 export MAGE_IMPORT_PATH
@@ -17,7 +17,6 @@ ifndef MAGE_PRESENT
 	@-mage -clean
 endif
 	@true
-
 
 ## help : Show this help.
 help: Makefile

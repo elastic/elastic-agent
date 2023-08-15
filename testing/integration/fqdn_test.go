@@ -23,6 +23,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 
@@ -39,6 +40,7 @@ func TestFQDN(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
+	t.Skip("Flaky test, see https://github.com/elastic/elastic-agent/issues/3154")
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
@@ -92,7 +94,11 @@ func TestFQDN(t *testing.T) {
 			},
 		},
 	}
-	policy, err := tools.InstallAgentWithPolicy(t, agentFixture, kibClient, createPolicyReq)
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+	policy, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Verify that agent name is short hostname")
@@ -114,7 +120,7 @@ func TestFQDN(t *testing.T) {
 		Namespace:     info.Namespace,
 		AgentFeatures: policy.AgentFeatures,
 	}
-	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
+	_, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")
@@ -145,7 +151,7 @@ func TestFQDN(t *testing.T) {
 		Namespace:     info.Namespace,
 		AgentFeatures: policy.AgentFeatures,
 	}
-	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
+	_, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")
@@ -162,9 +168,9 @@ func TestFQDN(t *testing.T) {
 
 	// TODO: Re-enable assertion once https://github.com/elastic/elastic-agent/issues/3078 is
 	// investigated for root cause and resolved.
-	//t.Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname again")
-	//verifyHostNameInIndices(t, "logs-*", shortName, info.ESClient)
-	//verifyHostNameInIndices(t, "metrics-*", shortName, info.ESClient)
+	// t.Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname again")
+	// verifyHostNameInIndices(t, "logs-*", shortName, info.ESClient)
+	// verifyHostNameInIndices(t, "metrics-*", shortName, info.ESClient)
 }
 
 func verifyAgentName(t *testing.T, hostname string, kibClient *kibana.Client) *kibana.AgentExisting {
@@ -179,7 +185,7 @@ func verifyAgentName(t *testing.T, hostname string, kibClient *kibana.Client) *k
 			agent, err = tools.GetAgentByHostnameFromList(kibClient, hostname)
 			return err == nil && agent != nil
 		},
-		1*time.Minute,
+		5*time.Minute,
 		5*time.Second,
 	)
 
@@ -276,7 +282,7 @@ func setHostFQDN(ctx context.Context, etcHosts []byte, externalIP, fqdn string, 
 	line := fmt.Sprintf("%s\t%s %s\n", externalIP, fqdn, shortName)
 
 	etcHosts = append(etcHosts, []byte(line)...)
-	err := os.WriteFile(filename, etcHosts, 0644)
+	err := os.WriteFile(filename, etcHosts, 0o644)
 	if err != nil {
 		return err
 	}
@@ -293,7 +299,7 @@ func setHostFQDN(ctx context.Context, etcHosts []byte, externalIP, fqdn string, 
 
 func setEtcHosts(data []byte) error {
 	filename := string(filepath.Separator) + filepath.Join("etc", "hosts")
-	return os.WriteFile(filename, data, 0644)
+	return os.WriteFile(filename, data, 0o644)
 }
 
 func setHostname(ctx context.Context, hostname string, log func(args ...any)) error {

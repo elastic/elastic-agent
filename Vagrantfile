@@ -148,8 +148,8 @@ Vagrant.configure("2") do |config|
         # Display the VirtualBox GUI when booting the machine
         vb.gui = false
         vb.customize ["modifyvm", :id, "--vram", "128"]
-        # Customize the amount of memory on the VM:
-        vb.memory = "2048"
+        vb.memory = 6144
+        vb.cpus = 6
       end
 
       nodeconfig.vm.provision "shell", inline: <<-SHELL
@@ -164,7 +164,7 @@ Vagrant.configure("2") do |config|
           wget
          curl -sL -o /tmp/go#{GO_VERSION}.linux-amd64.tar.gz https://go.dev/dl/go#{GO_VERSION}.linux-amd64.tar.gz
          tar -C /usr/local -xzf /tmp/go#{GO_VERSION}.linux-amd64.tar.gz
-         echo "alias ll='ls -la'" > /etc/profile.d/ll.sh
+         echo "alias ll='ls -lah'" > /etc/profile.d/ll.sh
          echo 'export PATH=$PATH:/usr/local/go/bin' > /etc/profile.d/go.sh
          echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> /etc/profile.d/go.sh
       SHELL

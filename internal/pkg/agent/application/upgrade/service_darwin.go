@@ -112,10 +112,9 @@ func (p *darwinPidProvider) piderFromCmd(name string, args ...string) func(conte
 	}
 }
 
-func invokeCmd(topPath string) *exec.Cmd {
-	// paths.BinaryPath properly derives the newPath depending on the platform. The path to the binary for macOS is inside of the app bundle.
-	homeExePath := paths.BinaryPath(topPath, agentName)
-	cmd := exec.Command(homeExePath, watcherSubcommand,
+func invokeCmd() *exec.Cmd {
+	// #nosec G204 -- user cannot inject any parameters to this command
+	cmd := exec.Command(paths.TopBinaryPath(), watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),
 	)

@@ -1,6 +1,7 @@
 # Directories
 /bin
 /.agent-testing
+/.integration-cache
 /.ogc-cache
 /.vagrant
 /.idea
