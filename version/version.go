@@ -4,5 +4,6 @@
 
 package version
 
-const defaultBeatVersion = "8.11.0"
+// FIXME: remove this — testing only!
+const defaultBeatVersion = "8.12.0"
 const Agent = defaultBeatVersion
