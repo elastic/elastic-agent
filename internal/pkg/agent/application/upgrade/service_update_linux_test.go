@@ -39,10 +39,12 @@ WantedBy=multi-user.target
 `
 	tests := map[string]struct {
 		unitFileInitialContents string
+		expectedUpdated         bool
 		expectedKillMode        string
 	}{
 		"killmode_process_exists": {
 			unitFileInitialContents: unitFileExpectedContents,
+			expectedUpdated:         false,
 			expectedKillMode:        "process",
 		},
 		"killmode_process_missing": {
@@ -63,6 +65,7 @@ EnvironmentFile=-/etc/sysconfig/elastic-agent
 [Install]
 WantedBy=multi-user.target
 `,
+			expectedUpdated:  true,
 			expectedKillMode: "process",
 		},
 		"killmode_different": {
@@ -84,6 +87,7 @@ KillMode=control-group
 [Install]
 WantedBy=multi-user.target
 `,
+			expectedUpdated:  false,
 			expectedKillMode: "control-group",
 		},
 	}
@@ -94,8 +98,9 @@ WantedBy=multi-user.target
 			err := os.WriteFile(unitFilePath, []byte(test.unitFileInitialContents), 0644)
 			require.NoError(t, err)
 
-			err = ensureSystemdServiceConfigUpToDate(unitFilePath)
+			updated, err := ensureSystemdServiceConfigUpToDate(unitFilePath)
 			require.NoError(t, err)
+			require.Equal(t, test.expectedUpdated, updated)
 
 			cfg, err := ini.Load(unitFilePath)
 			require.NoError(t, err)

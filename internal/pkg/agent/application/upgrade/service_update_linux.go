@@ -24,8 +24,14 @@ func EnsureServiceConfigUpToDate() error {
 	switch service.ChosenSystem().String() {
 	case "linux-systemd":
 		unitFilePath := "/etc/systemd/system/" + paths.ServiceName + ".service"
-		if err := ensureSystemdServiceConfigUpToDate(unitFilePath); err != nil {
+		updated, err := ensureSystemdServiceConfigUpToDate(unitFilePath)
+		if err != nil {
 			return err
+		}
+
+		if !updated {
+			// Nothing more to do!
+			return nil
 		}
 
 		// Reload systemd unit configuration files
@@ -39,26 +45,29 @@ func EnsureServiceConfigUpToDate() error {
 	return nil
 }
 
-func ensureSystemdServiceConfigUpToDate(unitFilePath string) error {
+// ensureSystemdServiceConfigUpToDate modifies, if necessary, Elastic Agent's systemd
+// unit configuration file to its latest definition. If the the file is modified, this
+// function returns true; otherwise, it returns false.
+func ensureSystemdServiceConfigUpToDate(unitFilePath string) (bool, error) {
 	// It is safe to use an INI file parser/writer for systemd unit files.
 	// See https://www.freedesktop.org/software/systemd/man/systemd.syntax.html
 	cfg, err := ini.Load(unitFilePath)
 	if err != nil {
-		return fmt.Errorf("error opening systemd unit file [%s]: %w", unitFilePath, err)
+		return false, fmt.Errorf("error opening systemd unit file [%s]: %w", unitFilePath, err)
 	}
 
 	// Check if KillMode= is already present
 	if cfg.Section("Service").HasKey("KillMode") {
 		// Nothing more to do
-		return nil
+		return false, nil
 	}
 
 	// If KillMode= is not present, add it and set it to "process"
 	// See https://github.com/elastic/elastic-agent/pull/3220
 	cfg.Section("Service").Key("KillMode").SetValue("process")
 	if err := cfg.SaveTo(unitFilePath); err != nil {
-		return fmt.Errorf("error writing updated systemd unit file [%s]: %w", unitFilePath, err)
+		return false, fmt.Errorf("error writing updated systemd unit file [%s]: %w", unitFilePath, err)
 	}
 
-	return nil
+	return true, nil
 }
