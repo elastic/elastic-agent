@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: namespace
+    app.kubernetes.io/instance: system
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: elastic-agent-operator
+    app.kubernetes.io/part-of: elastic-agent-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-node-datastreams
+  namespace: system
+  labels:
+    k8s-app: elastic-agent-standalone
+data:
+  agent.yml: |-
+    outputs:
+      default:
+        type: elasticsearch
+        hosts:
+          - >-
+            ${ES_HOST}
+        username: ${ES_USERNAME}
+        password: ${ES_PASSWORD}
+    agent:
+      logging.level: info
+      act_as_operator: true
+      monitoring:
+        enabled: true
+        use_output: default
+        logs: true
+        metrics: false
+    inputs: []
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: deployment
+    app.kubernetes.io/instance: controller-manager
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: elastic-agent-operator
+    app.kubernetes.io/part-of: elastic-agent-operator
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  strategy: 
+    type: Recreate
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: controller-manager
+    spec:
+      serviceAccountName: controller-manager
+      containers:
+        - name: manager
+          image: docker.elastic.co/beats/elastic-agent:8.10.0-SNAPSHOT
+          args: [
+            "./elastic-agent",
+            "-c", "/etc/elastic-agent/agent.yml",
+            "-e",
+          ]
+          env:
+            - name: IS_OPERATOR
+              value: "true"
+            - name: ES_USERNAME
+              value: elastic
+            - name: ES_PASSWORD
+              value: j0qdkQMssl5jc6tTLlcYEQGv
+            - name: ES_HOST
+              value: https://13dcac45c9f24de8a4891b4bf698a418.eu-west-1.aws.qa.cld.elstc.co:443
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: STATE_PATH
+              value: /etc/elastic-agent
+          securityContext:
+            runAsUser: 0
+          resources:
+            requests:
+              cpu: 200m
+              memory: 200Mi
+          volumeMounts:
+            - name: datastreams
+              mountPath: /etc/elastic-agent/agent.yml
+              readOnly: true
+              subPath: agent.yml
+            - name: proc
+              mountPath: /hostfs/proc
+              readOnly: true
+            - name: cgroup
+              mountPath: /hostfs/sys/fs/cgroup
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: etc-full
+              mountPath: /hostfs/etc
+              readOnly: true
+            - name: var-lib
+              mountPath: /hostfs/var/lib
+              readOnly: true
+      volumes:
+        - name: datastreams
+          configMap:
+            defaultMode: 0640
+            name: agent-node-datastreams
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: etc-full
+          hostPath:
+            path: /etc
+        - name: var-lib
+          hostPath:
+            path: /var/lib

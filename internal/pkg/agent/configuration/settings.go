@@ -7,6 +7,7 @@ package configuration
 import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 
+	"github.com/elastic/elastic-agent/internal/pkg/core/env"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -26,6 +27,7 @@ type SettingsConfig struct {
 	Reload              *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`
 	Path                string        `config:"path" yaml:"path" json:"path"`
 	V1MonitoringEnabled bool          `config:"v1_monitoring_enabled" yaml:"v1_monitoring_enabled" json:"v1_monitoring_enabled"`
+	ActAsOperator       bool          `config:"act_as_operator" yaml:"act_as_operator" json:"act_as_operator"`
 }
 
 // DefaultSettingsConfig creates a config with pre-set default values.
@@ -39,5 +41,6 @@ func DefaultSettingsConfig() *SettingsConfig {
 		Upgrade:             DefaultUpgradeConfig(),
 		Reload:              DefaultReloadConfig(),
 		V1MonitoringEnabled: true,
+		ActAsOperator:       env.Bool("IS_OPERATOR"),
 	}
 }

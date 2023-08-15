@@ -1,0 +1,46 @@
+instances:
+- instance:
+    id: linux-arm64-ubuntu-2204
+    name: ogc-linux-arm64-ubuntu-2204-c1a5
+    ip: 34.136.212.37
+    username: ubuntu
+    remote_path: /home/ubuntu/agent
+    internal:
+      instance_id: "4608090296409314364"
+  prepared: true
+- instance:
+    id: linux-arm64-ubuntu-2204-teststandaloneupgrade
+    name: ogc-linux-arm64-ubuntu-2204-teststandaloneupgrade-e195
+    ip: 34.172.200.217
+    username: ubuntu
+    remote_path: /home/ubuntu/agent
+    internal:
+      instance_id: "590156298036106243"
+  prepared: true
+- instance:
+    id: linux-amd64-ubuntu-2204
+    name: ogc-linux-amd64-ubuntu-2204-95bc
+    ip: 34.30.105.102
+    username: ubuntu
+    remote_path: /home/ubuntu/agent
+    internal:
+      instance_id: "4007283191276033086"
+  prepared: true
+- instance:
+    id: linux-amd64-ubuntu-2204-teststandaloneupgrade
+    name: ogc-linux-amd64-ubuntu-2204-teststandaloneupgrade-7abc
+    ip: 104.154.200.27
+    username: ubuntu
+    remote_path: /home/ubuntu/agent
+    internal:
+      instance_id: "6036140714438874116"
+  prepared: true
+stacks:
+- id: 8100-SNAPSHOT
+  version: 8.10.0-SNAPSHOT
+  elasticsearch: https://a3757fd0f7894f878c57862c501a9253.us-central1.gcp.qa.cld.elstc.co
+  kibana: https://5da276fec801498daf00203c8772a093.us-central1.gcp.qa.cld.elstc.co:9243
+  username: elastic
+  password: c44lIjUXWfhEUu8gBrHwjZXD
+  internal:
+    deployment_id: d18c3659bb504c868319d8bd75cd78cf

@@ -47,7 +47,7 @@ type managedConfigManager struct {
 	stateStore       *store.StateStore
 	actionQueue      *queue.ActionQueue
 	dispatcher       *dispatcher.ActionDispatcher
-	runtime          *runtime.Manager
+	runtime          coordinator.RuntimeManager
 	coord            *coordinator.Coordinator
 	fleetInitTimeout time.Duration
 
@@ -60,7 +60,7 @@ func newManagedConfigManager(
 	agentInfo *info.AgentInfo,
 	cfg *configuration.Configuration,
 	storeSaver storage.Store,
-	runtime *runtime.Manager,
+	runtime coordinator.RuntimeManager,
 	fleetInitTimeout time.Duration,
 ) (*managedConfigManager, error) {
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)

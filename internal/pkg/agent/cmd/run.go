@@ -41,6 +41,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/env"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -90,7 +91,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	// this way, only the integration testing framework runs the Elastic Agent in this mode
 	cmd.Flags().Bool("testing-mode", false, "Run with testing mode enabled")
 
-	cmd.Flags().Duration("fleet-init-timeout", envTimeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
+	cmd.Flags().Duration("fleet-init-timeout", env.Timeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
 	_ = cmd.Flags().MarkHidden("testing-mode")
 
 	return cmd

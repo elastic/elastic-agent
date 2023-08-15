@@ -170,7 +170,8 @@ type Component struct {
 
 	// ShipperRef references the component/unit that this component used as its output.
 	// (only applies to inputs targeting a shipper, not set when ShipperSpec is)
-	ShipperRef *ShipperReference `yaml:"shipper,omitempty"`
+	ShipperRef *ShipperReference      `yaml:"shipper,omitempty"`
+	Kubernetes map[string]interface{} `yaml:"deployment,omitempty"`
 }
 
 // Type returns the type of the component.
@@ -373,6 +374,7 @@ func (r *RuntimeSpecs) componentForInputType(
 			units = append(units, unitForOutput(output, componentID))
 		}
 	}
+
 	return Component{
 		ID:         componentID,
 		Err:        componentErr,

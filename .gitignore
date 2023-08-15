@@ -1,4 +1,5 @@
 # Directories
+/bin
 /.agent-testing
 /.ogc-cache
 /.vagrant

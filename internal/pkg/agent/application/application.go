@@ -6,10 +6,19 @@ package application
 
 import (
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/features"
+	operatorv1alpha1 "github.com/elastic/elastic-agent/pkg/operator/api/v1alpha1"
+	"github.com/elastic/elastic-agent/pkg/operator/controllers"
 	"github.com/elastic/elastic-agent/version"
+	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	"go.elastic.co/apm"
 
@@ -25,9 +34,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/env"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -45,6 +54,7 @@ func New(
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
+	log.Info("Running as operator")
 	err := version.InitVersionInformation()
 	if err != nil {
 		// non-fatal error, log a warning and move on
@@ -100,17 +110,29 @@ func New(
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
 	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
 
-	runtime, err := runtime.NewManager(
-		log,
-		baseLogger,
-		cfg.Settings.GRPC.String(),
-		agentInfo,
-		tracer,
-		monitor,
-		cfg.Settings.GRPC,
-	)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+	var runtimeMgr coordinator.RuntimeManager
+	if isOperator() {
+		log.Info("Acting as operator creating runtime mgr")
+		runtimeMgr, err = runtime.NewOperatorManager(
+			log,
+			baseLogger,
+		)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+		}
+	} else {
+		runtimeMgr, err = runtime.NewManager(
+			log,
+			baseLogger,
+			cfg.Settings.GRPC.String(),
+			agentInfo,
+			tracer,
+			monitor,
+			cfg.Settings.GRPC,
+		)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+		}
 	}
 
 	var configMgr coordinator.ConfigManager
@@ -123,6 +145,13 @@ func New(
 
 		// testing mode uses a config manager that takes configuration from over the control protocol
 		configMgr = newTestingModeConfigManager(log)
+	} else if isOperator() {
+		log.Info("Acting as operator creating setting up config mgr")
+		runtimeWatcher, ok := runtimeMgr.(controllers.Watcher)
+		if !ok {
+			panic("runtime manager does not implement controllers.Watcher")
+		}
+		configMgr = registerOperatorWatches(log, runtimeWatcher)
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
 
@@ -157,7 +186,7 @@ func New(
 				EndpointSignedComponentModifier(),
 			)
 
-			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime, fleetInitTimeout)
+			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtimeMgr, fleetInitTimeout)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -170,7 +199,7 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, isManaged, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtimeMgr, configMgr, composable, caps, monitor, isManaged, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
@@ -234,4 +263,72 @@ func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.C
 	}
 
 	return store, cfg, nil
+}
+
+func registerOperatorWatches(log *logger.Logger, runtimeManager controllers.Watcher) coordinator.ConfigManager {
+	scheme := k8sRuntime.NewScheme()
+	setupLog := ctrl.Log.WithName("setup")
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
+
+	var metricsAddr = env.WithDefault(":8080", "METRICS_BIND_ADDRESS")
+	var probeAddr = env.WithDefault(":8081", "HEALTH_PROBE_BIND_ADDRESS")
+	var enableLeaderElection = env.Bool("LEADER_ELECT")
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:                 scheme,
+		MetricsBindAddress:     metricsAddr,
+		Port:                   9443,
+		HealthProbeBindAddress: probeAddr,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "7aab3455.agent.k8s.elastic.co",
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	var agentPolicyReconciler = controllers.NewElasticPolicyController(
+		log,
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		runtimeManager,
+	)
+	if err = agentPolicyReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ElasticAgentPolicy")
+		os.Exit(1)
+	}
+
+	var agentComponentReconciler = controllers.NewElasticComponentController(
+		log,
+		mgr.GetClient(),
+		mgr.GetScheme(),
+	)
+	if err = (agentComponentReconciler).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ElasticAgentComponent")
+		os.Exit(1)
+	}
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+
+	setupLog.Info("starting manager")
+	go func() {
+		if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+			setupLog.Error(err, "problem running manager")
+			os.Exit(1)
+		}
+	}()
+
+	return agentPolicyReconciler.ConfigManager()
+}
+
+func isOperator() bool {
+	return env.Bool("IS_OPERATOR")
 }

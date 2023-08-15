@@ -1,0 +1,104 @@
+apiVersion: observability.agent.k8s.elastic.co/v1alpha1
+kind: ElasticAgentPolicy
+metadata:
+  labels:
+    app.kubernetes.io/name: elasticagentpolicy
+    app.kubernetes.io/instance: elasticagentpolicy-sample
+    app.kubernetes.io/part-of: elastic-agent-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: elastic-agent-operator
+  name: elasticagentpolicy-sample
+  namespace: elastic-agent-operator-system
+spec:
+  policy: |-
+    outputs:
+      default:
+        type: elasticsearch
+        hosts:
+          - >-
+            https://sample-id.eu-west-1.aws.qa.cld.elstc.co:443
+        username: elastic
+        password: changeme
+      default2:
+        type: elasticsearch
+        hosts:
+          - >-
+            127.0.0.1:1234
+        username: elastic
+        password: changeme
+      default3:
+        type: elasticsearch
+        hosts:
+          - >-
+            127.0.0.1:1234
+        username: elastic
+        password: changeme
+    agent:
+      logging.level: info
+      monitoring:
+        enabled: false
+    inputs:
+      - name: container-log
+        kubernetes:
+          deployment:
+            replicas: 1
+        id: container-log-1-${kubernetes.pod.name}-${kubernetes.container.id}
+        type: filestream
+        use_output: default
+        meta:
+          package:
+            name: kubernetes
+            version: 1.9.12
+        data_stream:
+          namespace: default
+        streams:
+          - data_stream:
+              dataset: kubernetes.container_logsing
+              type: logs
+            prospector.scanner.symlinks: true
+            parsers:
+              - container: ~
+            paths:
+              - /var/log/containers/*${kubernetes.container.id}.log
+              - /var/log/containers/majkl.log
+      - name: container-log2
+        id: container-log-2-marec
+        type: filestream
+        use_output: default2
+        meta:
+          package:
+            name: kubernetes
+            version: 1.9.1
+        data_stream:
+          namespace: default
+        streams:
+          - data_stream:
+              dataset: kubernetes.container_logsing
+              type: logs
+            prospector.scanner.symlinks: true
+            parsers:
+              - container: ~
+            paths:
+              - /var/log/containers/marec.log
+      - name: container-log3
+        kubernetes:
+          deployment:
+            replicas: 1
+        id: container-log-3-samo
+        type: filestream
+        use_output: default3
+        meta:
+          package:
+            name: kubernetes
+            version: 1.9.1
+        data_stream:
+          namespace: default
+        streams:
+          - data_stream:
+              dataset: kubernetes.container_logsing
+              type: logs
+            prospector.scanner.symlinks: true
+            parsers:
+              - container: ~
+            paths:
+              - /var/log/containers/samo.log

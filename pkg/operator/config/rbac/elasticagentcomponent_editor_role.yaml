@@ -1,0 +1,31 @@
+# permissions for end users to edit elasticagentcomponents.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: elasticagentcomponent-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: elastic-agent-operator
+    app.kubernetes.io/part-of: elastic-agent-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: elasticagentcomponent-editor-role
+rules:
+- apiGroups:
+  - observability.agent.k8s.elastic.co
+  resources:
+  - elasticagentcomponents
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - observability.agent.k8s.elastic.co
+  resources:
+  - elasticagentcomponents/status
+  verbs:
+  - get
