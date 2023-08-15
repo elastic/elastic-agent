@@ -6,8 +6,6 @@ package vault
 
 import "time"
 
-const defaultRetryDelay = 10 * time.Millisecond
-
 type Options struct {
 	readonly   bool
 	retryDelay time.Duration
@@ -27,16 +25,4 @@ func WithRetryDelay(retryDelay time.Duration) OptionFunc {
 			o.retryDelay = retryDelay
 		}
 	}
-}
-
-func applyOptions(opts ...OptionFunc) Options {
-	options := Options{
-		retryDelay: defaultRetryDelay,
-	}
-
-	for _, opt := range opts {
-		opt(&options)
-	}
-
-	return options
 }
