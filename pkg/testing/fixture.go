@@ -43,6 +43,7 @@ type Fixture struct {
 	logOutput       bool
 	allowErrs       bool
 	connectTimout   time.Duration
+	binaryName      string
 
 	srcPackage string
 	workDir    string
@@ -98,6 +99,13 @@ func WithAllowErrors() FixtureOpt {
 func WithConnectTimeout(timeout time.Duration) FixtureOpt {
 	return func(f *Fixture) {
 		f.connectTimout = timeout
+	}
+}
+
+// WithBinaryName sets the name of the binary under test, in cases where tests aren't being run against elastic-agent
+func WithBinaryName(name string) FixtureOpt {
+	return func(f *Fixture) {
+		f.binaryName = name
 	}
 }
 
@@ -176,6 +184,21 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	return nil
 }
 
+// WriteFileToWorkDir sends a file to the working directory alongside the unpacked tar build.
+func (f *Fixture) WriteFileToWorkDir(ctx context.Context, data string, name string) error {
+	err := f.ensurePrepared(ctx)
+	if err != nil {
+		return fmt.Errorf("error preparing binary: %w", err)
+	}
+
+	err = os.WriteFile(filepath.Join(f.workDir, name), []byte(data), 644)
+	if err != nil {
+		return fmt.Errorf("error writing file: %w", err)
+	}
+	f.t.Logf("wrote %s to %s", name, f.workDir)
+	return nil
+}
+
 // Configure replaces the default Agent configuration file with the provided
 // configuration. This must be called after `Prepare` is called but before `Run`
 // or `Install` can be called.
@@ -225,6 +248,74 @@ func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	}
 	l.Logf("Completed extraction of artifact %s to %s", filename, outputDir)
 	return nil
+}
+
+// Runs the given beat for a specified period of time. Will fail if an error appears in the logs,
+// Will refuse to run if the given binary is elastic-agent
+func (f *Fixture) RunBeat(ctx context.Context, runFor time.Duration) error {
+	if f.binaryName == "elastic-agent" {
+		return fmt.Errorf("binary %s is not a beat", f.binaryName)
+	}
+
+	err := f.ensurePrepared(ctx)
+	if err != nil {
+		return err
+	}
+
+	var logProxy Logger
+	if f.logOutput {
+		logProxy = f.t
+	}
+	stdOut := newLogWatcher(logProxy)
+	stdErr := newLogWatcher(logProxy)
+
+	proc, err := process.Start(
+		f.binaryPath(),
+		process.WithContext(ctx),
+		process.WithArgs([]string{"run", "-e", "-c", filepath.Join(f.workDir, "metricbeat.yml")}),
+		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+	if err != nil {
+		return fmt.Errorf("failed to spawn beat: %w", err)
+	}
+
+	killProc := func() {
+		_ = proc.Kill()
+		<-proc.Wait()
+	}
+	doneChan := time.After(runFor)
+
+	stopping := false
+	for {
+		select {
+		case <-ctx.Done():
+			killProc()
+			return ctx.Err()
+		case pstate := <-proc.Wait():
+			if stopping {
+				return nil
+			}
+			return fmt.Errorf("beat exited unexpectedly with exit code: %d", pstate.ExitCode())
+		case err := <-stdOut.Watch():
+			if !f.allowErrs {
+				// no errors allowed
+				killProc()
+				return fmt.Errorf("beat logged an unexpected error: %w", err)
+			}
+		case err := <-stdErr.Watch():
+			if !f.allowErrs {
+				// no errors allowed
+				killProc()
+				return fmt.Errorf("beat logged an unexpected error: %w", err)
+			}
+		case <-doneChan:
+			if !stopping {
+				// trigger the stop
+				stopping = true
+				_ = proc.Stop()
+			}
+		}
+	}
+
 }
 
 // Run runs the Elastic Agent.
@@ -354,7 +445,7 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 	if err != nil {
 		return nil, fmt.Errorf("error creating cmd: %w", err)
 	}
-	f.t.Logf(">> running agent with: %v", cmd.Args)
+	f.t.Logf(">> running binary with: %v", cmd.Args)
 
 	return cmd.CombinedOutput()
 }
@@ -476,7 +567,11 @@ func (f *Fixture) binaryPath() string {
 			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
 		}
 	}
-	binary := filepath.Join(workDir, "elastic-agent")
+	defaultBin := "elastic-agent"
+	if f.binaryName != "" {
+		defaultBin = f.binaryName
+	}
+	binary := filepath.Join(workDir, defaultBin)
 	if f.operatingSystem == "windows" {
 		binary += ".exe"
 	}

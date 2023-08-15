@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
+	"github.com/stretchr/testify/require"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -78,19 +79,30 @@ func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*ate
 		buildsDir = filepath.Join(projectDir, "build", "distributions")
 	}
 
+	fixture, err := NewFixtureWithBinary(t, version, "elastic-agent", buildsDir)
+	require.NoError(t, err)
+	return fixture, nil
+}
+
+// NewFixture returns a new Elastic Agent testing fixture with a LocalFetcher and
+// the agent logging to the test logger.
+func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	ver, err := semver.ParseVersion(version)
 	if err != nil {
 		return nil, fmt.Errorf("%q is an invalid agent version: %w", version, err)
 	}
 
-	var f atesting.Fetcher
+	var binFetcher atesting.Fetcher
 	if ver.IsSnapshot() {
-		f = atesting.LocalFetcher(buildsDir, atesting.WithLocalSnapshotOnly())
+		binFetcher = atesting.LocalFetcher(buildsDir, binary, atesting.WithLocalSnapshotOnly())
 	} else {
-		f = atesting.LocalFetcher(buildsDir)
+		binFetcher = atesting.LocalFetcher(buildsDir, binary)
 	}
 
-	opts = append(opts, atesting.WithFetcher(f), atesting.WithLogOutput())
+	opts = append(opts, atesting.WithFetcher(binFetcher), atesting.WithLogOutput())
+	if binary != "elastic-agent" {
+		opts = append(opts, atesting.WithBinaryName(binary))
+	}
 	return atesting.NewFixture(t, version, opts...)
 }
 

@@ -17,7 +17,7 @@ import (
 )
 
 func TestLocalFetcher_Name(t *testing.T) {
-	f := LocalFetcher(t.TempDir())
+	f := LocalFetcher(t.TempDir(), "elastic-agent")
 	require.Equal(t, "local", f.Name())
 }
 
@@ -77,7 +77,7 @@ func TestLocalFetcher(t *testing.T) {
 	for _, tc := range tcs {
 		tmp := t.TempDir()
 
-		f := LocalFetcher(testdata, tc.opts...)
+		f := LocalFetcher(testdata, "elastic-agent", tc.opts...)
 		got, err := f.Fetch(
 			context.Background(), runtime.GOOS, runtime.GOARCH, tc.version)
 		require.NoError(t, err)

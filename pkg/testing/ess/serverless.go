@@ -54,6 +54,13 @@ type Project struct {
 	} `json:"endpoints"`
 }
 
+// CredResetResponse contains the new auth details for a
+// stack credential reset
+type CredResetResponse struct {
+	Password string `json:"password"`
+	Username string `json:"username"`
+}
+
 // NewServerlessClient creates a new instance of the serverless client
 func NewServerlessClient(region, projectType, api string, logger runner.Logger) *ServerlessClient {
 	return &ServerlessClient{
@@ -97,6 +104,16 @@ func (srv *ServerlessClient) DeployStack(ctx context.Context, req ServerlessRequ
 		return Project{}, fmt.Errorf("error decoding JSON response: %w", err)
 	}
 	srv.proj = serverlessHandle
+
+	// as of 8/8-ish, the serverless ESS cloud no longer provides credentials on the first POST request, we must send an additional POST
+	// to reset the credentials
+	updated, err := srv.ResetCredentials(ctx)
+	if err != nil {
+		return serverlessHandle, fmt.Errorf("error resetting credentials: %w", err)
+	}
+	srv.proj.Credentials.Username = updated.Username
+	srv.proj.Credentials.Password = updated.Password
+
 	return serverlessHandle, nil
 }
 
@@ -181,27 +198,15 @@ func (srv *ServerlessClient) WaitForEndpoints(ctx context.Context) error {
 
 // WaitForElasticsearch waits until the ES endpoint is healthy
 func (srv *ServerlessClient) WaitForElasticsearch(ctx context.Context) error {
-	endpoint := fmt.Sprintf("%s/_cluster/health", srv.proj.Endpoints.Elasticsearch)
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", srv.proj.Endpoints.Elasticsearch, nil)
 	if err != nil {
 		return fmt.Errorf("error creating HTTP request: %w", err)
 	}
 	req.SetBasicAuth(srv.proj.Credentials.Username, srv.proj.Credentials.Password)
 
+	// _cluster/health no longer works on serverless, just check response code
 	readyFunc := func(resp *http.Response) bool {
-		var health struct {
-			Status string `json:"status"`
-		}
-		err = json.NewDecoder(resp.Body).Decode(&health)
-		resp.Body.Close()
-		if err != nil {
-			srv.log.Logf("response decoding error: %v", err)
-			return false
-		}
-		if health.Status == "green" {
-			return true
-		}
-		return false
+		return resp.StatusCode == 200
 	}
 
 	err = srv.waitForRemoteState(ctx, req, time.Second*5, readyFunc)
@@ -241,6 +246,38 @@ func (srv *ServerlessClient) WaitForKibana(ctx context.Context) error {
 		return fmt.Errorf("error waiting for ES to become healthy: %w", err)
 	}
 	return nil
+}
+
+// ResetCredentials resets the credentials for the given ESS instance
+func (srv *ServerlessClient) ResetCredentials(ctx context.Context) (CredResetResponse, error) {
+	resetURL := fmt.Sprintf("%s/api/v1/serverless/projects/%s/%s/_reset-credentials", serverlessURL, srv.projectType, srv.proj.ID)
+
+	resetHandler, err := http.NewRequestWithContext(ctx, "POST", resetURL, nil)
+	if err != nil {
+		return CredResetResponse{}, fmt.Errorf("error creating new httpRequest: %w", err)
+	}
+
+	resetHandler.Header.Set("Content-Type", "application/json")
+	resetHandler.Header.Set("Authorization", fmt.Sprintf("ApiKey %s", srv.api))
+
+	resp, err := http.DefaultClient.Do(resetHandler)
+	if err != nil {
+		return CredResetResponse{}, fmt.Errorf("error performing HTTP request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		p, _ := io.ReadAll(resp.Body)
+		return CredResetResponse{}, fmt.Errorf("Non-201 status code returned by server: %d, body: %s", resp.StatusCode, string(p))
+	}
+
+	updated := CredResetResponse{}
+	err = json.NewDecoder(resp.Body).Decode(&updated)
+	if err != nil {
+		return CredResetResponse{}, fmt.Errorf("error decoding JSON response: %w", err)
+	}
+
+	return updated, nil
 }
 
 func (srv *ServerlessClient) waitForRemoteState(ctx context.Context, httpHandler *http.Request, tick time.Duration, isReady func(*http.Response) bool) error {

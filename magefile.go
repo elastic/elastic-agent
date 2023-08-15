@@ -1527,6 +1527,25 @@ func (Integration) Single(ctx context.Context, testName string) error {
 	return integRunner(ctx, false, testName)
 }
 
+// Run beat serverless tests
+func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
+	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
+	err := os.Setenv("AGENT_BUILD_DIR", beatBuildPath)
+	if err != nil {
+		return fmt.Errorf("error setting build dir: %s", err)
+	}
+	// err = os.Setenv("STACK", "serverless")
+	// if err != nil {
+	// 	return fmt.Errorf("error setting serverless stack var: %w", err)
+	// }
+
+	err = os.Setenv("TEST_BINARY_NAME", beatname)
+	if err != nil {
+		return fmt.Errorf("error setting binary name: %w", err)
+	}
+	return integRunner(ctx, false, "TestMetricbeatSeverless")
+}
+
 // PrepareOnRemote shouldn't be called locally (called on remote host to prepare it for testing)
 func (Integration) PrepareOnRemote() {
 	mg.Deps(mage.InstallGoTestTools)
@@ -1732,23 +1751,34 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
 	}
 
+	binaryName := os.Getenv("TEST_BINARY_NAME")
+	if binaryName == "" {
+		binaryName = "elastic-agent"
+	}
+
+	repoDir := os.Getenv("TEST_INTEG_REPO_PATH")
+	if repoDir == "" {
+		repoDir = "."
+	}
+
 	diagDir := filepath.Join("build", "diagnostics")
 	_ = os.MkdirAll(diagDir, 0755)
 
 	cfg := runner.Config{
-		AgentVersion:      agentVersion,
-		AgentStackVersion: agentStackVersion,
-		BuildDir:          agentBuildDir,
-		GOVersion:         goVersion,
-		RepoDir:           ".",
-		DiagnosticsDir:    diagDir,
-		Platforms:         testPlatforms(),
-		Matrix:            matrix,
-		SingleTest:        singleTest,
-		VerboseMode:       mg.Verbose(),
-		Timestamp:         timestamp,
-		TestFlags:         goTestFlags,
-		ExtraEnv:          extraEnv,
+		ReleaseVersion: agentVersion,
+		StackVersion:   agentStackVersion,
+		BuildDir:       agentBuildDir,
+		GOVersion:      goVersion,
+		RepoDir:        repoDir,
+		DiagnosticsDir: diagDir,
+		Platforms:      testPlatforms(),
+		Matrix:         matrix,
+		SingleTest:     singleTest,
+		VerboseMode:    mg.Verbose(),
+		Timestamp:      timestamp,
+		TestFlags:      goTestFlags,
+		ExtraEnv:       extraEnv,
+		BinaryName:     binaryName,
 	}
 	ogcCfg := ogc.Config{
 		ServiceTokenPath: serviceTokenPath,
