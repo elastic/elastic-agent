@@ -99,6 +99,8 @@ func newComponentState(comp *component.Component) (s ComponentState) {
 	s.Message = startingMsg
 	s.Units = make(map[ComponentUnitKey]ComponentUnitState)
 	s.expectedUnits = make(map[ComponentUnitKey]expectedUnitState)
+	s.expectedFeaturesIdx = 1
+	s.expectedComponentIdx = 1
 
 	s.syncComponent(comp)
 	return s
@@ -196,16 +198,12 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 		changed = true
 		s.expectedFeaturesIdx++
 		s.expectedFeatures = comp.Features
-	} else {
-		s.expectedFeaturesIdx = 1
 	}
 
 	if !gproto.Equal(s.expectedComponent, comp.Component) {
 		changed = true
 		s.expectedComponentIdx++
 		s.expectedComponent = comp.Component
-	} else {
-		s.expectedComponentIdx = 1
 	}
 
 	return changed
