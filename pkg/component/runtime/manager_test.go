@@ -488,7 +488,7 @@ func TestManager_FakeInput_Limits(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agentInfo, _ := info.NewAgentInfo(true)
+	agentInfo, _ := info.NewAgentInfo(ctx, true)
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
@@ -649,7 +649,7 @@ func TestManager_FakeShipper_Limits(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agentInfo, _ := info.NewAgentInfo(true)
+	agentInfo, _ := info.NewAgentInfo(ctx, true)
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
