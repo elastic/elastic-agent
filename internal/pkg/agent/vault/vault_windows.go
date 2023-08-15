@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -136,7 +135,7 @@ func (v *Vault) Set(ctx context.Context, key string, data []byte) (err error) {
 		err = v.unlock(err)
 	}()
 
-	return writeFile(v.filepathFromKey(key), enc)
+	return os.WriteFile(v.filepathFromKey(key), enc, 0600)
 }
 
 // Get retrieves the key from the vault store
@@ -149,7 +148,7 @@ func (v *Vault) Get(ctx context.Context, key string) (dec []byte, err error) {
 		err = v.unlock(err)
 	}()
 
-	enc, err := ioutil.ReadFile(v.filepathFromKey(key))
+	enc, err := os.ReadFile(v.filepathFromKey(key))
 	if err != nil {
 		return nil, err
 	}
