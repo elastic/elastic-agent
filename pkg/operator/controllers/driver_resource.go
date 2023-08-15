@@ -9,11 +9,12 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func reconcileResource(ctx context.Context,
@@ -53,7 +54,9 @@ func reconcileResourceForce(ctx context.Context,
 		if err != nil {
 			filteredErr := k8sClient.IgnoreAlreadyExists(err)
 			if filteredErr == nil && needsRecreate {
-				client.Update(ctx, reconciled)
+				if err := client.Update(ctx, reconciled); err != nil {
+					return err
+				}
 			}
 			return filteredErr
 		}

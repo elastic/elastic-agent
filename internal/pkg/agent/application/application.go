@@ -9,18 +9,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
-	"github.com/elastic/elastic-agent/pkg/features"
-	operatorv1alpha1 "github.com/elastic/elastic-agent/pkg/operator/api/v1alpha1"
-	"github.com/elastic/elastic-agent/pkg/operator/controllers"
-	"github.com/elastic/elastic-agent/version"
+	"go.elastic.co/apm"
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-
-	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -37,7 +31,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/env"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
+	operatorv1alpha1 "github.com/elastic/elastic-agent/pkg/operator/api/v1alpha1"
+	"github.com/elastic/elastic-agent/pkg/operator/controllers"
+	"github.com/elastic/elastic-agent/version"
 )
 
 // New creates a new Agent and bootstrap the required subsystem.

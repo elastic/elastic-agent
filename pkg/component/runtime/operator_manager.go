@@ -11,12 +11,13 @@ import (
 	"fmt"
 	"sync"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/atomic"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"gopkg.in/yaml.v2"
 )
 
 type watchResult struct {
@@ -191,7 +192,7 @@ func (m *OperatorManager) update(log *logger.Logger, model component.Model, cfg 
 			newComponents = append(newComponents, comp)
 		}
 	}
-	// compute removed componentes
+	// compute removed components
 	var stop []*containerRuntime
 	m.currentMx.RLock()
 	for id, existing := range m.current {

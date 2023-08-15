@@ -9,10 +9,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/kardianos/service"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/kardianos/service"
 )
 
 // containerRuntime provides the command runtime for running a component as a container.
