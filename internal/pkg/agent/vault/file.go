@@ -38,7 +38,7 @@ func writeFile(fp string, data []byte) (err error) {
 
 	err = f.Sync()
 	if err != nil {
-		return fmt.Errorf("failed synching temp file: %w", err)
+		return fmt.Errorf("failed syncing temp file: %w", err)
 	}
 
 	err = f.Close()

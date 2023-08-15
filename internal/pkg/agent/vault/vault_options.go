@@ -6,6 +6,7 @@ package vault
 
 import "time"
 
+//nolint:unused // not used on darwin
 const defaultRetryDelay = 10 * time.Millisecond
 
 type Options struct {

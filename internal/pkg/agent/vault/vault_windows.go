@@ -120,7 +120,7 @@ func (v *Vault) Close() error {
 }
 
 // Set stores the key in the vault store
-func (v *Vault) Set(ctx context.Context, key string, data []byte) error {
+func (v *Vault) Set(ctx context.Context, key string, data []byte) (err error) {
 	enc, err := v.encrypt(data)
 	if err != nil {
 		return err
@@ -174,7 +174,7 @@ func (v *Vault) Exists(ctx context.Context, key string) (ok bool, err error) {
 }
 
 // Remove removes the key
-func (v *Vault) Remove(ctx context.Context, key string) error {
+func (v *Vault) Remove(ctx context.Context, key string) (err error) {
 	err = v.tryLock(ctx)
 	if err != nil {
 		return err
