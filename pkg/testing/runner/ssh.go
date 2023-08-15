@@ -101,6 +101,9 @@ type SSHClient interface {
 
 	// GetFileContents returns the file content.
 	GetFileContents(ctx context.Context, filename string, opts ...FileContentsOpt) ([]byte, error)
+
+	// GetFileContentsOutput returns the file content writing to output.
+	GetFileContentsOutput(ctx context.Context, filename string, output io.Writer, opts ...FileContentsOpt) error
 }
 
 type sshClient struct {
@@ -291,8 +294,18 @@ func (s *sshClient) Copy(filePath string, dest string) error {
 
 // GetFileContents returns the file content.
 func (s *sshClient) GetFileContents(ctx context.Context, filename string, opts ...FileContentsOpt) ([]byte, error) {
+	var stdout bytes.Buffer
+	err := s.GetFileContentsOutput(ctx, filename, &stdout, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return stdout.Bytes(), nil
+}
+
+// GetFileContentsOutput returns the file content writing into output.
+func (s *sshClient) GetFileContentsOutput(ctx context.Context, filename string, output io.Writer, opts ...FileContentsOpt) error {
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return ctx.Err()
 	}
 
 	var fco fileContentsOpts
@@ -303,15 +316,14 @@ func (s *sshClient) GetFileContents(ctx context.Context, filename string, opts .
 
 	session, err := s.NewSession()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer session.Close()
 
-	var stdout bytes.Buffer
-	session.Stdout = &stdout
+	session.Stdout = output
 	err = session.Run(fmt.Sprintf("%s %s", fco.command, filename))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return stdout.Bytes(), nil
+	return nil
 }
