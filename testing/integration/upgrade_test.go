@@ -142,7 +142,7 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, ctx context.Context, info
 			EnrollmentToken: enrollmentToken.APIKey,
 		},
 	}
-	output, err := tools.InstallAgent(installOpts, agentFixture)
+	output, err := tools.InstallAgent(ctx, installOpts, agentFixture)
 	if err != nil {
 		t.Log(string(output))
 	}
@@ -421,7 +421,7 @@ func testStandaloneUpgrade(
 		Force:          true,
 	}
 
-	output, err := tools.InstallAgent(installOpts, f)
+	output, err := tools.InstallAgent(ctx, installOpts, f)
 	t.Logf("Agent installation output: %q", string(output))
 	require.NoError(t, err)
 
@@ -654,7 +654,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	require.NoError(t, err, "error configuring agent fixture")
 
 	t.Log("Install the built Agent")
-	output, err := tools.InstallStandaloneAgent(agentFixture)
+	output, err := tools.InstallStandaloneAgent(ctx, agentFixture)
 	t.Log(string(output))
 	require.NoError(t, err)
 
@@ -809,7 +809,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	output, err := tools.InstallStandaloneAgent(f)
+	output, err := tools.InstallStandaloneAgent(ctx, f)
 	t.Logf("Agent installation output: %q", string(output))
 	require.NoError(t, err)
 

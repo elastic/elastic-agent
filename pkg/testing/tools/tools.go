@@ -53,7 +53,7 @@ func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, 
 // InstallAgentWithPolicy creates the given policy, enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.
-func InstallAgentWithPolicy(t *testing.T, ctx context.Context, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (kibana.PolicyResponse, error) {
+func InstallAgentWithPolicy(ctx context.Context, t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (kibana.PolicyResponse, error) {
 	t.Helper()
 
 	// Create policy
@@ -81,14 +81,14 @@ func InstallAgentWithPolicy(t *testing.T, ctx context.Context, installOpts atest
 		agentFixture.SetUninstallToken(uninstallToken)
 	}
 
-	err = InstallAgentForPolicy(t, installOpts, agentFixture, kibClient, policy.ID)
+	err = InstallAgentForPolicy(ctx, t, installOpts, agentFixture, kibClient, policy.ID)
 	return policy, err
 }
 
 // InstallAgentForPolicy enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns error or nil.
-func InstallAgentForPolicy(t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, policyID string) error {
+func InstallAgentForPolicy(ctx context.Context, t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, policyID string) error {
 	t.Helper()
 
 	// Create enrollment API key
@@ -114,7 +114,7 @@ func InstallAgentForPolicy(t *testing.T, installOpts atesting.InstallOpts, agent
 		URL:             fleetServerURL,
 		EnrollmentToken: enrollmentToken.APIKey,
 	}
-	output, err := InstallAgent(installOpts, agentFixture)
+	output, err := InstallAgent(ctx, installOpts, agentFixture)
 	if err != nil {
 		t.Log(string(output))
 		return fmt.Errorf("unable to enroll Elastic Agent: %w", err)
