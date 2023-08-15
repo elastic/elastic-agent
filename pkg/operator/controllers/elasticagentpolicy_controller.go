@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	observabilityv1alpha1 "github.com/elastic/elastic-agent/pkg/operator/api/v1alpha1"
 )
