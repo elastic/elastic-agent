@@ -132,7 +132,7 @@ func (s *sshClient) Connect(ctx context.Context) error {
 		}
 		config := &ssh.ClientConfig{
 			User:            s.username,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec // it's the tests framework test
 			Auth:            []ssh.AuthMethod{s.auth},
 			Timeout:         30 * time.Second,
 		}
@@ -191,7 +191,7 @@ func (s *sshClient) Exec(ctx context.Context, cmd string, args []string, stdin i
 	cmdStr := strings.Join(cmdArgs, " ")
 	session, err := s.NewSession()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("could not create new SSH session: %w", err)
 	}
 	defer session.Close()
 
@@ -203,6 +203,10 @@ func (s *sshClient) Exec(ctx context.Context, cmd string, args []string, stdin i
 		session.Stdin = stdin
 	}
 	err = session.Run(cmdStr)
+	if err != nil {
+		return stdout.Bytes(), stderr.Bytes(), fmt.Errorf("could not run %q though SSH: %w",
+			cmdStr, err)
+	}
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 

@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-kibana
+      id: filestream-kibana-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -34,7 +35,35 @@ inputs:
             scanner:
                 symlinks: true
       data_stream.namespace: default
+    - name: http/metrics-kibana
+      id: http/metrics-kibana-${kubernetes.hints.container_id}
+      type: http/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.kibana.background_task_utilization.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.background_task_utilization
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.kibana.background_task_utilization.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
+          method: GET
+          metricsets:
+            - json
+          namespace: background_task_utilization
+          password: ${kubernetes.hints.kibana.background_task_utilization.password|kubernetes.hints.kibana.password|''}
+          path: /api/task_manager/_background_task_utilization
+          period: ${kubernetes.hints.kibana.background_task_utilization.period|kubernetes.hints.kibana.period|'10s'}
+          processors:
+            - rename:
+                fail_on_error: false
+                fields:
+                    - from: http.background_task_utilization
+                      to: kibana.background_task_utilization
+                ignore_missing: true
+          username: ${kubernetes.hints.kibana.background_task_utilization.username|kubernetes.hints.kibana.username|''}
+      data_stream.namespace: default
     - name: kibana/metrics-kibana
+      id: kibana/metrics-kibana-${kubernetes.hints.container_id}
       type: kibana/metrics
       use_output: default
       streams:
@@ -46,7 +75,9 @@ inputs:
             - ${kubernetes.hints.kibana.cluster_actions.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
           metricsets:
             - cluster_actions
-          period: null
+          password: ${kubernetes.hints.kibana.cluster_actions.password|kubernetes.hints.kibana.password|''}
+          period: ${kubernetes.hints.kibana.cluster_actions.period|kubernetes.hints.kibana.period|'10s'}
+          username: ${kubernetes.hints.kibana.cluster_actions.username|kubernetes.hints.kibana.username|''}
         - condition: ${kubernetes.hints.kibana.cluster_rules.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
           data_stream:
             dataset: kibana.stack_monitoring.cluster_rules
@@ -55,7 +86,9 @@ inputs:
             - ${kubernetes.hints.kibana.cluster_rules.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
           metricsets:
             - cluster_rules
-          period: null
+          password: ${kubernetes.hints.kibana.cluster_rules.password|kubernetes.hints.kibana.password|''}
+          period: ${kubernetes.hints.kibana.cluster_rules.period|kubernetes.hints.kibana.period|'10s'}
+          username: ${kubernetes.hints.kibana.cluster_rules.username|kubernetes.hints.kibana.username|''}
         - condition: ${kubernetes.hints.kibana.node_actions.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
           data_stream:
             dataset: kibana.stack_monitoring.node_actions
@@ -64,7 +97,9 @@ inputs:
             - ${kubernetes.hints.kibana.node_actions.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
           metricsets:
             - node_actions
-          period: null
+          password: ${kubernetes.hints.kibana.node_actions.password|kubernetes.hints.kibana.password|''}
+          period: ${kubernetes.hints.kibana.node_actions.period|kubernetes.hints.kibana.period|'10s'}
+          username: ${kubernetes.hints.kibana.node_actions.username|kubernetes.hints.kibana.username|''}
         - condition: ${kubernetes.hints.kibana.node_rules.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
           data_stream:
             dataset: kibana.stack_monitoring.node_rules
@@ -73,7 +108,9 @@ inputs:
             - ${kubernetes.hints.kibana.node_rules.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
           metricsets:
             - node_rules
-          period: null
+          password: ${kubernetes.hints.kibana.node_rules.password|kubernetes.hints.kibana.password|''}
+          period: ${kubernetes.hints.kibana.node_rules.period|kubernetes.hints.kibana.period|'10s'}
+          username: ${kubernetes.hints.kibana.node_rules.username|kubernetes.hints.kibana.username|''}
         - condition: ${kubernetes.hints.kibana.stats.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
           data_stream:
             dataset: kibana.stack_monitoring.stats
@@ -82,7 +119,9 @@ inputs:
             - ${kubernetes.hints.kibana.stats.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
           metricsets:
             - stats
-          period: null
+          password: ${kubernetes.hints.kibana.stats.password|kubernetes.hints.kibana.password|''}
+          period: ${kubernetes.hints.kibana.stats.period|kubernetes.hints.kibana.period|'10s'}
+          username: ${kubernetes.hints.kibana.stats.username|kubernetes.hints.kibana.username|''}
         - condition: ${kubernetes.hints.kibana.status.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
           data_stream:
             dataset: kibana.stack_monitoring.status
@@ -91,5 +130,7 @@ inputs:
             - ${kubernetes.hints.kibana.status.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
           metricsets:
             - status
-          period: null
+          password: ${kubernetes.hints.kibana.status.password|kubernetes.hints.kibana.password|''}
+          period: ${kubernetes.hints.kibana.status.period|kubernetes.hints.kibana.period|'10s'}
+          username: ${kubernetes.hints.kibana.status.username|kubernetes.hints.kibana.username|''}
       data_stream.namespace: default

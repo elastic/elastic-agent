@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -23,12 +24,14 @@ import (
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	semver "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/version"
 )
 
 var osInfo *types.OSInfo
 var osInfoErr error
 var osInfoOnce sync.Once
+var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")
 
 // Require defines what this test requires for it to be run by the test runner.
 //
@@ -75,7 +78,18 @@ func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*ate
 		buildsDir = filepath.Join(projectDir, "build", "distributions")
 	}
 
-	f := atesting.LocalFetcher(buildsDir)
+	ver, err := semver.ParseVersion(version)
+	if err != nil {
+		return nil, fmt.Errorf("%q is an invalid agent version: %w", version, err)
+	}
+
+	var f atesting.Fetcher
+	if ver.IsSnapshot() {
+		f = atesting.LocalFetcher(buildsDir, atesting.WithLocalSnapshotOnly())
+	} else {
+		f = atesting.LocalFetcher(buildsDir)
+	}
+
 	opts = append(opts, atesting.WithFetcher(f), atesting.WithLogOutput())
 	return atesting.NewFixture(t, version, opts...)
 }
@@ -191,7 +205,13 @@ func getNamespace(t *testing.T, local bool) (string, error) {
 	name := fmt.Sprintf("%s-%s", prefix, t.Name())
 	hasher := sha256.New()
 	hasher.Write([]byte(name))
-	return base64.URLEncoding.EncodeToString(hasher.Sum(nil)), nil
+
+	// Fleet API requires the namespace to be lowercased and not contain
+	// special characters.
+	namespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
+	namespace = noSpecialCharsRegexp.ReplaceAllString(namespace, "")
+
+	return namespace, nil
 }
 
 // getESClient creates the elasticsearch client from the information passed from the test runner.

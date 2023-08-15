@@ -21,175 +21,133 @@ const (
 
 var (
 	// ErrOSNotSupported returned when it's an unsupported OS.
-	ErrOSNotSupported = errors.New("os/arch not current supported")
+	ErrOSNotSupported = errors.New("os/arch not currently supported")
 )
 
-// LayoutOS defines the minimal information for a mapping of an OS to the
-// provider, instance size, and runs on for that OS.
-type LayoutOS struct {
-	OS           define.OS
-	Provider     string
-	InstanceSize string
-	RunsOn       string
-	Username     string
-	RemotePath   string
-	Runner       OSRunner
+// SupportedOS maps a OS definition to a OSRunner.
+type SupportedOS struct {
+	define.OS
+
+	// Runner is the runner to use for the OS.
+	Runner OSRunner
 }
 
-// Supported defines the set of supported OS's the runner currently supports.
-//
-// In the case that a batch is not specific on the version and/or distro the first
-// one in this list will be picked. So it's best to place the one that we want the
-// most testing at the top.
-var supported = []LayoutOS{
-	{
+var (
+	// UbuntuAMD64_2204 - Ubuntu (amd64) 22.04
+	UbuntuAMD64_2204 = SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
 			Distro:  Ubuntu,
 			Version: "22.04",
 		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-2", // 2 amd64 cpus
-		RunsOn:       "ubuntu-2204-lts",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
-	},
-	{
+		Runner: DebianRunner{},
+	}
+	// UbuntuAMD64_2004 - Ubuntu (amd64) 20.04
+	UbuntuAMD64_2004 = SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
 			Distro:  Ubuntu,
 			Version: "20.04",
 		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-2", // 2 amd64 cpus
-		RunsOn:       "ubuntu-2004-lts",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
-	},
-	{
+		Runner: DebianRunner{},
+	}
+	// UbuntuARM64_2204 - Ubuntu (arm64) 22.04
+	UbuntuARM64_2204 = SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.ARM64,
 			Distro:  Ubuntu,
 			Version: "22.04",
 		},
-		Provider:     Google,
-		InstanceSize: "t2a-standard-2", // 2 arm64 cpus
-		RunsOn:       "ubuntu-2204-lts-arm64",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
-	},
-	{
+		Runner: DebianRunner{},
+	}
+	// UbuntuARM64_2004 - Ubuntu (arm64) 20.04
+	UbuntuARM64_2004 = SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.ARM64,
 			Distro:  Ubuntu,
 			Version: "20.04",
 		},
-		Provider:     Google,
-		InstanceSize: "t2a-standard-2", // 2 arm64 cpus
-		RunsOn:       "ubuntu-2004-lts-arm64",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
-	},
-	{
+		Runner: DebianRunner{},
+	}
+	// WindowsAMD64_2022 - Windows (amd64) Server 2022
+	WindowsAMD64_2022 = SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2022",
 		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-4", // 4 amd64 cpus
-		RunsOn:       "windows-2022",
-		Username:     "windows",
-		RemotePath:   "C:\\Users\\windows\\agent",
-		Runner:       WindowsRunner{},
-	},
-	{
+		Runner: WindowsRunner{},
+	}
+	// WindowsAMD64_2022_Core - Windows (amd64) Server 2022 Core
+	WindowsAMD64_2022_Core = SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2022-core",
 		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-4", // 4 amd64 cpus
-		RunsOn:       "windows-2022-core",
-		Username:     "windows",
-		RemotePath:   "C:\\Users\\windows\\agent",
-		Runner:       WindowsRunner{},
-	},
-	{
+		Runner: WindowsRunner{},
+	}
+	// WindowsAMD64_2019 - Windows (amd64) Server 2019
+	WindowsAMD64_2019 = SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2019",
 		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-4", // 4 amd64 cpus
-		RunsOn:       "windows-2019",
-		Username:     "windows",
-		RemotePath:   "C:\\Users\\windows\\agent",
-		Runner:       WindowsRunner{},
-	},
-	{
+		Runner: WindowsRunner{},
+	}
+	// WindowsAMD64_2019_Core - Windows (amd64) Server 2019 Core
+	WindowsAMD64_2019_Core = SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2019-core",
 		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-4", // 4 amd64 cpus
-		RunsOn:       "windows-2019-core",
-		Username:     "windows",
-		RemotePath:   "C:\\Users\\windows\\agent",
-		Runner:       WindowsRunner{},
-	},
-	{
+		Runner: WindowsRunner{},
+	}
+	// WindowsAMD64_2016 - Windows (amd64) Server 2016
+	WindowsAMD64_2016 = SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2016",
 		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-4", // 4 amd64 cpus
-		RunsOn:       "windows-2016",
-		Username:     "windows",
-		RemotePath:   "C:\\Users\\windows\\agent",
-		Runner:       WindowsRunner{},
-	},
-	{
+		Runner: WindowsRunner{},
+	}
+	// WindowsAMD64_2016_Core - Windows (amd64) Server 2016 Core
+	WindowsAMD64_2016_Core = SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2016-core",
 		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-4", // 4 amd64 cpus
-		RunsOn:       "windows-2016-core",
-		Username:     "windows",
-		RemotePath:   "C:\\Users\\windows\\agent",
-		Runner:       WindowsRunner{},
-	},
-}
+		Runner: WindowsRunner{},
+	}
+)
 
-// getSupported returns all the supported layout based on the provided OS profile.
-func getSupported(os define.OS) ([]LayoutOS, error) {
-	var match []LayoutOS
-	for _, s := range supported {
-		if osMatch(s.OS, os) {
-			match = append(match, s)
-		}
-	}
-	if len(match) > 0 {
-		return match, nil
-	}
-	return nil, fmt.Errorf("%w: %s/%s", ErrOSNotSupported, os.Type, os.Arch)
+// supported defines the set of supported OS's.
+//
+// A provisioner might support a lesser number of this OS's, but the following
+// are known to be supported by out OS runner logic.
+//
+// In the case that a batch is not specific on the version and/or distro the first
+// one in this list will be picked. So it's best to place the one that we want the
+// most testing at the top.
+var supported = []SupportedOS{
+	UbuntuAMD64_2204,
+	UbuntuAMD64_2004,
+	UbuntuARM64_2204,
+	UbuntuARM64_2004,
+	WindowsAMD64_2022,
+	WindowsAMD64_2022_Core,
+	WindowsAMD64_2019,
+	WindowsAMD64_2019_Core,
+	WindowsAMD64_2016,
+	WindowsAMD64_2016_Core,
 }
 
 // osMatch returns true when the specific OS is a match for a non-specific OS.
@@ -201,6 +159,66 @@ func osMatch(specific define.OS, notSpecific define.OS) bool {
 		return false
 	}
 	if notSpecific.Version != "" && specific.Version != notSpecific.Version {
+		return false
+	}
+	return true
+}
+
+// getSupported returns all the supported based on the provided OS profile while using
+// the provided platforms as a filter.
+func getSupported(os define.OS, platforms []define.OS) ([]SupportedOS, error) {
+	var match []SupportedOS
+	for _, s := range supported {
+		if osMatch(s.OS, os) && allowedByPlatforms(s.OS, platforms) {
+			match = append(match, s)
+		}
+	}
+	if len(match) > 0 {
+		return match, nil
+	}
+	return nil, fmt.Errorf("%w: %s/%s", ErrOSNotSupported, os.Type, os.Arch)
+}
+
+// allowedByPlatforms determines if the os is in the allowed list of platforms.
+func allowedByPlatforms(os define.OS, platforms []define.OS) bool {
+	if len(platforms) == 0 {
+		return true
+	}
+	for _, platform := range platforms {
+		if ok := allowedByPlatform(os, platform); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// allowedByPlatform determines if the platform allows this os.
+func allowedByPlatform(os define.OS, platform define.OS) bool {
+	if os.Type != platform.Type {
+		return false
+	}
+	if platform.Arch == "" {
+		// not specific on arch
+		return true
+	}
+	if os.Arch != platform.Arch {
+		return false
+	}
+	if platform.Type == define.Linux {
+		// on linux distro is supported
+		if platform.Distro == "" {
+			// not specific on distro
+			return true
+		}
+		if os.Distro != platform.Distro {
+			return false
+		}
+	}
+	if os.Version == "" {
+		// not specific on version
+		return true
+	}
+	if os.Version != platform.Version {
 		return false
 	}
 	return true

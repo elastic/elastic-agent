@@ -92,7 +92,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
 		if err := upgrade.Cleanup(log, release.ShortCommit(), true, false); err != nil {
-			log.Error("rollback failed", err)
+			log.Error("clean up of prior watcher run failed", err)
 		}
 		// exit nicely
 		return nil
@@ -119,7 +119,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	removeMarker := !isWindows()
 	err = upgrade.Cleanup(log, marker.Hash, removeMarker, false)
 	if err != nil {
-		log.Error("rollback failed", err)
+		log.Error("cleanup after successful watch failed", err)
 	}
 	return err
 }

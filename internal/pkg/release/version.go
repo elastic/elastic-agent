@@ -5,6 +5,7 @@
 package release
 
 import (
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,9 @@ const (
 
 // snapshot is a flag marking build as a snapshot.
 var snapshot = ""
+
+// complete is an environment variable marking the image as complete.
+var complete = "ELASTIC_AGENT_COMPLETE"
 
 // allowEmptyPgp is used as a debug flag and allows working
 // without valid pgp
@@ -53,13 +57,19 @@ func BuildTime() time.Time {
 
 // Version returns the version of the application.
 func Version() string {
-	return version.GetDefaultVersion()
+	return version.GetAgentPackageVersion()
 }
 
 // Snapshot returns true if binary was built as snapshot.
 func Snapshot() bool {
 	val, err := strconv.ParseBool(snapshot)
 	return err == nil && val
+}
+
+// Complete returns true if image was built as complete.
+func Complete() bool {
+	isComplete, ok := os.LookupEnv(complete)
+	return ok && isComplete == "true"
 }
 
 // VersionInfo is structure used by `version --yaml`.

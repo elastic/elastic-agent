@@ -12,19 +12,11 @@ import (
 )
 
 // InstallAgent force install the Elastic Agent through agentFixture.
-func InstallAgent(ctx context.Context, fleetUrl string, enrollmentToken string, agentFixture *atesting.Fixture) ([]byte, error) {
+func InstallAgent(ctx context.Context, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture) ([]byte, error) {
 	// 5 minute timeout, to ensure that it at least doesn't get stuck.
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetUrl,
-			EnrollmentToken: enrollmentToken,
-		},
-	}
-	return agentFixture.Install(ctx, &installOpts)
+	return agentFixture.Install(context.Background(), &installOpts)
 }
 
 // InstallStandaloneAgent force install the Elastic Agent through agentFixture.

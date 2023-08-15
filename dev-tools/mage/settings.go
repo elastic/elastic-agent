@@ -38,6 +38,13 @@ const (
 	elasticAgentImportPath = "github.com/elastic/elastic-agent"
 
 	elasticAgentModulePath = "github.com/elastic/elastic-agent"
+
+	// Env vars
+	// agent package version
+	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
+
+	// Mapped functions
+	agentPackageVersionMappedFunc = "agent_package_version"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -76,22 +83,35 @@ var (
 	versionQualified bool
 	versionQualifier string
 
+	// Env var to set the agent package version
+	agentPackageVersion string
+
+	// PackagingFromManifest This value is set to tru when we have defined a ManifestURL variable
+	PackagingFromManifest bool
+	// ManifestURL Location of the manifest file to package
+	ManifestURL string
+
 	FuncMap = map[string]interface{}{
-		"beat_doc_branch":   BeatDocBranch,
-		"beat_version":      BeatQualifiedVersion,
-		"commit":            CommitHash,
-		"commit_short":      CommitHashShort,
-		"date":              BuildDate,
-		"elastic_beats_dir": ElasticBeatsDir,
-		"go_version":        GoVersion,
-		"repo":              GetProjectRepoInfo,
-		"title":             func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
-		"tolower":           strings.ToLower,
-		"contains":          strings.Contains,
+		"beat_doc_branch":             BeatDocBranch,
+		"beat_version":                BeatQualifiedVersion,
+		"commit":                      CommitHash,
+		"commit_short":                CommitHashShort,
+		"date":                        BuildDate,
+		"elastic_beats_dir":           ElasticBeatsDir,
+		"go_version":                  GoVersion,
+		"repo":                        GetProjectRepoInfo,
+		"title":                       func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
+		"tolower":                     strings.ToLower,
+		"contains":                    strings.Contains,
+		agentPackageVersionMappedFunc: AgentPackageVersion,
 	}
 )
 
 func init() {
+	initGlobals()
+}
+
+func initGlobals() {
 	if GOOS == "windows" {
 		BinaryExt = ".exe"
 	}
@@ -123,6 +143,11 @@ func init() {
 	}
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
+
+	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
+
+	ManifestURL = EnvOr("ManifestURL", "")
+	PackagingFromManifest = ManifestURL != ""
 }
 
 // ProjectType specifies the type of project (OSS vs X-Pack).
@@ -223,6 +248,7 @@ repo.CanonicalRootImportPath = {{ repo.CanonicalRootImportPath }}
 repo.RootDir                 = {{ repo.RootDir }}
 repo.ImportPath              = {{ repo.ImportPath }}
 repo.SubDir                  = {{ repo.SubDir }}
+agent_package_version        = {{ agent_package_version}}
 `
 
 	return Expand(dumpTemplate)
@@ -260,6 +286,15 @@ func CommitHashShort() (string, error) {
 		shortHash = shortHash[:6]
 	}
 	return shortHash, err
+}
+
+func AgentPackageVersion() (string, error) {
+
+	if agentPackageVersion != "" {
+		return agentPackageVersion, nil
+	}
+
+	return BeatQualifiedVersion()
 }
 
 var (

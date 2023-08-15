@@ -73,7 +73,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
 
-	topPath := installPath(basePath)
+	topPath := paths.InstallPath(basePath)
 
 	status, reason := install.Status(topPath)
 	force, _ := cmd.Flags().GetBool("force")
@@ -188,7 +188,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 		defer func() {
 			if err != nil {
-				_ = install.Uninstall(cfgFile, topPath)
+				_ = install.Uninstall(cfgFile, topPath, "")
 			}
 		}()
 
@@ -222,7 +222,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		if err != nil {
 			if status != install.PackageInstall {
 				var exitErr *exec.ExitError
-				_ = install.Uninstall(cfgFile, topPath)
+				_ = install.Uninstall(cfgFile, topPath, "")
 				if err != nil && errors.As(err, &exitErr) {
 					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
 				}
@@ -237,8 +237,4 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	fmt.Fprint(streams.Out, "Elastic Agent has been successfully installed.\n")
 	return nil
-}
-
-func installPath(basePath string) string {
-	return filepath.Join(basePath, "Elastic", "Agent")
 }

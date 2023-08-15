@@ -12,6 +12,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
+
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -23,7 +26,13 @@ const (
 	//artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
 )
 
-var ErrBadHTTPStatusCode = errors.New("bad http status code")
+var (
+	ErrLatestVersionNil        = errors.New("latest version is nil")
+	ErrSnapshotVersionsEmpty   = errors.New("snapshot list is nil")
+	ErrInvalidVersionRetrieved = errors.New("invalid version retrieved from artifact API")
+
+	ErrBadHTTPStatusCode = errors.New("bad http status code")
+)
 
 type VersionList struct {
 	Versions  []string `json:"versions"`
@@ -51,12 +60,18 @@ type Package struct {
 	Os           []string `json:"os"`
 	Classifier   string   `json:"classifier"`
 	Attributes   struct {
+		IncludeInRepo string `json:"include_in_repo"`
 		ArtifactNoKpi string `json:"artifactNoKpi"`
 		Internal      string `json:"internal"`
 		ArtifactID    string `json:"artifact_id"`
 		Oss           string `json:"oss"`
 		Group         string `json:"group"`
 	} `json:"attributes"`
+}
+
+type Dependency struct {
+	Prefix   string `json:"prefix"`
+	BuildUri string `json:"build_uri"`
 }
 
 type Project struct {
@@ -66,22 +81,24 @@ type Project struct {
 	ExternalArtifactsManifestURL string             `json:"external_artifacts_manifest_url"`
 	BuildDurationSeconds         int                `json:"build_duration_seconds"`
 	Packages                     map[string]Package `json:"packages"`
-	Dependencies                 []any              `json:"dependencies"`
+	Dependencies                 []Dependency       `json:"dependencies"`
+}
+
+type Build struct {
+	Projects             map[string]Project `json:"projects"`
+	StartTime            string             `json:"start_time"`
+	ReleaseBranch        string             `json:"release_branch"`
+	Prefix               string             `json:"prefix"`
+	EndTime              string             `json:"end_time"`
+	ManifestVersion      string             `json:"manifest_version"`
+	Version              string             `json:"version"`
+	Branch               string             `json:"branch"`
+	BuildID              string             `json:"build_id"`
+	BuildDurationSeconds int                `json:"build_duration_seconds"`
 }
 
 type BuildDetails struct {
-	Build struct {
-		Projects             map[string]Project `json:"projects"`
-		StartTime            string             `json:"start_time"`
-		ReleaseBranch        string             `json:"release_branch"`
-		Prefix               string             `json:"prefix"`
-		EndTime              string             `json:"end_time"`
-		ManifestVersion      string             `json:"manifest_version"`
-		Version              string             `json:"version"`
-		Branch               string             `json:"branch"`
-		BuildID              string             `json:"build_id"`
-		BuildDurationSeconds int                `json:"build_duration_seconds"`
-	} `json:"build"`
+	Build     Build
 	Manifests struct {
 		LastUpdateTime         string `json:"last-update-time"`
 		SecondsSinceLastUpdate int    `json:"seconds-since-last-update"`
@@ -228,4 +245,50 @@ func checkResponseAndUnmarshal[T any](resp *http.Response) (*T, error) {
 	}
 
 	return result, nil
+}
+
+type logger interface {
+	Logf(format string, args ...any)
+}
+
+func GetLatestSnapshotVersion(ctx context.Context, log logger, aac *ArtifactAPIClient) (*version.ParsedSemVer, error) {
+	vList, err := aac.GetVersions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if vList == nil {
+		return nil, ErrSnapshotVersionsEmpty
+	}
+
+	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
+	for _, v := range vList.Versions {
+		pv, err := version.ParseVersion(v)
+		if err != nil {
+			log.Logf("invalid version retrieved from artifact API: %q", v)
+			return nil, ErrInvalidVersionRetrieved
+		}
+		sortedParsedVersions = append(sortedParsedVersions, pv)
+	}
+
+	if len(sortedParsedVersions) == 0 {
+		return nil, ErrSnapshotVersionsEmpty
+	}
+
+	// normally the output of the versions returned by artifact API is already sorted in ascending order,
+	// if we want to sort in descending order we could use
+	sort.Sort(sort.Reverse(sortedParsedVersions))
+
+	var latestSnapshotVersion *version.ParsedSemVer
+	// fetch the latest SNAPSHOT build
+	for _, pv := range sortedParsedVersions {
+		if pv.IsSnapshot() {
+			latestSnapshotVersion = pv
+			break
+		}
+	}
+	if latestSnapshotVersion == nil {
+		return nil, ErrLatestVersionNil
+	}
+	return latestSnapshotVersion, nil
 }

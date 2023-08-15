@@ -465,7 +465,7 @@ func TestAgentStateToString(t *testing.T) {
 		// everything else maps to degraded
 		{
 			agentState:         agentclient.Configuring,
-			expectedFleetState: fleetStateDegraded,
+			expectedFleetState: fleetStateOnline,
 		},
 		{
 			agentState:         agentclient.Degraded,
@@ -473,18 +473,23 @@ func TestAgentStateToString(t *testing.T) {
 		},
 		{
 			agentState:         agentclient.Stopping,
-			expectedFleetState: fleetStateDegraded,
+			expectedFleetState: fleetStateOnline,
 		},
 		{
 			agentState:         agentclient.Stopped,
-			expectedFleetState: fleetStateDegraded,
+			expectedFleetState: fleetStateOnline,
 		},
 		{
 			agentState:         agentclient.Upgrading,
-			expectedFleetState: fleetStateDegraded,
+			expectedFleetState: fleetStateOnline,
 		},
 		{
 			agentState:         agentclient.Rollback,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			// Unknown states should map to degraded.
+			agentState:         agentclient.Rollback + 1,
 			expectedFleetState: fleetStateDegraded,
 		},
 	}

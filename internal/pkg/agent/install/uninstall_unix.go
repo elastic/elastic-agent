@@ -10,6 +10,10 @@ func isBlockingOnExe(_ error) bool {
 	return false
 }
 
-func removeBlockingExe(_ error) (string, error) {
-	return "", nil
+func removeBlockingExe(_ error) error {
+	return nil
+}
+
+func isRetryableError(_ error) bool {
+	return false
 }

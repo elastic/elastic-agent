@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/spf13/cobra"
 
@@ -32,6 +33,7 @@ func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 	}
 
 	cmd.Flags().StringP("file", "f", "", "name of the output diagnostics zip archive")
+	cmd.Flags().BoolP("cpu-profile", "p", false, "wait to collect a CPU profile")
 
 	return cmd
 }
@@ -52,23 +54,41 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	defer daemon.Disconnect()
 
-	agentDiag, err := daemon.DiagnosticAgent(ctx)
+	fetchCPU, _ := cmd.Flags().GetBool("cpu-profile")
+
+	additionalDiags := []cproto.AdditionalDiagnosticRequest{}
+	if fetchCPU {
+		// console will just hang while we wait for the CPU profile; print something so user doesn't get confused
+		fmt.Fprintf(streams.Out, "Creating diagnostics archive, waiting for CPU profile...\n")
+		additionalDiags = []cproto.AdditionalDiagnosticRequest{cproto.AdditionalDiagnosticRequest_CPU}
+	}
+
+	agentDiag, err := daemon.DiagnosticAgent(ctx, additionalDiags)
 	if err != nil {
-		return fmt.Errorf("failed to fetch agent diagnostics: %w", err)
+		fmt.Fprintf(streams.Err, "[WARNING]: failed to fetch agent diagnostics: %s", err)
 	}
 
 	unitDiags, err := daemon.DiagnosticUnits(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to fetch component/unit diagnostics: %w", err)
+		fmt.Fprintf(streams.Err, "[WARNING]: failed to fetch unit diagnostics: %s", err)
+	}
+
+	compDiags, err := daemon.DiagnosticComponents(ctx, additionalDiags)
+	if err != nil {
+		fmt.Fprintf(streams.Err, "[WARNING]: failed to fetch component diagnostics: %s", err)
+	}
+
+	if len(compDiags) == 0 && len(unitDiags) == 0 && len(agentDiag) == 0 {
+		return fmt.Errorf("no diags could be fetched")
 	}
 
 	f, err := os.Create(fileName)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating .zip file: %w", err)
 	}
 	defer f.Close()
 
-	if err := diagnostics.ZipArchive(streams.Err, f, agentDiag, unitDiags); err != nil {
+	if err := diagnostics.ZipArchive(streams.Err, f, agentDiag, unitDiags, compDiags); err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", fileName, err)
 	}
 	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", fileName)

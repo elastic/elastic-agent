@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 
 	gproto "google.golang.org/protobuf/proto"
@@ -40,6 +41,11 @@ type ComponentUnitState struct {
 type ComponentUnitKey struct {
 	UnitType client.UnitType
 	UnitID   string
+}
+
+// MarshalYAML implements the Marshaller interface for the componentUnitKey
+func (key ComponentUnitKey) MarshalYAML() (interface{}, error) {
+	return fmt.Sprintf("%s-%s", key.UnitType.String(), key.UnitID), nil
 }
 
 // ComponentVersionInfo provides version information reported by the component.

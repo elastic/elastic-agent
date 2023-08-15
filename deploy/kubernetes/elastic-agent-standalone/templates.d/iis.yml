@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-iis
+      id: filestream-iis-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -45,11 +46,11 @@ inputs:
             - iis-error
       data_stream.namespace: default
     - name: iis/metrics-iis
+      id: iis/metrics-iis-${kubernetes.hints.container_id}
       type: iis/metrics
       use_output: default
       streams:
-        - application_pool.name: null
-          condition: ${kubernetes.hints.iis.application_pool.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+        - condition: ${kubernetes.hints.iis.application_pool.enabled} == true or ${kubernetes.hints.iis.enabled} == true
           data_stream:
             dataset: iis.application_pool
             type: metrics

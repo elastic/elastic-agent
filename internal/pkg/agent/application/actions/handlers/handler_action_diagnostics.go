@@ -145,7 +145,8 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 				h.log.Warn(str)
 			}
 		}()
-		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag)
+		// NOTE: Right now, actions don't support component-level diagnostics
+		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag, []client.DiagnosticComponentResult{})
 		if err != nil {
 			h.log.Errorw(
 				"diagnostics action handler failed generate zip archive",
@@ -254,7 +255,7 @@ func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []clie
 			h.log.Warn(str)
 		}
 	}()
-	if err := diagnostics.ZipArchive(&wBuf, f, aDiag, uDiag); err != nil {
+	if err := diagnostics.ZipArchive(&wBuf, f, aDiag, uDiag, []client.DiagnosticComponentResult{}); err != nil {
 		os.Remove(name)
 		return nil, 0, err
 	}

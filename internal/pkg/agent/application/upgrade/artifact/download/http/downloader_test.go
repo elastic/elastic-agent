@@ -30,19 +30,20 @@ func TestDownloadBodyError(t *testing.T) {
 	// part way through the download, while copying the response body.
 
 	type connKey struct{}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.(http.Flusher).Flush()
 		conn, ok := r.Context().Value(connKey{}).(net.Conn)
 		if ok {
-			conn.Close()
+			_ = conn.Close()
 		}
 	}))
-	defer srv.Close()
-	client := srv.Client()
 	srv.Config.ConnContext = func(ctx context.Context, c net.Conn) context.Context {
 		return context.WithValue(ctx, connKey{}, c)
 	}
+	srv.Start()
+	defer srv.Close()
+	client := srv.Client()
 
 	targetDir, err := ioutil.TempDir(os.TempDir(), "")
 	if err != nil {
@@ -63,6 +64,9 @@ func TestDownloadBodyError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected Download to return an error")
 	}
+
+	log.lock.RLock()
+	defer log.lock.RUnlock()
 
 	require.GreaterOrEqual(t, len(log.info), 1, "download error not logged at info level")
 	assert.True(t, containsMessage(log.info, "download from %s failed at %s @ %sps: %s"))
@@ -112,6 +116,9 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
+
+	log.lock.RLock()
+	defer log.lock.RUnlock()
 
 	// 2 files are downloaded so 4 log messages are expected in the info level and only the complete is over the warn
 	// window as 2 log messages for warn.
@@ -166,6 +173,9 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
+
+	log.lock.RLock()
+	defer log.lock.RUnlock()
 
 	// 2 files are downloaded so 4 log messages are expected in the info level and only the complete is over the warn
 	// window as 2 log messages for warn.

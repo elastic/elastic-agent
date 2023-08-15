@@ -1,5 +1,6 @@
 inputs:
     - name: httpjson-snyk
+      id: httpjson-snyk-${kubernetes.hints.container_id}
       type: httpjson
       use_output: default
       streams:
@@ -117,6 +118,7 @@ inputs:
             - snyk-vulnerabilities
       data_stream.namespace: default
     - name: filestream-snyk
+      id: filestream-snyk-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
