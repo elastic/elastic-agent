@@ -214,6 +214,10 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		l.Error(errors.New(err, "failed to invoke rollback watcher"))
 	}
 
+	// FIXME: for testing only!
+	time.Sleep(10 * time.Second)
+	return errors.New("deliberately crashing agent (after invoking watcher)")
+
 	if allowEmptyPgp, _ := release.PGP(); allowEmptyPgp {
 		l.Info("Elastic Agent has been built with security disabled. Elastic Agent will not verify signatures of upgrade artifact.")
 	}
