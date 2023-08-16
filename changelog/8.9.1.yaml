@@ -1,0 +1,47 @@
+version: 8.9.1
+entries:
+    - kind: bug-fix
+      summary: Fix error messages from Upgrade Watcher
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3093
+      issue: []
+      timestamp: 1689622778
+      file:
+        name: 1689622778-upgrade-watcher-fix-error-message.yaml
+        checksum: 088b53a2e691e117e13fffe731d3056c53193494
+    - kind: bug-fix
+      summary: Add default UTC timezone to synthetics agent docker images to prevent navigation errors
+      description: ""
+      component: synthetics
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3160
+      issue:
+        - https://github.com/elastic/beats/issues/36117
+      timestamp: 1690896259
+      file:
+        name: 1690896259-synthetics-default-timezone.yaml
+        checksum: 79dc5e66ffceb72c42784e3d7ec97bdd800dc048
+    - kind: security
+      summary: Upgrade to Go 1.19.12
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3186
+      issue: []
+      timestamp: 1691091834
+      file:
+        name: 1691091834-Upgrade-to-Go-1.19.12.yaml
+        checksum: b0050c1a8384116b6058922897e97260a81fdade
+    - kind: bug-fix
+      summary: Stop translating the Upgrading agent state to Degraded
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3227
+      issue: []
+      timestamp: 1691694963
+      file:
+        name: 1691694963-Stop-translating-the-Upgrading-agent-state-to-Degraded.yaml
+        checksum: dcd97274dba64e10660ed53d1d123291ffd29e11
