@@ -194,7 +194,7 @@ func (f *Fixture) WriteFileToWorkDir(ctx context.Context, data string, name stri
 		return fmt.Errorf("error preparing binary: %w", err)
 	}
 
-	err = os.WriteFile(filepath.Join(f.workDir, name), []byte(data), 644)
+	err = os.WriteFile(filepath.Join(f.workDir, name), []byte(data), 0644)
 	if err != nil {
 		return fmt.Errorf("error writing file: %w", err)
 	}

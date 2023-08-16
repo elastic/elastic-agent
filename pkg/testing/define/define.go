@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
-	"github.com/stretchr/testify/require"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -79,9 +78,8 @@ func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*ate
 		buildsDir = filepath.Join(projectDir, "build", "distributions")
 	}
 
-	fixture, err := NewFixtureWithBinary(t, version, "elastic-agent", buildsDir)
-	require.NoError(t, err)
-	return fixture, nil
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir)
+
 }
 
 // NewFixture returns a new Elastic Agent testing fixture with a LocalFetcher and
