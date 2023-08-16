@@ -152,6 +152,9 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		"source": agentName,
 	})
 
+	// Make sure to flush any buffered logs before we're done.
+	defer l.Sync()
+
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
 		err = errors.New(err, "failed to perform delayed enrollment")
