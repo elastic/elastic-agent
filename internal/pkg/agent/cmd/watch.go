@@ -48,7 +48,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			}
 
 			// Make sure to flush any buffered logs before we're done.
-			defer log.Sync()
+			defer log.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
 			if err := watchCmd(log, cfg); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)

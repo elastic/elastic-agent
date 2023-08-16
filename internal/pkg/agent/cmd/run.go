@@ -153,7 +153,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	})
 
 	// Make sure to flush any buffered logs before we're done.
-	defer l.Sync()
+	defer l.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
