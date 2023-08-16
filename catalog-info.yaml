@@ -156,7 +156,7 @@ apiVersion: backstage.io/v1alpha1
 kind: Resource
 metadata:
   name: buildkite-elastic-agent-gce-cleanup
-  description: Buildkite pipeline to clean up stale GCE instances
+  description: Clean up stale GCE instances
   links:
     - title: Pipeline
       url: https://buildkite.com/elastic/elastic-agent
