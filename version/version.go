@@ -5,3 +5,6 @@
 package version
 
 const defaultBeatVersion = "8.9.1"
+
+// Agent is the exported version of defaultBeatVersion.
+const Agent = defaultBeatVersion
