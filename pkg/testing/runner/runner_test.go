@@ -23,13 +23,13 @@ func TestNewRunner_Clean(t *testing.T) {
 	require.NoError(t, err)
 
 	cfg := Config{
-		AgentVersion:      "8.10.0",
-		AgentStackVersion: "8.10.0-SNAPSHOT",
-		BuildDir:          filepath.Join(tmpdir, "build"),
-		GOVersion:         "1.20.7",
-		RepoDir:           filepath.Join(tmpdir, "repo"),
-		StateDir:          stateDir,
-		ExtraEnv:          nil,
+		AgentVersion: "8.10.0",
+		StackVersion: "8.10.0-SNAPSHOT",
+		BuildDir:     filepath.Join(tmpdir, "build"),
+		GOVersion:    "1.20.7",
+		RepoDir:      filepath.Join(tmpdir, "repo"),
+		StateDir:     stateDir,
+		ExtraEnv:     nil,
 	}
 	ip := &fakeInstanceProvisioner{}
 	sp := &fakeStackProvisioner{}

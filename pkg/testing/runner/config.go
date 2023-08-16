@@ -14,15 +14,14 @@ import (
 
 // Config provides the configuration for running the runner.
 type Config struct {
-	AgentVersion      string
-	AgentStackVersion string
-	StateDir          string
-	ReleaseVersion    string
-	StackVersion      string
-	BuildDir          string
-	GOVersion         string
-	RepoDir           string
-	DiagnosticsDir    string
+	AgentVersion   string
+	StateDir       string
+	ReleaseVersion string
+	StackVersion   string
+	BuildDir       string
+	GOVersion      string
+	RepoDir        string
+	DiagnosticsDir string
 
 	// Platforms filters the tests to only run on the provided list
 	// of platforms even if the tests supports more than what is
@@ -59,7 +58,7 @@ func (c *Config) Validate() error {
 		return errors.New("field AgentVersion must be set")
 	}
 	if c.StackVersion == "" {
-		return errors.New("field AgentStackVersion must be set")
+		return errors.New("field StackVersion must be set")
 	}
 	if c.BuildDir == "" {
 		return errors.New("field BuildDir must be set")
