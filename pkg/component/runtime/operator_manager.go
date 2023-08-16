@@ -242,6 +242,7 @@ func groupComponents(log *logger.Logger, comp component.Component) []component.C
 		}
 		hash := sha256.New()
 		hash.Write([]byte(k8sConfig.String()))
+		hash.Write([]byte(comp.ID))
 		key := fmt.Sprintf("%x", hash.Sum(nil))
 
 		if _, ok := grouping[key]; !ok {
