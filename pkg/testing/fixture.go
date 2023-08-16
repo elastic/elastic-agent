@@ -258,7 +258,7 @@ func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	return nil
 }
 
-// Runs the given beat for a specified period of time. Will fail if an error appears in the logs,
+// Runs the given beat for a specified period of time. Will fail if an error appears in the logs.
 // Will refuse to run if the given binary is elastic-agent
 func (f *Fixture) RunBeat(ctx context.Context, runFor time.Duration) error {
 	if f.binaryName == "elastic-agent" {
@@ -336,6 +336,9 @@ func (f *Fixture) RunBeat(ctx context.Context, runFor time.Duration) error {
 func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	if f.installed {
 		return errors.New("fixture is installed; cannot be run")
+	}
+	if f.binaryName != "elastic-agent" {
+		return fmt.Errorf("Run() can only be run against elastic-agent, got %s", f.binaryName)
 	}
 
 	var err error

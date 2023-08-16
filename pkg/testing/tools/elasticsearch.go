@@ -351,6 +351,7 @@ func GetLogsForDatastreamWithContext(ctx context.Context, client elastictranspor
 	return performQueryForRawQuery(ctx, indexQuery, "*ds-logs*", client)
 }
 
+// GetPing performs a basic ping and returns ES config info
 func GetPing(ctx context.Context, client elastictransport.Interface) (Ping, error) {
 	req := esapi.InfoRequest{}
 	resp, err := req.Do(ctx, client)
