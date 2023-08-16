@@ -388,7 +388,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	env["TEST_BINARY"] = r.cfg.BinaryName
 
 	// run the actual tests on the host
-	result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, client, logger, r.cfg.ReleaseVersion, batch.ID, batch.Batch, env)
+	result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, client, logger, r.cfg.AgentVersion, batch.ID, batch.Batch, env)
 	if err != nil {
 		logger.Logf("Failed to execute tests on instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
@@ -451,7 +451,7 @@ func (r *Runner) getBuild(b OSBatch) Build {
 	if r.cfg.BinaryName != "" {
 		name = r.cfg.BinaryName
 	}
-	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("%s-%s-%s-%s.%s", name, r.cfg.ReleaseVersion, b.OS.Type, arch, ext))
+	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("%s-%s-%s-%s.%s", name, r.cfg.AgentVersion, b.OS.Type, arch, ext))
 	return Build{
 		Version:    r.cfg.ReleaseVersion,
 		Type:       b.OS.Type,

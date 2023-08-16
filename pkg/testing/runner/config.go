@@ -55,7 +55,7 @@ type Config struct {
 
 // Validate returns an error if the information is invalid.
 func (c *Config) Validate() error {
-	if c.ReleaseVersion == "" {
+	if c.AgentVersion == "" {
 		return errors.New("field AgentVersion must be set")
 	}
 	if c.StackVersion == "" {

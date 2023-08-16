@@ -1535,10 +1535,10 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	if err != nil {
 		return fmt.Errorf("error setting build dir: %s", err)
 	}
-	// err = os.Setenv("STACK", "serverless")
-	// if err != nil {
-	// 	return fmt.Errorf("error setting serverless stack var: %w", err)
-	// }
+	err = os.Setenv("STACK_PROVISIONER", "serverless")
+	if err != nil {
+		return fmt.Errorf("error setting serverless stack var: %w", err)
+	}
 
 	err = os.Setenv("TEST_BINARY_NAME", beatname)
 	if err != nil {
@@ -1693,7 +1693,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if err != nil {
 		return nil, err
 	}
-	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
+
 	agentVersion := os.Getenv("AGENT_VERSION")
 	if agentVersion == "" {
 		agentVersion, err = mage.DefaultBeatBuildVariableSources.GetBeatVersion()
@@ -1710,6 +1710,8 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 			agentVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
 		}
 	}
+
+	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
 	if agentStackVersion == "" {
 		agentStackVersion = agentVersion
 	}
