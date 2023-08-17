@@ -76,6 +76,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 		Isolate: false,
 		Sudo:    true, // requires Agent installation
 	})
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/3262")
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
