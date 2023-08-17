@@ -249,3 +249,26 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 
 	return hintsMapping
 }
+
+// Generates the hints and processor mappings from provided pod annotation map
+func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) hintsData {
+	hintData := hintsData{
+		composableMapping: mapstr.M{},
+		processors:        []mapstr.M{},
+	}
+
+	if ann, ok := k8sMapping["annotations"]; ok {
+		annotations, _ := ann.(mapstr.M)
+		hints := utils.GenerateHints(annotations, "", prefix)
+		if len(hints) > 0 {
+			logger.Debugf("Extracted hints are :%v", hints)
+			hintData.composableMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
+			logger.Debugf("Generated hints mappings are :%v", hintData.composableMapping)
+
+			hintData.processors = utils.GetConfigs(annotations, prefix, processorhints)
+			logger.Debugf("Generated Processors are :%v", hintData.processors)
+		}
+
+	}
+	return hintData
+}

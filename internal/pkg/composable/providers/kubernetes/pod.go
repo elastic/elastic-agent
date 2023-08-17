@@ -55,9 +55,9 @@ type providerData struct {
 }
 
 // Will hold the generated mapping data needed for hints based autodsicovery
-type mappingsData struct {
-	hints      mapstr.M
-	processors []mapstr.M
+type hintsData struct {
+	composableMapping mapstr.M
+	processors        []mapstr.M
 }
 
 // NewPodEventer creates an eventer that can discover and process pod objects
@@ -449,28 +449,28 @@ func generateContainerData(
 
 				if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 					if !managed {
-						mappingData := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
-						if len(mappingData.hints) > 0 {
-							if len(mappingData.processors) > 0 {
-								processors = updateProcessors(mappingData.processors, processors)
+						hintData := GetHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+						if len(hintData.composableMapping) > 0 {
+							if len(hintData.processors) > 0 {
+								processors = updateProcessors(hintData.processors, processors)
 							}
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
-								map[string]interface{}{"hints": mappingData.hints},
+								map[string]interface{}{"hints": hintData.composableMapping},
 								processors,
 							)
 						} else if config.Hints.DefaultContainerLogs {
 							// in case of no package detected in the hints fallback to the generic log collection
-							_, _ = mappingData.hints.Put("container_logs.enabled", true)
-							_, _ = mappingData.hints.Put("container_id", c.ID)
-							if len(mappingData.processors) > 0 {
-								processors = updateProcessors(mappingData.processors, processors)
+							_, _ = hintData.composableMapping.Put("container_logs.enabled", true)
+							_, _ = hintData.composableMapping.Put("container_id", c.ID)
+							if len(hintData.processors) > 0 {
+								processors = updateProcessors(hintData.processors, processors)
 							}
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
-								map[string]interface{}{"hints": mappingData.hints},
+								map[string]interface{}{"hints": hintData.composableMapping},
 								processors,
 							)
 						}
@@ -483,28 +483,28 @@ func generateContainerData(
 			k8sMapping["container"] = containerMeta
 			if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 				if !managed {
-					mappingData := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
-					if len(mappingData.hints) > 0 {
-						if len(mappingData.processors) > 0 {
-							processors = updateProcessors(mappingData.processors, processors)
+					hintData := GetHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+					if len(hintData.composableMapping) > 0 {
+						if len(hintData.processors) > 0 {
+							processors = updateProcessors(hintData.processors, processors)
 						}
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
-							map[string]interface{}{"hints": mappingData.hints},
+							map[string]interface{}{"hints": hintData.composableMapping},
 							processors,
 						)
 					} else if config.Hints.DefaultContainerLogs {
 						// in case of no package detected in the hints fallback to the generic log collection
-						_, _ = mappingData.hints.Put("container_logs.enabled", true)
-						_, _ = mappingData.hints.Put("container_id", c.ID)
-						if len(mappingData.processors) > 0 {
-							processors = updateProcessors(mappingData.processors, processors)
+						_, _ = hintData.composableMapping.Put("container_logs.enabled", true)
+						_, _ = hintData.composableMapping.Put("container_id", c.ID)
+						if len(hintData.processors) > 0 {
+							processors = updateProcessors(hintData.processors, processors)
 						}
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
-							map[string]interface{}{"hints": mappingData.hints},
+							map[string]interface{}{"hints": hintData.composableMapping},
 							processors,
 						)
 					}
@@ -514,29 +514,6 @@ func generateContainerData(
 			}
 		}
 	}
-}
-
-// Generates the hints and processor mappings from provided pod annotation map
-func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) mappingsData {
-	mappingData := mappingsData{
-		hints:      mapstr.M{},
-		processors: []mapstr.M{},
-	}
-
-	if ann, ok := k8sMapping["annotations"]; ok {
-		annotations, _ := ann.(mapstr.M)
-		hints := utils.GenerateHints(annotations, "", prefix)
-		if len(hints) > 0 {
-			logger.Debugf("Extracted hints are :%v", hints)
-			mappingData.hints = GenerateHintsMapping(hints, k8sMapping, logger, cID)
-			logger.Debugf("Generated hints mappings are :%v", mappingData.hints)
-
-			mappingData.processors = utils.GetConfigs(annotations, prefix, processorhints)
-			logger.Debugf("Generated Processors are :%v", mappingData.processors)
-		}
-
-	}
-	return mappingData
 }
 
 // Updates processors map with any additional processors identfied from annotations

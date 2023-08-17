@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
-	"github.com/elastic/elastic-agent-autodiscover/utils"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 )
 
@@ -381,7 +380,13 @@ func TestGenerateHintsMappingWithProcessors(t *testing.T) {
 				"with/slash": "some/path",
 			},
 			Annotations: map[string]string{
-				"app": "production",
+				"app":                      "production",
+				"co.elastic.hints/package": "apache",
+				"co.elastic.hints/processors.1.add_fields.target":      "project",
+				"co.elastic.hints/processors.1.add_fields.fields.name": "myproject",
+				"co.elastic.hints/processors.rename.fields.0.from":     "a.g",
+				"co.elastic.hints/processors.rename.fields.1.to":       "e.d",
+				"co.elastic.hints/processors.rename.fail_on_error":     "false",
 			},
 		},
 		TypeMeta: metav1.TypeMeta{
@@ -411,28 +416,45 @@ func TestGenerateHintsMappingWithProcessors(t *testing.T) {
 		},
 		"annotations": mapstr.M{
 			"app": "production",
-			"co.elastic.hints/processors.1.add_fields.target":      "project",
-			"co.elastic.hints/processors.1.add_fields.fields.name": "myproject",
-			"co.elastic.hints/processors.rename.fields.0.from":     "a.g",
-			"co.elastic.hints/processors.rename.fields.1.to":       "e.d",
-			"co.elastic.hints/processors.rename.fail_on_error":     false,
-		},
-	}
-	hints := mapstr.M{
-		"hints": mapstr.M{
-			"data_streams": "access, error",
-			"access":       mapstr.M{"stream": "stdout"},
-			"error":        mapstr.M{"stream": "stderr"},
-			"package":      "apache",
+			"co": mapstr.M{
+				"elastic": mapstr.M{
+					"hints/package": "apache",
+					"hints/processors": mapstr.M{
+						"add_fields": mapstr.M{
+							"target": "project",
+							"name":   "myproject",
+						},
+						"rename": mapstr.M{
+							"fail_on_error": "false",
+							"fields": mapstr.M{
+								"from": "a.g",
+								"to":   "e.d",
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 
-	processors := mapstr.M{
-		"hints/processors": mapstr.M{
+	expected_hints := mapstr.M{
+		"container_id": "asdfghjkl",
+		"apache": mapstr.M{
+			"container_logs": mapstr.M{
+				"enabled": true,
+			},
+			"enabled": true,
+		},
+	}
+
+	expected_procesors := []mapstr.M{
+		0: {
 			"add_fields": mapstr.M{
 				"target": "project",
 				"name":   "myproject",
 			},
+		},
+		1: {
 			"rename": mapstr.M{
 				"fail_on_error": "false",
 				"fields": mapstr.M{
@@ -443,43 +465,9 @@ func TestGenerateHintsMappingWithProcessors(t *testing.T) {
 		},
 	}
 
-	expected := mapstr.M{
-		"container_id": "asdfghjkl",
-		"apache": mapstr.M{
-			"container_logs": mapstr.M{
-				"enabled": true,
-			},
-			"access": mapstr.M{
-				"enabled": true,
-				"stream":  "stdout",
-			}, "error": mapstr.M{
-				"enabled": true,
-				"stream":  "stderr",
-			},
-		},
-		"processors": []mapstr.M{
-			0: {
-				"add_fields": mapstr.M{
-					"target": "project",
-					"name":   "myproject",
-				},
-			},
-			1: {
-				"rename": mapstr.M{
-					"fail_on_error": "false",
-					"fields": mapstr.M{
-						"from": "a.g",
-						"to":   "e.d",
-					},
-				},
-			},
-		},
-	}
+	hintData := GetHintsMapping(mapping, logger, "co.elastic", "asdfghjkl")
 
-	hintsMapping := GenerateHintsMapping(hints, mapping, logger, "asdfghjkl")
-	processorMapping := utils.GetConfigs(processors, "", processorhints)
+	assert.Equal(t, expected_hints, hintData.composableMapping)
+	assert.Equal(t, expected_procesors, hintData.processors)
 
-	hintsMapping.Put("processors", processorMapping)
-
-	assert.Equal(t, expected, hintsMapping)
 }
