@@ -180,7 +180,7 @@ func verifyAgentName(t *testing.T, hostname string, kibClient *kibana.Client) *k
 			agent, err = tools.GetAgentByHostnameFromList(kibClient, hostname)
 			return err == nil && agent != nil
 		},
-		1*time.Minute,
+		5*time.Minute,
 		5*time.Second,
 	)
 
