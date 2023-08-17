@@ -59,9 +59,6 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	unitDiags, err := daemon.DiagnosticUnits(ctx)
 	if err != nil {
-<<<<<<< HEAD
-		return fmt.Errorf("failed to fetch component/unit diagnostics: %w", err)
-=======
 		fmt.Fprintf(streams.Err, "[WARNING]: failed to fetch unit diagnostics: %s", err)
 	}
 
@@ -72,7 +69,6 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	if len(compDiags) == 0 && len(unitDiags) == 0 && len(agentDiag) == 0 {
 		return fmt.Errorf("no diags could be fetched")
->>>>>>> a2b1c15a32 (Fix diagnostic scrubbing errors (#3165))
 	}
 
 	f, err := os.Create(fileName)

@@ -25,12 +25,8 @@ import (
 	agentclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-<<<<<<< HEAD:internal/pkg/diagnostics/dianostics_test.go
-=======
 	agentruntime "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/version"
->>>>>>> a2b1c15a32 (Fix diagnostic scrubbing errors (#3165)):internal/pkg/diagnostics/diagnostics_test.go
 )
 
 func TestRedactResults(t *testing.T) {

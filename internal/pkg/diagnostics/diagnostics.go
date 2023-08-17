@@ -218,10 +218,6 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 	return zipLogs(zw, ts)
 }
 
-<<<<<<< HEAD
-func writeRedacted(errOut, w io.Writer, fullFilePath string, fr client.DiagnosticFileResult) error {
-	out := &fr.Content
-=======
 func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
 	ts := time.Now().UTC()
 	w, err := zw.CreateHeader(&zip.FileHeader{
@@ -242,11 +238,10 @@ func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
 
 func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResult client.DiagnosticFileResult) error {
 	out := &fileResult.Content
->>>>>>> a2b1c15a32 (Fix diagnostic scrubbing errors (#3165))
 
 	// Should we support json too?
 	if fileResult.ContentType == "application/yaml" {
-		unmarshalled := map[interface{}]interface{}{}
+		unmarshalled := map[string]interface{}{}
 		err := yaml.Unmarshal(fileResult.Content, &unmarshalled)
 		if err != nil {
 			// Best effort, output a warning but still include the file
@@ -270,7 +265,7 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 // the whole generic function here is out of paranoia. Although extremely unlikely,
 // we have no way of guaranteeing we'll get a "normal" map[string]interface{},
 // since the diagnostic interface is a bit of a free-for-all
-func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K]interface{} {
+func redactMap(errOut io.Writer, inputMap map[string]interface{}) map[string]interface{} {
 	if inputMap == nil {
 		return nil
 	}
@@ -278,10 +273,6 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K
 		if rootValue != nil {
 			switch cast := rootValue.(type) {
 			case map[string]interface{}:
-				rootValue = redactMap(errOut, cast)
-			case map[interface{}]interface{}:
-				rootValue = redactMap(errOut, cast)
-			case map[int]interface{}:
 				rootValue = redactMap(errOut, cast)
 			case string:
 				if keyString, ok := any(rootKey).(string); ok {
