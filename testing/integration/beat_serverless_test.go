@@ -132,31 +132,6 @@ func (runner *BeatRunner) TestRunAndCheckData() {
 	require.NotEmpty(runner.T(), docs.Hits.Hits)
 }
 
-// NOTE for the below tests: the testing framework doesn't guarantee a new stack instance each time,
-// which means we might be running against a stack where a previous test has already done setup.
-// perhaps CI should run `mage integration:clean` first?
-
-// tests the [beat] setup --pipelines command
-func (runner *BeatRunner) TestSetupPipelines() {
-	if runner.testbeatName != "filebeat" {
-		runner.T().Skip("pipelines only available on filebeat")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	// need to actually enable something that has pipelines
-	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home", runner.agentFixture.WorkDir(),
-		"setup", "--pipelines", "--modules", "apache", "-M", "apache.error.enabled=true", "-M", "apache.access.enabled=true"})
-	assert.NoError(runner.T(), err)
-
-	runner.T().Logf("got response from pipeline setup: %s", string(resp))
-
-	pipelines, err := tools.GetPipelines(ctx, runner.requirementsInfo.ESClient, "*filebeat*")
-	require.NoError(runner.T(), err)
-	require.NotEmpty(runner.T(), pipelines)
-
-}
-
 // tests the [beat] setup --dashboards command
 func (runner *BeatRunner) TestSetupDashboards() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3) //dashboards seem to take a while
@@ -167,9 +142,19 @@ func (runner *BeatRunner) TestSetupDashboards() {
 	runner.T().Logf("got response from dashboard setup: %s", string(resp))
 	require.True(runner.T(), strings.Contains(string(resp), "Loaded dashboards"))
 
-	//TODO: actually check
-	_, err = tools.GetDashboards(ctx, runner.requirementsInfo.KibanaClient)
+	dashList, err := tools.GetDashboards(ctx, runner.requirementsInfo.KibanaClient)
 	require.NoError(runner.T(), err)
+
+	// interesting hack in cases where we don't have a clean environment
+	// check to see if any of the dashboards were created recently
+	found := false
+	for _, dash := range dashList {
+		if time.Since(dash.UpdatedAt) < time.Minute*5 {
+			found = true
+			break
+		}
+	}
+	require.True(runner.T(), found, fmt.Sprintf("could not find dashboard newer than 5 minutes, out of %d dashboards", len(dashList)))
 
 	runner.Run("export dashboards", runner.SubtestExportDashboards)
 }
@@ -194,6 +179,30 @@ func (runner *BeatRunner) SubtestExportDashboards() {
 	require.NoError(runner.T(), err)
 	runner.T().Logf("got log contents: %#v", inFolder)
 	require.NotEmpty(runner.T(), inFolder)
+}
+
+// NOTE for the below tests: the testing framework doesn't guarantee a new stack instance each time,
+// which means we might be running against a stack where a previous test has already done setup.
+// perhaps CI should run `mage integration:clean` first?
+
+// tests the [beat] setup --pipelines command
+func (runner *BeatRunner) TestSetupPipelines() {
+	if runner.testbeatName != "filebeat" {
+		runner.T().Skip("pipelines only available on filebeat")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	// need to actually enable something that has pipelines
+	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home", runner.agentFixture.WorkDir(),
+		"setup", "--pipelines", "--modules", "apache", "-M", "apache.error.enabled=true", "-M", "apache.access.enabled=true"})
+	assert.NoError(runner.T(), err)
+
+	runner.T().Logf("got response from pipeline setup: %s", string(resp))
+
+	pipelines, err := tools.GetPipelines(ctx, runner.requirementsInfo.ESClient, "*filebeat*")
+	require.NoError(runner.T(), err)
+	require.NotEmpty(runner.T(), pipelines)
 
 }
 

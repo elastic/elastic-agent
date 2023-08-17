@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 )
@@ -21,9 +22,12 @@ type DashboardResponse struct {
 }
 
 type Dashboard struct {
-	Type       string   `json:"type"`
-	ID         string   `json:"id"`
-	Namespaces []string `json:"namespaces"`
+	Type       string    `json:"type"`
+	ID         string    `json:"id"`
+	Namespaces []string  `json:"namespaces"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	CreatedAt  time.Time `json:"created_at"`
+	Version    string    `json:"version"`
 }
 
 // GetDashboards returns a list of known dashboards on the system
