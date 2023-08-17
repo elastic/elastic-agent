@@ -80,6 +80,7 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 			define.OS{Type: define.Linux},
 		},
 	})
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/3260")
 
 	for _, tc := range protectionTests {
 		t.Run(tc.name, func(t *testing.T) {
