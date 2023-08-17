@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build linux || windows
+//go:build !darwin
 
 package vault
 
@@ -19,6 +19,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
 func getTestVaultPath(t *testing.T) string {
@@ -51,7 +53,7 @@ func TestVaultRekey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	diff := cmp.Diff(int(AES256), len(seedBytes))
+	diff := cmp.Diff(int(aesgcm.AES256), len(seedBytes))
 	if diff != "" {
 		t.Fatal(diff)
 	}
@@ -215,17 +217,17 @@ func doCrud(t *testing.T, ctx context.Context, vaultPath, key string) error {
 	defer v.Close()
 
 	// Create new AES256 key
-	k, err := NewKey(AES256)
+	k, err := aesgcm.NewKey(aesgcm.AES256)
 	if err != nil {
 		return err
 	}
 
-	secret := secret{
+	sec := secret{
 		Value:     k,
 		CreatedOn: time.Now().UTC(),
 	}
 
-	b, err := json.Marshal(secret)
+	b, err := json.Marshal(sec)
 	if err != nil {
 		return fmt.Errorf("could not marshal secret: %w", err)
 	}
@@ -235,12 +237,10 @@ func doCrud(t *testing.T, ctx context.Context, vaultPath, key string) error {
 		return fmt.Errorf("failed to set secret: %w", err)
 	}
 
-	sec, err := v.Get(ctx, key)
+	_, err = v.Get(ctx, key)
 	if err != nil {
 		return fmt.Errorf("failed to get secret: %w", err)
 	}
-
-	_ = sec
 
 	return nil
 }

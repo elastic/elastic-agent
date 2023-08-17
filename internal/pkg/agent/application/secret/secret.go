@@ -15,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
 const agentSecretKey = "secret"
@@ -73,7 +74,7 @@ func Create(ctx context.Context, key string, opts ...OptionFunc) error {
 	}
 
 	// Create new AES256 key
-	k, err := vault.NewKey(vault.AES256)
+	k, err := aesgcm.NewKey(aesgcm.AES256)
 	if err != nil {
 		return err
 	}

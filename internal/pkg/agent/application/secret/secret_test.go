@@ -15,7 +15,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
 func getTestVaultPath(t *testing.T) string {
@@ -55,7 +55,7 @@ func TestCreate(t *testing.T) {
 			t.Errorf("invalid created on date/time: %v", secret.CreatedOn)
 		}
 
-		diff := cmp.Diff(int(vault.AES256), len(secret.Value))
+		diff := cmp.Diff(int(aesgcm.AES256), len(secret.Value))
 		if diff != "" {
 			t.Error(diff)
 		}
