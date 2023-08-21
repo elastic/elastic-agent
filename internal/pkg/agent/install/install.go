@@ -172,6 +172,16 @@ func StopService(topPath string) error {
 	return nil
 }
 
+// RestartService stops and starts the installed service.
+func RestartService(topPath string) error {
+	err := StopService(topPath)
+	if err != nil {
+		return err
+	}
+
+	return StartService(topPath)
+}
+
 // FixPermissions fixes the permissions on the installed system.
 func FixPermissions(topPath string) error {
 	return fixPermissions(topPath)

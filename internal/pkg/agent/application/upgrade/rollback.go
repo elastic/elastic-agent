@@ -145,10 +145,9 @@ func restartAgent(ctx context.Context, log *logger.Logger) error {
 
 	restartViaServiceFn := func(ctx context.Context) error {
 		topPath := paths.Top()
-		install.StopService(topPath)
-		err := install.StartService(topPath)
+		err := install.RestartService(topPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to restart agent via service: %w", err)
 		}
 
 		return nil
