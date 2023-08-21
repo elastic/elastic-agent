@@ -1134,11 +1134,13 @@ func downloadBinary(ctx context.Context, project string, packageName string, bin
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
-				fmt.Printf("Downloading %s: unsupported on %s, skipping\n", binary, platform)
+				fmt.Printf("Done downloading %s: unsupported on %s, skipping\n", binary, platform)
 			} else {
 				return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
 			}
 		}
+
+		fmt.Printf("Done downloading %s\n", packageName)
 		return nil
 	}
 }
