@@ -3,9 +3,12 @@ package application
 import (
 	"fmt"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	moncfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -15,9 +18,19 @@ import (
 
 func InjectAPMConfig(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 
+	tracesEnabled, err := getAPMTracesEnabled(cfg)
+	if err != nil {
+		return comps, fmt.Errorf("error retrieving traces flag: %w", err)
+	}
+
+	if !tracesEnabled {
+		// nothing to do
+		return comps, nil
+	}
+
 	apmConfig, err := getAPMConfigFromMap(cfg)
 	if err != nil {
-		return comps, fmt.Errorf("error injecting apm config: %w", err)
+		return comps, fmt.Errorf("error retrieving apm config: %w", err)
 	}
 
 	if apmConfig == nil {
@@ -26,11 +39,35 @@ func InjectAPMConfig(comps []component.Component, cfg map[string]interface{}) ([
 	}
 
 	for i, _ := range comps {
-		comps[i].APM = new(component.APMConfig)
-		comps[i].APM.Elastic = (*component.ElasticAPM)(apmConfig)
+		// We shouldn't really go straight from config datamodel to protobuf datamodel (a core datamodel would be nice to
+		// abstract from protocol details)
+		if comps[i].Component == nil {
+			comps[i].Component = new(proto.Component)
+		}
+		comps[i].Component.ApmConfig = runtime.MapAPMConfig(apmConfig)
 	}
 
 	return comps, nil
+}
+
+func getAPMTracesEnabled(cfg map[string]any) (bool, error) {
+
+	rawTracesEnabled, err := utils.GetNestedMap(cfg, "agent", "monitoring", "traces")
+	if errors.Is(err, utils.ErrKeyNotFound) {
+		// We didn't find the key, return false without any error
+		return false, nil
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("error accessing trace flag: %w", err)
+	}
+
+	traceEnabled, ok := rawTracesEnabled.(bool)
+	if !ok {
+		return false, fmt.Errorf("trace flag has unexpected type %T", rawTracesEnabled)
+	}
+
+	return traceEnabled, nil
 }
 
 func getAPMConfigFromMap(cfg map[string]any) (*moncfg.APMConfig, error) {
@@ -73,6 +110,12 @@ func PatchAPMConfig(log *logger.Logger, rawConfig *config.Config) func(change co
 		return noop
 	}
 
+	tracesEnabled, err := getAPMTracesEnabled(configMap)
+	if err != nil {
+		log.Errorf("error retrieving trace flag, patching disabled: %v", err)
+		return noop
+	}
+
 	apmConfig, err := getAPMConfigFromMap(configMap)
 
 	if err != nil {
@@ -80,13 +123,18 @@ func PatchAPMConfig(log *logger.Logger, rawConfig *config.Config) func(change co
 		return noop
 	}
 
-	if apmConfig == nil {
-		log.Debug("no apm config set, patching disabled")
+	if tracesEnabled == false && apmConfig == nil {
+		// traces disabled and no apm config -> no patching happening
+		log.Debugf("traces disabled and no apm config: no patching necessary")
 		return noop
+	}
+	monitoringPatch := map[string]any{"traces": tracesEnabled}
+	if apmConfig != nil {
+		monitoringPatch["apm"] = apmConfig
 	}
 
 	return func(change coordinator.ConfigChange) coordinator.ConfigChange {
-		err := change.Config().Merge(map[string]any{"agent": map[string]any{"monitoring": map[string]any{"apm": apmConfig}}})
+		err := change.Config().Merge(map[string]any{"agent": map[string]any{"monitoring": monitoringPatch}})
 		if err != nil {
 			log.Errorf("error patching apm config into configchange: %v", err)
 		}

@@ -286,21 +286,25 @@ components:
 func TestDiagnosticComponentsExpectedWithAPM(t *testing.T) {
 	// Create a Coordinator with a test component model and make sure it's
 	// reported by the components-expected diagnostic
+	apik := "apikey"
+	st := "st"
 	components := []component.Component{
 		{
 			ID:         "some-apm-aware-component",
 			InputType:  "filestream",
 			OutputType: "elasticsearch",
-			APM: &component.APMConfig{
-				Elastic: &component.ElasticAPM{
-					Environment: "diag-unit-test",
-					APIKey:      "apikey",
-					SecretToken: "st",
-					Hosts:       []string{"host1", "host2"},
-					TLS: monitoringCfg.APMTLS{
-						SkipVerify:        true,
-						ServerCertificate: "servercert",
-						ServerCA:          "serverca",
+			Component: &proto.Component{
+				ApmConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment: "diag-unit-test",
+						APIKey:      &apik,
+						SecretToken: &st,
+						Hosts:       []string{"host1", "host2"},
+						Tls: &proto.ElasticAPMTLS{
+							SkipVerify: true,
+							ServerCert: "servercert",
+							ServerCa:   "serverca",
+						},
 					},
 				},
 			},
@@ -313,18 +317,20 @@ components:
     input_type: filestream
     output_type: elasticsearch
     units: []
-    apm:
-      elastic:
-        environment: diag-unit-test
-        apikey: apikey
-        secrettoken: st
-        hosts:
-        - host1
-        - host2
-        tls:
-          skipverify: true
-          servercertificate: servercert
-          serverca: serverca
+    component:
+      limits: null
+      apmconfig:
+        elastic:
+          environment: diag-unit-test
+          apikey: apikey
+          secrettoken: st
+          hosts:
+          - host1
+          - host2
+          tls:
+            skipverify: true
+            servercert: servercert
+            serverca: serverca
 `
 
 	coord := &Coordinator{componentModel: components}

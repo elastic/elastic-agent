@@ -185,9 +185,6 @@ type Component struct {
 	// ShipperRef references the component/unit that this component used as its output.
 	// (only applies to inputs targeting a shipper, not set when ShipperSpec is)
 	ShipperRef *ShipperReference `yaml:"shipper,omitempty"`
-
-	//TODO document this
-	APM *APMConfig `yaml:"apm,omitempty"`
 }
 
 // Type returns the type of the component.

@@ -250,10 +250,14 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 }
 
 func injectAPMConfig(current component.Component, expected *proto.CheckinExpected) {
+	if current.Component == nil {
+		expected.Component = nil
+		return
+	}
 	if expected.Component == nil {
 		expected.Component = &proto.Component{}
 	}
-	expected.Component.ApmConfig = mapAPMConfig(current.APM)
+	expected.Component.ApmConfig = current.Component.ApmConfig
 }
 
 // Watch returns the channel that sends component state.
