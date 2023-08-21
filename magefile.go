@@ -948,6 +948,8 @@ func packageAgent(platforms []string, packagingFn func()) {
 			//
 			// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
 			// download artifacts on unsupported platforms and choose to ignore the errors.
+			//
+			// Change this to InfoLevel to see exactly what the downloader is doing.
 			logrus.SetLevel(logrus.FatalLevel)
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
