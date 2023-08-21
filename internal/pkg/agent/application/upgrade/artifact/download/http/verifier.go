@@ -5,6 +5,7 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 
@@ -82,7 +84,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string, pgpBytes ...string) error {
+func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
 	fullPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
 		return errors.New(err, "retrieving package path")
@@ -97,7 +99,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, pgpBytes ...strin
 		return err
 	}
 
-	if err = v.verifyAsc(a, version, pgpBytes...); err != nil {
+	if err = v.verifyAsc(a, version, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
 			os.Remove(fullPath + ".asc")
@@ -108,9 +110,9 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, pgpBytes ...strin
 	return nil
 }
 
-func (v *Verifier) verifyAsc(a artifact.Artifact, version string, pgpSources ...string) error {
+func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultPgp bool, pgpSources ...string) error {
 	var pgpBytes [][]byte
-	if len(v.pgpBytes) > 0 {
+	if len(v.pgpBytes) > 0 && !skipDefaultPgp {
 		v.log.Infof("Default PGP being appended")
 		pgpBytes = append(pgpBytes, v.pgpBytes)
 	}
@@ -167,7 +169,7 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version string, pgpSources ...
 			v.log.Infof("Verification with PGP[%d] successful", i)
 			return nil
 		}
-		v.log.Warnf("Verification with PGP[%d] succfailed: %v", i, err)
+		v.log.Warnf("Verification with PGP[%d] failed: %v", i, err)
 	}
 
 	v.log.Warnf("Verification failed")
@@ -194,7 +196,14 @@ func (v *Verifier) composeURI(filename, artifactName string) (string, error) {
 }
 
 func (v *Verifier) getPublicAsc(sourceURI string) ([]byte, error) {
-	resp, err := v.client.Get(sourceURI)
+	ctx, cancelFn := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelFn()
+	// Change NewRequest to NewRequestWithContext and pass context it
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURI, nil)
+	if err != nil {
+		return nil, errors.New(err, "failed create request for loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, errors.New(err, "failed loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}

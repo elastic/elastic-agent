@@ -10,6 +10,7 @@ inputs:
     outputs:
       - elasticsearch
       - logstash
+      - kafka
     proxied_actions:
       - UNENROLL
       - UPGRADE
@@ -19,6 +20,8 @@ inputs:
           message: "No support for RHEL7 on arm64"
         - condition: ${user.root} == false
           message: "Elastic Agent must be running as root"
+        - condition: ${install.in_default} == false
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service:
       cport: 6788
       log:
@@ -57,6 +60,10 @@ inputs:
     proxied_actions:
       - UNENROLL
       - UPGRADE
+    runtime:
+      preventions:
+        - condition: ${install.in_default} == false
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service:
       cport: 6788
       log:
@@ -76,6 +83,8 @@ inputs:
       preventions:
         - condition: ${user.root} == false
           message: "Elastic Agent must be running as Administrator or SYSTEM"
+        - condition: ${install.in_default} == false
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service:
       cport: 6788
       log:

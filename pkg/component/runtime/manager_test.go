@@ -91,7 +91,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -189,7 +189,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -319,7 +319,7 @@ func TestManager_FakeInput_Features(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -491,6 +491,328 @@ func TestManager_FakeInput_Features(t *testing.T) {
 	}
 }
 
+func TestManager_FakeInput_Limits(t *testing.T) {
+	testPaths(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	agentInfo, _ := info.NewAgentInfo(true)
+	m, err := NewManager(
+		newDebugLogger(t),
+		newDebugLogger(t),
+		"localhost:0",
+		agentInfo,
+		apmtest.DiscardTracer,
+		newTestMonitoringMgr(),
+		configuration.DefaultGRPCConfig(),
+	)
+	require.NoError(t, err)
+
+	managerErrCh := make(chan error)
+	go func() {
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		managerErrCh <- err
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := waitForReady(waitCtx, m); err != nil {
+		require.NoError(t, err)
+	}
+
+	binaryPath := testBinary(t, "component")
+	const compID = "fake-default"
+	var compMu sync.Mutex
+	comp := component.Component{
+		ID: compID,
+		Component: &proto.Component{
+			Limits: &proto.ComponentLimits{
+				GoMaxProcs: 99,
+			},
+		},
+		InputSpec: &component.InputRuntimeSpec{
+			InputType:  "fake",
+			BinaryName: "",
+			BinaryPath: binaryPath,
+			Spec:       fakeInputSpec,
+		},
+		Units: []component.Unit{},
+	}
+
+	subscriptionCtx, subCancel := context.WithCancel(context.Background())
+	defer subCancel()
+	subscriptionErrCh := make(chan error)
+	doneCh := make(chan struct{})
+
+	go func() {
+		sub := m.Subscribe(subscriptionCtx, compID)
+		var healthyIteration int
+
+		for {
+			select {
+			case <-subscriptionCtx.Done():
+				return
+
+			case componentState := <-sub.Ch():
+
+				t.Logf("component state changed: %+v", componentState)
+
+				switch componentState.State {
+				case client.UnitStateHealthy:
+					compMu.Lock()
+					comp := comp // local copy for changes
+					compMu.Unlock()
+					healthyIteration++
+
+					switch healthyIteration {
+					// check that the initial value was set correctly
+					case 1:
+						assert.NotNil(t, componentState.Component)
+						assert.NotNil(t, componentState.Component.Limits)
+						assert.Equal(t, uint64(99), componentState.Component.Limits.GoMaxProcs)
+
+						// then make a change and see how it's reflected on the next healthy state
+						// we must replace the whole section to keep it thread-safe
+						comp.Component = &proto.Component{
+							Limits: &proto.ComponentLimits{
+								GoMaxProcs: 101,
+							},
+						}
+						err := m.Update(component.Model{
+							Components: []component.Component{comp},
+						})
+						if err != nil {
+							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
+								healthyIteration, err)
+							return
+						}
+					// check if the change was handled
+					case 2:
+						assert.NotNil(t, componentState.Component)
+						assert.NotNil(t, componentState.Component.Limits)
+						assert.Equal(t, uint64(101), componentState.Component.Limits.GoMaxProcs)
+
+						comp.Component = nil
+						err := m.Update(component.Model{
+							Components: []component.Component{comp},
+						})
+						if err != nil {
+							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
+								healthyIteration, err)
+							return
+						}
+					// check if the empty config is handled
+					case 3:
+						assert.Nil(t, componentState.Component)
+						doneCh <- struct{}{}
+					}
+				// allowed states
+				case client.UnitStateStarting:
+				case client.UnitStateConfiguring:
+				default:
+					// unexpected state that should not have occurred
+					subscriptionErrCh <- fmt.Errorf("unit reported unexpected state: %v",
+						componentState.State)
+				}
+			}
+		}
+	}()
+
+	defer drainErrChan(managerErrCh)
+	defer drainErrChan(subscriptionErrCh)
+
+	err = m.Update(component.Model{Components: []component.Component{comp}})
+	require.NoError(t, err)
+
+	timeout := 30 * time.Second
+	timeoutTimer := time.NewTimer(timeout)
+	defer timeoutTimer.Stop()
+
+	// Wait for a success, an error or time out
+	for {
+		select {
+		case <-timeoutTimer.C:
+			t.Fatalf("timed out after %s", timeout)
+		case err := <-managerErrCh:
+			require.NoError(t, err)
+		case err := <-subscriptionErrCh:
+			require.NoError(t, err)
+		case <-doneCh:
+			subCancel()
+			cancel()
+
+			err = <-managerErrCh
+			require.NoError(t, err)
+			return
+		}
+	}
+}
+
+func TestManager_FakeShipper_Limits(t *testing.T) {
+	testPaths(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	agentInfo, _ := info.NewAgentInfo(true)
+	m, err := NewManager(
+		newDebugLogger(t),
+		newDebugLogger(t),
+		"localhost:0",
+		agentInfo,
+		apmtest.DiscardTracer,
+		newTestMonitoringMgr(),
+		configuration.DefaultGRPCConfig(),
+	)
+	require.NoError(t, err)
+
+	managerErrCh := make(chan error)
+	go func() {
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		managerErrCh <- err
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := waitForReady(waitCtx, m); err != nil {
+		require.NoError(t, err)
+	}
+
+	shipperPath := testBinary(t, "shipper")
+	const compID = "fake-shipper-default"
+	var compMu sync.Mutex
+	comp := component.Component{
+		ID: compID,
+		ShipperSpec: &component.ShipperRuntimeSpec{
+			ShipperType: "fake-shipper",
+			BinaryName:  "",
+			BinaryPath:  shipperPath,
+			Spec:        fakeShipperSpec,
+		},
+		Component: &proto.Component{
+			Limits: &proto.ComponentLimits{
+				GoMaxProcs: 99,
+			},
+		},
+		Units: []component.Unit{},
+	}
+
+	subscriptionCtx, subCancel := context.WithCancel(context.Background())
+	defer subCancel()
+	subscriptionErrCh := make(chan error)
+	doneCh := make(chan struct{})
+
+	go func() {
+		sub := m.Subscribe(subscriptionCtx, compID)
+		var healthyIteration int
+
+		for {
+			select {
+			case <-subscriptionCtx.Done():
+				return
+
+			case componentState := <-sub.Ch():
+
+				t.Logf("component state changed: %+v", componentState)
+
+				switch componentState.State {
+				case client.UnitStateHealthy:
+					compMu.Lock()
+					comp := comp // local copy for changes
+					compMu.Unlock()
+					healthyIteration++
+
+					switch healthyIteration {
+					// check that the initial value was set correctly
+					case 1:
+						assert.NotNil(t, componentState.Component)
+						assert.NotNil(t, componentState.Component.Limits)
+						assert.Equal(t, uint64(99), componentState.Component.Limits.GoMaxProcs)
+
+						// then make a change and see how it's reflected on the next healthy state
+						// we must replace the whole section to keep it thread-safe
+						comp.Component = &proto.Component{
+							Limits: &proto.ComponentLimits{
+								GoMaxProcs: 101,
+							},
+						}
+						err := m.Update(component.Model{
+							Components: []component.Component{comp},
+						})
+						if err != nil {
+							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
+								healthyIteration, err)
+							return
+						}
+					// check if the change was handled
+					case 2:
+						assert.NotNil(t, componentState.Component)
+						assert.NotNil(t, componentState.Component.Limits)
+						assert.Equal(t, uint64(101), componentState.Component.Limits.GoMaxProcs)
+
+						comp.Component = nil
+						err := m.Update(component.Model{
+							Components: []component.Component{comp},
+						})
+						if err != nil {
+							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
+								healthyIteration, err)
+							return
+						}
+					// check if the empty config is handled
+					case 3:
+						assert.Nil(t, componentState.Component)
+						doneCh <- struct{}{}
+					}
+				// allowed states
+				case client.UnitStateStarting:
+				case client.UnitStateConfiguring:
+				default:
+					// unexpected state that should not have occurred
+					subscriptionErrCh <- fmt.Errorf("unit reported unexpected state: %v",
+						componentState.State)
+				}
+			}
+		}
+	}()
+
+	defer drainErrChan(managerErrCh)
+	defer drainErrChan(subscriptionErrCh)
+
+	err = m.Update(component.Model{Components: []component.Component{comp}})
+	require.NoError(t, err)
+
+	timeout := 30 * time.Second
+	timeoutTimer := time.NewTimer(timeout)
+	defer timeoutTimer.Stop()
+
+	// Wait for a success, an error or time out
+	for {
+		select {
+		case <-timeoutTimer.C:
+			t.Fatalf("timed out after %s", timeout)
+		case err := <-managerErrCh:
+			require.NoError(t, err)
+		case err := <-subscriptionErrCh:
+			require.NoError(t, err)
+		case <-doneCh:
+			subCancel()
+			cancel()
+
+			err = <-managerErrCh
+			require.NoError(t, err)
+			return
+		}
+	}
+}
+
 func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 	testPaths(t)
 
@@ -511,7 +833,7 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -680,7 +1002,7 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -839,7 +1161,7 @@ func TestManager_FakeInput_NoDeadlock(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -973,7 +1295,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1096,7 +1418,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1252,7 +1574,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1379,7 +1701,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1517,7 +1839,7 @@ func TestManager_FakeInput_Restarts_ConfigKill(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1662,7 +1984,7 @@ func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1807,7 +2129,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1925,7 +2247,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -2053,7 +2375,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -2266,7 +2588,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -2413,7 +2735,7 @@ func TestManager_FakeShipper(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -2716,7 +3038,7 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -3042,3 +3364,15 @@ func newTestMonitoringMgr() *testMonitoringManager { return &testMonitoringManag
 func (*testMonitoringManager) EnrichArgs(_ string, _ string, args []string) []string { return args }
 func (*testMonitoringManager) Prepare(_ string) error                                { return nil }
 func (*testMonitoringManager) Cleanup(string) error                                  { return nil }
+
+// waitForReady waits until the RPC server is ready to be used.
+func waitForReady(ctx context.Context, m *Manager) error {
+	for !m.serverReady.Load() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	return nil
+}

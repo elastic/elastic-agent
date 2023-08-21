@@ -168,7 +168,7 @@ func (s *Server) Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartRes
 
 // Upgrade performs the upgrade operation.
 func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error) {
-	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil, request.SkipVerify, request.PgpBytes...)
+	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil, request.SkipVerify, request.SkipDefaultPgp, request.PgpBytes...)
 	if err != nil {
 		//nolint:nilerr // ignore the error, return a failure upgrade response
 		return &cproto.UpgradeResponse{
@@ -183,7 +183,7 @@ func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*
 }
 
 // DiagnosticAgent returns diagnostic information for this running Elastic Agent.
-func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentRequest) (*cproto.DiagnosticAgentResponse, error) {
+func (s *Server) DiagnosticAgent(ctx context.Context, req *cproto.DiagnosticAgentRequest) (*cproto.DiagnosticAgentResponse, error) {
 	res := make([]*cproto.DiagnosticFileResult, 0, len(s.diagHooks))
 	for _, h := range s.diagHooks {
 		if ctx.Err() != nil {
@@ -199,10 +199,69 @@ func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentR
 			Generated:   timestamppb.New(time.Now().UTC()),
 		})
 	}
+
+	for _, metric := range req.AdditionalMetrics {
+		switch metric {
+		case cproto.AdditionalDiagnosticRequest_CPU:
+			duration := time.Second * 30
+			s.logger.Infof("Collecting CPU metrics, waiting for %s", duration)
+			cpuResults, err := diagnostics.CreateCPUProfile(ctx, duration)
+			if err != nil {
+				return nil, fmt.Errorf("error gathering CPU profile: %w", err)
+			}
+			res = append(res, &cproto.DiagnosticFileResult{
+				Name:        "cpuprofile",
+				Filename:    "cpu.pprof",
+				Description: "CPU profile",
+				ContentType: "application/octet-stream",
+				Content:     cpuResults,
+				Generated:   timestamppb.New(time.Now().UTC()),
+			})
+		}
+	}
+
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
 	return &cproto.DiagnosticAgentResponse{Results: res}, nil
+}
+
+// DiagnosticComponents returns diagnostic information for the given components
+func (s *Server) DiagnosticComponents(req *cproto.DiagnosticComponentsRequest, respServ cproto.ElasticAgentControl_DiagnosticComponentsServer) error {
+	reqs := []component.Component{}
+	for _, comp := range req.Components {
+		reqs = append(reqs, component.Component{ID: comp.GetComponentId()})
+	}
+
+	diags, err := s.coord.PerformComponentDiagnostics(respServ.Context(), req.AdditionalMetrics, reqs...)
+	if err != nil {
+		return fmt.Errorf("error fetching component-level diagnostics: %w", err)
+	}
+	for _, diag := range diags {
+		respFiles := []*cproto.DiagnosticFileResult{}
+		for _, file := range diag.Results {
+			respFiles = append(respFiles, &cproto.DiagnosticFileResult{
+				Name:        file.Name,
+				Filename:    file.Filename,
+				Description: file.Description,
+				ContentType: file.ContentType,
+				Content:     file.Content,
+				Generated:   file.Generated,
+			})
+		}
+		respStruct := &cproto.DiagnosticComponentResponse{
+			ComponentId: diag.Component.ID,
+			Results:     respFiles,
+		}
+		if diag.Err != nil {
+			respStruct.Error = diag.Err.Error()
+		}
+		err := respServ.Send(respStruct)
+		if err != nil {
+			return fmt.Errorf("error sending response: %w", err)
+		}
+	}
+	return nil
 }
 
 // DiagnosticUnits returns diagnostic information for the specific units (or all units if non-provided).
@@ -278,7 +337,7 @@ func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.
 			if unit.Payload != nil {
 				payload, err = json.Marshal(unit.Payload)
 				if err != nil {
-					return nil, fmt.Errorf("failed to marshal componend %s unit %s payload: %w", comp.Component.ID, key.UnitID, err)
+					return nil, fmt.Errorf("failed to marshal component %s unit %s payload: %w", comp.Component.ID, key.UnitID, err)
 				}
 			}
 			units = append(units, &cproto.ComponentUnitState{

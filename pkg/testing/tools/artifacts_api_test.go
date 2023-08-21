@@ -20,28 +20,20 @@ const (
 		"versions": [
 		  "7.17.9",
 		  "7.17.10",
-		  "7.17.11-SNAPSHOT",
 		  "8.6.0",
 		  "8.6.1",
 		  "8.6.2",
 		  "8.7.0",
-		  "8.7.1-SNAPSHOT",
 		  "8.7.1",
-		  "8.7.2-SNAPSHOT",
-		  "8.8.0-SNAPSHOT",
 		  "8.8.0",
-		  "8.8.1-SNAPSHOT",
+		  "8.8.1",
 		  "8.9.0-SNAPSHOT"
 		],
 		"aliases": [
-		  "7.17-SNAPSHOT",
 		  "7.17",
 		  "8.6",
-		  "8.7-SNAPSHOT",
 		  "8.7",
-		  "8.8-SNAPSHOT",
-		  "8.8",
-		  "8.9-SNAPSHOT"
+		  "8.8"
 		],
 		"manifests": {
 		  "last-update-time": "Thu, 01 Jun 2023 07:50:21 UTC",
@@ -52,11 +44,11 @@ const (
 	// simplified response for version 8.9.0-SNAPSHOT
 	cannedBuildVersions = `{
 		"builds": [
-		  "8.9.0-1ee08db3",
-		  "8.9.0-f1fa1d73",
-		  "8.9.0-3b0166e4",
-		  "8.9.0-b4e26cd0",
-		  "8.9.0-3cc641a9"
+		  "8.9.0-abcdefgh",
+		  "8.9.0-12343567",
+		  "8.9.0-asdfasds",
+		  "8.9.0-zzaqwsxc",
+		  "8.9.0-iopwerth"
 		],
 		"manifests": {
 		  "last-update-time": "Thu, 01 Jun 2023 08:31:02 UTC",
@@ -64,7 +56,7 @@ const (
 		}
 	  }
 	`
-	// simplified response for build 8.9.0-SNAPSHOT+1ee08db3 (the original one is over 6k lines)
+	// simplified response for build 8.9.0-SNAPSHOT+abcdefgh (the original one is over 6k lines)
 	cannedBuildDetails = `
 	{
 		"build": {
@@ -76,9 +68,9 @@ const (
 			  "build_duration_seconds": 3319,
 			  "packages": {
 				"elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz": {
-				  "url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz",
-				  "sha_url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.sha512",
-				  "asc_url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.asc",
+				  "url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz",
+				  "sha_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.sha512",
+				  "asc_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.asc",
 				  "type": "docker",
 				  "architecture": "amd64",
 				  "os": [
@@ -94,9 +86,9 @@ const (
 				  }
 				},
 				"elastic-agent-8.9.0-SNAPSHOT-arm64.deb": {
-				  "url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-arm64.deb",
-				  "sha_url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-arm64.deb.sha512",
-				  "asc_url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-arm64.deb.asc",
+				  "url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-arm64.deb",
+				  "sha_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-arm64.deb.sha512",
+				  "asc_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-arm64.deb.asc",
 				  "type": "deb",
 				  "architecture": "arm64",
 				  "attributes": {
@@ -105,9 +97,9 @@ const (
 				  }
 				},
 				"elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz": {
-				  "url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz",
-				  "sha_url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz.sha512",
-				  "asc_url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz.asc",
+				  "url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz",
+				  "sha_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz.sha512",
+				  "asc_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz.asc",
 				  "type": "tar",
 				  "architecture": "x86_64",
 				  "os": [
@@ -115,9 +107,9 @@ const (
 				  ]
 				},
 				"elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip": {
-				  "url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip",
-				  "sha_url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip.sha512",
-				  "asc_url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip.asc",
+				  "url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip",
+				  "sha_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip.sha512",
+				  "asc_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip.asc",
 				  "type": "zip",
 				  "architecture": "x86_64",
 				  "os": [
@@ -125,9 +117,9 @@ const (
 				  ]
 				},
 				"elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm": {
-				  "url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm",
-				  "sha_url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm.sha512",
-				  "asc_url": "https://snapshots.elastic.co/8.9.0-1ee08db3/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm.asc",
+				  "url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm",
+				  "sha_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm.sha512",
+				  "asc_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm.asc",
 				  "type": "rpm",
 				  "architecture": "aarch64",
 				  "attributes": {
@@ -146,7 +138,7 @@ const (
 		  "manifest_version": "2.1.0",
 		  "version": "8.9.0-SNAPSHOT",
 		  "branch": "master",
-		  "build_id": "8.9.0-1ee08db3",
+		  "build_id": "8.9.0-abcdefgh",
 		  "build_duration_seconds": 14565
 		},
 		"manifests": {
@@ -196,7 +188,7 @@ func TestDefaultArtifactAPIClient(t *testing.T) {
 			_, _ = w.Write([]byte(cannedVersions))
 		case "/v1/versions/8.9.0-SNAPSHOT/builds/":
 			_, _ = w.Write([]byte(cannedBuildVersions))
-		case "/v1/versions/8.9.0-SNAPSHOT/builds/8.9.0-1ee08db3":
+		case "/v1/versions/8.9.0-SNAPSHOT/builds/8.9.0-abcdefgh":
 			_, _ = w.Write([]byte(cannedBuildDetails))
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -217,7 +209,7 @@ func TestDefaultArtifactAPIClient(t *testing.T) {
 	assert.NotNil(t, builds)
 	assert.NotEmpty(t, builds.Builds)
 
-	buildDetails, err := aac.GetBuildDetails(context.Background(), "8.9.0-SNAPSHOT", "8.9.0-1ee08db3")
+	buildDetails, err := aac.GetBuildDetails(context.Background(), "8.9.0-SNAPSHOT", "8.9.0-abcdefgh")
 	assert.NoError(t, err)
 	assert.NotNil(t, buildDetails)
 	assert.NotEmpty(t, buildDetails.Build)

@@ -11,10 +11,12 @@ jobs:
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
 
+      - name: Extract Go version from .go-version
+        run: echo "GO_VERSION=$(cat .go-version)" >> $GITHUB_ENV
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version-file: 'go.mod'
+          go-version: "${{ env.GO_VERSION }}"
           cache: true
 
       - name: Go cache

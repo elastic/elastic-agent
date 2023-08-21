@@ -7,6 +7,7 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -32,10 +33,8 @@ func TestEnrollAndLog(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
-
-	t.Skip("Test is flaky; see https://github.com/elastic/elastic-agent/issues/3081")
-
 	t.Logf("got namespace: %s", info.Namespace)
+	t.Skip("Test is flaky; see https://github.com/elastic/elastic-agent/issues/3081")
 	suite.Run(t, &EnrollRunner{requirementsInfo: info})
 }
 
@@ -78,12 +77,16 @@ func (runner *EnrollRunner) TestEnroll() {
 	}
 	// Stage 1: Install
 	// As part of the cleanup process, we'll uninstall the agent
-	policy, err := tools.InstallAgentWithPolicy(t, runner.agentFixture, kibClient, createPolicyReq)
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+	policy, err := tools.InstallAgentWithPolicy(t, context.Background(), installOpts, runner.agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 
 	t.Cleanup(func() {
-		//After: unenroll
+		// After: unenroll
 		t.Logf("Cleanup: unenrolling agent")
 		err = tools.UnEnrollAgent(info.KibanaClient)
 		require.NoError(t, err)
