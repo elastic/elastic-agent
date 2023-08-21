@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -169,6 +170,9 @@ type Component struct {
 	// Features configuration the component should use.
 	Features *proto.Features `yaml:"features,omitempty"`
 
+	// Component-level configuration
+	Component *proto.Component `yaml:"component,omitempty"`
+
 	// ShipperRef references the component/unit that this component used as its output.
 	// (only applies to inputs targeting a shipper, not set when ShipperSpec is)
 	ShipperRef *ShipperReference `yaml:"shipper,omitempty"`
@@ -316,6 +320,7 @@ func (r *RuntimeSpecs) componentForInputType(
 	inputType string,
 	output outputI,
 	featureFlags *features.Flags,
+	componentConfig *ComponentConfig,
 ) Component {
 	componentID := fmt.Sprintf("%s-%s", inputType, output.name)
 
@@ -381,11 +386,12 @@ func (r *RuntimeSpecs) componentForInputType(
 		OutputType: output.outputType,
 		Units:      units,
 		Features:   featureFlags.AsProto(),
+		Component:  componentConfig.AsProto(),
 		ShipperRef: shipperRef,
 	}
 }
 
-func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *features.Flags) []Component {
+func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *features.Flags, componentConfig *ComponentConfig) []Component {
 	var components []Component
 	shipperTypes := make(map[string]bool)
 	for inputType := range output.inputs {
@@ -394,7 +400,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 		// from running then it will be in the Component's Err field and
 		// we will report it later. The only thing we skip is a component
 		// with no units.
-		component := r.componentForInputType(inputType, output, featureFlags)
+		component := r.componentForInputType(inputType, output, featureFlags, componentConfig)
 		if len(component.Units) > 0 {
 			if component.ShipperRef != nil {
 				// If this component uses a shipper, mark that shipper type as active
@@ -406,7 +412,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 
 	// create the shipper components to go with the inputs
 	for shipperType := range shipperTypes {
-		shipperComponent, ok := r.componentForShipper(shipperType, output, components, featureFlags)
+		shipperComponent, ok := r.componentForShipper(shipperType, output, components, featureFlags, componentConfig)
 		if ok {
 			components = append(components, shipperComponent)
 		}
@@ -419,6 +425,7 @@ func (r *RuntimeSpecs) componentForShipper(
 	output outputI,
 	inputComponents []Component,
 	featureFlags *features.Flags,
+	componentConfig *ComponentConfig,
 ) (Component, bool) {
 	shipperSpec := r.shipperSpecs[shipperType] // type always exists at this point
 	shipperCompID := fmt.Sprintf("%s-%s", shipperType, output.name)
@@ -458,6 +465,7 @@ func (r *RuntimeSpecs) componentForShipper(
 			ShipperSpec: &shipperSpec,
 			Units:       shipperUnits,
 			Features:    featureFlags.AsProto(),
+			Component:   componentConfig.AsProto(),
 		}, true
 	}
 	return Component{}, false
@@ -490,12 +498,23 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	}
 	sort.Strings(outputKeys)
 
+	// get agent limits from the policy
+	limits, err := limits.Parse(policy)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse limits from policy: %w", err)
+	}
+	// for now it's a shared component configuration for all components
+	// subject to change in the future
+	componentConfig := &ComponentConfig{
+		Limits: ComponentLimits(*limits),
+	}
+
 	var components []Component
 	for _, outputName := range outputKeys {
 		output := outputsMap[outputName]
 		if output.enabled {
 			components = append(components,
-				r.componentsForOutput(output, featureFlags)...)
+				r.componentsForOutput(output, featureFlags, componentConfig)...)
 		}
 	}
 

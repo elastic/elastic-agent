@@ -121,6 +121,12 @@ inputs:
 #   # Default is false
 #   exponential: false
 
+# agent.limits:
+#   # limits the number of operating system threads that can execute user-level Go code simultaneously.
+#   # Translates into the GOMAXPROCS runtime parameter for each Go process started by the agent and the agent itself.
+#   # By default is set to `0` which means using all available CPUs.
+#   go_max_procs: 0
+
 # agent.monitoring:
 #   # enabled turns on monitoring of running processes
 #   enabled: false
