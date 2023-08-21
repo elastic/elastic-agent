@@ -773,8 +773,8 @@ github.com/dsnet/golib v0.0.0-20171103203638-1ea166775780/go.mod h1:Lj+Z9rebOhdf
 github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
-github.com/elastic/e2e-testing v1.99.2-0.20230817095916-3cca08594aec h1:tAqFA1umWgPKe/T78g05kq0+dObbduG0RyZgYayOwzo=
-github.com/elastic/e2e-testing v1.99.2-0.20230817095916-3cca08594aec/go.mod h1:8q2d8dmwavJXISowwaoreHFBnbR/uK4qanfRGhC/W9A=
+github.com/elastic/e2e-testing v1.1.0 h1:Y+K215EWkf3ojAWmBK2JrxH/rITjkKM1zR8mnwIpvLw=
+github.com/elastic/e2e-testing v1.1.0/go.mod h1:8q2d8dmwavJXISowwaoreHFBnbR/uK4qanfRGhC/W9A=
 github.com/elastic/elastic-agent-autodiscover v0.6.2 h1:7P3cbMBWXjbzA80rxitQjc+PiWyZ4I4F4LqrCYgYlNc=
 github.com/elastic/elastic-agent-autodiscover v0.6.2/go.mod h1:yXYKFAG+Py+TcE4CCR8EAbJiYb+6Dz9sCDoWgOveqtU=
 github.com/elastic/elastic-agent-client/v7 v7.3.0 h1:LugKtBXK7bp4SFL/uQqGU/f4Ppx12Jk5a36voGabLa0=

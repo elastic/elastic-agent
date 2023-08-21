@@ -12,7 +12,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.3-0.20220203105225-a9a7ef127534
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/e2e-testing v1.99.2-0.20230817095916-3cca08594aec
+	github.com/elastic/e2e-testing v1.1.0
 	github.com/elastic/elastic-agent-autodiscover v0.6.2
 	github.com/elastic/elastic-agent-client/v7 v7.3.0
 	github.com/elastic/elastic-agent-libs v0.3.11
