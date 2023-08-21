@@ -72,6 +72,9 @@ func init() {
 // Top returns the top directory for Elastic Agent, all the versioned
 // home directories live under this top-level/data/elastic-agent-${hash}
 func Top() string {
+	mu.Lock()
+	defer mu.Unlock()
+
 	return topPath
 }
 
@@ -91,13 +94,18 @@ func TempDir() string {
 	tmpDir := filepath.Join(Data(), tempSubdir)
 	tmpCreator.Do(func() {
 		// create tempdir as it probably doesn't exist
-		_ = os.MkdirAll(tmpDir, tempSubdirPerms)
+		if err := os.MkdirAll(tmpDir, tempSubdirPerms); err != nil {
+			panic(fmt.Sprintf("could not create Agent's temp directory: %v", err))
+		}
 	})
 	return tmpDir
 }
 
 // Home returns a directory where binary lives
 func Home() string {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if unversionedHome {
 		return topPath
 	}
@@ -106,6 +114,9 @@ func Home() string {
 
 // IsVersionHome returns true if the Home path is versioned based on build.
 func IsVersionHome() bool {
+	mu.Lock()
+	defer mu.Unlock()
+
 	return !unversionedHome
 }
 
@@ -122,6 +133,9 @@ func SetVersionHome(version bool) {
 
 // Config returns a directory where configuration file lives
 func Config() string {
+	mu.Lock()
+	defer mu.Unlock()
+
 	return configPath
 }
 
@@ -132,11 +146,15 @@ func Config() string {
 func SetConfig(path string) {
 	mu.Lock()
 	defer mu.Unlock()
+
 	configPath = path
 }
 
 // ConfigFile returns the path to the configuration file.
 func ConfigFile() string {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if configFilePath == "" || configFilePath == DefaultConfigName {
 		return filepath.Join(Config(), DefaultConfigName)
 	}
@@ -153,6 +171,9 @@ func ExternalInputs() string {
 
 // Data returns the data directory for Agent
 func Data() string {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if unversionedHome {
 		// unversioned means the topPath is the data path
 		return topPath
@@ -162,16 +183,23 @@ func Data() string {
 
 // Run returns the run directory for Agent
 func Run() string {
+	// Home() is already threadsafe
 	return filepath.Join(Home(), "run")
 }
 
 // Components returns the component directory for Agent
 func Components() string {
+	mu.Lock()
+	defer mu.Unlock()
+
 	return componentsPath
 }
 
 // Logs returns the log directory for Agent
 func Logs() string {
+	mu.Lock()
+	defer mu.Unlock()
+
 	return logsPath
 }
 
@@ -190,6 +218,9 @@ func VersionedHome(base string) string {
 
 // Downloads returns the downloads directory for Agent
 func Downloads() string {
+	mu.Lock()
+	defer mu.Unlock()
+
 	return downloadsPath
 }
 
@@ -201,8 +232,12 @@ func SetDownloads(path string) {
 	downloadsPath = path
 }
 
-// Install returns the install directory for Agent
+// Install returns the installation directory for Agent
 func Install() string {
+	mu.Lock()
+	installPath := installPath
+	defer mu.Unlock()
+
 	if installPath == "" {
 		return filepath.Join(Home(), "install")
 	}
