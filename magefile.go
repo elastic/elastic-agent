@@ -38,12 +38,12 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
-
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
+	tools "github.com/elastic/elastic-agent/pkg/testing/tools"
 	bversion "github.com/elastic/elastic-agent/version"
 
 	// mage:import
@@ -51,7 +51,7 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
-	"github.com/sirupsen/logrus"
+	// "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
@@ -494,9 +494,6 @@ func FixDRADockerArtifacts() error {
 }
 
 func getPackageName(beat, version, pkg string) (string, string) {
-	if _, ok := os.LookupEnv(snapshotEnv); ok {
-		version += "-SNAPSHOT"
-	}
 	return version, fmt.Sprintf("%s-%s-%s", beat, version, pkg)
 }
 
@@ -933,22 +930,28 @@ func packageAgent(platforms []string, packagingFn func()) {
 				"pf-host-agent",
 			}
 
-			ctx := context.Background()
+			packageRequests := []tools.PackageRequest{}
+			downloadVersion := packageVersion
+			if _, ok := os.LookupEnv(snapshotEnv); ok {
+				downloadVersion += "-SNAPSHOT"
+			}
 			for _, binary := range externalBinaries {
 				for _, platform := range platforms {
 					reqPackage := platformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
-					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
-					err := fetchBinaryFromArtifactsApi(ctx, packageName, binary, newVersion, targetPath)
-					if err != nil {
-						if strings.Contains(err.Error(), "object not found") {
-							fmt.Printf("Downloading %s: unsupported on %s, skipping\n", binary, platform)
-						} else {
-							panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed for %s on %s: %v", binary, platform, err))
-						}
-					}
+					_, packageName := getPackageName(binary, downloadVersion, reqPackage)
+					packageRequests = append(packageRequests, tools.PackageRequest{Name: packageName, TargetPath: targetPath})
 				}
+			}
+
+			ctx := context.Background()
+
+			artifactSnapshotClient := tools.NewArtifactSnapshotClient()
+			err = artifactSnapshotClient.DownloadPackages(ctx, packageRequests, downloadVersion)
+			if err != nil {
+				log.Fatalf("Failed to download packages: %v", err)
+				panic(err)
 			}
 		} else {
 			packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
@@ -1211,7 +1214,7 @@ func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, ver
 	//
 	// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
 	// download artifacts on unsupported platforms and choose to ignore the errors.
-	logrus.SetLevel(logrus.FatalLevel)
+	// logrus.SetLevel(logrus.FatalLevel)
 
 	location, err := downloads.FetchBeatsBinary(
 		ctx,
