@@ -52,6 +52,8 @@ import (
 )
 
 const (
+	VersionAgentStack = "AGENT_STACK_VERSION"
+
 	goLintRepo        = "golang.org/x/lint/golint"
 	goLicenserRepo    = "github.com/elastic/go-licenser"
 	buildDir          = "build"
@@ -1683,7 +1685,8 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if err != nil {
 		return nil, err
 	}
-	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
+
+	agentStackVersion := os.Getenv(VersionAgentStack)
 	agentVersion := os.Getenv("AGENT_VERSION")
 	if agentVersion == "" {
 		agentVersion, err = mage.DefaultBeatBuildVariableSources.GetBeatVersion()
@@ -1703,6 +1706,21 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if agentStackVersion == "" {
 		agentStackVersion = agentVersion
 	}
+
+	pv, err := version.ParseVersion(agentStackVersion)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse agentStackVersion %q: %w",
+			agentStackVersion, err)
+	}
+	if pv.Major() == 8 && pv.Minor() == 11 {
+		prev, err := pv.GetPreviousMinor()
+		if err != nil {
+			return nil, fmt.Errorf("8.11 cannoit be used right now, "+
+				"failed getting previous minor: %w", err)
+		}
+		agentStackVersion = prev.String()
+	}
+
 	agentBuildDir := os.Getenv("AGENT_BUILD_DIR")
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")
