@@ -299,13 +299,10 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	}
 
 	// override the overall state to upgrading until the re-execution is complete
-<<<<<<< HEAD
+
 	c.state.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, skipVerifyOverride, pgpBytes...)
-=======
-	c.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
->>>>>>> 2c9e581944 ([Integration Test] Upgrade failed default verification test (#3101))
+
 	if err != nil {
 		c.state.ClearOverrideState()
 		return err

@@ -785,8 +785,6 @@ func upgradeAgent(ctx context.Context, version string, agentFixture *atesting.Fi
 
 	return nil
 }
-<<<<<<< HEAD
-=======
 
 func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	define.Require(t, define.Requirements{
@@ -900,4 +898,3 @@ func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) {
 		require.NoErrorf(t, err, "error removing package version file %q", vFile)
 	}
 }
->>>>>>> 2c9e581944 ([Integration Test] Upgrade failed default verification test (#3101))
