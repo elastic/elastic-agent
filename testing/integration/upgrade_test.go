@@ -961,6 +961,9 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	err = f.Prepare(context.Background())
 	require.NoError(t, err)
 
+	err = f.Configure(context.Background(), []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
 	t.Logf("Installing the current version [%s] of Agent", fromVersion.String())
 
 	ctx, cancel := context.WithCancel(context.Background())
