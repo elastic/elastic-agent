@@ -190,7 +190,7 @@ func (d *Dict) Processors() Processors {
 	return nil
 }
 
-// Parsers returns any attached processors, because of variable substitution.
+// Parsers returns any attached Parsers, because of variable substitution.
 func (d *Dict) Parsers() Parsers {
 	if d.parsers != nil {
 		return d.parsers
@@ -332,7 +332,7 @@ func NewList(nodes []Node) *List {
 
 // NewListWithProcessors creates a new list with provided nodes with processors attached.
 func NewListWithProcessors(nodes []Node, processors Processors, parsers Parsers) *List {
-	return &List{nodes, processors, nil}
+	return &List{nodes, processors, parsers}
 }
 
 func (l *List) String() string {
@@ -420,7 +420,7 @@ func (l *List) Processors() Processors {
 	return nil
 }
 
-// Processors returns any attached processors, because of variable substitution.
+// Parsers returns any attached parsers, because of variable substitution.
 func (l *List) Parsers() Parsers {
 	if l.processors != nil {
 		return l.parsers
@@ -485,7 +485,7 @@ func (s *StrVal) Processors() Processors {
 	return s.processors
 }
 
-// Parsers returns any linked processors that are now connected because of Apply.
+// Parsers returns any linked parsers that are now connected because of Apply.
 func (s *StrVal) Parsers() Parsers {
 	return s.parsers
 }
@@ -655,7 +655,7 @@ func (s *FloatVal) Processors() Processors {
 	return s.processors
 }
 
-// Processors returns any linked processors that are now connected because of Apply.
+// Parsers returns any linked Parsers that are now connected because of Apply.
 func (s *FloatVal) Parsers() Parsers {
 	return s.Parsers()
 }
@@ -718,7 +718,7 @@ func (s *BoolVal) Processors() Processors {
 	return s.processors
 }
 
-// Processors returns any linked processors that are now connected because of Apply.
+// Parsers returns any linked parsers that are now connected because of Apply.
 func (s *BoolVal) Parsers() Parsers {
 	return s.parsers
 }

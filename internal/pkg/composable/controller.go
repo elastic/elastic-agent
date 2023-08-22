@@ -381,7 +381,7 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	curr, ok := c.mappings[id]
-	if ok && reflect.DeepEqual(curr.mapping, mapping) && reflect.DeepEqual(curr.processors, processors) {
+	if ok && reflect.DeepEqual(curr.mapping, mapping) && reflect.DeepEqual(curr.processors, processors) && reflect.DeepEqual(curr.parsers, parsers) {
 		// same mapping; no need to update and signal
 		return nil
 	}

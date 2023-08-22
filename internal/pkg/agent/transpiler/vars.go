@@ -90,7 +90,7 @@ func (v *Vars) Replace(value string) (Node, error) {
 			lastIndex = r[1]
 		}
 	}
-	return NewStrValWithProcessors(result+value[lastIndex:], processors, nil), nil
+	return NewStrValWithProcessors(result+value[lastIndex:], processors, v.parsers), nil
 }
 
 // ID returns the unique ID for the vars.
