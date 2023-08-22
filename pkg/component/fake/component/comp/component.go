@@ -288,8 +288,8 @@ type fakeInput struct {
 	state    client.UnitState
 	stateMsg string
 
-	features *proto.Features
-
+	features        *proto.Features
+	apmConfig       *proto.APMConfig
 	canceller       context.CancelFunc
 	killerCanceller context.CancelFunc
 }

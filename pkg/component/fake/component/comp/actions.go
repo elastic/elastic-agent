@@ -17,6 +17,7 @@ import (
 )
 
 const ActionRetrieveFeatures = "retrieve_features"
+const ActionRetrieveAPMConfig = "retrieve_apm_config"
 
 type retrieveFeaturesAction struct {
 	input *fakeInput
@@ -32,6 +33,10 @@ type sendEventAction struct {
 
 type killAction struct {
 	logger zerolog.Logger
+}
+
+type retrieveAPMConfigAction struct {
+	input *fakeInput
 }
 
 func (s *stateSetterAction) Name() string {
@@ -132,4 +137,17 @@ func newRunningUnit(logger zerolog.Logger, manager *StateManager, unit *client.U
 	}
 	return nil, fmt.Errorf("unknown input unit config type: %s",
 		expected.Config.Type)
+}
+
+func (a *retrieveAPMConfigAction) Name() string {
+	return ActionRetrieveAPMConfig
+}
+
+func (a *retrieveAPMConfigAction) Execute(
+	_ context.Context,
+	_ map[string]interface{}) (map[string]interface{}, error) {
+
+	a.input.logger.Info().Msg("executing " + ActionRetrieveAPMConfig + " action")
+
+	return map[string]interface{}{"apm": a.input.apmConfig}, nil
 }
