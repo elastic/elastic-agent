@@ -964,11 +964,6 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	err = f.Prepare(context.Background())
 	require.NoError(t, err)
 
-	packagePath := createFakeUnhealthyAgentPackage(t, f, toVersion)
-	t.Logf("fake unhealthy agent package path = %s", packagePath)
-	time.Sleep(1 * time.Minute)
-	return
-
 	t.Logf("Installing the current version [%s] of Agent", fromVersion.String())
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1003,6 +998,9 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	require.NoError(t, err)
 	defer c.Disconnect()
 
+	t.Logf("Creating fake unhealthy Agent package, version = %s", toVersion.String())
+	packagePath := createFakeUnhealthyAgentPackage(t, f, toVersion)
+
 	// Try upgrading to the fake Agent package.
 	t.Logf("Attempting upgrade to %s using Agent package at %s", toVersion.String(), packagePath)
 	ctx, _ = context.WithTimeout(ctx, 2*time.Minute)
@@ -1026,7 +1024,6 @@ func createFakeUnhealthyAgentPackage(t *testing.T, fixture *atesting.Fixture, ve
 	// Start with current Agent fixture's package
 	srcPackage, err := fixture.SrcPackage(context.Background())
 	require.NoError(t, err)
-	t.Logf("fixture source package: %s", srcPackage)
 
 	// Make a copy of it
 	tmpDir := t.TempDir()
@@ -1054,7 +1051,6 @@ func createFakeUnhealthyAgentPackage(t *testing.T, fixture *atesting.Fixture, ve
 	require.Len(t, matches, 1)
 
 	filebeatExecutable := matches[0]
-	t.Logf("removing filebeat executable: %s", filebeatExecutable)
 	err = os.Remove(filebeatExecutable)
 	require.NoError(t, err)
 
