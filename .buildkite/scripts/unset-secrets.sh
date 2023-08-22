@@ -3,7 +3,7 @@
 set -euo pipefail
 # Unset all variables ending with _SECRET
 for var in $(printenv | sed 's;=.*;;' | sort); do
-  if [[ "$var" == *_SECRET ]]; then
+  if [[ "$var" == *_SECRET || "$var" == *_TOKEN]]; then
       unset "$var"
   fi
 done
