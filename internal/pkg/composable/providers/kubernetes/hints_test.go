@@ -382,11 +382,11 @@ func TestGenerateHintsMappingWithProcessors(t *testing.T) {
 			Annotations: map[string]string{
 				"app":                      "production",
 				"co.elastic.hints/package": "apache",
-				"co.elastic.hints/processors.1.add_fields.target":      "project",
-				"co.elastic.hints/processors.1.add_fields.fields.name": "myproject",
-				"co.elastic.hints/processors.rename.fields.0.from":     "a.g",
-				"co.elastic.hints/processors.rename.fields.1.to":       "e.d",
-				"co.elastic.hints/processors.rename.fail_on_error":     "false",
+				"co.elastic.hints/processors.1.rename.fields.0.from":   "a.g",
+				"co.elastic.hints/processors.1.rename.fields.1.to":     "e.d",
+				"co.elastic.hints/processors.1.rename.fail_on_error":   "false",
+				"co.elastic.hints/processors.2.add_fields.target":      "project",
+				"co.elastic.hints/processors.2.add_fields.fields.name": "myproject",
 			},
 		},
 		TypeMeta: metav1.TypeMeta{
@@ -420,16 +420,16 @@ func TestGenerateHintsMappingWithProcessors(t *testing.T) {
 				"elastic": mapstr.M{
 					"hints/package": "apache",
 					"hints/processors": mapstr.M{
-						"add_fields": mapstr.M{
-							"target": "project",
-							"name":   "myproject",
-						},
 						"rename": mapstr.M{
 							"fail_on_error": "false",
 							"fields": mapstr.M{
 								"from": "a.g",
 								"to":   "e.d",
 							},
+						},
+						"add_fields": mapstr.M{
+							"target": "project",
+							"name":   "myproject",
 						},
 					},
 				},
@@ -449,18 +449,18 @@ func TestGenerateHintsMappingWithProcessors(t *testing.T) {
 
 	expected_procesors := []mapstr.M{
 		0: {
-			"add_fields": mapstr.M{
-				"target": "project",
-				"name":   "myproject",
-			},
-		},
-		1: {
 			"rename": mapstr.M{
 				"fail_on_error": "false",
 				"fields": mapstr.M{
 					"from": "a.g",
 					"to":   "e.d",
 				},
+			},
+		},
+		1: {
+			"add_fields": mapstr.M{
+				"target": "project",
+				"name":   "myproject",
 			},
 		},
 	}
