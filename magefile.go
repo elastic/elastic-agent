@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build mage
+//   go:build mage
 
 package main
 
@@ -938,9 +938,9 @@ func packageAgent(platforms []string, packagingFn func()) {
 			for _, binary := range externalBinaries {
 				for _, platform := range platforms {
 					reqPackage := platformPackages[platform]
-					targetPath := filepath.Join(archivePath, reqPackage)
-					os.MkdirAll(targetPath, 0755)
 					_, packageName := getPackageName(binary, downloadVersion, reqPackage)
+					targetPath := filepath.Join(archivePath, packageName)
+					os.MkdirAll(targetPath, 0755)
 					packageRequests = append(packageRequests, tools.PackageRequest{Name: packageName, TargetPath: targetPath})
 				}
 			}

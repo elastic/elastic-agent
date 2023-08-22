@@ -78,6 +78,7 @@ func (c *ArtifactSnapshotClient) DownloadPackages(ctx context.Context, packageRe
 		if !ok {
 			return fmt.Errorf("package %s not found in manifest", pkg)
 		}
+		fmt.Printf("Downloading package %s to %s \n", pkg.Name, pkg.TargetPath)
 		err := c.downloadPackage(ctx, pkgData, pkg.TargetPath)
 		if err != nil {
 			return fmt.Errorf("downloading package: %w", err)
@@ -118,9 +119,8 @@ func (c *ArtifactSnapshotClient) getManifestPackages(ctx context.Context, manife
 	return allPackages, nil
 }
 
-func (c *ArtifactSnapshotClient) downloadPackage(ctx context.Context, pkg PackageData, destinationDir string) error {
-
-	return nil
+func (c *ArtifactSnapshotClient) downloadPackage(ctx context.Context, pkg PackageData, destination string) error {
+	return downloadFile(pkg.Url, destination)
 }
 
 func downloadFile(url string, path string) error {

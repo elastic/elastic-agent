@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,4 +31,18 @@ func TestArtifactsSnapshotProjects(t *testing.T) {
 	t.Log("------------------")
 	t.Log(packageMap["auditbeat-8.10.0-SNAPSHOT-aarch64.rpm"].Url)
 
+}
+
+func TestBatchDownload(t *testing.T) {
+	ctx := context.Background()
+
+	packageRequests := make([]PackageRequest, 0)
+	packageRequests = append(packageRequests, PackageRequest{
+		Name:       "auditbeat-8.10.0-SNAPSHOT-aarch64.rpm",
+		TargetPath: filepath.Join("build", "distributions", "elastic-agent-drop", "auditbeat-8.10.0-SNAPSHOT-aarch64.rpm"),
+	})
+	artifactSnapshotClient := NewArtifactSnapshotClient()
+	err := artifactSnapshotClient.DownloadPackages(ctx, packageRequests, "8.10.0-SNAPSHOT")
+
+	assert.NoError(t, err)
 }
