@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -19,7 +20,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/version"
+	agentVersion "github.com/elastic/elastic-agent/version"
 
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
@@ -127,6 +132,8 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 	for _, o := range opts {
 		o(f)
 	}
+
+	decreasePackageVersionFor8_11(t, f)
 	return f, nil
 }
 
@@ -915,4 +922,44 @@ type AgentInspectOutput struct {
 	Signed struct {
 		Data string `yaml:"data"`
 	} `yaml:"signed"`
+}
+
+func decreasePackageVersionFor8_11(t *testing.T, f *Fixture) {
+	installFS := os.DirFS(f.WorkDir())
+	var matches []string
+
+	err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.Name() == agentVersion.PackageVersionFileName {
+			matches = append(matches, path)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	t.Logf("package version files found: %v", matches)
+
+	for _, m := range matches {
+		versionFile := filepath.Join(f.WorkDir(), m)
+		fmt.Printf("removing package version file %q\n", versionFile)
+
+		pv, err := version.ParseVersion(f.version)
+		if err != nil {
+			require.NoError(t, err, "could not parse fixture version")
+		}
+		if pv.Major() == 8 && pv.Minor() > 11 {
+			prev, err := pv.GetPreviousMinor()
+			if err != nil {
+				require.NoError(t, err, "8.11 cannot be used right now, "+
+					"failed getting previous minor")
+			}
+
+			err = os.WriteFile(versionFile, []byte(prev.String()), 0666)
+			require.NoError(t, err, "could not write package-version file %q",
+				versionFile)
+		}
+	}
 }
