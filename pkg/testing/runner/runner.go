@@ -283,7 +283,11 @@ func (r *Runner) Clean() error {
 }
 
 // runInstances runs the batch on each instance in parallel.
-func (r *Runner) runInstances(ctx context.Context, sshAuth ssh.AuthMethod, repoArchive string, instances []StateInstance) (map[string]OSRunnerResult, error) {
+func (r *Runner) runInstances(
+	ctx context.Context,
+	sshAuth ssh.AuthMethod,
+	repoArchive string,
+	instances []StateInstance) (map[string]OSRunnerResult, error) {
 	g, ctx := errgroup.WithContext(ctx)
 	results := make(map[string]OSRunnerResult)
 	var resultsMx sync.Mutex
@@ -315,7 +319,13 @@ func (r *Runner) runInstances(ctx context.Context, sshAuth ssh.AuthMethod, repoA
 }
 
 // runInstance runs the batch on the machine.
-func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger Logger, repoArchive string, batch OSBatch, instance StateInstance) (OSRunnerResult, error) {
+func (r *Runner) runInstance(
+	ctx context.Context,
+	sshAuth ssh.AuthMethod,
+	logger Logger,
+	repoArchive string,
+	batch OSBatch,
+	instance StateInstance) (OSRunnerResult, error) {
 	sshPrivateKeyPath, err := filepath.Abs(filepath.Join(r.cfg.StateDir, "id_rsa"))
 	if err != nil {
 		return OSRunnerResult{}, fmt.Errorf("failed to determine OGC SSH private key path: %w", err)
@@ -368,7 +378,9 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		// wait for the stack to be ready before continuing
 		r.stacksReady.Wait()
 		if r.stacksErr != nil {
-			return OSRunnerResult{}, fmt.Errorf("%s unable to continue because stack never became ready: %w", instance.Name, r.stacksErr)
+			return OSRunnerResult{}, fmt.Errorf(
+				"%s unable to continue because stack never became ready: %w",
+				instance.Name, r.stacksErr)
 		}
 		stack, ok := r.getStackForBatchID(batch.ID)
 		if !ok {
