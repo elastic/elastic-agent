@@ -19,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
@@ -165,10 +166,11 @@ func TestCoordinator_State_ConfigError_NotManaged(t *testing.T) {
 	cfgMgr.Config(ctx, cfg)
 
 	// set an error on cfg manager
-	cfgMgr.ReportError(ctx, errors.New("force error"))
+	const errorStr = "force error"
+	cfgMgr.ReportError(ctx, errors.New(errorStr))
 	assert.Eventually(t, func() bool {
 		state := coord.State()
-		return state.State == agentclient.Failed && state.Message == "force error"
+		return state.State == agentclient.Failed && strings.Contains(state.Message, "force error")
 	}, 3*time.Second, 10*time.Millisecond)
 
 	// clear error
@@ -447,7 +449,7 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, true)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
 	require.ErrorIs(t, err, ErrNotUpgradable)
 	cancel()
 
@@ -558,7 +560,7 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
 	if f.upgradeErr != nil {
 		return nil, f.upgradeErr
@@ -708,9 +710,9 @@ func (r *fakeRuntimeManager) Run(ctx context.Context) error {
 
 func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
 
-func (r *fakeRuntimeManager) Update(components []component.Component) error {
+func (r *fakeRuntimeManager) Update(model component.Model) error {
 	if r.updateCallback != nil {
-		return r.updateCallback(components)
+		return r.updateCallback(model.Components)
 	}
 	return nil
 }
@@ -721,7 +723,7 @@ func (r *fakeRuntimeManager) State() []runtime.ComponentComponentState {
 }
 
 // PerformAction executes an action on a unit.
-func (r *fakeRuntimeManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+func (r *fakeRuntimeManager) PerformAction(_ context.Context, _ component.Component, _ component.Unit, _ string, _ map[string]interface{}) (map[string]interface{}, error) {
 	return nil, nil
 }
 
@@ -734,6 +736,11 @@ func (r *fakeRuntimeManager) SubscribeAll(context.Context) *runtime.Subscription
 // it performs diagnostics for all current units.
 func (r *fakeRuntimeManager) PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
 	return nil
+}
+
+// PerformComponentDiagnostics  executes the diagnostic action for the provided components.
+func (r *fakeRuntimeManager) PerformComponentDiagnostics(_ context.Context, _ []cproto.AdditionalDiagnosticRequest, _ ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	return nil, nil
 }
 
 func testBinary(t *testing.T, name string) string {

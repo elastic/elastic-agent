@@ -1,5 +1,6 @@
 inputs:
     - name: httpjson-sentinel_one
+      id: httpjson-sentinel_one-${kubernetes.hints.container_id}
       type: httpjson
       use_output: default
       streams:
@@ -195,6 +196,7 @@ inputs:
             - sentinel_one-threat
       data_stream.namespace: default
     - name: filestream-sentinel_one
+      id: filestream-sentinel_one-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

@@ -5,6 +5,7 @@
 package component
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -12,9 +13,11 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -80,6 +83,63 @@ type Unit struct {
 	Err error `yaml:"error,omitempty"`
 }
 
+// Signed Strongly typed configuration for the signed data
+type Signed struct {
+	Data      string `yaml:"data"`      // Signed base64 encoded json bytes
+	Signature string `yaml:"signature"` // Signature
+}
+
+// IsSigned Checks if the signature exists, safe to call on nil
+func (s *Signed) IsSigned() bool {
+	return (s != nil && (len(s.Signature) > 0))
+}
+
+// ErrNotFound is returned if the expected "signed" property itself or it's expected properties are missing or not a valid data type
+var ErrNotFound = errors.New("not found")
+
+// SignedFromPolicy Returns Signed instance from the nested map representation of the agent configuration
+func SignedFromPolicy(policy map[string]interface{}) (*Signed, error) {
+	v, ok := policy["signed"]
+	if !ok {
+		return nil, fmt.Errorf("policy is not signed: %w", ErrNotFound)
+	}
+
+	signed, ok := v.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("policy \"signed\" is not map: %w", ErrNotFound)
+	}
+
+	data, err := getStringValue(signed, "data")
+	if err != nil {
+		return nil, err
+	}
+
+	signature, err := getStringValue(signed, "signature")
+	if err != nil {
+		return nil, err
+	}
+
+	res := &Signed{
+		Data:      data,
+		Signature: signature,
+	}
+	return res, nil
+}
+
+func getStringValue(m map[string]interface{}, key string) (string, error) {
+	v, ok := m[key]
+	if !ok {
+		return "", fmt.Errorf("missing signed \"%s\": %w", key, ErrNotFound)
+	}
+
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("signed \"%s\" is not string: %w", key, ErrNotFound)
+	}
+
+	return s, nil
+}
+
 // Component is a set of units that needs to run.
 type Component struct {
 	// ID is the unique ID of the component.
@@ -110,6 +170,9 @@ type Component struct {
 	// Features configuration the component should use.
 	Features *proto.Features `yaml:"features,omitempty"`
 
+	// Component-level configuration
+	Component *proto.Component `yaml:"component,omitempty"`
+
 	// ShipperRef references the component/unit that this component used as its output.
 	// (only applies to inputs targeting a shipper, not set when ShipperSpec is)
 	ShipperRef *ShipperReference `yaml:"shipper,omitempty"`
@@ -123,6 +186,55 @@ func (c *Component) Type() string {
 		return c.ShipperSpec.ShipperType
 	}
 	return ""
+}
+
+// Model is the components model with signed policy data
+// This replaces former top level []Components with the top Model that captures signed policy data.
+// The signed data is a part of the policy since 8.8.0 release and contains the signed policy fragments and the signature that can be validated.
+// The signed data is created and signed by kibana which provides protection from tampering for certain parts of the policy.
+//
+// The initial idea was that the Agent would validate the signed data if it's present,
+// merge the signed data with the policy and dispatch configuration updates to the components.
+// The latest Endpoint requirement of not trusting the Agent requires the full signed data with the signature to be passed to Endpoint for validation.
+// Endpoint validates the signature and applies the configuration as needed.
+//
+// The Agent validation of the signature was disabled for 8.8.0 in order to minimize the scope of the change.
+// Presently (as of June, 27, 2023) the signature is only validated by Endpoint.
+//
+// Example of the signed policy property:
+// signed:
+//
+//	data: >-
+//	  eyJpZCI6IjBlNjA2OTUwLTE0NTEtMTFlZS04OTI2LTlkZjY4ZjdjMzhlZSIsImFnZW50Ijp7ImZlYXR1cmVzIjp7fSwicHJvdGVjdGlvbiI6eyJlbmFibGVkIjp0cnVlLCJ1bmluc3RhbGxfdG9rZW5faGFzaCI6IjB4MXJ1REo0NVBUYlNuV0V6Yi9xc3VnZHRMNFhKUVRHazU5QitxVEF1OVE9Iiwic2lnbmluZ19rZXkiOiJNRmt3RXdZSEtvWkl6ajBDQVFZSUtvWkl6ajBEQVFjRFFnQUVMRHd4Rk1WTjJvSTFmZW9USGJIWmkrUFJuSjZ5TzVzdUw4MktvRXl1M3FTMDB2OGNGVDNlb2JnZG5oT0MxUG9ka0MwVTFmWjhpN1k1TUlzc2szQ2Rzdz09In19LCJpbnB1dHMiOlt7ImlkIjoiZTgyZmQ1ZDEtOTBkOC00NWJjLWE5MTEtOTU1OTBjNDRjYTc1IiwibmFtZSI6IkVQIiwicmV2aXNpb24iOjEsInR5cGUiOiJlbmRwb2ludCJ9XX0=
+//	signature: >-
+//	  MEUCIQCpQR8WES3X4gjptjIWtLdqJT0QLRVz5bUnTlG3xt4LfQIgW5ioOoaAUII4G0b74vWGSLSD7sQ6uAdqgZoNF33vSbM=
+//
+// Example of decoded signed.data from above:
+//
+//	{
+//	  "id": "0e606950-1451-11ee-8926-9df68f7c38ee",
+//	  "agent": {
+//	    "features": {},
+//	    "protection": {
+//	      "enabled": true,
+//	      "uninstall_token_hash": "0x1ruDJ45PTbSnWEzb/qsugdtL4XJQTGk59B+qTAu9Q=",
+//	      "signing_key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAELDwxFMVN2oI1feoTHbHZi+PRnJ6yO5suL82KoEyu3qS00v8cFT3eobgdnhOC1PodkC0U1fZ8i7Y5MIssk3Cdsw=="
+//	    }
+//	  },
+//	  "inputs": [
+//	    {
+//	      "id": "e82fd5d1-90d8-45bc-a911-95590c44ca75",
+//	      "name": "EP",
+//	      "revision": 1,
+//	      "type": "endpoint"
+//	    }
+//	  ]
+//	}
+//
+// The signed.data JSON has exact same shape/schema as the policy.
+type Model struct {
+	Components []Component `yaml:"components,omitempty"`
+	Signed     *Signed     `yaml:"signed,omitempty"`
 }
 
 // ToComponents returns the components that should be running based on the policy and
@@ -208,6 +320,7 @@ func (r *RuntimeSpecs) componentForInputType(
 	inputType string,
 	output outputI,
 	featureFlags *features.Flags,
+	componentConfig *ComponentConfig,
 ) Component {
 	componentID := fmt.Sprintf("%s-%s", inputType, output.name)
 
@@ -216,8 +329,7 @@ func (r *RuntimeSpecs) componentForInputType(
 	if componentErr == nil {
 		if output.shipperEnabled {
 			var shipperType string
-			shipperType, componentErr =
-				r.getSupportedShipperType(inputSpec, output.outputType)
+			shipperType, componentErr = r.getSupportedShipperType(inputSpec, output.outputType)
 
 			if componentErr == nil {
 				// We've found a valid shipper, construct the reference
@@ -274,11 +386,12 @@ func (r *RuntimeSpecs) componentForInputType(
 		OutputType: output.outputType,
 		Units:      units,
 		Features:   featureFlags.AsProto(),
+		Component:  componentConfig.AsProto(),
 		ShipperRef: shipperRef,
 	}
 }
 
-func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *features.Flags) []Component {
+func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *features.Flags, componentConfig *ComponentConfig) []Component {
 	var components []Component
 	shipperTypes := make(map[string]bool)
 	for inputType := range output.inputs {
@@ -287,7 +400,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 		// from running then it will be in the Component's Err field and
 		// we will report it later. The only thing we skip is a component
 		// with no units.
-		component := r.componentForInputType(inputType, output, featureFlags)
+		component := r.componentForInputType(inputType, output, featureFlags, componentConfig)
 		if len(component.Units) > 0 {
 			if component.ShipperRef != nil {
 				// If this component uses a shipper, mark that shipper type as active
@@ -299,8 +412,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 
 	// create the shipper components to go with the inputs
 	for shipperType := range shipperTypes {
-		shipperComponent, ok :=
-			r.componentForShipper(shipperType, output, components, featureFlags)
+		shipperComponent, ok := r.componentForShipper(shipperType, output, components, featureFlags, componentConfig)
 		if ok {
 			components = append(components, shipperComponent)
 		}
@@ -313,8 +425,8 @@ func (r *RuntimeSpecs) componentForShipper(
 	output outputI,
 	inputComponents []Component,
 	featureFlags *features.Flags,
+	componentConfig *ComponentConfig,
 ) (Component, bool) {
-
 	shipperSpec := r.shipperSpecs[shipperType] // type always exists at this point
 	shipperCompID := fmt.Sprintf("%s-%s", shipperType, output.name)
 
@@ -353,6 +465,7 @@ func (r *RuntimeSpecs) componentForShipper(
 			ShipperSpec: &shipperSpec,
 			Units:       shipperUnits,
 			Features:    featureFlags.AsProto(),
+			Component:   componentConfig.AsProto(),
 		}, true
 	}
 	return Component{}, false
@@ -385,12 +498,23 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	}
 	sort.Strings(outputKeys)
 
+	// get agent limits from the policy
+	limits, err := limits.Parse(policy)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse limits from policy: %w", err)
+	}
+	// for now it's a shared component configuration for all components
+	// subject to change in the future
+	componentConfig := &ComponentConfig{
+		Limits: ComponentLimits(*limits),
+	}
+
 	var components []Component
 	for _, outputName := range outputKeys {
 		output := outputsMap[outputName]
 		if output.enabled {
 			components = append(components,
-				r.componentsForOutput(output, featureFlags)...)
+				r.componentsForOutput(output, featureFlags, componentConfig)...)
 		}
 	}
 
@@ -719,6 +843,9 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 		return nil, err
 	}
 	return transpiler.NewVars("", map[string]interface{}{
+		"install": map[string]interface{}{
+			"in_default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)),
+		},
 		"runtime": map[string]interface{}{
 			"platform": platform.String(),
 			"os":       platform.OS,
@@ -741,6 +868,7 @@ func validateRuntimeChecks(
 	if err != nil {
 		return err
 	}
+	preventionMessages := []string{}
 	for _, prevention := range runtime.Preventions {
 		expression, err := eql.New(prevention.Condition)
 		if err != nil {
@@ -755,8 +883,11 @@ func validateRuntimeChecks(
 		}
 		if preventionTrigger {
 			// true means the prevention valid (so input should not run)
-			return NewErrInputRuntimeCheckFail(prevention.Message)
+			preventionMessages = append(preventionMessages, prevention.Message)
 		}
+	}
+	if len(preventionMessages) > 0 {
+		return NewErrInputRuntimeCheckFail(strings.Join(preventionMessages, ", "))
 	}
 	return nil
 }

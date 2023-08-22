@@ -5,16 +5,23 @@
 package tools
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
 // GetAgentByHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
 func GetAgentByHostnameFromList(client *kibana.Client, hostname string) (*kibana.AgentExisting, error) {
-	listAgentsResp, err := client.ListAgents(kibana.ListAgentsRequest{})
+	listAgentsResp, err := client.ListAgents(context.Background(), kibana.ListAgentsRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +78,7 @@ func UnEnrollAgent(client *kibana.Client) error {
 		ID:     agentID,
 		Revoke: true,
 	}
-	_, err = client.UnEnrollAgent(unEnrollAgentReq)
+	_, err = client.UnEnrollAgent(context.Background(), unEnrollAgentReq)
 	if err != nil {
 		return fmt.Errorf("unable to unenroll agent with ID [%s]: %w", agentID, err)
 	}
@@ -101,7 +108,7 @@ func UpgradeAgent(client *kibana.Client, version string) error {
 		ID:      agentID,
 		Version: version,
 	}
-	_, err = client.UpgradeAgent(upgradeAgentReq)
+	_, err = client.UpgradeAgent(context.Background(), upgradeAgentReq)
 	if err != nil {
 		return fmt.Errorf("unable to upgrade agent with ID [%s]: %w", agentID, err)
 	}
@@ -111,7 +118,7 @@ func UpgradeAgent(client *kibana.Client, version string) error {
 
 func GetDefaultFleetServerURL(client *kibana.Client) (string, error) {
 	req := kibana.ListFleetServerHostsRequest{}
-	resp, err := client.ListFleetServerHosts(req)
+	resp, err := client.ListFleetServerHosts(context.Background(), req)
 	if err != nil {
 		return "", fmt.Errorf("unable to list fleet server hosts: %w", err)
 	}
@@ -126,4 +133,22 @@ func GetDefaultFleetServerURL(client *kibana.Client) (string, error) {
 	}
 
 	return "", errors.New("unable to determine default fleet server host")
+}
+
+func WaitForAgent(ctx context.Context, t *testing.T, c client.Client) {
+	require.Eventually(t, func() bool {
+		err := c.Connect(ctx)
+		if err != nil {
+			t.Logf("connecting client to agent: %v", err)
+			return false
+		}
+		defer c.Disconnect()
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("agent state: %+v", state)
+		return state.State == cproto.State_HEALTHY
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 }

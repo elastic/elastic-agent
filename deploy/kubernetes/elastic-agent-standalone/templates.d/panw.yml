@@ -1,5 +1,6 @@
 inputs:
     - name: tcp-panw
+      id: tcp-panw-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:
@@ -31,6 +32,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: udp-panw
+      id: udp-panw-${kubernetes.hints.container_id}
       type: udp
       use_output: default
       streams:
@@ -61,6 +63,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: filestream-panw
+      id: filestream-panw-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

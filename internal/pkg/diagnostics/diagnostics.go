@@ -21,7 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -69,6 +69,7 @@ func GlobalHooks() Hooks {
 		{
 			Name:        "package version",
 			Filename:    ".package.version",
+			Description: "Package Version",
 			ContentType: "text/plain",
 			Hook: func(_ context.Context) []byte {
 				pkgVersionPath, err := version.GetAgentPackageVersionFilePath()
@@ -112,7 +113,7 @@ func GlobalHooks() Hooks {
 		},
 		{
 			Name:        "block",
-			Filename:    "block.pprog.gz",
+			Filename:    "block.pprof.gz",
 			Description: "stack traces that led to blocking on synchronization primitives",
 			ContentType: "application/octet-stream",
 			Hook:        pprofDiag("block", 0),
@@ -139,13 +140,32 @@ func pprofDiag(name string, debug int) func(context.Context) []byte {
 	}
 }
 
+// CreateCPUProfile will gather a CPU profile over a given time duration.
+func CreateCPUProfile(ctx context.Context, period time.Duration) ([]byte, error) {
+	var writeBuf bytes.Buffer
+	err := pprof.StartCPUProfile(&writeBuf)
+	if err != nil {
+		return nil, fmt.Errorf("error starting CPU profile: %w", err)
+	}
+	tc := time.After(period)
+	select {
+	case <-ctx.Done():
+		pprof.StopCPUProfile()
+		return nil, ctx.Err()
+	case <-tc:
+		break
+	}
+
+	pprof.StopCPUProfile()
+	return writeBuf.Bytes(), nil
+}
+
 // ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics and local logs.
 // If any error is encountered when writing the contents of the archive it is returned.
-func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
+func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult, compDiags []client.DiagnosticComponentResult) error {
 	ts := time.Now().UTC()
 	zw := zip.NewWriter(w)
 	defer zw.Close()
-
 	// Write agent diagnostics content
 	for _, ad := range agentDiag {
 		zf, err := zw.CreateHeader(&zip.FileHeader{
@@ -154,11 +174,11 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 			Modified: ad.Generated,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating header for agent diagnostics: %w", err)
 		}
 		err = writeRedacted(errOut, zf, ad.Filename, ad)
 		if err != nil {
-			return err
+			return fmt.Errorf("error writing file for agent diagnostics: %w", err)
 		}
 	}
 
@@ -169,6 +189,13 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 		compDir := strings.ReplaceAll(ud.ComponentID, "/", "-")
 		compDirs[compDir] = append(compDirs[compDir], ud)
 	}
+
+	componentResults := map[string]client.DiagnosticComponentResult{}
+	// handle component diagnostics
+	for _, comp := range compDiags {
+		compDir := strings.ReplaceAll(comp.ComponentID, "/", "-")
+		componentResults[compDir] = comp
+	}
 	// write each units diagnostics into its own directory
 	// layout becomes components/<component-id>/<unit-id>/<filename>
 	_, err := zw.CreateHeader(&zip.FileHeader{
@@ -177,8 +204,9 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 		Modified: ts,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating .zip header for components/ directory: %w", err)
 	}
+	// iterate over components
 	for dirName, units := range compDirs {
 		_, err := zw.CreateHeader(&zip.FileHeader{
 			Name:     fmt.Sprintf("components/%s/", dirName),
@@ -186,8 +214,37 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 			Modified: ts,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating .zip header for component directory: %w", err)
 		}
+		// create component diags
+		if comp, ok := componentResults[dirName]; ok {
+			// check for component-level errors
+			if comp.Err != nil {
+				err = writeErrorResult(zw, fmt.Sprintf("components/%s/error.txt", dirName), comp.Err.Error())
+				if err != nil {
+					return fmt.Errorf("error while writing error result for component %s: %w", comp.ComponentID, err)
+				}
+			} else {
+				for _, res := range comp.Results {
+
+					filePath := fmt.Sprintf("components/%s/%s", dirName, res.Filename)
+					resFileWriter, err := zw.CreateHeader(&zip.FileHeader{
+						Name:     filePath,
+						Method:   zip.Deflate,
+						Modified: ts,
+					})
+					if err != nil {
+						return fmt.Errorf("error creating .zip header for %s: %w", res.Filename, err)
+					}
+					err = writeRedacted(errOut, resFileWriter, filePath, res)
+					if err != nil {
+						return fmt.Errorf("error writing %s in zip file: %w", res.Filename, err)
+					}
+				}
+			}
+
+		}
+		// create unit diags
 		for _, ud := range units {
 			unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
 			_, err := zw.CreateHeader(&zip.FileHeader{
@@ -196,20 +253,13 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 				Modified: ts,
 			})
 			if err != nil {
-				return err
+				return fmt.Errorf("error creating .zip header for unit directory: %w", err)
 			}
+			// check for unit-level errors
 			if ud.Err != nil {
-				w, err := zw.CreateHeader(&zip.FileHeader{
-					Name:     fmt.Sprintf("components/%s/%s/error.txt", dirName, unitDir),
-					Method:   zip.Deflate,
-					Modified: ts,
-				})
+				err = writeErrorResult(zw, fmt.Sprintf("components/%s/%s/error.txt", dirName, unitDir), ud.Err.Error())
 				if err != nil {
-					return err
-				}
-				_, err = w.Write([]byte(fmt.Sprintf("%s\n", ud.Err)))
-				if err != nil {
-					return err
+					return fmt.Errorf("error while writing error result for unit %s: %w", ud.UnitID, err)
 				}
 				continue
 			}
@@ -235,18 +285,36 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 	return zipLogs(zw, ts)
 }
 
-func writeRedacted(errOut, w io.Writer, fullFilePath string, fr client.DiagnosticFileResult) error {
-	out := &fr.Content
+func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
+	ts := time.Now().UTC()
+	w, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     path,
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
+	if err != nil {
+		return fmt.Errorf("error writing header for error.txt file for component: %w", err)
+	}
+	_, err = w.Write([]byte(fmt.Sprintf("%s\n", errBody)))
+	if err != nil {
+		return fmt.Errorf("error writing error.txt file for component: %w", err)
+	}
+
+	return nil
+}
+
+func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResult client.DiagnosticFileResult) error {
+	out := &fileResult.Content
 
 	// Should we support json too?
-	if fr.ContentType == "application/yaml" {
+	if fileResult.ContentType == "application/yaml" {
 		unmarshalled := map[interface{}]interface{}{}
-		err := yaml.Unmarshal(fr.Content, &unmarshalled)
+		err := yaml.Unmarshal(fileResult.Content, &unmarshalled)
 		if err != nil {
 			// Best effort, output a warning but still include the file
 			fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
 		} else {
-			redacted, err := yaml.Marshal(redactMap(unmarshalled))
+			redacted, err := yaml.Marshal(redactMap(errOut, unmarshalled))
 			if err != nil {
 				// Best effort, output a warning but still include the file
 				fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
@@ -256,23 +324,46 @@ func writeRedacted(errOut, w io.Writer, fullFilePath string, fr client.Diagnosti
 		}
 	}
 
-	_, err := w.Write(*out)
+	_, err := resultWriter.Write(*out)
 	return err
 }
 
-func redactMap(m map[interface{}]interface{}) map[interface{}]interface{} {
-	for k, v := range m {
-		if v != nil && reflect.TypeOf(v).Kind() == reflect.Map {
-			v = redactMap(v.(map[interface{}]interface{}))
-		}
-		if s, ok := k.(string); ok {
-			if redactKey(s) {
-				v = REDACTED
-			}
-			m[k] = v
-		}
+// redactMap sensitive values from the underlying map
+// the whole generic function here is out of paranoia. Although extremely unlikely,
+// we have no way of guaranteeing we'll get a "normal" map[string]interface{},
+// since the diagnostic interface is a bit of a free-for-all
+func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K]interface{} {
+	if inputMap == nil {
+		return nil
 	}
-	return m
+	for rootKey, rootValue := range inputMap {
+		if rootValue != nil {
+			switch cast := rootValue.(type) {
+			case map[string]interface{}:
+				rootValue = redactMap(errOut, cast)
+			case map[interface{}]interface{}:
+				rootValue = redactMap(errOut, cast)
+			case map[int]interface{}:
+				rootValue = redactMap(errOut, cast)
+			case string:
+				if keyString, ok := any(rootKey).(string); ok {
+					if redactKey(keyString) {
+						rootValue = REDACTED
+					}
+				}
+			default:
+				// in cases where we got some weird kind of map we couldn't parse, print a warning
+				if reflect.TypeOf(rootValue).Kind() == reflect.Map {
+					fmt.Fprintf(errOut, "[WARNING]: file may be partly redacted, could not cast value %v of type %T", rootKey, rootValue)
+				}
+
+			}
+		}
+
+		inputMap[rootKey] = rootValue
+
+	}
+	return inputMap
 }
 
 func redactKey(k string) bool {

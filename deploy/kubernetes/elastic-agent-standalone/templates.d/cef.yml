@@ -1,5 +1,48 @@
 inputs:
+    - name: udp-cef
+      id: udp-cef-${kubernetes.hints.container_id}
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cef.log.enabled} == true or ${kubernetes.hints.cef.enabled} == true
+          data_stream:
+            dataset: cef.log
+            type: logs
+          host: localhost:9003
+          processors:
+            - rename:
+                fields:
+                    - from: message
+                      to: event.original
+            - decode_cef:
+                field: event.original
+          tags:
+            - cef
+            - forwarded
+      data_stream.namespace: default
+    - name: tcp-cef
+      id: tcp-cef-${kubernetes.hints.container_id}
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cef.log.enabled} == true or ${kubernetes.hints.cef.enabled} == true
+          data_stream:
+            dataset: cef.log
+            type: logs
+          host: localhost:9004
+          processors:
+            - rename:
+                fields:
+                    - from: message
+                      to: event.original
+            - decode_cef:
+                field: event.original
+          tags:
+            - cef
+            - forwarded
+      data_stream.namespace: default
     - name: filestream-cef
+      id: filestream-cef-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -25,46 +68,6 @@ inputs:
           prospector:
             scanner:
                 symlinks: true
-          tags:
-            - cef
-            - forwarded
-      data_stream.namespace: default
-    - name: udp-cef
-      type: udp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.cef.log.enabled} == true or ${kubernetes.hints.cef.enabled} == true
-          data_stream:
-            dataset: cef.log
-            type: logs
-          host: localhost:9003
-          processors:
-            - rename:
-                fields:
-                    - from: message
-                      to: event.original
-            - decode_cef:
-                field: event.original
-          tags:
-            - cef
-            - forwarded
-      data_stream.namespace: default
-    - name: tcp-cef
-      type: tcp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.cef.log.enabled} == true or ${kubernetes.hints.cef.enabled} == true
-          data_stream:
-            dataset: cef.log
-            type: logs
-          host: localhost:9004
-          processors:
-            - rename:
-                fields:
-                    - from: message
-                      to: event.original
-            - decode_cef:
-                field: event.original
           tags:
             - cef
             - forwarded

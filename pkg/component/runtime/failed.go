@@ -75,7 +75,7 @@ func (c *failedRuntime) Stop() error {
 }
 
 // Teardown marks it stopped.
-func (c *failedRuntime) Teardown() error {
+func (c *failedRuntime) Teardown(_ *component.Signed) error {
 	return c.Stop()
 }
 
@@ -97,9 +97,10 @@ func createState(comp component.Component, done bool) ComponentState {
 		}
 	}
 	return ComponentState{
-		State:    state,
-		Message:  comp.Err.Error(),
-		Units:    unitErrs,
-		Features: comp.Features,
+		State:     state,
+		Message:   comp.Err.Error(),
+		Units:     unitErrs,
+		Features:  comp.Features,
+		Component: comp.Component,
 	}
 }

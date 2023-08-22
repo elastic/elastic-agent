@@ -86,6 +86,11 @@ var (
 	// Env var to set the agent package version
 	agentPackageVersion string
 
+	// PackagingFromManifest This value is set to tru when we have defined a ManifestURL variable
+	PackagingFromManifest bool
+	// ManifestURL Location of the manifest file to package
+	ManifestURL string
+
 	FuncMap = map[string]interface{}{
 		"beat_doc_branch":             BeatDocBranch,
 		"beat_version":                BeatQualifiedVersion,
@@ -140,6 +145,9 @@ func initGlobals() {
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
 	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
+
+	ManifestURL = EnvOr("ManifestURL", "")
+	PackagingFromManifest = ManifestURL != ""
 }
 
 // ProjectType specifies the type of project (OSS vs X-Pack).

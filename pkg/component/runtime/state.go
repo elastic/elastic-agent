@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 
 	gproto "google.golang.org/protobuf/proto"
@@ -42,6 +43,11 @@ type ComponentUnitKey struct {
 	UnitID   string
 }
 
+// MarshalYAML implements the Marshaller interface for the componentUnitKey
+func (key ComponentUnitKey) MarshalYAML() (interface{}, error) {
+	return fmt.Sprintf("%s-%s", key.UnitType.String(), key.UnitID), nil
+}
+
 // ComponentVersionInfo provides version information reported by the component.
 type ComponentVersionInfo struct {
 	// Name of the binary.
@@ -64,6 +70,9 @@ type ComponentState struct {
 	Features    *proto.Features `yaml:"-"`
 	FeaturesIdx uint64          `yaml:"features_idx"`
 
+	Component    *proto.Component `yaml:"component,omitempty"`
+	ComponentIdx uint64           `yaml:"component_idx"`
+
 	VersionInfo ComponentVersionInfo `yaml:"version_info"`
 
 	// internal
@@ -71,6 +80,9 @@ type ComponentState struct {
 
 	expectedFeatures    *proto.Features
 	expectedFeaturesIdx uint64
+
+	expectedComponent    *proto.Component
+	expectedComponentIdx uint64
 }
 
 // expectedUnitState is the expected state of a unit.
@@ -87,6 +99,8 @@ func newComponentState(comp *component.Component) (s ComponentState) {
 	s.Message = startingMsg
 	s.Units = make(map[ComponentUnitKey]ComponentUnitState)
 	s.expectedUnits = make(map[ComponentUnitKey]expectedUnitState)
+	s.expectedFeaturesIdx = 1
+	s.expectedComponentIdx = 1
 
 	s.syncComponent(comp)
 	return s
@@ -108,6 +122,11 @@ func (s *ComponentState) Copy() (c ComponentState) {
 	c.FeaturesIdx = s.FeaturesIdx
 	c.expectedFeatures = s.expectedFeatures
 	c.expectedFeaturesIdx = s.expectedFeaturesIdx
+
+	c.Component = s.Component
+	c.ComponentIdx = s.ComponentIdx
+	c.expectedComponent = s.expectedComponent
+	c.expectedComponentIdx = s.expectedComponentIdx
 
 	return c
 }
@@ -179,8 +198,12 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 		changed = true
 		s.expectedFeaturesIdx++
 		s.expectedFeatures = comp.Features
-	} else {
-		s.expectedFeaturesIdx = 1
+	}
+
+	if !gproto.Equal(s.expectedComponent, comp.Component) {
+		changed = true
+		s.expectedComponentIdx++
+		s.expectedComponent = comp.Component
 	}
 
 	return changed
@@ -239,6 +262,11 @@ func (s *ComponentState) syncUnits(comp *component.Component) bool {
 
 	if !gproto.Equal(s.Features, comp.Features) {
 		s.Features = comp.Features
+		changed = true
+	}
+
+	if !gproto.Equal(s.Component, comp.Component) {
+		s.Component = comp.Component
 		changed = true
 	}
 
@@ -346,6 +374,11 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		changed = true
 	}
 
+	if s.ComponentIdx != checkin.ComponentIdx {
+		s.ComponentIdx = checkin.ComponentIdx
+		changed = true
+	}
+
 	return changed
 }
 
@@ -368,7 +401,7 @@ func (s *ComponentState) unsettled() bool {
 		}
 	}
 
-	return s.FeaturesIdx != s.expectedFeaturesIdx
+	return s.FeaturesIdx != s.expectedFeaturesIdx || s.ComponentIdx != s.expectedComponentIdx
 }
 
 func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
@@ -401,9 +434,11 @@ func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
 	}
 
 	return &proto.CheckinExpected{
-		Units:       units,
-		Features:    s.expectedFeatures,
-		FeaturesIdx: s.expectedFeaturesIdx,
+		Units:        units,
+		Features:     s.expectedFeatures,
+		FeaturesIdx:  s.expectedFeaturesIdx,
+		Component:    s.expectedComponent,
+		ComponentIdx: s.expectedComponentIdx,
 	}
 }
 
