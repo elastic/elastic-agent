@@ -172,7 +172,7 @@ func StopService(topPath string) error {
 	return nil
 }
 
-// RestartService stops and starts the installed service.
+// RestartService restarts the installed service.
 func RestartService(topPath string) error {
 	svc, err := newService(topPath)
 	if err != nil {
