@@ -54,7 +54,7 @@ type providerData struct {
 	processors []map[string]interface{}
 }
 
-// Will hold the generated mapping data needed for hints based autodsicovery
+// hintsData hold the generated mapping data needed for hints based autodsicovery
 type hintsData struct {
 	composableMapping mapstr.M
 	processors        []mapstr.M
