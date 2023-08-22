@@ -20,8 +20,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/version"
 	agentVersion "github.com/elastic/elastic-agent/version"
@@ -133,7 +131,6 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 		o(f)
 	}
 
-	decreasePackageVersionFor8_11(t, f)
 	return f, nil
 }
 
@@ -924,13 +921,15 @@ type AgentInspectOutput struct {
 	} `yaml:"signed"`
 }
 
-func decreasePackageVersionFor8_11(t *testing.T, f *Fixture) {
+func decreasePackageVersionFor8_11(f *Fixture) error {
 	installFS := os.DirFS(f.WorkDir())
 	var matches []string
 
+	fmt.Printf("decreasePackageVersionFor8_11: installFS: %q\n", installFS)
 	err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("my fs.WalkDir reveiced and error and aborted: %w",
+				err)
 		}
 
 		if d.Name() == agentVersion.PackageVersionFileName {
@@ -938,9 +937,11 @@ func decreasePackageVersionFor8_11(t *testing.T, f *Fixture) {
 		}
 		return nil
 	})
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
-	t.Logf("package version files found: %v", matches)
+	fmt.Printf("package version files found: %v\n", matches)
 
 	for _, m := range matches {
 		versionFile := filepath.Join(f.WorkDir(), m)
@@ -948,18 +949,20 @@ func decreasePackageVersionFor8_11(t *testing.T, f *Fixture) {
 
 		pv, err := version.ParseVersion(f.version)
 		if err != nil {
-			require.NoError(t, err, "could not parse fixture version")
+			return fmt.Errorf("could not parse fixture version: %w", err)
 		}
 		if pv.Major() == 8 && pv.Minor() > 11 {
 			prev, err := pv.GetPreviousMinor()
 			if err != nil {
-				require.NoError(t, err, "8.11 cannot be used right now, "+
-					"failed getting previous minor")
+				return fmt.Errorf("8.11 cannot be used right now, "+
+					"failed getting previous minor: %w", err)
 			}
 
 			err = os.WriteFile(versionFile, []byte(prev.String()), 0666)
-			require.NoError(t, err, "could not write package-version file %q",
-				versionFile)
+			return fmt.Errorf("could not write package-version file %q: %w",
+				versionFile, err)
 		}
 	}
+
+	return nil
 }

@@ -147,7 +147,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 		}
 	})
 
-	return out, nil
+	return out, decreasePackageVersionFor8_11(f)
 }
 
 type UninstallOpts struct {
