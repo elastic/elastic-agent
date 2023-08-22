@@ -146,17 +146,16 @@ func restartAgent(ctx context.Context, log *logger.Logger) error {
 	signal := make(chan struct{})
 	backExp := backoff.NewExpBackoff(signal, restartBackoffInit, restartBackoffMax)
 
-	for i := maxRestartCount; i >= 1; i-- {
+	for restartAttempt := 1; restartAttempt <= maxRestartCount; restartAttempt++ {
 		backExp.Wait()
-		attempt := maxRestartCount - i + 1
-		log.Infof("Restarting Agent via control protocol; attempt %d of %d", attempt, maxRestartCount)
+		log.Infof("Restarting Agent via control protocol; attempt %d of %d", restartAttempt, maxRestartCount)
 
 		err := restartFn(ctx)
 		if err == nil {
 			break
 		}
 
-		if i == 1 {
+		if restartAttempt == maxRestartCount {
 			log.Error("Failed to restart agent via control protocol after final attempt")
 			return err
 		}
