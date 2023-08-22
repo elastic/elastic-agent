@@ -955,9 +955,6 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 		"", "",
 	)
 
-	// Create a fake Agent package, based on the current fixture,
-	// that this test will attempt to upgrade to. This Agent will
-	// deliberately report an unhealthy status.
 	f, err := define.NewFixture(t, fromVersion.String())
 	require.NoError(t, err)
 
@@ -998,8 +995,19 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	require.NoError(t, err)
 	defer c.Disconnect()
 
+	// Create a fake Agent package, based on the current fixture,
+	// that this test will attempt to upgrade to. This Agent will
+	// deliberately report an unhealthy status.
+	srcPackagePath, err := f.SrcPackage(context.Background())
+	require.NoError(t, err)
+
 	t.Logf("Creating fake unhealthy Agent package, version = %s", toVersion.String())
-	packagePath := createFakeUnhealthyAgentPackage(t, f, toVersion)
+	packagePath := createFakeUnhealthyAgentPackage(t, srcPackagePath, toVersion)
+
+	t.Logf("from agent package path: %s", srcPackagePath)
+	t.Logf("to agent package path: %s", packagePath)
+
+	time.Sleep(1 * time.Minute)
 
 	// Try upgrading to the fake Agent package.
 	t.Logf("Attempting upgrade to %s using Agent package at %s", toVersion.String(), packagePath)
@@ -1018,17 +1026,13 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	require.Equal(t, fromVersion, currentVersion.Daemon.Version)
 }
 
-func createFakeUnhealthyAgentPackage(t *testing.T, fixture *atesting.Fixture, version *version.ParsedSemVer) string {
+func createFakeUnhealthyAgentPackage(t *testing.T, srcPackagePath string, version *version.ParsedSemVer) string {
 	t.Helper()
 
-	// Start with current Agent fixture's package
-	srcPackage, err := fixture.SrcPackage(context.Background())
-	require.NoError(t, err)
-
-	// Make a copy of it
+	// Make a copy of the source package
 	tmpDir := t.TempDir()
-	destPackage := filepath.Join(tmpDir, filepath.Base(srcPackage))
-	data, err := os.ReadFile(srcPackage)
+	destPackage := filepath.Join(tmpDir, filepath.Base(srcPackagePath))
+	data, err := os.ReadFile(srcPackagePath)
 	require.NoError(t, err)
 	err = os.WriteFile(destPackage, data, 0644)
 	require.NoError(t, err)
@@ -1062,6 +1066,31 @@ func createFakeUnhealthyAgentPackage(t *testing.T, fixture *atesting.Fixture, ve
 	// Write new commit hash file
 	destPackageDir := strings.ReplaceAll(destPackage, ".tar.gz", "")
 	err = os.WriteFile(filepath.Join(destPackageDir, ".elastic-agent.active.commit"), []byte(commitHash), 0644)
+	require.NoError(t, err)
+
+	// Rename versioned dir
+	versionedDirGlob := filepath.Join(tmpDir, "*", "data", "elastic-agent-*")
+	matches, err = filepath.Glob(versionedDirGlob)
+	require.NoError(t, err)
+	require.Len(t, matches, 1)
+
+	oldVersionedDirAbsPath := matches[0]
+	newVersionedDirRelPath := fmt.Sprintf("elastic-agent-%s", commitHash[0:6])
+	err = os.Rename(oldVersionedDirAbsPath, filepath.Join(filepath.Dir(oldVersionedDirAbsPath), newVersionedDirRelPath))
+	require.NoError(t, err)
+
+	// Update executable symlink
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(cwd)
+
+	err = os.Chdir(destPackageDir)
+	require.NoError(t, err)
+
+	err = os.Remove("elastic-agent")
+	require.NoError(t, err)
+
+	err = os.Symlink(filepath.Join("data", newVersionedDirRelPath, "elastic-agent"), "elastic-agent")
 	require.NoError(t, err)
 
 	// Rename package dir to have new package name
