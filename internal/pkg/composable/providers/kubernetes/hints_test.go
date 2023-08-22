@@ -468,6 +468,8 @@ func TestGenerateHintsMappingWithProcessors(t *testing.T) {
 	hintData := GetHintsMapping(mapping, logger, "co.elastic", "asdfghjkl")
 
 	assert.Equal(t, expected_hints, hintData.composableMapping)
-	assert.Equal(t, expected_procesors, hintData.processors)
+	//assert.Equal(t, expected_procesors, hintData.processors). We replace this assertion with assert.Contains in order to avoid flakiness in tests because map keys are not sorted
+	assert.Contains(t, expected_procesors, hintData.processors[0])
+	assert.Contains(t, expected_procesors, hintData.processors[1])
 
 }
