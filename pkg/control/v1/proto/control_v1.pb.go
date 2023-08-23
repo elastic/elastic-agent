@@ -21,7 +21,7 @@ import (
 
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	)
+)
 
 const (
 	// Verify that this generated code is sufficiently up-to-date.
