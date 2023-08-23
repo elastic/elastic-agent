@@ -965,6 +965,8 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	err = agentFixture.Prepare(ctx)
 	require.NoError(t, err, "error preparing agent fixture")
 
+	// TODO: we need the fast watcher config but we also need one component
+	// sub-process to be running.
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
 
