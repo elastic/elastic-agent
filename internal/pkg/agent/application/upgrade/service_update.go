@@ -2,7 +2,11 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package version
+//go:build !linux
 
-const defaultBeatVersion = "8.11.0"
-const Agent = defaultBeatVersion
+package upgrade
+
+func EnsureServiceConfigUpToDate() error {
+	// Noop on non-Linux systems
+	return nil
+}
