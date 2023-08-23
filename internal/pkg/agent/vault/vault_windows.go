@@ -44,6 +44,6 @@ func systemAdministratorsOnly(path string, inherit bool) error {
 		acl.GrantSid(0xF10F0000, administratorsSID))
 }
 
-func writeFile(fp string, data []byte) (err error) {
+func writeFile(fp string, data []byte) error {
 	return os.WriteFile(fp, data, 0600)
 }

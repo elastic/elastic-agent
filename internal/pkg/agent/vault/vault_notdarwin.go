@@ -138,12 +138,13 @@ func (v *Vault) Exists(ctx context.Context, key string) (ok bool, err error) {
 		err = v.unlock(err)
 	}()
 
-	if _, err = os.Stat(v.filepathFromKey(key)); err == nil {
-		ok = true
-	} else if errors.Is(err, fs.ErrNotExist) {
-		err = nil
+	if _, err = os.Stat(v.filepathFromKey(key)); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
 	}
-	return ok, err
+	return true, nil
 }
 
 // Remove removes the key
@@ -179,7 +180,7 @@ func applyOptions(opts ...OptionFunc) Options {
 }
 
 // fileNameFromKey returns the filename as a hash of the vault seed combined with the key
-// this ties the key with the vault seed eliminating the change of attempting
+// This ties the key with the vault seed eliminating the chance of attempting
 // to decrypt the key for the wrong vault seed value.
 func fileNameFromKey(seed []byte, key string) string {
 	hash := sha256.Sum256(append(seed, []byte(key)...))
