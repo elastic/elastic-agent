@@ -14,7 +14,7 @@ if [ -n "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE" ]; then
   fi
 fi
 
-sh .buildkite/hooks/unset-secrets.sh
+source .buildkite/scripts/unset-secrets.sh
 
 if command -v docker &>/dev/null; then
   DOCKER_REGISTRY="docker.elastic.co"
