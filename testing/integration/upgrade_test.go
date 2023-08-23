@@ -1019,8 +1019,9 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	t.Logf("PID for component ID = %s is %d", componentID, pid)
 
 	// Send SIGSTOP to component process. This should cause the component to report
-	// a DEGRADED status and the Agent itself to also reoprt a DEGRADED status, which
+	// a DEGRADED status and the Agent itself to also report a DEGRADED status, which
 	// should trigger a rollback
+	t.Logf("Sending SIGSTOP to process with PID = %d for component ID %s", pid, componentID)
 	process, err := os.FindProcess(pid)
 	require.NoError(t, err)
 	err = process.Signal(syscall.SIGSTOP)
