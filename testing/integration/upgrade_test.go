@@ -15,10 +15,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -57,6 +60,23 @@ agent.upgrade.watcher:
   error_check.interval: 15s
   crash_check.interval: 15s
 `, standaloneWatcherDuration)
+
+const systemMetricsInputCfg = `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+
+inputs:
+  - type: system/metrics
+    id: unique-system-metrics-input
+    data_stream.namespace: default
+    use_output: default
+    streams:
+      - metricsets:
+        - cpu
+        data_stream.dataset: system.cpu
+`
 
 // notable versions used in tests
 
@@ -935,9 +955,8 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 		Isolate: false,
 		Sudo:    true, // requires Agent installation and modifying /etc/hosts
 		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		}, // TODO: using SIGSTOP
+			{Type: define.Linux}, // using SIGSTOP
+		},
 	})
 
 	upgradeFromVersion, err := version.ParseVersion(define.Version())
@@ -965,9 +984,9 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	err = agentFixture.Prepare(ctx)
 	require.NoError(t, err, "error preparing agent fixture")
 
-	// TODO: we need the fast watcher config but we also need one component
+	// We need the fast watcher config but we also need one component
 	// sub-process to be running.
-	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg+systemMetricsInputCfg))
 	require.NoError(t, err, "error configuring agent fixture")
 
 	t.Log("Install the built Agent")
@@ -976,30 +995,12 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	c := agentFixture.Client()
-
 	require.Eventually(t, func() bool {
-		err := c.Connect(ctx)
-		if err != nil {
-			t.Logf("connecting client to agent: %v", err)
-			return false
-		}
-		defer c.Disconnect()
-		state, err := c.State(ctx)
-		if err != nil {
-			t.Logf("error getting the agent state: %v", err)
-			return false
-		}
-		t.Logf("agent state: %+v", state)
-		return state.State == v2proto.State_HEALTHY
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
 	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 
-	t.Log("Ensure the correct version is running")
-	currentVersion, err := c.Version(ctx)
-	require.NoError(t, err)
-	require.Equal(t, upgradeFromVersion.String(), currentVersion.Version)
-
-	t.Log("Start the Agent upgrade")
 	toVersion := upgradeToVersion.String()
+	t.Logf("Upgrading Agent to %s", toVersion)
 	err = c.Connect(ctx)
 	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
@@ -1007,16 +1008,60 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	_, err = c.Upgrade(ctx, toVersion, "", false, false)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion)
 
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeToVersion.CoreVersion(), upgradeToVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 10*time.Second, "Upgraded Agent never became healthy")
+
+	// Figure out the PID of one of the component processes
+	componentID := "system/metrics-default"
+	pid, err := getComponentPID(ctx, c, componentID)
+	require.NoError(t, err)
+	t.Logf("PID for component ID = %s is %d", componentID, pid)
+
+	// Send SIGSTOP to component process. This should cause the component to report
+	// a DEGRADED status and the Agent itself to also reoprt a DEGRADED status, which
+	// should trigger a rollback
+	process, err := os.FindProcess(pid)
+	require.NoError(t, err)
+	err = process.Signal(syscall.SIGSTOP)
+	require.NoError(t, err)
+
+	// Wait for upgrade watcher to finish running
 	checkUpgradeWatcherRan(t, agentFixture, upgradeFromVersion)
 
-	t.Log("Check Agent version to ensure upgrade is successful")
-	t.Log("Ensure the correct version is running")
-	currentVersion, err = c.Version(ctx)
-	require.NoError(t, err)
-	require.Equal(t, toVersion, currentVersion.Version)
+	t.Log("Ensure the we have rolled back and the correct version is running")
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 10*time.Second, "Rolled back Agent never became healthy")
+}
 
-	// TODO: Figure out the PID of one of the component processes
-	// TODO: Send SIGSTOP to PID (OS-dependent?)
-	// TODO: Wait for Agent status to be degraded
-	// TODO: Wait for rollback
+func getComponentPID(ctx context.Context, c v2client.Client, componentID string) (int, error) {
+	state, err := c.State(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	notFoundErr := fmt.Errorf("unable to determine PID for process running component with ID = %s", componentID)
+	msgRegexp := regexp.MustCompile(`Healthy: communicating with pid '(\d+)'`)
+	for _, component := range state.Components {
+		if component.ID != componentID {
+			continue
+		}
+
+		msg := component.Message
+		matches := msgRegexp.FindStringSubmatch(msg)
+		if len(matches) != 2 {
+			return 0, notFoundErr
+		}
+
+		pidStr := matches[1]
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			return 0, fmt.Errorf("unable to parse PID from %s", pidStr)
+		}
+
+		return pid, nil
+	}
+
+	return 0, notFoundErr
 }
