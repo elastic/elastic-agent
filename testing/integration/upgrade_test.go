@@ -950,10 +950,7 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Local:   false, // requires Agent installation
 		Isolate: false,
-		Sudo:    true, // requires Agent installation and modifying /etc/hosts
-		OS: []define.OS{
-			{Type: define.Linux}, // using SIGSTOP
-		},
+		Sudo:    true, // requires Agent installation
 	})
 
 	upgradeFromVersion, err := version.ParseVersion(define.Version())
