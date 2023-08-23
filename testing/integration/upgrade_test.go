@@ -1018,7 +1018,7 @@ inputs:
 
 	require.Eventually(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeToVersion.CoreVersion(), upgradeToVersion.IsSnapshot(), "")
-	}, 2*time.Minute, 1*time.Second, "Upgraded Agent never became healthy")
+	}, 2*time.Minute, 250*time.Millisecond, "Upgraded Agent never became healthy")
 
 	// Wait for upgrade watcher to finish running
 	checkUpgradeWatcherRan(t, agentFixture, upgradeFromVersion)
