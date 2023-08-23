@@ -808,7 +808,8 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	f, err := define.NewFixture(t, define.Version())
+	startingVersion := define.Version()
+	f, err := define.NewFixture(t, startingVersion)
 	require.NoError(t, err)
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -856,17 +857,39 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	versionList, err := aac.GetVersions(ctx)
 	require.NoError(t, err)
 	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
-	latestVersion := versionList.Versions[len(versionList.Versions)-1]
 
-	t.Logf("Upgrading to version %q", latestVersion)
+	// the current version is higher than the latest on the ArtifactAPI, thus
+	// we want one version before the current. However, during Feature Freeze for
+	// a new minor, the latest version on the ArtifactAPI isn't yet released, so
+	// the Agent won't be able to fetch it. Therefore, the previous version must
+	// be based on the current agent's version, which, during Feature Freeze, is
+	// tweaked to be one before what is on main.
+	pv, err := version.ParseVersion(startingVersion)
+	require.NoErrorf(t, err, "could not parse starting version %q", startingVersion)
+	previous, err := pv.GetPreviousMinor()
+	require.NoErrorf(t, err, "could not get previous version from parsed starting version %q", pv.String())
+	previousVersion := previous.String()
+	found := false
+	for _, v := range versionList.Versions {
+		if v == previousVersion {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("previous version is %q, but it ins't in the ArtifactAPI, available versions are %v",
+			previousVersion, versionList.Versions)
+	}
+
+	t.Logf("Upgrading to version %q", previousVersion)
 
 	err = c.Connect(ctx)
 	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
 
-	_, err = c.Upgrade(ctx, latestVersion, "", false, false)
-	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", latestVersion)
-	parsedLatestVersion, err := version.ParseVersion(latestVersion)
+	_, err = c.Upgrade(ctx, previousVersion, "", false, false)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", previousVersion)
+	parsedLatestVersion, err := version.ParseVersion(previousVersion)
 	require.NoError(t, err)
 
 	require.Eventuallyf(t, func() bool {
