@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 )
@@ -27,4 +28,13 @@ func getAgentVersion(t *testing.T, f *integrationtest.Fixture, ctx context.Conte
 	actualVersionBytes, err := versionCmd.Output()
 	require.NoError(t, err, "error executing 'version' command. Output %q", string(actualVersionBytes))
 	return actualVersionBytes
+}
+
+// unmarshalVersionOutput retrieves the version string for binary or daemon from "version" subcommand yaml output
+func unmarshalVersionOutput(t *testing.T, cmdOutput []byte, binaryOrDaemonKey string) string {
+	versionCmdOutput := map[string]any{}
+	err := yaml.Unmarshal(cmdOutput, &versionCmdOutput)
+	require.NoError(t, err, "error parsing 'version' command output")
+	require.Contains(t, versionCmdOutput, binaryOrDaemonKey)
+	return versionCmdOutput[binaryOrDaemonKey].(map[any]any)["version"].(string)
 }
