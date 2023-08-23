@@ -8,8 +8,6 @@ package integration
 
 import (
 	"context"
-	"crypto/sha512"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -38,7 +36,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
 	v2client "github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -934,193 +931,90 @@ func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) {
 // that the Agent is rolled back to the previous version.
 func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	define.Require(t, define.Requirements{
-		// We require sudo for this test to run
-		// `elastic-agent install`.
-		Sudo: true,
-
-		// It's not safe to run this test locally as it
-		// installs Elastic Agent.
-		Local: false,
-
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation and modifying /etc/hosts
 		OS: []define.OS{
 			{Type: define.Linux},
 			{Type: define.Darwin},
-		}, // using tar
+		}, // TODO: using SIGSTOP
 	})
 
-	fromVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
-	toVersion := version.NewParsedSemVer(
-		fromVersion.Major(), fromVersion.Minor()+1, 0,
-		"", "",
-	)
-
-	f, err := define.NewFixture(t, fromVersion.String())
+	upgradeFromVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	err = f.Prepare(context.Background())
+	// We go back TWO minors because sometimes we are in a situation where
+	// the current version has been advanced to the next release (e.g. 8.10.0)
+	// but the version before that (e.g. 8.9.0) hasn't been released yet.
+	previousVersion, err := upgradeFromVersion.GetPreviousMinor()
+	require.NoError(t, err)
+	previousVersion, err = previousVersion.GetPreviousMinor()
 	require.NoError(t, err)
 
-	err = f.Configure(context.Background(), []byte(fastWatcherCfg))
-	require.NoError(t, err, "error configuring agent fixture")
+	// For testing the upgrade we actually perform a downgrade
+	upgradeToVersion := previousVersion
 
-	t.Logf("Installing the current version [%s] of Agent", fromVersion.String())
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
+
+	agentFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	output, err := tools.InstallStandaloneAgent(f)
-	t.Logf("Agent installation output: %q", string(output))
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err, "error preparing agent fixture")
+
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	t.Log("Install the built Agent")
+	output, err := tools.InstallStandaloneAgent(agentFixture)
+	t.Log(string(output))
 	require.NoError(t, err)
 
-	c := f.Client()
+	c := agentFixture.Client()
 
-	t.Log("Waiting until Agent is healthy")
 	require.Eventually(t, func() bool {
-		err = c.Connect(ctx)
+		err := c.Connect(ctx)
 		if err != nil {
 			t.Logf("connecting client to agent: %v", err)
 			return false
 		}
 		defer c.Disconnect()
-
 		state, err := c.State(ctx)
 		if err != nil {
 			t.Logf("error getting the agent state: %v", err)
 			return false
 		}
 		t.Logf("agent state: %+v", state)
-		return state.State == cproto.State_HEALTHY
+		return state.State == v2proto.State_HEALTHY
 	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 
-	// Reconnect
-	err = c.Connect(ctx)
+	t.Log("Ensure the correct version is running")
+	currentVersion, err := c.Version(ctx)
 	require.NoError(t, err)
+	require.Equal(t, upgradeFromVersion.String(), currentVersion.Version)
+
+	t.Log("Start the Agent upgrade")
+	toVersion := upgradeToVersion.String()
+	err = c.Connect(ctx)
+	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
 
-	// Create a fake Agent package, based on the current fixture,
-	// that this test will attempt to upgrade to. This Agent will
-	// deliberately report an unhealthy status.
-	srcPackagePath, err := f.SrcPackage(context.Background())
+	_, err = c.Upgrade(ctx, toVersion, "", false, false)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion)
+
+	checkUpgradeWatcherRan(t, agentFixture, upgradeFromVersion)
+
+	t.Log("Check Agent version to ensure upgrade is successful")
+	t.Log("Ensure the correct version is running")
+	currentVersion, err = c.Version(ctx)
 	require.NoError(t, err)
+	require.Equal(t, toVersion, currentVersion.Version)
 
-	t.Logf("Creating fake unhealthy Agent package, version = %s", toVersion.String())
-	packagePath := createFakeUnhealthyAgentPackage(t, srcPackagePath, toVersion)
-
-	t.Logf("from agent package path: %s", srcPackagePath)
-	t.Logf("to agent package path: %s", packagePath)
-
-	time.Sleep(1 * time.Minute)
-
-	// Try upgrading to the fake Agent package.
-	t.Logf("Attempting upgrade to %s using Agent package at %s", toVersion.String(), packagePath)
-	ctx, _ = context.WithTimeout(ctx, 2*time.Minute)
-	_, err = c.Upgrade(ctx, toVersion.String(), "file://"+packagePath, true, false)
-	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion.String())
-
-	// Ensure that the Upgrade Watcher has stopped running.
-	checkUpgradeWatcherRan(t, f, fromVersion)
-
-	// Ensure that the original version of Agent is running again.
-	t.Log("Check Agent version to ensure rollback is successful")
-	currentVersion, err := getVersion(t, ctx, f)
-	require.NoError(t, err)
-	require.Equal(t, fromVersion, currentVersion.Binary.Version)
-	require.Equal(t, fromVersion, currentVersion.Daemon.Version)
-}
-
-func createFakeUnhealthyAgentPackage(t *testing.T, srcPackagePath string, version *version.ParsedSemVer) string {
-	t.Helper()
-
-	// Make a copy of the source package
-	tmpDir := t.TempDir()
-	destPackage := filepath.Join(tmpDir, filepath.Base(srcPackagePath))
-	data, err := os.ReadFile(srcPackagePath)
-	require.NoError(t, err)
-	err = os.WriteFile(destPackage, data, 0644)
-	require.NoError(t, err)
-
-	// Extract the copy so we can manipulate its contents
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "tar", "-xzf", filepath.Base(destPackage))
-	cmd.Dir = tmpDir
-
-	err = cmd.Run()
-	require.NoError(t, err)
-
-	// Deliberately remove the Filebeat executable so any components using
-	// Filebeat will report unhealthy and therefore the Agent will report
-	// unhealthy.
-	filebeatExecutableGlob := filepath.Join(tmpDir, "*", "data", "*", "components", "filebeat")
-	matches, err := filepath.Glob(filebeatExecutableGlob)
-	require.NoError(t, err)
-	require.Len(t, matches, 1)
-
-	filebeatExecutable := matches[0]
-	err = os.Remove(filebeatExecutable)
-	require.NoError(t, err)
-
-	// Come up with new package name and commit hash
-	packageName := fmt.Sprintf("elastic-agent-%s-%s-%s", version.String(), runtime.GOOS, runtime.GOARCH)
-	archiveFileName := fmt.Sprintf("%s.tar.gz", packageName)
-	commitHash := "abcdef0123456789abcdef0123456789abcdef01"
-
-	// Write new commit hash file
-	destPackageDir := strings.ReplaceAll(destPackage, ".tar.gz", "")
-	err = os.WriteFile(filepath.Join(destPackageDir, ".elastic-agent.active.commit"), []byte(commitHash), 0644)
-	require.NoError(t, err)
-
-	// Rename versioned dir
-	versionedDirGlob := filepath.Join(tmpDir, "*", "data", "elastic-agent-*")
-	matches, err = filepath.Glob(versionedDirGlob)
-	require.NoError(t, err)
-	require.Len(t, matches, 1)
-
-	oldVersionedDirAbsPath := matches[0]
-	newVersionedDirRelPath := fmt.Sprintf("elastic-agent-%s", commitHash[0:6])
-	err = os.Rename(oldVersionedDirAbsPath, filepath.Join(filepath.Dir(oldVersionedDirAbsPath), newVersionedDirRelPath))
-	require.NoError(t, err)
-
-	// Update executable symlink
-	cwd, err := os.Getwd()
-	require.NoError(t, err)
-	defer os.Chdir(cwd)
-
-	err = os.Chdir(destPackageDir)
-	require.NoError(t, err)
-
-	err = os.Remove("elastic-agent")
-	require.NoError(t, err)
-
-	err = os.Symlink(filepath.Join("data", newVersionedDirRelPath, "elastic-agent"), "elastic-agent")
-	require.NoError(t, err)
-
-	// Rename package dir to have new package name
-	err = os.Rename(destPackageDir, filepath.Join(tmpDir, packageName))
-	require.NoError(t, err)
-
-	// Repackage Agent
-	ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-	cmd = exec.CommandContext(ctx, "tar", "-czf", archiveFileName, packageName)
-	cmd.Dir = tmpDir
-
-	err = cmd.Run()
-	require.NoError(t, err)
-
-	// Create archive hash file
-	archiveFilePath := filepath.Join(tmpDir, archiveFileName)
-	hash := sha512.New()
-	data, err = os.ReadFile(archiveFilePath)
-	require.NoError(t, err)
-
-	_, err = hash.Write(data)
-	require.NoError(t, err)
-
-	data = []byte(hex.EncodeToString(hash.Sum(nil)))
-	err = os.WriteFile(archiveFilePath+".sha512", data, 0644)
-	require.NoError(t, err)
-
-	return tmpDir
+	// TODO: Figure out the PID of one of the component processes
+	// TODO: Send SIGSTOP to PID (OS-dependent?)
+	// TODO: Wait for Agent status to be degraded
+	// TODO: Wait for rollback
 }
