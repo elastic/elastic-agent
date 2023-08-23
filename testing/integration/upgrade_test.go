@@ -212,7 +212,15 @@ func TestStandaloneUpgrade(t *testing.T) {
 			parsedUpgradeVersion, err := version.ParseVersion(define.Version())
 			require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
 			skipVerify := version_8_7_0.Less(*parsedVersion)
-			testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, parsedUpgradeVersion, "", skipVerify, true, false, "")
+			testStandaloneUpgrade(ctx, t,
+				agentFixture,
+				parsedVersion,
+				parsedUpgradeVersion,
+				"",
+				skipVerify,
+				true,
+				false,
+				"")
 		})
 	}
 }
@@ -466,7 +474,8 @@ func testStandaloneUpgrade(
 	}
 
 	upgradeTriggerOutput, err := f.Exec(ctx, upgradeCmdArgs)
-	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s%", parsedUpgradeVersion, upgradeTriggerOutput)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s",
+		parsedUpgradeVersion, upgradeTriggerOutput)
 
 	require.Eventuallyf(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, f, parsedUpgradeVersion.CoreVersion(), parsedUpgradeVersion.IsSnapshot(), expectedAgentHashAfterUpgrade)

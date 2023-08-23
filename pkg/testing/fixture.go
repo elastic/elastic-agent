@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -20,18 +19,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/process"
-	"github.com/elastic/elastic-agent/pkg/version"
-	agentVersion "github.com/elastic/elastic-agent/version"
 )
 
 // Fixture handles the setup and management of the Elastic Agent.
@@ -182,67 +179,14 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 
 	f.workDir = finalDir
 
-	err = decreasePackageVersionDuringFeatureFreeze(f, f.workDir)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// After feature freeze the agent has the version of the next minor but there is a few
-// days of lag until the snapshot is produced to test against. To get around this the
-// tests continue to provision the previous minor and the agent package version is replaced
-// to report the previous minor version as well. As of the time of writing fleet server
-// will consider versions greater than its own to be unsupported. This allows the newer
-// agent to enroll.
-//
-// This function is meant to be temporary. Fleet server should be modified to allow the next
-// minor version to connect to get around this in a more sustainable way.
-func decreasePackageVersionDuringFeatureFreeze(f *Fixture, workDir string) error {
-	installFS := os.DirFS(workDir)
-	var matches []string
-	err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return fmt.Errorf("my fs.WalkDir reveiced and error and aborted: %w",
-				err)
-		}
-
-		if d.Name() == agentVersion.PackageVersionFileName {
-			matches = append(matches, path)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	f.t.Logf("package version files found: %v\n", matches)
-
-	for _, m := range matches {
-		versionFile := filepath.Join(f.WorkDir(), m)
-
-		pv, err := version.ParseVersion(f.version)
-		if err != nil {
-			return fmt.Errorf("could not parse fixture version: %w", err)
-		}
-
-		if pv.Major() == 8 && pv.Minor() == 11 {
-			prev, err := pv.GetPreviousMinor()
-			if err != nil {
-				return fmt.Errorf("8.11 cannot be used right now, "+
-					"failed getting previous minor: %w", err)
-			}
-
-			err = os.WriteFile(versionFile, []byte(prev.String()), 0666)
-			if err != nil {
-				return fmt.Errorf("could not write package-version file %q: %w",
-					versionFile, err)
-			}
-
-			f.t.Logf("Updated package version file from %s to %s", pv.String(), prev.String())
-		}
-	}
+	// version, err := featurefreeze.AdjustVersion(f.version)
+	// if err != nil {
+	// 	return fmt.Errorf("could not adjust version during feature freeze")
+	// }
+	// err = featurefreeze.ChangePackageVersion(workDir, version)
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }

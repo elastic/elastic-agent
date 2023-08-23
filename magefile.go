@@ -1707,19 +1707,10 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		agentStackVersion = agentVersion
 	}
 
-	pv, err := version.ParseVersion(agentStackVersion)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse agentStackVersion %q: %w",
-			agentStackVersion, err)
-	}
-	if pv.Major() == 8 && pv.Minor() == 11 {
-		prev, err := pv.GetPreviousMinor()
-		if err != nil {
-			return nil, fmt.Errorf("8.11 cannoit be used right now, "+
-				"failed getting previous minor: %w", err)
-		}
-		agentStackVersion = prev.String()
-	}
+	// agentStackVersion, err = featurefreeze.AdjustVersion(agentStackVersion)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	agentBuildDir := os.Getenv("AGENT_BUILD_DIR")
 	if agentBuildDir == "" {

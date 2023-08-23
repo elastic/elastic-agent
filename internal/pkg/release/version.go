@@ -56,6 +56,8 @@ func BuildTime() time.Time {
 }
 
 // Version returns the version of the application.
+// This can only be called AFTER version.InitVersionInformation()
+// has initialized the package variables.
 func Version() string {
 	return version.GetAgentPackageVersion()
 }
