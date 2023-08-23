@@ -1707,11 +1707,6 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		agentStackVersion = agentVersion
 	}
 
-	// agentStackVersion, err = featurefreeze.AdjustVersion(agentStackVersion)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	agentBuildDir := os.Getenv("AGENT_BUILD_DIR")
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")

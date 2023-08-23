@@ -23,7 +23,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -178,15 +177,6 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 
 	f.workDir = finalDir
-
-	// version, err := featurefreeze.AdjustVersion(f.version)
-	// if err != nil {
-	// 	return fmt.Errorf("could not adjust version during feature freeze")
-	// }
-	// err = featurefreeze.ChangePackageVersion(workDir, version)
-	// if err != nil {
-	// 	return err
-	// }
 
 	return nil
 }
