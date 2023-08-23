@@ -81,7 +81,7 @@ func New(ctx context.Context, path string, opts ...OptionFunc) (v *Vault, err er
 		return nil, err
 	}
 	defer func() {
-		err = r.unlock(err)
+		err = r.unlockAndJoinErrors(err)
 	}()
 
 	r.seed, err = getOrCreateSeed(path, options.readonly)
@@ -104,7 +104,7 @@ func (v *Vault) Set(ctx context.Context, key string, data []byte) (err error) {
 		return err
 	}
 	defer func() {
-		err = v.unlock(err)
+		err = v.unlockAndJoinErrors(err)
 	}()
 
 	return writeFile(v.filepathFromKey(key), enc)
@@ -117,7 +117,7 @@ func (v *Vault) Get(ctx context.Context, key string) (dec []byte, err error) {
 		return nil, err
 	}
 	defer func() {
-		err = v.unlock(err)
+		err = v.unlockAndJoinErrors(err)
 	}()
 
 	enc, err := os.ReadFile(v.filepathFromKey(key))
@@ -135,7 +135,7 @@ func (v *Vault) Exists(ctx context.Context, key string) (ok bool, err error) {
 		return false, err
 	}
 	defer func() {
-		err = v.unlock(err)
+		err = v.unlockAndJoinErrors(err)
 	}()
 
 	if _, err = os.Stat(v.filepathFromKey(key)); err != nil {
@@ -154,7 +154,7 @@ func (v *Vault) Remove(ctx context.Context, key string) (err error) {
 		return err
 	}
 	defer func() {
-		err = v.unlock(err)
+		err = v.unlockAndJoinErrors(err)
 	}()
 
 	return os.RemoveAll(v.filepathFromKey(key))
@@ -209,7 +209,7 @@ func (v *Vault) tryRLock(ctx context.Context) error {
 	return nil
 }
 
-// unlock unlocks the file lock and preserves the original error if there was a error
-func (v *Vault) unlock(err error) error {
+// unlockAndJoinErrors Helper function that unlocks the file lock and returns joined error
+func (v *Vault) unlockAndJoinErrors(err error) error {
 	return errors.Join(err, v.lock.Unlock())
 }
