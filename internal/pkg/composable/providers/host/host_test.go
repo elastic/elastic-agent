@@ -56,7 +56,7 @@ func TestContextProvider(t *testing.T) {
 	})
 
 	go func() {
-		_ = provider.Run(comm)
+		_ = provider.Run(ctx, comm)
 	}()
 
 	// wait for it to be called once
@@ -114,9 +114,7 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-	}()
+	defer cancel()
 	comm := ctesting.NewContextComm(ctx)
 
 	calledChan := make(chan struct{})
@@ -130,7 +128,7 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 
 	// Run the provider
 	go func() {
-		err = hostProvider.Run(comm)
+		err = hostProvider.Run(ctx, comm)
 	}()
 
 	// Trigger the FQDN feature flag callback by
