@@ -100,7 +100,7 @@ func TestCoordinator_State_Starting(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	coord, cfgMgr, varsMgr := createCoordinator(t)
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx)
 	stateChan := coord.StateSubscribe(ctx, 32)
 	go func() {
 		err := coord.Run(ctx)
@@ -147,7 +147,7 @@ func TestCoordinator_State_ConfigError_NotManaged(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	coord, cfgMgr, varsMgr := createCoordinator(t)
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx)
 	go func() {
 		err := coord.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -190,7 +190,7 @@ func TestCoordinator_State_ConfigError_Managed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	coord, cfgMgr, varsMgr := createCoordinator(t, ManagedCoordinator(true))
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, ManagedCoordinator(true))
 	go func() {
 		err := coord.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -232,7 +232,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	coord, cfgMgr, varsMgr := createCoordinator(t)
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx)
 	go func() {
 		err := coord.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -392,7 +392,7 @@ func TestCoordinator_ReExec(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	coord, cfgMgr, varsMgr := createCoordinator(t)
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx)
 	go func() {
 		err := coord.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -431,7 +431,7 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	coord, cfgMgr, varsMgr := createCoordinator(t)
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx)
 	go func() {
 		err := coord.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -472,7 +472,7 @@ func ManagedCoordinator(managed bool) CoordinatorOpt {
 // createCoordinator creates a coordinator that using a fake config manager and a fake vars manager.
 //
 // The runtime specifications is set up to use both the fake component and fake shipper.
-func createCoordinator(t *testing.T, opts ...CoordinatorOpt) (*Coordinator, *fakeConfigManager, *fakeVarsManager) {
+func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt) (*Coordinator, *fakeConfigManager, *fakeVarsManager) {
 	t.Helper()
 
 	o := &createCoordinatorOpts{}
@@ -482,7 +482,7 @@ func createCoordinator(t *testing.T, opts ...CoordinatorOpt) (*Coordinator, *fak
 
 	l := newErrorLogger(t)
 
-	ai, err := info.NewAgentInfo(false)
+	ai, err := info.NewAgentInfo(ctx, false)
 	require.NoError(t, err)
 
 	componentSpec := component.InputRuntimeSpec{

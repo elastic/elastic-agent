@@ -57,7 +57,7 @@ func TestUpgradeHandler(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
-	agentInfo, _ := info.NewAgentInfo(true)
+	agentInfo, _ := info.NewAgentInfo(ctx, true)
 	msgChan := make(chan string)
 
 	// Create and start the coordinator
@@ -89,7 +89,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
-	agentInfo, _ := info.NewAgentInfo(true)
+	agentInfo, _ := info.NewAgentInfo(ctx, true)
 	msgChan := make(chan string)
 
 	// Create and start the Coordinator
@@ -123,7 +123,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
-	agentInfo, _ := info.NewAgentInfo(true)
+	agentInfo, _ := info.NewAgentInfo(ctx, true)
 	msgChan := make(chan string)
 
 	// Create and start the Coordinator

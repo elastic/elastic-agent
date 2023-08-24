@@ -66,7 +66,7 @@ func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 	comm := ctesting.NewContextComm(ctx)
 
 	go func() {
-		_ = fp.Run(comm)
+		_ = fp.Run(ctx, comm)
 	}()
 
 	for {
@@ -121,7 +121,7 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 	comm := ctesting.NewContextComm(ctx)
 
 	go func() {
-		_ = fp.Run(comm)
+		_ = fp.Run(ctx, comm)
 	}()
 
 	for {

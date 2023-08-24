@@ -5,6 +5,7 @@
 package testutils
 
 import (
+	"context"
 	"runtime"
 	"testing"
 
@@ -22,7 +23,7 @@ import (
 func InitStorage(t *testing.T) {
 	storage.DisableEncryptionDarwin()
 	if runtime.GOOS != "darwin" {
-		err := secret.CreateAgentSecret()
+		err := secret.CreateAgentSecret(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}

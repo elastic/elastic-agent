@@ -5,6 +5,8 @@
 package agent
 
 import (
+	"context"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
@@ -21,8 +23,8 @@ func init() {
 type contextProvider struct{}
 
 // Run runs the Agent context provider.
-func (*contextProvider) Run(comm corecomp.ContextProviderComm) error {
-	a, err := info.NewAgentInfo(false)
+func (*contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
+	a, err := info.NewAgentInfo(ctx, false)
 	if err != nil {
 		return err
 	}

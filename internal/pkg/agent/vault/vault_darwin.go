@@ -23,6 +23,7 @@ extern char* GetOSStatusMessage(OSStatus status);
 */
 import "C"
 import (
+	"context"
 	"fmt"
 	"sync"
 	"unsafe"
@@ -37,7 +38,7 @@ type Vault struct {
 
 // New initializes the vault store
 // Call Close when done to release the resources
-func New(name string, opts ...OptionFunc) (*Vault, error) {
+func New(ctx context.Context, name string, opts ...OptionFunc) (*Vault, error) {
 	var keychain C.SecKeychainRef
 
 	err := statusToError(C.OpenKeychain(keychain))
@@ -64,7 +65,7 @@ func (v *Vault) Close() error {
 }
 
 // Set sets the key in the vault store
-func (v *Vault) Set(key string, data []byte) error {
+func (v *Vault) Set(ctx context.Context, key string, data []byte) error {
 	v.mx.Lock()
 	defer v.mx.Unlock()
 
@@ -81,7 +82,7 @@ func (v *Vault) Set(key string, data []byte) error {
 }
 
 // Get retrieves the key from the vault store
-func (v *Vault) Get(key string) ([]byte, error) {
+func (v *Vault) Get(ctx context.Context, key string) ([]byte, error) {
 	var (
 		data unsafe.Pointer
 		len  C.size_t
@@ -106,7 +107,7 @@ func (v *Vault) Get(key string) ([]byte, error) {
 }
 
 // Exists checks if the key exists
-func (v *Vault) Exists(key string) (bool, error) {
+func (v *Vault) Exists(ctx context.Context, key string) (bool, error) {
 	v.mx.Lock()
 	defer v.mx.Unlock()
 
@@ -128,7 +129,7 @@ func (v *Vault) Exists(key string) (bool, error) {
 }
 
 // Remove will remove a key from the keychain.
-func (v *Vault) Remove(key string) error {
+func (v *Vault) Remove(ctx context.Context, key string) error {
 	v.mx.Lock()
 	defer v.mx.Unlock()
 

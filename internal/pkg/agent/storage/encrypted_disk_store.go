@@ -6,6 +6,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -39,11 +40,12 @@ type OptionFunc func(s *EncryptedDiskStore)
 
 // NewEncryptedDiskStore creates an encrypted disk store.
 // Drop-in replacement for NewDiskStorage
-func NewEncryptedDiskStore(target string, opts ...OptionFunc) Storage {
+func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFunc) Storage {
 	if encryptionDisabled {
 		return NewDiskStore(target)
 	}
 	s := &EncryptedDiskStore{
+		ctx:       ctx,
 		target:    target,
 		vaultPath: paths.AgentVaultPath(),
 	}
@@ -75,9 +77,9 @@ func (d *EncryptedDiskStore) Exists() (bool, error) {
 	return true, nil
 }
 
-func (d *EncryptedDiskStore) ensureKey() error {
+func (d *EncryptedDiskStore) ensureKey(ctx context.Context) error {
 	if d.key == nil {
-		key, err := secret.GetAgentSecret(secret.WithVaultPath(d.vaultPath))
+		key, err := secret.GetAgentSecret(ctx, secret.WithVaultPath(d.vaultPath))
 		if err != nil {
 			return fmt.Errorf("could not get agent key: %w", err)
 		}
@@ -90,7 +92,7 @@ func (d *EncryptedDiskStore) ensureKey() error {
 // Specifically it will write to a .tmp file then rotate the file to the target name to ensure that an error does not corrupt the previously written file.
 func (d *EncryptedDiskStore) Save(in io.Reader) error {
 	// Ensure has agent key
-	err := d.ensureKey()
+	err := d.ensureKey(d.ctx)
 	if err != nil {
 		return errors.New(err, "failed to ensure key")
 	}
@@ -179,7 +181,7 @@ func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
 	}()
 
 	// Ensure has agent key
-	err = d.ensureKey()
+	err = d.ensureKey(d.ctx)
 	if err != nil {
 		return nil, errors.New(err, "failed to ensure key during encrypted disk store Load")
 	}
