@@ -42,7 +42,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const fastWatcherCfg = `
@@ -831,9 +830,6 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 		return state.State == v2proto.State_HEALTHY
 	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 
-	// get rid of the package version files in the installed directory
-	removePackageVersionFiles(t, f)
-
 	// get the version returned by the currently running agent
 	actualVersionBytes := getAgentVersion(t, f, context.Background(), false)
 
@@ -871,31 +867,4 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 			state.Info.Snapshot == parsedLatestVersion.IsSnapshot() &&
 			state.State == v2proto.State_HEALTHY
 	}, 5*time.Minute, 10*time.Second, "agent never upgraded to expected version")
-}
-
-func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) {
-	installFS := os.DirFS(f.WorkDir())
-	matches := []string{}
-
-	err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if d.Name() == agtversion.PackageVersionFileName {
-			matches = append(matches, path)
-		}
-		return nil
-	})
-	require.NoError(t, err)
-
-	t.Logf("package version files found: %v", matches)
-
-	// the version files should have been removed from the other test, we just make sure
-	for _, m := range matches {
-		vFile := filepath.Join(f.WorkDir(), m)
-		t.Logf("removing package version file %q", vFile)
-		err = os.Remove(vFile)
-		require.NoErrorf(t, err, "error removing package version file %q", vFile)
-	}
 }
