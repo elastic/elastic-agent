@@ -8,6 +8,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io/fs"
 	"io/ioutil"
@@ -28,8 +29,11 @@ const (
 func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	dir := t.TempDir()
 
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
 	fp := filepath.Join(dir, testConfigFile)
-	s := NewEncryptedDiskStore(fp, WithVaultPath(dir))
+	s := NewEncryptedDiskStore(ctx, fp, WithVaultPath(dir))
 
 	// Test that the file loads and doesn't create vault
 	r, err := s.Load()
@@ -67,7 +71,7 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	}
 
 	// Create agent secret
-	err = secret.CreateAgentSecret(secret.WithVaultPath(dir))
+	err = secret.CreateAgentSecret(ctx, secret.WithVaultPath(dir))
 	if err != nil {
 		t.Fatal(err)
 	}

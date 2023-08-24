@@ -13,7 +13,13 @@ TESTS_EXIT_STATUS=$?
 set -e
 
 # HTML report
-go install github.com/alexec/junit2html@latest
-junit2html < build/TEST-go-integration.xml > build/TEST-report.html
+outputXML="build/TEST-go-integration.xml"
+
+if [ -f "$outputXML" ]; then
+  go install github.com/alexec/junit2html@latest
+  junit2html < "$outputXML" > build/TEST-report.html
+else
+    echo "Cannot generate HTML test report: $outputXML not found"
+fi
 
 exit $TESTS_EXIT_STATUS

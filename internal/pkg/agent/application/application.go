@@ -5,6 +5,7 @@
 package application
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
+	ctx context.Context,
 	log *logger.Logger,
 	baseLogger *logger.Logger,
 	logLevel logp.Level,
@@ -139,7 +141,7 @@ func New(
 	} else {
 		isManaged = true
 		var store storage.Store
-		store, cfg, err = mergeFleetConfig(rawConfig)
+		store, cfg, err = mergeFleetConfig(ctx, rawConfig)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -158,7 +160,7 @@ func New(
 				EndpointSignedComponentModifier(),
 			)
 
-			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime, fleetInitTimeout)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -196,9 +198,9 @@ func New(
 	return coord, configMgr, composable, nil
 }
 
-func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
+func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(path)
+	store := storage.NewEncryptedDiskStore(ctx, path)
 
 	reader, err := store.Load()
 	if err != nil {
