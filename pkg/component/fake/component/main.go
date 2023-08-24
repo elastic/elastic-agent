@@ -68,29 +68,41 @@ func run() error {
 		case <-ctx.Done():
 			return nil
 		case change := <-c.UnitChanges():
+			logger.Info().Msgf("Received change: %+v", change)
 			if change.Unit != nil {
-				u := change.Unit
-				state, _, _ := u.State()
-				logger.Info().
-					Str("state", state.String()).
-					Str("expectedState", u.Expected().State.String()).
-					Msg("unit change received")
-			} else {
-				logger.Info().Msg("unit change received, but no unit on it")
+				logger.Info().Msgf("unit: %+v", change.Unit)
+				if change.Unit.Expected().APMConfig != nil {
+					logger.Info().Msgf("apmConfig: %+v", change.Unit.Expected().APMConfig)
+				}
 			}
+			handleChange(logger, s, change)
 
-			switch change.Type {
-			case client.UnitChangedAdded:
-				s.Added(change.Unit)
-			case client.UnitChangedModified:
-				s.Modified(change)
-			case client.UnitChangedRemoved:
-				s.Removed(change.Unit)
-			}
 		case err := <-c.Errors():
 			if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
 				fmt.Fprintf(os.Stderr, "GRPC client error: %+v\n", err)
 			}
 		}
+	}
+}
+
+func handleChange(logger zerolog.Logger, s *comp.StateManager, change client.UnitChanged) {
+	if change.Unit != nil {
+		u := change.Unit
+		state, _, _ := u.State()
+		logger.Info().
+			Str("state", state.String()).
+			Str("expectedState", u.Expected().State.String()).
+			Msg("unit change received")
+	} else {
+		logger.Info().Msg("unit change received, but no unit on it")
+	}
+
+	switch change.Type {
+	case client.UnitChangedAdded:
+		s.Added(change.Unit)
+	case client.UnitChangedModified:
+		s.Modified(change)
+	case client.UnitChangedRemoved:
+		s.Removed(change.Unit)
 	}
 }

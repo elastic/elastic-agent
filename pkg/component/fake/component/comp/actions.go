@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 )
@@ -148,6 +149,10 @@ func (a *retrieveAPMConfigAction) Execute(
 	_ map[string]interface{}) (map[string]interface{}, error) {
 
 	a.input.logger.Info().Msg("executing " + ActionRetrieveAPMConfig + " action")
-
-	return map[string]interface{}{"apm": a.input.apmConfig}, nil
+	a.input.logger.Debug().Msgf("stored apm config %v", a.input.apmConfig)
+	if a.input.apmConfig == nil {
+		return map[string]interface{}{"apm": nil}, nil
+	}
+	marshaledBytes, err := protojson.Marshal(a.input.apmConfig)
+	return map[string]interface{}{"apm": string(marshaledBytes)}, err
 }
