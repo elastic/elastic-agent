@@ -233,7 +233,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		case checkin := <-comm.CheckinObserved():
 			s.log.Debugf("got check-in for %s service, tearingDown: %v, ignoreCheckins: %v", s.name(), tearingDown, ignoreCheckins)
 			tamperProtection := features.TamperProtection()
-			if tamperProtection { // If tamper protection feature flag is enabled, new behavour
+			if tamperProtection { // If tamper protection feature flag is enabled, new behavior
 				// Got check-in upon teardown update
 				// tearingDown can be set to true only if tamper protection feature is enabled
 				if tearingDown {
@@ -247,7 +247,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 						s.processCheckin(checkin, comm, &lastCheckin)
 					}
 				}
-			} else { // If tamper protection feature flag is disabled, old behavour
+			} else { // If tamper protection feature flag is disabled, old behavior
 				s.processCheckin(checkin, comm, &lastCheckin)
 			}
 		case <-checkinTimer.C:
