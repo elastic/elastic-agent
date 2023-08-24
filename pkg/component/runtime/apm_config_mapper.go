@@ -19,10 +19,11 @@ func MapAPMConfig(conf *config.APMConfig) *proto.APMConfig {
 	}
 
 	elasticAPMConf := &proto.ElasticAPM{
-		Environment: conf.Environment,
-		APIKey:      &conf.APIKey,
-		SecretToken: &conf.SecretToken,
-		Hosts:       append([]string{}, conf.Hosts...),
+		Environment:  conf.Environment,
+		ApiKey:       conf.APIKey,
+		SecretToken:  conf.SecretToken,
+		Hosts:        append([]string{}, conf.Hosts...),
+		GlobalLabels: conf.GlobalLabels,
 	}
 
 	if conf.TLS != zeroElasticAPMTLS {

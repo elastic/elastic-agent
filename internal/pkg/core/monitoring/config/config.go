@@ -66,11 +66,12 @@ func DefaultConfig() *MonitoringConfig {
 
 // APMConfig configures APM Tracing.
 type APMConfig struct {
-	Environment string   `config:"environment"`
-	APIKey      string   `config:"api_key"`
-	SecretToken string   `config:"secret_token"`
-	Hosts       []string `config:"hosts"`
-	TLS         APMTLS   `config:"tls"`
+	Environment  string   `config:"environment"`
+	APIKey       string   `config:"api_key"`
+	SecretToken  string   `config:"secret_token"`
+	Hosts        []string `config:"hosts"`
+	GlobalLabels string   `config:"global_labels""`
+	TLS          APMTLS   `config:"tls"`
 }
 
 // APMTLS contains the configuration options necessary for configuring TLS in

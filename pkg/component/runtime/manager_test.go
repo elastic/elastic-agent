@@ -547,14 +547,11 @@ func TestManager_FakeInput_APM(t *testing.T) {
 	subscriptionErrCh := make(chan error)
 	doneCh := make(chan struct{})
 
-	apiK := "apiKey"
-	st := "secretToken"
-
 	initialAPMConfig := &proto.APMConfig{
 		Elastic: &proto.ElasticAPM{
 			Environment: "test",
-			APIKey:      &apiK,
-			SecretToken: &st,
+			ApiKey:      "apiKey",
+			SecretToken: "secretToken",
 			Hosts:       []string{"host1", "host2", "host3"},
 			Tls: &proto.ElasticAPMTLS{
 				SkipVerify: true,
@@ -567,8 +564,8 @@ func TestManager_FakeInput_APM(t *testing.T) {
 	modifiedAPMConfig := &proto.APMConfig{
 		Elastic: &proto.ElasticAPM{
 			Environment: "test-modified",
-			APIKey:      &apiK,
-			SecretToken: &st,
+			ApiKey:      "apiKey",
+			SecretToken: "secretToken",
 			Hosts:       []string{"newhost1", "host2", "differenthost3"},
 			Tls: &proto.ElasticAPMTLS{
 				SkipVerify: true,

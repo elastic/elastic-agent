@@ -43,8 +43,6 @@ func apmConfigEqual(apmConfig *proto.APMConfig) injectedConfigAssertion {
 
 func TestInjectAPMConfig(t *testing.T) {
 
-	apiKey := "apik"
-	secret := "🤫"
 	type args struct {
 		comps []component.Component
 		cfg   map[string]interface{}
@@ -221,8 +219,8 @@ func TestInjectAPMConfig(t *testing.T) {
 			want: apmConfigEqual(&proto.APMConfig{
 				Elastic: &proto.ElasticAPM{
 					Environment: "apm-unit-tests",
-					APIKey:      &apiKey,
-					SecretToken: &secret,
+					ApiKey:      "apik",
+					SecretToken: "🤫",
 					Hosts: []string{
 						"https://apmhost1",
 						"https://apmhost2",
@@ -415,6 +413,7 @@ func TestPatchAPMConfig(t *testing.T) {
                       - https://apmhost1:443
                       environment: test-apm
                       secret_token: secret
+                      global_labels: "key1=value1,key2=value2"
                       tls:
                         skip_verify: true
                   `,
@@ -432,6 +431,7 @@ func TestPatchAPMConfig(t *testing.T) {
                     environment: test-apm
                     api_key: ""
                     secret_token: secret
+                    global_labels: "key1=value1,key2=value2"
                     tls:
                       skip_verify: true
                       server_ca: ""

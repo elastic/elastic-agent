@@ -63,10 +63,11 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 			MonitoringConfig: &monitoringCfg.MonitoringConfig{
 				MonitorTraces: true,
 				APM: monitoringCfg.APMConfig{
-					Environment: "diag-unit-test",
-					APIKey:      "apikey",
-					SecretToken: "secret",
-					Hosts:       []string{"host1", "host2"},
+					Environment:  "diag-unit-test",
+					APIKey:       "apikey",
+					SecretToken:  "secret",
+					Hosts:        []string{"host1", "host2"},
+					GlobalLabels: "k1=b1,k2=v2",
 					TLS: monitoringCfg.APMTLS{
 						SkipVerify:        false,
 						ServerCertificate: "/path/to/server/cert",
@@ -103,6 +104,7 @@ agent:
       environment: diag-unit-test
       apikey: apikey
       secrettoken: secret
+      globallabels: "k1=b1,k2=v2"
       tls:
         skipverify: false
         servercertificate: "/path/to/server/cert"
@@ -287,8 +289,6 @@ components:
 func TestDiagnosticComponentsExpectedWithAPM(t *testing.T) {
 	// Create a Coordinator with a test component model and make sure it's
 	// reported by the components-expected diagnostic
-	apik := "apikey"
-	st := "st"
 	components := []component.Component{
 		{
 			ID:         "some-apm-aware-component",
@@ -297,10 +297,11 @@ func TestDiagnosticComponentsExpectedWithAPM(t *testing.T) {
 			Component: &proto.Component{
 				ApmConfig: &proto.APMConfig{
 					Elastic: &proto.ElasticAPM{
-						Environment: "diag-unit-test",
-						APIKey:      &apik,
-						SecretToken: &st,
-						Hosts:       []string{"host1", "host2"},
+						Environment:  "diag-unit-test",
+						ApiKey:       "apikey",
+						SecretToken:  "st",
+						Hosts:        []string{"host1", "host2"},
+						GlobalLabels: "k=v",
 						Tls: &proto.ElasticAPMTLS{
 							SkipVerify: true,
 							ServerCert: "servercert",
@@ -325,6 +326,7 @@ components:
           environment: diag-unit-test
           apikey: apikey
           secrettoken: st
+          globallabels: "k=v"
           hosts:
           - host1
           - host2
@@ -487,7 +489,7 @@ func TestDiagnosticStateForAPM(t *testing.T) {
 						ApmConfig: &proto.APMConfig{
 							Elastic: &proto.ElasticAPM{
 								Environment: "diag-state-ut",
-								SecretToken: &token,
+								SecretToken: token,
 								Hosts:       []string{"apmhost"},
 								Tls: &proto.ElasticAPMTLS{
 									SkipVerify: true,
@@ -522,10 +524,11 @@ components:
       component:
         apmconfig:
           elastic:
-            apikey: null
+            apikey: ""
             environment: diag-state-ut
             hosts: [apmhost]
             secrettoken: st
+            globallabels: ""
             tls:
               skipverify: true
               serverca: sca
