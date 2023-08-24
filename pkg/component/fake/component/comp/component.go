@@ -94,7 +94,11 @@ func (s *StateManager) Modified(change client.UnitChanged) {
 			return
 		}
 
-		err := existingInput.Update(unit, change.Triggers)
+		err := existingInput.Update(unit, change.Triggers)type runningUnit interface {
+	Unit() *client.Unit
+	Update(u *client.Unit, triggers client.Trigger) error
+}
+
 		if err != nil {
 			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
 		}

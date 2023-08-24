@@ -15,9 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
