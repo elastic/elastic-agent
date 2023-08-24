@@ -42,7 +42,7 @@ func InjectAPMConfig(comps []component.Component, cfg map[string]interface{}) ([
 		return comps, nil
 	}
 
-	for i, _ := range comps {
+	for i := range comps {
 		// We shouldn't really go straight from config datamodel to protobuf datamodel (a core datamodel would be nice to
 		// abstract from protocol details)
 		if comps[i].Component == nil {
@@ -127,7 +127,7 @@ func PatchAPMConfig(log *logger.Logger, rawConfig *config.Config) func(change co
 		return noop
 	}
 
-	if tracesEnabled == false && apmConfig == nil {
+	if !tracesEnabled && apmConfig == nil {
 		// traces disabled and no apm config -> no patching happening
 		log.Debugf("traces disabled and no apm config: no patching necessary")
 		return noop

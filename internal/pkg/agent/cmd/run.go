@@ -488,7 +488,7 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 	}
 
 	cfg := mcfg.APM
-	fmt.Printf("APM config: %v", cfg)
+
 	//nolint:godox // the TODO is intentional
 	// TODO(stn): Ideally, we'd use apmtransport.NewHTTPTransportOptions()
 	// but it doesn't exist today. Update this code once we have something

@@ -70,7 +70,7 @@ type APMConfig struct {
 	APIKey       string   `config:"api_key"`
 	SecretToken  string   `config:"secret_token"`
 	Hosts        []string `config:"hosts"`
-	GlobalLabels string   `config:"global_labels""`
+	GlobalLabels string   `config:"global_labels"`
 	TLS          APMTLS   `config:"tls"`
 }
 
