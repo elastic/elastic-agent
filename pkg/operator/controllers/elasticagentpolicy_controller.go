@@ -6,7 +6,6 @@ package controllers
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"sync"
 	"time"
@@ -126,18 +125,16 @@ func (r *k8sConfigManager) handleReconcile(ctx context.Context, client k8sClient
 		return reconcile.Result{}, err
 	}
 
-	policyHash := sha256.New()
-	_, err := policyHash.Write([]byte(policy.Spec.Policy))
+	newHash, err := policy.Spec.Policy.Hash()
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	newHash := policyHash.Sum(nil)
 	if r.cfgHash == string(newHash) {
 		return reconcile.Result{}, nil
 	}
 
-	cfg, err := config.NewConfigFrom(policy.Spec.Policy)
+	cfg, err := config.NewConfigFrom(policy.Spec.Policy.Data)
 	if err != nil {
 		err = fmt.Errorf("failed to parse policy: %w", err)
 		r.reportError(err)
@@ -150,7 +147,7 @@ func (r *k8sConfigManager) handleReconcile(ctx context.Context, client k8sClient
 	}
 	r.currNamespace = req.Namespace
 	r.currPolicy = policy
-	r.newHash = string(newHash)
+	r.newHash = newHash
 
 	// pass config to config Manager
 	select {

@@ -39,7 +39,8 @@ spec:
               policy:
                 description: Foo is an example field of ElasticAgentPolicy. Edit elasticagentpolicy_types.go
                   to remove/update
-                type: string
+                x-kubernetes-preserve-unknown-fields: true
+                type: object
             type: object
           status:
             description: ElasticAgentPolicyStatus defines the observed state of ElasticAgentPolicy

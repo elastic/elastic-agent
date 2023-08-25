@@ -10,7 +10,7 @@ metadata:
   name: elasticagentpolicy-sample
   namespace: elastic-agent-operator-system
 spec:
-  policy: |-
+  policy: 
     outputs:
       default:
         type: elasticsearch
