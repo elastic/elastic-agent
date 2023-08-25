@@ -276,9 +276,9 @@ func GetLatestSnapshotVersion(ctx context.Context, log logger, aac *ArtifactAPIC
 	}
 
 	// normally the output of the versions returned by artifact API is already
-	// sorted in ascending order.If we want to sort in descending order we can
-	// use sort.Reverse.
-	sort.Sort(sortedParsedVersions)
+	// sorted in ascending order.If we want to sort in descending order we need
+	// to pass a sort.Reverse to sort.Sort.
+	sort.Sort(sort.Reverse(sortedParsedVersions))
 
 	var latestSnapshotVersion *version.ParsedSemVer
 	// fetch the latest SNAPSHOT build
