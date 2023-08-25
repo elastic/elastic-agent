@@ -454,6 +454,23 @@ func (f *Fixture) ensurePrepared(ctx context.Context) error {
 	return nil
 }
 
+// PrepareAgentCommand creates an exec.Cmd ready to execute an elastic-agent command.
+func (f *Fixture) PrepareAgentCommand(ctx context.Context, args []string, opts ...process.CmdOption) (*exec.Cmd, error) {
+	err := f.ensurePrepared(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare before exec: %w", err)
+	}
+
+	// #nosec G204 -- Not so many ways to support variadic arguments to the elastic-agent command :(
+	cmd := exec.CommandContext(ctx, f.binaryPath(), args...)
+	for _, o := range opts {
+		if err := o(cmd); err != nil {
+			return nil, fmt.Errorf("error adding opts to Exec: %w", err)
+		}
+	}
+	return cmd, nil
+}
+
 func (f *Fixture) binaryPath() string {
 	workDir := f.workDir
 	if f.installed {

@@ -122,7 +122,7 @@ func (_c *UpgradeManager_Reload_Call) RunAndReturn(run func(*config.Config) erro
 }
 
 // Upgrade provides a mock function with given fields: ctx, version, sourceURI, action, skipVerifyOverride, pgpBytes
-func (_m *UpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+func (_m *UpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
 	_va := make([]interface{}, len(pgpBytes))
 	for _i := range pgpBytes {
 		_va[_i] = pgpBytes[_i]
@@ -166,7 +166,7 @@ type UpgradeManager_Upgrade_Call struct {
 //   - action *fleetapi.ActionUpgrade
 //   - skipVerifyOverride bool
 //   - pgpBytes ...string
-func (_e *UpgradeManager_Expecter) Upgrade(ctx interface{}, version interface{}, sourceURI interface{}, action interface{}, skipVerifyOverride interface{}, pgpBytes ...interface{}) *UpgradeManager_Upgrade_Call {
+func (_e *UpgradeManager_Expecter) Upgrade(ctx interface{}, version interface{}, sourceURI interface{}, action interface{}, skipVerifyOverride interface{}, skipDefaultPgp interface{}, pgpBytes ...interface{}) *UpgradeManager_Upgrade_Call {
 	return &UpgradeManager_Upgrade_Call{Call: _e.mock.On("Upgrade",
 		append([]interface{}{ctx, version, sourceURI, action, skipVerifyOverride}, pgpBytes...)...)}
 }

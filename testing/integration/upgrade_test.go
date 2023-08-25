@@ -65,6 +65,9 @@ var version_8_7_0 = version.NewParsedSemVer(8, 7, 0, "", "")
 // minimum version for upgrade to specific snapshot + minimum version for setting shorter watch period after upgrade
 var version_8_9_0_SNAPSHOT = version.NewParsedSemVer(8, 9, 0, "SNAPSHOT", "")
 
+// minimum version for upgrade with remote pgp and skipping default pgp verification
+var version_8_10_0_SNAPSHOT = version.NewParsedSemVer(8, 10, 0, "SNAPSHOT", "")
+
 func TestFleetManagedUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack:   &define.Stack{},
@@ -207,9 +210,54 @@ func TestStandaloneUpgrade(t *testing.T) {
 
 			parsedUpgradeVersion, err := version.ParseVersion(define.Version())
 			require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
-			testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, parsedUpgradeVersion, "", true)
+			skipVerify := version_8_7_0.Less(*parsedVersion)
+			testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, parsedUpgradeVersion, "", skipVerify, true, false, "")
 		})
 	}
+}
+
+func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+
+	minVersion := version_8_10_0_SNAPSHOT
+	parsedVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	if parsedVersion.Less(*minVersion) {
+		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// previous
+	toVersion, err := parsedVersion.GetPreviousMinor()
+	require.NoError(t, err, "failed to get previous minor")
+	agentFixture, err := define.NewFixture(
+		t,
+		define.Version(),
+	)
+	require.NoError(t, err, "error creating fixture")
+
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err, "error preparing agent fixture")
+
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	_, defaultPGP := release.PGP()
+	firstSeven := string(defaultPGP[:7])
+	customPGP := strings.Replace(
+		string(defaultPGP),
+		firstSeven,
+		"abcDEFg",
+		1,
+	)
+
+	testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, toVersion, "", false, false, true, customPGP)
 }
 
 func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
@@ -238,33 +286,8 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 
 	// retrieve all the versions of agent from the artifact API
 	aac := tools.NewArtifactAPIClient()
-	vList, err := aac.GetVersions(ctx)
-	require.NoError(t, err, "error retrieving versions from Artifact API")
-	require.NotNil(t, vList)
-
-	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
-	for _, v := range vList.Versions {
-		pv, err := version.ParseVersion(v)
-		require.NoErrorf(t, err, "invalid version retrieved from artifact API: %q", v)
-		sortedParsedVersions = append(sortedParsedVersions, pv)
-	}
-
-	require.NotEmpty(t, sortedParsedVersions)
-
-	// normally the output of the versions returned by artifact API is already sorted in ascending order,
-	// if we want to sort in descending order we could use
-	sort.Sort(sort.Reverse(sortedParsedVersions))
-
-	var latestSnapshotVersion *version.ParsedSemVer
-	// fetch the latest SNAPSHOT build
-	for _, pv := range sortedParsedVersions {
-		if pv.IsSnapshot() {
-			latestSnapshotVersion = pv
-			break
-		}
-	}
-
-	require.NotNil(t, latestSnapshotVersion)
+	latestSnapshotVersion, err := tools.GetLatestSnapshotVersion(ctx, t, aac)
+	require.NoError(t, err)
 
 	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
@@ -309,7 +332,7 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 	t.Logf("Targeting upgrade to version %+v", upgradeInputVersion)
 	parsedFromVersion, err := version.ParseVersion(define.Version())
 	require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
-	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false)
+	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false, true, false, "")
 
 }
 
@@ -383,6 +406,9 @@ func testStandaloneUpgrade(
 	parsedUpgradeVersion *version.ParsedSemVer,
 	expectedAgentHashAfterUpgrade string,
 	allowLocalPackage bool,
+	skipVerify bool,
+	skipDefaultPgp bool,
+	customPgp string,
 ) {
 
 	var nonInteractiveFlag bool
@@ -412,7 +438,8 @@ func testStandaloneUpgrade(
 
 	upgradeCmdArgs := []string{"upgrade", parsedUpgradeVersion.String()}
 
-	if allowLocalPackage && version_8_7_0.Less(*parsedFromVersion) {
+	useLocalPackage := allowLocalPackage && version_8_7_0.Less(*parsedFromVersion)
+	if useLocalPackage {
 		// if we are upgrading from a version > 8.7.0 (min version to skip signature verification) we pass :
 		// - a file:// sourceURI pointing the agent package under test
 		// - flag --skip-verify to bypass pgp signature verification (we don't produce signatures for PR/main builds)
@@ -423,7 +450,18 @@ func testStandaloneUpgrade(
 		require.NoError(t, err)
 		sourceURI := "file://" + filepath.Dir(srcPkg)
 		t.Logf("setting sourceURI to : %q", sourceURI)
-		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI, "--skip-verify")
+		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
+	}
+	if useLocalPackage || skipVerify {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-verify")
+	}
+
+	if skipDefaultPgp {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-default-pgp")
+	}
+
+	if len(customPgp) > 0 {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp", customPgp)
 	}
 
 	upgradeTriggerOutput, err := f.Exec(ctx, upgradeCmdArgs)
@@ -746,4 +784,87 @@ func upgradeAgent(ctx context.Context, version string, agentFixture *atesting.Fi
 	}
 
 	return nil
+}
+
+func TestUpgradeBrokenPackageVersion(t *testing.T) {
+	define.Require(t, define.Requirements{
+		// We require sudo for this test to run
+		// `elastic-agent install`.
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	// Get path to Elastic Agent executable
+	f, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = f.Prepare(context.Background())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	output, err := tools.InstallStandaloneAgent(f)
+	t.Logf("Agent installation output: %q", string(output))
+	require.NoError(t, err)
+
+	c := f.Client()
+
+	require.Eventually(t, func() bool {
+		err := c.Connect(ctx)
+		if err != nil {
+			t.Logf("connecting client to agent: %v", err)
+			return false
+		}
+		defer c.Disconnect()
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("agent state: %+v", state)
+		return state.State == v2proto.State_HEALTHY
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	// get the version returned by the currently running agent
+	actualVersionBytes := getAgentVersion(t, f, context.Background(), false)
+
+	actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "daemon")
+
+	// start the upgrade to the latest version
+	require.NotEmpty(t, actualVersion, "broken agent package version should not be empty")
+
+	// upgrade to latest version whatever that will be
+	aac := tools.NewArtifactAPIClient()
+	versionList, err := aac.GetVersions(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
+	latestVersion := versionList.Versions[len(versionList.Versions)-1]
+
+	t.Logf("Upgrading to version %q", latestVersion)
+
+	err = c.Connect(ctx)
+	require.NoError(t, err, "error connecting client to agent")
+	defer c.Disconnect()
+
+	_, err = c.Upgrade(ctx, latestVersion, "", false, false)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", latestVersion)
+	parsedLatestVersion, err := version.ParseVersion(latestVersion)
+	require.NoError(t, err)
+
+	require.Eventuallyf(t, func() bool {
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("current agent state: %+v", state)
+		return state.Info.Version == parsedLatestVersion.CoreVersion() &&
+			state.Info.Snapshot == parsedLatestVersion.IsSnapshot() &&
+			state.State == v2proto.State_HEALTHY
+	}, 5*time.Minute, 10*time.Second, "agent never upgraded to expected version")
 }
