@@ -23,7 +23,7 @@ const (
 	artifactsAPIV1VersionsEndpoint      = "v1/versions/"
 	artifactsAPIV1VersionBuildsEndpoint = "v1/versions/%s/builds/"
 	artifactAPIV1BuildDetailsEndpoint   = "v1/versions/%s/builds/%s"
-	//artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
+	// artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
 )
 
 var (
@@ -267,8 +267,9 @@ func GetLatestSnapshotVersion(ctx context.Context, log logger, aac *ArtifactAPIC
 		return nil, ErrSnapshotVersionsEmpty
 	}
 
-	// normally the output of the versions returned by artifact API is already sorted in ascending order,
-	// if we want to sort in descending order we could use
+	// normally the output of the versions returned by artifact API is already
+	// sorted in ascending order.If we want to sort in descending order we need
+	// to pass a sort.Reverse to sort.Sort.
 	sort.Sort(sort.Reverse(sortedParsedVersions))
 
 	var latestSnapshotVersion *version.ParsedSemVer
