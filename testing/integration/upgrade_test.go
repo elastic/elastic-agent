@@ -970,8 +970,9 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	// local one, which will then cause the invalid input in the Agent test policy (defined further
 	// below in this test) to come into play with the Agent version we're upgrading from, thus preventing
 	// it from ever becoming healthy.
-	// 2. We don't want to necessarily use the version that's one before the latest as it might not have
-	// been released yet and, thus, might not be available for download.
+	// 2. We don't want to necessarily use the version that's one before the latest because sometimes we
+	// are in a situation where the latest version has been advanced to the next release (e.g. 8.10.0)
+	// but the version before that (e.g. 8.9.0) hasn't been released yet.
 	require.GreaterOrEqual(t, len(versionList.Versions), 3)
 	upgradeToVersionStr := versionList.Versions[len(versionList.Versions)-3]
 
