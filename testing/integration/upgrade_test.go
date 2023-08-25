@@ -273,7 +273,6 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
-	// prepare the agent fixture
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
@@ -293,11 +292,13 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
 	require.NoError(t, err)
-	// TODO if we don't have at least 2 builds, select the next older snapshot build
-	require.Greater(t, len(builds.Builds), 1)
 
-	// take the penultimate build of the snapshot (the builds are ordered from most to least recent)
-	upgradeVersionString := builds.Builds[1]
+	upgradeVersionString := builds.Builds[0]
+	if len(builds.Builds) > 2 {
+		// if ther is more than 1 build, take the penultimate build of the
+		// snapshot (the builds are ordered from most to least recent)
+		upgradeVersionString = builds.Builds[1]
+	}
 
 	t.Logf("Targeting build %q of version %q", upgradeVersionString, latestSnapshotVersion)
 
