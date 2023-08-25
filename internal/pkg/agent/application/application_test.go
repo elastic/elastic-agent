@@ -5,6 +5,7 @@
 package application
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func TestMergeFleetConfig(t *testing.T) {
 	}
 
 	rawConfig := config.MustNewConfigFrom(cfg)
-	storage, conf, err := mergeFleetConfig(rawConfig)
+	storage, conf, err := mergeFleetConfig(context.Background(), rawConfig)
 	require.NoError(t, err)
 	assert.NotNil(t, storage)
 	assert.NotNil(t, conf)
@@ -48,7 +49,11 @@ func TestMergeFleetConfig(t *testing.T) {
 
 func TestLimitsLog(t *testing.T) {
 	log, obs := logger.NewTesting("TestLimitsLog")
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
 	_, _, _, err := New(
+		ctx,
 		log,
 		log,
 		logp.DebugLevel,

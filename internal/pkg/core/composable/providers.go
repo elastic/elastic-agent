@@ -26,7 +26,7 @@ type ContextProviderComm interface {
 // ContextProvider is the interface that a context provider must implement.
 type ContextProvider interface {
 	// Run runs the context provider.
-	Run(ContextProviderComm) error
+	Run(context.Context, ContextProviderComm) error
 }
 
 // CloseableProvider is an interface that providers may choose to implement
