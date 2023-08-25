@@ -956,24 +956,32 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	upgradeFromVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	// We go back TWO minors because sometimes we are in a situation where
-	// the current version has been advanced to the next release (e.g. 8.10.0)
-	// but the version before that (e.g. 8.9.0) hasn't been released yet.
-	previousVersion, err := upgradeFromVersion.GetPreviousMinor()
-	require.NoError(t, err)
-	previousVersion, err = previousVersion.GetPreviousMinor()
-	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// For testing the upgrade we actually perform a downgrade
-	upgradeToVersion := previousVersion
+	// Get available versions from Artifacts API
+	aac := tools.NewArtifactAPIClient()
+	versionList, err := aac.GetVersions(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
+
+	// Determine the version that's TWO versions behind the latest. This is necessary for two reasons:
+	// 1. We don't want to necessarily use the latest version as it might be the same as the
+	// local one, which will then cause the invalid input in the Agent test policy (defined further
+	// below in this test) to come into play with the Agent version we're upgrading from, thus preventing
+	// it from ever becoming healthy.
+	// 2. We don't want to necessarily use the version that's one before the latest as it might not have
+	// been released yet and, thus, might not be available for download.
+	require.GreaterOrEqual(t, len(versionList.Versions), 3)
+	upgradeToVersionStr := versionList.Versions[len(versionList.Versions)-3]
+
+	upgradeToVersion, err := version.ParseVersion(upgradeToVersionStr)
+	require.NoError(t, err)
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	err = agentFixture.Prepare(ctx)
 	require.NoError(t, err, "error preparing agent fixture")
