@@ -131,11 +131,14 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	h.log.Debug("Gathering unit diagnostics.")
 	uDiag := h.diagUnits(ctx)
 
+	h.log.Debug("Gathering component diagnostics.")
+	cDiag := h.diagComponents(ctx)
+
 	var r io.Reader
 	// attempt to create the a temporary diagnostics file on disk in order to avoid loading a
 	// potentially large file in memory.
 	// if on-disk creation fails an in-memory buffer is used.
-	f, s, err := h.diagFile(aDiag, uDiag)
+	f, s, err := h.diagFile(aDiag, uDiag, cDiag)
 	if err != nil {
 		var b bytes.Buffer
 		h.log.Warnw("Diagnostics action unable to use temporary file, using buffer instead.", "error.message", err)
@@ -145,8 +148,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 				h.log.Warn(str)
 			}
 		}()
-		// NOTE: Right now, actions don't support component-level diagnostics
-		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag, []client.DiagnosticComponentResult{})
+		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag, cDiag)
 		if err != nil {
 			h.log.Errorw(
 				"diagnostics action handler failed generate zip archive",
@@ -241,8 +243,43 @@ func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResu
 	return uDiag
 }
 
+// diagUnits gathers diagnostics from components.
+func (h *Diagnostics) diagComponents(ctx context.Context) []client.DiagnosticComponentResult {
+	cDiag := make([]client.DiagnosticComponentResult, 0)
+	h.log.Debug("Performing component diagnostics")
+	startTime := time.Now()
+	defer func() {
+		h.log.Debugf("Component diagnostics complete. Took: %s", time.Since(startTime))
+	}()
+	rr := h.diagProvider.PerformDiagnostics(ctx)
+	h.log.Debug("Collecting results of component diagnostics")
+	for _, r := range rr {
+		diag := client.DiagnosticComponentResult{
+			ComponentID: r.Component.ID,
+		}
+		if r.Err != nil {
+			diag.Err = r.Err
+		} else {
+			results := make([]client.DiagnosticFileResult, 0, len(r.Results))
+			for _, res := range r.Results {
+				results = append(results, client.DiagnosticFileResult{
+					Name:        res.Name,
+					Filename:    res.Filename,
+					Description: res.Description,
+					ContentType: res.ContentType,
+					Content:     res.Content,
+					Generated:   res.Generated.AsTime(),
+				})
+			}
+			diag.Results = results
+		}
+		cDiag = append(cDiag, diag)
+	}
+	return cDiag
+}
+
 // diagFile will write the diagnostics to a temporary file and return the file ready to be read
-func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []client.DiagnosticUnitResult) (*os.File, int64, error) {
+func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []client.DiagnosticUnitResult, cDiag []client.DiagnosticComponentResult) (*os.File, int64, error) {
 	f, err := os.CreateTemp("", "elastic-agent-diagnostics")
 	if err != nil {
 		return nil, 0, err
@@ -255,7 +292,7 @@ func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []clie
 			h.log.Warn(str)
 		}
 	}()
-	if err := diagnostics.ZipArchive(&wBuf, f, aDiag, uDiag, []client.DiagnosticComponentResult{}); err != nil {
+	if err := diagnostics.ZipArchive(&wBuf, f, aDiag, uDiag, cDiag); err != nil {
 		os.Remove(name)
 		return nil, 0, err
 	}
