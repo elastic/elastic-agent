@@ -261,7 +261,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, toVersion, "", false, false, true, customPGP)
 }
 
-func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
+func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -293,12 +293,12 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
 	require.NoError(t, err)
 
-	upgradeVersionString := builds.Builds[0]
-	if len(builds.Builds) > 2 {
-		// if ther is more than 1 build, take the penultimate build of the
-		// snapshot (the builds are ordered from most to least recent)
-		upgradeVersionString = builds.Builds[1]
+	if len(builds.Builds) < 2 {
+		t.Skip("there is only one SNAPSHOT version available, " +
+			"the test requires at least 2 so it can downgrade to the previous" +
+			"SNAPSHOT")
 	}
+	upgradeVersionString := builds.Builds[1]
 
 	t.Logf("Targeting build %q of version %q", upgradeVersionString, latestSnapshotVersion)
 
