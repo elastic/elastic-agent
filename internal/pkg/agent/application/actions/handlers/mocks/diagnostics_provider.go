@@ -11,7 +11,11 @@
 package mocks
 
 import (
+	component "github.com/elastic/elastic-agent/pkg/component"
+
 	context "context"
+
+	cproto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	diagnostics "github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 
@@ -97,6 +101,11 @@ func (_m *DiagnosticsProvider) PerformDiagnostics(ctx context.Context, req ...ru
 	}
 
 	return r0
+}
+
+// PerformComponentDiagnostics provides a mock function with given fields: ctx, additionalMetrics, req
+func (_m *DiagnosticsProvider) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	return []runtime.ComponentDiagnostic{}, nil
 }
 
 // DiagnosticsProvider_PerformDiagnostics_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PerformDiagnostics'
