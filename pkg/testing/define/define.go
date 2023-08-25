@@ -92,9 +92,9 @@ func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir
 
 	var binFetcher atesting.Fetcher
 	if ver.IsSnapshot() {
-		binFetcher = atesting.LocalFetcher(buildsDir, binary, atesting.WithLocalSnapshotOnly())
+		binFetcher = atesting.LocalFetcher(buildsDir, atesting.WithLocalSnapshotOnly(), atesting.WithCustomBinaryName(binary))
 	} else {
-		binFetcher = atesting.LocalFetcher(buildsDir, binary)
+		binFetcher = atesting.LocalFetcher(buildsDir, atesting.WithCustomBinaryName(binary))
 	}
 
 	opts = append(opts, atesting.WithFetcher(binFetcher), atesting.WithLogOutput())

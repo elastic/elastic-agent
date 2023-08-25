@@ -60,7 +60,7 @@ func (runner *BeatRunner) SetupSuite() {
 
 	runner.testbeatName = os.Getenv("TEST_BINARY")
 
-	agentFixture, err := define.NewFixtureWithBinary(runner.T(), define.Version(), runner.testbeatName, "/home/ubuntu")
+	agentFixture, err := define.NewFixtureWithBinary(runner.T(), define.Version(), runner.testbeatName, "/home/ubuntu", atesting.WithRunLength(time.Minute), atesting.WithAdditionalArgs([]string{"-E", "output.elasticsearch.allow_older_versions=true"}))
 	runner.agentFixture = agentFixture
 	require.NoError(runner.T(), err)
 
@@ -120,7 +120,7 @@ func (runner *BeatRunner) TestRunAndCheckData() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*4)
 	defer cancel()
-	err := runner.agentFixture.RunBeat(ctx, time.Minute)
+	err := runner.agentFixture.Run(ctx)
 	require.NoError(runner.T(), err)
 
 	docs, err := tools.GetLatestDocumentMatchingQuery(ctx, runner.requirementsInfo.ESClient, map[string]interface{}{
@@ -250,7 +250,7 @@ func (runner *BeatRunner) TestIndexManagementILMEnabledFail() {
 		"-E", "setup.ilm.enabled=true"})
 	runner.T().Logf("got response from management setup: %s", string(resp))
 	assert.Error(runner.T(), err)
-	assert.Contains(runner.T(), resp, "not supported")
+	assert.Contains(runner.T(), string(resp), "not supported")
 }
 
 // tests beat setup ilm-policy
@@ -270,7 +270,7 @@ func (runner *BeatRunner) TestExportILMFail() {
 		"export", "ilm-policy"})
 	runner.T().Logf("got response from management setup: %s", string(resp))
 	assert.Error(runner.T(), err)
-	assert.Contains(runner.T(), resp, "not supported")
+	assert.Contains(runner.T(), string(resp), "not supported")
 
 }
 

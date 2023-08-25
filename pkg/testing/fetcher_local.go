@@ -29,11 +29,18 @@ func WithLocalSnapshotOnly() localFetcherOpt {
 	}
 }
 
+// WithCustomBinaryName sets the binary to a custom name, the default is `elastic-agent`
+func WithCustomBinaryName(name string) localFetcherOpt {
+	return func(f *localFetcher) {
+		f.binaryName = name
+	}
+}
+
 // LocalFetcher returns a fetcher that pulls the binary of the Elastic Agent from a local location.
-func LocalFetcher(dir string, binary string, opts ...localFetcherOpt) Fetcher {
+func LocalFetcher(dir string, opts ...localFetcherOpt) Fetcher {
 	f := &localFetcher{
 		dir:        dir,
-		binaryName: binary,
+		binaryName: "elastic-agent",
 	}
 	for _, o := range opts {
 		o(f)

@@ -44,6 +44,8 @@ type Fixture struct {
 	allowErrs       bool
 	connectTimout   time.Duration
 	binaryName      string
+	runLength       time.Duration
+	additionalArgs  []string
 
 	srcPackage string
 	workDir    string
@@ -109,6 +111,19 @@ func WithConnectTimeout(timeout time.Duration) FixtureOpt {
 func WithBinaryName(name string) FixtureOpt {
 	return func(f *Fixture) {
 		f.binaryName = name
+	}
+}
+
+// WithRunLength sets the total time the binary will run
+func WithRunLength(run time.Duration) FixtureOpt {
+	return func(f *Fixture) {
+		f.runLength = run
+	}
+}
+
+func WithAdditionalArgs(args []string) FixtureOpt {
+	return func(f *Fixture) {
+		f.additionalArgs = args
 	}
 }
 
@@ -280,7 +295,7 @@ func (f *Fixture) RunBeat(ctx context.Context, runFor time.Duration) error {
 	proc, err := process.Start(
 		f.binaryPath(),
 		process.WithContext(ctx),
-		process.WithArgs([]string{"run", "-e", "-c", filepath.Join(f.workDir, "metricbeat.yml")}),
+		process.WithArgs([]string{"run", "-e", "-c", filepath.Join(f.workDir, fmt.Sprintf("%s.yml", f.binaryName))}),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
 	if err != nil {
 		return fmt.Errorf("failed to spawn beat: %w", err)
@@ -326,19 +341,21 @@ func (f *Fixture) RunBeat(ctx context.Context, runFor time.Duration) error {
 
 }
 
-// Run runs the Elastic Agent.
+// Run runs the provided binary.
 //
-// If `states` are provided then the Elastic Agent runs until each state has been reached. Once reached the
+// If `states` are provided and the binary is Elastic Agent, agent runs until each state has been reached. Once reached the
 // Elastic Agent is stopped. If at any time the Elastic Agent logs an error log and the Fixture is not started
 // with `WithAllowErrors()` then `Run` will exit early and return the logged error.
 //
-// If no `states` are provided then the Elastic Agent runs until the context is cancelled.
+// If no `states` are provided then the Elastic Agent runs until the context is or the timeout specified with WithRunLength is reached.
 func (f *Fixture) Run(ctx context.Context, states ...State) error {
-	if f.installed {
-		return errors.New("fixture is installed; cannot be run")
-	}
+	isBeat := false
 	if f.binaryName != "elastic-agent" {
-		return fmt.Errorf("Run() can only be run against elastic-agent, got %s", f.binaryName)
+		isBeat = true
+	}
+
+	if !isBeat && f.installed {
+		return errors.New("fixture is installed; cannot be run")
 	}
 
 	var err error
@@ -350,12 +367,30 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var sm *stateMachine
+	var smInstance *stateMachine
+	if states != nil && isBeat {
+		return errors.New("states not supported when running against beats")
+	}
 	if states != nil {
-		sm, err = newStateMachine(states)
+		smInstance, err = newStateMachine(states)
 		if err != nil {
 			return err
 		}
+	}
+
+	// agent-specific setup
+	var agentClient client.Client
+	var stateCh chan *client.AgentState
+	var stateErrCh chan error
+	if !isBeat {
+		cAddr, err := control.AddressFromPath(f.operatingSystem, f.workDir)
+		if err != nil {
+			return fmt.Errorf("failed to get control protcol address: %w", err)
+		}
+		agentClient = client.New(client.WithAddress(cAddr))
+		f.setClient(agentClient)
+		defer f.setClient(nil)
+		stateCh, stateErrCh = watchState(ctx, agentClient, f.connectTimout)
 	}
 
 	var logProxy Logger
@@ -365,29 +400,32 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	stdOut := newLogWatcher(logProxy)
 	stdErr := newLogWatcher(logProxy)
 
-	cAddr, err := control.AddressFromPath(f.operatingSystem, f.workDir)
-	if err != nil {
-		return fmt.Errorf("failed to get control protcol address: %w", err)
+	args := []string{"run", "-e", "--disable-encrypted-store", "--testing-mode"}
+	if isBeat {
+		args = []string{"run", "-e", "-c", filepath.Join(f.workDir, fmt.Sprintf("%s.yml", f.binaryName))}
 	}
+	args = append(args, f.additionalArgs...)
 
 	proc, err := process.Start(
 		f.binaryPath(),
 		process.WithContext(ctx),
-		process.WithArgs([]string{"run", "-e", "--disable-encrypted-store", "--testing-mode"}),
+		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+
 	if err != nil {
-		return fmt.Errorf("failed to spawn elastic-agent: %w", err)
+		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
+
 	killProc := func() {
 		_ = proc.Kill()
 		<-proc.Wait()
 	}
 
-	c := client.New(client.WithAddress(cAddr))
-	f.setClient(c)
-	defer f.setClient(nil)
+	var doneChan <-chan time.Time
+	if f.runLength != 0 {
+		doneChan = time.After(f.runLength)
+	}
 
-	stateCh, stateErrCh := watchState(ctx, c, f.connectTimout)
 	stopping := false
 	for {
 		select {
@@ -417,9 +455,15 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 				killProc()
 				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
 			}
+		case <-doneChan:
+			if !stopping {
+				// trigger the stop
+				stopping = true
+				_ = proc.Stop()
+			}
 		case state := <-stateCh:
-			if sm != nil {
-				cfg, cont, err := sm.next(state)
+			if smInstance != nil {
+				cfg, cont, err := smInstance.next(state)
 				if err != nil {
 					killProc()
 					return fmt.Errorf("state management failed with unexpected error: %w", err)
@@ -431,7 +475,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 						_ = proc.Stop()
 					}
 				} else if cfg != "" {
-					err := performConfigure(ctx, c, cfg, 3*time.Second)
+					err := performConfigure(ctx, agentClient, cfg, 3*time.Second)
 					if err != nil {
 						killProc()
 						return err
