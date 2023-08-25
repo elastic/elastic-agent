@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/pkg/component"
 
 	"golang.org/x/time/rate"
 )
@@ -39,6 +40,7 @@ type Uploader interface {
 type diagnosticsProvider interface {
 	DiagnosticHooks() diagnostics.Hooks
 	PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
+	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
 
 // abstractLogger represents a logger implementation
@@ -251,7 +253,10 @@ func (h *Diagnostics) diagComponents(ctx context.Context) []client.DiagnosticCom
 	defer func() {
 		h.log.Debugf("Component diagnostics complete. Took: %s", time.Since(startTime))
 	}()
-	rr := h.diagProvider.PerformDiagnostics(ctx)
+	rr, err := h.diagProvider.PerformComponentDiagnostics(ctx, []cproto.AdditionalDiagnosticRequest{})
+	if err != nil {
+		h.log.Errorf("Error fetching component-level diagnostics: %w", err)
+	}
 	h.log.Debug("Collecting results of component diagnostics")
 	for _, r := range rr {
 		diag := client.DiagnosticComponentResult{
