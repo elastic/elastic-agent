@@ -150,11 +150,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 				h.log.Warn(str)
 			}
 		}()
-<<<<<<< HEAD
-		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag)
-=======
 		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag, cDiag)
->>>>>>> d3d510dbb1 (Fix components in diag collection from Kibana (#3295))
 		if err != nil {
 			h.log.Errorw(
 				"diagnostics action handler failed generate zip archive",
@@ -301,11 +297,7 @@ func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []clie
 			h.log.Warn(str)
 		}
 	}()
-<<<<<<< HEAD
-	if err := diagnostics.ZipArchive(&wBuf, f, aDiag, uDiag); err != nil {
-=======
 	if err := diagnostics.ZipArchive(&wBuf, f, aDiag, uDiag, cDiag); err != nil {
->>>>>>> d3d510dbb1 (Fix components in diag collection from Kibana (#3295))
 		os.Remove(name)
 		return nil, 0, err
 	}
