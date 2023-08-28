@@ -5,6 +5,7 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -25,8 +26,8 @@ var (
 
 // LoadFullAgentConfig load agent config based on provided paths and defined capabilities.
 // In case fleet is used, config from policy action is returned.
-func LoadFullAgentConfig(logger *logger.Logger, cfgPath string, failOnFleetMissing bool) (*config.Config, error) {
-	rawConfig, err := loadConfig(cfgPath)
+func LoadFullAgentConfig(ctx context.Context, logger *logger.Logger, cfgPath string, failOnFleetMissing bool) (*config.Config, error) {
+	rawConfig, err := loadConfig(ctx, cfgPath)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +55,7 @@ func LoadFullAgentConfig(logger *logger.Logger, cfgPath string, failOnFleetMissi
 		return c, nil
 	}
 
-	fleetConfig, err := loadFleetConfig(logger)
+	fleetConfig, err := loadFleetConfig(ctx, logger)
 	if err != nil {
 		return nil, err
 	} else if fleetConfig == nil {
@@ -74,7 +75,7 @@ func LoadFullAgentConfig(logger *logger.Logger, cfgPath string, failOnFleetMissi
 	return rawConfig, nil
 }
 
-func loadConfig(configPath string) (*config.Config, error) {
+func loadConfig(ctx context.Context, configPath string) (*config.Config, error) {
 	rawConfig, err := config.LoadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -82,7 +83,7 @@ func loadConfig(configPath string) (*config.Config, error) {
 
 	path := paths.AgentConfigFile()
 
-	store := storage.NewEncryptedDiskStore(path)
+	store := storage.NewEncryptedDiskStore(ctx, path)
 	reader, err := store.Load()
 	if err != nil {
 		return nil, errors.New(err, "could not initialize config store",
@@ -108,8 +109,8 @@ func loadConfig(configPath string) (*config.Config, error) {
 	return rawConfig, nil
 }
 
-func loadFleetConfig(l *logger.Logger) (map[string]interface{}, error) {
-	stateStore, err := store.NewStateStoreWithMigration(l, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
+func loadFleetConfig(ctx context.Context, l *logger.Logger) (map[string]interface{}, error) {
+	stateStore, err := store.NewStateStoreWithMigration(ctx, l, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
 	if err != nil {
 		return nil, err
 	}
