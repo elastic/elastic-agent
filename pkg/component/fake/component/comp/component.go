@@ -29,6 +29,7 @@ import (
 const (
 	Fake        = "fake"
 	fakeShipper = "fake-shipper"
+	APM         = "fake-apm"
 
 	configuringMsg = "Configuring"
 	stoppingMsg    = "Stopping"

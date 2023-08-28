@@ -43,7 +43,7 @@ func (ats *apmTracesSender) Start(ctx context.Context, cfg *proto.APMConfig) err
 		ats.cleanup()
 		return InitialSenderConfigFailError
 	}
-
+	return nil
 }
 
 func (ats *apmTracesSender) init(outerCtx context.Context) {
@@ -86,7 +86,6 @@ func (ats *apmTracesSender) sendTracesLoop(sendInterval time.Duration, traceDura
 				ats.updateErrCh <- fmt.Errorf("error creating tracer from config: %w", err)
 				continue
 			}
-			tracer.Close()
 			tracer = newTracer
 			ats.updateErrCh <- nil
 		}
@@ -108,6 +107,10 @@ func (ats *apmTracesSender) Stop() error {
 }
 
 func (ats *apmTracesSender) createNewTracer(cfg *proto.APMConfig) (*apm.Tracer, error) {
+	if cfg == nil {
+		return apm.DefaultTracer, nil
+	}
+
 	const (
 		envVerifyServerCert = "ELASTIC_APM_VERIFY_SERVER_CERT"
 		envServerCert       = "ELASTIC_APM_SERVER_CERT"
@@ -167,12 +170,7 @@ func (ats *apmTracesSender) sendTrace(tracer *apm.Tracer, duration time.Duration
 type fakeAPMInput struct {
 	logger zerolog.Logger
 	unit   *client.Unit
-	cfg    *proto.UnitExpectedConfig
-
-	state    client.UnitState
-	stateMsg string
-
-	apmConfig *proto.APMConfig
+	sender *apmTracesSender
 }
 
 func (fai *fakeAPMInput) Unit() *client.Unit {
@@ -181,27 +179,36 @@ func (fai *fakeAPMInput) Unit() *client.Unit {
 func (fai *fakeAPMInput) Update(u *client.Unit, triggers client.Trigger) error {
 	if u.Expected().State == client.UnitStateStopped {
 		// stop apm trace sender
+		return fai.sender.Stop()
 	}
 
 	if triggers&client.TriggeredAPMChange != client.TriggeredAPMChange {
 		// no apm change, nothing to do
 		return nil
 	}
-	fai.apmConfig = u.Expected().APMConfig
 
-	return nil
+	return fai.sender.Update(u.Expected().APMConfig, time.Second)
 }
 
-func newFakeAPMInput(logger zerolog.Logger, logLevel client.UnitLogLevel, unit *client.Unit, cfg *proto.UnitExpectedConfig) (*fakeAPMInput, error) {
+func newFakeAPMInput(logger zerolog.Logger, logLevel client.UnitLogLevel, unit *client.Unit) (*fakeAPMInput, error) {
 	logger = logger.Level(toZerologLevel(logLevel))
 	apmInput := &fakeAPMInput{
-		logger:    logger,
-		unit:      unit,
-		cfg:       cfg,
-		state:     client.UnitStateConfiguring,
-		stateMsg:  "Configuring fake APM Unit",
-		apmConfig: unit.Expected().APMConfig,
+		logger: logger,
+		unit:   unit,
+		sender: new(apmTracesSender),
+	}
+	err := unit.UpdateState(client.UnitStateStarting, "Starting fake APM traces sender", nil)
+	if err != nil {
+		return apmInput, fmt.Errorf("error while setting starting state: %w", err)
+	}
+	err = apmInput.sender.Start(context.Background(), unit.Expected().APMConfig)
+	if err != nil {
+		return apmInput, fmt.Errorf("error starting apm tracer sender: %w", err)
 	}
 
-	return apmInput, nil
+	err = unit.UpdateState(client.UnitStateHealthy, "Fake APM traces sender has started", nil)
+	if err != nil {
+		return apmInput, fmt.Errorf("error while setting healthy state: %w", err)
+	}
+	return apmInput, err
 }

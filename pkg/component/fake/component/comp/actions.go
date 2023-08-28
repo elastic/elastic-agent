@@ -135,6 +135,8 @@ func newRunningUnit(logger zerolog.Logger, manager *StateManager, unit *client.U
 	switch expected.Config.Type {
 	case Fake:
 		return newFakeInput(logger, expected.LogLevel, manager, unit, expected.Config)
+	case APM:
+		return newFakeAPMInput(logger, expected.LogLevel, unit)
 	}
 	return nil, fmt.Errorf("unknown input unit config type: %s",
 		expected.Config.Type)
