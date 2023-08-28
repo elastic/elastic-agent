@@ -261,7 +261,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, toVersion, "", false, false, true, customPGP)
 }
 
-func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
+func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -273,7 +273,6 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
-	// prepare the agent fixture
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
@@ -293,10 +292,12 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
 	require.NoError(t, err)
-	// TODO if we don't have at least 2 builds, select the next older snapshot build
-	require.Greater(t, len(builds.Builds), 1)
 
-	// take the penultimate build of the snapshot (the builds are ordered from most to least recent)
+	if len(builds.Builds) < 2 {
+		t.Skip("there is only one SNAPSHOT version available, " +
+			"the test requires at least 2 so it can downgrade to the previous" +
+			"SNAPSHOT")
+	}
 	upgradeVersionString := builds.Builds[1]
 
 	t.Logf("Targeting build %q of version %q", upgradeVersionString, latestSnapshotVersion)

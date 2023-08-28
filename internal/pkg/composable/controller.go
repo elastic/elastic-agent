@@ -127,7 +127,7 @@ func (c *controller) Run(ctx context.Context) error {
 		state.signal = stateChangedChan
 		go func(name string, state *contextProviderState) {
 			defer wg.Done()
-			err := state.provider.Run(state)
+			err := state.provider.Run(ctx, state)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 				c.logger.Errorf("%s", err)

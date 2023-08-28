@@ -55,7 +55,7 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		return fmt.Errorf("failed to unpack log level: %w", err)
 	}
 
-	if err := h.agentInfo.SetLogLevel(action.LogLevel); err != nil {
+	if err := h.agentInfo.SetLogLevel(ctx, action.LogLevel); err != nil {
 		return fmt.Errorf("failed to update log level: %w", err)
 	}
 

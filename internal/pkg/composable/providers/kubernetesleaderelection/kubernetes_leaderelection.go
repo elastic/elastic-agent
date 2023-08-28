@@ -46,7 +46,7 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 }
 
 // Run runs the leaderelection provider.
-func (p *contextProvider) Run(comm corecomp.ContextProviderComm) error {
+func (p *contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
 	client, err := kubernetes.GetKubernetesClient(p.config.KubeConfig, p.config.KubeClientOptions)
 	if err != nil {
 		// info only; return nil (do nothing)
@@ -54,7 +54,7 @@ func (p *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		return nil
 	}
 
-	agentInfo, err := info.NewAgentInfo(false)
+	agentInfo, err := info.NewAgentInfo(ctx, false)
 	if err != nil {
 		return err
 	}
