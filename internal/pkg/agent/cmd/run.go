@@ -144,6 +144,9 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		return err
 	}
 
+	// Make sure to flush any buffered logs before we're done.
+	defer baseLogger.Sync() //nolint:errcheck // flushing buffered logs is best effort.
+
 	l := baseLogger.With("log", map[string]interface{}{
 		"source": agentName,
 	})
