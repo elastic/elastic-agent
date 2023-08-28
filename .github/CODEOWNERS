@@ -3,3 +3,4 @@
 
 /deploy/kubernetes @elastic/obs-cloudnative-monitoring
 /dev-tools/kubernetes @elastic/obs-cloudnative-monitoring
+/internal/pkg/composable/providers/kubernetes @elastic/obs-cloudnative-monitoring
