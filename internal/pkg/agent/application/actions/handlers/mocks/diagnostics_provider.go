@@ -13,6 +13,10 @@ package mocks
 import (
 	context "context"
 
+	component "github.com/elastic/elastic-agent/pkg/component"
+
+	cproto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+
 	diagnostics "github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 
 	mock "github.com/stretchr/testify/mock"
@@ -72,6 +76,76 @@ func (_c *DiagnosticsProvider_DiagnosticHooks_Call) Return(_a0 diagnostics.Hooks
 }
 
 func (_c *DiagnosticsProvider_DiagnosticHooks_Call) RunAndReturn(run func() diagnostics.Hooks) *DiagnosticsProvider_DiagnosticHooks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PerformComponentDiagnostics provides a mock function with given fields: ctx, additionalMetrics, req
+func (_m *DiagnosticsProvider) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	_va := make([]interface{}, len(req))
+	for _i := range req {
+		_va[_i] = req[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, additionalMetrics)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 []runtime.ComponentDiagnostic
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)); ok {
+		return rf(ctx, additionalMetrics, req...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) []runtime.ComponentDiagnostic); ok {
+		r0 = rf(ctx, additionalMetrics, req...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]runtime.ComponentDiagnostic)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) error); ok {
+		r1 = rf(ctx, additionalMetrics, req...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DiagnosticsProvider_PerformComponentDiagnostics_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PerformComponentDiagnostics'
+type DiagnosticsProvider_PerformComponentDiagnostics_Call struct {
+	*mock.Call
+}
+
+// PerformComponentDiagnostics is a helper method to define mock.On call
+//   - ctx context.Context
+//   - additionalMetrics []cproto.AdditionalDiagnosticRequest
+//   - req ...component.Component
+func (_e *DiagnosticsProvider_Expecter) PerformComponentDiagnostics(ctx interface{}, additionalMetrics interface{}, req ...interface{}) *DiagnosticsProvider_PerformComponentDiagnostics_Call {
+	return &DiagnosticsProvider_PerformComponentDiagnostics_Call{Call: _e.mock.On("PerformComponentDiagnostics",
+		append([]interface{}{ctx, additionalMetrics}, req...)...)}
+}
+
+func (_c *DiagnosticsProvider_PerformComponentDiagnostics_Call) Run(run func(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component)) *DiagnosticsProvider_PerformComponentDiagnostics_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]component.Component, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(component.Component)
+			}
+		}
+		run(args[0].(context.Context), args[1].([]cproto.AdditionalDiagnosticRequest), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *DiagnosticsProvider_PerformComponentDiagnostics_Call) Return(_a0 []runtime.ComponentDiagnostic, _a1 error) *DiagnosticsProvider_PerformComponentDiagnostics_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *DiagnosticsProvider_PerformComponentDiagnostics_Call) RunAndReturn(run func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)) *DiagnosticsProvider_PerformComponentDiagnostics_Call {
 	_c.Call.Return(run)
 	return _c
 }
