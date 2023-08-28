@@ -58,7 +58,11 @@ func TestMetricbeatSeverless(t *testing.T) {
 func (runner *BeatRunner) SetupSuite() {
 	runner.T().Logf("In SetupSuite")
 
-	runner.testbeatName = os.Getenv("TEST_BINARY")
+	runner.testbeatName = os.Getenv("TEST_BINARY_NAME")
+	if runner.testbeatName == "" {
+		runner.T().Fatalf("TEST_BINARY_NAME must be set")
+	}
+	runner.T().Logf("running serverless tests with %s", runner.testbeatName)
 
 	agentFixture, err := define.NewFixtureWithBinary(runner.T(), define.Version(), runner.testbeatName, "/home/ubuntu", atesting.WithRunLength(time.Minute), atesting.WithAdditionalArgs([]string{"-E", "output.elasticsearch.allow_older_versions=true"}))
 	runner.agentFixture = agentFixture

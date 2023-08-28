@@ -385,7 +385,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 
 	// set the go test flags
 	env["GOTEST_FLAGS"] = r.cfg.TestFlags
-	env["TEST_BINARY"] = r.cfg.BinaryName
+	env["TEST_BINARY_NAME"] = r.cfg.BinaryName
 
 	// run the actual tests on the host
 	result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, client, logger, r.cfg.AgentVersion, batch.ID, batch.Batch, env)
