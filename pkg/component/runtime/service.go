@@ -124,6 +124,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		lastCheckin    time.Time
 		missedCheckins int
 		tearingDown    bool
+		ignoreCheckins bool
 	)
 
 	cisStop := func() {
@@ -145,6 +146,9 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 		// Stop service
 		s.stop(ctx, comm, lastCheckin, am == actionTeardown)
+
+		// Service is stopped, ignore checkins in order to avoid clogging the watch channel
+		ignoreCheckins = true
 	}
 
 	processTeardown := func(am actionMode, signed *component.Signed) {
@@ -167,7 +171,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 	onTeardown := func(as actionModeSigned) {
 		tamperProtection := features.TamperProtection()
-		s.log.Debugf("got teardown for %s service, tearingDown==%v, tamperProtectoin=%v", s.name(), tearingDown, tamperProtection)
+		s.log.Debugf("got teardown for %s service, tearingDown: %v, tamperProtection: %v", s.name(), tearingDown, tamperProtection)
 
 		// If tamper protection is disabled do the old behavior
 		if !tamperProtection {
@@ -179,7 +183,6 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			tearingDown = true
 			processTeardown(as.actionMode, as.signed)
 		}
-
 	}
 
 	for {
@@ -194,6 +197,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			case actionStart:
 				// Initial state on start
 				lastCheckin = time.Time{}
+				ignoreCheckins = false
 				missedCheckins = 0
 				checkinTimer.Stop()
 				cisStop()
@@ -227,14 +231,24 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		case newComp := <-s.compCh:
 			s.processNewComp(newComp, comm)
 		case checkin := <-comm.CheckinObserved():
-			s.log.Debugf("got check-in for %s service, tearingDown=%v", s.name(), tearingDown)
-			s.processCheckin(checkin, comm, &lastCheckin)
-			// Got check-in upon teardown update
-			// tearingDown can be set to true only if tamper protection feature is enabled
-			if tearingDown {
-				tearingDown = false
-				teardownCheckinTimer.Stop()
-				onStop(actionTeardown)
+			s.log.Debugf("got check-in for %s service, tearingDown: %v, ignoreCheckins: %v", s.name(), tearingDown, ignoreCheckins)
+			tamperProtection := features.TamperProtection()
+			if tamperProtection { // If tamper protection feature flag is enabled, new behavior
+				// Got check-in upon teardown update
+				// tearingDown can be set to true only if tamper protection feature is enabled
+				if tearingDown {
+					tearingDown = false
+					teardownCheckinTimer.Stop()
+					onStop(actionTeardown)
+				} else {
+					// Ignore checkins if the service was stopped by the action
+					if !ignoreCheckins {
+						// Only process checkin if in "tearing down" sequence
+						s.processCheckin(checkin, comm, &lastCheckin)
+					}
+				}
+			} else { // If tamper protection feature flag is disabled, old behavior
+				s.processCheckin(checkin, comm, &lastCheckin)
 			}
 		case <-checkinTimer.C:
 			s.checkStatus(s.checkinPeriod(), &lastCheckin, &missedCheckins)
