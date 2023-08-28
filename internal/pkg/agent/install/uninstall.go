@@ -24,7 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/pkg/component"
-	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
+	compruntime "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
@@ -97,18 +97,21 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 // to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
 // seconds if it keeps getting that error.
 func RemovePath(path string) error {
-	const arbitraryTimeout = 5 * time.Second
+	if err := removePath(path); err != nil &&
+		!isRetryableError(err) {
+		return fmt.Errorf("could not remove %q, unretriable error: %w", path, err)
+	}
+
+	const arbitraryTimeout = 7 * time.Second
+	const nextSleep = 100 * time.Millisecond
+	t := time.NewTicker(nextSleep)
+	defer t.Stop()
 	start := time.Now()
-	nextSleep := 1 * time.Millisecond
+
+	var count int
 	for {
-		err := os.RemoveAll(path)
-		if err == nil {
-			return nil
-		}
-		if isBlockingOnExe(err) {
-			// try to remove the blocking exe
-			err = removeBlockingExe(err)
-		}
+		count++
+		err := removePath(path)
 		if err == nil {
 			return nil
 		}
@@ -116,10 +119,27 @@ func RemovePath(path string) error {
 			return err
 		}
 
+		<-t.C
 		if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
-			return err
+			return fmt.Errorf("could not remove path, "+
+				"timeout exeeded after %d tries during %s. Last error: %v",
+				count, arbitraryTimeout, err)
 		}
 	}
+}
+
+func removePath(path string) error {
+	err := os.RemoveAll(path)
+	if err == nil {
+		return nil
+	}
+
+	if isBlockingOnExe(err) {
+		// try to remove the blocking exe
+		err = removeBlockingExe(err)
+	}
+
+	return err
 }
 
 func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
@@ -232,7 +252,7 @@ func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp compo
 	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
 	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
 	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
-	return comprt.UninstallService(ctx, log, comp, uninstallToken)
+	return compruntime.UninstallService(ctx, log, comp, uninstallToken)
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
