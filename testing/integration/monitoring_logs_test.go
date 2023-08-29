@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// //go:build integration
+//go:build integration
 
 package integration
 
@@ -15,49 +15,31 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 )
 
-func TestEnrollAndLog(t *testing.T) {
+func TestMonitoringLogsShipped(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		OS: []define.OS{
-			{Type: define.Linux},
-		},
+		OS:    []define.OS{{Type: define.Linux}},
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
 	})
+	ctx := context.Background()
+
 	t.Logf("got namespace: %s", info.Namespace)
 	t.Skip("Test is flaky; see https://github.com/elastic/elastic-agent/issues/3081")
-	suite.Run(t, &EnrollRunner{requirementsInfo: info})
-}
 
-type EnrollRunner struct {
-	suite.Suite
-	requirementsInfo *define.Info
-	agentFixture     *atesting.Fixture
-}
-
-func (runner *EnrollRunner) SetupSuite() {
-	runner.T().Logf("In SetupSuite")
-	agentFixture, err := define.NewFixture(runner.T(), define.Version())
-	runner.agentFixture = agentFixture
-	require.NoError(runner.T(), err)
-}
-
-func (runner *EnrollRunner) SetupTest() {}
-
-func (runner *EnrollRunner) TestEnroll() {
-	t := runner.T()
-	info := runner.requirementsInfo
-
-	kibClient := info.KibanaClient
+	agentFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
 
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
@@ -75,32 +57,27 @@ func (runner *EnrollRunner) TestEnroll() {
 			},
 		},
 	}
+
 	// Stage 1: Install
 	// As part of the cleanup process, we'll uninstall the agent
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
 	}
-	policy, err := tools.InstallAgentWithPolicy(t, context.Background(), installOpts, runner.agentFixture, kibClient, createPolicyReq)
+	policy, err := tools.InstallAgentWithPolicy(t, ctx,
+		installOpts, agentFixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 
-	t.Cleanup(func() {
-		// After: unenroll
-		t.Logf("Cleanup: unenrolling agent")
-		err = tools.UnEnrollAgent(info.KibanaClient)
-		require.NoError(t, err)
-	})
+	check.ConnectedToFleet(t, agentFixture)
 
-	t.Logf("sleeping for one minute...")
-	time.Sleep(time.Second * 60)
-
-	// Stage 2: check indicies
+	// Stage 2: check indices
 	// This is mostly for debugging
 	resp, err := tools.GetAllindicies(info.ESClient)
 	require.NoError(t, err)
 	for _, run := range resp {
-		t.Logf("%s: %d/%d deleted: %d\n", run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
+		t.Logf("%s: %d/%d deleted: %d\n",
+			run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
 	}
 
 	// Stage 3: Make sure metricbeat logs are populated
@@ -111,21 +88,22 @@ func (runner *EnrollRunner) TestEnroll() {
 	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
 
-	// Stage 4: make sure we have no errors
-	t.Log("Making sure there are no error logs")
-	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{})
-	})
-	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
-	for _, doc := range docs.Hits.Hits {
-		t.Logf("%#v", doc.Source)
+	// Stage 4: make sure all components are health
+	t.Log("Making sure all components are healthy")
+	status, err := agentFixture.ExecStatus(ctx)
+	require.NoError(t, err,
+		"could not get agent status to verify all components are healthy")
+	for _, c := range status.Components {
+		assert.Equalf(t, client.Healthy, client.State(c.State),
+			"component %s: want %s, got %s",
+			c.Name, client.Healthy, client.State(c.State))
 	}
-	require.Empty(t, docs.Hits.Hits)
 
 	// Stage 5: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
 	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.FindMatchingLogLines(info.ESClient, info.Namespace, "Parsed configuration and determined agent is managed by Fleet")
+		return tools.FindMatchingLogLines(info.ESClient, info.Namespace,
+			"Parsed configuration and determined agent is managed by Fleet")
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
