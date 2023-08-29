@@ -271,6 +271,13 @@ func (b GolangCrossBuilder) Build() error {
 		return errors.Wrap(err, "failed to determine mage-linux-"+builderArch+" relative path")
 	}
 
+	// If we're running this mage target on Windows, the path separator used in
+	// buildCmd will be `\`. But the buildCmd is executed inside a Linux Docker
+	// container. So we replace all `\` path separators with `/`.
+	if GOOS == "windows" {
+		buildCmd = strings.ReplaceAll(buildCmd, "\\", "/")
+	}
+
 	dockerRun := sh.RunCmd("docker", "run")
 	image, err := b.ImageSelector(b.Platform)
 	if err != nil {
