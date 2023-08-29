@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -31,6 +32,9 @@ func TestAddToBucket(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			if runtime.GOOS == "windows" {
+				t.Skip("https://github.com/elastic/elastic-agent/issues/3290: Flaky timing on Windows")
+			}
 			b := newRateLimiter(tc.dropRate, tc.bucketSize)
 
 			blocked := false
