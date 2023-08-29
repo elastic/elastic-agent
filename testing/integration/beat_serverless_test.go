@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// //go:build integration
+//go:build integration
 
 package integration
 
@@ -61,6 +61,9 @@ func (runner *BeatRunner) SetupSuite() {
 	runner.testbeatName = os.Getenv("TEST_BINARY_NAME")
 	if runner.testbeatName == "" {
 		runner.T().Fatalf("TEST_BINARY_NAME must be set")
+	}
+	if runner.testbeatName == "elastic-agent" {
+		runner.T().Skipf("tests must be run against a beat, not elastic-agent")
 	}
 	runner.T().Logf("running serverless tests with %s", runner.testbeatName)
 
