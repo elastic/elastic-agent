@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/pkgmgr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -844,7 +845,7 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 	}
 	return transpiler.NewVars("", map[string]interface{}{
 		"install": map[string]interface{}{
-			"in_default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)),
+			"in_default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)) || pkgmgr.InstalledViaExternalPkgMgr(),
 		},
 		"runtime": map[string]interface{}{
 			"platform": platform.String(),
