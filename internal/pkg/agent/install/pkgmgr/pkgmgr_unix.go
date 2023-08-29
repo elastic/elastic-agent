@@ -25,11 +25,11 @@ func InstalledViaExternalPkgMgr() bool {
 
 	// NOTE searching for english words might not be a great idea as far as portability goes.
 	// list all installed packages then search for paths.BinaryName?
-	// dpkg is strange as the remove and purge processes leads to the package bing isted after a remove, but not after a purge
+	// dpkg is strange as the remove and purge processes leads to the package bing listed after a remove, but not after a purge
 
 	// check debian based systems (or systems that use dpkg)
 	// If the package has been installed, the status starts with "install"
-	// If the package has been removed (but not pruged) status starts with "deinstall"
+	// If the package has been removed (but not purged) status starts with "deinstall"
 	// If purged or never installed, rc is 1
 	if _, err := exec.Command("which", "dpkg-query").Output(); err == nil {
 		out, err := exec.Command("dpkg-query", "-W", "-f", "${Status}", binaryName).Output()
@@ -44,7 +44,7 @@ func InstalledViaExternalPkgMgr() bool {
 
 	// check rhel and sles based systems (or systems that use rpm)
 	// if package has been installed the query will returns the list of associated files.
-	// otherwise if uninstalled, or has never been installled status ends with "not installed"
+	// otherwise if uninstalled, or has never been installed status ends with "not installed"
 	if _, err := exec.Command("which", "rpm").Output(); err == nil {
 		out, err := exec.Command("rpm", "-q", binaryName, "--state").Output()
 		if err != nil {
