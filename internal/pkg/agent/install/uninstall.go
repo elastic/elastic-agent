@@ -134,8 +134,8 @@ func removePath(path string) error {
 		return nil
 	}
 
-	if isBlockingOnExe(err) {
-		// try to remove the blocking exe
+	if isAccessDeniedError(err) {
+		// might be blocking on exe, then try to remove the blocking exe
 		err = removeBlockingExe(err)
 	}
 
