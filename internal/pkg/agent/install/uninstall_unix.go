@@ -6,7 +6,7 @@
 
 package install
 
-func isBlockingOnExe(_ error) bool {
+func isAccessDeniedError(_ error) bool {
 	return false
 }
 
