@@ -146,6 +146,8 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 		operatingSystem: runtime.GOOS,
 		architecture:    runtime.GOARCH,
 		connectTimout:   5 * time.Second,
+		// default to elastic-agent, can be changed by a set FixtureOpt below
+		binaryName: "elastic-agent",
 	}
 	for _, o := range opts {
 		o(f)
