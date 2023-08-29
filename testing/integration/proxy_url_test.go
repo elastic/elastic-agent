@@ -17,9 +17,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/testing/fleetservertest"
 	"github.com/elastic/elastic-agent/testing/proxytest"
 	"github.com/elastic/elastic-agent/version"
@@ -130,7 +130,7 @@ func TestProxyURL_EnrollProxyAndNoProxyInThePolicy(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	p.assertConnectedFleet(t)
+	check.ConnectedToFleet(t, p.fixture)
 }
 
 func TestProxyURL_EnrollProxyAndEmptyProxyInThePolicy(t *testing.T) {
@@ -175,7 +175,7 @@ func TestProxyURL_EnrollProxyAndEmptyProxyInThePolicy(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	p.assertConnectedFleet(t)
+	check.ConnectedToFleet(t, p.fixture)
 }
 
 func TestProxyURL_ProxyInThePolicyTakesPrecedence(t *testing.T) {
@@ -220,7 +220,7 @@ func TestProxyURL_ProxyInThePolicyTakesPrecedence(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	p.assertConnectedFleet(t)
+	check.ConnectedToFleet(t, p.fixture)
 
 	// ensure the agent is communicating through the proxy set in the policy
 	want := fleetservertest.NewPathCheckin(p.policyData.AgentID)
@@ -282,7 +282,7 @@ func TestProxyURL_NoEnrollProxyAndProxyInThePolicy(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	p.assertConnectedFleet(t)
+	check.ConnectedToFleet(t, p.fixture)
 
 	// ensure the agent is communicating through the new proxy
 	if !assert.Eventually(t, func() bool {
@@ -343,7 +343,7 @@ func TestProxyURL_RemoveProxyFromThePolicy(t *testing.T) {
 	}
 
 	// assert the agent is actually connected to fleet.
-	p.assertConnectedFleet(t)
+	check.ConnectedToFleet(t, p.fixture)
 
 	// ensure the agent is communicating through the proxy set in the policy
 	if !assert.Eventually(t, func() bool {
@@ -389,24 +389,7 @@ func TestProxyURL_RemoveProxyFromThePolicy(t *testing.T) {
 	assert.Equal(t, inspect.Fleet.ProxyURL, want)
 
 	// assert, again, the agent is actually connected to fleet.
-	p.assertConnectedFleet(t)
-}
-
-func (p *ProxyURL) assertConnectedFleet(t *testing.T) {
-	t.Helper()
-
-	var err error
-	var agentStatus integrationtest.AgentStatusOutput
-	if !assert.Eventually(t, func() bool {
-		agentStatus, err = p.fixture.ExecStatus(context.Background())
-		return agentStatus.FleetState == int(cproto.State_HEALTHY)
-	}, 5*time.Minute, 5*time.Second,
-		"want fleet state %s, got %s. agent status: %v",
-		cproto.State_HEALTHY, cproto.State(agentStatus.FleetState), agentStatus) {
-		if err != nil {
-			t.Logf("[assertConnectedFleet] last error from agent status command: %v", err)
-		}
-	}
+	check.ConnectedToFleet(t, p.fixture)
 }
 
 func (p *ProxyURL) setupFleet(t *testing.T, fleetHost string) {
