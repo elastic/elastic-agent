@@ -273,10 +273,8 @@ func (b GolangCrossBuilder) Build() error {
 
 	// If we're running this mage target on Windows, the path separator used in
 	// buildCmd will be `\`. But the buildCmd is executed inside a Linux Docker
-	// container. So we replace all `\` path separators with `/`.
-	if GOOS == "windows" {
-		buildCmd = strings.ReplaceAll(buildCmd, "\\", "/")
-	}
+	// container. So we ensure that all path separators are `/`.
+	buildCmd = filepath.ToSlash(buildCmd)
 
 	dockerRun := sh.RunCmd("docker", "run")
 	image, err := b.ImageSelector(b.Platform)
