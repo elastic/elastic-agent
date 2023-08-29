@@ -217,17 +217,20 @@ func TestStandaloneUpgrade(t *testing.T) {
 	}
 }
 
-func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
+func TestStandaloneDowngradeWithGPGFallback(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
 
+	t.Skip("snapshot downloader has a bug which break this test between releases: " +
+		"https://github.com/elastic/elastic-agent/issues/3313")
+
 	minVersion := version_8_10_0_SNAPSHOT
-	parsedVersion, err := version.ParseVersion(define.Version())
+	fromVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	if parsedVersion.Less(*minVersion) {
+	if fromVersion.Less(*minVersion) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
@@ -235,7 +238,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	defer cancel()
 
 	// previous
-	toVersion, err := parsedVersion.GetPreviousMinor()
+	toVersion, err := fromVersion.GetPreviousMinor()
 	require.NoError(t, err, "failed to get previous minor")
 	agentFixture, err := define.NewFixture(
 		t,
@@ -258,7 +261,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 		1,
 	)
 
-	testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, toVersion, "", false, false, true, customPGP)
+	testStandaloneUpgrade(ctx, t, agentFixture, fromVersion, toVersion, "", false, false, true, customPGP)
 }
 
 func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
