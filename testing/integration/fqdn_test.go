@@ -115,7 +115,7 @@ func TestFQDN(t *testing.T) {
 		Namespace:     info.Namespace,
 		AgentFeatures: policy.AgentFeatures,
 	}
-	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
+	_, err = kibClient.UpdatePolicy(context.TODO(), policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")
@@ -146,7 +146,7 @@ func TestFQDN(t *testing.T) {
 		Namespace:     info.Namespace,
 		AgentFeatures: policy.AgentFeatures,
 	}
-	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
+	_, err = kibClient.UpdatePolicy(context.TODO(), policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")

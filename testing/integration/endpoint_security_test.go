@@ -162,7 +162,7 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, hostname)
 	require.NoError(t, err)
 
-	_, err = info.KibanaClient.UnEnrollAgent(kibana.UnEnrollAgentRequest{ID: agentID})
+	_, err = info.KibanaClient.UnEnrollAgent(context.TODO(), kibana.UnEnrollAgentRequest{ID: agentID})
 	require.NoError(t, err)
 
 	t.Log("Waiting for inputs to stop")

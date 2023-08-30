@@ -5,6 +5,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ func WaitForAgentStatus(t *testing.T, client *kibana.Client, expectedStatus stri
 func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, expectedPolicyRevision int) func() bool {
 	return func() bool {
 		getAgentReq := kibana.GetAgentRequest{ID: agentID}
-		updatedPolicyAgent, err := client.GetAgent(getAgentReq)
+		updatedPolicyAgent, err := client.GetAgent(context.TODO(), getAgentReq)
 		require.NoError(t, err)
 
 		return updatedPolicyAgent.PolicyRevision == expectedPolicyRevision
@@ -56,7 +57,7 @@ func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, 
 func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (*kibana.PolicyResponse, error) {
 	t.Helper()
 
-	policy, err := kibClient.CreatePolicy(createPolicyReq)
+	policy, err := kibClient.CreatePolicy(context.TODO(), createPolicyReq)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create policy: %w", err)
 	}
@@ -67,7 +68,7 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 	}
 
 	t.Logf("Creating enrollment API key...")
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentAPIKeyReq)
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(context.TODO(), createEnrollmentAPIKeyReq)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create enrollment API key: %w", err)
 	}
@@ -106,5 +107,5 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 		"Elastic Agent status is not online",
 	)
 
-	return policy, nil
+	return &policy, nil
 }
