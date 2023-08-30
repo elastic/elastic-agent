@@ -97,8 +97,10 @@ func (pt *ProgressTracker) calculateTickInterval() time.Duration {
 		return pt.tickInterval
 	}
 
-	floor := int64(math.Floor(float64(pt.tickInterval.Milliseconds()) * 0.8))
-	ceiling := pt.tickInterval.Milliseconds() * 2
+	// Randomize interval between 65% and 250% of configured interval
+	// to make it look like the progress is non-linear. :)
+	floor := int64(math.Floor(float64(pt.tickInterval.Milliseconds()) * 0.65))
+	ceiling := int64(math.Floor(float64(pt.tickInterval.Milliseconds()) * 2.5))
 
 	randomDuration := rand.Int63() % ceiling
 	if randomDuration < floor {
