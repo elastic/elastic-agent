@@ -223,14 +223,18 @@ func (f *Fixture) collectDiagnostics() {
 		f.t.Logf("failed to collect diagnostics; failed to create %s: %s", diagPath, err)
 		return
 	}
-	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", f.t.Name(), time.Now().Format(time.RFC3339)))
+
+	// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
+	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
+	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
 
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics to %s (%s): %s", outputPath, err, output)
 
+		// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
 		f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
-		zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-installation-%s.zip", f.t.Name(), time.Now().Format(time.RFC3339)))
+		zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-installation-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
 		err = f.archiveInstallDirectory(f.workDir, zipPath)
 		if err != nil {
 			f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)
@@ -257,7 +261,8 @@ func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string)
 		}
 		file, err := os.Open(path)
 		if err != nil {
-			return err
+			f.t.Logf("failed to add %s to zip, continuing: %s", path, err)
+			return nil
 		}
 		defer file.Close()
 
