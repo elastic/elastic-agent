@@ -28,7 +28,7 @@ type ProgressTracker struct {
 func NewProgressTracker(writer io.Writer) *ProgressTracker {
 	return &ProgressTracker{
 		writer:                writer,
-		tickInterval:          100 * time.Millisecond,
+		tickInterval:          200 * time.Millisecond,
 		randomizeTickInterval: true,
 		stop:                  make(chan struct{}),
 	}
