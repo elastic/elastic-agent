@@ -180,6 +180,8 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	pt := install.NewProgressTracker(streams.Out)
+	pt.Start()
+	defer pt.Stop()
 
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
