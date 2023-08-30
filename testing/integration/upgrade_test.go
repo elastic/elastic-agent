@@ -114,14 +114,14 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentF
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-	policy, err := kibClient.CreatePolicy(createPolicyReq)
+	policy, err := kibClient.CreatePolicy(context.TODO(), createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Creating Agent enrollment API key...")
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policy.ID,
 	}
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(context.TODO(), createEnrollmentApiKeyReq)
 	require.NoError(t, err)
 
 	t.Log("Getting default Fleet Server URL...")
