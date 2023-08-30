@@ -2,22 +2,23 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build linux || windows
+//go:build !darwin
 
 package vault
 
 import (
 	"context"
 	"encoding/hex"
-	"io/fs"
+	"errors"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
 func TestGetSeed(t *testing.T) {
@@ -25,27 +26,41 @@ func TestGetSeed(t *testing.T) {
 
 	fp := filepath.Join(dir, seedFile)
 
-	require.NoFileExists(t, fp)
+	// check the test prerequisites
+	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
 
 	// seed is not yet created
-	_, err := getSeed(dir)
+	if _, err := getSeed(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
 
 	// should be not found
-	require.ErrorIs(t, err, fs.ErrNotExist)
+	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
 
 	b, err := createSeedIfNotExists(dir)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	require.FileExists(t, fp)
+	// file should exist
+	if _, err := os.Stat(fp); err != nil {
+		t.Fatal(err)
+	}
 
-	diff := cmp.Diff(int(AES256), len(b))
+	diff := cmp.Diff(int(aesgcm.AES256), len(b))
 	if diff != "" {
 		t.Error(diff)
 	}
 
 	// try get seed
 	gotSeed, err := getSeed(dir)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	diff = cmp.Diff(b, gotSeed)
 	if diff != "" {
@@ -58,14 +73,21 @@ func TestCreateSeedIfNotExists(t *testing.T) {
 
 	fp := filepath.Join(dir, seedFile)
 
-	assert.NoFileExists(t, fp)
+	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
 
 	b, err := createSeedIfNotExists(dir)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	require.FileExists(t, fp)
+	// file should exist
+	if _, err := os.Stat(fp); err != nil {
+		t.Fatal(err)
+	}
 
-	diff := cmp.Diff(int(AES256), len(b))
+	diff := cmp.Diff(int(aesgcm.AES256), len(b))
 	if diff != "" {
 		t.Error(diff)
 	}
@@ -95,7 +117,9 @@ func TestCreateSeedIfNotExistsRace(t *testing.T) {
 	}
 
 	err = g.Wait()
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	set := make(map[string]struct{})
 

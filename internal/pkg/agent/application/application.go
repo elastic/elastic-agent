@@ -5,6 +5,7 @@
 package application
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -15,6 +16,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -34,6 +36,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
 	operatorv1alpha1 "github.com/elastic/elastic-agent/pkg/operator/api/v1alpha1"
 	"github.com/elastic/elastic-agent/pkg/operator/controllers"
 	"github.com/elastic/elastic-agent/version"
@@ -41,6 +44,7 @@ import (
 
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
+	ctx context.Context,
 	log *logger.Logger,
 	baseLogger *logger.Logger,
 	logLevel logp.Level,
@@ -166,7 +170,7 @@ func New(
 	} else {
 		isManaged = true
 		var store storage.Store
-		store, cfg, err = mergeFleetConfig(rawConfig)
+		store, cfg, err = mergeFleetConfig(ctx, rawConfig)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -185,7 +189,7 @@ func New(
 				EndpointSignedComponentModifier(),
 			)
 
-			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtimeMgr, fleetInitTimeout)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtimeMgr, fleetInitTimeout)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -205,6 +209,15 @@ func New(
 		managed.coord = coord
 	}
 
+	// every time we change the limits we'll see the log message
+	limits.AddLimitsOnChangeCallback(func(new, old limits.LimitsConfig) {
+		log.Debugf("agent limits have changed: %+v -> %+v", old, new)
+	}, "application.go")
+	// applying the initial limits for the agent process
+	if err := limits.Apply(rawConfig); err != nil {
+		return nil, nil, nil, fmt.Errorf("could not parse and apply limits config: %w", err)
+	}
+
 	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
 	// any feature flag change callbacks are registered before they get called by `features.Apply`.
 	if err := features.Apply(rawConfig); err != nil {
@@ -214,9 +227,9 @@ func New(
 	return coord, configMgr, composable, nil
 }
 
-func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
+func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(path)
+	store := storage.NewEncryptedDiskStore(ctx, path)
 
 	reader, err := store.Load()
 	if err != nil {
@@ -275,9 +288,10 @@ func registerOperatorWatches(log *logger.Logger, runtimeManager controllers.Watc
 	var enableLeaderElection = env.Bool("LEADER_ELECT")
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "7aab3455.agent.k8s.elastic.co",

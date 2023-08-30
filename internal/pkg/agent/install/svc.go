@@ -54,6 +54,20 @@ func newService(topPath string) (service.Service, error) {
 		},
 	}
 
+	if runtime.GOOS == "linux" {
+		// The github.com/kardianos/service library doesn't support KillMode in their prebuilt template.
+		// This option allows to pass our own template for the systemd unit configuration, which is a copy
+		// of the prebuilt template with added KillMode option
+		cfg.Option["SystemdScript"] = linuxSystemdScript
+
+		// By setting KillMode=process in Elastic Agent's systemd unit configuration file, we ensure
+		// that in a scenario where the upgraded Agent's process is repeatedly crashing, systemd keeps
+		// the Upgrade Watcher process running so it can monitor the Agent process for long enough to
+		// initiate a rollback.
+		// See also https://github.com/elastic/elastic-agent/pull/3220#issuecomment-1673935694.
+		cfg.Option["KillMode"] = "process"
+	}
+
 	if runtime.GOOS == "darwin" {
 		// The github.com/kardianos/service library doesn't support ExitTimeOut in their prebuilt template.
 		// This option allows to pass our own template for the launch daemon plist, which is a copy
@@ -105,4 +119,36 @@ const darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
 
   </dict>
 </plist>
+`
+
+// A copy of the systemd config template from github.com/kardianos/service
+// with added .Config.Option.KillMode option
+const linuxSystemdScript = `[Unit]
+Description={{.Description}}
+ConditionFileIsExecutable={{.Path|cmdEscape}}
+{{range $i, $dep := .Dependencies}}
+{{$dep}} {{end}}
+
+[Service]
+StartLimitInterval=5
+StartLimitBurst=10
+ExecStart={{.Path|cmdEscape}}{{range .Arguments}} {{.|cmd}}{{end}}
+{{if .ChRoot}}RootDirectory={{.ChRoot|cmd}}{{end}}
+{{if .WorkingDirectory}}WorkingDirectory={{.WorkingDirectory|cmdEscape}}{{end}}
+{{if .UserName}}User={{.UserName}}{{end}}
+{{if .ReloadSignal}}ExecReload=/bin/kill -{{.ReloadSignal}} "$MAINPID"{{end}}
+{{if .PIDFile}}PIDFile={{.PIDFile|cmd}}{{end}}
+{{if and .LogOutput .HasOutputFileSupport -}}
+StandardOutput=file:/var/log/{{.Name}}.out
+StandardError=file:/var/log/{{.Name}}.err
+{{- end}}
+{{if gt .LimitNOFILE -1 }}LimitNOFILE={{.LimitNOFILE}}{{end}}
+{{if .Restart}}Restart={{.Restart}}{{end}}
+{{if .SuccessExitStatus}}SuccessExitStatus={{.SuccessExitStatus}}{{end}}
+{{if .Config.Option.KillMode}}KillMode={{.Config.Option.KillMode}}{{end}}
+RestartSec=120
+EnvironmentFile=-/etc/sysconfig/{{.Name}}
+
+[Install]
+WantedBy=multi-user.target
 `

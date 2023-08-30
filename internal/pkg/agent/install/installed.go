@@ -11,6 +11,7 @@ import (
 	"github.com/kardianos/service"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/pkgmgr"
 )
 
 // StatusType is the return status types.
@@ -31,7 +32,7 @@ const (
 func Status(topPath string) (StatusType, string) {
 	expected := filepath.Join(topPath, paths.BinaryName)
 	status, reason := checkService(topPath)
-	if checkPackageInstall() {
+	if pkgmgr.InstalledViaExternalPkgMgr() {
 		if status == Installed {
 			return PackageInstall, "service running"
 		}
