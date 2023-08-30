@@ -395,10 +395,17 @@ github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0 h1:dTrVPE6H
 github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0/go.mod h1:hzqVK19fiowHGWldLoKRHl3eXLErKyP89o7L/R3aHsk=
 github.com/elastic/elastic-agent-autodiscover v0.6.2 h1:7P3cbMBWXjbzA80rxitQjc+PiWyZ4I4F4LqrCYgYlNc=
 github.com/elastic/elastic-agent-autodiscover v0.6.2/go.mod h1:yXYKFAG+Py+TcE4CCR8EAbJiYb+6Dz9sCDoWgOveqtU=
+<<<<<<< HEAD
 github.com/elastic/elastic-agent-client/v7 v7.1.2 h1:p6KvvDMoFCBPvchxcx9cRXpRjsDaii0m/wE3lqQxpmM=
 github.com/elastic/elastic-agent-client/v7 v7.1.2/go.mod h1:G3Mk1pHXxvj3wC5FvsGUlPOsvapTB5SfrUmWiJDXT6Q=
 github.com/elastic/elastic-agent-libs v0.3.9-0.20230608184016-1f368a55a6ac h1:0tNQuC+Tz+j9/O6Oq5LH+ccvpmEQOFAaSyxaNREAdXM=
 github.com/elastic/elastic-agent-libs v0.3.9-0.20230608184016-1f368a55a6ac/go.mod h1:Fy5QqIOax0EOVeQJ2l5Ux+GmJsX549Obllru5R1bHLI=
+=======
+github.com/elastic/elastic-agent-client/v7 v7.3.0 h1:LugKtBXK7bp4SFL/uQqGU/f4Ppx12Jk5a36voGabLa0=
+github.com/elastic/elastic-agent-client/v7 v7.3.0/go.mod h1:9/amG2K2y2oqx39zURcc+hnqcX+nyJ1cZrLgzsgo5c0=
+github.com/elastic/elastic-agent-libs v0.3.13 h1:qFiBWeBfjsBId+i31rggyW2ZjzA9qBRz7wIiy+rkcvc=
+github.com/elastic/elastic-agent-libs v0.3.13/go.mod h1:mpSfrigixx8x+uMxWKl4LtdlrKIhZbA4yT2eIeIazUQ=
+>>>>>>> 454e6253a0 (Update elastic-agent-libs to v0.3.13 (#3300))
 github.com/elastic/elastic-agent-system-metrics v0.6.1 h1:LCN1lvQTkdUuU/rKlpKyVMDU/G/I8/iZWCaW6K+mo4o=
 github.com/elastic/elastic-agent-system-metrics v0.6.1/go.mod h1:Bj8XM/uNKm553blQHkGNEICRLGnVEtw8yttmV5vBngA=
 github.com/elastic/elastic-package v0.36.0/go.mod h1:TUyhRXtf+kazrUthMF+5FtngcFJZtsgty0o/nnl8UFU=
