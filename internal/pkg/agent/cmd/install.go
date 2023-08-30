@@ -179,9 +179,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
+	pt := install.NewProgressTracker(streams.Out)
+
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
-		err = install.Install(cfgFile, topPath)
+		err = install.Install(cfgFile, topPath, pt)
 		if err != nil {
 			return err
 		}
@@ -193,15 +195,20 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}()
 
 		if !delayEnroll {
+			pt.StepStart("Starting service")
 			err = install.StartService(topPath)
 			if err != nil {
+				pt.StepFailed()
 				fmt.Fprintf(streams.Out, "Installation failed to start Elastic Agent service.\n")
 				return err
 			}
+			pt.StepSucceeded()
 
 			defer func() {
 				if err != nil {
+					fmt.Fprint(streams.Out, "Stopping service... ")
 					_ = install.StopService(topPath)
+					pt.StepSucceeded()
 				}
 			}()
 		}
@@ -214,12 +221,16 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		enrollCmd.Stdin = os.Stdin
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
+
+		fmt.Fprint(streams.Out, "Enrolling Elastic Agent with Fleet... ")
 		err = enrollCmd.Start()
 		if err != nil {
+			pt.StepFailed()
 			return fmt.Errorf("failed to execute enroll command: %w", err)
 		}
 		err = enrollCmd.Wait()
 		if err != nil {
+			pt.StepFailed()
 			if status != install.PackageInstall {
 				var exitErr *exec.ExitError
 				_ = install.Uninstall(cfgFile, topPath, "")
@@ -229,6 +240,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			}
 			return fmt.Errorf("enroll command failed for unknown reason: %w", err)
 		}
+		pt.StepSucceeded()
 	}
 
 	if err := info.CreateInstallMarker(topPath); err != nil {
