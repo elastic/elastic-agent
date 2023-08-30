@@ -5,9 +5,11 @@
 package testing
 
 import (
+	"archive/zip"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -226,7 +228,58 @@ func (f *Fixture) collectDiagnostics() {
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics to %s (%s): %s", outputPath, err, output)
+
+		f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
+		zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-installation-%s.zip", f.t.Name(), time.Now().Format(time.RFC3339)))
+		err = f.archiveInstallDirectory(f.workDir, zipPath)
+		if err != nil {
+			f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)
+		}
 	}
+}
+
+func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string) error {
+	file, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("creating zip output file %s: %w", outputPath, err)
+	}
+	defer file.Close()
+
+	w := zip.NewWriter(file)
+	defer w.Close()
+
+	walker := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		f, err := w.Create(path)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(f, file)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	err = filepath.Walk(f.workDir, walker)
+	if err != nil {
+		return fmt.Errorf("walking %s to create zip: %w", f.workDir, err)
+	}
+
+	return nil
 }
 
 func collectDiag() bool {
