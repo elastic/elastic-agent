@@ -10,42 +10,54 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/exp/rand"
 )
 
 type ProgressTracker struct {
-	writer               io.Writer
-	progressTickDuration time.Duration
-	stepInProgress       bool
-	mu                   sync.RWMutex
-	stop                 chan struct{}
+	writer io.Writer
+
+	tickInterval          time.Duration
+	randomizeTickInterval bool
+
+	stepInProgress bool
+	mu             sync.RWMutex
+	stop           chan struct{}
 }
 
 func NewProgressTracker(writer io.Writer) *ProgressTracker {
 	return &ProgressTracker{
-		writer:               writer,
-		progressTickDuration: 100 * time.Millisecond,
-		stop:                 make(chan struct{}),
+		writer:                writer,
+		tickInterval:          100 * time.Millisecond,
+		randomizeTickInterval: true,
+		stop:                  make(chan struct{}),
 	}
 }
 
-func (pt *ProgressTracker) SetProgressTickDuration(d time.Duration) {
-	pt.progressTickDuration = d
+func (pt *ProgressTracker) SetTickInterval(d time.Duration) {
+	pt.tickInterval = d
+}
+
+func (pt *ProgressTracker) DisableRandomizedTickIntervals() {
+	pt.randomizeTickInterval = false
 }
 
 func (pt *ProgressTracker) Start() {
-	ticker := time.NewTicker(pt.progressTickDuration)
+	timer := time.NewTimer(pt.calculateTickInterval())
 	go func() {
-		defer ticker.Stop()
+		defer timer.Stop()
 		for {
 			select {
 			case <-pt.stop:
 				return
-			case <-ticker.C:
+			case <-timer.C:
 				pt.mu.RLock()
 				if pt.stepInProgress {
 					pt.writer.Write([]byte("."))
 				}
 				pt.mu.RUnlock()
+
+				timer = time.NewTimer(pt.calculateTickInterval())
 			}
 		}
 	}()
@@ -77,4 +89,12 @@ func (pt *ProgressTracker) StepFailed() {
 
 func (pt *ProgressTracker) Stop() {
 	pt.stop <- struct{}{}
+}
+
+func (pt *ProgressTracker) calculateTickInterval() time.Duration {
+	if !pt.randomizeTickInterval {
+		return pt.tickInterval
+	}
+
+	return time.Duration(rand.Float64() * 2 * float64(pt.tickInterval.Milliseconds()))
 }
