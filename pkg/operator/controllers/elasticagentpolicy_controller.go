@@ -130,7 +130,7 @@ func (r *k8sConfigManager) handleReconcile(ctx context.Context, client k8sClient
 		return reconcile.Result{}, err
 	}
 
-	if r.cfgHash == string(newHash) {
+	if r.cfgHash == newHash {
 		return reconcile.Result{}, nil
 	}
 
