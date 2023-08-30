@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -64,7 +65,19 @@ func GetAgentPackageVersionFilePath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("detecting current executable path: %w", err)
 	}
-	return filepath.Join(filepath.Dir(execPath), PackageVersionFileName), nil
+
+	dirPath := filepath.Dir(execPath)
+
+	if runtime.GOOS == "darwin" {
+		// On Mac the path is different because of package signing issues
+		// we have to go outside the elastic-agent.app directory
+		appDirIndex := strings.Index(dirPath, "/elastic-agent.app/")
+		if appDirIndex != -1 {
+			dirPath = dirPath[:appDirIndex]
+		}
+	}
+
+	return filepath.Join(dirPath, PackageVersionFileName), nil
 }
 
 func getCurrentExecutablePath() (string, error) {
