@@ -81,14 +81,21 @@ func InstallAgentWithPolicy(t *testing.T, ctx context.Context, installOpts atest
 		agentFixture.SetUninstallToken(uninstallToken)
 	}
 
-	err = InstallAgentForPolicy(t, installOpts, agentFixture, kibClient, policy.ID)
+	err = InstallAgentForPolicy(t, ctx, installOpts, agentFixture, kibClient, policy.ID)
 	return policy, err
 }
 
-// InstallAgentForPolicy enrolls the given agent
-// fixture in Fleet using the default Fleet Server, waits for the agent to be
-// online, and returns error or nil.
-func InstallAgentForPolicy(t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, policyID string) error {
+// InstallAgentForPolicy enrolls the provided agent fixture in Fleet using the
+// default Fleet Server, waits for the agent to come online, and returns either
+// an error or nil.
+// If the context (ctx) has a deadline, it will wait for the agent to become
+// online until the deadline of the context, or if not, a default 5-minute
+// deadline will be applied.
+func InstallAgentForPolicy(t *testing.T, ctx context.Context,
+	installOpts atesting.InstallOpts,
+	agentFixture *atesting.Fixture,
+	kibClient *kibana.Client,
+	policyID string) error {
 	t.Helper()
 
 	// Create enrollment API key
@@ -97,7 +104,7 @@ func InstallAgentForPolicy(t *testing.T, installOpts atesting.InstallOpts, agent
 	}
 
 	t.Logf("Creating enrollment API key...")
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(context.Background(), createEnrollmentAPIKeyReq)
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, createEnrollmentAPIKeyReq)
 	if err != nil {
 		return fmt.Errorf("unable to create enrollment API key: %w", err)
 	}
@@ -121,11 +128,15 @@ func InstallAgentForPolicy(t *testing.T, installOpts atesting.InstallOpts, agent
 	}
 	t.Logf(">>> Ran Enroll. Output: %s", output)
 
+	timeout := 5 * time.Minute
+	if deadline, ok := ctx.Deadline(); ok {
+		timeout = time.Until(deadline)
+	}
 	// Wait for Agent to be healthy
 	require.Eventually(
 		t,
 		WaitForAgentStatus(t, kibClient, "online"),
-		2*time.Minute,
+		timeout,
 		10*time.Second,
 		"Elastic Agent status is not online",
 	)
