@@ -45,7 +45,7 @@ func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentH
 
 	// Restart
 	log.Info("Restarting the agent after rollback")
-	if err := restartAgent(ctx); err != nil {
+	if err := restartAgent(ctx, log); err != nil {
 		return err
 	}
 
@@ -126,8 +126,8 @@ func InvokeWatcher(log *logger.Logger) error {
 	return cmd.Start()
 }
 
-func restartAgent(ctx context.Context) error {
-	restartFn := func(ctx context.Context) error {
+func restartAgent(ctx context.Context, log *logger.Logger) error {
+	restartViaDaemonFn := func(ctx context.Context) error {
 		c := client.New()
 		err := c.Connect(ctx)
 		if err != nil {
@@ -143,19 +143,43 @@ func restartAgent(ctx context.Context) error {
 		return nil
 	}
 
+	restartViaServiceFn := func(ctx context.Context) error {
+		topPath := paths.Top()
+		err := install.RestartService(topPath)
+		if err != nil {
+			return fmt.Errorf("failed to restart agent via service: %w", err)
+		}
+
+		return nil
+	}
+
 	signal := make(chan struct{})
 	backExp := backoff.NewExpBackoff(signal, restartBackoffInit, restartBackoffMax)
 
-	for i := maxRestartCount; i >= 1; i-- {
+	for restartAttempt := 1; restartAttempt <= maxRestartCount; restartAttempt++ {
 		backExp.Wait()
-		err := restartFn(ctx)
+		log.Infof("Restarting Agent via control protocol; attempt %d of %d", restartAttempt, maxRestartCount)
+		// First, try to restart Agent by sending a restart command
+		// to its daemon (via GRPC).
+		err := restartViaDaemonFn(ctx)
+		if err == nil {
+			break
+		}
+		log.Warnf("Failed to restart agent via control protocol: %s", err.Error())
+
+		// Next, try to restart Agent via the service.
+		log.Infof("Restarting Agent via service; attempt %d of %d", restartAttempt, maxRestartCount)
+		err = restartViaServiceFn(ctx)
 		if err == nil {
 			break
 		}
 
-		if i == 1 {
+		if restartAttempt == maxRestartCount {
+			log.Error("Failed to restart agent after final attempt")
 			return err
 		}
+
+		log.Warnf("Failed to restart agent via service: %s; will try again in %v", err.Error(), backExp.NextWait())
 	}
 
 	close(signal)

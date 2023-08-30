@@ -5,6 +5,7 @@
 package local
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -23,7 +24,7 @@ type contextProvider struct {
 }
 
 // Run runs the environment context provider.
-func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
+func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
 	err := comm.Set(c.Mapping)
 	if err != nil {
 		return errors.New(err, "failed to set mapping", errors.TypeUnexpected)

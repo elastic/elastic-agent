@@ -56,6 +56,7 @@ type managedConfigManager struct {
 }
 
 func newManagedConfigManager(
+	ctx context.Context,
 	log *logger.Logger,
 	agentInfo *info.AgentInfo,
 	cfg *configuration.Configuration,
@@ -72,7 +73,7 @@ func newManagedConfigManager(
 	}
 
 	// Create the state store that will persist the last good policy change on disk.
-	stateStore, err := store.NewStateStoreWithMigration(log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
+	stateStore, err := store.NewStateStoreWithMigration(ctx, log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
 	if err != nil {
 		return nil, errors.New(err, fmt.Sprintf("fail to read action store '%s'", paths.AgentActionStoreFile()))
 	}
@@ -116,7 +117,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	}
 
 	// Reload ID because of win7 sync issue
-	if err := m.agentInfo.ReloadID(); err != nil {
+	if err := m.agentInfo.ReloadID(ctx); err != nil {
 		return err
 	}
 

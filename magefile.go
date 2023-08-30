@@ -22,36 +22,33 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
-	"github.com/elastic/elastic-agent/pkg/version"
-
-	"github.com/hashicorp/go-multierror"
-	"github.com/magefile/mage/mg"
-	"github.com/magefile/mage/sh"
-	"github.com/otiai10/copy"
-	"k8s.io/utils/strings/slices"
-
 	"github.com/elastic/e2e-testing/pkg/downloads"
-
-	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
-
 	"github.com/elastic/elastic-agent/dev-tools/mage"
-	// mage:import
-	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
-
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
+	"github.com/elastic/elastic-agent/pkg/version"
 	bversion "github.com/elastic/elastic-agent/version"
 
+	// mage:import
+	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/magefile/mage/mg"
+	"github.com/magefile/mage/sh"
+	"github.com/otiai10/copy"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
+	"k8s.io/utils/strings/slices"
 )
 
 const (
@@ -918,36 +915,57 @@ func packageAgent(platforms []string, packagingFn func()) {
 		defer os.Unsetenv(agentDropPath)
 
 		if devtools.ExternalBuild == true {
-			// for external go for all dependencies
-			externalBinaries := []string{
-				"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat",
-				"cloudbeat", // only supporting linux/amd64 or linux/arm64
-				"cloud-defend",
-				"elastic-agent-shipper",
-				"apm-server",
-				"endpoint-security",
-				"fleet-server",
-				"pf-elastic-collector",
-				"pf-elastic-symbolizer",
-				"pf-host-agent",
+			// Map of binaries to download to their project name in the unified-release manager.
+			// The project names are used to generate the URLs when downloading binaries. For example:
+			//
+			// https://artifacts-snapshot.elastic.co/beats/latest/8.11.0-SNAPSHOT.json
+			// https://artifacts-snapshot.elastic.co/cloudbeat/latest/8.11.0-SNAPSHOT.json
+			// https://artifacts-snapshot.elastic.co/cloud-defend/latest/8.11.0-SNAPSHOT.json
+			// https://artifacts-snapshot.elastic.co/apm-server/latest/8.11.0-SNAPSHOT.json
+			// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
+			// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
+			// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
+			externalBinaries := map[string]string{
+				"auditbeat":             "beats",
+				"filebeat":              "beats",
+				"heartbeat":             "beats",
+				"metricbeat":            "beats",
+				"osquerybeat":           "beats",
+				"packetbeat":            "beats",
+				"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
+				"cloud-defend":          "cloud-defend",
+				"apm-server":            "apm-server", // not supported on darwin/aarch64
+				"endpoint-security":     "endpoint-dev",
+				"fleet-server":          "fleet-server",
+				"pf-elastic-collector":  "prodfiler",
+				"pf-elastic-symbolizer": "prodfiler",
+				"pf-host-agent":         "prodfiler",
 			}
 
-			ctx := context.Background()
-			for _, binary := range externalBinaries {
+			// Only log fatal logs for logs produced using logrus. This is the global logger
+			// used by github.com/elastic/e2e-testing/pkg/downloads which can only be configured globally like this or via
+			// environment variables.
+			//
+			// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
+			// download artifacts on unsupported platforms and choose to ignore the errors.
+			//
+			// Change this to InfoLevel to see exactly what the downloader is doing.
+			logrus.SetLevel(logrus.FatalLevel)
+
+			errGroup, ctx := errgroup.WithContext(context.Background())
+			for binary, project := range externalBinaries {
 				for _, platform := range platforms {
 					reqPackage := platformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
-					err := fetchBinaryFromArtifactsApi(ctx, packageName, binary, newVersion, targetPath)
-					if err != nil {
-						if strings.Contains(err.Error(), "object not found") {
-							fmt.Printf("Downloading %s: unsupported on %s, skipping\n", binary, platform)
-						} else {
-							panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed for %s on %s: %v", binary, platform, err))
-						}
-					}
+					errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath))
 				}
+			}
+
+			err := errGroup.Wait()
+			if err != nil {
+				panic(err)
 			}
 		} else {
 			packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
@@ -1109,6 +1127,24 @@ func packageAgent(platforms []string, packagingFn func()) {
 	mg.SerialDeps(devtools.Package, TestPackages)
 }
 
+// Helper that wraps the fetchBinaryFromArtifactsApi in a way that is compatible with the errgroup.Go() function.
+// Ensures the arguments are captured by value before starting the goroutine.
+func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string) func() error {
+	return func() error {
+		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				fmt.Printf("Done downloading %s: unsupported on %s, skipping\n", binary, platform)
+			} else {
+				return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
+			}
+		}
+
+		fmt.Printf("Done downloading %s\n", packageName)
+		return nil
+	}
+}
+
 func copyComponentSpecs(componentName, versionedDropPath string) (string, error) {
 	specFileName := componentName + specSuffix
 	targetPath := filepath.Join(versionedDropPath, specFileName)
@@ -1201,32 +1237,6 @@ func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 	}
 
 	return archivePath
-}
-
-func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
-	// Only log fatal logs for logs produced using logrus. This is the global logger
-	// used by github.com/elastic/e2e-testing/pkg/downloads which can only be configured globally like this or via
-	// environment variables.
-	//
-	// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
-	// download artifacts on unsupported platforms and choose to ignore the errors.
-	logrus.SetLevel(logrus.FatalLevel)
-
-	location, err := downloads.FetchBeatsBinary(
-		ctx,
-		packageName,
-		artifact,
-		version,
-		3,
-		false,
-		downloadPath,
-		true)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("downloaded binaries on", location)
-	return err
 }
 
 func selectedPackageTypes() string {
@@ -1719,14 +1729,22 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if essRegion == "" {
 		essRegion = "gcp-us-central1"
 	}
-	provisionerMode := os.Getenv("STACK")
-	if provisionerMode == "" {
-		provisionerMode = "ess"
+	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
+	if instanceProvisionerMode == "" {
+		instanceProvisionerMode = "ogc"
 	}
-	if provisionerMode != "ess" && provisionerMode != "serverless" {
-		return nil, errors.New("STACK environment variable must be one of 'serverless' or 'ess'")
+	if instanceProvisionerMode != "ogc" && instanceProvisionerMode != "multipass" {
+		return nil, errors.New("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass'")
 	}
-	fmt.Printf(">>>> Using %s ESS deployment\n", provisionerMode)
+	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
+	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
+	if stackProvisionerMode == "" {
+		stackProvisionerMode = "ess"
+	}
+	if stackProvisionerMode != "ess" && stackProvisionerMode != "serverless" {
+		return nil, errors.New("STACK_PROVISIONER environment variable must be one of 'serverless' or 'ess'")
+	}
+	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
 	timestamp := timestampEnabled()
 
@@ -1761,15 +1779,21 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		ServiceTokenPath: serviceTokenPath,
 		Datacenter:       datacenter,
 	}
-
-	ogcProvisioner, err := ogc.NewProvisioner(ogcCfg)
+	email, err := ogcCfg.ClientEmail()
 	if err != nil {
 		return nil, err
 	}
 
-	email, err := ogcCfg.ClientEmail()
-	if err != nil {
-		return nil, err
+	var instanceProvisioner runner.InstanceProvisioner
+	if instanceProvisionerMode == "multipass" {
+		instanceProvisioner = multipass.NewProvisioner()
+	} else if instanceProvisionerMode == "ogc" {
+		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("unknown instance provisioner: %s", instanceProvisionerMode)
 	}
 
 	provisionCfg := ess.ProvisionerConfig{
@@ -1777,20 +1801,22 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		APIKey:     essToken,
 		Region:     essRegion,
 	}
-
-	essProvisioner, err := ess.NewProvisioner(provisionCfg)
-	if err != nil {
-		return nil, err
-	}
-
-	if provisionerMode == "serverless" {
-		essProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
+	var stackProvisioner runner.StackProvisioner
+	if stackProvisionerMode == "ess" {
+		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
 		if err != nil {
-			return nil, fmt.Errorf("error creating serverless provisioner: %w", err)
+			return nil, err
 		}
+	} else if stackProvisionerMode == "serverless" {
+		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("unknown stack provisioner: %s", stackProvisionerMode)
 	}
 
-	r, err := runner.NewRunner(cfg, ogcProvisioner, essProvisioner, batches...)
+	r, err := runner.NewRunner(cfg, instanceProvisioner, stackProvisioner, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}

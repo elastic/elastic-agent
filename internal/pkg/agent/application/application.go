@@ -5,10 +5,12 @@
 package application
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/version"
 
 	"go.elastic.co/apm"
@@ -33,6 +35,7 @@ import (
 
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
+	ctx context.Context,
 	log *logger.Logger,
 	baseLogger *logger.Logger,
 	logLevel logp.Level,
@@ -138,7 +141,7 @@ func New(
 	} else {
 		isManaged = true
 		var store storage.Store
-		store, cfg, err = mergeFleetConfig(rawConfig)
+		store, cfg, err = mergeFleetConfig(ctx, rawConfig)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -157,7 +160,7 @@ func New(
 				EndpointSignedComponentModifier(),
 			)
 
-			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime, fleetInitTimeout)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -177,6 +180,15 @@ func New(
 		managed.coord = coord
 	}
 
+	// every time we change the limits we'll see the log message
+	limits.AddLimitsOnChangeCallback(func(new, old limits.LimitsConfig) {
+		log.Debugf("agent limits have changed: %+v -> %+v", old, new)
+	}, "application.go")
+	// applying the initial limits for the agent process
+	if err := limits.Apply(rawConfig); err != nil {
+		return nil, nil, nil, fmt.Errorf("could not parse and apply limits config: %w", err)
+	}
+
 	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
 	// any feature flag change callbacks are registered before they get called by `features.Apply`.
 	if err := features.Apply(rawConfig); err != nil {
@@ -186,9 +198,9 @@ func New(
 	return coord, configMgr, composable, nil
 }
 
-func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
+func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(path)
+	store := storage.NewEncryptedDiskStore(ctx, path)
 
 	reader, err := store.Load()
 	if err != nil {

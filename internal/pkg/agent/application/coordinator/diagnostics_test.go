@@ -336,6 +336,7 @@ components:
       state: 3
       message: "degraded message"
       features_idx: 0
+      component_idx: 0
       units: {}
       version_info:
         name: "version name"

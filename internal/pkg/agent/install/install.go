@@ -172,6 +172,22 @@ func StopService(topPath string) error {
 	return nil
 }
 
+// RestartService restarts the installed service.
+func RestartService(topPath string) error {
+	svc, err := newService(topPath)
+	if err != nil {
+		return err
+	}
+	err = svc.Restart()
+	if err != nil {
+		return errors.New(
+			err,
+			fmt.Sprintf("failed to restart service (%s)", paths.ServiceName),
+			errors.M("service", paths.ServiceName))
+	}
+	return nil
+}
+
 // FixPermissions fixes the permissions on the installed system.
 func FixPermissions(topPath string) error {
 	return fixPermissions(topPath)
