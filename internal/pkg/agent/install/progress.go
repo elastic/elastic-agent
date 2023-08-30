@@ -25,9 +25,9 @@ func (pt *ProgressTracker) StepStart(msg string) {
 }
 
 func (pt *ProgressTracker) StepSucceeded() {
-	fmt.Fprintln(pt.writer, "DONE")
+	fmt.Fprintln(pt.writer, " DONE")
 }
 
 func (pt *ProgressTracker) StepFailed() {
-	fmt.Fprintln(pt.writer, "FAILED")
+	fmt.Fprintln(pt.writer, " FAILED")
 }
