@@ -7,6 +7,7 @@ package install
 import (
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -53,7 +54,7 @@ func (pt *ProgressTracker) Start() {
 			case <-timer.C:
 				pt.mu.RLock()
 				if pt.stepInProgress {
-					pt.writer.Write([]byte("."))
+					_, _ = pt.writer.Write([]byte("."))
 				}
 				pt.mu.RUnlock()
 
@@ -96,5 +97,13 @@ func (pt *ProgressTracker) calculateTickInterval() time.Duration {
 		return pt.tickInterval
 	}
 
-	return time.Duration(rand.Float64() * 2 * float64(pt.tickInterval.Milliseconds()))
+	floor := int64(math.Floor(float64(pt.tickInterval.Milliseconds()) * 0.8))
+	ceiling := pt.tickInterval.Milliseconds() * 2
+
+	randomDuration := rand.Int63() % ceiling
+	if randomDuration < floor {
+		randomDuration = floor
+	}
+
+	return time.Duration(randomDuration) * time.Millisecond
 }
