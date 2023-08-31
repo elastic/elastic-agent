@@ -1731,8 +1731,8 @@ github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8/go.mod h1:HUYIGzjTL3rfEspMx
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/xlab/treeprint v1.1.0/go.mod h1:gj5Gd3gPdKtR1ikdDK6fnFLdmIS0X30kTTuNd/WEJu0=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
-github.com/ycombinator/copy v0.0.0-20230831215828-55a4d5bcc092 h1:JNmVZYmY9ns62FFpzrWOrf55znZhG7jIw7WiPHiwyUg=
-github.com/ycombinator/copy v0.0.0-20230831215828-55a4d5bcc092/go.mod h1:Fg2x1XxE6bm9DR/NJSKWSECfuLj5B1HP4SCo8rpJSv8=
+github.com/ycombinator/copy v0.0.0-20230831230801-6d4e4ba7e3b3 h1:9RiKReUEjD+5sfYhTEfTJEwcFVeIEfjOchCGpf72Ehc=
+github.com/ycombinator/copy v0.0.0-20230831230801-6d4e4ba7e3b3/go.mod h1:Fg2x1XxE6bm9DR/NJSKWSECfuLj5B1HP4SCo8rpJSv8=
 github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d/go.mod h1:rHwXgn7JulP+udvsHwJoVG1YGAP6VLg4y9I5dyZdqmA=
 github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a h1:fZHgsYlfvtyqToslyjUt3VOPF4J7aK/3MPcK7xp3PDk=
 github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a/go.mod h1:ul22v+Nro/R083muKhosV54bj5niojjWZvU8xrevuH4=
