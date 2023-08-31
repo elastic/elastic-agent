@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/jaypipes/ghw"
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -58,13 +59,17 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	}
 
 	// copy source into install path
+	var copyConcurrency uint = 1
+	if hasAllSSDs() {
+		copyConcurrency = uint(runtime.NumCPU())
+	}
 	s := pt.StepStart("Copying files")
 	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
 		Sync:        true,
-		Concurrency: uint(runtime.NumCPU()), // TODO: account for SSDs
+		Concurrency: copyConcurrency,
 	})
 	if err != nil {
 		s.Failed()
@@ -238,4 +243,36 @@ func verifyDirectory(dir string) error {
 		return fmt.Errorf("missing %s", paths.BinaryName)
 	}
 	return nil
+}
+
+// hasAllSSDs returns true if the host we are on uses SSDs for
+// all its persistent storage; false otherwise or on error
+func hasAllSSDs() bool {
+	block, err := ghw.Block()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "hasAllSSDs: ghw.Block() returned error: %s\n", err.Error())
+		return false
+	}
+
+	for _, disk := range block.Disks {
+		switch disk.DriveType {
+		case ghw.DRIVE_TYPE_FDD, ghw.DRIVE_TYPE_ODD:
+			// Floppy or optical drive; we don't care about these
+			fmt.Fprintf(os.Stdout, "hasAllSSDs: %s is a FDD or ODD\n", disk.Name)
+			continue
+		case ghw.DRIVE_TYPE_SSD:
+			// SSDs
+			fmt.Fprintf(os.Stdout, "hasAllSSDs: %s is a SSD\n", disk.Name)
+			continue
+		case ghw.DRIVE_TYPE_HDD:
+			// HDD (spinning hard disk)
+			fmt.Fprintf(os.Stdout, "hasAllSSDs: %s is a HDD\n", disk.Name)
+			return false
+		default:
+			fmt.Fprintf(os.Stdout, "hasAllSSDs: %s is of unknown type\n", disk.Name)
+			return false
+		}
+	}
+
+	return true
 }
