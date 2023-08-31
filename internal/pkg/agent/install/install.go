@@ -63,7 +63,8 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
-		Sync: true,
+		Sync:        true,
+		Concurrency: uint(runtime.NumCPU()), // TODO: account for SSDs
 	})
 	if err != nil {
 		s.Failed()
