@@ -177,10 +177,9 @@ replace (
 	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
 	github.com/fsnotify/fsnotify => github.com/adriansr/fsnotify v1.4.8-0.20211018144411-a81f2b630e7c
+	github.com/otiai10/copy => github.com/ycombinator/copy v0.0.0-20230901032348-510839011b29 // until https://github.com/otiai10/copy/pull/120 is merged
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
-
-replace github.com/otiai10/copy => github.com/ycombinator/copy v0.0.0-20230901000706-688f9d60d20c
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible

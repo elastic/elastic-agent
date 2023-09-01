@@ -59,9 +59,9 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	}
 
 	// copy source into install path
-	var copyConcurrency uint = 1
-	if hasAllSSDs() {
-		copyConcurrency = uint(runtime.NumCPU())
+	copyConcurrency := 1
+	if HasAllSSDs() {
+		copyConcurrency = runtime.NumCPU() * 4
 	}
 	s := pt.StepStart("Copying files")
 	err = copy.Copy(dir, topPath, copy.Options{
@@ -69,7 +69,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 			return copy.Shallow
 		},
 		Sync:        true,
-		Concurrency: copyConcurrency,
+		Concurrency: int64(copyConcurrency),
 	})
 	if err != nil {
 		s.Failed()
@@ -245,12 +245,12 @@ func verifyDirectory(dir string) error {
 	return nil
 }
 
-// hasAllSSDs returns true if the host we are on uses SSDs for
+// HasAllSSDs returns true if the host we are on uses SSDs for
 // all its persistent storage; false otherwise or on error
-func hasAllSSDs() bool {
+func HasAllSSDs() bool {
 	block, err := ghw.Block()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "hasAllSSDs: ghw.Block() returned error: %s\n", err.Error())
+		fmt.Fprintf(os.Stdout, "HasAllSSDs: ghw.Block() returned error: %s\n", err.Error())
 		return false
 	}
 
@@ -258,18 +258,18 @@ func hasAllSSDs() bool {
 		switch disk.DriveType {
 		case ghw.DRIVE_TYPE_FDD, ghw.DRIVE_TYPE_ODD:
 			// Floppy or optical drive; we don't care about these
-			fmt.Fprintf(os.Stdout, "hasAllSSDs: %s is a FDD or ODD\n", disk.Name)
+			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a FDD or ODD\n", disk.Name)
 			continue
 		case ghw.DRIVE_TYPE_SSD:
 			// SSDs
-			fmt.Fprintf(os.Stdout, "hasAllSSDs: %s is a SSD\n", disk.Name)
+			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a SSD\n", disk.Name)
 			continue
 		case ghw.DRIVE_TYPE_HDD:
 			// HDD (spinning hard disk)
-			fmt.Fprintf(os.Stdout, "hasAllSSDs: %s is a HDD\n", disk.Name)
+			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a HDD\n", disk.Name)
 			return false
 		default:
-			fmt.Fprintf(os.Stdout, "hasAllSSDs: %s is of unknown type\n", disk.Name)
+			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is of unknown type\n", disk.Name)
 			return false
 		}
 	}
