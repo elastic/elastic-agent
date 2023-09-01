@@ -203,6 +203,7 @@ pipeline {
                           [ source: "beats/elastic-agent", arch: env.ARCH, target: "observability-ci/elastic-agent"],
                           [ source: "beats/elastic-agent-oss", arch: env.ARCH, target: "observability-ci/elastic-agent-oss"],
                           [ source: "beats/elastic-agent-ubi8", arch: env.ARCH, target: "observability-ci/elastic-agent-ubi8"],
+                          [ source: "beats/elastic-agent-operator", arch: env.ARCH, target: "observability-ci/elastic-agent-operator"],
                           [ source: "beats/elastic-agent-complete", arch: env.ARCH, target: "observability-ci/elastic-agent-complete"],
                           [ source: "beats-ci/elastic-agent-cloud", arch: env.ARCH, target: "observability-ci/elastic-agent-cloud"]
                         ]
