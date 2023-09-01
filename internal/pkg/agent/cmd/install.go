@@ -83,7 +83,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 	if nonInteractive {
-		fmt.Fprintf(streams.Out, "Installing in non-interactive mode.")
+		fmt.Fprintf(streams.Out, "Installing in non-interactive mode.\n")
 	}
 
 	if status == install.PackageInstall {
@@ -205,6 +205,8 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 				}
 			}()
 		}
+
+		fmt.Fprint(streams.Out, "Elastic Agent successfully installed, starting enrollment.\n")
 	}
 
 	if enroll {
