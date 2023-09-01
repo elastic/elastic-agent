@@ -488,7 +488,8 @@ func testStandaloneUpgrade(
 	}
 
 	upgradeTriggerOutput, err := f.Exec(ctx, upgradeCmdArgs)
-	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s%", parsedUpgradeVersion, upgradeTriggerOutput)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s",
+		parsedUpgradeVersion, upgradeTriggerOutput)
 
 	require.Eventuallyf(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, f, parsedUpgradeVersion.CoreVersion(), parsedUpgradeVersion.IsSnapshot(), expectedAgentHashAfterUpgrade)

@@ -30,6 +30,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 )
 
 const (
@@ -77,7 +78,7 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 		Isolate: false,
 		Sudo:    true, // requires Agent installation
 		OS: []define.OS{
-			define.OS{Type: define.Linux},
+			{Type: define.Linux},
 		},
 	})
 
@@ -101,7 +102,10 @@ func buildPolicyWithTamperProtection(policy kibana.AgentPolicy, protected bool) 
 }
 
 func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.Info, protected bool) {
-	t.Helper()
+	deadline := time.Now().Add(10 * time.Minute)
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
+	defer cancel()
+
 	// Get path to agent executable.
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
@@ -127,19 +131,16 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 		Force:          true,
 	}
 
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-
-	// Create policy
-	policy, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, fixture, info.KibanaClient, createPolicyReq)
-	require.NoError(t, err)
+	policy, err := tools.InstallAgentWithPolicy(t, ctx,
+		installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoError(t, err, "failed to install agent with policy")
 
 	t.Log("Installing Elastic Defend")
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policy.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
 	t.Log("Polling for endpoint-security to become Healthy")
-	ctx, cancel := context.WithTimeout(context.Background(), endpointHealthPollingTimeout)
+	ctx, cancel = context.WithTimeout(ctx, endpointHealthPollingTimeout)
 	defer cancel()
 
 	agentClient := fixture.Client()
