@@ -23,11 +23,11 @@ import (
 )
 
 var SenderAlreadyRunningError = errors.New("apm sender is already running")
-var InitialSenderConfigFailError = errors.New("initial configuration of apm sender failed")
 
 type apmTracesSender struct {
 	cfgUpd      chan *proto.APMConfig
 	updateErrCh chan error
+	logger      *zerolog.Logger
 	ctx         context.Context
 	ctxCancelF  context.CancelFunc
 }
@@ -40,15 +40,7 @@ func (ats *apmTracesSender) Start(ctx context.Context, cfg *proto.APMConfig) err
 
 	ats.init(ctx)
 
-	go ats.sendTracesLoop(time.Second, 100*time.Millisecond)
-	select {
-	case ats.cfgUpd <- cfg:
-		// nothing to do
-	case <-time.After(100 * time.Millisecond):
-		// startup failure, cancel the context and cleanup
-		ats.cleanup()
-		return InitialSenderConfigFailError
-	}
+	go ats.sendTracesLoop(cfg, time.Second, 100*time.Millisecond)
 	return nil
 }
 
@@ -71,12 +63,10 @@ func (ats *apmTracesSender) cleanup() {
 	ats.updateErrCh = nil
 }
 
-func (ats *apmTracesSender) sendTracesLoop(sendInterval time.Duration, traceDuration time.Duration) {
-	// wait for initial config
-	cfg := <-ats.cfgUpd
-	tracer, err := ats.createNewTracer(cfg)
+func (ats *apmTracesSender) sendTracesLoop(initialCfg *proto.APMConfig, sendInterval time.Duration, traceDuration time.Duration) {
+	tracer, err := ats.createNewTracer(initialCfg)
 	if err != nil {
-		ats.updateErrCh <- fmt.Errorf("error creating tracer from config: %w", err)
+		ats.updateErrCh <- fmt.Errorf("error creating tracer from initial config: %w", err)
 	}
 
 	ticker := time.NewTicker(sendInterval)
@@ -92,6 +82,9 @@ func (ats *apmTracesSender) sendTracesLoop(sendInterval time.Duration, traceDura
 				ats.updateErrCh <- fmt.Errorf("error creating tracer from config: %w", err)
 				continue
 			}
+			if tracer != nil {
+				tracer.Close()
+			}
 			tracer = newTracer
 			ats.updateErrCh <- nil
 		}
@@ -103,7 +96,7 @@ func (ats *apmTracesSender) Update(cfg *proto.APMConfig, timeout time.Duration) 
 	case ats.cfgUpd <- cfg:
 		return nil
 	case <-time.After(timeout):
-		return fmt.Errorf("config update failed")
+		return fmt.Errorf("config update timed out")
 	}
 }
 
@@ -114,13 +107,14 @@ func (ats *apmTracesSender) Stop() error {
 
 func (ats *apmTracesSender) createNewTracer(cfg *proto.APMConfig) (*apm.Tracer, error) {
 	if cfg == nil {
-		return apm.DefaultTracer, nil
+		return nil, nil
 	}
 
 	const (
 		envVerifyServerCert = "ELASTIC_APM_VERIFY_SERVER_CERT"
 		envServerCert       = "ELASTIC_APM_SERVER_CERT"
 		envCACert           = "ELASTIC_APM_SERVER_CA_CERT_FILE"
+		envGlobalLabels     = "ELASTIC_APM_GLOBAL_LABELS"
 	)
 	if cfg.Elastic.Tls.SkipVerify {
 		os.Setenv(envVerifyServerCert, "false")
@@ -165,6 +159,10 @@ func (ats *apmTracesSender) createNewTracer(cfg *proto.APMConfig) (*apm.Tracer, 
 }
 
 func (ats *apmTracesSender) sendTrace(tracer *apm.Tracer, duration time.Duration) {
+	if tracer == nil {
+		// no tracer configured, skip
+		return
+	}
 	tx := tracer.StartTransaction("faketransaction", "request")
 	defer tx.End()
 	span := tx.StartSpan("spanName", "spanType", nil)
@@ -183,6 +181,7 @@ func (fai *fakeAPMInput) Unit() *client.Unit {
 }
 func (fai *fakeAPMInput) Update(u *client.Unit, triggers client.Trigger) error {
 	if u.Expected().State == client.UnitStateStopped {
+		fai.logger.Info().Msg("fakeAPMInput stopping APM sender")
 		// stop apm trace sender
 		return fai.sender.Stop()
 	}
@@ -191,6 +190,8 @@ func (fai *fakeAPMInput) Update(u *client.Unit, triggers client.Trigger) error {
 		// no apm change, nothing to do
 		return nil
 	}
+
+	fai.logger.Info().Msgf("Updating sender config with %+v", u.Expected().APMConfig)
 
 	return fai.sender.Update(u.Expected().APMConfig, time.Second)
 }
@@ -210,10 +211,29 @@ func newFakeAPMInput(logger zerolog.Logger, logLevel client.UnitLogLevel, unit *
 	if err != nil {
 		return apmInput, fmt.Errorf("error starting apm tracer sender: %w", err)
 	}
-
+	go senderErrorLogger(apmInput.sender.ctx, logger, apmInput.sender.updateErrCh, unit)
 	err = unit.UpdateState(client.UnitStateHealthy, "Fake APM traces sender has started", nil)
 	if err != nil {
 		return apmInput, fmt.Errorf("error while setting healthy state: %w", err)
 	}
 	return apmInput, err
+}
+
+func senderErrorLogger(ctx context.Context, logger zerolog.Logger, errCh <-chan error, unit *client.Unit) {
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info().Msg("context expired: senderErrorLogger exiting")
+			return
+		case err, ok := <-errCh:
+			if !ok {
+				logger.Info().Msg("error channel closed: senderErrorLogger exiting")
+			}
+			if err != nil {
+				logger.Err(err).Msg("sender error")
+				unit.UpdateState(client.UnitStateDegraded, fmt.Sprintf("sender error: %s", err), nil)
+			}
+			unit.UpdateState(client.UnitStateHealthy, fmt.Sprintf("sender error: %s", err), nil)
+		}
+	}
 }

@@ -48,7 +48,18 @@ var fakeComponent = atesting.UsableComponent{
 				Shippers: []string{
 					fakeShipperName,
 				},
-				Command: &component.CommandSpec{},
+				Command: &component.CommandSpec{
+					Env: []component.CommandEnvSpec{
+						{
+							Name:  "ELASTIC_APM_LOG_FILE",
+							Value: "stderr",
+						},
+						{
+							Name:  "ELASTIC_APM_LOG_LEVEL",
+							Value: "debug",
+						},
+					},
+				},
 			},
 		},
 	},
