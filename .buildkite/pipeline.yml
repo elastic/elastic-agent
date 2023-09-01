@@ -15,11 +15,6 @@ steps:
     retry:
       manual:
         allowed: true
-    # Unit tests failed in the container
-    # agents:
-    #   image: "golang:${GO_VERSION}"
-    #   cpu: "8"
-    #   memory: "4G"
 
   - label: ":sonarqube: Continuous Code Inspection"
     env:
