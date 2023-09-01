@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -39,25 +40,46 @@ func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 }
 
 func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
-	fileName, _ := cmd.Flags().GetString("file")
-	if fileName == "" {
+	filepath, _ := cmd.Flags().GetString("file")
+	if filepath == "" {
 		ts := time.Now().UTC()
-		fileName = "elastic-agent-diagnostics-" + ts.Format("2006-01-02T15-04-05Z07-00") + ".zip" // RFC3339 format that replaces : with -, so it will work on Windows
+		filepath = "elastic-agent-diagnostics-" + ts.Format("2006-01-02T15-04-05Z07-00") + ".zip" // RFC3339 format that replaces : with -, so it will work on Windows
 	}
 
 	ctx := handleSignal(context.Background())
 
+	// 1st create the file to store the diagnostics, if it fails, anything else
+	// is pointless.
+	f, err := createFile(filepath)
+	if err != nil {
+		return fmt.Errorf("could not create diagnostics file %q: %w", filepath, err)
+	}
+	defer f.Close()
+
+	cpuProfile, _ := cmd.Flags().GetBool("cpu-profile")
+	agentDiag, unitDiags, compDiags, err := collectDiagnostics(ctx, streams, cpuProfile)
+	if err != nil {
+		return fmt.Errorf("failed collecting diagnostics: %w", err)
+	}
+
+	if err := diagnostics.ZipArchive(streams.Err, f, agentDiag, unitDiags, compDiags); err != nil {
+		return fmt.Errorf("unable to create archive %q: %w", filepath, err)
+	}
+	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", filepath)
+	fmt.Fprintln(streams.Out, "***** WARNING *****\nCreated archive may contain plain text credentials.\nEnsure that files in archive are redacted before sharing.\n*******************")
+	return nil
+}
+
+func collectDiagnostics(ctx context.Context, streams *cli.IOStreams, cpuProfile bool) ([]client.DiagnosticFileResult, []client.DiagnosticUnitResult, []client.DiagnosticComponentResult, error) {
 	daemon := client.New()
 	err := daemon.Connect(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to connect to daemon: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to connect to daemon: %w", err)
 	}
 	defer daemon.Disconnect()
 
-	fetchCPU, _ := cmd.Flags().GetBool("cpu-profile")
-
-	additionalDiags := []cproto.AdditionalDiagnosticRequest{}
-	if fetchCPU {
+	var additionalDiags []cproto.AdditionalDiagnosticRequest
+	if cpuProfile {
 		// console will just hang while we wait for the CPU profile; print something so user doesn't get confused
 		fmt.Fprintf(streams.Out, "Creating diagnostics archive, waiting for CPU profile...\n")
 		additionalDiags = []cproto.AdditionalDiagnosticRequest{cproto.AdditionalDiagnosticRequest_CPU}
@@ -79,19 +101,24 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	if len(compDiags) == 0 && len(unitDiags) == 0 && len(agentDiag) == 0 {
-		return fmt.Errorf("no diags could be fetched")
+		return nil, nil, nil, fmt.Errorf("no diags could be fetched")
 	}
 
-	f, err := os.Create(fileName)
+	return agentDiag, unitDiags, compDiags, nil
+}
+
+func createFile(filepath string) (*os.File, error) {
+	// Ensure all the folders on filepath exist as os.Create does not do so.
+	// 0777 is the same permission, before unmask, os.Create uses.
+	dir := path.Dir(filepath)
+	if err := os.MkdirAll(dir, 0777); err != nil {
+		return nil, fmt.Errorf("could not create folders to save diagnostics on %q: %w",
+			dir, err)
+	}
+
+	f, err := os.Create(filepath)
 	if err != nil {
-		return fmt.Errorf("error creating .zip file: %w", err)
+		return nil, fmt.Errorf("error creating .zip file: %w", err)
 	}
-	defer f.Close()
-
-	if err := diagnostics.ZipArchive(streams.Err, f, agentDiag, unitDiags, compDiags); err != nil {
-		return fmt.Errorf("unable to create archive %q: %w", fileName, err)
-	}
-	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", fileName)
-	fmt.Fprintln(streams.Out, "***** WARNING *****\nCreated archive may contain plain text credentials.\nEnsure that files in archive are redacted before sharing.\n*******************")
-	return nil
+	return f, nil
 }
