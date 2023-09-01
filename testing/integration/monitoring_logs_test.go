@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleet"
 )
 
 func TestMonitoringLogsShipped(t *testing.T) {
@@ -69,7 +70,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 
-	check.ConnectedToFleet(t, agentFixture)
+	check.ConnectedToFleet(t, agentFixture, 5*time.Minute)
 
 	// Stage 2: check indices
 	// This is mostly for debugging
@@ -114,7 +115,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 		t.Fatalf("could not get hostname to filter Agent: %s", err)
 	}
 
-	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, hostname)
+	agentID, err := fleet.AgentIDByHostname(info.KibanaClient, hostname)
 	require.NoError(t, err, "could not get Agent ID by hostname")
 	t.Logf("Agent ID: %q", agentID)
 

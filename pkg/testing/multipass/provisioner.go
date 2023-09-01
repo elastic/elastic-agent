@@ -147,7 +147,10 @@ func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runne
 
 	var output bytes.Buffer
 	p.logger.Logf("Launching multipass image %s", batch.ID)
-	proc, err := process.Start("multipass", process.WithContext(ctx), process.WithArgs(args), process.WithCmdOptions(runner.AttachOut(&output), runner.AttachErr(&output)))
+	proc, err := process.Start("multipass",
+		process.WithContext(ctx),
+		process.WithArgs(args),
+		process.WithCmdOptions(runner.AttachOut(&output), runner.AttachErr(&output)))
 	if err != nil {
 		return fmt.Errorf("failed to run multipass launch: %w", err)
 	}

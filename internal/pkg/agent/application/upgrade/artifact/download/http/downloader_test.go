@@ -16,13 +16,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
-
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 )
 
 func TestDownloadBodyError(t *testing.T) {
@@ -195,9 +194,10 @@ type logMessage struct {
 }
 
 type recordLogger struct {
-	lock sync.RWMutex
-	info []logMessage
-	warn []logMessage
+	lock  sync.RWMutex
+	info  []logMessage
+	warn  []logMessage
+	error []logMessage
 }
 
 func newRecordLogger() *recordLogger {
@@ -217,6 +217,12 @@ func (f *recordLogger) Warnf(record string, args ...interface{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.warn = append(f.warn, logMessage{record, args})
+}
+
+func (f *recordLogger) Errorf(record string, args ...interface{}) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.error = append(f.error, logMessage{record, args})
 }
 
 func containsMessage(logs []logMessage, msg string) bool {

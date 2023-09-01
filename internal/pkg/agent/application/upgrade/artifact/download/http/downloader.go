@@ -168,7 +168,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		return "", err
 	}
 
-	req, err := http.NewRequest("GET", sourceURI, nil)
+	req, err := http.NewRequest(http.MethodGet, sourceURI, nil)
 	if err != nil {
 		return "", errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
@@ -232,7 +232,11 @@ type downloadProgressReporter struct {
 	started    time.Time
 }
 
-func newDownloadProgressReporter(log progressLogger, sourceURI string, timeout time.Duration, length int) *downloadProgressReporter {
+func newDownloadProgressReporter(
+	log progressLogger,
+	sourceURI string,
+	timeout time.Duration,
+	length int) *downloadProgressReporter {
 	return &downloadProgressReporter{
 		log:         log,
 		sourceURI:   sourceURI,
@@ -328,7 +332,12 @@ func (dp *downloadProgressReporter) ReportFailed(err error) {
 		percentComplete := downloaded / dp.length * 100.0
 		msg = "download from %s failed at %s/%s (%.2f%% complete) @ %sps: %s"
 		args = []interface{}{
-			dp.sourceURI, units.HumanSize(downloaded), units.HumanSize(dp.length), percentComplete, units.HumanSize(bytesPerSecond), err,
+			dp.sourceURI,
+			units.HumanSize(downloaded),
+			units.HumanSize(dp.length),
+			percentComplete,
+			units.HumanSize(bytesPerSecond),
+			err,
 		}
 	} else {
 		// length unknown so provide the amount downloaded and the speed
@@ -337,16 +346,17 @@ func (dp *downloadProgressReporter) ReportFailed(err error) {
 			dp.sourceURI, units.HumanSize(downloaded), units.HumanSize(bytesPerSecond), err,
 		}
 	}
-	dp.log.Infof(msg, args...)
+	dp.log.Errorf(msg, args...)
 	if timePast >= dp.warnTimeout {
 		// see reason in `Report`
 		dp.log.Warnf(msg, args...)
 	}
 }
 
-// progressLogger is a logger that only needs to implement Infof and Warnf, as those are the only functions
-// that the downloadProgressReporter uses.
+// progressLogger is a logger that only needs to implement Infof and Warnf and
+// Errorf as those are the only functions that the downloadProgressReporter uses.
 type progressLogger interface {
 	Infof(format string, args ...interface{})
 	Warnf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
 }

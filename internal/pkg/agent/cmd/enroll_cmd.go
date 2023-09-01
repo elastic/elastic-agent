@@ -269,9 +269,9 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 
 	defer func() {
 		if err != nil {
-			fmt.Fprintln(streams.Out, "Successfully enrolled the Elastic Agent.")
-		} else {
 			fmt.Fprintf(streams.Out, "Something went wrong while enrolling the Elastic Agent: %v\n", err)
+		} else {
+			fmt.Fprintln(streams.Out, "Successfully enrolled the Elastic Agent.")
 		}
 	}()
 

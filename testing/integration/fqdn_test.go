@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleet"
 	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -58,7 +59,7 @@ func TestFQDN(t *testing.T) {
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient))
+		assert.NoError(t, fleet.UnenrollAgent(info.KibanaClient))
 
 		t.Log("Restoring hostname...")
 		err := setHostname(context.Background(), origHostname, t.Log)
@@ -182,7 +183,7 @@ func verifyAgentName(t *testing.T, hostname string, kibClient *kibana.Client) *k
 	require.Eventually(
 		t,
 		func() bool {
-			agent, err = tools.GetAgentByHostnameFromList(kibClient, hostname)
+			agent, err = fleet.AgentByHostnameFromList(kibClient, hostname)
 			return err == nil && agent != nil
 		},
 		5*time.Minute,

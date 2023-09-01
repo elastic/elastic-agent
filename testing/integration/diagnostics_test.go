@@ -88,7 +88,7 @@ type componentAndUnitNames struct {
 
 func TestDiagnosticsOptionalValues(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local: true,
+		Local: false,
 	})
 
 	fixture, err := define.NewFixture(t, define.Version())
@@ -113,7 +113,7 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 
 func TestDiagnosticsCommand(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local: true,
+		Local: false,
 	})
 
 	f, err := define.NewFixture(t, define.Version())

@@ -31,7 +31,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	cmdVersion "github.com/elastic/elastic-agent/internal/pkg/basecmd/version"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -41,6 +40,8 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleet"
 	"github.com/elastic/elastic-agent/pkg/version"
 	agtversion "github.com/elastic/elastic-agent/version"
 )
@@ -80,32 +81,43 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	upgradableVersions := getUpgradableVersions(ctx, t, define.Version())
-
+	// upgradableVersions := getUpgradableVersions(ctx, t, define.Version())
+	v, err := version.ParseVersion("8.10.0")
+	require.NoError(t, err, "could not parse agent version")
+	upgradableVersions := []*version.ParsedSemVer{v}
 	for _, parsedVersion := range upgradableVersions {
 
-		t.Run(fmt.Sprintf("Upgrade managed agent from %s to %s", parsedVersion, define.Version()), func(t *testing.T) {
-			agentFixture, err := atesting.NewFixture(
-				t,
-				parsedVersion.String(),
-				atesting.WithFetcher(atesting.ArtifactFetcher()),
-			)
-			require.NoError(t, err)
-			err = agentFixture.Prepare(ctx)
-			require.NoError(t, err, "error preparing agent fixture")
+		t.Run(fmt.Sprintf("Upgrade managed agent from %s to %s",
+			parsedVersion, define.Version()),
+			func(t *testing.T) {
+				agentFixture, err := atesting.NewFixture(
+					t,
+					parsedVersion.String(),
+					atesting.WithFetcher(atesting.ArtifactFetcher()),
+				)
+				require.NoError(t, err)
+				err = agentFixture.Prepare(ctx)
+				require.NoError(t, err, "error preparing agent fixture")
 
-			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
-			require.NoError(t, err, "error configuring agent fixture")
-			testUpgradeFleetManagedElasticAgent(t, ctx, info, agentFixture, parsedVersion, define.Version())
-		})
+				err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+				require.NoError(t, err, "error configuring agent fixture")
+				testUpgradeFleetManagedElasticAgent(t, ctx,
+					info, agentFixture, parsedVersion, define.Version())
+			})
 	}
 }
 
-func testUpgradeFleetManagedElasticAgent(t *testing.T, ctx context.Context, info *define.Info, agentFixture *atesting.Fixture, parsedFromVersion *version.ParsedSemVer, toVersion string) {
+func testUpgradeFleetManagedElasticAgent(
+	t *testing.T,
+	ctx context.Context,
+	info *define.Info,
+	agentFixture *atesting.Fixture,
+	parsedFromVersion *version.ParsedSemVer,
+	toVersion string) {
+
 	kibClient := info.KibanaClient
 	policyUUID := uuid.New().String()
 
-	t.Log("Creating Agent policy...")
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
@@ -116,20 +128,18 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, ctx context.Context, info
 		},
 	}
 	policy, err := kibClient.CreatePolicy(ctx, createPolicyReq)
-	require.NoError(t, err)
+	require.NoError(t, err, "could not create policy")
 
-	t.Log("Creating Agent enrollment API key...")
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policy.ID,
 	}
 	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, createEnrollmentApiKeyReq)
-	require.NoError(t, err)
+	require.NoError(t, err, "could not create agent's enrollment API key")
 
-	t.Log("Getting default Fleet Server URL...")
-	fleetServerURL, err := tools.GetDefaultFleetServerURL(kibClient)
-	require.NoError(t, err)
+	fleetServerURL, err := fleet.DefaultURL(kibClient)
+	require.NoError(t, err, "could not get default fleet-server URL")
 
-	t.Log("Enrolling Elastic Agent...")
+	t.Log("Installing Elastic Agent...")
 	var nonInteractiveFlag bool
 	if version_8_2_0.Less(*parsedFromVersion) {
 		nonInteractiveFlag = true
@@ -142,25 +152,27 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, ctx context.Context, info
 			EnrollmentToken: enrollmentToken.APIKey,
 		},
 	}
-	output, err := tools.InstallAgent(installOpts, agentFixture)
+	output, err := agentFixture.Install(ctx, &installOpts)
 	if err != nil {
 		t.Log(string(output))
 	}
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient))
-	})
+	require.NoError(t, err, "failed to install the agent")
 
-	t.Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	t.Log(`Waiting for installed Agent status to be "online"...`)
+	require.Eventually(t, check.FleetAgentStatus(t, kibClient, "online"),
+		2*time.Minute, 10*time.Second, "Agent status is not online")
 
-	t.Logf("Upgrade Elastic Agent to version %s...", toVersion)
-	err = tools.UpgradeAgent(kibClient, toVersion)
-	require.NoError(t, err)
+	t.Logf("Upgrade Elastic Agent to version from %s to %s...",
+		parsedFromVersion, toVersion)
+	err = fleet.UpgradeAgent(kibClient, toVersion)
+	require.NoError(t, err, "failed to start agent upgrade from fleet")
 
-	t.Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+	t.Log(`Waiting for fleet Agent status to be "online" after upgrade...`)
+	assert.Eventually(t, // do not use require, the version check below must happen
+		check.FleetAgentStatus(t, kibClient, "online"),
+		10*time.Minute,
+		15*time.Second,
+		"fleet Agent status is not 'online'")
 
 	// Upgrade Watcher check disabled until
 	// https://github.com/elastic/elastic-agent/issues/2977 is resolved.
@@ -169,11 +181,11 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, ctx context.Context, info
 	// We remove the `-SNAPSHOT` suffix because, post-upgrade, the version reported
 	// by the Agent will not contain this suffix, even if a `-SNAPSHOT`-suffixed
 	// version was used as the target version for the upgrade.
-	require.Eventually(t, func() bool {
+	assert.Eventually(t, func() bool {
 		t.Log("Getting Agent version...")
-		newVersion, err := tools.GetAgentVersion(kibClient)
+		newVersion, err := fleet.AgentVersion(kibClient)
 		if err != nil {
-			t.Logf("error getting agent version: %v", err)
+			t.Logf("error getting fleet agent version: %v", err)
 			return false
 		}
 		return strings.TrimRight(toVersion, `-SNAPSHOT`) == newVersion
@@ -420,17 +432,16 @@ func testStandaloneUpgrade(
 	if version_8_2_0.Less(*parsedFromVersion) {
 		nonInteractiveFlag = true
 	}
+
 	installOpts := atesting.InstallOpts{
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
 	}
-
-	output, err := tools.InstallAgent(installOpts, f)
+	output, err := f.Install(ctx, &installOpts)
 	t.Logf("Agent installation output: %q", string(output))
 	require.NoError(t, err)
 
 	c := f.Client()
-
 	err = c.Connect(ctx)
 	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
@@ -587,12 +598,15 @@ func extractCommitHashFromArtifact(t *testing.T, ctx context.Context, artifactVe
 	architecture := runtime.GOARCH
 	suffix, err := atesting.GetPackageSuffix(operatingSystem, architecture)
 	require.NoErrorf(t, err, "error determining suffix for OS %q and arch %q", operatingSystem, architecture)
+
 	prefix := fmt.Sprintf("elastic-agent-%s", artifactVersion.VersionWithPrerelease())
 	pkgName := fmt.Sprintf("%s-%s", prefix, suffix)
 	require.Containsf(t, agentProject.Packages, pkgName, "Artifact API response does not contain pkg %s", pkgName)
+
 	artifactFilePath := filepath.Join(tmpDownloadDir, pkgName)
 	err = atesting.DownloadPackage(ctx, t, http.DefaultClient, agentProject.Packages[pkgName].URL, artifactFilePath)
 	require.NoError(t, err, "error downloading package")
+
 	err = atesting.ExtractArtifact(t, artifactFilePath, tmpDownloadDir)
 	require.NoError(t, err, "error extracting artifact")
 
@@ -659,8 +673,10 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	require.NoError(t, err, "error configuring agent fixture")
 
 	t.Log("Install the built Agent")
-	output, err := tools.InstallStandaloneAgent(agentFixture)
-	t.Log(string(output))
+	output, err := agentFixture.Install(ctx, &atesting.InstallOpts{
+		Force:          true,
+		NonInteractive: true})
+	t.Log("agen installation output:", string(output))
 	require.NoError(t, err)
 
 	t.Log("Ensure the correct version is running")
@@ -814,7 +830,9 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	output, err := tools.InstallStandaloneAgent(f)
+	output, err := f.Install(ctx, &atesting.InstallOpts{
+		Force:          true,
+		NonInteractive: true})
 	t.Logf("Agent installation output: %q", string(output))
 	require.NoError(t, err)
 

@@ -81,8 +81,12 @@ func (i InstallOpts) toCmdArgs() []string {
 	return args
 }
 
-// Install installs the prepared Elastic Agent binary and returns:
-//   - the combined output of stdout and stderr
+// Install installs the prepared Elastic Agent binary and registers a t.Cleanup
+// function to uninstall the agent if it hasn't been uninstalled. It also takes
+// cate of collecting a diagnostics when AGENT_COLLECT_DIAG=true or the test
+// has failed.
+// It returns:
+//   - the combined output of Install command stdout and stderr
 //   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	installArgs := []string{"install"}
@@ -114,7 +118,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 		}
 
 		// diagnostics is collected when either the environment variable
-		// AGENT_KEEP_INSTALLED=true or the test is marked failed
+		// AGENT_COLLECT_DIAG=true or the test is marked failed
 		collect := collectDiag()
 		failed := f.t.Failed()
 		if collect || failed {
@@ -221,11 +225,13 @@ func (f *Fixture) collectDiagnostics() {
 		f.t.Logf("failed to collect diagnostics; failed to create %s: %s", diagPath, err)
 		return
 	}
-	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", f.t.Name(), time.Now().Format(time.RFC3339)))
+	outputPath := filepath.Join(diagPath,
+		fmt.Sprintf("%s-diagnostics-%s.zip", f.t.Name(), time.Now().Format(time.RFC3339)))
 
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
 	if err != nil {
-		f.t.Logf("failed to collect diagnostics to %s (%s): %s", outputPath, err, output)
+		f.t.Logf("failed to collect diagnostics to %s. err: %v: output: %q",
+			outputPath, err, output)
 	}
 }
 
