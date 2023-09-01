@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -28,7 +29,7 @@ var (
 	packageVersion = ""
 )
 
-const PackageVersionFileName = ".package.version"
+const PackageVersionFileName = "package.version"
 
 // InitVersionInformation initialize the package version string reading from the
 // corresponding file. This function is not thread-safe and should be called once
@@ -50,7 +51,7 @@ func InitVersionInformation() error {
 	return nil
 }
 
-// GetAgentPackageVersion retrieves the version saved in .package.version in the same
+// GetAgentPackageVersion retrieves the version saved in package.version in the same
 // directory as the agent executable.
 // This function must be called AFTER InitVersionInformation() has initialized the module vars
 func GetAgentPackageVersion() string {
@@ -64,7 +65,19 @@ func GetAgentPackageVersionFilePath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("detecting current executable path: %w", err)
 	}
-	return filepath.Join(filepath.Dir(execPath), PackageVersionFileName), nil
+
+	dirPath := filepath.Dir(execPath)
+
+	if runtime.GOOS == "darwin" {
+		// On Mac the path is different because of package signing issues
+		// we have to go outside the elastic-agent.app directory
+		appDirIndex := strings.Index(dirPath, "/elastic-agent.app/")
+		if appDirIndex != -1 {
+			dirPath = dirPath[:appDirIndex]
+		}
+	}
+
+	return filepath.Join(dirPath, PackageVersionFileName), nil
 }
 
 func getCurrentExecutablePath() (string, error) {

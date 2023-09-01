@@ -271,8 +271,8 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	}()
 
 	if c.agentProc == nil {
-		if c.daemonReload(ctx) != nil {
-			c.log.Info("Elastic Agent might not be running; unable to trigger restart")
+		if err := c.daemonReload(ctx); err != nil {
+			c.log.Infow("Elastic Agent might not be running; unable to trigger restart", "error", err)
 		} else {
 			c.log.Info("Successfully triggered restart on running Elastic Agent.")
 		}

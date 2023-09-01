@@ -44,9 +44,3 @@ func postInstall(topPath string) error {
 
 	return nil
 }
-
-// checkPackageInstall is used for unix based systems to see if the Elastic-Agent was installed through a package manager.
-// returns false
-func checkPackageInstall() bool {
-	return false
-}

@@ -2,12 +2,11 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build !windows
+//go:build windows
 
-package install
+package pkgmgr
 
-// postInstall performs post installation for unix-based systems.
-func postInstall(topPath string) error {
-	// do nothing
-	return nil
+// InstalledViaExternalPkgMgr returns false under windows
+func InstalledViaExternalPkgMgr() bool {
+	return false
 }
