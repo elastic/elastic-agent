@@ -413,7 +413,9 @@ func TestPatchAPMConfig(t *testing.T) {
                       - https://apmhost1:443
                       environment: test-apm
                       secret_token: secret
-                      global_labels: "key1=value1,key2=value2"
+                      global_labels:
+                        key1: value1
+                        key2: value2
                       tls:
                         skip_verify: true
                   `,
@@ -431,7 +433,9 @@ func TestPatchAPMConfig(t *testing.T) {
                     environment: test-apm
                     api_key: ""
                     secret_token: secret
-                    global_labels: "key1=value1,key2=value2"
+                    global_labels:
+                      key1: value1
+                      key2: value2
                     tls:
                       skip_verify: true
                       server_ca: ""

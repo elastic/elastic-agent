@@ -5,6 +5,9 @@
 package runtime
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -23,7 +26,7 @@ func MapAPMConfig(conf *config.APMConfig) *proto.APMConfig {
 		ApiKey:       conf.APIKey,
 		SecretToken:  conf.SecretToken,
 		Hosts:        append([]string{}, conf.Hosts...),
-		GlobalLabels: conf.GlobalLabels,
+		GlobalLabels: buildGlobalLabelsString(conf.GlobalLabels),
 	}
 
 	if conf.TLS != zeroElasticAPMTLS {
@@ -36,4 +39,32 @@ func MapAPMConfig(conf *config.APMConfig) *proto.APMConfig {
 	}
 
 	return &proto.APMConfig{Elastic: elasticAPMConf}
+}
+
+func buildGlobalLabelsString(labels map[string]string) string {
+	const separator = ","
+
+	if len(labels) == 0 {
+		return ""
+	}
+
+	//prepare sorted keys to make output deterministic
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	// create the key=value string
+	buf := new(strings.Builder)
+	for _, k := range keys {
+		if buf.Len() > 0 {
+			buf.WriteString(separator)
+		}
+		buf.WriteString(k)
+		buf.WriteString("=")
+		buf.WriteString(labels[k])
+	}
+	return buf.String()
 }

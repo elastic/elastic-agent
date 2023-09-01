@@ -104,7 +104,9 @@ agent:
       environment: diag-unit-test
       apikey: apikey
       secrettoken: secret
-      globallabels: "k1=b1,k2=v2"
+      globallabels:
+        k1: v1
+        k2: v2
       tls:
         skipverify: false
         servercertificate: "/path/to/server/cert"
