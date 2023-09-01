@@ -40,6 +40,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/env"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -58,7 +59,7 @@ const (
 
 type cfgOverrider func(cfg *configuration.Configuration)
 
-func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
+func newRunCommandWithArgs(_ []string, streams *cli.IOStreams, isOperator bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Start the Elastic Agent",
@@ -71,10 +72,12 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			}
 			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
-			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
+
+			if err := run(nil, testingMode, fleetInitTimeout, isOperator); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 
 				return err
+
 			}
 			return nil
 		},
@@ -97,7 +100,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
+func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration, isOperator bool, modifiers ...component.PlatformModifier) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -240,7 +243,26 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	var applicationCtor func(
+		ctx context.Context,
+		log *logger.Logger,
+		baseLogger *logger.Logger,
+		logLevel logp.Level,
+		agentInfo *info.AgentInfo,
+		reexec coordinator.ReExecManager,
+		tracer *apm.Tracer,
+		testingMode bool,
+		fleetInitTimeout time.Duration,
+		disableMonitoring bool,
+		modifiers ...component.PlatformModifier,
+	) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error)
+	if isOperator {
+		applicationCtor = application.NewOperator
+	} else {
+		applicationCtor = application.New
+	}
+
+	coord, configMgr, composable, err := applicationCtor(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}

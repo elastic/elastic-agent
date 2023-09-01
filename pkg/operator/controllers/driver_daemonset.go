@@ -223,7 +223,7 @@ func podTemplate(ctx context.Context,
 
 	agentContainer := corev1.Container{
 		Name:  name,
-		Image: fmt.Sprintf("%s:%s", AgentContainerImageName, "8.10.0-SNAPSHOT"), // version),
+		Image: fmt.Sprintf("%s:%s", AgentContainerImageName, "8.11.0-SNAPSHOT"), // version),
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      ConfigVolumeName,

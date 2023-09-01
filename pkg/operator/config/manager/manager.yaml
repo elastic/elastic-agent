@@ -68,15 +68,13 @@ spec:
       serviceAccountName: controller-manager
       containers:
         - name: manager
-          image: docker.elastic.co/beats/elastic-agent:8.10.0-SNAPSHOT
+          image: docker.elastic.co/beats/elastic-agent-operator:8.11.0-SNAPSHOT
           args: [
             "./elastic-agent",
             "-c", "/etc/elastic-agent/agent.yml",
             "-e",
           ]
           env:
-            - name: IS_OPERATOR
-              value: "true"
             - name: ES_USERNAME
               value: elastic
             - name: ES_PASSWORD

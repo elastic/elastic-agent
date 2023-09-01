@@ -248,6 +248,19 @@ func (Build) Binary() error {
 	return devtools.Build(buildArgs)
 }
 
+// Binary build the fleet artifact.
+func (Build) Operator() error {
+	mg.Deps(Prepare.Env)
+
+	buildArgs := devtools.DefaultBuildArgs()
+	buildArgs.Name += "-operator"
+	buildArgs.InputFiles = []string{filepath.Join("cmd", "operator", "main.go")}
+	buildArgs.OutputDir = buildDir
+	injectBuildVars(buildArgs.Vars)
+
+	return devtools.Build(buildArgs)
+}
+
 // Clean up dev environment.
 func (Build) Clean() {
 	os.RemoveAll(buildDir)
@@ -551,7 +564,15 @@ func Update() {
 
 // CrossBuild cross-builds the beat for all target platforms.
 func CrossBuild() error {
-	return devtools.CrossBuild()
+	if err := devtools.CrossBuild(); err != nil {
+		return err
+	}
+	err := devtools.CrossBuild(devtools.InDir("cmd", "operator"))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // CrossBuildGoDaemon cross-builds the go-daemon binary using Docker.

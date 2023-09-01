@@ -56,5 +56,3 @@ spec:
               value: "127.0.0.1:8080"
             - name: LEADER_ELECT
               value: "false"
-            - name: IS_OPERATOR
-              value: "true"

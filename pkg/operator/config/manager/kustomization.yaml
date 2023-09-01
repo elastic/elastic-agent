@@ -4,5 +4,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: docker.elastic.co/beats/elastic-agent
-  newTag: 8.10.0-SNAPSHOT
+  newName: docker.elastic.co/beats/elastic-agent-operator
+  newTag: 8.11.0-SNAPSHOT

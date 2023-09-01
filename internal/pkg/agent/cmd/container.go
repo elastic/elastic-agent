@@ -53,7 +53,7 @@ var (
 	tokenNameStrip = regexp.MustCompile(`\s\([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\)$`)
 )
 
-func newContainerCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
+func newContainerCommand(_ []string, streams *cli.IOStreams, isOperator bool) *cobra.Command {
 	cmd := cobra.Command{
 		Hidden: true, // not exposed over help; used by container entrypoint only
 		Use:    "container",
@@ -134,7 +134,7 @@ all the above actions will be skipped, because the Elastic Agent has already bee
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
 		Run: func(c *cobra.Command, args []string) {
-			if err := logContainerCmd(streams); err != nil {
+			if err := logContainerCmd(streams, isOperator); err != nil {
 				logError(streams, err)
 				os.Exit(1)
 			}
@@ -151,7 +151,7 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 	fmt.Fprintln(streams.Out, a...)
 }
 
-func logContainerCmd(streams *cli.IOStreams) error {
+func logContainerCmd(streams *cli.IOStreams, isOperator bool) error {
 	logsPath := env.WithDefault("", "LOGS_PATH")
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams
@@ -167,10 +167,10 @@ func logContainerCmd(streams *cli.IOStreams) error {
 		streams.Out = io.MultiWriter(streams.Out, w)
 		streams.Err = io.MultiWriter(streams.Out, w)
 	}
-	return containerCmd(streams)
+	return containerCmd(streams, isOperator)
 }
 
-func containerCmd(streams *cli.IOStreams) error {
+func containerCmd(streams *cli.IOStreams, isOperator bool) error {
 	// set paths early so all action below use the defined paths
 	if err := setPaths("", "", "", true); err != nil {
 		return err
@@ -249,14 +249,14 @@ func containerCmd(streams *cli.IOStreams) error {
 
 	if runAgent {
 		// run the main elastic-agent container command
-		err = runContainerCmd(streams, cfg)
+		err = runContainerCmd(streams, cfg, isOperator)
 	}
 	// wait until APM Server shut down
 	wg.Wait()
 	return err
 }
 
-func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
+func runContainerCmd(streams *cli.IOStreams, cfg setupConfig, isOperator bool) error {
 	var err error
 	var client *kibana.Client
 	executable, err := os.Executable()
@@ -269,7 +269,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(logToStderr, false, initTimeout, isContainer)
+		return run(logToStderr, false, initTimeout, isOperator, isContainer)
 	}
 
 	if cfg.FleetServer.Enable {
@@ -322,7 +322,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(logToStderr, false, initTimeout, isContainer)
+	return run(logToStderr, false, initTimeout, isOperator, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token

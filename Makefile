@@ -74,7 +74,7 @@ get-version:
 	@mage dumpVariables | grep 'beat_version' | cut -d"=" -f 2 | tr -d " "
 
 
-IMG ?= docker.elastic.co/beats/elastic-agent:8.10.0-SNAPSHOT
+IMG ?= docker.elastic.co/beats/elastic-agent-operator:8.11.0-SNAPSHOT
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
