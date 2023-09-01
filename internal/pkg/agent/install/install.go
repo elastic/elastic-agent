@@ -250,7 +250,7 @@ func verifyDirectory(dir string) error {
 func HasAllSSDs() bool {
 	block, err := ghw.Block()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "HasAllSSDs: ghw.Block() returned error: %s\n", err.Error())
+		//fmt.Fprintf(os.Stdout, "HasAllSSDs: ghw.Block() returned error: %s\n", err.Error())
 		return false
 	}
 
@@ -258,18 +258,18 @@ func HasAllSSDs() bool {
 		switch disk.DriveType {
 		case ghw.DRIVE_TYPE_FDD, ghw.DRIVE_TYPE_ODD:
 			// Floppy or optical drive; we don't care about these
-			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a FDD or ODD\n", disk.Name)
+			//fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a FDD or ODD\n", disk.Name)
 			continue
 		case ghw.DRIVE_TYPE_SSD:
 			// SSDs
-			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a SSD\n", disk.Name)
+			//fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a SSD\n", disk.Name)
 			continue
 		case ghw.DRIVE_TYPE_HDD:
 			// HDD (spinning hard disk)
-			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a HDD\n", disk.Name)
+			//fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a HDD\n", disk.Name)
 			return false
 		default:
-			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is of unknown type\n", disk.Name)
+			//fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is of unknown type\n", disk.Name)
 			return false
 		}
 	}
