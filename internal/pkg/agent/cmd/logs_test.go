@@ -38,10 +38,10 @@ func TestGetLogFilenames(t *testing.T) {
 	t.Run("returns the correct sorted filelist", func(t *testing.T) {
 		dir := t.TempDir()
 
-		createFile(t, dir, file2)
-		createFile(t, dir, file)
-		createFile(t, dir, file1)
-		createFile(t, dir, file3)
+		createFileEmpty(t, dir, file2)
+		createFileEmpty(t, dir, file)
+		createFileEmpty(t, dir, file1)
+		createFileEmpty(t, dir, file3)
 
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
@@ -62,14 +62,14 @@ func TestGetLogFilenames(t *testing.T) {
 		prevDayFile2 := "elastic-agent-20230529-2.ndjson"
 		prevDayFile3 := "elastic-agent-20230529-3.ndjson"
 
-		createFile(t, dir, file2)
-		createFile(t, dir, file)
-		createFile(t, dir, prevDayFile1)
-		createFile(t, dir, file1)
-		createFile(t, dir, prevDayFile)
-		createFile(t, dir, prevDayFile2)
-		createFile(t, dir, file3)
-		createFile(t, dir, prevDayFile3)
+		createFileEmpty(t, dir, file2)
+		createFileEmpty(t, dir, file)
+		createFileEmpty(t, dir, prevDayFile1)
+		createFileEmpty(t, dir, file1)
+		createFileEmpty(t, dir, prevDayFile)
+		createFileEmpty(t, dir, prevDayFile2)
+		createFileEmpty(t, dir, file3)
+		createFileEmpty(t, dir, prevDayFile3)
 
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
@@ -99,7 +99,7 @@ func TestGetLogFilenames(t *testing.T) {
 
 	t.Run("does not return non-log entries", func(t *testing.T) {
 		dir := t.TempDir()
-		createFile(t, dir, "excluded")
+		createFileEmpty(t, dir, "excluded")
 
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
@@ -109,7 +109,7 @@ func TestGetLogFilenames(t *testing.T) {
 
 	t.Run("returns a list of one", func(t *testing.T) {
 		dir := t.TempDir()
-		createFile(t, dir, file1)
+		createFileEmpty(t, dir, file1)
 
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
@@ -539,7 +539,7 @@ func generateLines(prefix string, start, end int) string {
 	return b.String()
 }
 
-func createFile(t *testing.T, dir, name string) {
+func createFileEmpty(t *testing.T, dir, name string) {
 	createFileContent(t, dir, name, nil)
 }
 
