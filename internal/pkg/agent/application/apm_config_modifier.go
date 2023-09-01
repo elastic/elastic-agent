@@ -11,7 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	moncfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	monitoringcfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
@@ -24,7 +24,7 @@ func InjectAPMConfig(comps []component.Component, cfg map[string]interface{}) ([
 
 	tracesEnabled, err := getAPMTracesEnabled(cfg)
 	if err != nil {
-		return comps, fmt.Errorf("error retrieving traces flag: %w", err)
+		return comps, fmt.Errorf("error retrieving APM traces flag: %w", err)
 	}
 
 	if !tracesEnabled {
@@ -74,13 +74,12 @@ func getAPMTracesEnabled(cfg map[string]any) (bool, error) {
 	return traceEnabled, nil
 }
 
-func getAPMConfigFromMap(cfg map[string]any) (*moncfg.APMConfig, error) {
+func getAPMConfigFromMap(cfg map[string]any) (*monitoringcfg.APMConfig, error) {
 	nestedValue, err := utils.GetNestedMap(cfg, "agent", "monitoring", "apm")
 	if errors.Is(err, utils.ErrKeyNotFound) {
 		// No APM config found, nothing to do
 		return nil, nil
 	}
-
 	if err != nil {
 		return nil, fmt.Errorf("error traversing config: %w", err)
 	}
@@ -90,12 +89,12 @@ func getAPMConfigFromMap(cfg map[string]any) (*moncfg.APMConfig, error) {
 		return nil, fmt.Errorf("the retrieved apm configs is not a map: %T", nestedValue)
 	}
 
-	monitoringConfig := new(moncfg.APMConfig)
 	newConfigFrom, err := config.NewConfigFrom(rawApmConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing apm config: %w", err)
 	}
 
+	monitoringConfig := new(monitoringcfg.APMConfig)
 	err = newConfigFrom.Unpack(monitoringConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error unpacking apm config: %w", err)
@@ -121,7 +120,6 @@ func PatchAPMConfig(log *logger.Logger, rawConfig *config.Config) func(change co
 	}
 
 	apmConfig, err := getAPMConfigFromMap(configMap)
-
 	if err != nil {
 		log.Errorf("error retrieving apm config, patching disabled: %v", err)
 		return noop

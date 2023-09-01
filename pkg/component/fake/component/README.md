@@ -4,7 +4,7 @@ Controllable through GRPC control protocol with actions. Allows tests to simulat
 
 
 ## How to use the fake component
-If we need to use the fake component for a manual test, we need to build it suing
+If we need to use the fake component for a manual test, we need to build it using
 `mage build:testbinaries`
 and then we have to drop the binary and its corresponding spec file (see example below) in the
 `elastic-agent-<unique suffix>/data/components` directory.

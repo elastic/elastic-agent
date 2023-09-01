@@ -15,7 +15,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
 	"github.com/elastic/elastic-agent/pkg/limits"
 )
 

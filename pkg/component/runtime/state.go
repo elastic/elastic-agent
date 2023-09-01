@@ -13,7 +13,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 

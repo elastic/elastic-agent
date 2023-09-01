@@ -67,7 +67,7 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 					APIKey:       "apikey",
 					SecretToken:  "secret",
 					Hosts:        []string{"host1", "host2"},
-					GlobalLabels: "k1=b1,k2=v2",
+					GlobalLabels: map[string]string{"k1": "v1", "k2": "v2"},
 					TLS: monitoringCfg.APMTLS{
 						SkipVerify:        false,
 						ServerCertificate: "/path/to/server/cert",

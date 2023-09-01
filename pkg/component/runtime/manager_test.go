@@ -492,7 +492,7 @@ func TestManager_FakeInput_APM(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agentInfo, _ := info.NewAgentInfo(true)
+	agentInfo, _ := info.NewAgentInfo(ctx, true)
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
@@ -578,7 +578,7 @@ func TestManager_FakeInput_APM(t *testing.T) {
 	go func() {
 		sub := m.Subscribe(subscriptionCtx, compID)
 		var healthIteration int
-
+		var retrievedApmConfig *proto.APMConfig
 		for {
 			select {
 			case <-subscriptionCtx.Done():
@@ -619,15 +619,15 @@ func TestManager_FakeInput_APM(t *testing.T) {
 					// check if config sent on iteration 1 was set
 					case 2:
 						// In the previous iteration, the (fake) component has received a CheckinExpected
-						// message to propagate the APM configuration.  In this iteration we are about to
+						// message to propagate the APM configuration. In this iteration we are about to
 						// retrieve the APM configuration from the same component via the retrieve_apm_config
 						// action. Within the component, which is running as a separate process, actions
-						// and CheckinExpected messages are processed concurrently.  We need some way to wait
+						// and CheckinExpected messages are processed concurrently. We need some way to wait
 						// a reasonably short amount of time for the CheckinExpected message to be applied by the
 						// component (thus setting the APM config) before we query the same component
-						// for apm config information.  We accomplish this via assert.Eventually.
+						// for apm config information. We accomplish this via assert.Eventually.
 						// We also send a modified APM config to see that the component updates correctly and
-						// reports the new config in the next iteration
+						// reports the new config in the next iteration.
 						assert.Eventuallyf(t, func() bool {
 							// check the component
 							res, err := m.PerformAction(
@@ -641,14 +641,14 @@ func TestManager_FakeInput_APM(t *testing.T) {
 									healthIteration, fakecmp.ActionRetrieveAPMConfig, err)
 								return false
 							}
-							retrievedApmConfig, err := extractAPMConfigFromActionResult(t, res)
+							retrievedApmConfig, err = extractAPMConfigFromActionResult(t, res)
 							if err != nil {
 								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to retrieve APM Config from ActionResult %s: %w",
 									healthIteration, fakecmp.ActionRetrieveAPMConfig, err)
 								return false
 							}
 							return gproto.Equal(initialAPMConfig, retrievedApmConfig)
-						}, 1*time.Second, 100*time.Millisecond, "APM config was not received by component. expected: %s", initialAPMConfig)
+						}, 1*time.Second, 100*time.Millisecond, "APM config was not received by component. expected: %s actual: %s", initialAPMConfig, retrievedApmConfig)
 
 						comp.Component = &proto.Component{
 							ApmConfig: modifiedAPMConfig,
@@ -662,7 +662,7 @@ func TestManager_FakeInput_APM(t *testing.T) {
 					// Set a new APM config to check that we update correctly
 					case 3:
 						// In the previous iteration, the (fake) component has received another CheckinExpected
-						// message to propagate a modified APM configuration.  In this iteration we are about to
+						// message to propagate a modified APM configuration. In this iteration we are about to
 						// retrieve the APM configuration from the same component via the retrieve_apm_config
 						// action.
 						assert.Eventuallyf(t, func() bool {
@@ -679,7 +679,7 @@ func TestManager_FakeInput_APM(t *testing.T) {
 								return false
 							}
 
-							retrievedApmConfig, err := extractAPMConfigFromActionResult(t, res)
+							retrievedApmConfig, err = extractAPMConfigFromActionResult(t, res)
 							if err != nil {
 								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to retrieve APM Config from ActionResult %s: %w",
 									healthIteration, fakecmp.ActionRetrieveAPMConfig, err)
@@ -687,7 +687,7 @@ func TestManager_FakeInput_APM(t *testing.T) {
 							}
 
 							return gproto.Equal(modifiedAPMConfig, retrievedApmConfig)
-						}, 1*time.Second, 100*time.Millisecond, "APM config was not received by component. expected: %s", modifiedAPMConfig)
+						}, 1*time.Second, 100*time.Millisecond, "APM config was not received by component. expected: %s actual: %s", modifiedAPMConfig, retrievedApmConfig)
 
 						comp.Component = &proto.Component{
 							ApmConfig: nil,
@@ -718,14 +718,14 @@ func TestManager_FakeInput_APM(t *testing.T) {
 								return false
 							}
 
-							retrievedApmConfig, err := extractAPMConfigFromActionResult(t, res)
+							retrievedApmConfig, err = extractAPMConfigFromActionResult(t, res)
 							if err != nil {
 								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to retrieve APM Config from ActionResult %s: %w",
 									healthIteration, fakecmp.ActionRetrieveAPMConfig, err)
 								return false
 							}
 							return retrievedApmConfig == nil
-						}, 1*time.Second, 100*time.Millisecond, "APM config was not received by component. expected: nil")
+						}, 1*time.Second, 100*time.Millisecond, "APM config was not received by component. expected: nil actual: %s", retrievedApmConfig)
 
 						doneCh <- struct{}{}
 					}
@@ -793,15 +793,12 @@ func extractAPMConfigFromActionResult(t *testing.T, res map[string]interface{}) 
 	if !ok {
 		return nil, fmt.Errorf("ActionResult for %s does not contain top level key %s", fakecmp.ActionRetrieveAPMConfig, "apm")
 	}
-	t.Logf("retrieved APM config: %v", apmCfg)
-
 	if apmCfg == nil {
 		// the APM config is not set on the component
 		return nil, nil
 	}
 
 	jsonApmConfig, ok := apmCfg.(string)
-
 	if !ok {
 		return nil, fmt.Errorf("ActionResult for %s does not contain a string value: %T", fakecmp.ActionRetrieveAPMConfig, apmCfg)
 	}

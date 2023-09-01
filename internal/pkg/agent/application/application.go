@@ -140,8 +140,6 @@ func New(
 			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
 			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
 		}
-
-		compModifiers = append(compModifiers)
 	} else {
 		isManaged = true
 		var store storage.Store

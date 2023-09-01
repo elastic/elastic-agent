@@ -68,15 +68,7 @@ func run() error {
 		case <-ctx.Done():
 			return nil
 		case change := <-c.UnitChanges():
-			logger.Info().Msgf("Received change: %+v", change)
-			if change.Unit != nil {
-				logger.Info().Msgf("unit: %+v", change.Unit)
-				if change.Unit.Expected().APMConfig != nil {
-					logger.Info().Msgf("apmConfig: %+v", change.Unit.Expected().APMConfig)
-				}
-			}
 			handleChange(logger, s, change)
-
 		case err := <-c.Errors():
 			if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
 				fmt.Fprintf(os.Stderr, "GRPC client error: %+v\n", err)

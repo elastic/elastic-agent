@@ -17,7 +17,7 @@ var zeroElasticAPMTLS = config.APMTLS{}
 
 func MapAPMConfig(conf *config.APMConfig) *proto.APMConfig {
 	if conf == nil {
-		// component apm config is nil, so the pb config is nil as well
+		// component apm config is nil, so the protobuf config is nil as well
 		return nil
 	}
 
@@ -25,7 +25,7 @@ func MapAPMConfig(conf *config.APMConfig) *proto.APMConfig {
 		Environment:  conf.Environment,
 		ApiKey:       conf.APIKey,
 		SecretToken:  conf.SecretToken,
-		Hosts:        append([]string{}, conf.Hosts...),
+		Hosts:        conf.Hosts,
 		GlobalLabels: buildGlobalLabelsString(conf.GlobalLabels),
 	}
 

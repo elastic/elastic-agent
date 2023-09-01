@@ -7,9 +7,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/rs/zerolog"
+
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
 
@@ -143,7 +145,6 @@ func (ats *apmTracesSender) createNewTracer(cfg *proto.APMConfig) (*apm.Tracer, 
 			}
 			hosts = append(hosts, u)
 		}
-		fmt.Printf("Setting apm hosts to %v", hosts)
 		ts.SetServerURL(hosts...)
 	}
 	if cfg.Elastic.ApiKey != "" {

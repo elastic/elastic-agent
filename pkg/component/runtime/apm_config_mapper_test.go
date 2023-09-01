@@ -3,9 +3,9 @@ package runtime
 import (
 	"testing"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 )
 
