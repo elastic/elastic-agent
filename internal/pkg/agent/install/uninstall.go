@@ -103,7 +103,7 @@ func RemovePath(path string) error {
 	}
 
 	const arbitraryTimeout = 7 * time.Second
-	const nextSleep = 100 * time.Millisecond
+	const nextSleep = 500 * time.Millisecond
 	t := time.NewTicker(nextSleep)
 	defer t.Stop()
 	start := time.Now()
