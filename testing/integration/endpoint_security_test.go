@@ -469,7 +469,29 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 		}
 
 		t.Log("Found directory", f.Name())
-		require.False(t, strings.Contains(f.Name(), "Endpoint"), "Endpoint directory was not removed")
+		// If Endpoint was not currently removed, let's see what was left
+		if strings.Contains(f.Name(), "Endpoint") {
+			info, err := f.Info()
+			if err != nil {
+				t.Logf("could not get file info for %q to check what was left"+
+					"behind: %v", f.Name(), err)
+			}
+			ls, err := os.ReadDir(info.Name())
+			if err != nil {
+				t.Logf("could not list fileson for %q to check what was left"+
+					"behind: %v", f.Name(), err)
+			}
+			var dirEntries []string
+			for _, de := range ls {
+				dirEntries = append(dirEntries, de.Name())
+			}
+
+			if len(dirEntries) == 0 {
+				t.Fatalf("Endpoint directory was not removed, but it's empty")
+			}
+			t.Fatalf("Endpoint directory was not removed, the directory content is: %s",
+				strings.Join(dirEntries, ", "))
+		}
 	}
 }
 
