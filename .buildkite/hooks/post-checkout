@@ -47,7 +47,11 @@ MERGE_BRANCH="pr_merge_${PR_ID}"
 checkout_merge "${TARGET_BRANCH}" "${PR_COMMIT}" "${MERGE_BRANCH}"
 
 echo "Commit information"
+<<<<<<< HEAD
 git log --format=%B -n 1
+=======
+git --no-pager log --format=%B -n 1
+>>>>>>> 2e9a256297 (Sonarqube buildkite integration (#3108))
 
 # Ensure buildkite groups are rendered
 echo ""
