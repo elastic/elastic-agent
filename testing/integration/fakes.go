@@ -14,6 +14,8 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
+const fakeShipperName = "fake-shipper"
+
 var fakeComponentPltfs = []string{
 	"container/amd64",
 	"container/arm64",
@@ -35,7 +37,7 @@ var fakeComponent = atesting.UsableComponent{
 				Description: "A fake input",
 				Platforms:   fakeComponentPltfs,
 				Shippers: []string{
-					"fake-shipper",
+					fakeShipperName,
 				},
 				Command: &component.CommandSpec{},
 			},
@@ -44,7 +46,7 @@ var fakeComponent = atesting.UsableComponent{
 				Description: "Fake component apm traces generator",
 				Platforms:   fakeComponentPltfs,
 				Shippers: []string{
-					"fake-shipper",
+					fakeShipperName,
 				},
 				Command: &component.CommandSpec{},
 			},
@@ -53,13 +55,13 @@ var fakeComponent = atesting.UsableComponent{
 }
 
 var fakeShipper = atesting.UsableComponent{
-	Name:       "fake-shipper",
+	Name:       fakeShipperName,
 	BinaryPath: mustAbs(filepath.Join("..", "..", "pkg", "component", "fake", "shipper", osExt("shipper"))),
 	Spec: &component.Spec{
 		Version: 2,
 		Shippers: []component.ShipperSpec{
 			{
-				Name:        "fake-shipper",
+				Name:        fakeShipperName,
 				Description: "A fake shipper",
 				Platforms: []string{
 					"container/amd64",
