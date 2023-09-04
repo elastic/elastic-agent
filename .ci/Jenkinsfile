@@ -160,7 +160,7 @@ pipeline {
               }
             }
             steps {
-              runK8s(k8sVersion: 'v1.26.0', kindVersion: 'v0.17.0', context: "K8s-${PLATFORM}")
+              runK8s(k8sVersion: 'v1.27.3', kindVersion: 'v0.20.0', context: "K8s-${PLATFORM}")
             }
           }
           stage('Package') {
@@ -232,7 +232,7 @@ pipeline {
         axes {
           axis {
             name 'K8S_VERSION'
-            values "v1.26.0","v1.25.0","v1.24.3", "v1.23.6"
+            values "v1.27.3","v1.26.6","v1.25.11"
           }
         }
         stages {
@@ -240,7 +240,7 @@ pipeline {
             steps {
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.17.0', context: "K8s-${K8S_VERSION}")
+              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.20.0', context: "K8s-${K8S_VERSION}")
             }
             post {
               always {
