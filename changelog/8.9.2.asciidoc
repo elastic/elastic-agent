@@ -23,7 +23,7 @@ Review important information about the  8.9.2 release.
 
 elastic-agent::
 
-* Adds More Logging To The Rollback Process. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3245[#https://github.com/elastic/elastic-agent/pull/3245] 
+* Adds logging to the restart step of the Agent upgrade rollback process. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3245[#https://github.com/elastic/elastic-agent/pull/3245] 
 
 
 
@@ -35,6 +35,6 @@ elastic-agent::
 
 Uninstaller::
 
-* Correctly Identify Retryable Errors When Attempting To Uninstall On Windows. {Uninstaller-pull}https://github.com/elastic/elastic-agent/pull/3317[#https://github.com/elastic/elastic-agent/pull/3317] 
+* Correctly identify retryable errors when attempting to uninstall on Windows. {Uninstaller-pull}https://github.com/elastic/elastic-agent/pull/3317[#https://github.com/elastic/elastic-agent/pull/3317] 
 
 // end 8.9.2 relnotes
