@@ -181,14 +181,15 @@ func testUpgradeFleetManagedElasticAgent(
 	// We remove the `-SNAPSHOT` suffix because, post-upgrade, the version reported
 	// by the Agent will not contain this suffix, even if a `-SNAPSHOT`-suffixed
 	// version was used as the target version for the upgrade.
-	assert.Eventually(t, func() bool {
-		t.Log("Getting Agent version...")
-		newVersion, err := fleet.AgentVersion(kibClient)
+	require.Eventually(t, func() bool {
+		gotVersion, err := fleet.AgentVersion(kibClient)
 		if err != nil {
 			t.Logf("error getting fleet agent version: %v", err)
 			return false
 		}
-		return strings.TrimRight(toVersion, `-SNAPSHOT`) == newVersion
+		t.Logf("Agent version on fleet %q, want %q...",
+			gotVersion, toVersion)
+		return strings.TrimRight(toVersion, `-SNAPSHOT`) == gotVersion
 	}, 5*time.Minute, time.Second)
 }
 
