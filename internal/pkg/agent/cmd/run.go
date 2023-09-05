@@ -130,7 +130,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
 
-	cfg, err := loadConfig(override)
+	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		return err
 	}
@@ -143,6 +143,9 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	if err != nil {
 		return err
 	}
+
+	// Make sure to flush any buffered logs before we're done.
+	defer baseLogger.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
 	l := baseLogger.With("log", map[string]interface{}{
 		"source": agentName,
@@ -166,7 +169,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	// The secret is not created here if it exists already from the previous enrollment.
 	// This is needed for compatibility with agent running in standalone mode,
 	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
-	err = secret.CreateAgentSecret()
+	err = secret.CreateAgentSecret(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read/write secrets: %w", err)
 	}
@@ -174,18 +177,18 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	// Migrate .yml files if the corresponding .enc does not exist
 
 	// the encrypted config does not exist but the unencrypted file does
-	err = migration.MigrateToEncryptedConfig(l, paths.AgentConfigYmlFile(), paths.AgentConfigFile())
+	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentConfigYmlFile(), paths.AgentConfigFile())
 	if err != nil {
 		return errors.New(err, "error migrating fleet config")
 	}
 
 	// the encrypted state does not exist but the unencrypted file does
-	err = migration.MigrateToEncryptedConfig(l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
+	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
 	if err != nil {
 		return errors.New(err, "error migrating agent state")
 	}
 
-	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg, logLvl.String()), createAgentID)
+	agentInfo, err := info.NewAgentInfoWithLog(ctx, defaultLogLevel(cfg, logLvl.String()), createAgentID)
 	if err != nil {
 		return errors.New(err,
 			"could not load agent info",
@@ -236,7 +239,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, configMgr, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
@@ -324,7 +327,7 @@ LOOP:
 	return err
 }
 
-func loadConfig(override cfgOverrider) (*configuration.Configuration, error) {
+func loadConfig(ctx context.Context, override cfgOverrider) (*configuration.Configuration, error) {
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
@@ -334,7 +337,7 @@ func loadConfig(override cfgOverrider) (*configuration.Configuration, error) {
 			errors.M(errors.MetaKeyPath, pathConfigFile))
 	}
 
-	if err := getOverwrites(rawConfig); err != nil {
+	if err := getOverwrites(ctx, rawConfig); err != nil {
 		return nil, errors.New(err, "could not read overwrites")
 	}
 
@@ -366,7 +369,7 @@ func reexecPath() (string, error) {
 	return potentialReexec, nil
 }
 
-func getOverwrites(rawConfig *config.Config) error {
+func getOverwrites(ctx context.Context, rawConfig *config.Config) error {
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
 		return err
@@ -377,7 +380,7 @@ func getOverwrites(rawConfig *config.Config) error {
 		return nil
 	}
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(path)
+	store := storage.NewEncryptedDiskStore(ctx, path)
 
 	reader, err := store.Load()
 	if err != nil && errors.Is(err, os.ErrNotExist) {
@@ -450,6 +453,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	options.DelayEnroll = false
 	options.FleetServer.SpawnAgent = false
 	c, err := newEnrollCmd(
+		ctx,
 		logger,
 		&options,
 		paths.ConfigFile(),
@@ -470,7 +474,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 			errors.M("path", enrollPath)))
 	}
 	logger.Info("Successfully performed delayed enrollment of this Elastic Agent.")
-	return loadConfig(override)
+	return loadConfig(ctx, override)
 }
 
 func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig) (*apm.Tracer, error) {

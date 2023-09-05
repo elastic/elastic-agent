@@ -134,7 +134,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 	}
 
 	if !opts.variables && !opts.includeMonitoring {
-		fullCfg, err := operations.LoadFullAgentConfig(l, cfgPath, true)
+		fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true)
 		if err != nil {
 			return err
 		}
@@ -146,7 +146,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return err
 	}
 
-	agentInfo, err := info.NewAgentInfoWithLog("error", false)
+	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
 	if err != nil {
 		return fmt.Errorf("could not load agent info: %w", err)
 	}
@@ -163,7 +163,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 		}
 
-		monitorFn, err := getMonitoringFn(cfg)
+		monitorFn, err := getMonitoringFn(ctx, cfg)
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
@@ -254,12 +254,12 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return err
 	}
 
-	monitorFn, err := getMonitoringFn(m)
+	monitorFn, err := getMonitoringFn(ctx, m)
 	if err != nil {
 		return fmt.Errorf("failed to get monitoring: %w", err)
 	}
 
-	agentInfo, err := info.NewAgentInfoWithLog("error", false)
+	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
 	if err != nil {
 		return fmt.Errorf("could not load agent info: %w", err)
 	}
@@ -330,7 +330,7 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 	return printComponents(allowed, blocked, streams)
 }
 
-func getMonitoringFn(cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {
+func getMonitoringFn(ctx context.Context, cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {
 	config, err := config.NewConfigFrom(cfg)
 	if err != nil {
 		return nil, err
@@ -341,7 +341,7 @@ func getMonitoringFn(cfg map[string]interface{}) (component.GenerateMonitoringCf
 		return nil, err
 	}
 
-	agentInfo, err := info.NewAgentInfoWithLog("error", false)
+	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
 	if err != nil {
 		return nil, fmt.Errorf("could not load agent info: %w", err)
 	}
@@ -352,7 +352,7 @@ func getMonitoringFn(cfg map[string]interface{}) (component.GenerateMonitoringCf
 
 func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration) (map[string]interface{}, logp.Level, error) {
 
-	cfg, err := operations.LoadFullAgentConfig(l, cfgPath, true)
+	cfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true)
 	if err != nil {
 		return nil, logp.InfoLevel, err
 	}

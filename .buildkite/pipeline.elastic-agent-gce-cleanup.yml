@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+# Removes stale GCE instances having matching labels, name prefixes and older than 24 hours
+# See gce-cleanup.sh and .buildkite/misc/gce-cleanup.yml
+env:
+  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+  DOCKER_REGISTRY: "docker.elastic.co"
+steps:
+  - label: "GCE Cleanup"
+    key: "gce-cleanup"
+    command: ".buildkite/scripts/steps/gce-cleanup.sh"
+    agents:
+      provider: "gcp"
