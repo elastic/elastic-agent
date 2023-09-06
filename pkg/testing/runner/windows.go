@@ -7,6 +7,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,7 @@ import (
 type WindowsRunner struct{}
 
 // Prepare the test
-func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error {
+func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string) error {
 	// install chocolatey
 	logger.Logf("Installing chocolatey")
 	chocoInstall := `"[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"`
@@ -64,14 +65,24 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Lo
 		return fmt.Errorf("failed to reconnect: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
+	return nil
+}
+
+// Copy places the required files on the host.
+func (WindowsRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, build Build) error {
 	// copy the archive and extract it on the host (tar exists and can extract zip on windows)
 	logger.Logf("Copying repo")
 	destRepoName := filepath.Base(repoArchive)
-	err = sshClient.Copy(repoArchive, destRepoName)
+	err := sshClient.Copy(repoArchive, destRepoName)
 	if err != nil {
 		return fmt.Errorf("failed to SCP repo archive %s: %w", repoArchive, err)
 	}
-	stdOut, errOut, err = sshClient.Exec(ctx, "mkdir", []string{"agent"}, nil)
+
+	// ensure that agent directory is removed (possible it already exists if instance already used)
+	// Windows errors if the directory doesn't exist, it's okay if it doesn't ignore any error here
+	_, _, _ = sshClient.Exec(ctx, "rmdir", []string{"agent", "/s", "/q"}, nil)
+
+	stdOut, errOut, err := sshClient.Exec(ctx, "mkdir", []string{"agent"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to mkdir agent: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
@@ -87,20 +98,59 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Lo
 		return fmt.Errorf("failed to to perform make mage and prepareOnRemote: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
-	// place the build for the agent on the host
-	logger.Logf("Copying agent build %s", filepath.Base(buildPath))
-	err = sshClient.Copy(buildPath, filepath.Base(buildPath))
+	// determine if the build needs to be replaced on the host
+	// if it already exists and the SHA512 are the same contents, then
+	// there is no reason to waste time uploading the build
+	copyBuild := true
+	localSHA512, err := os.ReadFile(build.SHA512Path)
 	if err != nil {
-		return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
+		return fmt.Errorf("failed to read local SHA52 contents %s: %w", build.SHA512Path, err)
 	}
-	insideAgentDir := filepath.Join("agent", buildPath)
-	stdOut, errOut, err = sshClient.Exec(ctx, "mkdir", []string{toWindowsPath(filepath.Dir(insideAgentDir))}, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create %s directory: %w (stdout: %s, stderr: %s)", toWindowsPath(filepath.Dir(insideAgentDir)), err, stdOut, errOut)
+	hostSHA512Path := filepath.Base(build.SHA512Path)
+	hostSHA512, err := sshClient.GetFileContents(ctx, hostSHA512Path, WithContentFetchCommand("type"))
+	if err == nil {
+		if string(localSHA512) == string(hostSHA512) {
+			logger.Logf("Skipping copy agent build %s; already the same", filepath.Base(build.Path))
+			copyBuild = false
+		}
 	}
-	stdOut, errOut, err = sshClient.Exec(ctx, "move", []string{filepath.Base(buildPath), toWindowsPath(insideAgentDir)}, nil)
-	if err != nil {
-		return fmt.Errorf("failed to move %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), toWindowsPath(insideAgentDir), err, stdOut, errOut)
+
+	if copyBuild {
+		// ensure the existing copies are removed first
+		toRemove := filepath.Base(build.Path)
+		stdOut, errOut, err = sshClient.Exec(ctx,
+			"del", []string{toRemove, "/f", "/q"}, nil)
+		if err != nil {
+			return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
+				toRemove, err, stdOut, errOut)
+		}
+
+		toRemove = filepath.Base(build.SHA512Path)
+		stdOut, errOut, err = sshClient.Exec(ctx,
+			"del", []string{toRemove, "/f", "/q"}, nil)
+		if err != nil {
+			return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
+				toRemove, err, stdOut, errOut)
+		}
+
+		logger.Logf("Copying agent build %s", filepath.Base(build.Path))
+	}
+
+	for _, buildPath := range []string{build.Path, build.SHA512Path} {
+		if copyBuild {
+			err = sshClient.Copy(buildPath, filepath.Base(buildPath))
+			if err != nil {
+				return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
+			}
+		}
+		insideAgentDir := filepath.Join("agent", buildPath)
+		// possible the build path already exists, 'mkdir' on windows will fail if it already exists
+		// error from this call is ignored because of it
+		_, _, _ = sshClient.Exec(ctx, "mkdir", []string{toWindowsPath(filepath.Dir(insideAgentDir))}, nil)
+		stdOut, errOut, err = sshClient.Exec(ctx, "mklink", []string{"/h", toWindowsPath(insideAgentDir), filepath.Base(buildPath)}, nil)
+		if err != nil {
+			return fmt.Errorf("failed to hard link %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), toWindowsPath(insideAgentDir), err, stdOut, errOut)
+		}
 	}
 
 	return nil
@@ -144,6 +194,41 @@ func (WindowsRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger 
 
 	}
 	return result, nil
+}
+
+// Diagnostics gathers any diagnostics from the host.
+func (WindowsRunner) Diagnostics(ctx context.Context, sshClient SSHClient, logger Logger, destination string) error {
+	diagnosticDir := "agent\\build\\diagnostics"
+	stdOut, _, err := sshClient.Exec(ctx, "dir", []string{diagnosticDir, "/b"}, nil)
+	if err != nil {
+		//nolint:nilerr // failed to list the directory, probably don't have any diagnostics (do nothing)
+		return nil
+	}
+	eachDiagnostic := strings.Split(string(stdOut), "\n")
+	for _, filename := range eachDiagnostic {
+		filename = strings.TrimSpace(filename)
+		if filename == "" {
+			continue
+		}
+
+		// don't use filepath.Join as we need this to work in Linux/Darwin as well
+		// this is because if we use `filepath.Join` on a Linux/Darwin host connected to a Windows host
+		// it will use a `/` and that will be incorrect for Windows
+		fp := fmt.Sprintf("%s\\%s", diagnosticDir, filename)
+		// use filepath.Join on this path because it's a path on this specific host platform
+		dp := filepath.Join(destination, filename)
+		logger.Logf("Copying diagnostic %s", filename)
+		out, err := os.Create(dp)
+		if err != nil {
+			return fmt.Errorf("failed to create file %s: %w", dp, err)
+		}
+		err = sshClient.GetFileContentsOutput(ctx, fp, out, WithContentFetchCommand("type"))
+		_ = out.Close()
+		if err != nil {
+			return fmt.Errorf("failed to copy file from remote host to %s: %w", dp, err)
+		}
+	}
+	return nil
 }
 
 func sshRunPowershell(ctx context.Context, sshClient SSHClient, cmd string) ([]byte, []byte, error) {

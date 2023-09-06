@@ -12,9 +12,6 @@ import (
 )
 
 const (
-	// Google is for the Google Cloud Platform (GCP)
-	Google = "google"
-
 	// Ubuntu is a Linux distro.
 	Ubuntu = "ubuntu"
 )
@@ -214,7 +211,7 @@ func allowedByPlatform(os define.OS, platform define.OS) bool {
 			return false
 		}
 	}
-	if os.Version == "" {
+	if platform.Version == "" {
 		// not specific on version
 		return true
 	}
