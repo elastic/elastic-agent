@@ -298,7 +298,7 @@ func osBatchToOGC(cacheDir string, batch runner.OSBatch) Layout {
 		} else if len(batch.Batch.Tests) > 0 {
 			test = batch.Batch.Tests[0]
 		}
-		tags = append(tags, fmt.Sprintf("%s-%s", path.Base(test.Name), strings.ToLower(test.Tests[0])))
+		tags = append(tags, fmt.Sprintf("%s-%s", path.Base(test.Name), strings.ToLower(test.Tests[0].Name)))
 	}
 	los, _ := findOSLayout(batch.OS.OS)
 	return Layout{

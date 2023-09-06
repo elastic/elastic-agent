@@ -183,13 +183,13 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, 
 	var tests []string
 	for _, pkg := range batch.Tests {
 		for _, test := range pkg.Tests {
-			tests = append(tests, fmt.Sprintf("%s:%s", pkg.Name, test))
+			tests = append(tests, fmt.Sprintf("%s:%s", pkg.Name, test.Name))
 		}
 	}
 	var sudoTests []string
 	for _, pkg := range batch.SudoTests {
 		for _, test := range pkg.Tests {
-			sudoTests = append(sudoTests, fmt.Sprintf("%s:%s", pkg.Name, test))
+			sudoTests = append(sudoTests, fmt.Sprintf("%s:%s", pkg.Name, test.Name))
 		}
 	}
 
