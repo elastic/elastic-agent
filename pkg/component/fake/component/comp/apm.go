@@ -27,7 +27,6 @@ var SenderAlreadyRunningError = errors.New("apm sender is already running")
 type apmTracesSender struct {
 	cfgUpd      chan *proto.APMConfig
 	updateErrCh chan error
-	logger      *zerolog.Logger
 	ctx         context.Context
 	ctxCancelF  context.CancelFunc
 }
@@ -231,9 +230,9 @@ func senderErrorLogger(ctx context.Context, logger zerolog.Logger, errCh <-chan 
 			}
 			if err != nil {
 				logger.Err(err).Msg("sender error")
-				unit.UpdateState(client.UnitStateDegraded, fmt.Sprintf("sender error: %s", err), nil)
+				_ = unit.UpdateState(client.UnitStateDegraded, fmt.Sprintf("sender error: %s", err), nil)
 			}
-			unit.UpdateState(client.UnitStateHealthy, fmt.Sprintf("sender error: %s", err), nil)
+			_ = unit.UpdateState(client.UnitStateHealthy, fmt.Sprintf("sender error: %s", err), nil)
 		}
 	}
 }
