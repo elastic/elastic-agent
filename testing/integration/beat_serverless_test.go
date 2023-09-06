@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+// //go:build integration
 
 package integration
 
@@ -65,6 +65,10 @@ func (runner *BeatRunner) SetupSuite() {
 	if runner.testbeatName == "elastic-agent" {
 		runner.T().Skipf("tests must be run against a beat, not elastic-agent")
 	}
+
+	if runner.testbeatName != "filebeat" && runner.testbeatName != "metricbeat" {
+		runner.T().Skip("test only supports metricbeat or filebeat")
+	}
 	runner.T().Logf("running serverless tests with %s", runner.testbeatName)
 
 	agentFixture, err := define.NewFixtureWithBinary(runner.T(), define.Version(), runner.testbeatName, "/home/ubuntu", atesting.WithRunLength(time.Minute), atesting.WithAdditionalArgs([]string{"-E", "output.elasticsearch.allow_older_versions=true"}))
@@ -80,7 +84,7 @@ func (runner *BeatRunner) SetupSuite() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	mbOutConfig := `
+	beatOutConfig := `
 output.elasticsearch:
   hosts: ["%s"]
   username: %s
@@ -95,6 +99,27 @@ processors:
       fields:
         test-id: %s
 `
+	if runner.testbeatName == "filebeat" {
+		beatOutConfig = `
+output.elasticsearch:
+  hosts: ["%s"]
+  username: %s
+  password: %s
+setup.kibana:
+  host: %s
+filebeat.config.modules:
+  - modules: system
+    syslog:
+      enabled: true
+    auth:
+      enabled: true
+processors:
+  - add_fields:
+      target: host
+      fields:
+        test-id: %s
+`
+	}
 
 	// beats likes to add standard ports to URLs that don't have them, and ESS will sometimes return a URL without a port, assuming :443
 	// so try to fix that here
@@ -117,14 +142,13 @@ processors:
 	testUuid, err := uuid.NewV4()
 	require.NoError(runner.T(), err)
 	runner.testUuid = testUuid.String()
-	parsedCfg := fmt.Sprintf(mbOutConfig, fixedESHost, runner.user, runner.pass, fixedKibanaHost, testUuid.String())
+	parsedCfg := fmt.Sprintf(beatOutConfig, fixedESHost, runner.user, runner.pass, fixedKibanaHost, testUuid.String())
 	err = runner.agentFixture.WriteFileToWorkDir(ctx, parsedCfg, fmt.Sprintf("%s.yml", runner.testbeatName))
 	require.NoError(runner.T(), err)
 }
 
 // run the beat with default metricsets, ensure no errors in logs + data is ingested
 func (runner *BeatRunner) TestRunAndCheckData() {
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*4)
 	defer cancel()
 	err := runner.agentFixture.Run(ctx)
@@ -164,6 +188,15 @@ func (runner *BeatRunner) TestSetupDashboards() {
 	require.True(runner.T(), found, fmt.Sprintf("could not find dashboard newer than 5 minutes, out of %d dashboards", len(dashList)))
 
 	runner.Run("export dashboards", runner.SubtestExportDashboards)
+
+	// cleanup
+	for _, dash := range dashList {
+		err = tools.DeleteDashboard(ctx, runner.requirementsInfo.KibanaClient, dash.ID)
+		if err != nil {
+			runner.T().Logf("WARNING: could not delete dashboards after test: %s", err)
+			break
+		}
+	}
 }
 
 // tests the [beat] export dashboard command
@@ -211,6 +244,11 @@ func (runner *BeatRunner) TestSetupPipelines() {
 	require.NoError(runner.T(), err)
 	require.NotEmpty(runner.T(), pipelines)
 
+	/// cleanup
+	err = tools.DeletePipelines(ctx, runner.requirementsInfo.ESClient, "*filebeat*")
+	if err != nil {
+		runner.T().Logf("WARNING: could not clean up pipelines: %s", err)
+	}
 }
 
 // test beat setup --index-management with ILM disabled
@@ -235,6 +273,12 @@ func (runner *BeatRunner) TestIndexManagementNoILM() {
 
 	runner.Run("export templates", runner.SubtestExportTemplates)
 	runner.Run("export index patterns", runner.SubtestExportIndexPatterns)
+
+	// cleanup
+	err = tools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("*%s*", runner.testbeatName))
+	if err != nil {
+		runner.T().Logf("WARNING: could not clean up index templates/data streams: %s", err)
+	}
 }
 
 // tests beat setup --index-management with ILM explicitly set

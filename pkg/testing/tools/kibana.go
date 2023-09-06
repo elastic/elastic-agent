@@ -30,6 +30,20 @@ type Dashboard struct {
 	Version    string    `json:"version"`
 }
 
+// DeleteDashboard removes the selected dashboard
+func DeleteDashboard(ctx context.Context, client *kibana.Client, id string) error {
+	status, resp, err := client.Connection.Request("DELETE", fmt.Sprintf("/api/saved_objects/dashboard/%s", id), nil, nil, nil)
+	if err != nil {
+		return fmt.Errorf("error making API request: %w, response: '%s'", err, string(resp))
+	}
+
+	if status != 200 {
+		return fmt.Errorf("non-200 return code: %v, response: '%s'", status, string(resp))
+	}
+	return nil
+
+}
+
 // GetDashboards returns a list of known dashboards on the system
 func GetDashboards(ctx context.Context, client *kibana.Client) ([]Dashboard, error) {
 	params := url.Values{}
