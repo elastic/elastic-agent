@@ -4,25 +4,11 @@
 
 package vault
 
-type Options struct {
-	readonly bool
-}
-
 type OptionFunc func(o *Options)
 
+// WithReadonly opens storage for read-only access only, noop for Darwin
 func WithReadonly(readonly bool) OptionFunc {
 	return func(o *Options) {
 		o.readonly = readonly
 	}
-}
-
-//nolint:unused // not used on darwin
-func applyOptions(opts ...OptionFunc) Options {
-	var options Options
-
-	for _, opt := range opts {
-		opt(&options)
-	}
-
-	return options
 }

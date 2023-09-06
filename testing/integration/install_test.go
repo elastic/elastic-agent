@@ -53,8 +53,8 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	}
 
 	topPath := filepath.Join(defaultBasePath, "Elastic", "Agent")
-	_, err = os.Stat(topPath)
-	require.True(t, os.IsNotExist(err))
+	err = os.RemoveAll(topPath)
+	require.NoError(t, err, "failed to remove %q. The test requires this path not to exist.")
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.

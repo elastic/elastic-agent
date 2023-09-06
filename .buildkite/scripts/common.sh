@@ -55,7 +55,7 @@ mage() {
     go version
     if ! [ -x "$(type -p mage | sed 's/mage is //g')" ];
     then
-        echo "--- installing mage ${SETUP_MAGE_VERSION}"
+        echo "installing mage ${SETUP_MAGE_VERSION}"
         make mage
     fi
     pushd "$WORKSPACE"
@@ -71,7 +71,7 @@ go(){
     if ! [ -x "$(type -p go | sed 's/go is //g')" ];
     then
         getOSOptions
-        echo "--- installing golang "${GO_VERSION}" for "${AGENT_OS_NAME}/${AGENT_OS_ARCH}" "
+        echo "installing golang "${GO_VERSION}" for "${AGENT_OS_NAME}/${AGENT_OS_ARCH}" "
         local _bin="${WORKSPACE}/bin"
         mkdir -p "${_bin}"
         retry 5 curl -sL -o "${_bin}/gvm" "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${AGENT_OS_NAME}-${AGENT_OS_ARCH}"

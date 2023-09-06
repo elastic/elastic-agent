@@ -5,6 +5,7 @@
 package env
 
 import (
+	"context"
 	"os"
 	"strings"
 
@@ -22,7 +23,7 @@ func init() {
 type contextProvider struct{}
 
 // Run runs the environment context provider.
-func (*contextProvider) Run(comm corecomp.ContextProviderComm) error {
+func (*contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
 	err := comm.Set(getEnvMapping())
 	if err != nil {
 		return errors.New(err, "failed to set mapping", errors.TypeUnexpected)

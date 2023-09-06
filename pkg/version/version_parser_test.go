@@ -360,3 +360,54 @@ func TestLess(t *testing.T) {
 		})
 	}
 }
+
+func TestPreviousMinor(t *testing.T) {
+	testcases := []struct {
+		name             string
+		version          string
+		prevMinorVersion string
+	}{
+		{
+			name:             "basic release version",
+			version:          "8.7.0",
+			prevMinorVersion: "8.6.0",
+		},
+		{
+			name:             "snapshot release version",
+			version:          "8.9.3-SNAPSHOT",
+			prevMinorVersion: "8.8.0-SNAPSHOT",
+		},
+		{
+			name:             "emergency release version",
+			version:          "8.9.0-er1",
+			prevMinorVersion: "8.8.0-er1",
+		},
+		{
+			name:             "previous major version",
+			version:          "8.0.0",
+			prevMinorVersion: "7.17.10",
+		},
+		{
+			name:             "previous major snapshot",
+			version:          "8.0.0-SNAPSHOT",
+			prevMinorVersion: "7.17.10-SNAPSHOT",
+		},
+		{
+			name:             "snapshot version with metadata",
+			version:          "8.9.1-SNAPSHOT+aaaaaa",
+			prevMinorVersion: "8.8.0-SNAPSHOT+aaaaaa",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			parsed, err := ParseVersion(tc.version)
+			require.NoError(t, err)
+			require.NotNil(t, parsed)
+
+			prev, err := parsed.GetPreviousMinor()
+			require.NoError(t, err)
+			require.Equal(t, tc.prevMinorVersion, prev.String())
+		})
+	}
+}

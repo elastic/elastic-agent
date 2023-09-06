@@ -5,6 +5,7 @@
 package host
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -47,7 +48,7 @@ type contextProvider struct {
 }
 
 // Run runs the environment context provider.
-func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
+func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
 	current, err := c.fetcher()
 	if err != nil {
 		return err

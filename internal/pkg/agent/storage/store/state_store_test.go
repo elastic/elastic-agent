@@ -31,6 +31,10 @@ func TestStateStore(t *testing.T) {
 
 func runTestStateStore(t *testing.T, ackToken string) {
 	log, _ := logger.New("state_store", false)
+
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
 	withFile := func(fn func(t *testing.T, file string)) func(*testing.T) {
 		return func(t *testing.T) {
 			dir := t.TempDir()
@@ -244,7 +248,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 	t.Run("migrate actions file does not exists",
 		withFile(func(t *testing.T, actionStorePath string) {
 			withFile(func(t *testing.T, stateStorePath string) {
-				err := migrateStateStore(log, actionStorePath, stateStorePath)
+				err := migrateStateStore(ctx, log, actionStorePath, stateStorePath)
 				require.NoError(t, err)
 				stateStore, err := NewStateStore(log, storage.NewDiskStore(stateStorePath))
 				require.NoError(t, err)
@@ -275,7 +279,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.Len(t, actionStore.actions(), 1)
 
 			withFile(func(t *testing.T, stateStorePath string) {
-				err = migrateStateStore(log, actionStorePath, stateStorePath)
+				err = migrateStateStore(ctx, log, actionStorePath, stateStorePath)
 				require.NoError(t, err)
 
 				stateStore, err := NewStateStore(log, storage.NewDiskStore(stateStorePath))
