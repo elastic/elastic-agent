@@ -18,8 +18,6 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -206,7 +204,6 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 			}
 			if sendExpected {
 				checkinExpected := c.state.toCheckinExpected()
-				injectAPMConfig(c.current, checkinExpected)
 				comm.CheckinExpected(checkinExpected, checkin)
 			}
 			if changed {
@@ -248,17 +245,6 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 			}
 		}
 	}
-}
-
-func injectAPMConfig(current component.Component, expected *proto.CheckinExpected) {
-	if current.Component == nil {
-		expected.Component = nil
-		return
-	}
-	if expected.Component == nil {
-		expected.Component = &proto.Component{}
-	}
-	expected.Component.ApmConfig = current.Component.ApmConfig
 }
 
 // Watch returns the channel that sends component state.
