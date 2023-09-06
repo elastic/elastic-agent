@@ -91,6 +91,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 				atesting.WithFetcher(atesting.ArtifactFetcher()),
 			)
 			require.NoError(t, err)
+
 			err = agentFixture.Prepare(ctx)
 			require.NoError(t, err, "error preparing agent fixture")
 

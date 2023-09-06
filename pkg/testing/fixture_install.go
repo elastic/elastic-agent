@@ -208,7 +208,7 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	return out, nil
 }
 
-func (f *Fixture) collectDiagnostics() {
+func (f *Fixture) CollectDiagnostics() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
