@@ -78,7 +78,7 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	}
 
 	// remove existing directory
-	err = RemovePath(topPath)
+	err = RemoveBut(topPath, true, "ndjson")
 	if err != nil {
 		return errors.New(
 			err,
