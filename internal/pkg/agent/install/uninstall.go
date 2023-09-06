@@ -36,7 +36,14 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	if err != nil {
 		return err
 	}
-	status, _ := svc.Status()
+
+	status, err := svc.Status()
+	if err != nil {
+		return errors.New(
+			err,
+			fmt.Sprintf("failed to get status for service (%s)", paths.ServiceName),
+			errors.M("service", paths.ServiceName))
+	}
 
 	if status == service.StatusRunning {
 		err := svc.Stop()
@@ -60,11 +67,19 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 					errors.M("service", paths.ServiceName))
 			}
 		}
-		return err
+		return errors.New(
+			err,
+			fmt.Sprintf("failed to uninstall components for service (%s)", paths.ServiceName),
+			errors.M("service", paths.ServiceName))
 	}
 
-	// Uninstall service only after components were uninstalled successfully
-	_ = svc.Uninstall()
+	err = svc.Uninstall()
+	if err != nil {
+		return errors.New(
+			err,
+			fmt.Sprintf("failed to uninstall service (%s)", paths.ServiceName),
+			errors.M("service", paths.ServiceName))
+	}
 
 	// remove, if present on platform
 	if paths.ShellWrapperPath != "" {

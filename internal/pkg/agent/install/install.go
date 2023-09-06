@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/kardianos/service"
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -35,7 +36,7 @@ func Install(cfgFile, topPath string, pt *ProgressTracker) error {
 	// The protected Agent will need to be uninstalled first before it can be installed.
 	pt.StepStart("Uninstalling current Elastic Agent")
 	err = Uninstall(cfgFile, topPath, "")
-	if err != nil {
+	if err != nil && !errors.Is(err, service.ErrNotInstalled) {
 		pt.StepFailed()
 		return errors.New(
 			err,
@@ -45,7 +46,7 @@ func Install(cfgFile, topPath string, pt *ProgressTracker) error {
 	pt.StepSucceeded()
 
 	// ensure parent directory exists
-	err = os.MkdirAll(filepath.Dir(topPath), 0755)
+	err = os.MkdirAll(filepath.Dir(topPath), 0o755)
 	if err != nil {
 		return errors.New(
 			err,
@@ -73,7 +74,7 @@ func Install(cfgFile, topPath string, pt *ProgressTracker) error {
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
 		pathDir := filepath.Dir(paths.ShellWrapperPath)
-		err = os.MkdirAll(pathDir, 0755)
+		err = os.MkdirAll(pathDir, 0o755)
 		if err != nil {
 			return errors.New(
 				err,
@@ -106,7 +107,7 @@ func Install(cfgFile, topPath string, pt *ProgressTracker) error {
 			// latter, govet throws a false positive error here: "fmt.Sprintf call has
 			// arguments but no formatting directives".
 			shellWrapper := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
-			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
+			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0o755)
 			if err != nil {
 				return errors.New(
 					err,
