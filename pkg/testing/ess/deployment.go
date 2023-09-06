@@ -12,6 +12,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -84,9 +85,9 @@ type DeploymentStatusResponse struct {
 
 // CreateDeployment creates the deployment with the specified configuration.
 func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentRequest) (*CreateDeploymentResponse, error) {
-	tpl, err := template.New("create_deployment_request").Parse(createDeploymentRequestTemplateAzure)
+	tpl, err := deploymentTemplateFactory(req)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse deployment creation template: %w", err)
+		return nil, err
 	}
 
 	var buf bytes.Buffer
@@ -305,6 +306,31 @@ func overallStatus(statuses ...DeploymentStatus) DeploymentStatus {
 	}
 
 	return overallStatus
+}
+
+func deploymentTemplateFactory(req CreateDeploymentRequest) (*template.Template, error) {
+	regionParts := strings.Split(req.Region, "-")
+	if len(regionParts) < 2 {
+		return nil, fmt.Errorf("unable to parse CSP out of region [%s]", req.Region)
+	}
+
+	csp := regionParts[0]
+	var tplStr string
+	switch csp {
+	case "gcp":
+		tplStr = createDeploymentRequestTemplateGCP
+	case "azure":
+		tplStr = createDeploymentRequestTemplateAzure
+	default:
+		return nil, fmt.Errorf("unsupported CSP [%s]", csp)
+	}
+
+	tpl, err := template.New("create_deployment_request").Parse(tplStr)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse deployment creation template: %w", err)
+	}
+
+	return tpl, nil
 }
 
 // TODO: make work for cloud other than GCP
