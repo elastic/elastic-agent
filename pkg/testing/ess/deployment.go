@@ -333,7 +333,6 @@ func deploymentTemplateFactory(req CreateDeploymentRequest) (*template.Template,
 	return tpl, nil
 }
 
-// TODO: make work for cloud other than GCP
 const createDeploymentRequestTemplateGCP = `
 {
   "resources": {
