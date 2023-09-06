@@ -20,6 +20,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+// InjectAPMConfig is a modifier passed to coordinator in order to set the global APM configuration used for the agent
+// into each Component coming from input/output configuration
 func InjectAPMConfig(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 
 	tracesEnabled, err := getAPMTracesEnabled(cfg)
@@ -106,6 +108,9 @@ func noop(change coordinator.ConfigChange) coordinator.ConfigChange {
 	return change
 }
 
+// PatchAPMConfig is a temporary configuration patcher function (see ConfigPatchManager and ConfigPatch for reference) that
+// will patch the configuration coming from Fleet adding the APM parameters from the elastic agent configuration file
+// until Fleet supports this config directly
 func PatchAPMConfig(log *logger.Logger, rawConfig *config.Config) func(change coordinator.ConfigChange) coordinator.ConfigChange {
 	configMap, err := rawConfig.ToMapStr()
 	if err != nil {
