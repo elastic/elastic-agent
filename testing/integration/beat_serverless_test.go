@@ -254,7 +254,7 @@ func (runner *BeatRunner) TestIndexManagementILMEnabledFail() {
 		runner.agentFixture.WorkDir(),
 		"setup",
 		"--index-management",
-		"-E", "setup.ilm.enabled=true"})
+		"-E", "setup.ilm.enabled=true", "-E", "setup.ilm.overwrite=true"})
 	runner.T().Logf("got response from management setup: %s", string(resp))
 	assert.Error(runner.T(), err)
 	assert.Contains(runner.T(), string(resp), "not supported")
@@ -274,7 +274,7 @@ func (runner *BeatRunner) TestExportILMFail() {
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
 		runner.agentFixture.WorkDir(),
-		"export", "ilm-policy"})
+		"export", "ilm-policy", "-E", "setup.ilm.overwrite=true"})
 	runner.T().Logf("got response from management setup: %s", string(resp))
 	assert.Error(runner.T(), err)
 	assert.Contains(runner.T(), string(resp), "not supported")
