@@ -143,7 +143,8 @@ func TestBatch(t *testing.T) {
 							Name: "TestSpecificCombinationTwo",
 						},
 						{
-							Name: "TestSpecificCombinationWithCloud",
+							Name:  "TestSpecificCombinationWithCloud",
+							Stack: true,
 						},
 					},
 				},
