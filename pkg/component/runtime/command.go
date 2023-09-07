@@ -73,17 +73,31 @@ type commandRuntime struct {
 	current component.Component
 	monitor MonitoringManager
 
-	ch       chan ComponentState
-	actionCh chan actionMode
-	procCh   chan procState
+	// ch is the reporting channel for the current state. When a policy change
+	// or client checkin affects the component state, its new value is sent
+	// here and handled by (componentRuntimeState).runLoop.
+	ch chan ComponentState
+
+	// When the managed process closes, its termination status is sent on procCh
+	// by the watching goroutine, and handled by (*commandRuntime).Run.
+	procCh chan procState
 
 	// compCh forwards new component metadata from the runtime manager to
 	// the command runtime. It is written by calls to (*commandRuntime).Update
 	// and read by the run loop in (*commandRuntime).Run.
 	compCh chan component.Component
 
+	// The most recent mode received on actionCh. The mode will be either
+	// actionStart (indicating the process should be running, and should be
+	// created if it is not), or actionStop or actionTeardown (indicating that
+	// it should terminate).
 	actionState actionMode
-	proc        *process.Info
+
+	// actionState is changed by sending its new value on actionCh, where it is
+	// handled by (*commandRuntime).Run.
+	actionCh chan actionMode
+
+	proc *process.Info
 
 	state          ComponentState
 	lastCheckin    time.Time
