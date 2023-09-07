@@ -8,11 +8,9 @@ package upgrade
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"time"
 
-	winsvc "golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -56,31 +54,6 @@ func (p *pidProvider) PID(ctx context.Context) (int, error) {
 	}
 
 	return int(status.ProcessId), nil
-}
-
-func (p *pidProvider) Restart(ctx context.Context) error {
-	svc, err := p.winManager.OpenService(paths.ServiceName)
-	if err != nil {
-		return fmt.Errorf("failed to read windows service: %w", err)
-	}
-
-	// AFAICT, there's no way to directly/atomically restart a windows service.
-	// So we do a stop followed by a start instead.
-	if _, err := svc.Control(winsvc.Stop); err != nil {
-		return fmt.Errorf(
-			"failed to stop service %s using %s as part of restarting it: %w",
-			paths.ServiceName, p.Name(), err,
-		)
-	}
-
-	if err := svc.Start(); err != nil {
-		return fmt.Errorf(
-			"failed to start service %s using %s as part of restarting it: %w",
-			paths.ServiceName, p.Name(), err,
-		)
-	}
-
-	return nil
 }
 
 func invokeCmd() *exec.Cmd {

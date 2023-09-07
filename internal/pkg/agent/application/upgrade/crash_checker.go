@@ -23,10 +23,6 @@ const (
 type serviceHandler interface {
 	PID(ctx context.Context) (int, error)
 	Name() string
-
-	// Restart restarts the Elastic Agent service
-	Restart(ctx context.Context) error
-
 	Close()
 }
 

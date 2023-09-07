@@ -100,15 +100,6 @@ func (p *upstartPidProvider) PID(ctx context.Context) (int, error) {
 	return pid, nil
 }
 
-func (p *upstartPidProvider) Restart(ctx context.Context) error {
-	restartCmd := exec.Command("/sbin/restart", agentName)
-	if err := restartCmd.Run(); err != nil {
-		return fmt.Errorf("failed to restart %s service via %s: %w", agentName, p.Name(), err)
-	}
-
-	return nil
-}
-
 // SYSV PID Provider
 
 type sysvPidProvider struct{}
@@ -149,15 +140,6 @@ func (p *sysvPidProvider) PID(ctx context.Context) (int, error) {
 	}
 
 	return pid, nil
-}
-
-func (p *sysvPidProvider) Restart(ctx context.Context) error {
-	restartCmd := exec.Command("service", agentName, "restart")
-	if err := restartCmd.Run(); err != nil {
-		return fmt.Errorf("failed to restart %s service via %s: %w", agentName, p.Name(), err)
-	}
-
-	return nil
 }
 
 // DBUS PID provider
@@ -201,25 +183,6 @@ func (p *dbusPidProvider) PID(ctx context.Context) (int, error) {
 	return int(pid), nil
 }
 
-func (p *dbusPidProvider) Restart(ctx context.Context) error {
-	sn := paths.ServiceName
-	if !strings.HasSuffix(sn, ".service") {
-		sn += ".service"
-	}
-
-	result := make(chan string)
-	if _, err := p.dbusConn.RestartUnitContext(ctx, sn, "replace", result); err != nil {
-		return fmt.Errorf("failed to request restart of service [%s]: %w", sn, err)
-	}
-
-	status := <-result
-	if status == "done" || status == "skipped" {
-		return nil
-	}
-
-	return fmt.Errorf("failed to restart service [%s]; status = %s", sn, status)
-}
-
 // noop PID provider
 
 type noopPidProvider struct{}
@@ -231,10 +194,6 @@ func (p *noopPidProvider) Close() {}
 func (p *noopPidProvider) Name() string { return "noop" }
 
 func (p *noopPidProvider) PID(ctx context.Context) (int, error) { return 0, nil }
-
-func (p *noopPidProvider) Restart(ctx context.Context) error {
-	return errors.New("not yet implemented")
-}
 
 func invokeCmd() *exec.Cmd {
 	// #nosec G204 -- user cannot inject any parameters to this command
