@@ -1725,11 +1725,13 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if datacenter == "" {
 		datacenter = "us-central1-a"
 	}
+
+	// Valid values are gcp-us-central1 (default), azure-eastus2
 	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
 	if essRegion == "" {
-		//essRegion = "gcp-us-central1"
-		essRegion = "azure-eastus2"
+		essRegion = "gcp-us-central1"
 	}
+
 	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
 	if instanceProvisionerMode == "" {
 		instanceProvisionerMode = "ogc"
