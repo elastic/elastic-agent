@@ -712,9 +712,9 @@ spec:
                   fieldPath: metadata.name
             - name: STATE_PATH
               value: "/etc/elastic-agent"
-            # The following NETINNFO:false variable will disable the netinfo.enabled option of add-host-metadata processor. This will remove fields host.ip and host.mac.  
+            # The following ELASTIC_NETINFO:false variable will disable the netinfo.enabled option of add-host-metadata processor. This will remove fields host.ip and host.mac.  
             # For more info: https://www.elastic.co/guide/en/beats/metricbeat/current/add-host-metadata.html
-            # - name: NETINFO
+            # - name: ELASTIC_NETINFO
             #   value: "false"
           securityContext:
             runAsUser: 0
