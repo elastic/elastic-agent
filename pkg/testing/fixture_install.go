@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -227,10 +228,20 @@ func (f *Fixture) CollectDiagnostics() {
 	// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
 	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
 	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
-
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics to %s (%s): %s", outputPath, err, output)
+
+		goroutinesPath := filepath.Join(diagPath, fmt.Sprintf("%s-goroutines-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
+		goroutinesFile, err := os.Create(goroutinesPath)
+		if err != nil {
+			f.t.Logf("creating pprof output file %s: %s", goroutinesPath, err)
+		}
+		defer goroutinesFile.Close()
+		err = pprof.Lookup("goroutine").WriteTo(goroutinesFile, 1)
+		if err != nil {
+			f.t.Logf("creating goroutines profile %s: %s", goroutinesPath, err)
+		}
 
 		// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
 		f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
