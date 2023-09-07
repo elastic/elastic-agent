@@ -67,8 +67,16 @@ func (p *darwinPidProvider) PID(ctx context.Context) (int, error) {
 }
 
 func (p *darwinPidProvider) Restart(ctx context.Context) error {
-	// TODO
-	return errors.New("not yet implemented")
+	restartCmd := exec.Command("launchctl", "kickstart", "-k", paths.ServiceName)
+	restartCmd.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{Uid: 0, Gid: 0},
+	}
+
+	if err := restartCmd.Run(); err != nil {
+		return fmt.Errorf("failed to restart %s service via %s: %w", paths.ServiceName, p.Name(), err)
+	}
+
+	return nil
 }
 
 func (p *darwinPidProvider) piderFromCmd(name string, args ...string) func(context.Context) (int, error) {

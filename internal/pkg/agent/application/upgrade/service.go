@@ -152,8 +152,12 @@ func (p *sysvPidProvider) PID(ctx context.Context) (int, error) {
 }
 
 func (p *sysvPidProvider) Restart(ctx context.Context) error {
-	// TODO
-	return errors.New("not yet implemented")
+	restartCmd := exec.Command("service", agentName, "restart")
+	if err := restartCmd.Run(); err != nil {
+		return fmt.Errorf("failed to restart %s service via %s: %w", agentName, p.Name(), err)
+	}
+
+	return nil
 }
 
 // DBUS PID provider
