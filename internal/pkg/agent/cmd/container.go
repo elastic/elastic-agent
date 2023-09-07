@@ -14,7 +14,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -31,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/env"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -53,7 +53,7 @@ var (
 	tokenNameStrip = regexp.MustCompile(`\s\([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\)$`)
 )
 
-func newContainerCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
+func newContainerCommand(_ []string, streams *cli.IOStreams, isOperator bool) *cobra.Command {
 	cmd := cobra.Command{
 		Hidden: true, // not exposed over help; used by container entrypoint only
 		Use:    "container",
@@ -134,7 +134,7 @@ all the above actions will be skipped, because the Elastic Agent has already bee
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
 		Run: func(c *cobra.Command, args []string) {
-			if err := logContainerCmd(streams); err != nil {
+			if err := logContainerCmd(streams, isOperator); err != nil {
 				logError(streams, err)
 				os.Exit(1)
 			}
@@ -151,8 +151,8 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 	fmt.Fprintln(streams.Out, a...)
 }
 
-func logContainerCmd(streams *cli.IOStreams) error {
-	logsPath := envWithDefault("", "LOGS_PATH")
+func logContainerCmd(streams *cli.IOStreams, isOperator bool) error {
+	logsPath := env.WithDefault("", "LOGS_PATH")
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams
 		if err := os.MkdirAll(logsPath, logsPathPerms); err != nil {
@@ -167,16 +167,16 @@ func logContainerCmd(streams *cli.IOStreams) error {
 		streams.Out = io.MultiWriter(streams.Out, w)
 		streams.Err = io.MultiWriter(streams.Out, w)
 	}
-	return containerCmd(streams)
+	return containerCmd(streams, isOperator)
 }
 
-func containerCmd(streams *cli.IOStreams) error {
+func containerCmd(streams *cli.IOStreams, isOperator bool) error {
 	// set paths early so all action below use the defined paths
 	if err := setPaths("", "", "", true); err != nil {
 		return err
 	}
 
-	elasticCloud := envBool("ELASTIC_AGENT_CLOUD")
+	elasticCloud := env.Bool("ELASTIC_AGENT_CLOUD")
 	// if not in cloud mode, always run the agent
 	runAgent := !elasticCloud
 	// create access configuration from ENV and config files
@@ -249,14 +249,14 @@ func containerCmd(streams *cli.IOStreams) error {
 
 	if runAgent {
 		// run the main elastic-agent container command
-		err = runContainerCmd(streams, cfg)
+		err = runContainerCmd(streams, cfg, isOperator)
 	}
 	// wait until APM Server shut down
 	wg.Wait()
 	return err
 }
 
-func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
+func runContainerCmd(streams *cli.IOStreams, cfg setupConfig, isOperator bool) error {
 	var err error
 	var client *kibana.Client
 	executable, err := os.Executable()
@@ -264,12 +264,12 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		return err
 	}
 
-	initTimeout := envTimeout(fleetInitTimeoutName)
+	initTimeout := env.Timeout(fleetInitTimeoutName)
 
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(logToStderr, false, initTimeout, isContainer)
+		return run(logToStderr, false, initTimeout, isOperator, isContainer)
 	}
 
 	if cfg.FleetServer.Enable {
@@ -322,7 +322,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(logToStderr, false, initTimeout, isContainer)
+	return run(logToStderr, false, initTimeout, isOperator, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token
@@ -407,7 +407,7 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 	if !paths.IsVersionHome() {
 		args = append(args, "--path.home.unversioned")
 	}
-	if tags := envWithDefault("", "ELASTIC_AGENT_TAGS"); tags != "" {
+	if tags := env.WithDefault("", "ELASTIC_AGENT_TAGS"); tags != "" {
 		args = append(args, "--tag", tags)
 	}
 	if cfg.FleetServer.Enable {
@@ -587,71 +587,6 @@ func findKey(keys []kibanaAPIKey, policy *kibanaPolicy, tokenName string) (*kiba
 	return nil, fmt.Errorf(`unable to find enrollment token named "%s" in policy "%s"`, tokenName, policy.Name)
 }
 
-func envWithDefault(def string, keys ...string) string {
-	for _, key := range keys {
-		val, ok := os.LookupEnv(key)
-		if ok {
-			return val
-		}
-	}
-	return def
-}
-
-func envBool(keys ...string) bool {
-	for _, key := range keys {
-		val, ok := os.LookupEnv(key)
-		if ok && isTrue(val) {
-			return true
-		}
-	}
-	return false
-}
-
-func envTimeout(keys ...string) time.Duration {
-	for _, key := range keys {
-		val, ok := os.LookupEnv(key)
-		if ok {
-			dur, err := time.ParseDuration(val)
-			if err == nil {
-				return dur
-			}
-		}
-	}
-	return 0
-}
-
-func envMap(key string) map[string]string {
-	m := make(map[string]string)
-	prefix := key + "="
-	for _, env := range os.Environ() {
-		if !strings.HasPrefix(env, prefix) {
-			continue
-		}
-
-		envVal := strings.TrimPrefix(env, prefix)
-
-		keyValue := strings.SplitN(envVal, "=", 2)
-		if len(keyValue) != 2 {
-			continue
-		}
-
-		m[keyValue[0]] = keyValue[1]
-	}
-
-	return m
-}
-
-func isTrue(val string) bool {
-	trueVals := []string{"1", "true", "yes", "y"}
-	val = strings.ToLower(val)
-	for _, v := range trueVals {
-		if val == v {
-			return true
-		}
-	}
-	return false
-}
-
 func performGET(cfg setupConfig, client *kibana.Client, path string, response interface{}, writer io.Writer, msg string) error {
 	var lastErr error
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
@@ -739,7 +674,7 @@ func runLegacyAPMServer(streams *cli.IOStreams) (*process.Info, error) {
 }
 
 func logToStderr(cfg *configuration.Configuration) {
-	logsPath := envWithDefault("", "LOGS_PATH")
+	logsPath := env.WithDefault("", "LOGS_PATH")
 	if logsPath == "" {
 		// when no LOGS_PATH defined the container should log to stderr
 		cfg.Settings.LoggingConfig.ToStderr = true
@@ -748,12 +683,12 @@ func logToStderr(cfg *configuration.Configuration) {
 }
 
 func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
-	statePath = envWithDefault(statePath, "STATE_PATH")
+	statePath = env.WithDefault(statePath, "STATE_PATH")
 	if statePath == "" {
 		statePath = defaultStateDirectory
 	}
 	topPath := filepath.Join(statePath, "data")
-	configPath = envWithDefault(configPath, "CONFIG_PATH")
+	configPath = env.WithDefault(configPath, "CONFIG_PATH")
 	if configPath == "" {
 		configPath = statePath
 	}
@@ -778,7 +713,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	// install path stays on container default mount (otherwise a bind mounted directory could have noexec set)
 	paths.SetInstall(originalInstall)
 	// set LOGS_PATH is given
-	logsPath = envWithDefault(logsPath, "LOGS_PATH")
+	logsPath = env.WithDefault(logsPath, "LOGS_PATH")
 	if logsPath != "" {
 		paths.SetLogs(logsPath)
 		// ensure that the logs directory exists
@@ -898,32 +833,6 @@ type kibanaAPIKeys struct {
 
 type kibanaAPIKeyDetail struct {
 	Item kibanaAPIKey `json:"item"`
-}
-
-func envDurationWithDefault(defVal string, keys ...string) (time.Duration, error) {
-	valStr := defVal
-	for _, key := range keys {
-		val, ok := os.LookupEnv(key)
-		if ok {
-			valStr = val
-			break
-		}
-	}
-
-	return time.ParseDuration(valStr)
-}
-
-func envIntWithDefault(defVal string, keys ...string) (int, error) {
-	valStr := defVal
-	for _, key := range keys {
-		val, ok := os.LookupEnv(key)
-		if ok {
-			valStr = val
-			break
-		}
-	}
-
-	return strconv.Atoi(valStr)
 }
 
 // isContainer changes the platform details to be a container.

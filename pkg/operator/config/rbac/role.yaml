@@ -1,0 +1,114 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - observability.agent.k8s.elastic.co
+  resources:
+  - elasticagentcomponents
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+    - coordination.k8s.io
+  resources:
+    - leases
+  verbs: ["get", "create", "update"]
+- apiGroups: ["", "apps", "extensions"]
+  resources:
+  - nodes
+  - namespaces
+  - events
+  - pods
+  - services
+  - secrets
+  - replicasets
+  - daemonsets
+  - deployments
+  - statefulsets
+  - cronjobs
+  - replicasets
+  - configmaps
+  - serviceaccounts
+  - podsecuritypolicies
+  - storageclasses
+  - persistentvolumes
+  - persistentvolumeclaims
+  verbs: ["get",  "create", "delete", "update", "list", "watch"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources:
+  - serviceaccounts
+  - roles
+  - clusterroles
+  - rolebindings
+  - clusterrolebindings
+  verbs: ["get",  "create", "delete", "update", "list", "watch"]
+- apiGroups: ["batch"]
+  resources:
+  - jobs
+  - cronjobs
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources:
+  - nodes/stats
+  verbs: ["get"]
+- apiGroups: ["policy"]
+  resources:
+  - podsecuritypolicies
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["storage.k8s.io"]
+  resources:
+  - storageclasses
+  verbs: ["get", "list", "watch"]
+- apiGroups:
+  - observability.agent.k8s.elastic.co
+  resources:
+  - elasticagentcomponents/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - observability.agent.k8s.elastic.co
+  resources:
+  - elasticagentcomponents/status
+  verbs:
+  - get
+  - patch
+  - update
+- nonResourceURLs:
+    - "/metrics"
+  verbs:
+    - get
+- apiGroups:
+  - observability.agent.k8s.elastic.co
+  resources:
+  - elasticagentpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - observability.agent.k8s.elastic.co
+  resources:
+  - elasticagentpolicies/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - observability.agent.k8s.elastic.co
+  resources:
+  - elasticagentpolicies/status
+  verbs:
+  - get
+  - patch
+  - update

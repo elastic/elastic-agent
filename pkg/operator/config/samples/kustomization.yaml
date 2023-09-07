@@ -1,0 +1,5 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- observability_v1alpha1_elasticagentpolicy.yaml
+- observability_v1alpha1_elasticagentcomponent.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

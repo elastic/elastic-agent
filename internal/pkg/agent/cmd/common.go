@@ -65,7 +65,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("environment"))
 
 	// sub-commands
-	run := newRunCommandWithArgs(args, streams)
+	run := newRunCommandWithArgs(args, streams, false)
 	cmd.AddCommand(basecmd.NewDefaultCommandsWithArgs(args, streams)...)
 	cmd.AddCommand(run)
 	cmd.AddCommand(newInstallCommandWithArgs(args, streams))
@@ -74,7 +74,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newEnrollCommandWithArgs(args, streams))
 	cmd.AddCommand(newInspectCommandWithArgs(args, streams))
 	cmd.AddCommand(newWatchCommandWithArgs(args, streams))
-	cmd.AddCommand(newContainerCommand(args, streams))
+	cmd.AddCommand(newContainerCommand(args, streams, false))
 	cmd.AddCommand(newStatusCommand(args, streams))
 	cmd.AddCommand(newDiagnosticsCommand(args, streams))
 	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
@@ -85,6 +85,56 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	if reexec != nil {
 		cmd.AddCommand(reexec)
 	}
+	cmd.Run = run.Run
+	cmd.RunE = run.RunE
+
+	return cmd
+}
+
+// NewCommandWithArgs returns a new agent with the flags and the subcommand.
+func NewOpreratorCommand() *cobra.Command {
+	streams := cli.NewIOStreams()
+	cmd := &cobra.Command{
+		Use: "elastic-agent [subcommand]",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return tryContainerLoadPaths()
+		},
+	}
+
+	// Init version information contained in package version file
+	err := version.InitVersionInformation()
+	if err != nil {
+		cmd.PrintErrf("Error initializing version information: %v\n", err)
+	}
+
+	// path flags
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home.unversioned"))
+	// hidden used internally by container subcommand
+	cmd.PersistentFlags().MarkHidden("path.home.unversioned") //nolint:errcheck // it's hidden
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.config"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("c"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.logs"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.downloads"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.install"))
+
+	// logging flags
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("v"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("e"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("d"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("environment"))
+
+	// sub-commands
+	run := newRunCommandWithArgs(os.Args, streams, true)
+	cmd.AddCommand(basecmd.NewDefaultCommandsWithArgs(os.Args, streams)...)
+	cmd.AddCommand(run)
+	cmd.AddCommand(newInspectCommandWithArgs(os.Args, streams))
+	cmd.AddCommand(newContainerCommand(os.Args, streams, true))
+	cmd.AddCommand(newStatusCommand(os.Args, streams))
+	cmd.AddCommand(newDiagnosticsCommand(os.Args, streams))
+	cmd.AddCommand(newComponentCommandWithArgs(os.Args, streams))
+	cmd.AddCommand(newLogsCommandWithArgs(os.Args, streams))
+
 	cmd.Run = run.Run
 	cmd.RunE = run.RunE
 

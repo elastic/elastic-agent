@@ -4,7 +4,11 @@
 
 package cmd
 
-import "time"
+import (
+	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/core/env"
+)
 
 // setup configuration
 
@@ -66,60 +70,60 @@ type kibanaFleetConfig struct {
 }
 
 func defaultAccessConfig() (setupConfig, error) {
-	retrySleepDuration, err := envDurationWithDefault(defaultRequestRetrySleep, requestRetrySleepEnv)
+	retrySleepDuration, err := env.DurationWithDefault(defaultRequestRetrySleep, requestRetrySleepEnv)
 	if err != nil {
 		return setupConfig{}, err
 	}
 
-	retryMaxCount, err := envIntWithDefault(defaultMaxRequestRetries, maxRequestRetriesEnv)
+	retryMaxCount, err := env.IntWithDefault(defaultMaxRequestRetries, maxRequestRetriesEnv)
 	if err != nil {
 		return setupConfig{}, err
 	}
 
 	cfg := setupConfig{
 		Fleet: fleetConfig{
-			CA:              envWithDefault("", "FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"),
-			Enroll:          envBool("FLEET_ENROLL", "FLEET_SERVER_ENABLE"),
-			EnrollmentToken: envWithDefault("", "FLEET_ENROLLMENT_TOKEN"),
-			Force:           envBool("FLEET_FORCE"),
-			Insecure:        envBool("FLEET_INSECURE"),
-			TokenName:       envWithDefault("Default", "FLEET_TOKEN_NAME"),
-			TokenPolicyName: envWithDefault("", "FLEET_TOKEN_POLICY_NAME"),
-			URL:             envWithDefault("", "FLEET_URL"),
-			DaemonTimeout:   envTimeout("FLEET_DAEMON_TIMEOUT"),
+			CA:              env.WithDefault("", "FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"),
+			Enroll:          env.Bool("FLEET_ENROLL", "FLEET_SERVER_ENABLE"),
+			EnrollmentToken: env.WithDefault("", "FLEET_ENROLLMENT_TOKEN"),
+			Force:           env.Bool("FLEET_FORCE"),
+			Insecure:        env.Bool("FLEET_INSECURE"),
+			TokenName:       env.WithDefault("Default", "FLEET_TOKEN_NAME"),
+			TokenPolicyName: env.WithDefault("", "FLEET_TOKEN_POLICY_NAME"),
+			URL:             env.WithDefault("", "FLEET_URL"),
+			DaemonTimeout:   env.Timeout("FLEET_DAEMON_TIMEOUT"),
 		},
 		FleetServer: fleetServerConfig{
-			Cert:           envWithDefault("", "FLEET_SERVER_CERT"),
-			CertKey:        envWithDefault("", "FLEET_SERVER_CERT_KEY"),
-			PassphrasePath: envWithDefault("", "FLEET_SERVER_CERT_KEY_PASSPHRASE"),
+			Cert:           env.WithDefault("", "FLEET_SERVER_CERT"),
+			CertKey:        env.WithDefault("", "FLEET_SERVER_CERT_KEY"),
+			PassphrasePath: env.WithDefault("", "FLEET_SERVER_CERT_KEY_PASSPHRASE"),
 			Elasticsearch: elasticsearchConfig{
-				Host:                 envWithDefault("http://elasticsearch:9200", "FLEET_SERVER_ELASTICSEARCH_HOST", "ELASTICSEARCH_HOST"),
-				ServiceToken:         envWithDefault("", "FLEET_SERVER_SERVICE_TOKEN"),
-				ServiceTokenPath:     envWithDefault("", "FLEET_SERVER_SERVICE_TOKEN_PATH"),
-				CA:                   envWithDefault("", "FLEET_SERVER_ELASTICSEARCH_CA", "ELASTICSEARCH_CA"),
-				CATrustedFingerprint: envWithDefault("", "FLEET_SERVER_ELASTICSEARCH_CA_TRUSTED_FINGERPRINT"),
-				Insecure:             envBool("FLEET_SERVER_ELASTICSEARCH_INSECURE"),
+				Host:                 env.WithDefault("http://elasticsearch:9200", "FLEET_SERVER_ELASTICSEARCH_HOST", "ELASTICSEARCH_HOST"),
+				ServiceToken:         env.WithDefault("", "FLEET_SERVER_SERVICE_TOKEN"),
+				ServiceTokenPath:     env.WithDefault("", "FLEET_SERVER_SERVICE_TOKEN_PATH"),
+				CA:                   env.WithDefault("", "FLEET_SERVER_ELASTICSEARCH_CA", "ELASTICSEARCH_CA"),
+				CATrustedFingerprint: env.WithDefault("", "FLEET_SERVER_ELASTICSEARCH_CA_TRUSTED_FINGERPRINT"),
+				Insecure:             env.Bool("FLEET_SERVER_ELASTICSEARCH_INSECURE"),
 			},
-			Enable:       envBool("FLEET_SERVER_ENABLE"),
-			Host:         envWithDefault("", "FLEET_SERVER_HOST"),
-			InsecureHTTP: envBool("FLEET_SERVER_INSECURE_HTTP"),
-			PolicyID:     envWithDefault("", "FLEET_SERVER_POLICY_ID", "FLEET_SERVER_POLICY"),
-			Port:         envWithDefault("", "FLEET_SERVER_PORT"),
-			Headers:      envMap("FLEET_HEADER"),
-			Timeout:      envTimeout("FLEET_SERVER_TIMEOUT"),
+			Enable:       env.Bool("FLEET_SERVER_ENABLE"),
+			Host:         env.WithDefault("", "FLEET_SERVER_HOST"),
+			InsecureHTTP: env.Bool("FLEET_SERVER_INSECURE_HTTP"),
+			PolicyID:     env.WithDefault("", "FLEET_SERVER_POLICY_ID", "FLEET_SERVER_POLICY"),
+			Port:         env.WithDefault("", "FLEET_SERVER_PORT"),
+			Headers:      env.Map("FLEET_HEADER"),
+			Timeout:      env.Timeout("FLEET_SERVER_TIMEOUT"),
 		},
 		Kibana: kibanaConfig{
 			Fleet: kibanaFleetConfig{
-				Host:             envWithDefault("http://kibana:5601", "KIBANA_FLEET_HOST", "KIBANA_HOST"),
-				Username:         envWithDefault("elastic", "KIBANA_FLEET_USERNAME", "KIBANA_USERNAME", "ELASTICSEARCH_USERNAME"),
-				Password:         envWithDefault("changeme", "KIBANA_FLEET_PASSWORD", "KIBANA_PASSWORD", "ELASTICSEARCH_PASSWORD"),
-				ServiceToken:     envWithDefault("", "KIBANA_FLEET_SERVICE_TOKEN", "FLEET_SERVER_SERVICE_TOKEN"),
-				ServiceTokenPath: envWithDefault("", "KIBANA_FLEET_SERVICE_TOKEN_PATH", "FLEET_SERVER_SERVICE_TOKEN_PATH"),
-				CA:               envWithDefault("", "KIBANA_FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"),
+				Host:             env.WithDefault("http://kibana:5601", "KIBANA_FLEET_HOST", "KIBANA_HOST"),
+				Username:         env.WithDefault("elastic", "KIBANA_FLEET_USERNAME", "KIBANA_USERNAME", "ELASTICSEARCH_USERNAME"),
+				Password:         env.WithDefault("changeme", "KIBANA_FLEET_PASSWORD", "KIBANA_PASSWORD", "ELASTICSEARCH_PASSWORD"),
+				ServiceToken:     env.WithDefault("", "KIBANA_FLEET_SERVICE_TOKEN", "FLEET_SERVER_SERVICE_TOKEN"),
+				ServiceTokenPath: env.WithDefault("", "KIBANA_FLEET_SERVICE_TOKEN_PATH", "FLEET_SERVER_SERVICE_TOKEN_PATH"),
+				CA:               env.WithDefault("", "KIBANA_FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"),
 			},
 			RetrySleepDuration: retrySleepDuration,
 			RetryMaxCount:      retryMaxCount,
-			Headers:            envMap("FLEET_KIBANA_HEADER"),
+			Headers:            env.Map("FLEET_KIBANA_HEADER"),
 		},
 	}
 	return cfg, nil

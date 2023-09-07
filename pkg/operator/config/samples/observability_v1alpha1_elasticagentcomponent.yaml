@@ -1,0 +1,12 @@
+apiVersion: observability.agent.k8s.elastic.co/v1alpha1
+kind: ElasticAgentComponent
+metadata:
+  labels:
+    app.kubernetes.io/name: elasticagentcomponent
+    app.kubernetes.io/instance: elasticagentcomponent-sample
+    app.kubernetes.io/part-of: elastic-agent-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: elastic-agent-operator
+  name: elasticagentcomponent-sample
+spec:
+  # TODO(user): Add fields here

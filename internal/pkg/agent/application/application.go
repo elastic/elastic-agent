@@ -7,13 +7,16 @@ package application
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/features"
-	"github.com/elastic/elastic-agent/pkg/limits"
-	"github.com/elastic/elastic-agent/version"
-
 	"go.elastic.co/apm"
+	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -27,10 +30,16 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/env"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
+	operatorv1alpha1 "github.com/elastic/elastic-agent/pkg/operator/api/v1alpha1"
+	"github.com/elastic/elastic-agent/pkg/operator/controllers"
+	"github.com/elastic/elastic-agent/version"
 )
 
 // New creates a new Agent and bootstrap the required subsystem.
@@ -103,7 +112,7 @@ func New(
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
 	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
 
-	runtime, err := runtime.NewManager(
+	runtimeMgr, err := runtime.NewManager(
 		log,
 		baseLogger,
 		cfg.Settings.GRPC.String(),
@@ -160,7 +169,7 @@ func New(
 				EndpointSignedComponentModifier(),
 			)
 
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtimeMgr, fleetInitTimeout)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -173,7 +182,138 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, isManaged, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtimeMgr, configMgr, composable, caps, monitor, isManaged, compModifiers...)
+	if managed != nil {
+		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
+		// coordinator, so it must be set here once the coordinator is created
+		managed.coord = coord
+	}
+
+	// every time we change the limits we'll see the log message
+	limits.AddLimitsOnChangeCallback(func(new, old limits.LimitsConfig) {
+		log.Debugf("agent limits have changed: %+v -> %+v", old, new)
+	}, "application.go")
+	// applying the initial limits for the agent process
+	if err := limits.Apply(rawConfig); err != nil {
+		return nil, nil, nil, fmt.Errorf("could not parse and apply limits config: %w", err)
+	}
+
+	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
+	// any feature flag change callbacks are registered before they get called by `features.Apply`.
+	if err := features.Apply(rawConfig); err != nil {
+		return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
+	}
+
+	return coord, configMgr, composable, nil
+}
+
+// New creates a new Agent and bootstrap the required subsystem.
+func NewOperator(
+	ctx context.Context,
+	log *logger.Logger,
+	baseLogger *logger.Logger,
+	logLevel logp.Level,
+	agentInfo *info.AgentInfo,
+	reexec coordinator.ReExecManager,
+	tracer *apm.Tracer,
+	testingMode bool,
+	fleetInitTimeout time.Duration,
+	disableMonitoring bool,
+	modifiers ...component.PlatformModifier,
+) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
+
+	log.Info("Running as operator")
+	err := version.InitVersionInformation()
+	if err != nil {
+		// non-fatal error, log a warning and move on
+		log.With("error.message", err).Warnf("Error initializing version information: falling back to %s", release.Version())
+	}
+
+	platform, err := component.LoadPlatformDetail(modifiers...)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to gather system information: %w", err)
+	}
+	log.Info("Gathered system information")
+
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
+	}
+	log.With("inputs", specs.Inputs()).Info("Detected available inputs and outputs")
+
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to determine capabilities: %w", err)
+	}
+	log.Info("Determined allowed capabilities")
+
+	pathConfigFile := paths.ConfigFile()
+
+	var rawConfig *config.Config
+	if testingMode {
+		// testing mode doesn't read any configuration from the disk
+		rawConfig, err = config.NewConfigFrom("")
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		// monitoring is always disabled in testing mode
+		disableMonitoring = true
+	} else {
+		rawConfig, err = config.LoadFile(pathConfigFile)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+		}
+	}
+	if err := info.InjectAgentConfig(rawConfig); err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+	cfg, err := configuration.NewFromConfig(rawConfig)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
+	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
+	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
+	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
+
+	var runtimeMgr coordinator.RuntimeManager
+
+	log.Info("Acting as operator creating runtime mgr")
+	runtimeMgr, err = runtime.NewOperatorManager(
+		log,
+		baseLogger,
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+	}
+
+	var configMgr coordinator.ConfigManager
+	var managed *managedConfigManager
+	var compModifiers []coordinator.ComponentsModifier
+	var composableManaged bool
+	var isManaged bool
+	if testingMode {
+		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
+
+		// testing mode uses a config manager that takes configuration from over the control protocol
+		configMgr = newTestingModeConfigManager(log)
+	} else {
+		log.Info("Acting as operator creating setting up config mgr")
+		runtimeWatcher, ok := runtimeMgr.(controllers.Watcher)
+		if !ok {
+			panic("runtime manager does not implement controllers.Watcher")
+		}
+		configMgr = registerOperatorWatches(log, runtimeWatcher)
+	}
+
+	composable, err := composable.New(log, rawConfig, composableManaged)
+	if err != nil {
+		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
+	}
+
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtimeMgr, configMgr, composable, caps, monitor, isManaged, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
@@ -246,4 +386,69 @@ func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.St
 	}
 
 	return store, cfg, nil
+}
+
+func registerOperatorWatches(log *logger.Logger, runtimeManager controllers.Watcher) coordinator.ConfigManager {
+	scheme := k8sRuntime.NewScheme()
+	setupLog := ctrl.Log.WithName("setup")
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
+
+	var metricsAddr = env.WithDefault(":8080", "METRICS_BIND_ADDRESS")
+	var probeAddr = env.WithDefault(":8081", "HEALTH_PROBE_BIND_ADDRESS")
+	var enableLeaderElection = env.Bool("LEADER_ELECT")
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
+		HealthProbeBindAddress: probeAddr,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "7aab3455.agent.k8s.elastic.co",
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	var agentPolicyReconciler = controllers.NewElasticPolicyController(
+		log,
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		runtimeManager,
+	)
+	if err = agentPolicyReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ElasticAgentPolicy")
+		os.Exit(1)
+	}
+
+	var agentComponentReconciler = controllers.NewElasticComponentController(
+		log,
+		mgr.GetClient(),
+		mgr.GetScheme(),
+	)
+	if err = (agentComponentReconciler).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ElasticAgentComponent")
+		os.Exit(1)
+	}
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+
+	setupLog.Info("starting manager")
+	go func() {
+		if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+			setupLog.Error(err, "problem running manager")
+			os.Exit(1)
+		}
+	}()
+
+	return agentPolicyReconciler.ConfigManager()
 }

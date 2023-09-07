@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -251,6 +252,7 @@ type Coordinator struct {
 	// The final component model generated from ast and vars (this is the same
 	// value that is sent to the runtime manager).
 	componentModel []component.Component
+	processLock    sync.Mutex
 
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
@@ -279,7 +281,20 @@ type managerChans struct {
 var ErrFatalCoordinator = errors.New("fatal error in coordinator")
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger,
+	cfg *configuration.Configuration,
+	logLevel logp.Level,
+	agentInfo *info.AgentInfo,
+	specs component.RuntimeSpecs,
+	reexecMgr ReExecManager,
+	upgradeMgr UpgradeManager,
+	runtimeMgr RuntimeManager,
+	configMgr ConfigManager,
+	varsMgr VarsManager,
+	caps capabilities.Capabilities,
+	monitorMgr MonitorManager,
+	isManaged bool,
+	modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -504,7 +519,10 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 	// may not initialize all managers -- in that case we leave subChan nil,
 	// and just idle until Coordinator shuts down.
 	if c.runtimeMgr != nil {
-		subChan = c.runtimeMgr.SubscribeAll(ctx).Ch()
+		sub := c.runtimeMgr.SubscribeAll(ctx)
+		if sub != nil {
+			subChan = sub.Ch()
+		}
 	}
 	for {
 		select {
@@ -1031,6 +1049,8 @@ func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) {
 // forward the result to the runtime manager.
 // Always called on the main Coordinator goroutine.
 func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
+	c.processLock.Lock()
+	defer c.processLock.Unlock()
 	if c.ast == nil || c.vars == nil {
 		// Nothing to process yet
 		return nil
