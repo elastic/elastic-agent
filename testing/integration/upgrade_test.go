@@ -96,6 +96,12 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
+
+			t.Cleanup(func() {
+				// Make sure the watcher is done at the end of the test.
+				time.Sleep(time.Minute + time.Second)
+			})
+
 			testUpgradeFleetManagedElasticAgent(t, ctx, info, agentFixture, parsedVersion, define.Version())
 		})
 	}
@@ -209,6 +215,11 @@ func TestStandaloneUpgrade(t *testing.T) {
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
 
+			t.Cleanup(func() {
+				// Make sure the watcher is done at the end of the test.
+				time.Sleep(time.Minute + time.Second)
+			})
+
 			parsedUpgradeVersion, err := version.ParseVersion(define.Version())
 			require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
 			skipVerify := version_8_7_0.Less(*parsedVersion)
@@ -252,6 +263,11 @@ func TestStandaloneDowngradeWithGPGFallback(t *testing.T) {
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
 
+	t.Cleanup(func() {
+		// Make sure the watcher is done at the end of the test.
+		time.Sleep(time.Minute + time.Second)
+	})
+
 	_, defaultPGP := release.PGP()
 	firstSeven := string(defaultPGP[:7])
 	customPGP := strings.Replace(
@@ -286,6 +302,11 @@ func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
 
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
+
+	t.Cleanup(func() {
+		// Make sure the watcher is done at the end of the test.
+		time.Sleep(time.Minute + time.Second)
+	})
 
 	// retrieve all the versions of agent from the artifact API
 	aac := tools.NewArtifactAPIClient()
@@ -338,7 +359,6 @@ func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
 	parsedFromVersion, err := version.ParseVersion(define.Version())
 	require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
 	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false, true, false, "")
-
 }
 
 func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion string) (upgradableVersions []*version.ParsedSemVer) {
@@ -658,6 +678,11 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
 
+	t.Cleanup(func() {
+		// Make sure the watcher is done at the end of the test.
+		time.Sleep(time.Minute + time.Second)
+	})
+
 	t.Log("Install the built Agent")
 	output, err := tools.InstallStandaloneAgent(agentFixture)
 	t.Log(string(output))
@@ -813,6 +838,14 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	err = f.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	t.Cleanup(func() {
+		// Make sure the watcher is done at the end of the test.
+		time.Sleep(time.Minute + time.Second)
+	})
 
 	output, err := tools.InstallStandaloneAgent(f)
 	t.Logf("Agent installation output: %q", string(output))
