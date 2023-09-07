@@ -45,7 +45,7 @@ import (
 	agtversion "github.com/elastic/elastic-agent/version"
 )
 
-const watcherWaitDuration = time.Minute + 30*time.Second
+const watcherWaitDuration = 10 * time.Minute
 const fastWatcherCfg = `
 agent.upgrade.watcher:
   grace_period: 1m
