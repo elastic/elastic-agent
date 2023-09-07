@@ -232,7 +232,7 @@ func (f *Fixture) CollectDiagnostics() {
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics to %s (%s): %s", outputPath, err, output)
 
-		goroutinesPath := filepath.Join(diagPath, fmt.Sprintf("%s-goroutines-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
+		goroutinesPath := filepath.Join(diagPath, fmt.Sprintf("%s-goroutines-%s.txt", sanitizedTestName, time.Now().Format(time.RFC3339)))
 		goroutinesFile, err := os.Create(goroutinesPath)
 		if err != nil {
 			f.t.Logf("creating pprof output file %s: %s", goroutinesPath, err)
