@@ -101,8 +101,12 @@ func (p *upstartPidProvider) PID(ctx context.Context) (int, error) {
 }
 
 func (p *upstartPidProvider) Restart(ctx context.Context) error {
-	// TODO
-	return errors.New("not yet implemented")
+	restartCmd := exec.Command("/sbin/restart", agentName)
+	if err := restartCmd.Run(); err != nil {
+		return fmt.Errorf("failed to restart %s service via upstart: %w", agentName, err)
+	}
+
+	return nil
 }
 
 // SYSV PID Provider
@@ -148,6 +152,7 @@ func (p *sysvPidProvider) PID(ctx context.Context) (int, error) {
 }
 
 func (p *sysvPidProvider) Restart(ctx context.Context) error {
+	// TODO
 	return errors.New("not yet implemented")
 }
 
@@ -224,7 +229,6 @@ func (p *noopPidProvider) Name() string { return "noop" }
 func (p *noopPidProvider) PID(ctx context.Context) (int, error) { return 0, nil }
 
 func (p *noopPidProvider) Restart(ctx context.Context) error {
-	// TODO
 	return errors.New("not yet implemented")
 }
 
