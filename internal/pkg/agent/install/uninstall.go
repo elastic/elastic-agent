@@ -328,7 +328,7 @@ func killWatcher() error {
 				continue
 			}
 			err = proc.Kill()
-			if err != nil {
+			if err != nil && !errors.Is(err, os.ErrProcessDone) {
 				errs = errors.Join(errs, fmt.Errorf("failed to kill watcher process with pid %d: %w", pid, err))
 				continue
 			}
