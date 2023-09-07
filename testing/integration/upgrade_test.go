@@ -45,6 +45,7 @@ import (
 	agtversion "github.com/elastic/elastic-agent/version"
 )
 
+const watcherWaitDuration = time.Minute + 30*time.Second
 const fastWatcherCfg = `
 agent.upgrade.watcher:
   grace_period: 1m
@@ -99,7 +100,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 			t.Cleanup(func() {
 				// Make sure the watcher is done at the end of the test.
-				time.Sleep(time.Minute + time.Second)
+				time.Sleep(watcherWaitDuration)
 			})
 
 			testUpgradeFleetManagedElasticAgent(t, ctx, info, agentFixture, parsedVersion, define.Version())
@@ -217,7 +218,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 
 			t.Cleanup(func() {
 				// Make sure the watcher is done at the end of the test.
-				time.Sleep(time.Minute + time.Second)
+				time.Sleep(watcherWaitDuration)
 			})
 
 			parsedUpgradeVersion, err := version.ParseVersion(define.Version())
@@ -265,7 +266,7 @@ func TestStandaloneDowngradeWithGPGFallback(t *testing.T) {
 
 	t.Cleanup(func() {
 		// Make sure the watcher is done at the end of the test.
-		time.Sleep(time.Minute + time.Second)
+		time.Sleep(watcherWaitDuration)
 	})
 
 	_, defaultPGP := release.PGP()
@@ -305,7 +306,7 @@ func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
 
 	t.Cleanup(func() {
 		// Make sure the watcher is done at the end of the test.
-		time.Sleep(time.Minute + time.Second)
+		time.Sleep(watcherWaitDuration)
 	})
 
 	// retrieve all the versions of agent from the artifact API
@@ -680,7 +681,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 
 	t.Cleanup(func() {
 		// Make sure the watcher is done at the end of the test.
-		time.Sleep(time.Minute + time.Second)
+		time.Sleep(watcherWaitDuration)
 	})
 
 	t.Log("Install the built Agent")
@@ -844,7 +845,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 
 	t.Cleanup(func() {
 		// Make sure the watcher is done at the end of the test.
-		time.Sleep(time.Minute + time.Second)
+		time.Sleep(watcherWaitDuration)
 	})
 
 	output, err := tools.InstallStandaloneAgent(f)
