@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestHTTPClient(t *testing.T) {
@@ -145,5 +147,65 @@ func TestExtract(t *testing.T) {
 		assert.True(t, strings.Index(err.Error(), "400") > 0)
 		assert.True(t, strings.Index(err.Error(), "Bad Request") > 0)
 		assert.True(t, strings.Index(err.Error(), "fails because") > 0)
+	})
+}
+
+func TestElasticApiVersion(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		assert.Equal(t, request.Header.Get(elasticApiVersionHeaderKey), defaultFleetApiVersion)
+		writer.WriteHeader(http.StatusOK)
+	})
+
+	mux.HandleFunc("/downgrade", func(writer http.ResponseWriter, request *http.Request) {
+		assert.Equal(t, request.Header.Get(elasticApiVersionHeaderKey), defaultFleetApiVersion)
+		// request to downgrade to a completely fictitious version (just testing that we get a log for that)
+		writer.Header().Add(elasticApiVersionHeaderKey, request.URL.Query().Get("version"))
+		writer.WriteHeader(http.StatusBadRequest)
+	})
+
+	mux.HandleFunc("/warning", func(writer http.ResponseWriter, request *http.Request) {
+		assert.Equal(t, request.Header.Get(elasticApiVersionHeaderKey), defaultFleetApiVersion)
+		// send back a warning simulating an unsupported api version
+		writer.Header().Add("Warning", request.URL.Query().Get("warning_msg"))
+		writer.WriteHeader(http.StatusBadRequest)
+	})
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	testLogger, obsLogs := logger.NewTesting("testElasticApiVersion")
+
+	clt, err := NewWithConfig(testLogger, remote.Config{
+		Hosts: []string{ts.URL},
+	})
+	require.NoError(t, err)
+
+	t.Run("verify that Elastic-Api-Version header is present", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		_, err = clt.Send(ctx, http.MethodGet, "/", nil, nil, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("verify that we log a downgrade request", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		_, err = clt.Send(ctx, http.MethodGet, "/downgrade", map[string][]string{"version": {"2020-01-01"}}, nil, nil)
+		assert.NoError(t, err)
+		logs := obsLogs.FilterMessageSnippet("fleet requested a different api version \"2020-01-01\"").All()
+		t.Logf("retrieved logs: %v", logs)
+		assert.NotEmptyf(t, logs, "downgrade response was not logged")
+	})
+
+	t.Run("verify that we log an incoming warning", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		warningText := "API version is no longer supported. Upgrade immediately!"
+		_, err = clt.Send(ctx, http.MethodGet, "/warning", map[string][]string{"warning_msg": {warningText}}, nil, nil)
+		assert.NoError(t, err)
+		logs := obsLogs.FilterMessageSnippet("API version is no longer supported. Upgrade immediately!").All()
+		t.Logf("retrieved logs: %v", logs)
+		assert.NotEmptyf(t, logs, "warning was not logged")
 	})
 }
