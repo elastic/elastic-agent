@@ -366,7 +366,7 @@ func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion s
 	t.Helper()
 
 	const currentMajorVersions = 2
-	const previousMajorVersions = 0
+	const previousMajorVersions = 1
 
 	aac := tools.NewArtifactAPIClient()
 	vList, err := aac.GetVersions(ctx)
