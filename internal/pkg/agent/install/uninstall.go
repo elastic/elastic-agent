@@ -6,6 +6,7 @@ package install
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,9 +16,11 @@ import (
 
 	"github.com/kardianos/service"
 
+	"github.com/elastic/elastic-agent-system-metrics/metric/system/process"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	aerrors "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -41,11 +44,16 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	if status == service.StatusRunning {
 		err := svc.Stop()
 		if err != nil {
-			return errors.New(
+			return aerrors.New(
 				err,
 				fmt.Sprintf("failed to stop service (%s)", paths.ServiceName),
-				errors.M("service", paths.ServiceName))
+				aerrors.M("service", paths.ServiceName))
 		}
+	}
+
+	// kill any running watcher
+	if err := killWatcher(); err != nil {
+		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
 	}
 
 	// Uninstall components first
@@ -54,10 +62,10 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 		// If the components uninstall failed start the service again
 		if status == service.StatusRunning {
 			if startErr := svc.Start(); startErr != nil {
-				return errors.New(
+				return aerrors.New(
 					err,
 					fmt.Sprintf("failed to restart service (%s), after failed components uninstall: %v", paths.ServiceName, startErr),
-					errors.M("service", paths.ServiceName))
+					aerrors.M("service", paths.ServiceName))
 			}
 		}
 		return err
@@ -70,20 +78,20 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	if paths.ShellWrapperPath != "" {
 		err = os.Remove(paths.ShellWrapperPath)
 		if !os.IsNotExist(err) && err != nil {
-			return errors.New(
+			return aerrors.New(
 				err,
 				fmt.Sprintf("failed to remove shell wrapper (%s)", paths.ShellWrapperPath),
-				errors.M("destination", paths.ShellWrapperPath))
+				aerrors.M("destination", paths.ShellWrapperPath))
 		}
 	}
 
 	// remove existing directory
 	err = RemovePath(topPath)
 	if err != nil {
-		return errors.New(
+		return aerrors.New(
 			err,
 			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
-			errors.M("directory", paths.Top()))
+			aerrors.M("directory", paths.Top()))
 	}
 
 	return nil
@@ -258,7 +266,7 @@ func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp compo
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
 	mm, err := cfg.ToMapStr()
 	if err != nil {
-		return nil, errors.New("failed to create a map from config", err)
+		return nil, aerrors.New("failed to create a map from config", err)
 	}
 	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil)
 	if err != nil {
@@ -299,7 +307,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 		}
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
-			return nil, errors.New("inserting rendered inputs failed", err)
+			return nil, aerrors.New("inserting rendered inputs failed", err)
 		}
 	}
 
@@ -309,4 +317,41 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	}
 
 	return config.NewConfigFrom(finalConfig)
+}
+
+// killWatcher finds and kills any running Elastic Agent watcher.
+func killWatcher() error {
+	procStats := process.Stats{
+		Procs:        []string{"elastic-agent"},
+		CacheCmdLine: true,
+	}
+	err := procStats.Init()
+	if err != nil {
+		return fmt.Errorf("failed to initialize process.Stats: %w", err)
+	}
+	pidMap, _, err := procStats.FetchPids()
+	if err != nil {
+		return fmt.Errorf("failed to fetch elastic-agent pids: %w", err)
+	}
+	var errs error
+	for pid, state := range pidMap {
+		if len(state.Args) < 2 {
+			// must have at least 2 args "elastic-agent watcher"
+			continue
+		}
+		if state.Args[0] == "elastic-agent" && state.Args[1] == "watcher" {
+			// it is a watcher
+			proc, err := os.FindProcess(pid)
+			if err != nil {
+				errs = errors.Join(errs, fmt.Errorf("failed to load watcher process with pid %d: %w", pid, err))
+				continue
+			}
+			err = proc.Kill()
+			if err != nil {
+				errs = errors.Join(errs, fmt.Errorf("failed to kill watcher process with pid %d: %w", pid, err))
+				continue
+			}
+		}
+	}
+	return errs
 }
