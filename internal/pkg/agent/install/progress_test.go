@@ -44,13 +44,13 @@ func TestProgress(t *testing.T) {
 	t.Run("single_step_delayed_failure", func(t *testing.T) {
 		w := newTestWriter()
 		pt := NewProgressTracker(w)
-		pt.SetTickInterval(20 * time.Millisecond) // to speed up testing
+		pt.SetTickInterval(40 * time.Millisecond) // to speed up testing
 		pt.DisableRandomizedTickIntervals()
 
 		pt.Start()
 
 		pt.StepStart("step 1 starting")
-		time.Sleep(45 * time.Millisecond) // to simulate work being done
+		time.Sleep(90 * time.Millisecond) // to simulate work being done
 		pt.StepFailed()
 
 		pt.Stop()
@@ -78,16 +78,16 @@ func TestProgress(t *testing.T) {
 	t.Run("multi_step_delayed_success", func(t *testing.T) {
 		w := newTestWriter()
 		pt := NewProgressTracker(w)
-		pt.SetTickInterval(20 * time.Millisecond) // to speed up testing
+		pt.SetTickInterval(40 * time.Millisecond) // to speed up testing
 		pt.DisableRandomizedTickIntervals()
 
 		pt.Start()
 
 		pt.StepStart("step 1 starting")
-		time.Sleep(110 * time.Millisecond) // to simulate work being done
+		time.Sleep(210 * time.Millisecond) // to simulate work being done
 		pt.StepSucceeded()
 		pt.StepStart("step 2 starting")
-		time.Sleep(50 * time.Millisecond) // to simulate work being done
+		time.Sleep(90 * time.Millisecond) // to simulate work being done
 		pt.StepSucceeded()
 
 		pt.Stop()
@@ -98,14 +98,14 @@ func TestProgress(t *testing.T) {
 	t.Run("single_step_delay_after_success", func(t *testing.T) {
 		w := newTestWriter()
 		pt := NewProgressTracker(w)
-		pt.SetTickInterval(20 * time.Millisecond) // to speed up testing
+		pt.SetTickInterval(40 * time.Millisecond) // to speed up testing
 		pt.DisableRandomizedTickIntervals()
 
 		pt.Start()
 
 		pt.StepStart("step 1 starting")
 		pt.StepFailed()
-		time.Sleep(50 * time.Millisecond) // to simulate work being done
+		time.Sleep(90 * time.Millisecond) // to simulate work being done
 
 		pt.Stop()
 
