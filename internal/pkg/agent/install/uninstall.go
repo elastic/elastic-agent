@@ -302,7 +302,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 // killWatcher finds and kills any running Elastic Agent watcher.
 func killWatcher() error {
 	procStats := process.Stats{
-		Procs:        []string{"elastic-agent"},
+		Procs:        []string{".*elastic-agent"},
 		CacheCmdLine: true,
 	}
 	err := procStats.Init()
@@ -319,8 +319,8 @@ func killWatcher() error {
 			// must have at least 2 args "elastic-agent watcher"
 			continue
 		}
-		if state.Args[0] == "elastic-agent" && state.Args[1] == "watcher" {
-			// it is a watcher
+		if filepath.Base(state.Args[0]) == "elastic-agent" && state.Args[1] == "watch" {
+			// it is the watch subprocess
 			proc, err := os.FindProcess(pid)
 			if err != nil {
 				errs = errors.Join(errs, fmt.Errorf("failed to load watcher process with pid %d: %w", pid, err))
