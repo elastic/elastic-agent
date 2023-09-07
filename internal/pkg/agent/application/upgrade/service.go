@@ -103,7 +103,7 @@ func (p *upstartPidProvider) PID(ctx context.Context) (int, error) {
 func (p *upstartPidProvider) Restart(ctx context.Context) error {
 	restartCmd := exec.Command("/sbin/restart", agentName)
 	if err := restartCmd.Run(); err != nil {
-		return fmt.Errorf("failed to restart %s service via upstart: %w", agentName, err)
+		return fmt.Errorf("failed to restart %s service via %s: %w", agentName, p.Name(), err)
 	}
 
 	return nil
