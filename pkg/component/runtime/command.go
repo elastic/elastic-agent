@@ -76,7 +76,11 @@ type commandRuntime struct {
 	ch       chan ComponentState
 	actionCh chan actionMode
 	procCh   chan procState
-	compCh   chan component.Component
+
+	// compCh forwards new component metadata from the runtime manager to
+	// the command runtime. It is written by calls to (*commandRuntime).Update
+	// and read by the run loop in (*commandRuntime).Run.
+	compCh chan component.Component
 
 	actionState actionMode
 	proc        *process.Info
@@ -204,14 +208,10 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 				} else {
 					// running and should be running
 					now := time.Now().UTC()
-					if c.lastCheckin.IsZero() {
-						// never checked-in
-						c.missedCheckins++
-					} else if now.Sub(c.lastCheckin) > checkinPeriod {
-						// missed check-in during required period
-						c.missedCheckins++
-					} else if now.Sub(c.lastCheckin) <= checkinPeriod {
+					if now.Sub(c.lastCheckin) <= checkinPeriod {
 						c.missedCheckins = 0
+					} else {
+						c.missedCheckins++
 					}
 					if c.missedCheckins == 0 {
 						c.compState(client.UnitStateHealthy)
