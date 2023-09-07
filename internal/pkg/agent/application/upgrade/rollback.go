@@ -46,7 +46,6 @@ func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentH
 	// Restart
 	log.Info("Restarting the agent after rollback")
 	if err := restartAgent(ctx, log); err != nil {
-		log.Errorf("Restarting the agent after rollback FAILED: %s", err.Error())
 		return err
 	}
 
@@ -132,14 +131,12 @@ func restartAgent(ctx context.Context, log *logger.Logger) error {
 		c := client.New()
 		err := c.Connect(ctx)
 		if err != nil {
-			log.Errorf("Failed communicating with running Agent daemon: %s", err.Error())
 			return errors.New(err, "failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 		}
 		defer c.Disconnect()
 
 		err = c.Restart(ctx)
 		if err != nil {
-			log.Errorf("Failed to trigger restart of running Agent daemon: %s", err.Error())
 			return errors.New(err, "failed trigger restart of daemon")
 		}
 
