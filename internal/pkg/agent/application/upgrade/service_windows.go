@@ -15,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -23,15 +24,18 @@ const (
 	afterRestartDelay = 15 * time.Second
 )
 
-func newServiceHandler() (serviceHandler, error) {
+// Init initializes os dependent properties.
+func (ch *CrashChecker) Init(ctx context.Context, _ *logger.Logger) error {
 	mgr, err := mgr.Connect()
 	if err != nil {
-		return nil, errors.New("failed to initiate service manager", err)
+		return errors.New("failed to initiate service manager", err)
 	}
 
-	return &pidProvider{
+	ch.sc = &pidProvider{
 		winManager: mgr,
-	}, nil
+	}
+
+	return nil
 }
 
 type pidProvider struct {

@@ -49,11 +49,9 @@ func NewCrashChecker(ctx context.Context, ch chan error, log *logger.Logger, che
 		checkInterval: checkInterval,
 	}
 
-	sc, err := newServiceHandler()
-	if err != nil {
+	if err := c.Init(ctx, log); err != nil {
 		return nil, err
 	}
-	c.sc = sc
 
 	log.Debugf("running checks using '%s' controller", c.sc.Name())
 

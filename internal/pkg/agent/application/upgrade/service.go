@@ -20,8 +20,10 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/dbus"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -32,16 +34,21 @@ const (
 
 type pidProvider interface {
 	Init() error
-	serviceHandler
+	Close()
+	PID(ctx context.Context) (int, error)
+	Name() string
 }
 
-func newServiceHandler() (serviceHandler, error) {
+// Init initializes os dependent properties.
+func (ch *CrashChecker) Init(ctx context.Context, _ *logger.Logger) error {
 	pp := relevantPidProvider()
 	if err := pp.Init(); err != nil {
-		return nil, fmt.Errorf("unable to initialize relevant PID provider: %w", err)
+		return fmt.Errorf("unable to initialize relevant PID provider: %w", err)
 	}
 
-	return pp, nil
+	ch.sc = pp
+
+	return nil
 }
 
 func relevantPidProvider() pidProvider {
