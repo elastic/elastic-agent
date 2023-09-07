@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -226,11 +227,26 @@ func (f *Fixture) collectDiagnostics() {
 		f.t.Logf("failed to collect diagnostics; failed to create %s: %s", diagPath, err)
 		return
 	}
-	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", f.t.Name(), time.Now().Format(time.RFC3339)))
+	stamp := time.Now().Format(time.RFC3339)
+	if runtime.GOOS == "windows" {
+		// on Windows a filename cannot contain a ':' as this collides with disk labels (aka. C:\)
+		stamp = strings.ReplaceAll(stamp, ":", "-")
+	}
+	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", f.t.Name(), stamp))
 
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics to %s (%s): %s", outputPath, err, output)
+
+		// possible that the test was so fast that the Elastic Agent was just installed, the control protocol is
+		// not fully running yet. wait 15 seconds to try again, ensuring that best effort is performed in fetching
+		// diagnostics
+		if strings.Contains(string(output), "connection error") {
+			f.t.Logf("retrying in 15 seconds due to connection error; possible Elastic Agent was not fully started")
+			time.Sleep(15 * time.Second)
+			output, err = f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
+			f.t.Logf("failed to collect diagnostics a second time at %s (%s): %s", outputPath, err, output)
+		}
 	}
 }
 
