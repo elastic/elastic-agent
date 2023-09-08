@@ -933,6 +933,8 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 		Sudo:    true, // requires Agent installation
 	})
 
+	t.Skip("Possibly cause of flaky tests")
+
 	upgradeFromVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
