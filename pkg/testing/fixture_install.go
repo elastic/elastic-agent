@@ -131,12 +131,14 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 
 		// environment variable AGENT_KEEP_INSTALLED=true will skip the uninstall
 		// useful to debug the issue with the Elastic Agent
-		if keepInstalled() && f.t.Failed() {
-			f.t.Logf("skipping uninstall; AGENT_KEEP_INSTALLED=true")
+		if f.t.Failed() && keepInstalled() {
+			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
 			return
-		} else {
+		}
+
+		if keepInstalled() {
 			f.t.Logf("ignoring AGENT_KEEP_INSTALLED=true as test succeeded, " +
-				"keeping the agent installed will jeperdise other tests")
+				"keeping the agent installed will jeopardise other tests")
 		}
 
 		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
