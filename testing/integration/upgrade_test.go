@@ -1013,7 +1013,7 @@ inputs:
 	}, 2*time.Minute, 250*time.Millisecond, "Upgraded Agent never became healthy")
 
 	// Wait for upgrade watcher to finish running
-	checkUpgradeWatcherRan(t, agentFixture, upgradeFromVersion)
+	waitForUpgradeWatcherToComplete(t, agentFixture, upgradeFromVersion, standaloneWatcherDuration)
 
 	t.Log("Ensure the we have rolled back and the correct version is running")
 	require.Eventually(t, func() bool {
