@@ -126,7 +126,7 @@ func TestChecker(t *testing.T) {
 		}
 
 		cancel()
-		require.ErrorContains(t, err, "service restarted '3' times within '0.1' seconds")
+		assert.ErrorContains(t, err, "service restarted '3' times within '0.1' seconds")
 	})
 
 	t.Run("fails when pid remains 0", func(t *testing.T) {
