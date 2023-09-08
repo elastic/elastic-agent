@@ -227,14 +227,11 @@ func TestStandaloneUpgrade(t *testing.T) {
 	}
 }
 
-func TestStandaloneDowngradeWithGPGFallback(t *testing.T) {
+func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-
-	t.Skip("snapshot downloader has a bug which break this test between releases: " +
-		"https://github.com/elastic/elastic-agent/issues/3313")
 
 	minVersion := version_8_10_0_SNAPSHOT
 	fromVersion, err := version.ParseVersion(define.Version())
