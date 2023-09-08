@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 
@@ -172,7 +171,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, release.TrimCommit(newHash))
 
 	// Clean everything from the downloads dir
-	u.log.Debugw("Removing downloads directory", "file.path", paths.Downloads())
+	u.log.Infow("Removing downloads directory", "file.path", paths.Downloads())
 	err = os.RemoveAll(paths.Downloads())
 	if err != nil {
 		u.log.Errorw("Unable to clean downloads after update", "error.message", err, "file.path", paths.Downloads())
@@ -231,11 +230,12 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
 	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
-	log.Debugw("Copying action store", "new_home_path", newHome)
+	log.Infow("Copying action store", "new_home_path", newHome)
 
 	for _, currentActionStorePath := range storePaths {
 		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
-		log.Debugw("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
+		// TODO: decide if this should be left as log.Debugw, in case log.Infow is too verbose
+		log.Infow("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
 		currentActionStore, err := os.ReadFile(currentActionStorePath)
 		if os.IsNotExist(err) {
 			// nothing to copy
@@ -266,7 +266,7 @@ func copyRunDirectory(log *logger.Logger, newHash string) error {
 	err := copyDir(log, oldRunPath, newRunPath, true)
 	if os.IsNotExist(err) {
 		// nothing to copy, operation ok
-		log.Debugw("Run directory not present", "old_run_path", oldRunPath)
+		log.Infow("Run directory not present", "old_run_path", oldRunPath)
 		return nil
 	}
 	if err != nil {
