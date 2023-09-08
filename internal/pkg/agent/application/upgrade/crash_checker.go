@@ -28,7 +28,7 @@ type serviceHandler interface {
 // CrashChecker checks agent for crash pattern in Elastic Agent lifecycle.
 type CrashChecker struct {
 	notifyChan    chan error
-	q             *disctintQueue
+	q             *distinctQueue
 	log           *logger.Logger
 	sc            serviceHandler
 	checkInterval time.Duration
@@ -75,33 +75,72 @@ func (ch *CrashChecker) Run(ctx context.Context) {
 				ch.log.Error(err)
 			}
 
+			ch.log.Infof("retrieved service PID [%d]", pid)
 			ch.q.Push(pid)
-			restarts := ch.q.Distinct()
-			ch.log.Infof("retrieved service PID [%d] changed %d times within %d", pid, restarts, evaluatedPeriods)
-			if restarts > crashesAllowed {
-				ch.notifyChan <- errors.New(fmt.Sprintf("service restarted '%d' times within '%v' seconds", restarts, ch.checkInterval.Seconds()))
-			}
+
+			// We decide if the Agent process has crashed in either of
+			// these two ways.
+			ch.checkNotRunning()
+			ch.checkRestarted()
 		}
 	}
 }
 
-type disctintQueue struct {
+// checkNotRunning checks if the PID reported for the Agent process has
+// remained 0 for most recent crashesAllowed times the PID was checked.
+// If so, it decides that the service has crashed.
+func (ch *CrashChecker) checkNotRunning() {
+	// If PID has remained 0 for the most recent crashesAllowed number of checks,
+	// we consider the Agent as having crashed.
+	if ch.q.Len() < crashesAllowed {
+		// Not enough history of PIDs yet
+		return
+	}
+
+	recentPIDs := ch.q.Peek(crashesAllowed)
+	ch.log.Debugf("most recent %d service PIDs within %d evaulations: %v", crashesAllowed, evaluatedPeriods, recentPIDs)
+
+	allZeroPIDs := true
+	for _, recentPID := range recentPIDs {
+		allZeroPIDs = allZeroPIDs && (recentPID == 0)
+	}
+
+	if allZeroPIDs {
+		msg := fmt.Sprintf("service remained crashed (PID = 0) within '%v' seconds", ch.checkInterval.Seconds())
+		ch.notifyChan <- errors.New(msg)
+	}
+}
+
+// checkRestarted checks if the PID reported for the Agent process has
+// changed more than crashesAllowed times. If so, it decides that the service
+// has crashed.
+func (ch *CrashChecker) checkRestarted() {
+	restarts := ch.q.Distinct()
+	ch.log.Debugf("service PID changed %d times within %d evaluations", restarts, evaluatedPeriods)
+
+	if restarts > crashesAllowed {
+		msg := fmt.Sprintf("service restarted '%d' times within '%v' seconds", restarts, ch.checkInterval.Seconds())
+		ch.notifyChan <- errors.New(msg)
+	}
+}
+
+type distinctQueue struct {
 	q    []int
 	size int
 	lock sync.Mutex
 }
 
-func newDistinctQueue(size int) (*disctintQueue, error) {
+func newDistinctQueue(size int) (*distinctQueue, error) {
 	if size < 1 {
 		return nil, errors.New("invalid size", errors.TypeUnexpected)
 	}
-	return &disctintQueue{
+	return &distinctQueue{
 		q:    make([]int, 0, size),
 		size: size,
 	}, nil
 }
 
-func (dq *disctintQueue) Push(id int) {
+func (dq *distinctQueue) Push(id int) {
 	dq.lock.Lock()
 	defer dq.lock.Unlock()
 
@@ -112,7 +151,7 @@ func (dq *disctintQueue) Push(id int) {
 	dq.q = append([]int{id}, dq.q[:cutIdx]...)
 }
 
-func (dq *disctintQueue) Distinct() int {
+func (dq *distinctQueue) Distinct() int {
 	dq.lock.Lock()
 	defer dq.lock.Unlock()
 
@@ -123,4 +162,16 @@ func (dq *disctintQueue) Distinct() int {
 	}
 
 	return len(dm)
+}
+
+func (dq *distinctQueue) Len() int {
+	return len(dq.q)
+}
+
+func (dq *distinctQueue) Peek(size int) []int {
+	if size > len(dq.q) {
+		size = len(dq.q)
+	}
+
+	return dq.q[:size]
 }
