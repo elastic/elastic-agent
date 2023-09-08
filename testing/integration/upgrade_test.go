@@ -58,23 +58,6 @@ agent.upgrade.watcher:
   crash_check.interval: 15s
 `, standaloneWatcherDuration)
 
-const systemMetricsInputCfg = `
-outputs:
-  default:
-    type: elasticsearch
-    hosts: [127.0.0.1:9200]
-
-inputs:
-  - type: system/metrics
-    id: unique-system-metrics-input
-    data_stream.namespace: default
-    use_output: default
-    streams:
-      - metricsets:
-        - cpu
-        data_stream.dataset: system.cpu
-`
-
 // notable versions used in tests
 
 // first version to include --non-interactive flag during install
