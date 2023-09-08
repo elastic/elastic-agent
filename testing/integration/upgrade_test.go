@@ -46,7 +46,7 @@ import (
 )
 
 // The watcher will need the default 10 minutes to complete for a Fleet managed agent, see https://github.com/elastic/elastic-agent/issues/2977.
-const fleetWatcherDuration = 10 * time.Minute
+const defaultWatcherDuration = 10 * time.Minute
 
 // Configure standalone agents to complete faster to speed up tests.
 const standaloneWatcherDuration = time.Minute
@@ -103,7 +103,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 			t.Cleanup(func() {
 				// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-				waitForUpgradeWatcherToComplete(t, agentFixture, fleetWatcherDuration)
+				waitForUpgradeWatcherToComplete(t, agentFixture, parsedVersion, defaultWatcherDuration)
 			})
 
 			testUpgradeFleetManagedElasticAgent(t, ctx, info, agentFixture, parsedVersion, define.Version())
@@ -217,7 +217,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 
 			t.Cleanup(func() {
 				// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-				waitForUpgradeWatcherToComplete(t, agentFixture, standaloneWatcherDuration)
+				waitForUpgradeWatcherToComplete(t, agentFixture, parsedVersion, standaloneWatcherDuration)
 			})
 
 			parsedUpgradeVersion, err := version.ParseVersion(define.Version())
@@ -265,7 +265,7 @@ func TestStandaloneDowngradeWithGPGFallback(t *testing.T) {
 
 	t.Cleanup(func() {
 		// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-		waitForUpgradeWatcherToComplete(t, agentFixture, standaloneWatcherDuration)
+		waitForUpgradeWatcherToComplete(t, agentFixture, fromVersion, standaloneWatcherDuration)
 	})
 
 	_, defaultPGP := release.PGP()
@@ -302,11 +302,6 @@ func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
 
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
-
-	t.Cleanup(func() {
-		// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-		waitForUpgradeWatcherToComplete(t, agentFixture, standaloneWatcherDuration)
-	})
 
 	// retrieve all the versions of agent from the artifact API
 	aac := tools.NewArtifactAPIClient()
@@ -357,6 +352,12 @@ func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
 
 	t.Logf("Targeting upgrade to version %+v", upgradeInputVersion)
 	parsedFromVersion, err := version.ParseVersion(define.Version())
+
+	t.Cleanup(func() {
+		// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
+		waitForUpgradeWatcherToComplete(t, agentFixture, parsedFromVersion, standaloneWatcherDuration)
+	})
+
 	require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
 	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false, true, false, "")
 }
@@ -577,13 +578,17 @@ func checkLegacyAgentHealthAndVersion(t *testing.T, ctx context.Context, f *ates
 // waitForUpgradeWatcherToComplete asserts that the Upgrade Watcher finished running. We use the
 // presence of the update marker file as evidence that the Upgrade Watcher is still running
 // and the absence of that file as evidence that the Upgrade Watcher is no longer running.
-func waitForUpgradeWatcherToComplete(t *testing.T, agentFixture *atesting.Fixture, timeout time.Duration) {
+func waitForUpgradeWatcherToComplete(t *testing.T, f *atesting.Fixture, fromVersion *version.ParsedSemVer, timeout time.Duration) {
 	t.Helper()
 
 	t.Log("Waiting for upgrade watcher to finish running...")
 
-	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
+	if fromVersion.Less(*version_8_9_0_SNAPSHOT) {
+		t.Logf("Version %q is too old for a quick update marker check, using default", fromVersion)
+		timeout = defaultWatcherDuration
+	}
 
+	updateMarkerFile := filepath.Join(f.WorkDir(), "data", ".update-marker")
 	info, err := os.Lstat(updateMarkerFile)
 	if os.IsNotExist(err) {
 		t.Logf("Not waiting for upgrade watcher, .update-marker not found")
@@ -680,7 +685,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 
 	t.Cleanup(func() {
 		// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-		waitForUpgradeWatcherToComplete(t, agentFixture, standaloneWatcherDuration)
+		waitForUpgradeWatcherToComplete(t, agentFixture, upgradeFromVersion, standaloneWatcherDuration)
 	})
 
 	t.Log("Install the built Agent")
@@ -830,6 +835,9 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	f, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
+	fromVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
 	err = f.Prepare(context.Background())
 	require.NoError(t, err)
@@ -842,7 +850,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 
 	t.Cleanup(func() {
 		// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-		waitForUpgradeWatcherToComplete(t, f, standaloneWatcherDuration)
+		waitForUpgradeWatcherToComplete(t, f, fromVersion, standaloneWatcherDuration)
 	})
 
 	output, err := tools.InstallStandaloneAgent(f)
