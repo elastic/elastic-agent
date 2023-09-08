@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -153,7 +154,7 @@ func TestChecker(t *testing.T) {
 		}
 
 		cancel()
-		require.ErrorContains(t, err, "service remained crashed (PID = 0) within '0.1' seconds")
+		assert.ErrorContains(t, err, "service remained crashed (PID = 0) within '0.1' seconds")
 	})
 }
 
