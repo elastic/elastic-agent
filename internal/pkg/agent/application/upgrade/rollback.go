@@ -123,7 +123,15 @@ func InvokeWatcher(log *logger.Logger) error {
 	}()
 
 	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start Upgrade Watcher: %w", err)
+	}
+
+	upgradeWatcherPID := cmd.Process.Pid
+	agentPID := os.Getpid()
+	log.Infow("Upgrade Watcher invoked", "agent.upgrade.watcher.process.pid", upgradeWatcherPID, "agent.process.pid", agentPID)
+
+	return nil
 }
 
 func restartAgent(ctx context.Context, log *logger.Logger) error {
