@@ -362,18 +362,18 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		}
 	}
 
-	var copyConcurrency uint = 1
+	copyConcurrency := 1
 	if install.HasAllSSDs() {
-		copyConcurrency = uint(runtime.NumCPU() * 4)
+		copyConcurrency = runtime.NumCPU() * 4
 	}
 
 	return copy.Copy(from, to, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
-		Sync:        true,
-		OnError:     onErr,
-		Concurrency: copyConcurrency,
+		Sync:         true,
+		OnError:      onErr,
+		NumOfWorkers: int64(copyConcurrency),
 	})
 }
 
