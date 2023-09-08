@@ -151,6 +151,8 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		"source": agentName,
 	})
 
+	l.Infow("Elastic Agent started. PID = %d. Agent version = %s", os.Getpid(), version.GetAgentPackageVersion())
+
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
 		err = errors.New(err, "failed to perform delayed enrollment")
