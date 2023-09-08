@@ -1238,6 +1238,9 @@ type coordinatorUnitLog struct {
 }
 
 func logBasedOnState(l *logger.Logger, state client.UnitState, msg string, args ...interface{}) {
+	// Skipping one more stack frame in order to have correct file line set in the logger output while using this wrapper function
+	l = logger.AddCallerSkip(l, 1)
+
 	switch state {
 	case client.UnitStateStarting:
 		l.With(args...).Info(msg)
