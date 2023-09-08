@@ -925,3 +925,98 @@ func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) {
 		require.NoErrorf(t, err, "error removing package version file %q", vFile)
 	}
 }
+
+// TestStandaloneUpgradeFailsStatus tests the scenario where upgrading to a new version
+// of Agent fails due to the new Agent binary reporting an unhealthy status. It checks
+// that the Agent is rolled back to the previous version.
+func TestStandaloneUpgradeFailsStatus(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+	})
+
+	upgradeFromVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Get available versions from Artifacts API
+	aac := tools.NewArtifactAPIClient()
+	versionList, err := aac.GetVersions(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
+
+	// Determine the version that's TWO versions behind the latest. This is necessary for two reasons:
+	// 1. We don't want to necessarily use the latest version as it might be the same as the
+	// local one, which will then cause the invalid input in the Agent test policy (defined further
+	// below in this test) to come into play with the Agent version we're upgrading from, thus preventing
+	// it from ever becoming healthy.
+	// 2. We don't want to necessarily use the version that's one before the latest because sometimes we
+	// are in a situation where the latest version has been advanced to the next release (e.g. 8.10.0)
+	// but the version before that (e.g. 8.9.0) hasn't been released yet.
+	require.GreaterOrEqual(t, len(versionList.Versions), 3)
+	upgradeToVersionStr := versionList.Versions[len(versionList.Versions)-3]
+
+	upgradeToVersion, err := version.ParseVersion(upgradeToVersionStr)
+	require.NoError(t, err)
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
+
+	agentFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err, "error preparing agent fixture")
+
+	// Configure Agent with fast watcher configuration and also an invalid
+	// input when the Agent version matches the upgraded Agent version. This way
+	// the pre-upgrade version of the Agent runs healthy, but the post-upgrade
+	// version doesn't.
+	invalidInputPolicy := fastWatcherCfg + fmt.Sprintf(`
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+
+inputs:
+  - condition: '${agent.version.version} == "%s"'
+    type: invalid
+    id: invalid-input
+`, upgradeToVersion.CoreVersion())
+
+	err = agentFixture.Configure(ctx, []byte(invalidInputPolicy))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	t.Log("Install the built Agent")
+	output, err := tools.InstallStandaloneAgent(agentFixture)
+	t.Log(string(output))
+	require.NoError(t, err)
+
+	c := agentFixture.Client()
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	toVersion := upgradeToVersion.String()
+	t.Logf("Upgrading Agent to %s", toVersion)
+	err = c.Connect(ctx)
+	require.NoError(t, err, "error connecting client to agent")
+	defer c.Disconnect()
+
+	_, err = c.Upgrade(ctx, toVersion, "", false, false)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion)
+
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeToVersion.CoreVersion(), upgradeToVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 250*time.Millisecond, "Upgraded Agent never became healthy")
+
+	// Wait for upgrade watcher to finish running
+	waitForUpgradeWatcherToComplete(t, agentFixture, upgradeFromVersion, standaloneWatcherDuration)
+
+	t.Log("Ensure the we have rolled back and the correct version is running")
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 10*time.Second, "Rolled back Agent never became healthy")
+}
