@@ -11,8 +11,7 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: This PR introduces the ELASTIC_NETINFO variable in the manifests of Elastic Agent. Setting the new environmental variable ELASTIC_NETINFO: false globally disables the netinfo.enabled parameter of add_host_metadata processor. This disables the indexing of `host.ip` and `host.mac` fields.
-This is recommended for large scale setups where the `host.ip` and `host.mac` fields' index size increases. The number of IPs and MAC addresses reported increases significantly as a Kubenetes cluster grows. This leads to considerably increased indexing time, as well as the need for extra storage and additional overhead for visualization rendering.
+summary: Setting a new environmental variable ELASTIC_NETINFO=false globally disables the netinfo.enabled parameter of add_host_metadata processor. This disables the indexing of host.ip and host.mac fields. This is recommended for large scale setups where the `host.ip` and `host.mac` fields' index size increases. The number of IPs and MAC addresses reported increases significantly as a Kubenetes cluster grows. This leads to considerably increased indexing time, as well as the need for extra storage and additional overhead for visualization
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
