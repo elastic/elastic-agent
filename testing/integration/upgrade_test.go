@@ -1138,7 +1138,7 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion.String())
 
 	// Ensure that the Upgrade Watcher has stopped running.
-	waitForUpgradeWatcherToComplete(t, agentFixture, upgradeFromVersion, standaloneWatcherDuration)
+	waitForUpgradeWatcherToComplete(t, f, fromVersion, standaloneWatcherDuration)
 
 	// Ensure that the original version of Agent is running again.
 	t.Log("Check Agent version to ensure rollback is successful")
