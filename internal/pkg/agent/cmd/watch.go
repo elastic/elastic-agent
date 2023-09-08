@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/elastic/elastic-agent/version"
+
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/spf13/cobra"
@@ -62,6 +64,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 }
 
 func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
+	log.Infow("Upgrade Watcher started. PID = %d. Agent version = %s", os.Getpid(), version.GetAgentPackageVersion())
 	marker, err := upgrade.LoadMarker()
 	if err != nil {
 		log.Error("failed to load marker", err)
