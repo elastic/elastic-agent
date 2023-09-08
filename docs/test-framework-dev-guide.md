@@ -128,9 +128,12 @@ every tests you can use the environment variable `AGENT_COLLECT_DIAG=true`. When
 it will cause the testing fixture to always collect diagnostics before the uninstall in the cleanup step of a test.
 
 #### Keeping Elastic Agent installed
-When the testing fixture installs the Elastic Agent it will automatically uninstall the Elastic Agent during the
-cleanup process of the test. In the case that you do not want that to happen you can disable the auto-uninstallation
-using `AGENT_KEEP_INSTALLED=true` environment variable. It is recommend to only do this when inspecting a single test.
+
+When the testing fixture installs the Elastic Agent, it will automatically uninstall
+the Elastic Agent during the cleanup process of the test. In the event that you do
+not want this to occur, you can disable the auto-uninstallation using the
+AGENT_KEEP_INSTALLED=true environment variable. If the test succeeds, the agent
+will be uninstalled regardless of the value of AGENT_KEEP_INSTALLED.
 
 - `AGENT_KEEP_INSTALLED=true mage integration:single [testName]`
 
