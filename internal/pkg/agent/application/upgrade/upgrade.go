@@ -234,7 +234,6 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 
 	for _, currentActionStorePath := range storePaths {
 		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
-		// TODO: decide if this should be left as log.Debugw, in case log.Infow is too verbose
 		log.Infow("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
 		currentActionStore, err := os.ReadFile(currentActionStorePath)
 		if os.IsNotExist(err) {
