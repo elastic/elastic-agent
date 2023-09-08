@@ -64,7 +64,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 }
 
 func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
-	log.Infow("Upgrade Watcher started. PID = %d. Agent version = %s", os.Getpid(), version.GetAgentPackageVersion())
+	log.Infow("Upgrade Watcher started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion())
 	marker, err := upgrade.LoadMarker()
 	if err != nil {
 		log.Error("failed to load marker", err)
