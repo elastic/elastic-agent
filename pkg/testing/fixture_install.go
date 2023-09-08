@@ -87,6 +87,7 @@ func (i InstallOpts) toCmdArgs() []string {
 //   - the combined output of stdout and stderr
 //   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 	installArgs := []string{"install"}
 	if installOpts != nil {
 		installArgs = append(installArgs, installOpts.toCmdArgs()...)
@@ -110,6 +111,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
+		f.t.Logf("[test %s] Inside fixture cleanup function", f.t.Name())
 		if !f.installed {
 			f.t.Logf("skipping uninstall; agent not installed (fixture.installed is false)")
 			// not installed; no need to clean up or collect diagnostics
