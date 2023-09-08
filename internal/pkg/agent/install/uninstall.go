@@ -332,15 +332,15 @@ func killWatcher() error {
 	}
 	pidMap, _, err := procStats.FetchPids()
 	if err != nil {
-		return fmt.Errorf("failed to fetch elastic-agent pids: %w", err)
+		return fmt.Errorf("failed to fetch pids: %w", err)
 	}
 	var errs error
 	for pid, state := range pidMap {
 		if len(state.Args) < 2 {
-			// must have at least 2 args "elastic-agent watch"
+			// must have at least 2 args "elastic-agent[.exe] watch"
 			continue
 		}
-		if filepath.Base(state.Args[0]) == "elastic-agent" && state.Args[1] == "watch" {
+		if filepath.Base(state.Args[0]) == paths.BinaryName && state.Args[1] == "watch" {
 			// it is the watch subprocess
 			proc, err := os.FindProcess(pid)
 			if err != nil {
