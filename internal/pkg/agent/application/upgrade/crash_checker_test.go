@@ -23,7 +23,7 @@ func TestChecker(t *testing.T) {
 	t.Run("no failure when no change", func(t *testing.T) {
 		pider := &testPider{pid: 111}
 		ch, errChan := testableChecker(t, pider)
-		ctx, canc := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -41,7 +41,7 @@ func TestChecker(t *testing.T) {
 		default:
 		}
 
-		canc()
+		cancel()
 		require.NoError(t, err)
 	})
 
@@ -49,7 +49,7 @@ func TestChecker(t *testing.T) {
 		const startingPID = 222
 		pider := &testPider{pid: startingPID}
 		ch, errChan := testableChecker(t, pider)
-		ctx, canc := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -69,7 +69,7 @@ func TestChecker(t *testing.T) {
 		default:
 		}
 
-		canc()
+		cancel()
 		require.NoError(t, err)
 	})
 
@@ -77,7 +77,7 @@ func TestChecker(t *testing.T) {
 		const startingPID = 333
 		pider := &testPider{pid: startingPID}
 		ch, errChan := testableChecker(t, pider)
-		ctx, canc := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -97,14 +97,14 @@ func TestChecker(t *testing.T) {
 		default:
 		}
 
-		canc()
+		cancel()
 		require.NoError(t, err)
 	})
 
 	t.Run("fails when pid changes frequently", func(t *testing.T) {
 		pider := &testPider{}
 		ch, errChan := testableChecker(t, pider)
-		ctx, canc := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -124,7 +124,7 @@ func TestChecker(t *testing.T) {
 		default:
 		}
 
-		canc()
+		cancel()
 		require.ErrorContains(t, err, "service restarted '3' times within '0.1' seconds")
 	})
 
@@ -132,7 +132,7 @@ func TestChecker(t *testing.T) {
 		const startingPID = 0
 		pider := &testPider{pid: startingPID}
 		ch, errChan := testableChecker(t, pider)
-		ctx, canc := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -152,7 +152,7 @@ func TestChecker(t *testing.T) {
 		default:
 		}
 
-		canc()
+		cancel()
 		require.ErrorContains(t, err, "service remained crashed (PID = 0) within '0.1' seconds")
 	})
 }
