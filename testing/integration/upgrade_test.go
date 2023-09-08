@@ -1134,7 +1134,7 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 	// Try upgrading to the fake Agent package.
 	t.Logf("Attempting upgrade to %s using Agent package at %s", toVersion.String(), packagePath)
 	ctx, _ = context.WithTimeout(ctx, 2*time.Minute)
-	_, err = c.Upgrade(ctx, toVersion.String(), "file://"+packagePath, true)
+	_, err = c.Upgrade(ctx, toVersion.String(), "file://"+packagePath, true, false)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion.String())
 
 	// Ensure that the Upgrade Watcher has stopped running.
