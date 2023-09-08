@@ -2,7 +2,7 @@
 
 ## Reminders
 
-When Elastic Agent tries to perform an upgrade, it first verifies the binary signature with the key bundled in the Agent.
+Starting from version 8.9.0, when Elastic Agent tries to perform an upgrade, it first verifies the binary signature with the key bundled in the Agent.
 This process has a backup mechanism that will use the key coming from https://artifacts.elastic.co/GPG-KEY-elastic-agent instead of the one it already has.
 
 In an air-gapped environment, the Agent won't be able to download the remote key and therefore cannot be upgraded.
