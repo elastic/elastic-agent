@@ -7,7 +7,6 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -64,7 +63,6 @@ func (ch *CrashChecker) Run(ctx context.Context) {
 
 	ch.log.Info("Crash checker started")
 	for {
-		ch.log.Infof("watcher having PID: %d", os.Getpid())
 		t := time.NewTimer(ch.checkInterval)
 
 		select {
