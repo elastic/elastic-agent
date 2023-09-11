@@ -172,8 +172,9 @@ func TestElasticApiVersion(t *testing.T) {
 		require.NoError(t, err)
 
 		resp, err := clt.Send(ctx, http.MethodGet, "/", nil, nil, nil)
-		defer resp.Body.Close()
-		assert.NoError(t, err)
+		if assert.NoError(t, err) {
+			defer resp.Body.Close()
+		}
 	})
 
 	t.Run("verify that we log a downgrade request", func(t *testing.T) {
@@ -199,8 +200,9 @@ func TestElasticApiVersion(t *testing.T) {
 		require.NoError(t, err)
 
 		resp, err := clt.Send(ctx, http.MethodGet, "/downgrade", map[string][]string{"version": {"2020-01-01"}}, nil, nil)
-		defer resp.Body.Close()
-		assert.NoError(t, err)
+		if assert.NoError(t, err) {
+			defer resp.Body.Close()
+		}
 		logs := obsLogs.FilterMessageSnippet("fleet requested a different api version \"2020-01-01\"").All()
 		t.Logf("retrieved logs: %v", logs)
 		assert.NotEmptyf(t, logs, "downgrade response was not logged")
@@ -230,8 +232,9 @@ func TestElasticApiVersion(t *testing.T) {
 
 		warningText := "API version is no longer supported. Upgrade immediately!"
 		resp, err := clt.Send(ctx, http.MethodGet, "/warning", map[string][]string{"warning_msg": {warningText}}, nil, nil)
-		defer resp.Body.Close()
-		assert.NoError(t, err)
+		if assert.NoError(t, err) {
+			defer resp.Body.Close()
+		}
 		logs := obsLogs.FilterMessageSnippet("API version is no longer supported. Upgrade immediately!").All()
 		t.Logf("retrieved logs: %v", logs)
 		assert.NotEmptyf(t, logs, "warning was not logged")
