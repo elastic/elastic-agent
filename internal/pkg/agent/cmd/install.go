@@ -192,7 +192,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 		defer func() {
 			if err != nil {
-				_ = install.Uninstall(cfgFile, topPath, "")
+				_ = install.Uninstall(cfgFile, topPath, "", force)
 			}
 		}()
 
@@ -235,7 +235,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			pt.StepFailed()
 			if status != install.PackageInstall {
 				var exitErr *exec.ExitError
-				_ = install.Uninstall(cfgFile, topPath, "")
+				_ = install.Uninstall(cfgFile, topPath, "", force)
 				if err != nil && errors.As(err, &exitErr) {
 					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
 				}

@@ -30,8 +30,20 @@ import (
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath, uninstallToken string) error {
-	// uninstall the current service
+func Uninstall(cfgFile, topPath, uninstallToken string, force bool) error {
+	var log *logp.Logger
+	var err error
+
+	if force {
+		log, err = logger.NewWithLogpLevel("uninstall", logp.DebugLevel, false)
+
+	} else {
+		log, err = logger.NewWithLogpLevel("uninstall", logp.ErrorLevel, false)
+	}
+	if err != nil {
+		return fmt.Errorf("error setting logger: %w", err)
+	}
+
 	svc, err := newService(topPath)
 	if err != nil {
 		return err
@@ -39,10 +51,13 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 
 	status, err := svc.Status()
 	if err != nil {
-		return errors.New(
-			err,
-			fmt.Sprintf("failed to get status for service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+		log.Debugf("failed to get status for service (%s): %s", paths.ServiceName, err)
+		if !force {
+			return errors.New(
+				err,
+				fmt.Sprintf("failed to get status for service (%s)", paths.ServiceName),
+				errors.M("service", paths.ServiceName))
+		}
 	}
 
 	if status == service.StatusRunning {
@@ -75,10 +90,13 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 
 	err = svc.Uninstall()
 	if err != nil {
-		return errors.New(
-			err,
-			fmt.Sprintf("failed to uninstall service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+		log.Debugf("failed to uninstall service (%s): %s", paths.ServiceName, err)
+		if !force {
+			return errors.New(
+				err,
+				fmt.Sprintf("failed to uninstall service (%s)", paths.ServiceName),
+				errors.M("service", paths.ServiceName))
+		}
 	}
 
 	// remove, if present on platform

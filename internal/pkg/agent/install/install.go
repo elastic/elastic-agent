@@ -35,7 +35,7 @@ func Install(cfgFile, topPath string, pt *ProgressTracker) error {
 	// Uninstall will fail on protected agent.
 	// The protected Agent will need to be uninstalled first before it can be installed.
 	pt.StepStart("Uninstalling current Elastic Agent")
-	err = Uninstall(cfgFile, topPath, "")
+	err = Uninstall(cfgFile, topPath, "", true)
 	if err != nil && !errors.Is(err, service.ErrNotInstalled) {
 		pt.StepFailed()
 		return errors.New(

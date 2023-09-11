@@ -80,7 +80,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
-	err = install.Uninstall(paths.ConfigFile(), paths.Top(), uninstallToken)
+	err = install.Uninstall(paths.ConfigFile(), paths.Top(), uninstallToken, force)
 	if err != nil {
 		return err
 	}
