@@ -446,6 +446,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// Kill any running Upgrade Watcher process so it doesn't interfere with
 	// this upgrade.
+	c.logger.Infof("Killing any running Upgrade Watcher process before starting upgrade to %s", version)
 	if err := install.KillWatcher(); err != nil {
 		return fmt.Errorf("unable to kill running Upgrade Watcher: %w", err)
 	}
