@@ -209,10 +209,12 @@ func (runner *BeatRunner) SubtestExportDashboards() {
 	require.NoError(runner.T(), err)
 	require.NotEmpty(runner.T(), dashlist)
 
-	_, err = runner.agentFixture.Exec(ctx, []string{"--path.home",
+	exportOut, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
 		runner.agentFixture.WorkDir(),
 		"export",
 		"dashboard", "--folder", outDir, "--id", dashlist[0].ID})
+
+	runner.T().Logf("got output: %s", exportOut)
 	assert.NoError(runner.T(), err)
 
 	inFolder, err := os.ReadDir(filepath.Join(outDir, "/_meta/kibana/8/dashboard"))
