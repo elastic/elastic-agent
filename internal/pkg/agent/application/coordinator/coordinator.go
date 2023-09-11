@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -441,6 +442,12 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	}
 	if err != nil {
 		return err
+	}
+
+	// Kill any running Upgrade Watcher process so it doesn't interfere with
+	// this upgrade.
+	if err := install.KillWatcher(); err != nil {
+		return fmt.Errorf("unable to kill running Upgrade Watcher: %w", err)
 	}
 
 	// override the overall state to upgrading until the re-execution is complete
