@@ -16,8 +16,6 @@ import (
 
 	"github.com/kardianos/service"
 
-	"github.com/elastic/elastic-agent-system-metrics/metric/system/process"
-
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	aerrors "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -30,6 +28,7 @@ import (
 	compruntime "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
@@ -325,7 +324,7 @@ func killWatcher() error {
 		// finding and killing watchers is performed in a loop until no
 		// more watchers are existing, this ensures that during uninstall
 		// that no matter what the watchers are dead before going any further
-		pids, errs := findWatchers()
+		pids, errs := utils.GetWatcherPIDs()
 		if errs != nil {
 			return errs
 		}
@@ -350,39 +349,4 @@ func killWatcher() error {
 		// wait 1 second before performing the loop again
 		<-time.After(1 * time.Second)
 	}
-}
-
-func findWatchers() ([]int, error) {
-	procStats := process.Stats{
-		// filtering with '.*elastic-agent' or '^.*elastic-agent$' doesn't
-		// seem to work as expected, filtering is done in the for loop below
-		Procs: []string{".*"},
-	}
-	err := procStats.Init()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize process.Stats: %w", err)
-	}
-	pidMap, _, err := procStats.FetchPids()
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch pids: %w", err)
-	}
-	var pids []int
-	var errs error
-	for pid, state := range pidMap {
-		if len(state.Args) < 2 {
-			// must have at least 2 args "elastic-agent[.exe] watch"
-			continue
-		}
-		// instead of matching on Windows using the specific '.exe' suffix, this ensures
-		// that even if the watcher is spawned without the '.exe' suffix (which Windows will allow and supports)
-		// it always results in the watch process being killed
-		if strings.TrimSuffix(filepath.Base(state.Args[0]), ".exe") == "elastic-agent" && state.Args[1] == "watch" {
-			// it is a watch subprocess
-			pids = append(pids, pid)
-		}
-	}
-	if errs != nil {
-		return nil, errs
-	}
-	return pids, nil
 }
