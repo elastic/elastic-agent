@@ -933,7 +933,7 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 		Sudo:    true, // requires Agent installation
 	})
 
-	t.Skip("Possibly cause of flaky tests")
+	t.Skip("Affected by https://github.com/elastic/elastic-agent/issues/3371, watcher left running at end of test")
 
 	upgradeFromVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
