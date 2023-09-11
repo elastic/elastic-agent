@@ -321,27 +321,18 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 
 // killWatcher finds and kills any running Elastic Agent watcher.
 func killWatcher() error {
-	procStats := process.Stats{
-		// filtering with '.*elastic-agent' or '^.*elastic-agent$' doesn't
-		// seem to work as expected, filtering is done in the for loop below
-		Procs: []string{".*"},
-	}
-	err := procStats.Init()
-	if err != nil {
-		return fmt.Errorf("failed to initialize process.Stats: %w", err)
-	}
-	pidMap, _, err := procStats.FetchPids()
-	if err != nil {
-		return fmt.Errorf("failed to fetch pids: %w", err)
-	}
-	var errs error
-	for pid, state := range pidMap {
-		if len(state.Args) < 2 {
-			// must have at least 2 args "elastic-agent[.exe] watch"
-			continue
+	for {
+		// finding and killing watchers is performed in a loop until no
+		// more watchers are existing, this ensures that during uninstall
+		// that no matter what the watchers are dead before going any further
+		pids, errs := findWatchers()
+		if errs != nil {
+			return errs
 		}
-		if filepath.Base(state.Args[0]) == paths.BinaryName && state.Args[1] == "watch" {
-			// it is the watch subprocess
+		if len(pids) == 0 {
+			return nil
+		}
+		for _, pid := range pids {
 			proc, err := os.FindProcess(pid)
 			if err != nil {
 				errs = errors.Join(errs, fmt.Errorf("failed to load watcher process with pid %d: %w", pid, err))
@@ -353,6 +344,45 @@ func killWatcher() error {
 				continue
 			}
 		}
+		if errs != nil {
+			return errs
+		}
+		// wait 1 second before performing the loop again
+		<-time.After(1 * time.Second)
 	}
-	return errs
+}
+
+func findWatchers() ([]int, error) {
+	procStats := process.Stats{
+		// filtering with '.*elastic-agent' or '^.*elastic-agent$' doesn't
+		// seem to work as expected, filtering is done in the for loop below
+		Procs: []string{".*"},
+	}
+	err := procStats.Init()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize process.Stats: %w", err)
+	}
+	pidMap, _, err := procStats.FetchPids()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch pids: %w", err)
+	}
+	var pids []int
+	var errs error
+	for pid, state := range pidMap {
+		if len(state.Args) < 2 {
+			// must have at least 2 args "elastic-agent[.exe] watch"
+			continue
+		}
+		// instead of matching on Windows using the specific '.exe' suffix, this ensures
+		// that even if the watcher is spawned without the '.exe' suffix (which Windows will allow and supports)
+		// it always results in the watch process being killed
+		if strings.TrimSuffix(filepath.Base(state.Args[0]), ".exe") == "elastic-agent" && state.Args[1] == "watch" {
+			// it is a watch subprocess
+			pids = append(pids, pid)
+		}
+	}
+	if errs != nil {
+		return nil, errs
+	}
+	return pids, nil
 }
