@@ -73,7 +73,10 @@ func TestHTTPClient(t *testing.T) {
 			})
 
 			require.NoError(t, err)
-			_, err = client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
+			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
+			if err == nil {
+				defer resp.Body.Close()
+			}
 			require.Error(t, err)
 		},
 	))
@@ -120,7 +123,10 @@ func TestHTTPClient(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = client.Send(timeoutCtx, "GET", "/echo-hello", nil, nil, nil)
+		resp, err := client.Send(timeoutCtx, "GET", "/echo-hello", nil, nil, nil)
+		if err == nil {
+			defer resp.Body.Close()
+		}
 		require.Error(t, err)
 	})
 }
