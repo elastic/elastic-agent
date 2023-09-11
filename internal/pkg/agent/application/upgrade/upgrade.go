@@ -11,9 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
+
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
