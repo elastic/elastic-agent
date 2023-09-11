@@ -222,7 +222,7 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 
 		f.checkinFailCounter = 0
 		if resp.FleetWarning != "" {
-			f.errCh <- &coordinator.WarningError{Warning: resp.FleetWarning}
+			f.errCh <- coordinator.NewWarningError(resp.FleetWarning)
 		} else {
 			f.errCh <- nil
 		}
