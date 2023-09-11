@@ -174,11 +174,11 @@ WATCHLOOP:
 			break WATCHLOOP
 		// Agent in degraded state.
 		case err := <-errChan:
-			log.Error("Agent Error detected", err)
+			log.Errorf("Agent Error detected: %s", err.Error())
 			return err
 		// Agent keeps crashing unexpectedly
 		case err := <-crashChan:
-			log.Error("Agent crash detected", err)
+			log.Errorf("Agent crash detected: %s", err.Error())
 			return err
 		}
 	}

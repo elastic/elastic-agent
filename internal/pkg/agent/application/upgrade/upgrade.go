@@ -118,10 +118,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
 	}
 
-	if sourceURI != "" {
-		sourceURI = u.settings.SourceURI
-	}
-
+	sourceURI = u.sourceURI(sourceURI)
 	archivePath, err := u.downloadArtifact(ctx, version, sourceURI, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
@@ -215,6 +212,14 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	marker.Acked = true
 
 	return saveMarker(marker)
+}
+
+func (u *Upgrader) sourceURI(retrievedURI string) string {
+	if retrievedURI != "" {
+		return retrievedURI
+	}
+
+	return u.settings.SourceURI
 }
 
 func rollbackInstall(ctx context.Context, log *logger.Logger, hash string) {
