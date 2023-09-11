@@ -52,7 +52,7 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	}
 
 	// kill any running watcher
-	if err := killWatcher(); err != nil {
+	if err := KillWatcher(); err != nil {
 		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
 	}
 
@@ -299,8 +299,8 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	return config.NewConfigFrom(finalConfig)
 }
 
-// killWatcher finds and kills any running Elastic Agent watcher.
-func killWatcher() error {
+// KillWatcher finds and kills any running Elastic Agent watcher.
+func KillWatcher() error {
 	procStats := process.Stats{
 		// filtering with '.*elastic-agent' or '^.*elastic-agent$' doesn't
 		// seem to work as expected, filtering is done in the for loop below
