@@ -860,7 +860,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 				c.setFleetState(agentclient.Healthy, "Connected")
 			} else if errors.As(configErr, &wErr) {
 				// we received a warning from Fleet, set state to degraded and the warning as state string
-				c.setFleetState(agentclient.Degraded, wErr.Warning)
+				c.setFleetState(agentclient.Degraded, wErr.Error())
 			} else {
 				c.setFleetState(agentclient.Failed, configErr.Error())
 			}

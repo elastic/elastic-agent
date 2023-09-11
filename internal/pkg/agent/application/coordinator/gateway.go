@@ -31,9 +31,13 @@ type FleetGateway interface {
 
 // WarningError is emitted when we receive a warning in the Fleet response
 type WarningError struct {
-	Warning string
+	msg string
 }
 
 func (w WarningError) Error() string {
-	return w.Warning
+	return w.msg
+}
+
+func NewWarningError(warningMsg string) *WarningError {
+	return &WarningError{msg: warningMsg}
 }
