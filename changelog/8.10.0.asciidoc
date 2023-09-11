@@ -1,0 +1,80 @@
+// begin 8.10.0 relnotes
+
+[[release-notes-8.10.0]]
+==  8.10.0
+
+Review important information about the  8.10.0 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.10.0]]
+=== New features
+
+The 8.10.0 release adds the following new and notable features.
+
+
+
+
+* Implement Tamper Protection For Endpoint Uninstall Use Cases. {-pull}https://github.com/elastic/elastic-agent/pull/2781[#https://github.com/elastic/elastic-agent/pull/2781] 
++
+Add new `--uninstall-token` to allow uninstall when Endpoint protection is enabled.
+Enable unenroll and upgrade actions to complete successfully when Endpoint protection is enabled.
+Enable Endpoint integration removal when Endpoint protection is enabled.
+
+* Improves Upgrade Process To Use Upgraded Version Of Watcher To Ensure For A Successful Upgrade. {-pull}https://github.com/elastic/elastic-agent/pull/3140[#https://github.com/elastic/elastic-agent/pull/3140] {-issue}https://github.com/elastic/elastic-agent/issues/2873[#https://github.com/elastic/elastic-agent/issues/2873]
+agent::
+
+* Add Support For Setting Gomaxprocs To Limit Cpu Usage Through The Agent Policy. {agent-pull}3179[#3179] 
+diagnostics::
+
+* Add Compoonent-Level Diagnostics And Cpu Profiling. {diagnostics-pull}https://github.com/elastic/elastic-agent/pull/3118[#https://github.com/elastic/elastic-agent/pull/3118] 
+elastic-agent::
+
+* Report The Version From The Agent Package Instead Of Agent Binary To Enhance Release Process. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2908[#https://github.com/elastic/elastic-agent/pull/2908] 
+* Removed Calls To Fleet Setup. {elastic-agent-pull}2985[#2985] {elastic-agent-issue}2910[#2910]
++
+Redundant calls to /api/fleet/setup were removed in favor of kibana initiated calls.
+
+
+[discrete]
+[[enhancements-8.10.0]]
+=== Enhancements
+
+
+
+
+* Upgrade To Go 1.20.7. {-pull}https://github.com/elastic/elastic-agent/pull/3177[#https://github.com/elastic/elastic-agent/pull/3177] 
+agent::
+
+* Add Runtime Prevention To Prevent Elastic Defend From Running If Agent Is Not Installed In The Default Location. {agent-pull}https://github.com/elastic/elastic-agent/pull/3114[#https://github.com/elastic/elastic-agent/pull/3114] 
+elastic-agent::
+
+* Add Additional Flag -Complete- To Agent Metadata, To Signal An Instance Running As Synthetics-Capable. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3190[#https://github.com/elastic/elastic-agent/pull/3190] {elastic-agent-issue}https://github.com/elastic/fleet-server/issues/1754[#https://github.com/elastic/fleet-server/issues/1754]
+
+
+
+
+[discrete]
+[[bug-fixes-8.10.0]]
+=== Bug fixes
+
+
+diagnostics::
+
+* Fix Credential Redaction In Diagnostic Bundle Collection. {diagnostics-pull}https://github.com/elastic/elastic-agent/pull/3165[#https://github.com/elastic/elastic-agent/pull/3165] 
+elastic-agent::
+
+* Ensure That Elastic Agent Upgrades Are Rolled Back Even When The Upgraded Agent Crashes Immediately And Repeatedly. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3220[#https://github.com/elastic/elastic-agent/pull/3220] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3123[#https://github.com/elastic/elastic-agent/issues/3123]
+* Ensure That Elastic Agent Is Restarted During Rollback. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3268[#https://github.com/elastic/elastic-agent/pull/3268] 
+uninstall::
+
+* Don&#39;t Trigger Ioc Alert On Windows Uninstall. {uninstall-pull}https://github.com/elastic/elastic-agent/pull/3014[#https://github.com/elastic/elastic-agent/pull/3014] {uninstall-issue}https://github.com/elastic/elastic-agent/issues/2970[#https://github.com/elastic/elastic-agent/issues/2970]
+
+// end 8.10.0 relnotes

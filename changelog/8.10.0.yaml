@@ -1,0 +1,153 @@
+version: 8.10.0
+entries:
+    - kind: feature
+      summary: Report the version from the agent package instead of agent binary to enhance release process.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2908
+      issue: []
+      timestamp: 1687529573
+      file:
+        name: 1687529573-Report-the-version-from-the-elastic-agent-package-instead-of-agent-binary.yaml
+        checksum: bf2eaac124d2c36295d50dc0124f4738d6138179
+    - kind: feature
+      summary: Implement tamper protection for Endpoint uninstall use cases.
+      description: |
+        Add new `--uninstall-token` to allow uninstall when Endpoint protection is enabled.
+        Enable unenroll and upgrade actions to complete successfully when Endpoint protection is enabled.
+        Enable Endpoint integration removal when Endpoint protection is enabled.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2781
+      issue: []
+      timestamp: 1688069371
+      file:
+        name: 1688069371-Tamper-protected-Endpoint-uninstall.yaml
+        checksum: 35e174b89ba4f0f90f889b7be7b21bb0339eece2
+    - kind: bug-fix
+      summary: Don't trigger IOC alert on Windows uninstall
+      description: ""
+      component: uninstall
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3014
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2970
+      timestamp: 1688657261
+      file:
+        name: 1688657261-Dont-trigger-IOC-alert-on-Windows-uninstall.yaml
+        checksum: 3ed04803e6252d4329862988fc0b69fafdaf313e
+    - kind: feature
+      summary: Removed calls to fleet setup
+      description: Redundant calls to /api/fleet/setup were removed in favor of kibana initiated calls.
+      component: elastic-agent
+      pr:
+        - "2985"
+      issue:
+        - "2910"
+      timestamp: 1688712693
+      file:
+        name: 1688712693-Removed-calls-to-fleet-setup.yaml
+        checksum: 902f9865559205388499fafee33d14298eeb8862
+    - kind: enhancement
+      summary:  Add runtime prevention to prevent Elastic Defend from running if Agent is not installed in the default location.
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3114
+      issue: []
+      timestamp: 1689883203
+      file:
+        name: 1689883203-Elastic-Defend-runtime-prevention.yaml
+        checksum: f5c8c78fae94d60d68eff4bea1f7992e39003ce6
+    - kind: feature
+      summary: Add compoonent-level diagnostics and CPU profiling
+      description: ""
+      component: diagnostics
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3118
+      issue: []
+      timestamp: 1690219594
+      file:
+        name: 1690219594-component-diagnostics.yaml
+        checksum: 8abe3723585237dd322c24f01cd69026a8f69805
+    - kind: feature
+      summary: Improves upgrade process to use upgraded version of watcher to ensure for a successful upgrade
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3140
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2873
+      timestamp: 1690468425
+      file:
+        name: 1690468425-Improves-upgrade-process-to-uses-upgraded-version-of-watcher-to-ensure-for-a-successful-upgrade.yaml
+        checksum: 642fe326d5a1259057649df3e3cb57ca8883e674
+    - kind: bug-fix
+      summary: Fix credential redaction in diagnostic bundle collection
+      description: ""
+      component: diagnostics
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3165
+      issue: []
+      timestamp: 1690916478
+      file:
+        name: 1690916478-fix-cred-scrubbing.yaml
+        checksum: 67811ff51c7b5ec6323259ea44a2e7bbeeba8b9a
+    - kind: enhancement
+      summary: Upgrade to Go 1.20.7
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3177
+      issue: []
+      timestamp: 1691070305
+      file:
+        name: 1691070305-Upgrade-to-Go-1.20.7.yaml
+        checksum: d29ced2a3950a2e5e7c548d7dbcabad5be4974d8
+    - kind: enhancement
+      summary: Add additional flag -complete- to agent metadata, to signal an instance running as synthetics-capable.
+      description: Add a new flag -complete- to agent metadata that signals the instance running as synthetics-capable, to be queried from Synthetics UI and used to provide early confirmation on successful enrollment.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3190
+      issue:
+        - https://github.com/elastic/fleet-server/issues/1754
+      timestamp: 1691141314
+      file:
+        name: 1691141314-complete-image-metadata.yaml
+        checksum: ae609cad85b074da1afbaa8258bc71a0f67b6a7e
+    - kind: feature
+      summary: Add support for setting GOMAXPROCS to limit CPU usage through the Agent policy.
+      description: ""
+      component: agent
+      pr:
+        - "3179"
+      issue: []
+      timestamp: 1691160301
+      file:
+        name: 1691160301-gomaxprocs-config-option.yaml
+        checksum: f55d8da34595d6b6aa0a87c22c4210c12d8859a8
+    - kind: bug-fix
+      summary: Ensure that Elastic Agent upgrades are rolled back even when the upgraded Agent crashes immediately and repeatedly
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3220
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3123
+      timestamp: 1691647276
+      file:
+        name: 1691647276-systemd-increase-upg-watcher-kill-timeout.yaml
+        checksum: de42d1f1feeef4e1ed892901d58f5a86879696ca
+    - kind: bug-fix
+      summary: Ensure that Elastic Agent is restarted during rollback
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3268
+      issue: []
+      timestamp: 1692323065
+      file:
+        name: 1692323065-bugfix-rollback-restart-agent-no-process.yaml
+        checksum: 91d7ff071b1610262d181ebed712e34738f3167d
