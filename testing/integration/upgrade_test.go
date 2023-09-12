@@ -20,7 +20,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -32,9 +31,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	cmdVersion "github.com/elastic/elastic-agent/internal/pkg/basecmd/version"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
@@ -1139,56 +1138,21 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s",
 		toVersion, upgradeTriggerOutput)
 
-	// Deliberately keep killing upgraded Agent to simulate it crashing
-	done := make(chan struct{}, 1)
-	go func() {
-		t.Logf("in killer goroutine")
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
+	// A few seconds after the upgrade, deliberately restart upgraded Agent a
+	// couple of times to simulate Agent crashing.
+	for restartIdx := 0; restartIdx < 3; restartIdx++ {
+		time.Sleep(10 * time.Second)
+		topPath := paths.Top()
 
-		for {
-			select {
-			case <-done:
-				break
-			case <-ticker.C:
-				t.Logf("in killer goroutine: tick")
-				pids, err := pgrep(t, []string{"elastic-agent"})
-				if err != nil {
-					t.Logf("err: %s", err.Error())
-				}
-				t.Logf("PIDS: %v", pids)
-
-				if len(pids) != 2 {
-					continue
-				}
-
-				upgradeWatcherPIDs, err := pgrep(t, []string{"elastic-agent", "watch"})
-				if len(upgradeWatcherPIDs) != 1 {
-					continue
-				}
-
-				upgradeWatcherPID := upgradeWatcherPIDs[0]
-				t.Logf("Upgrade Watcher PID: %v", upgradeWatcherPID)
-
-				agentPID := 0
-				for _, pid := range pids {
-					if pid != upgradeWatcherPID {
-						agentPID = pid
-					}
-				}
-				t.Logf("Agent PID: %v", agentPID)
-
-				err = syscall.Kill(agentPID, syscall.SIGKILL)
-				require.NoError(t, err)
-			}
-		}
-	}()
+		t.Logf("Restarting Agent via service to simulate crashing")
+		err = install.RestartService(topPath)
+		require.NoError(t, err)
+	}
 
 	// Ensure that the Upgrade Watcher has stopped running.
 	parsedFromVersion, err := version.ParseVersion(fromVersion)
 	require.NoError(t, err)
 	waitForUpgradeWatcherToComplete(t, fromF, parsedFromVersion, standaloneWatcherDuration)
-	done <- struct{}{}
 
 	// Ensure that the original version of Agent is running again.
 	t.Log("Check Agent version to ensure rollback is successful")
@@ -1196,140 +1160,4 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, fromVersion, currentVersion.Binary.Version)
 	require.Equal(t, fromVersion, currentVersion.Daemon.Version)
-}
-
-//func createFakeBrokenAgentPackage(t *testing.T, version *version.ParsedSemVer) string {
-//	t.Helper()
-//	arch := runtime.GOARCH
-//	if runtime.GOOS == "darwin" && arch == "arm64" {
-//		arch = "aarch64"
-//	}
-//
-//	packageName := fmt.Sprintf("elastic-agent-%s-%s-%s", version.String(), runtime.GOOS, arch)
-//	commitHash := "abcdef0123456789abcdef0123456789abcdef01"
-//	t.Logf("fake package name = %s", packageName)
-//
-//	// Create folder structure for broken Agent package
-//	tmpDir := t.TempDir()
-//	packagePath := filepath.Join(tmpDir, packageName)
-//	dataPath := filepath.Join(packagePath, "data", fmt.Sprintf("elastic-agent-%s", release.TrimCommit(commitHash)))
-//
-//	err := os.MkdirAll(dataPath, 0700)
-//	require.NoError(t, err)
-//
-//	// Compile broken Agent binary
-//	program := `package main
-//
-//import "os"
-//
-//func main() {
-//    os.Exit(101)
-//}
-//`
-//	programExePath := compileGoProgram(t, "elastic-agent", program)
-//
-//	// Move compiled broken Agent binary into correct path for packaging
-//	agentExePath := filepath.Join(dataPath, filepath.Base(programExePath))
-//	err = os.Rename(programExePath, agentExePath)
-//	require.NoError(t, err)
-//
-//	// Create commit hash file
-//	err = os.WriteFile(filepath.Join(packagePath, ".elastic-agent.active.commit"), []byte(commitHash), 0644)
-//	require.NoError(t, err)
-//
-//	// Compress contents to create package archive
-//	archiveFileExt := "tar.gz"
-//	if runtime.GOOS == "windows" {
-//		archiveFileExt = "zip"
-//	}
-//
-//	archiveFileName := fmt.Sprintf("%s.%s", packageName, archiveFileExt)
-//	archiveFilePath := filepath.Join(tmpDir, archiveFileName)
-//
-//	if runtime.GOOS == "windows" {
-//		// Create .zip
-//		// TODO
-//	} else {
-//		// Create .tar.gz
-//		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-//		defer cancel()
-//		cmd := exec.CommandContext(ctx, "tar", "-cvzf", archiveFilePath, packageName)
-//		cmd.Dir = tmpDir
-//
-//		err = cmd.Run()
-//		require.NoError(t, err)
-//	}
-//
-//	// Create archive hash file
-//	hash := sha512.New()
-//	data, err := os.ReadFile(archiveFilePath)
-//	require.NoError(t, err)
-//
-//	_, err = hash.Write(data)
-//	require.NoError(t, err)
-//
-//	data = []byte(hex.EncodeToString(hash.Sum(nil)))
-//	err = os.WriteFile(archiveFilePath+".sha512", data, 0644)
-//	require.NoError(t, err)
-//
-//	return tmpDir
-//}
-//
-//func compileGoProgram(t *testing.T, programName, program string) string {
-//	t.Helper()
-//
-//	tmpDirPath := t.TempDir()
-//	programSrcPath := filepath.Join(tmpDirPath, programName+".go")
-//	err := os.WriteFile(programSrcPath, []byte(program), 0600)
-//	require.NoError(t, err)
-//
-//	programBinaryExt := ""
-//	if runtime.GOOS == "windows" {
-//		programBinaryExt = ".exe"
-//	}
-//	programBinaryPath := filepath.Join(tmpDirPath, programName+programBinaryExt)
-//
-//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-//	defer cancel()
-//	cmd := exec.CommandContext(ctx, "go", "build", "-o", programBinaryPath, programSrcPath)
-//
-//	err = cmd.Run()
-//	require.NoError(t, err)
-//
-//	return programBinaryPath
-//}
-
-func pgrep(t *testing.T, processArgs []string) ([]int, error) {
-	t.Helper()
-
-	foundPIDs := make([]int, 0)
-	require.Eventually(t, func() bool {
-		procStats := process.Stats{
-			Procs: []string{".*"},
-		}
-		err := procStats.Init()
-		require.NoErrorf(t, err, "failed to initialize process.Stats")
-
-		pidMap, _, err := procStats.FetchPids()
-		require.NoErrorf(t, err, "failed to fetch PIDs")
-
-		for pid, state := range pidMap {
-			if len(state.Args) < len(processArgs) {
-				continue
-			}
-
-			matchFound := true
-			for i, processArg := range processArgs {
-				matchFound = matchFound && strings.Contains(state.Args[i], processArg)
-			}
-
-			if matchFound {
-				foundPIDs = append(foundPIDs, pid)
-			}
-		}
-
-		return len(foundPIDs) == 0
-	}, 1*time.Minute, 1*time.Second)
-
-	return foundPIDs, nil
 }
