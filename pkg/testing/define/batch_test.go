@@ -16,54 +16,78 @@ func TestBatch(t *testing.T) {
 	darwinLocalTests := []BatchPackageTests{
 		{
 			Name: pkgName,
-			Tests: []string{
-				"TestAnyLocal",
-				"TestDarwinLocal",
+			Tests: []BatchPackageTest{
+				{
+					Name: "TestAnyLocal",
+				},
+				{
+					Name: "TestDarwinLocal",
+				},
 			},
 		},
 	}
 	darwinSudoTests := []BatchPackageTests{
 		{
 			Name: pkgName,
-			Tests: []string{
-				"TestAnySudo",
-				"TestDarwinSudo",
+			Tests: []BatchPackageTest{
+				{
+					Name: "TestAnySudo",
+				},
+				{
+					Name: "TestDarwinSudo",
+				},
 			},
 		},
 	}
 	linuxLocalTests := []BatchPackageTests{
 		{
 			Name: pkgName,
-			Tests: []string{
-				"TestAnyLocal",
-				"TestLinuxLocal",
+			Tests: []BatchPackageTest{
+				{
+					Name: "TestAnyLocal",
+				},
+				{
+					Name: "TestLinuxLocal",
+				},
 			},
 		},
 	}
 	linuxSudoTests := []BatchPackageTests{
 		{
 			Name: pkgName,
-			Tests: []string{
-				"TestAnySudo",
-				"TestLinuxSudo",
+			Tests: []BatchPackageTest{
+				{
+					Name: "TestAnySudo",
+				},
+				{
+					Name: "TestLinuxSudo",
+				},
 			},
 		},
 	}
 	windowsLocalTests := []BatchPackageTests{
 		{
 			Name: pkgName,
-			Tests: []string{
-				"TestAnyLocal",
-				"TestWindowsLocal",
+			Tests: []BatchPackageTest{
+				{
+					Name: "TestAnyLocal",
+				},
+				{
+					Name: "TestWindowsLocal",
+				},
 			},
 		},
 	}
 	windowsSudoTests := []BatchPackageTests{
 		{
 			Name: pkgName,
-			Tests: []string{
-				"TestAnySudo",
-				"TestWindowsSudo",
+			Tests: []BatchPackageTest{
+				{
+					Name: "TestAnySudo",
+				},
+				{
+					Name: "TestWindowsSudo",
+				},
 			},
 		},
 	}
@@ -105,12 +129,23 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestAnyLocal",
-						"TestLinuxLocal",
-						"TestSpecificCombinationOne",
-						"TestSpecificCombinationTwo",
-						"TestSpecificCombinationWithCloud",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestAnyLocal",
+						},
+						{
+							Name: "TestLinuxLocal",
+						},
+						{
+							Name: "TestSpecificCombinationOne",
+						},
+						{
+							Name: "TestSpecificCombinationTwo",
+						},
+						{
+							Name:  "TestSpecificCombinationWithCloud",
+							Stack: true,
+						},
 					},
 				},
 			},
@@ -133,8 +168,10 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestAnyIsolate",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestAnyIsolate",
+						},
 					},
 				},
 			},
@@ -148,8 +185,10 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestAnyIsolate",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestAnyIsolate",
+						},
 					},
 				},
 			},
@@ -163,8 +202,10 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestAnyIsolate",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestAnyIsolate",
+						},
 					},
 				},
 			},
@@ -178,8 +219,10 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestAnyIsolate",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestAnyIsolate",
+						},
 					},
 				},
 			},
@@ -193,8 +236,10 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestAnyIsolate",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestAnyIsolate",
+						},
 					},
 				},
 			},
@@ -208,8 +253,10 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestDarwinIsolate",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestDarwinIsolate",
+						},
 					},
 				},
 			},
@@ -223,8 +270,10 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestDarwinIsolate",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestDarwinIsolate",
+						},
 					},
 				},
 			},
@@ -238,8 +287,10 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestLinuxIsolate",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestLinuxIsolate",
+						},
 					},
 				},
 			},
@@ -253,8 +304,10 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestLinuxIsolate",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestLinuxIsolate",
+						},
 					},
 				},
 			},
@@ -268,8 +321,10 @@ func TestBatch(t *testing.T) {
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
-					Tests: []string{
-						"TestWindowsIsolate",
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestWindowsIsolate",
+						},
 					},
 				},
 			},
@@ -281,7 +336,11 @@ func TestBatch(t *testing.T) {
 	require.EqualValues(t, expected, actual)
 }
 
-var testLinuxLocalTests = []string{"TestLinuxLocal"}
+var testLinuxLocalTests = []BatchPackageTest{
+	{
+		Name: "TestLinuxLocal",
+	},
+}
 
 var testLinuxLocalBatch = []Batch{
 	{

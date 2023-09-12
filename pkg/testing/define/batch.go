@@ -64,7 +64,15 @@ type BatchPackageTests struct {
 	// Name is the package name.
 	Name string `json:"name"`
 	// Tests is the set of tests in the package.
-	Tests []string `json:"tests"`
+	Tests []BatchPackageTest `json:"tests"`
+}
+
+// BatchPackageTest is a specific test in a package.
+type BatchPackageTest struct {
+	// Name of the test.
+	Name string `json:"name"`
+	// Stack needed for test.
+	Stack bool `json:"stack"`
 }
 
 // DetermineBatches parses the package directory with the possible extra build
@@ -196,33 +204,39 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 			batch.Stack = copyStack(req.Stack)
 		}
 		if req.Sudo {
-			batch.SudoTests = appendPackageTest(batch.SudoTests, tar.Package, tar.Test)
+			batch.SudoTests = appendPackageTest(batch.SudoTests, tar.Package, tar.Test, req.Stack != nil)
 		} else {
-			batch.Tests = appendPackageTest(batch.Tests, tar.Package, tar.Test)
+			batch.Tests = appendPackageTest(batch.Tests, tar.Package, tar.Test, req.Stack != nil)
 		}
 		batches[batchIdx] = batch
 	}
 	return batches
 }
 
-func appendPackageTest(tests []BatchPackageTests, pkg string, name string) []BatchPackageTests {
+func appendPackageTest(tests []BatchPackageTests, pkg string, name string, stack bool) []BatchPackageTests {
 	for i, pt := range tests {
 		if pt.Name == pkg {
 			for _, testName := range pt.Tests {
-				if testName == name {
+				if testName.Name == name {
 					// we already selected this test for this package for this batch,
 					// we can return immediately
 					return tests
 				}
 			}
-			pt.Tests = append(pt.Tests, name)
+			pt.Tests = append(pt.Tests, BatchPackageTest{
+				Name:  name,
+				Stack: stack,
+			})
 			tests[i] = pt
 			return tests
 		}
 	}
 	var pt BatchPackageTests
 	pt.Name = pkg
-	pt.Tests = append(pt.Tests, name)
+	pt.Tests = append(pt.Tests, BatchPackageTest{
+		Name:  name,
+		Stack: stack,
+	})
 	tests = append(tests, pt)
 	return tests
 }

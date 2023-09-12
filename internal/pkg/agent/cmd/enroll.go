@@ -393,6 +393,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	c, err := newEnrollCmd(
+		ctx,
 		logger,
 		&options,
 		pathConfigFile,

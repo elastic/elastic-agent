@@ -34,14 +34,26 @@ type testFile struct {
 	content string
 }
 
+// just wraps the whole line in exclamation marks
+func exclamationModifier(msg []byte) []byte {
+	if len(msg) == 0 {
+		return msg
+	}
+	newMsg := make([]byte, len(msg)+2)
+	newMsg[0] = '!'
+	copy(newMsg[1:len(newMsg)-1], msg)
+	newMsg[len(newMsg)-1] = '!'
+	return newMsg
+}
+
 func TestGetLogFilenames(t *testing.T) {
 	t.Run("returns the correct sorted filelist", func(t *testing.T) {
 		dir := t.TempDir()
 
-		createFile(t, dir, file2)
-		createFile(t, dir, file)
-		createFile(t, dir, file1)
-		createFile(t, dir, file3)
+		createFileEmpty(t, dir, file2)
+		createFileEmpty(t, dir, file)
+		createFileEmpty(t, dir, file1)
+		createFileEmpty(t, dir, file3)
 
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
@@ -62,14 +74,14 @@ func TestGetLogFilenames(t *testing.T) {
 		prevDayFile2 := "elastic-agent-20230529-2.ndjson"
 		prevDayFile3 := "elastic-agent-20230529-3.ndjson"
 
-		createFile(t, dir, file2)
-		createFile(t, dir, file)
-		createFile(t, dir, prevDayFile1)
-		createFile(t, dir, file1)
-		createFile(t, dir, prevDayFile)
-		createFile(t, dir, prevDayFile2)
-		createFile(t, dir, file3)
-		createFile(t, dir, prevDayFile3)
+		createFileEmpty(t, dir, file2)
+		createFileEmpty(t, dir, file)
+		createFileEmpty(t, dir, prevDayFile1)
+		createFileEmpty(t, dir, file1)
+		createFileEmpty(t, dir, prevDayFile)
+		createFileEmpty(t, dir, prevDayFile2)
+		createFileEmpty(t, dir, file3)
+		createFileEmpty(t, dir, prevDayFile3)
 
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
@@ -99,7 +111,7 @@ func TestGetLogFilenames(t *testing.T) {
 
 	t.Run("does not return non-log entries", func(t *testing.T) {
 		dir := t.TempDir()
-		createFile(t, dir, "excluded")
+		createFileEmpty(t, dir, "excluded")
 
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
@@ -109,7 +121,7 @@ func TestGetLogFilenames(t *testing.T) {
 
 	t.Run("returns a list of one", func(t *testing.T) {
 		dir := t.TempDir()
-		createFile(t, dir, file1)
+		createFileEmpty(t, dir, file1)
 
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
@@ -239,7 +251,7 @@ func TestPrintLogs(t *testing.T) {
 				createFileContent(t, dir, f.name, bytes.NewBuffer([]byte(f.content)))
 			}
 			result := bytes.NewBuffer(nil)
-			err := printLogs(context.Background(), result, dir, tc.lines, false, nil)
+			err := printLogs(context.Background(), result, dir, tc.lines, false, nil, nil)
 			require.NoError(t, err)
 
 			require.Equal(t, tc.expected, result.String())
@@ -255,7 +267,7 @@ func TestPrintLogs(t *testing.T) {
 		logResult := newChanWriter()
 		errChan := make(chan error)
 		go func() {
-			errChan <- printLogs(ctx, logResult, dir, 5, true, nil)
+			errChan <- printLogs(ctx, logResult, dir, 5, true, nil, nil)
 		}()
 
 		var expected string
@@ -300,7 +312,7 @@ func TestPrintLogs(t *testing.T) {
 		})
 	})
 
-	t.Run("returns tail and then follows the logs with filter", func(t *testing.T) {
+	t.Run("returns tail and then follows the logs with filter and modifier", func(t *testing.T) {
 		dir := t.TempDir()
 		content := []byte(`{"component":{"id":"match"}, "message":"test1"}
 {"component":{"id":"non-match"}, "message":"test2"}
@@ -316,15 +328,15 @@ func TestPrintLogs(t *testing.T) {
 		logResult := newChanWriter()
 		errChan := make(chan error)
 		go func() {
-			errChan <- printLogs(ctx, logResult, dir, 3, true, createComponentFilter("match"))
+			errChan <- printLogs(ctx, logResult, dir, 3, true, createComponentFilter("match"), exclamationModifier)
 		}()
 
 		var expected string
 
 		t.Run("tails filtering the file", func(t *testing.T) {
-			expected = `{"component":{"id":"match"}, "message":"test3"}
-{"component":{"id":"match"}, "message":"test4"}
-{"component":{"id":"match"}, "message":"test6"}
+			expected = `!{"component":{"id":"match"}, "message":"test3"}!
+!{"component":{"id":"match"}, "message":"test4"}!
+!{"component":{"id":"match"}, "message":"test6"}!
 `
 			logResult.waitUntilMatch(t, expected, time.Second)
 		})
@@ -347,10 +359,10 @@ func TestPrintLogs(t *testing.T) {
 
 			time.Sleep(watchInterval)
 
-			expected += `{"component":{"id":"match"}, "message":"test7"}
-{"component":{"id":"match"}, "message":"test9"}
-{"component":{"id":"match"}, "message":"test10"}
-{"component":{"id":"match"}, "message":"test12"}
+			expected += `!{"component":{"id":"match"}, "message":"test7"}!
+!{"component":{"id":"match"}, "message":"test9"}!
+!{"component":{"id":"match"}, "message":"test10"}!
+!{"component":{"id":"match"}, "message":"test12"}!
 `
 
 			logResult.waitUntilMatch(t, expected, 2*watchInterval)
@@ -366,8 +378,8 @@ func TestPrintLogs(t *testing.T) {
 
 			time.Sleep(watchInterval)
 
-			expected += `{"component":{"id":"match"}, "message":"test13"}
-{"component":{"id":"match"}, "message":"test15"}
+			expected += `!{"component":{"id":"match"}, "message":"test13"}!
+!{"component":{"id":"match"}, "message":"test15"}!
 `
 
 			logResult.waitUntilMatch(t, expected, 2*watchInterval)
@@ -439,7 +451,7 @@ func TestPrintLogFile(t *testing.T) {
 
 			buf := make([]byte, testBufferSize)
 
-			printed, err := printLogFile(filepath.Join(dir, filename), tc.lines, sw, buf, nil)
+			printed, err := printLogFile(filepath.Join(dir, filename), tc.lines, sw, buf)
 			require.NoError(t, err)
 
 			result := bytes.NewBuffer(nil)
@@ -465,15 +477,20 @@ func TestPrintLogFile(t *testing.T) {
 
 		createFileContent(t, dir, "test.ndjson", bytes.NewBuffer(entries))
 
-		result := bytes.NewBuffer(nil)
+		sw := &stackWriter{
+			filter: createComponentFilter(matchingID),
+		}
 		testBuffer := make([]byte, 16) // so the buffer is not aligned
-		_, err := printLogFile(filepath.Join(dir, "test.ndjson"), 2, result, testBuffer, createComponentFilter(matchingID))
+		_, err := printLogFile(filepath.Join(dir, "test.ndjson"), 2, sw, testBuffer)
 		require.NoError(t, err)
 
 		var expected []byte
 		expected = append(expected, matchingEntry...)
 		expected = append(expected, matchingEntry...)
-		require.Equal(t, string(expected), result.String())
+		w := bytes.NewBuffer(nil)
+		err = sw.PopAll(w)
+		require.NoError(t, err)
+		require.Equal(t, string(expected), w.String())
 	})
 
 	t.Run("filters out all entries", func(t *testing.T) {
@@ -486,14 +503,74 @@ func TestPrintLogFile(t *testing.T) {
 
 		createFileContent(t, dir, "test.ndjson", bytes.NewBuffer(entries))
 
-		result := bytes.NewBuffer(nil)
+		sw := &stackWriter{
+			filter: createComponentFilter(matchingID),
+		}
+
 		testBuffer := make([]byte, 16) // so the buffer is not aligned
-		_, err := printLogFile(filepath.Join(dir, "test.ndjson"), 2, result, testBuffer, createComponentFilter(matchingID))
+		_, err := printLogFile(filepath.Join(dir, "test.ndjson"), 2, sw, testBuffer)
 		require.NoError(t, err)
 
-		var expected []byte
-		require.Equal(t, string(expected), result.String())
+		w := bytes.NewBuffer(nil)
+		err = sw.PopAll(w)
+		require.NoError(t, err)
+
+		require.Equal(t, "", w.String())
 	})
+
+	t.Run("modifies entries with the given modifier", func(t *testing.T) {
+		dir := t.TempDir()
+		entries := []byte("first\nsecond\n")
+
+		createFileContent(t, dir, "test.ndjson", bytes.NewBuffer(entries))
+
+		sw := &stackWriter{
+			modifier: exclamationModifier,
+		}
+		testBuffer := make([]byte, 4) // so the buffer is not aligned
+		_, err := printLogFile(filepath.Join(dir, "test.ndjson"), 2, sw, testBuffer)
+		require.NoError(t, err)
+
+		expected := []byte("!first!\n!second!\n")
+		w := bytes.NewBuffer(nil)
+		err = sw.PopAll(w)
+		require.NoError(t, err)
+		require.Equal(t, string(expected), w.String())
+	})
+}
+
+func TestColorModifier(t *testing.T) {
+	t.Skip() // remove if you want to see examples of the messages on your terminal
+	cases := []struct {
+		name string
+		msg  []byte
+	}{
+		{
+			name: "debug",
+			msg:  []byte(`{"level": "debug", "message": "this is an example"}`),
+		},
+		{
+			name: "info",
+			msg:  []byte(`{"level": "info", "message": "this is an example"}`),
+		},
+		{
+			name: "warning",
+			msg:  []byte(`{"level": "warning", "message": "this is an example"}`),
+		},
+		{
+			name: "error",
+			msg:  []byte(`{"level": "error", "message": "this is an example"}`),
+		},
+		{
+			name: "critical",
+			msg:  []byte(`{"level": "critical", "message": "this is an example"}`),
+		},
+	}
+
+	for _, tc := range cases {
+		//nolint:forbidigo // for testing purposes
+		fmt.Println(string(addColorModifier(tc.msg)))
+	}
 }
 
 func TestCreateComponentFilter(t *testing.T) {
@@ -539,7 +616,7 @@ func generateLines(prefix string, start, end int) string {
 	return b.String()
 }
 
-func createFile(t *testing.T, dir, name string) {
+func createFileEmpty(t *testing.T, dir, name string) {
 	createFileContent(t, dir, name, nil)
 }
 

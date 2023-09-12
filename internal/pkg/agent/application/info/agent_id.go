@@ -6,6 +6,7 @@ package info
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -40,8 +41,8 @@ type ioStore interface {
 }
 
 // updateLogLevel updates log level and persists it to disk.
-func updateLogLevel(level string) error {
-	ai, err := loadAgentInfoWithBackoff(false, defaultLogLevel, false)
+func updateLogLevel(ctx context.Context, level string) error {
+	ai, err := loadAgentInfoWithBackoff(ctx, false, defaultLogLevel, false)
 	if err != nil {
 		return err
 	}
@@ -52,7 +53,7 @@ func updateLogLevel(level string) error {
 	}
 
 	agentConfigFile := paths.AgentConfigFile()
-	diskStore := storage.NewEncryptedDiskStore(agentConfigFile)
+	diskStore := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
 
 	ai.LogLevel = level
 	return updateAgentInfo(diskStore, ai)
@@ -173,7 +174,7 @@ func yamlToReader(in interface{}) (io.Reader, error) {
 	return bytes.NewReader(data), nil
 }
 
-func loadAgentInfoWithBackoff(forceUpdate bool, logLevel string, createAgentID bool) (*persistentAgentInfo, error) {
+func loadAgentInfoWithBackoff(ctx context.Context, forceUpdate bool, logLevel string, createAgentID bool) (*persistentAgentInfo, error) {
 	var err error
 	var ai *persistentAgentInfo
 
@@ -182,7 +183,7 @@ func loadAgentInfoWithBackoff(forceUpdate bool, logLevel string, createAgentID b
 
 	for i := 0; i <= maxRetriesloadAgentInfo; i++ {
 		backExp.Wait()
-		ai, err = loadAgentInfo(forceUpdate, logLevel, createAgentID)
+		ai, err = loadAgentInfo(ctx, forceUpdate, logLevel, createAgentID)
 		if !errors.Is(err, filelock.ErrAppAlreadyRunning) {
 			break
 		}
@@ -192,7 +193,7 @@ func loadAgentInfoWithBackoff(forceUpdate bool, logLevel string, createAgentID b
 	return ai, err
 }
 
-func loadAgentInfo(forceUpdate bool, logLevel string, createAgentID bool) (*persistentAgentInfo, error) {
+func loadAgentInfo(ctx context.Context, forceUpdate bool, logLevel string, createAgentID bool) (*persistentAgentInfo, error) {
 	idLock := paths.AgentConfigFileLock()
 	if err := idLock.TryLock(); err != nil {
 		return nil, err
@@ -201,7 +202,7 @@ func loadAgentInfo(forceUpdate bool, logLevel string, createAgentID bool) (*pers
 	defer idLock.Unlock()
 
 	agentConfigFile := paths.AgentConfigFile()
-	diskStore := storage.NewEncryptedDiskStore(agentConfigFile)
+	diskStore := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
 
 	agentInfo, err := getInfoFromStore(diskStore, logLevel)
 	if err != nil {

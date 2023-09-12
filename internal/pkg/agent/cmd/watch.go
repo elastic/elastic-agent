@@ -47,6 +47,9 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 				os.Exit(3)
 			}
 
+			// Make sure to flush any buffered logs before we're done.
+			defer log.Sync() //nolint:errcheck // flushing buffered logs is best effort.
+
 			if err := watchCmd(log, cfg); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
@@ -171,11 +174,11 @@ WATCHLOOP:
 			break WATCHLOOP
 		// Agent in degraded state.
 		case err := <-errChan:
-			log.Error("Agent Error detected", err)
+			log.Errorf("Agent Error detected: %s", err.Error())
 			return err
 		// Agent keeps crashing unexpectedly
 		case err := <-crashChan:
-			log.Error("Agent crash detected", err)
+			log.Errorf("Agent crash detected: %s", err.Error())
 			return err
 		}
 	}

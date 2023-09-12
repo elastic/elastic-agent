@@ -11,121 +11,25 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sync"
 	"syscall"
 
 	"golang.org/x/crypto/pbkdf2"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
-const saltSize = 8
-
-type Vault struct {
-	path string
-	key  []byte
-	mx   sync.Mutex
-}
-
-// New creates the vault store
-func New(path string, opts ...OptionFunc) (v *Vault, err error) {
-	options := applyOptions(opts...)
-	dir := filepath.Dir(path)
-
-	// If there is no specific path then get the executable directory
-	if dir == "." {
-		exefp, err := os.Executable()
-		if err != nil {
-			return nil, fmt.Errorf("could not get executable path: %w", err)
-		}
-		dir = filepath.Dir(exefp)
-		path = filepath.Join(dir, path)
-	}
-
-	if options.readonly {
-		fi, err := os.Stat(path)
-		if err != nil {
-			return nil, err
-		}
-		if !fi.IsDir() {
-			return nil, fs.ErrNotExist
-		}
-	} else {
-		err := os.MkdirAll(path, 0750)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create vault path: %v, err: %w", path, err)
-		}
-	}
-
-	key, err := getOrCreateSeed(path, options.readonly)
-	if err != nil {
-		return nil, fmt.Errorf("could not get seed to create new valt: %w", err)
-	}
-
-	return &Vault{
-		path: path,
-		key:  key,
-	}, nil
-}
-
-// Close closes the valut store
-// Noop on linux
-func (v *Vault) Close() error {
-	return nil
-}
-
-// Set stores the key in the vault store
-func (v *Vault) Set(key string, data []byte) error {
-	enc, err := v.encrypt(data)
-	if err != nil {
-		return err
-	}
-
-	v.mx.Lock()
-	defer v.mx.Unlock()
-
-	return ioutil.WriteFile(v.filepathFromKey(key), enc, 0600)
-}
-
-// Get retrieves the key from the vault store
-func (v *Vault) Get(key string) ([]byte, error) {
-	v.mx.Lock()
-	defer v.mx.Unlock()
-
-	enc, err := ioutil.ReadFile(v.filepathFromKey(key))
-	if err != nil {
-		return nil, err
-	}
-
-	return v.decrypt(enc)
-}
-
-// Exists checks if the key exists
-func (v *Vault) Exists(key string) (ok bool, err error) {
-	v.mx.Lock()
-	defer v.mx.Unlock()
-
-	if _, err = os.Stat(v.filepathFromKey(key)); err == nil {
-		ok = true
-	} else if errors.Is(err, fs.ErrNotExist) {
-		err = nil
-	}
-	return ok, err
-}
-
-// Remove removes the key
-func (v *Vault) Remove(key string) error {
-	return os.RemoveAll(v.filepathFromKey(key))
-}
+const (
+	saltSize = 8
+)
 
 func (v *Vault) encrypt(data []byte) ([]byte, error) {
-	key, salt, err := deriveKey(v.key, nil)
+	key, salt, err := deriveKey(v.seed, nil)
 	if err != nil {
 		return nil, err
 	}
-	enc, err := Encrypt(key, data)
+	enc, err := aesgcm.Encrypt(key, data)
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +41,11 @@ func (v *Vault) decrypt(data []byte) ([]byte, error) {
 		return nil, syscall.EINVAL
 	}
 	salt, data := data[:saltSize], data[saltSize:]
-	key, _, err := deriveKey(v.key, salt)
+	key, _, err := deriveKey(v.seed, salt)
 	if err != nil {
 		return nil, err
 	}
-	return Decrypt(key, data)
+	return aesgcm.Decrypt(key, data)
 }
 
 func deriveKey(pw []byte, salt []byte) ([]byte, []byte, error) {
@@ -154,6 +58,44 @@ func deriveKey(pw []byte, salt []byte) ([]byte, []byte, error) {
 	return pbkdf2.Key(pw, salt, 12022, 32, sha256.New), salt, nil
 }
 
-func (v *Vault) filepathFromKey(key string) string {
-	return filepath.Join(v.path, fileNameFromKey(v.key, key))
+func tightenPermissions(path string) error {
+	// Noop for linx
+	return nil
+}
+
+// writeFile "atomic" file write, utilizes temp file and replace
+func writeFile(fp string, data []byte) (err error) {
+	dir, fn := filepath.Split(fp)
+	if dir == "" {
+		dir = "."
+	}
+
+	f, err := os.CreateTemp(dir, fn)
+	if err != nil {
+		return fmt.Errorf("failed creating temp file: %w", err)
+	}
+	defer func() {
+		rerr := os.Remove(f.Name())
+		if rerr != nil && !errors.Is(rerr, os.ErrNotExist) {
+			err = errors.Join(err, fmt.Errorf("cleanup failed, could not remove temp file: %w", rerr))
+		}
+	}()
+	defer f.Close()
+
+	_, err = f.Write(data)
+	if err != nil {
+		return fmt.Errorf("failed writing temp file: %w", err)
+	}
+
+	err = f.Sync()
+	if err != nil {
+		return fmt.Errorf("failed syncing temp file: %w", err)
+	}
+
+	err = f.Close()
+	if err != nil {
+		return fmt.Errorf("failed closing temp file: %w", err)
+	}
+
+	return os.Rename(f.Name(), fp)
 }

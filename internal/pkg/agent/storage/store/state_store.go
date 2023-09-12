@@ -75,13 +75,13 @@ type stateSerializer struct {
 }
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.
-func NewStateStoreWithMigration(log *logger.Logger, actionStorePath, stateStorePath string) (*StateStore, error) {
-	err := migrateStateStore(log, actionStorePath, stateStorePath)
+func NewStateStoreWithMigration(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string) (*StateStore, error) {
+	err := migrateStateStore(ctx, log, actionStorePath, stateStorePath)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewStateStore(log, storage.NewEncryptedDiskStore(stateStorePath))
+	return NewStateStore(log, storage.NewEncryptedDiskStore(ctx, stateStorePath))
 }
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
@@ -143,10 +143,10 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	}, nil
 }
 
-func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath string) (err error) {
+func migrateStateStore(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string) (err error) {
 	log = log.Named("state_migration")
 	actionDiskStore := storage.NewDiskStore(actionStorePath)
-	stateDiskStore := storage.NewEncryptedDiskStore(stateStorePath)
+	stateDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath)
 
 	stateStoreExits, err := stateDiskStore.Exists()
 	if err != nil {

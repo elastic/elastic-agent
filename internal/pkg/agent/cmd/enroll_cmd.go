@@ -152,6 +152,7 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 // newEnrollCmd creates a new enroll command that will registers the current beats to the remote
 // system.
 func newEnrollCmd(
+	ctx context.Context,
 	log *logger.Logger,
 	options *enrollCmdOption,
 	configPath string,
@@ -160,7 +161,7 @@ func newEnrollCmd(
 	store := storage.NewReplaceOnSuccessStore(
 		configPath,
 		application.DefaultAgentFleetConfig,
-		storage.NewEncryptedDiskStore(paths.AgentConfigFile()),
+		storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile()),
 	)
 
 	return newEnrollCmdWithStore(
@@ -198,7 +199,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 
 	// Create encryption key from the agent before touching configuration
 	if !c.options.SkipCreateSecret {
-		err = secret.CreateAgentSecret()
+		err = secret.CreateAgentSecret(ctx)
 		if err != nil {
 			return err
 		}
@@ -270,8 +271,8 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	}()
 
 	if c.agentProc == nil {
-		if c.daemonReload(ctx) != nil {
-			c.log.Info("Elastic Agent might not be running; unable to trigger restart")
+		if err := c.daemonReload(ctx); err != nil {
+			c.log.Infow("Elastic Agent might not be running; unable to trigger restart", "error", err)
 		} else {
 			c.log.Info("Successfully triggered restart on running Elastic Agent.")
 		}
@@ -504,7 +505,7 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]interface{}) error {
 	cmd := fleetapi.NewEnrollCmd(c.client)
 
-	metadata, err := info.Metadata(c.log)
+	metadata, err := info.Metadata(ctx, c.log)
 	if err != nil {
 		return errors.New(err, "acquiring metadata failed")
 	}

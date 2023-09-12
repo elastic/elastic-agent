@@ -68,7 +68,7 @@ func GlobalHooks() Hooks {
 		},
 		{
 			Name:        "package version",
-			Filename:    ".package.version",
+			Filename:    "package.version",
 			Description: "Package Version",
 			ContentType: "text/plain",
 			Hook: func(_ context.Context) []byte {
