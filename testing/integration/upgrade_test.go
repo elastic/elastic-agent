@@ -1019,3 +1019,80 @@ inputs:
 		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
 	}, 2*time.Minute, 10*time.Second, "Rolled back Agent never became healthy")
 }
+
+// TestUpgradesInQuickSuccession verifies that it's possible to initiate and upgrade,
+// then immediately initiate another upgrade, and have the second upgrade succeed.
+func TestUpgradesInQuickSuccession(t *testing.T) {
+	define.Require(t, define.Requirements{
+		// We require sudo for this test to run
+		// `elastic-agent install`.
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		//Local: false,
+	})
+
+	// For this test we will be performing two upgrades in quick succession:
+	// - from an Agent that is two minors prior (vA) to the current one (vB),
+	// - from vB back to vA
+
+	toVersion := define.Version()
+	toVersionParsed, err := version.ParseVersion(toVersion)
+	require.NoError(t, err)
+
+	// For the fromVersion, we go back TWO minors because sometimes we are in a
+	// situation where the current version has been advanced to the next
+	// release (e.g. 8.10.0) but the version before that (e.g. 8.9.0) hasn't been
+	// released yet.
+	fromVersionParsed, err := toVersionParsed.GetPreviousMinor()
+	require.NoError(t, err)
+	fromVersionParsed, err = fromVersionParsed.GetPreviousMinor()
+	require.NoError(t, err)
+
+	// Drop the SNAPSHOT and metadata as a -SNAPSHOT version may not exist for
+	// a build that's two minors old.
+	fromVersion := fromVersionParsed.CoreVersion()
+
+	t.Logf("Installing Agent version %s", fromVersion)
+	fixtureOld, err := atesting.NewFixture(t, fromVersion)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+	_, err = fixtureOld.Install(ctx, &installOpts)
+	require.NoError(t, err)
+
+	require.Eventuallyf(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, fixtureOld, fromVersion, false, "")
+	}, 5*time.Minute, 1*time.Second, "agent never installed as expected version")
+
+	c := fixtureOld.Client()
+	err = c.Connect(ctx)
+	require.NoError(t, err)
+	defer c.Disconnect()
+
+	t.Logf("Upgrading Elastic Agent from %s to %s", fromVersion, toVersionParsed.String())
+	fixtureCurrent, err := define.NewFixture(t, toVersionParsed.String())
+	require.NoError(t, err)
+
+	fixturePath, err := fixtureCurrent.SrcPackage(ctx)
+	require.NoError(t, err)
+
+	sourceURI := fmt.Sprintf("file://%s", filepath.Dir(fixturePath))
+	upgradeCmdArgs := []string{"upgrade", toVersionParsed.String(), "--source-uri", sourceURI, "--skip-verify"}
+	t.Logf("upgradeCmdArgs: %v\n", upgradeCmdArgs)
+
+	upgradeTriggerOutput, err := fixtureOld.Exec(ctx, upgradeCmdArgs)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s",
+		toVersionParsed.String(), upgradeTriggerOutput)
+
+	require.Eventuallyf(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, fixtureOld, toVersionParsed.CoreVersion(), toVersionParsed.IsSnapshot(), "")
+	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
+
+	// WIP
+}
