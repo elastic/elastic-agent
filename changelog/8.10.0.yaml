@@ -26,7 +26,7 @@ entries:
         name: 1688069371-Tamper-protected-Endpoint-uninstall.yaml
         checksum: 35e174b89ba4f0f90f889b7be7b21bb0339eece2
     - kind: bug-fix
-      summary: Don't trigger IOC alert on Windows uninstall
+      summary: Don't trigger Indicator of Compromise (IoC) alert on Windows uninstall
       description: ""
       component: uninstall
       pr:

@@ -75,6 +75,6 @@ elastic-agent::
 * Ensure That Elastic Agent Is Restarted During Rollback. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3268[#https://github.com/elastic/elastic-agent/pull/3268] 
 uninstall::
 
-* Don&#39;t Trigger Ioc Alert On Windows Uninstall. {uninstall-pull}https://github.com/elastic/elastic-agent/pull/3014[#https://github.com/elastic/elastic-agent/pull/3014] {uninstall-issue}https://github.com/elastic/elastic-agent/issues/2970[#https://github.com/elastic/elastic-agent/issues/2970]
+* Don&#39;t Trigger Indicator of Compromise (IoC) Alert On Windows Uninstall. {uninstall-pull}https://github.com/elastic/elastic-agent/pull/3014[#https://github.com/elastic/elastic-agent/pull/3014] {uninstall-issue}https://github.com/elastic/elastic-agent/issues/2970[#https://github.com/elastic/elastic-agent/issues/2970]
 
 // end 8.10.0 relnotes
