@@ -12,7 +12,6 @@ import (
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
@@ -66,7 +65,7 @@ type stateStore interface {
 	Actions() []fleetapi.Action
 }
 
-type fleetGateway struct {
+type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
 	scheduler          scheduler.Scheduler
@@ -89,7 +88,7 @@ func New(
 	acker acker.Acker,
 	stateFetcher func() coordinator.State,
 	stateStore stateStore,
-) (gateway.FleetGateway, error) {
+) (*FleetGateway, error) {
 
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	return newFleetGatewayWithScheduler(
@@ -113,8 +112,8 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateFetcher func() coordinator.State,
 	stateStore stateStore,
-) (gateway.FleetGateway, error) {
-	return &fleetGateway{
+) (*FleetGateway, error) {
+	return &FleetGateway{
 		log:          log,
 		client:       client,
 		settings:     settings,
@@ -128,11 +127,11 @@ func newFleetGatewayWithScheduler(
 	}, nil
 }
 
-func (f *fleetGateway) Actions() <-chan []fleetapi.Action {
+func (f *FleetGateway) Actions() <-chan []fleetapi.Action {
 	return f.actionCh
 }
 
-func (f *fleetGateway) Run(ctx context.Context) error {
+func (f *FleetGateway) Run(ctx context.Context) error {
 	// Backoff implementation doesn't support the use of a context [cancellation] as the shutdown mechanism.
 	// So we keep a done channel that will be closed when the current context is shutdown.
 	done := make(chan struct{})
@@ -174,11 +173,11 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 }
 
 // Errors returns the channel to watch for reported errors.
-func (f *fleetGateway) Errors() <-chan error {
+func (f *FleetGateway) Errors() <-chan error {
 	return f.errCh
 }
 
-func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
+func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
 	bo.Reset()
 
 	// Guard if the context is stopped by a out of bound call,
@@ -222,7 +221,12 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 		}
 
 		f.checkinFailCounter = 0
-		f.errCh <- nil
+		if resp.FleetWarning != "" {
+			f.errCh <- coordinator.NewWarningError(resp.FleetWarning)
+		} else {
+			f.errCh <- nil
+		}
+
 		// Request was successful, return the collected actions.
 		return resp, nil
 	}
@@ -232,7 +236,7 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func (f *fleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState) []fleetapi.CheckinComponent {
+func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState) []fleetapi.CheckinComponent {
 	if components == nil {
 		return nil
 	}
@@ -307,7 +311,7 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 	return checkinComponents
 }
 
-func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
+func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
 	ecsMeta, err := info.Metadata(ctx, f.log)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
@@ -367,7 +371,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 }
 
 // shouldUnenroll checks if the max number of trying an invalid key is reached
-func (f *fleetGateway) shouldUnenroll() bool {
+func (f *FleetGateway) shouldUnenroll() bool {
 	return f.unauthCounter > maxUnauthCounter
 }
 
@@ -375,7 +379,7 @@ func isUnauth(err error) bool {
 	return errors.Is(err, client.ErrInvalidAPIKey)
 }
 
-func (f *fleetGateway) SetClient(c client.Sender) {
+func (f *FleetGateway) SetClient(c client.Sender) {
 	f.client = c
 }
 
