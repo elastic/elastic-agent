@@ -1134,6 +1134,11 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s",
 		toVersion, upgradeTriggerOutput)
 
+	// Ensure new (post-upgrade) version is running and Agent is healthy
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, fromF, toVersion, false, "")
+	}, 2*time.Minute, 10*time.Second, "Installed Agent never became healthy")
+
 	// A few seconds after the upgrade, deliberately restart upgraded Agent a
 	// couple of times to simulate Agent crashing.
 	for restartIdx := 0; restartIdx < 3; restartIdx++ {
@@ -1152,8 +1157,7 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 
 	// Ensure that the original version of Agent is running again.
 	t.Log("Check Agent version to ensure rollback is successful")
-	currentVersion, err := getVersion(t, ctx, fromF)
-	require.NoError(t, err)
-	require.Equal(t, fromVersion, currentVersion.Binary.Version)
-	require.Equal(t, fromVersion, currentVersion.Daemon.Version)
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, fromF, fromVersion, false, "")
+	}, 2*time.Minute, 10*time.Second, "Installed Agent never became healthy")
 }
