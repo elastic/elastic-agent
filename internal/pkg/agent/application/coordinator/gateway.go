@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package gateway
+package coordinator
 
 import (
 	"context"
@@ -27,4 +27,17 @@ type FleetGateway interface {
 
 	// SetClient sets the client for the gateway.
 	SetClient(client.Sender)
+}
+
+// WarningError is emitted when we receive a warning in the Fleet response
+type WarningError struct {
+	msg string
+}
+
+func (w WarningError) Error() string {
+	return w.msg
+}
+
+func NewWarningError(warningMsg string) *WarningError {
+	return &WarningError{msg: warningMsg}
 }
