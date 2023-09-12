@@ -8,8 +8,6 @@ package integration
 
 import (
 	"context"
-	"crypto/sha512"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +20,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -33,13 +32,13 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	cmdVersion "github.com/elastic/elastic-agent/internal/pkg/basecmd/version"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
 	v2client "github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -1076,169 +1075,261 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
+
+		OS: []define.OS{
+			{Type: define.Linux}, // Fake broken Agent package only works on Linux
+		},
 	})
 
-	fromVersion, err := version.ParseVersion(define.Version())
+	toVersion := define.Version()
+	toVersionParsed, err := version.ParseVersion(toVersion)
 	require.NoError(t, err)
-	toVersion := version.NewParsedSemVer(
-		fromVersion.Major(), fromVersion.Minor()+1, 0,
-		"", "",
-	)
 
-	t.Logf("Installing the current version [%s] of Agent", fromVersion.String())
+	// For the fromVersion, we go back TWO minors because sometimes we are in a
+	// situation where the current version has been advanced to the next
+	// release (e.g. 8.10.0) but the version before that (e.g. 8.9.0) hasn't been
+	// released yet.
+	fromVersionParsed, err := toVersionParsed.GetPreviousMinor()
+	require.NoError(t, err)
+	fromVersionParsed, err = fromVersionParsed.GetPreviousMinor()
+	require.NoError(t, err)
+
+	// Drop the SNAPSHOT and metadata as we may have stopped publishing snapshots
+	// for versions that are two minors old.
+	fromVersion := fromVersionParsed.CoreVersion()
+
+	t.Logf("Upgrading Elastic Agent from %s to %s", fromVersion, toVersion)
 
 	// Get path to Elastic Agent executable
-	f, err := define.NewFixture(t, fromVersion.String())
+	fromF, err := atesting.NewFixture(t, fromVersion)
 	require.NoError(t, err)
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
-	err = f.Prepare(context.Background())
+	err = fromF.Prepare(context.Background())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	output, err := tools.InstallStandaloneAgent(f)
+	err = fromF.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	output, err := tools.InstallStandaloneAgent(fromF)
 	t.Logf("Agent installation output: %q", string(output))
 	require.NoError(t, err)
 
-	c := f.Client()
-
-	t.Log("Waiting until Agent is healthy")
 	require.Eventually(t, func() bool {
-		err = c.Connect(ctx)
-		if err != nil {
-			t.Logf("connecting client to agent: %v", err)
-			return false
-		}
-		defer c.Disconnect()
+		return checkAgentHealthAndVersion(t, ctx, fromF, fromVersion, false, "")
+	}, 2*time.Minute, 10*time.Second, "Installed Agent never became healthy")
 
-		state, err := c.State(ctx)
-		if err != nil {
-			t.Logf("error getting the agent state: %v", err)
-			return false
-		}
-		t.Logf("agent state: %+v", state)
-		return state.State == cproto.State_HEALTHY
-	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
-
-	// Reconnect
-	err = c.Connect(ctx)
+	t.Logf("Attempting upgrade to %s", toVersion)
+	toF, err := define.NewFixture(t, toVersion)
 	require.NoError(t, err)
-	defer c.Disconnect()
 
-	// Create a fake Agent package that contains a fake binary that will
-	// deliberately fail to start.
-	packagePath := createFakeBrokenAgentPackage(t, toVersion)
+	packagePath, err := toF.SrcPackage(ctx)
+	require.NoError(t, err)
 
-	// Try upgrading to the fake Agent package.
-	t.Logf("Attempting upgrade to %s using Agent package at %s", toVersion.String(), packagePath)
-	ctx, _ = context.WithTimeout(ctx, 5*time.Minute)
-	_, err = c.Upgrade(ctx, toVersion.String(), "file://"+packagePath, true, false)
-	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion.String())
+	upgradeCmdArgs := []string{
+		"upgrade", toVersion,
+		"--source-uri", "file://" + filepath.Dir(packagePath),
+		"--skip-verify",
+	}
+
+	upgradeTriggerOutput, err := fromF.Exec(ctx, upgradeCmdArgs)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s",
+		toVersion, upgradeTriggerOutput)
+
+	// Deliberately keep killing upgraded Agent to simulate it crashing
+	done := make(chan struct{}, 1)
+	go func() {
+		t.Logf("in killer goroutine")
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-done:
+				break
+			case <-ticker.C:
+				t.Logf("in killer goroutine: tick")
+				pids, err := pgrep(t, []string{"elastic-agent"})
+				if err != nil {
+					t.Logf("err: %s", err.Error())
+				}
+				t.Logf("PIDS: %v", pids)
+
+				if len(pids) != 2 {
+					continue
+				}
+
+				upgradeWatcherPIDs, err := pgrep(t, []string{"elastic-agent", "watch"})
+				if len(upgradeWatcherPIDs) != 1 {
+					continue
+				}
+
+				upgradeWatcherPID := upgradeWatcherPIDs[0]
+				t.Logf("Upgrade Watcher PID: %v", upgradeWatcherPID)
+
+				agentPID := 0
+				for _, pid := range pids {
+					if pid != upgradeWatcherPID {
+						agentPID = pid
+					}
+				}
+				t.Logf("Agent PID: %v", agentPID)
+
+				err = syscall.Kill(agentPID, syscall.SIGKILL)
+				require.NoError(t, err)
+			}
+		}
+	}()
 
 	// Ensure that the Upgrade Watcher has stopped running.
-	waitForUpgradeWatcherToComplete(t, f, fromVersion, standaloneWatcherDuration)
+	parsedFromVersion, err := version.ParseVersion(fromVersion)
+	require.NoError(t, err)
+	waitForUpgradeWatcherToComplete(t, fromF, parsedFromVersion, standaloneWatcherDuration)
+	done <- struct{}{}
 
 	// Ensure that the original version of Agent is running again.
 	t.Log("Check Agent version to ensure rollback is successful")
-	currentVersion, err := getVersion(t, ctx, f)
+	currentVersion, err := getVersion(t, ctx, fromF)
 	require.NoError(t, err)
 	require.Equal(t, fromVersion, currentVersion.Binary.Version)
 	require.Equal(t, fromVersion, currentVersion.Daemon.Version)
 }
 
-func createFakeBrokenAgentPackage(t *testing.T, version *version.ParsedSemVer) string {
-	//t.Helper()
-	packageName := fmt.Sprintf("elastic-agent-%s-%s-%s", version.String(), runtime.GOOS, runtime.GOARCH)
-	commitHash := "abcdef0123456789abcdef0123456789abcdef01"
+//func createFakeBrokenAgentPackage(t *testing.T, version *version.ParsedSemVer) string {
+//	t.Helper()
+//	arch := runtime.GOARCH
+//	if runtime.GOOS == "darwin" && arch == "arm64" {
+//		arch = "aarch64"
+//	}
+//
+//	packageName := fmt.Sprintf("elastic-agent-%s-%s-%s", version.String(), runtime.GOOS, arch)
+//	commitHash := "abcdef0123456789abcdef0123456789abcdef01"
+//	t.Logf("fake package name = %s", packageName)
+//
+//	// Create folder structure for broken Agent package
+//	tmpDir := t.TempDir()
+//	packagePath := filepath.Join(tmpDir, packageName)
+//	dataPath := filepath.Join(packagePath, "data", fmt.Sprintf("elastic-agent-%s", release.TrimCommit(commitHash)))
+//
+//	err := os.MkdirAll(dataPath, 0700)
+//	require.NoError(t, err)
+//
+//	// Compile broken Agent binary
+//	program := `package main
+//
+//import "os"
+//
+//func main() {
+//    os.Exit(101)
+//}
+//`
+//	programExePath := compileGoProgram(t, "elastic-agent", program)
+//
+//	// Move compiled broken Agent binary into correct path for packaging
+//	agentExePath := filepath.Join(dataPath, filepath.Base(programExePath))
+//	err = os.Rename(programExePath, agentExePath)
+//	require.NoError(t, err)
+//
+//	// Create commit hash file
+//	err = os.WriteFile(filepath.Join(packagePath, ".elastic-agent.active.commit"), []byte(commitHash), 0644)
+//	require.NoError(t, err)
+//
+//	// Compress contents to create package archive
+//	archiveFileExt := "tar.gz"
+//	if runtime.GOOS == "windows" {
+//		archiveFileExt = "zip"
+//	}
+//
+//	archiveFileName := fmt.Sprintf("%s.%s", packageName, archiveFileExt)
+//	archiveFilePath := filepath.Join(tmpDir, archiveFileName)
+//
+//	if runtime.GOOS == "windows" {
+//		// Create .zip
+//		// TODO
+//	} else {
+//		// Create .tar.gz
+//		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+//		defer cancel()
+//		cmd := exec.CommandContext(ctx, "tar", "-cvzf", archiveFilePath, packageName)
+//		cmd.Dir = tmpDir
+//
+//		err = cmd.Run()
+//		require.NoError(t, err)
+//	}
+//
+//	// Create archive hash file
+//	hash := sha512.New()
+//	data, err := os.ReadFile(archiveFilePath)
+//	require.NoError(t, err)
+//
+//	_, err = hash.Write(data)
+//	require.NoError(t, err)
+//
+//	data = []byte(hex.EncodeToString(hash.Sum(nil)))
+//	err = os.WriteFile(archiveFilePath+".sha512", data, 0644)
+//	require.NoError(t, err)
+//
+//	return tmpDir
+//}
+//
+//func compileGoProgram(t *testing.T, programName, program string) string {
+//	t.Helper()
+//
+//	tmpDirPath := t.TempDir()
+//	programSrcPath := filepath.Join(tmpDirPath, programName+".go")
+//	err := os.WriteFile(programSrcPath, []byte(program), 0600)
+//	require.NoError(t, err)
+//
+//	programBinaryExt := ""
+//	if runtime.GOOS == "windows" {
+//		programBinaryExt = ".exe"
+//	}
+//	programBinaryPath := filepath.Join(tmpDirPath, programName+programBinaryExt)
+//
+//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+//	defer cancel()
+//	cmd := exec.CommandContext(ctx, "go", "build", "-o", programBinaryPath, programSrcPath)
+//
+//	err = cmd.Run()
+//	require.NoError(t, err)
+//
+//	return programBinaryPath
+//}
 
-	// Create folder structure for broken Agent package
-	tmpDir := t.TempDir()
-	packagePath := filepath.Join(tmpDir, packageName)
-	dataPath := filepath.Join(packagePath, "data", fmt.Sprintf("elastic-agent-%s", release.TrimCommit(commitHash)))
-
-	err := os.MkdirAll(dataPath, 0700)
-	require.NoError(t, err)
-
-	// Compile broken Agent binary
-	program := `package main
-
-import "os"
-
-func main() {
-    os.Exit(101)
-}
-`
-	programExePath := compileGoProgram(t, "elastic-agent", program)
-
-	// Move compiled broken Agent binary into correct path for packaging
-	agentExePath := filepath.Join(dataPath, filepath.Base(programExePath))
-	err = os.Rename(programExePath, agentExePath)
-	require.NoError(t, err)
-
-	// Create commit hash file
-	err = os.WriteFile(filepath.Join(packagePath, ".elastic-agent.active.commit"), []byte(commitHash), 0644)
-	require.NoError(t, err)
-
-	// Compress contents to create package archive
-	archiveFileExt := "tar.gz"
-	if runtime.GOOS == "windows" {
-		archiveFileExt = "zip"
-	}
-
-	archiveFileName := fmt.Sprintf("%s.%s", packageName, archiveFileExt)
-	archiveFilePath := filepath.Join(tmpDir, archiveFileName)
-
-	if runtime.GOOS == "windows" {
-		// Create .zip
-		// TODO
-	} else {
-		// Create .tar.gz
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, "tar", "-cvzf", archiveFilePath, packageName)
-		cmd.Dir = tmpDir
-
-		err = cmd.Run()
-		require.NoError(t, err)
-	}
-
-	// Create archive hash file
-	hash := sha512.New()
-	data, err := os.ReadFile(archiveFilePath)
-	require.NoError(t, err)
-
-	_, err = hash.Write(data)
-	require.NoError(t, err)
-
-	data = []byte(hex.EncodeToString(hash.Sum(nil)))
-	err = os.WriteFile(archiveFilePath+".sha512", data, 0644)
-	require.NoError(t, err)
-
-	return tmpDir
-}
-
-func compileGoProgram(t *testing.T, programName, program string) string {
+func pgrep(t *testing.T, processArgs []string) ([]int, error) {
 	t.Helper()
 
-	tmpDirPath := t.TempDir()
-	programSrcPath := filepath.Join(tmpDirPath, programName+".go")
-	err := os.WriteFile(programSrcPath, []byte(program), 0600)
-	require.NoError(t, err)
+	foundPIDs := make([]int, 0)
+	require.Eventually(t, func() bool {
+		procStats := process.Stats{
+			Procs: []string{".*"},
+		}
+		err := procStats.Init()
+		require.NoErrorf(t, err, "failed to initialize process.Stats")
 
-	programBinaryExt := ""
-	if runtime.GOOS == "windows" {
-		programBinaryExt = ".exe"
-	}
-	programBinaryPath := filepath.Join(tmpDirPath, programName+programBinaryExt)
+		pidMap, _, err := procStats.FetchPids()
+		require.NoErrorf(t, err, "failed to fetch PIDs")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", programBinaryPath, programSrcPath)
+		for pid, state := range pidMap {
+			if len(state.Args) < len(processArgs) {
+				continue
+			}
 
-	err = cmd.Run()
-	require.NoError(t, err)
+			matchFound := true
+			for i, processArg := range processArgs {
+				matchFound = matchFound && strings.Contains(state.Args[i], processArg)
+			}
 
-	return programBinaryPath
+			if matchFound {
+				foundPIDs = append(foundPIDs, pid)
+			}
+		}
+
+		return len(foundPIDs) == 0
+	}, 1*time.Minute, 1*time.Second)
+
+	return foundPIDs, nil
 }
