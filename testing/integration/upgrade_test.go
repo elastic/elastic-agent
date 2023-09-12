@@ -1031,7 +1031,7 @@ func TestUpgradesInQuickSuccession(t *testing.T) {
 
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
-		//Local: false,
+		Local: false,
 	})
 
 	// For this test we will be performing two upgrades in quick succession:
@@ -1056,48 +1056,68 @@ func TestUpgradesInQuickSuccession(t *testing.T) {
 	fromVersion := fromVersionParsed.CoreVersion()
 
 	t.Logf("Installing Agent version %s", fromVersion)
-	fixtureOld, err := atesting.NewFixture(t, fromVersion)
+	f, err := atesting.NewFixture(t, fromVersion)
 	require.NoError(t, err)
 
 	ctx := context.Background()
+	err = f.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err)
+
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
 	}
-	_, err = fixtureOld.Install(ctx, &installOpts)
+	_, err = f.Install(ctx, &installOpts)
 	require.NoError(t, err)
 
 	require.Eventuallyf(t, func() bool {
-		return checkAgentHealthAndVersion(t, ctx, fixtureOld, fromVersion, false, "")
+		return checkAgentHealthAndVersion(t, ctx, f, fromVersion, false, "")
 	}, 5*time.Minute, 1*time.Second, "agent never installed as expected version")
 
-	c := fixtureOld.Client()
+	c := f.Client()
 	err = c.Connect(ctx)
 	require.NoError(t, err)
 	defer c.Disconnect()
 
-	t.Logf("Upgrading Elastic Agent from %s to %s", fromVersion, toVersionParsed.String())
-	fixtureCurrent, err := define.NewFixture(t, toVersionParsed.String())
+	t.Logf("Initiating first upgrade: upgrading Elastic Agent from %s to %s", fromVersion, toVersion)
+	fixtureCurrent, err := define.NewFixture(t, toVersion)
 	require.NoError(t, err)
 
 	fixturePath, err := fixtureCurrent.SrcPackage(ctx)
 	require.NoError(t, err)
 
 	sourceURI := fmt.Sprintf("file://%s", filepath.Dir(fixturePath))
-	upgradeCmdArgs := []string{"upgrade", toVersionParsed.String(), "--source-uri", sourceURI, "--skip-verify"}
+	upgradeCmdArgs := []string{"upgrade", toVersion, "--source-uri", sourceURI, "--skip-verify"}
 
-	upgradeTriggerOutput, err := fixtureOld.Exec(ctx, upgradeCmdArgs)
-	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s",
-		toVersionParsed.String(), upgradeTriggerOutput)
+	upgradeTriggerOutput, err := f.Exec(ctx, upgradeCmdArgs)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s", toVersion, upgradeTriggerOutput)
 
 	require.Eventuallyf(t, func() bool {
-		return checkAgentHealthAndVersion(t, ctx, fixtureOld, toVersionParsed.CoreVersion(), toVersionParsed.IsSnapshot(), "")
-	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
+		return checkAgentHealthAndVersion(t, ctx, f, toVersionParsed.CoreVersion(), toVersionParsed.IsSnapshot(), "")
+	}, 5*time.Minute, 1*time.Second, "agent never completed first upgrade to expected version")
 
-	t.Log("Finding Upgrade Watcher PID")
-	watcherPID, err := pgrep(t, []string{paths.BinaryName, "watch"})
+	t.Log("Finding Upgrade Watcher PID from first upgrade")
+	firstWatcherPID, err := pgrep(t, []string{paths.BinaryName, "watch"})
 	require.NoError(t, err)
-	t.Logf("Upgrade Watcher PID = %d", watcherPID)
+	t.Logf("Upgrade Watcher PID from first upgrade = %d", firstWatcherPID)
+
+	t.Logf("Initiating second upgrade: upgrading Elastic Agent from %s to %s", toVersion, fromVersion)
+	upgradeCmdArgs = []string{"upgrade", fromVersion}
+	upgradeTriggerOutput, err = f.Exec(ctx, upgradeCmdArgs)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s", toVersion, upgradeTriggerOutput)
+
+	require.Eventuallyf(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, f, fromVersion, false, "")
+	}, 5*time.Minute, 1*time.Second, "agent never completed second upgrade to expected version")
+
+	t.Log("Finding Upgrade Watcher PID from second upgrade")
+	secondWatcherPID, err := pgrep(t, []string{paths.BinaryName, "watch"})
+	require.NoError(t, err)
+	t.Logf("Upgrade Watcher PID from second upgrade = %d", secondWatcherPID)
+
+	require.NotEqual(t, firstWatcherPID, secondWatcherPID)
+
+	checkUpgradeWatcherRan(t, f, toVersionParsed)
 }
 
 func pgrep(t *testing.T, processArgs []string) (pid int, err error) {
