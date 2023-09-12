@@ -1136,7 +1136,7 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 
 	// Ensure new (post-upgrade) version is running and Agent is healthy
 	require.Eventually(t, func() bool {
-		return checkAgentHealthAndVersion(t, ctx, fromF, toVersion, false, "")
+		return checkAgentHealthAndVersion(t, ctx, fromF, toVersionParsed.CoreVersion(), toVersionParsed.IsSnapshot(), "")
 	}, 2*time.Minute, 10*time.Second, "Installed Agent never became healthy")
 
 	// A few seconds after the upgrade, deliberately restart upgraded Agent a
@@ -1151,13 +1151,11 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 	}
 
 	// Ensure that the Upgrade Watcher has stopped running.
-	parsedFromVersion, err := version.ParseVersion(fromVersion)
-	require.NoError(t, err)
-	waitForUpgradeWatcherToComplete(t, fromF, parsedFromVersion, standaloneWatcherDuration)
+	waitForUpgradeWatcherToComplete(t, fromF, fromVersionParsed, standaloneWatcherDuration)
 
 	// Ensure that the original version of Agent is running again.
 	t.Log("Check Agent version to ensure rollback is successful")
 	require.Eventually(t, func() bool {
-		return checkAgentHealthAndVersion(t, ctx, fromF, fromVersion, false, "")
+		return checkAgentHealthAndVersion(t, ctx, fromF, fromVersionParsed.CoreVersion(), false, "")
 	}, 2*time.Minute, 10*time.Second, "Installed Agent never became healthy")
 }
