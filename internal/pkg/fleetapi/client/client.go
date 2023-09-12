@@ -34,8 +34,14 @@ type Sender interface {
 	URI() string
 }
 
+// Default value for Elastic-Api-Version header when sending requests to Fleet (that's the only version we have at the time of writing)
+const defaultFleetApiVersion = "2023-06-01"
+
 var baseRoundTrippers = func(rt http.RoundTripper) (http.RoundTripper, error) {
 	rt = NewFleetUserAgentRoundTripper(rt, release.Version())
+
+	rt = NewElasticApiVersionRoundTripper(rt, defaultFleetApiVersion)
+
 	return rt, nil
 }
 

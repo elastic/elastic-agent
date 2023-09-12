@@ -16,31 +16,26 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func isAccessDeniedError(err error) bool {
+func isBlockingOnExe(err error) bool {
 	if err == nil {
 		return false
 	}
-
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
-		return errno == syscall.ERROR_ACCESS_DENIED
+	path, errno := getPathFromError(err)
+	if path == "" {
+		return false
 	}
-
-	return false
+	return errno == syscall.ERROR_ACCESS_DENIED
 }
 
 func isRetryableError(err error) bool {
 	if err == nil {
 		return false
 	}
-
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
-		return errno == syscall.ERROR_ACCESS_DENIED ||
-			errno == windows.ERROR_SHARING_VIOLATION
+	path, errno := getPathFromError(err)
+	if path == "" {
+		return false
 	}
-
-	return false
+	return errno == syscall.ERROR_ACCESS_DENIED || errno == windows.ERROR_SHARING_VIOLATION
 }
 
 func removeBlockingExe(blockingErr error) error {
@@ -77,20 +72,14 @@ func removeBlockingExe(blockingErr error) error {
 	return nil
 }
 
-func getPathFromError(err error) (string, syscall.Errno) {
+func getPathFromError(blockingErr error) (string, syscall.Errno) {
 	var perr *fs.PathError
-	if errors.As(err, &perr) {
+	if errors.As(blockingErr, &perr) {
 		var errno syscall.Errno
 		if errors.As(perr.Err, &errno) {
 			return perr.Path, errno
 		}
 	}
-
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
-		return "", errno
-	}
-
 	return "", 0
 }
 
