@@ -30,6 +30,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	cmdVersion "github.com/elastic/elastic-agent/internal/pkg/basecmd/version"
@@ -1050,8 +1051,8 @@ func TestUpgradesInQuickSuccession(t *testing.T) {
 	fromVersionParsed, err = fromVersionParsed.GetPreviousMinor()
 	require.NoError(t, err)
 
-	// Drop the SNAPSHOT and metadata as a -SNAPSHOT version may not exist for
-	// a build that's two minors old.
+	// Drop the SNAPSHOT and metadata as we may have stopped publishing snapshots
+	// for versions that are two minors old.
 	fromVersion := fromVersionParsed.CoreVersion()
 
 	t.Logf("Installing Agent version %s", fromVersion)
@@ -1084,7 +1085,6 @@ func TestUpgradesInQuickSuccession(t *testing.T) {
 
 	sourceURI := fmt.Sprintf("file://%s", filepath.Dir(fixturePath))
 	upgradeCmdArgs := []string{"upgrade", toVersionParsed.String(), "--source-uri", sourceURI, "--skip-verify"}
-	t.Logf("upgradeCmdArgs: %v\n", upgradeCmdArgs)
 
 	upgradeTriggerOutput, err := fixtureOld.Exec(ctx, upgradeCmdArgs)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s",
@@ -1094,5 +1094,48 @@ func TestUpgradesInQuickSuccession(t *testing.T) {
 		return checkAgentHealthAndVersion(t, ctx, fixtureOld, toVersionParsed.CoreVersion(), toVersionParsed.IsSnapshot(), "")
 	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
-	// WIP
+	t.Log("Finding Upgrade Watcher PID")
+	watcherPID, err := pgrep(t, []string{paths.BinaryName, "watch"})
+	require.NoError(t, err)
+	t.Logf("Upgrade Watcher PID = %d", watcherPID)
+}
+
+func pgrep(t *testing.T, processArgs []string) (pid int, err error) {
+	t.Helper()
+
+	var foundPID int
+	require.Eventually(t, func() bool {
+		procStats := process.Stats{
+			Procs: []string{".*"},
+		}
+		err := procStats.Init()
+		require.NoErrorf(t, err, "failed to initialize process.Stats")
+
+		pidMap, _, err := procStats.FetchPids()
+		require.NoErrorf(t, err, "failed to fetch PIDs")
+
+		for pid, state := range pidMap {
+			if len(state.Args) < len(processArgs) {
+				continue
+			}
+
+			matchFound := true
+			for i, processArg := range processArgs {
+				matchFound = matchFound && strings.Contains(state.Args[i], processArg)
+			}
+
+			if matchFound {
+				foundPID = pid
+				return true
+			}
+		}
+
+		return false
+	}, 1*time.Minute, 1*time.Second)
+
+	if foundPID == 0 {
+		return 0, fmt.Errorf("failed to find PID for process %v", processArgs)
+	}
+
+	return foundPID, nil
 }
