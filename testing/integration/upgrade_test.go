@@ -1074,10 +1074,6 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
-
-		OS: []define.OS{
-			{Type: define.Linux}, // Fake broken Agent package only works on Linux
-		},
 	})
 
 	toVersion := define.Version()
