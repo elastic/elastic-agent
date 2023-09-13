@@ -19,6 +19,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/google/uuid"
@@ -134,6 +135,11 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	policy, err := tools.InstallAgentWithPolicy(t, ctx,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
+
+	t.Cleanup(func() {
+		t.Log("Un-enrolling Elastic Agent...")
+		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient))
+	})
 
 	t.Log("Installing Elastic Defend")
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policy.ID)
