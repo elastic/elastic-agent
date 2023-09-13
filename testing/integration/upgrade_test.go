@@ -988,9 +988,6 @@ inputs:
 		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeToVersion.CoreVersion(), upgradeToVersion.IsSnapshot(), "")
 	}, 2*time.Minute, 250*time.Millisecond, "Upgraded Agent never became healthy")
 
-	// Wait for upgrade watcher to finish running
-	waitForUpgradeWatcherToComplete(t, agentFixture, upgradeFromVersion, standaloneWatcherDuration)
-
 	t.Log("Ensure the we have rolled back and the correct version is running")
 	require.Eventually(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
