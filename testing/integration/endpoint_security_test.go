@@ -244,7 +244,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	hostname, err := os.Hostname()
 	require.NoError(t, err)
 
-	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, hostname)
+	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, policy.ID, hostname)
 	require.NoError(t, err)
 
 	_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{ID: agentID})
