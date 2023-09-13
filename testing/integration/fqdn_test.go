@@ -56,19 +56,6 @@ func TestFQDN(t *testing.T) {
 	origHostname, err := getHostname(context.Background())
 	require.NoError(t, err)
 
-	t.Cleanup(func() {
-		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient))
-
-		t.Log("Restoring hostname...")
-		err := setHostname(context.Background(), origHostname, t.Log)
-		require.NoError(t, err)
-
-		t.Log("Restoring original /etc/hosts...")
-		err = setEtcHosts(origEtcHosts)
-		require.NoError(t, err)
-	})
-
 	ctx := context.Background()
 	kibClient := info.KibanaClient
 
@@ -100,6 +87,19 @@ func TestFQDN(t *testing.T) {
 	}
 	policy, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		t.Log("Un-enrolling Elastic Agent...")
+		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient, policy.ID))
+
+		t.Log("Restoring hostname...")
+		err := setHostname(context.Background(), origHostname, t.Log)
+		require.NoError(t, err)
+
+		t.Log("Restoring original /etc/hosts...")
+		err = setEtcHosts(origEtcHosts)
+		require.NoError(t, err)
+	})
 
 	t.Log("Verify that agent name is short hostname")
 	agent := verifyAgentName(t, shortName, info.KibanaClient)
@@ -182,7 +182,7 @@ func verifyAgentName(t *testing.T, hostname string, kibClient *kibana.Client) *k
 	require.Eventually(
 		t,
 		func() bool {
-			agent, err = tools.GetAgentByHostnameFromList(kibClient, hostname)
+			agent, err = tools.GetAgentByPolicyIDAndHostnameFromList(kibClient, hostname)
 			return err == nil && agent != nil
 		},
 		5*time.Minute,

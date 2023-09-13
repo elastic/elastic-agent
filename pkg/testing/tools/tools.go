@@ -19,9 +19,9 @@ import (
 // WaitForAgentStatus returns a niladic function that returns true if the agent
 // has reached expectedStatus; false otherwise. The returned function is intended
 // for use with assert.Eventually or require.Eventually.
-func WaitForAgentStatus(t *testing.T, client *kibana.Client, expectedStatus string) func() bool {
+func WaitForAgentStatus(t *testing.T, client *kibana.Client, policyID string, expectedStatus string) func() bool {
 	return func() bool {
-		currentStatus, err := GetAgentStatus(client)
+		currentStatus, err := GetAgentStatus(client, policyID)
 		if err != nil {
 			t.Errorf("unable to determine agent status: %s", err.Error())
 			return false
@@ -135,7 +135,7 @@ func InstallAgentForPolicy(t *testing.T, ctx context.Context,
 	// Wait for Agent to be healthy
 	require.Eventually(
 		t,
-		WaitForAgentStatus(t, kibClient, "online"),
+		WaitForAgentStatus(t, kibClient, policyID, "online"),
 		timeout,
 		10*time.Second,
 		"Elastic Agent status is not online",

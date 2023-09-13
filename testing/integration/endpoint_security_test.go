@@ -138,7 +138,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient))
+		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient, policy.ID))
 	})
 
 	t.Log("Installing Elastic Defend")
