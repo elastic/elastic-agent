@@ -262,9 +262,11 @@ func (runner *BeatRunner) TestIndexManagementNoILM() {
 		runner.agentFixture.WorkDir(),
 		"setup",
 		"--index-management",
-		"-E", "setup.ilm.enabled=false"})
+		"--E=setup.ilm.enabled=false"})
 	runner.T().Logf("got response from management setup: %s", string(resp))
 	assert.NoError(runner.T(), err)
+	// we should not print a warning if we've explicitly disabled ILM
+	assert.NotContains(runner.T(), string(resp), "not supported")
 
 	tmpls, err := tools.GetIndexTemplatesForPattern(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("*%s*", runner.testbeatName))
 	require.NoError(runner.T(), err)
@@ -286,7 +288,7 @@ func (runner *BeatRunner) TestIndexManagementNoILM() {
 // tests beat setup --index-management with ILM explicitly set
 // On serverless, this should fail.
 // Will not pass right now, may need to change
-func (runner *BeatRunner) TestIndexManagementILMEnabledFail() {
+func (runner *BeatRunner) TestIndexManagementILMEnabledWarning() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	info, err := tools.GetPing(ctx, runner.requirementsInfo.ESClient)
@@ -300,15 +302,16 @@ func (runner *BeatRunner) TestIndexManagementILMEnabledFail() {
 		runner.agentFixture.WorkDir(),
 		"setup",
 		"--index-management",
-		"-E", "setup.ilm.enabled=true", "-E", "setup.ilm.overwrite=true"})
+		"--E=setup.ilm.enabled=true", "--E=setup.ilm.overwrite=true"})
 	runner.T().Logf("got response from management setup: %s", string(resp))
-	assert.Error(runner.T(), err)
+	require.NoError(runner.T(), err)
 	assert.Contains(runner.T(), string(resp), "not supported")
 }
 
 // tests beat setup ilm-policy
-// On serverless, this should fail
-func (runner *BeatRunner) TestExportILMFail() {
+// the export command doesn't actually make a network connection,
+// so this won't fail
+func (runner *BeatRunner) TestExport() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	info, err := tools.GetPing(ctx, runner.requirementsInfo.ESClient)
@@ -320,10 +323,15 @@ func (runner *BeatRunner) TestExportILMFail() {
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
 		runner.agentFixture.WorkDir(),
-		"export", "ilm-policy", "-E", "setup.ilm.overwrite=true"})
-	runner.T().Logf("got response from management setup: %s", string(resp))
-	assert.Error(runner.T(), err)
-	assert.Contains(runner.T(), string(resp), "not supported")
+		"export", "ilm-policy", "--E=setup.ilm.overwrite=true"})
+	runner.T().Logf("got response from export: %s", string(resp))
+	assert.NoError(runner.T(), err)
+	// check to see if we got a valid output
+	policy := map[string]interface{}{}
+	err = json.Unmarshal(resp, &policy)
+	require.NoError(runner.T(), err)
+
+	require.NotEmpty(runner.T(), policy["policy"])
 
 }
 

@@ -33,6 +33,7 @@ type Dashboard struct {
 
 // DeleteDashboard removes the selected dashboard
 func DeleteDashboard(ctx context.Context, client *kibana.Client, id string) error {
+	// In the future there should be logic to check if we need this header, waiting for https://github.com/elastic/kibana/pull/164850
 	headers := http.Header{}
 	headers.Add("x-elastic-internal-origin", "integration-tests")
 	status, resp, err := client.Connection.Request("DELETE", fmt.Sprintf("/api/saved_objects/dashboard/%s", id), nil, headers, nil)
