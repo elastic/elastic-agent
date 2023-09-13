@@ -27,12 +27,12 @@ func GetAgentByPolicyIDAndHostnameFromList(client *kibana.Client, policyID, host
 	}
 
 	hostnameAgents := make([]*kibana.AgentExisting, 0)
-	for _, item := range listAgentsResp.Items {
+	for i, item := range listAgentsResp.Items {
 		agentHostname := item.LocalMetadata.Host.Hostname
 		agentPolicyID := item.PolicyID
 
 		if agentHostname == hostname && agentPolicyID == policyID {
-			hostnameAgents = append(hostnameAgents, &item)
+			hostnameAgents = append(hostnameAgents, &listAgentsResp.Items[i])
 		}
 	}
 
