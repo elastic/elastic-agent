@@ -71,6 +71,13 @@ func NewWithoutConfig(name string) *Logger {
 	return logp.NewLogger(name)
 }
 
+// AddCallerSkip returns new logger with incremented stack frames to skip.
+// This is needed in order to correctly report the log file lines when the logging statement
+// is wrapped in some convenience wrapping function for example.
+func AddCallerSkip(l *Logger, skip int) *Logger {
+	return l.WithOptions(zap.AddCallerSkip(skip))
+}
+
 func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
 	commonCfg, err := ToCommonConfig(cfg)
 	if err != nil {

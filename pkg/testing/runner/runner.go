@@ -892,30 +892,38 @@ func filterSingleTest(batches []OSBatch, singleTest string) ([]OSBatch, error) {
 func filterSingleTestBatch(batch OSBatch, testName string) (OSBatch, bool) {
 	for _, pt := range batch.Batch.Tests {
 		for _, t := range pt.Tests {
-			if t == testName {
+			if t.Name == testName {
 				// filter batch to only run one test
 				batch.Batch.Tests = []define.BatchPackageTests{
 					{
 						Name:  pt.Name,
-						Tests: []string{testName},
+						Tests: []define.BatchPackageTest{t},
 					},
 				}
 				batch.Batch.SudoTests = nil
+				// remove stack requirement when the test doesn't need a stack
+				if !t.Stack {
+					batch.Batch.Stack = nil
+				}
 				return batch, true
 			}
 		}
 	}
 	for _, pt := range batch.Batch.SudoTests {
 		for _, t := range pt.Tests {
-			if t == testName {
+			if t.Name == testName {
 				// filter batch to only run one test
 				batch.Batch.SudoTests = []define.BatchPackageTests{
 					{
 						Name:  pt.Name,
-						Tests: []string{testName},
+						Tests: []define.BatchPackageTest{t},
 					},
 				}
 				batch.Batch.Tests = nil
+				// remove stack requirement when the test doesn't need a stack
+				if !t.Stack {
+					batch.Batch.Stack = nil
+				}
 				return batch, true
 			}
 		}
@@ -946,11 +954,11 @@ func createBatchID(batch OSBatch) string {
 	if batch.Batch.Isolate {
 		if len(batch.Batch.Tests) > 0 {
 			// only ever has one test in an isolated batch
-			id += "-" + batch.Batch.Tests[0].Tests[0]
+			id += "-" + batch.Batch.Tests[0].Tests[0].Name
 		}
 		if len(batch.Batch.SudoTests) > 0 {
 			// only ever has one test in an isolated batch
-			id += "-" + batch.Batch.SudoTests[0].Tests[0]
+			id += "-" + batch.Batch.SudoTests[0].Tests[0].Name
 		}
 	}
 	return strings.ToLower(id)

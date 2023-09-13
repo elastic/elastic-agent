@@ -85,6 +85,7 @@ func (i InstallOpts) toCmdArgs() []string {
 //   - the combined output of stdout and stderr
 //   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 	installArgs := []string{"install"}
 	if installOpts != nil {
 		installArgs = append(installArgs, installOpts.toCmdArgs()...)
@@ -108,14 +109,16 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
+		f.t.Logf("[test %s] Inside fixture cleanup function", f.t.Name())
 		if !f.installed {
+			f.t.Logf("skipping uninstall; agent not installed (fixture.installed is false)")
 			// not installed; no need to clean up or collect diagnostics
 			return
 		}
 
 		// diagnostics is collected when either the environment variable
-		// AGENT_KEEP_INSTALLED=true or the test is marked failed
-		collect := collectDiag()
+		// AGENT_COLLECT_DIAG=true or the test is marked failed
+		collect := collectDiagFlag()
 		failed := f.t.Failed()
 		if collect || failed {
 			if collect {
@@ -128,23 +131,30 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 
 		// environment variable AGENT_KEEP_INSTALLED=true will skip the uninstall
 		// useful to debug the issue with the Elastic Agent
-		if keepInstalled() {
-			f.t.Logf("skipping uninstall; AGENT_KEEP_INSTALLED=true")
-		} else {
-			out, err := f.Uninstall(ctx, &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
-			f.setClient(nil)
-			if err != nil &&
-				(errors.Is(err, ErrNotInstalled) ||
-					strings.Contains(
-						err.Error(),
-						"elastic-agent: no such file or directory")) {
-				// Agent fixture has already been uninstalled, perhaps by
-				// an explicit call to fixture.Uninstall, so nothing needs
-				// to be done here.
-				return
-			}
-			require.NoErrorf(f.t, err, "uninstalling agent failed. Output: %q", out)
+		if f.t.Failed() && keepInstalled() {
+			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
+			return
 		}
+
+		if keepInstalled() {
+			f.t.Logf("ignoring AGENT_KEEP_INSTALLED=true as test succeeded, " +
+				"keeping the agent installed will jeopardise other tests")
+		}
+
+		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
+		f.setClient(nil)
+		if err != nil &&
+			(errors.Is(err, ErrNotInstalled) ||
+				strings.Contains(
+					err.Error(),
+					"elastic-agent: no such file or directory")) {
+			f.t.Logf("fixture.Install Cleanup: agent was already uninstalled, skipping uninstall")
+			// Agent fixture has already been uninstalled, perhaps by
+			// an explicit call to fixture.Uninstall, so nothing needs
+			// to be done here.
+			return
+		}
+		require.NoErrorf(f.t, err, "uninstalling agent failed. Output: %q", out)
 	})
 
 	return out, nil
@@ -229,7 +239,7 @@ func (f *Fixture) collectDiagnostics() {
 	}
 }
 
-func collectDiag() bool {
+func collectDiagFlag() bool {
 	// failure reports false (ignore error)
 	v, _ := strconv.ParseBool(os.Getenv("AGENT_COLLECT_DIAG"))
 	return v

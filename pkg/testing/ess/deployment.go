@@ -12,6 +12,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -84,9 +85,9 @@ type DeploymentStatusResponse struct {
 
 // CreateDeployment creates the deployment with the specified configuration.
 func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentRequest) (*CreateDeploymentResponse, error) {
-	tpl, err := template.New("create_deployment_request").Parse(createDeploymentRequestTemplate)
+	tpl, err := deploymentTemplateFactory(req)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse deployment creation template: %w", err)
+		return nil, err
 	}
 
 	var buf bytes.Buffer
@@ -307,8 +308,32 @@ func overallStatus(statuses ...DeploymentStatus) DeploymentStatus {
 	return overallStatus
 }
 
-// TODO: make work for cloud other than GCP
-const createDeploymentRequestTemplate = `
+func deploymentTemplateFactory(req CreateDeploymentRequest) (*template.Template, error) {
+	regionParts := strings.Split(req.Region, "-")
+	if len(regionParts) < 2 {
+		return nil, fmt.Errorf("unable to parse CSP out of region [%s]", req.Region)
+	}
+
+	csp := regionParts[0]
+	var tplStr string
+	switch csp {
+	case "gcp":
+		tplStr = createDeploymentRequestTemplateGCP
+	case "azure":
+		tplStr = createDeploymentRequestTemplateAzure
+	default:
+		return nil, fmt.Errorf("unsupported CSP [%s]", csp)
+	}
+
+	tpl, err := template.New("create_deployment_request").Parse(tplStr)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse deployment creation template: %w", err)
+	}
+
+	return tpl, nil
+}
+
+const createDeploymentRequestTemplateGCP = `
 {
   "resources": {
     "integrations_server": [
@@ -384,6 +409,109 @@ const createDeploymentRequestTemplate = `
           "cluster_topology": [
             {
               "instance_configuration_id": "gcp.kibana.n2.68x32x45",
+              "zone_count": 1,
+              "size": {
+                "resource": "memory",
+                "value": 1024
+              }
+            }
+          ],
+          "kibana": {
+            "version": "{{ .Version }}",
+			"user_settings_json": {
+				"xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"]
+			}
+          }
+        },
+        "ref_id": "main-kibana"
+      }
+    ]
+  },
+  "settings": {
+    "autoscaling_enabled": false
+  },
+  "name": "{{ .Name }}",
+  "metadata": {
+    "system_owned": false
+  }
+}`
+
+const createDeploymentRequestTemplateAzure = `
+{
+  "resources": {
+    "integrations_server": [
+      {
+        "elasticsearch_cluster_ref_id": "main-elasticsearch",
+        "region": "{{ .Region }}",
+        "plan": {
+          "cluster_topology": [
+            {
+              "instance_configuration_id": "azure.integrationsserver.fsv2.2",
+              "zone_count": 1,
+              "size": {
+                "resource": "memory",
+                "value": 1024
+              }
+            }
+          ],
+          "integrations_server": {
+            "version": "{{ .Version }}"
+          }
+        },
+        "ref_id": "main-integrations_server"
+      }
+    ],
+    "elasticsearch": [
+      {
+        "region": "{{ .Region }}",
+        "settings": {
+          "dedicated_masters_threshold": 6
+        },
+        "plan": {
+          "cluster_topology": [
+            {
+              "zone_count": 1,
+              "elasticsearch": {
+                "node_attributes": {
+                  "data": "hot"
+                }
+              },
+              "instance_configuration_id": "azure.es.datahot.edsv4",
+              "node_roles": [
+                "master",
+                "ingest",
+                "transform",
+                "data_hot",
+                "remote_cluster_client",
+                "data_content"
+              ],
+              "id": "hot_content",
+              "size": {
+                "resource": "memory",
+                "value": 8192
+              }
+            }
+          ],
+          "elasticsearch": {
+            "version": "{{ .Version }}",
+            "enabled_built_in_plugins": []
+          },
+          "deployment_template": {
+            "id": "azure-storage-optimized-v2"
+          }
+        },
+        "ref_id": "main-elasticsearch"
+      }
+    ],
+    "enterprise_search": [],
+    "kibana": [
+      {
+        "elasticsearch_cluster_ref_id": "main-elasticsearch",
+        "region": "{{ .Region }}",
+        "plan": {
+          "cluster_topology": [
+            {
+              "instance_configuration_id": "azure.kibana.fsv2",
               "zone_count": 1,
               "size": {
                 "resource": "memory",
