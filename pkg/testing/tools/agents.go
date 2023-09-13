@@ -26,7 +26,7 @@ func GetAgentByHostnameFromList(client *kibana.Client, hostname string) (*kibana
 		return nil, err
 	}
 
-	hostnameAgents := make([]*kibana.AgentExisting)
+	hostnameAgents := make([]*kibana.AgentExisting, 0)
 	for _, item := range listAgentsResp.Items {
 		agentHostname := item.LocalMetadata.Host.Hostname
 		if agentHostname == hostname {
