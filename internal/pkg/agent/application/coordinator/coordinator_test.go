@@ -222,6 +222,20 @@ func TestCoordinator_State_ConfigError_Managed(t *testing.T) {
 		return state.State == agentclient.Healthy && state.Message == "Running" && state.FleetState == agentclient.Healthy && state.FleetMessage == "Connected"
 	}, 3*time.Second, 10*time.Millisecond)
 
+	// report a warning
+	cfgMgr.ReportError(ctx, NewWarningError("some msg from Fleet"))
+	assert.Eventually(t, func() bool {
+		state := coord.State()
+		return state.State == agentclient.Healthy && state.Message == "Running" && state.FleetState == agentclient.Degraded && state.FleetMessage == "some msg from Fleet"
+	}, 3*time.Second, 10*time.Millisecond)
+
+	// recover from warning error
+	cfgMgr.ReportError(ctx, nil)
+	assert.Eventually(t, func() bool {
+		state := coord.State()
+		return state.State == agentclient.Healthy && state.Message == "Running" && state.FleetState == agentclient.Healthy && state.FleetMessage == "Connected"
+	}, 3*time.Second, 10*time.Millisecond)
+
 	cancel()
 	err = <-coordCh
 	require.NoError(t, err)

@@ -855,8 +855,12 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case configErr := <-c.managerChans.configManagerError:
 		if c.isManaged {
+			var wErr *WarningError
 			if configErr == nil {
 				c.setFleetState(agentclient.Healthy, "Connected")
+			} else if errors.As(configErr, &wErr) {
+				// we received a warning from Fleet, set state to degraded and the warning as state string
+				c.setFleetState(agentclient.Degraded, wErr.Error())
 			} else {
 				c.setFleetState(agentclient.Failed, configErr.Error())
 			}
