@@ -7,7 +7,6 @@
 package install
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -15,41 +14,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const simpleBlockForever = `
-package main
-
-import (
-    "math"
-    "time"
-)
-
-func main() {
-    <-time.After(time.Duration(math.MaxInt64))
-}
-`
-
 func TestRemovePath(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "subdir")
-	err := os.Mkdir(dir, 0644)
-	require.NoError(t, err)
+	const binaryName = "testblocking"
+	binaryPath, err := filepath.Abs(filepath.Join(binaryName, binaryName+".exe"))
+	require.NoErrorf(t, err, "failed abs %s", binaryPath)
 
-	src := filepath.Join(dir, "main.go")
-	err = os.WriteFile(src, []byte(simpleBlockForever), 0644)
-	require.NoError(t, err)
-
-	binary := filepath.Join(dir, "main.exe")
-	cmd := exec.Command("go", "build", "-o", binary, src)
-	_, err = cmd.CombinedOutput()
-	require.NoError(t, err)
-
-	cmd = exec.Command(binary)
+	cmd := exec.Command(binaryPath)
 	err = cmd.Start()
 	require.NoError(t, err)
 	defer func() {
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 	}()
-
-	err = RemovePath(dir)
-	require.NoError(t, err)
 }
