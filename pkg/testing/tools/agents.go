@@ -26,14 +26,23 @@ func GetAgentByHostnameFromList(client *kibana.Client, hostname string) (*kibana
 		return nil, err
 	}
 
+	hostnameAgents := make([]*kibana.AgentExisting)
 	for _, item := range listAgentsResp.Items {
 		agentHostname := item.LocalMetadata.Host.Hostname
 		if agentHostname == hostname {
-			return &item, nil
+			hostnameAgents = append(hostnameAgents, &item)
 		}
 	}
 
-	return nil, fmt.Errorf("unable to find agent with hostname [%s]", hostname)
+	if len(hostnameAgents) == 0 {
+		return nil, fmt.Errorf("unable to find agent with hostname [%s]", hostname)
+	}
+
+	if len(hostnameAgents) > 1 {
+		return nil, fmt.Errorf("found %d agents with hostname [%s]; expected to find only one", len(hostnameAgents), hostname)
+	}
+
+	return hostnameAgents[0], nil
 }
 
 func GetAgentStatus(client *kibana.Client) (string, error) {
