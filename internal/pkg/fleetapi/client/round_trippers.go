@@ -69,3 +69,22 @@ func NewFleetAuthRoundTripper(
 	}
 	return &FleetAuthRoundTripper{rt: wrapped, apiKey: apiKey}, nil
 }
+
+// ElasticApiVersionRoundTripper adds an Elastic-Api-Version header on every request.
+type ElasticApiVersionRoundTripper struct {
+	rt                http.RoundTripper
+	elasticApiVersion string
+}
+
+const elasticApiVersionHeaderKey = "Elastic-Api-Version"
+
+// RoundTrip adds an Elastic-Api-Version header on every request.
+func (r *ElasticApiVersionRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set(elasticApiVersionHeaderKey, r.elasticApiVersion)
+
+	return r.rt.RoundTrip(req)
+}
+
+func NewElasticApiVersionRoundTripper(inner http.RoundTripper, elasticApiVersion string) http.RoundTripper {
+	return &ElasticApiVersionRoundTripper{elasticApiVersion: elasticApiVersion, rt: inner}
+}
