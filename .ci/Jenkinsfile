@@ -47,13 +47,21 @@ pipeline {
     // disabled by default, but required for merge:
     // opt-in with 'ci:extended-m1' tag on PR
     booleanParam(name: 'extended_m1_ci', defaultValue: false, description: 'Enable M1 tests')
+
+    // allow overriding git revision for manually trigerred Jenkins builds
+    string(name: 'REVISION', defaultValue: '', description: 'the git branch to checkout (empty if default MBP approach)')
   }
   stages {
     stage('Checkout') {
+      environment {
+        // Parameters will be empty for the very first build, setting an environment variable
+        // with the same name will workaround the issue. see JENKINS-41929
+        REVISION = "${params?.REVISION}"
+      }
       steps {
         pipelineManager([ cancelPreviousRunningBuilds: [ when: 'PR' ] ])
         deleteDir()
-        gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: true)
+        gitCheckout(basedir: "${BASE_DIR}", branches: [[name: "${params.REVISION}"]], githubNotifyFirstTimeContributor: true)
         stashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
         dir("${BASE_DIR}"){
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
