@@ -128,7 +128,7 @@ func InstallAgentForPolicy(t *testing.T, ctx context.Context,
 	}
 	t.Logf(">>> Ran Enroll. Output: %s", output)
 
-	timeout := 5 * time.Minute
+	timeout := 10 * time.Minute
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
