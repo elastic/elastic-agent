@@ -7,7 +7,6 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -53,7 +52,7 @@ func NewCrashChecker(ctx context.Context, ch chan error, log *logger.Logger, che
 		return nil, err
 	}
 
-	log.Debugf("running checks using '%s' controller", c.sc.Name())
+	log.Infof("running checks using '%s' controller", c.sc.Name())
 
 	return c, nil
 }
@@ -62,9 +61,8 @@ func NewCrashChecker(ctx context.Context, ch chan error, log *logger.Logger, che
 func (ch *CrashChecker) Run(ctx context.Context) {
 	defer ch.sc.Close()
 
-	ch.log.Debug("Crash checker started")
+	ch.log.Info("Crash checker started")
 	for {
-		ch.log.Debugf("watcher having PID: %d", os.Getpid())
 		t := time.NewTimer(ch.checkInterval)
 
 		select {
@@ -77,7 +75,7 @@ func (ch *CrashChecker) Run(ctx context.Context) {
 				ch.log.Error(err)
 			}
 
-			ch.log.Debugf("retrieved service PID [%d]", pid)
+			ch.log.Infof("retrieved service PID [%d]", pid)
 			ch.q.Push(pid)
 
 			// We decide if the Agent process has crashed in either of
