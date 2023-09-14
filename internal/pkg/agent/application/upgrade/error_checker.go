@@ -49,7 +49,7 @@ func NewErrorChecker(ch chan error, log *logger.Logger, checkInterval time.Durat
 
 // Run runs the checking loop.
 func (ch *ErrorChecker) Run(ctx context.Context) {
-	ch.log.Debug("Error checker started")
+	ch.log.Info("Error checker started")
 	for {
 		t := time.NewTimer(ch.checkInterval)
 		select {
