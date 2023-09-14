@@ -32,7 +32,7 @@ import (
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath, uninstallToken string) error {
+func Uninstall(cfgFile, topPath, uninstallToken string, pt ProgressTrackerStep) error {
 	// uninstall the current service
 	svc, err := newService(topPath)
 	if err != nil {
@@ -40,18 +40,21 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	}
 	status, _ := svc.Status()
 
+	s := pt.StepStart("Stopping service")
 	if status == service.StatusRunning {
 		err := svc.Stop()
 		if err != nil {
+			s.Failed()
 			return aerrors.New(
 				err,
 				fmt.Sprintf("failed to stop service (%s)", paths.ServiceName),
 				aerrors.M("service", paths.ServiceName))
 		}
 	}
+	s.Succeeded()
 
 	// kill any running watcher
-	if err := killWatcher(); err != nil {
+	if err := killWatcher(s); err != nil {
 		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
 	}
 
@@ -71,7 +74,13 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	}
 
 	// Uninstall service only after components were uninstalled successfully
-	_ = svc.Uninstall()
+	s = pt.StepStart("Removing service")
+	err = svc.Uninstall()
+	if err != nil {
+		s.Failed()
+	} else {
+		s.Succeeded()
+	}
 
 	// remove, if present on platform
 	if paths.ShellWrapperPath != "" {
@@ -85,13 +94,16 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	}
 
 	// remove existing directory
+	s = pt.StepStart("Removing install directory")
 	err = RemovePath(topPath)
 	if err != nil {
+		s.Failed()
 		return aerrors.New(
 			err,
 			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
 			aerrors.M("directory", paths.Top()))
 	}
+	s.Succeeded()
 
 	return nil
 }
@@ -299,18 +311,35 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 }
 
 // killWatcher finds and kills any running Elastic Agent watcher.
-func killWatcher() error {
+func killWatcher(pt ProgressTrackerStep) error {
+	var s ProgressTrackerStep
 	for {
 		// finding and killing watchers is performed in a loop until no
 		// more watchers are existing, this ensures that during uninstall
 		// that no matter what the watchers are dead before going any further
-		pids, errs := utils.GetWatcherPIDs()
-		if errs != nil {
-			return errs
+		pids, err := utils.GetWatcherPIDs()
+		if err != nil {
+			if s != nil {
+				s.Failed()
+			}
+			return err
 		}
 		if len(pids) == 0 {
+			if s != nil {
+				s.Succeeded()
+			}
 			return nil
 		}
+
+		if s == nil {
+			var pidsStr []string
+			for _, pid := range pids {
+				pidsStr = append(pidsStr, fmt.Sprintf("%d", pid))
+			}
+			s = pt.StepStart(fmt.Sprintf("Stopping upgrade watcher (%s)", strings.Join(pidsStr, ", ")))
+		}
+
+		var errs error
 		for _, pid := range pids {
 			proc, err := os.FindProcess(pid)
 			if err != nil {
@@ -324,6 +353,9 @@ func killWatcher() error {
 			}
 		}
 		if errs != nil {
+			if s != nil {
+				s.Failed()
+			}
 			return errs
 		}
 		// wait 1 second before performing the loop again

@@ -22,7 +22,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, pt *ProgressTracker) error {
+func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	dir, err := findDirectory()
 	if err != nil {
 		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
@@ -33,16 +33,16 @@ func Install(cfgFile, topPath string, pt *ProgressTracker) error {
 	// There is no uninstall token for "install" command.
 	// Uninstall will fail on protected agent.
 	// The protected Agent will need to be uninstalled first before it can be installed.
-	pt.StepStart("Uninstalling current Elastic Agent")
-	err = Uninstall(cfgFile, topPath, "")
+	s := pt.StepStart("Uninstalling current Elastic Agent")
+	err = Uninstall(cfgFile, topPath, "", s)
 	if err != nil {
-		pt.StepFailed()
+		s.Failed()
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
 			errors.M("directory", filepath.Dir(topPath)))
 	}
-	pt.StepSucceeded()
+	s.Succeeded()
 
 	// ensure parent directory exists
 	err = os.MkdirAll(filepath.Dir(topPath), 0755)
@@ -54,7 +54,7 @@ func Install(cfgFile, topPath string, pt *ProgressTracker) error {
 	}
 
 	// copy source into install path
-	pt.StepStart("Copying files")
+	s = pt.StepStart("Copying files")
 	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
@@ -62,13 +62,13 @@ func Install(cfgFile, topPath string, pt *ProgressTracker) error {
 		Sync: true,
 	})
 	if err != nil {
-		pt.StepFailed()
+		s.Failed()
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
 			errors.M("source", dir), errors.M("destination", topPath))
 	}
-	pt.StepSucceeded()
+	s.Succeeded()
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
@@ -132,21 +132,21 @@ func Install(cfgFile, topPath string, pt *ProgressTracker) error {
 	}
 
 	// install service
-	pt.StepStart("Installing service")
+	s = pt.StepStart("Installing service")
 	svc, err := newService(topPath)
 	if err != nil {
-		pt.StepFailed()
+		s.Failed()
 		return err
 	}
 	err = svc.Install()
 	if err != nil {
-		pt.StepFailed()
+		s.Failed()
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
 			errors.M("service", paths.ServiceName))
 	}
-	pt.StepSucceeded()
+	s.Succeeded()
 
 	return nil
 }

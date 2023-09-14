@@ -15,15 +15,98 @@ import (
 	"golang.org/x/exp/rand"
 )
 
+// ProgressTrackerStep is a currently running step.
+//
+// A step can produce a sub-step that is a step that is part of another step.
+type ProgressTrackerStep interface {
+	// Succeeded step is done and successful.
+	Succeeded()
+	// Failed step has failed.
+	Failed()
+	// StepStart creates a new step.
+	StepStart(msg string) ProgressTrackerStep
+}
+
+type progressTrackerStep struct {
+	tracker *ProgressTracker
+	prefix  string
+
+	finalizeFunc func()
+
+	rootstep bool
+	substeps bool
+	step     *progressTrackerStep
+}
+
+func newProgressTrackerStep(tracker *ProgressTracker, prefix string, finalizeFunc func()) *progressTrackerStep {
+	return &progressTrackerStep{
+		tracker:      tracker,
+		prefix:       prefix,
+		finalizeFunc: finalizeFunc,
+	}
+}
+
+// Succeeded step is done and successful.
+func (pts *progressTrackerStep) Succeeded() {
+	prefix := " "
+	if pts.substeps {
+		prefix = pts.prefix + "   "
+	}
+	if !pts.rootstep {
+		pts.tracker.printf("%sDONE\n", prefix)
+	}
+	pts.finalizeFunc()
+}
+
+// Failed step has failed.
+func (pts *progressTrackerStep) Failed() {
+	prefix := " "
+	if pts.substeps {
+		prefix = pts.prefix + "   "
+	}
+	if !pts.rootstep {
+		pts.tracker.printf("%sFAILED\n", prefix)
+	}
+	pts.finalizeFunc()
+}
+
+// StepStart creates a new step.
+func (pts *progressTrackerStep) StepStart(msg string) ProgressTrackerStep {
+	prefix := pts.prefix
+	if !pts.rootstep {
+		prefix += "   "
+		if !pts.substeps {
+			prefix = "\n" + prefix
+			pts.substeps = true
+		}
+	}
+	pts.tracker.printf("%s%s...", prefix, strings.TrimSpace(msg))
+	s := newProgressTrackerStep(pts.tracker, prefix, func() {
+		pts.step = nil
+	})
+	pts.step = s
+	return s
+}
+
+func (pts *progressTrackerStep) tick() {
+	if pts.step != nil {
+		pts.step.tick()
+		return
+	}
+	if !pts.rootstep {
+		pts.tracker.printf(".")
+	}
+}
+
 type ProgressTracker struct {
 	writer io.Writer
 
 	tickInterval          time.Duration
 	randomizeTickInterval bool
 
-	stepInProgress bool
-	mu             sync.RWMutex
-	stop           chan struct{}
+	step *progressTrackerStep
+	mu   sync.Mutex
+	stop chan struct{}
 }
 
 func NewProgressTracker(writer io.Writer) *ProgressTracker {
@@ -43,7 +126,7 @@ func (pt *ProgressTracker) DisableRandomizedTickIntervals() {
 	pt.randomizeTickInterval = false
 }
 
-func (pt *ProgressTracker) Start() {
+func (pt *ProgressTracker) Start() ProgressTrackerStep {
 	timer := time.NewTimer(pt.calculateTickInterval())
 	go func() {
 		defer timer.Stop()
@@ -52,44 +135,27 @@ func (pt *ProgressTracker) Start() {
 			case <-pt.stop:
 				return
 			case <-timer.C:
-				pt.mu.RLock()
-				if pt.stepInProgress {
-					_, _ = pt.writer.Write([]byte("."))
+				if pt.step != nil {
+					pt.step.tick()
 				}
-				pt.mu.RUnlock()
-
 				timer = time.NewTimer(pt.calculateTickInterval())
 			}
 		}
 	}()
+
+	s := newProgressTrackerStep(pt, "", func() {
+		pt.step = nil
+		pt.stop <- struct{}{}
+	})
+	s.rootstep = true // is the root step
+	pt.step = s
+	return s
 }
 
-func (pt *ProgressTracker) StepStart(msg string) {
+func (pt *ProgressTracker) printf(format string, a ...any) {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-
-	pt.stepInProgress = true
-	fmt.Fprintf(pt.writer, strings.TrimSpace(msg)+"...")
-}
-
-func (pt *ProgressTracker) StepSucceeded() {
-	pt.mu.Lock()
-	defer pt.mu.Unlock()
-
-	fmt.Fprintln(pt.writer, " DONE")
-	pt.stepInProgress = false
-}
-
-func (pt *ProgressTracker) StepFailed() {
-	pt.mu.Lock()
-	defer pt.mu.Unlock()
-
-	fmt.Fprintln(pt.writer, " FAILED")
-	pt.stepInProgress = false
-}
-
-func (pt *ProgressTracker) Stop() {
-	pt.stop <- struct{}{}
+	_, _ = fmt.Fprintf(pt.writer, format, a...)
 }
 
 func (pt *ProgressTracker) calculateTickInterval() time.Duration {

@@ -28,7 +28,6 @@ func GetWatcherPIDs() ([]int, error) {
 		return nil, fmt.Errorf("failed to fetch pids: %w", err)
 	}
 	var pids []int
-	var errs error
 	for pid, state := range pidMap {
 		if len(state.Args) < 2 {
 			// must have at least 2 args "elastic-agent[.exe] watch"
@@ -41,9 +40,6 @@ func GetWatcherPIDs() ([]int, error) {
 			// it is a watch subprocess
 			pids = append(pids, pid)
 		}
-	}
-	if errs != nil {
-		return nil, errs
 	}
 	return pids, nil
 }
