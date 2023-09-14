@@ -46,8 +46,11 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 =======
 	// We only uninstall currently-installed Agent if --force
 	// is present.
+=======
+	// We only uninstall Agent if it is currently installed.
+>>>>>>> df1d9888d (Don't pass force)
 	status, _ := Status(topPath)
-	if status == Installed && force {
+	if status == Installed {
 		// Uninstall current installation
 		//
 		// There is no uninstall token for "install" command.
