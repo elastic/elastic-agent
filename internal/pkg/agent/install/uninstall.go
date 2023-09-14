@@ -54,12 +54,12 @@ func Uninstall(cfgFile, topPath, uninstallToken string, pt ProgressTrackerStep) 
 	s.Succeeded()
 
 	// kill any running watcher
-	if err := killWatcher(s); err != nil {
+	if err := killWatcher(pt); err != nil {
 		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
 	}
 
 	// Uninstall components first
-	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken); err != nil {
+	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken, pt); err != nil {
 		// If service status was running it was stopped to uninstall the components.
 		// If the components uninstall failed start the service again
 		if status == service.StatusRunning {
@@ -181,7 +181,7 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	return false
 }
 
-func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string) error {
+func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, pt ProgressTrackerStep) error {
 	log, err := logger.NewWithLogpLevel("", logp.ErrorLevel, false)
 	if err != nil {
 		return err
@@ -235,7 +235,7 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 			// This component is not active
 			continue
 		}
-		if err := uninstallServiceComponent(ctx, log, comp, uninstallToken); err != nil {
+		if err := uninstallServiceComponent(ctx, log, comp, uninstallToken, pt); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 			// The decision was made to change the behaviour and leave the Agent installed if Endpoint uninstall fails
 			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
@@ -247,11 +247,18 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 	return nil
 }
 
-func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string) error {
+func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string, pt ProgressTrackerStep) error {
 	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
 	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
 	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
-	return comprt.UninstallService(ctx, log, comp, uninstallToken)
+	s := pt.StepStart(fmt.Sprintf("Uninstalling service component %s", comp.InputType))
+	err := comprt.UninstallService(ctx, log, comp, uninstallToken)
+	if err != nil {
+		s.Failed()
+		return err
+	}
+	s.Succeeded()
+	return nil
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
