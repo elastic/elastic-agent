@@ -22,9 +22,10 @@ func TestRemovePath(t *testing.T) {
 		binaryName = pkgName + ".exe"
 	)
 
-	// Create a temporary directory that we can safely remove.
-	destDir := filepath.Join(t.TempDir(), "subdir")
-	err := os.Mkdir(destDir, 0644)
+	// Create a temporary directory that we can safely remove. The directory is created as a new
+	// sub-directory. This avoids having Microsoft Defender quarantine the file if it is exec'd from
+	// the default temporary directory.
+	destDir, err := os.MkdirTemp(pkgName, t.Name())
 	require.NoError(t, err)
 
 	// Copy the test executable to the new temporary directory.
