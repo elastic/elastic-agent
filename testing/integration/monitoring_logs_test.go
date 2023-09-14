@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"testing"
 	"time"
@@ -108,16 +109,13 @@ func TestMonitoringLogsShipped(t *testing.T) {
 
 	// Stage 6: verify logs from the monitoring components are not sent to the output
 	t.Log("Check monitoring logs")
-	agentClient := agentFixture.Client()
-	err = agentClient.Connect(ctx)
-	require.NoError(t, err)
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Fatalf("could not get hostname to filter Agent: %s", err)
+	}
 
-	agentState, err := agentClient.State(ctx)
-	require.NoError(t, err)
-
-	agent, err := tools.GetAgentByID(info.KibanaClient, agentState.Info.ID)
-	require.NoError(t, err)
-	agentID := agent.Agent.ID
+	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, policy.ID, hostname)
+	require.NoError(t, err, "could not get Agent ID by hostname")
 	t.Logf("Agent ID: %q", agentID)
 
 	// We cannot search for `component.id` because at the moment of writing

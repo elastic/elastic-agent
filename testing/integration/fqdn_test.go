@@ -101,16 +101,8 @@ func TestFQDN(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	agentClient := agentFixture.Client()
-	err = agentClient.Connect(ctx)
-	require.NoError(t, err)
-
-	agentState, err := agentClient.State(ctx)
-	require.NoError(t, err)
-	agentID := agentState.Info.ID
-
 	t.Log("Verify that agent name is short hostname")
-	agent := verifyAgentName(t, agentID, shortName, info.KibanaClient)
+	agent := verifyAgentName(t, policy.ID, shortName, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname")
 	verifyHostNameInIndices(t, "logs-*", shortName, info.Namespace, info.ESClient)
@@ -141,7 +133,7 @@ func TestFQDN(t *testing.T) {
 	)
 
 	t.Log("Verify that agent name is FQDN")
-	verifyAgentName(t, agentID, fqdn, info.KibanaClient)
+	verifyAgentName(t, policy.ID, fqdn, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is FQDN")
 	verifyHostNameInIndices(t, "logs-*", fqdn, info.Namespace, info.ESClient)
@@ -172,7 +164,7 @@ func TestFQDN(t *testing.T) {
 	)
 
 	t.Log("Verify that agent name is short hostname again")
-	verifyAgentName(t, agentID, shortName, info.KibanaClient)
+	verifyAgentName(t, policy.ID, shortName, info.KibanaClient)
 
 	// TODO: Re-enable assertion once https://github.com/elastic/elastic-agent/issues/3078 is
 	// investigated for root cause and resolved.
@@ -181,7 +173,7 @@ func TestFQDN(t *testing.T) {
 	// verifyHostNameInIndices(t, "metrics-*", shortName, info.ESClient)
 }
 
-func verifyAgentName(t *testing.T, agentID, hostname string, kibClient *kibana.Client) *kibana.AgentExisting {
+func verifyAgentName(t *testing.T, policyID, hostname string, kibClient *kibana.Client) *kibana.AgentExisting {
 	t.Helper()
 
 	var agent *kibana.AgentExisting
@@ -190,8 +182,8 @@ func verifyAgentName(t *testing.T, agentID, hostname string, kibClient *kibana.C
 	require.Eventually(
 		t,
 		func() bool {
-			agent, err = tools.GetAgentByID(kibClient, agentID)
-			return err == nil && agent.LocalMetadata.Host.Hostname == hostname
+			agent, err = tools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policyID, hostname)
+			return err == nil && agent != nil
 		},
 		5*time.Minute,
 		5*time.Second,
