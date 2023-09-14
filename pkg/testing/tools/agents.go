@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -19,41 +18,33 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
-// GetAgentByPolicyIDAndHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
-func GetAgentByPolicyIDAndHostnameFromList(client *kibana.Client, policyID, hostname string) (*kibana.AgentExisting, error) {
+// GetAgentByID get an agent by the local_metadata.host.name property, reading from the agents list
+func GetAgentByID(client *kibana.Client, agentID string) (*kibana.AgentExisting, error) {
 	listAgentsResp, err := client.ListAgents(context.Background(), kibana.ListAgentsRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	hostnameAgents := make([]*kibana.AgentExisting, 0)
+	agents := make([]*kibana.AgentExisting, 0)
 	for i, item := range listAgentsResp.Items {
-		agentHostname := item.LocalMetadata.Host.Hostname
-		agentPolicyID := item.PolicyID
-
-		if agentHostname == hostname && agentPolicyID == policyID {
-			hostnameAgents = append(hostnameAgents, &listAgentsResp.Items[i])
+		if agentID == item.Agent.ID {
+			agents = append(agents, &listAgentsResp.Items[i])
 		}
 	}
 
-	if len(hostnameAgents) == 0 {
-		return nil, fmt.Errorf("unable to find agent with hostname [%s]", hostname)
+	if len(agents) == 0 {
+		return nil, fmt.Errorf("unable to find agent with ID [%s]", agentID)
 	}
 
-	if len(hostnameAgents) > 1 {
-		return nil, fmt.Errorf("found %d agents with hostname [%s]; expected to find only one", len(hostnameAgents), hostname)
+	if len(agents) > 1 {
+		return nil, fmt.Errorf("found %d agents with ID [%s]; expected to find only one", len(agents), agentID)
 	}
 
-	return hostnameAgents[0], nil
+	return agents[0], nil
 }
 
-func GetAgentStatus(client *kibana.Client, policyID string) (string, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "", err
-	}
-
-	agent, err := GetAgentByPolicyIDAndHostnameFromList(client, policyID, hostname)
+func GetAgentStatus(client *kibana.Client, agentID string) (string, error) {
+	agent, err := GetAgentByID(client, agentID)
 	if err != nil {
 		return "", err
 	}
@@ -61,13 +52,8 @@ func GetAgentStatus(client *kibana.Client, policyID string) (string, error) {
 	return agent.Status, nil
 }
 
-func GetAgentVersion(client *kibana.Client, policyID string) (string, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "", err
-	}
-
-	agent, err := GetAgentByPolicyIDAndHostnameFromList(client, policyID, hostname)
+func GetAgentVersion(client *kibana.Client, agentID string) (string, error) {
+	agent, err := GetAgentByID(client, agentID)
 	if err != nil {
 		return "", err
 	}
@@ -75,21 +61,12 @@ func GetAgentVersion(client *kibana.Client, policyID string) (string, error) {
 	return agent.Agent.Version, err
 }
 
-func UnEnrollAgent(client *kibana.Client, policyID string) error {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return err
-	}
-	agentID, err := GetAgentIDByHostname(client, policyID, hostname)
-	if err != nil {
-		return err
-	}
-
+func UnEnrollAgent(client *kibana.Client, agentID string) error {
 	unEnrollAgentReq := kibana.UnEnrollAgentRequest{
 		ID:     agentID,
 		Revoke: true,
 	}
-	_, err = client.UnEnrollAgent(context.Background(), unEnrollAgentReq)
+	_, err := client.UnEnrollAgent(context.Background(), unEnrollAgentReq)
 	if err != nil {
 		return fmt.Errorf("unable to unenroll agent with ID [%s]: %w", agentID, err)
 	}
@@ -97,29 +74,12 @@ func UnEnrollAgent(client *kibana.Client, policyID string) error {
 	return nil
 }
 
-func GetAgentIDByHostname(client *kibana.Client, policyID, hostname string) (string, error) {
-	agent, err := GetAgentByPolicyIDAndHostnameFromList(client, policyID, hostname)
-	if err != nil {
-		return "", err
-	}
-	return agent.Agent.ID, nil
-}
-
-func UpgradeAgent(client *kibana.Client, policyID, version string) error {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return err
-	}
-	agentID, err := GetAgentIDByHostname(client, policyID, hostname)
-	if err != nil {
-		return err
-	}
-
+func UpgradeAgent(client *kibana.Client, agentID, version string) error {
 	upgradeAgentReq := kibana.UpgradeAgentRequest{
 		ID:      agentID,
 		Version: version,
 	}
-	_, err = client.UpgradeAgent(context.Background(), upgradeAgentReq)
+	_, err := client.UpgradeAgent(context.Background(), upgradeAgentReq)
 	if err != nil {
 		return fmt.Errorf("unable to upgrade agent with ID [%s]: %w", agentID, err)
 	}
