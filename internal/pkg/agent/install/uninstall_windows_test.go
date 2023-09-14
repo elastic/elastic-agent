@@ -7,23 +7,46 @@
 package install
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
+	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRemovePath(t *testing.T) {
-	const binaryName = "testblocking"
-	binaryPath, err := filepath.Abs(filepath.Join(binaryName, binaryName+".exe"))
-	require.NoErrorf(t, err, "failed abs %s", binaryPath)
+	var (
+		pkgName    = "testblocking"
+		binaryName = pkgName + ".exe"
+	)
 
-	cmd := exec.Command(binaryPath)
+	// Create a temporary directory that we can safely remove.
+	destDir := filepath.Join(t.TempDir(), "subdir")
+	err := os.Mkdir(destDir, 0644)
+	require.NoError(t, err)
+
+	// Copy the test executable to the new temporary directory.
+	destpath, err := filepath.Abs(filepath.Join(destDir, binaryName))
+	require.NoErrorf(t, err, "failed dest abs %s + %s", destDir, binaryName)
+
+	srcPath, err := filepath.Abs(filepath.Join(pkgName, binaryName))
+	require.NoErrorf(t, err, "failed src abs %s + %s", pkgName, binaryName)
+
+	err = copy.Copy(srcPath, destpath, copy.Options{Sync: true})
+	require.NoError(t, err)
+
+	// Execute the test executable asynchronously.
+	cmd := exec.Command(destpath)
 	err = cmd.Start()
 	require.NoError(t, err)
 	defer func() {
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 	}()
+
+	// Ensure the directory containing the executable can be removed.
+	err = RemovePath(destDir)
+	require.NoError(t, err)
 }
