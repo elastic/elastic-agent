@@ -83,7 +83,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 	if nonInteractive {
-		fmt.Fprintf(streams.Out, "Installing in non-interactive mode.")
+		fmt.Fprintln(streams.Out, "Installing in non-interactive mode.")
 	}
 
 	if status == install.PackageInstall {
