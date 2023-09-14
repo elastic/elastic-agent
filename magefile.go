@@ -260,16 +260,19 @@ func (Build) Clean() {
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
 	wd, _ := os.Getwd()
-	p := filepath.Join(wd, "pkg", "component", "fake")
-	for _, name := range []string{"component", "shipper"} {
-		binary := name
+	testBinaryPkgs := []string{
+		filepath.Join(wd, "pkg", "component", "fake", "component"),
+		filepath.Join(wd, "pkg", "component", "fake", "shipper"),
+		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
+	}
+	for _, pkg := range testBinaryPkgs {
+		binary := filepath.Base(pkg)
 		if runtime.GOOS == "windows" {
 			binary += ".exe"
 		}
 
-		fakeDir := filepath.Join(p, name)
-		outputName := filepath.Join(fakeDir, binary)
-		err := RunGo("build", "-o", outputName, filepath.Join(fakeDir))
+		outputName := filepath.Join(pkg, binary)
+		err := RunGo("build", "-o", outputName, filepath.Join(pkg))
 		if err != nil {
 			return err
 		}
