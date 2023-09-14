@@ -256,8 +256,8 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 		composableMapping: mapstr.M{},
 		processors:        []mapstr.M{},
 	}
-	hints := mapstr.M{}
-	containerProcessors := []mapstr.M{}
+	var hints mapstr.M
+	var containerProcessors []mapstr.M
 
 	if ann, ok := k8sMapping["annotations"]; ok {
 		annotations, _ := ann.(mapstr.M)
@@ -274,7 +274,7 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 								// If there are hints like co.elastic.hints.<container_name>/ then add add the values after the / to the corresponding container
 								hints = utils.GenerateHints(annotations, parts[0], prefix)
 								//Processors for specific container
-								//We need to make an extra check if we have processors added only to the specific conatiners
+								//We need to make an extra check if we have processors added only to the specific containers
 								containerProcessors = utils.GetConfigs(annotations, prefix, "hints."+parts[0]+"/processors")
 
 							} else {
@@ -289,9 +289,7 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 								hintData.processors = utils.GetConfigs(annotations, prefix, processorhints)
 								//Only if there are processors defined in a specific container we append the to the processors of the pod
 								if len(containerProcessors) > 0 {
-									for _, value := range containerProcessors {
-										hintData.processors = append(hintData.processors, value)
-									}
+									hintData.processors = append(hintData.processors, containerProcessors...)
 								}
 								logger.Debugf("Generated Processors are :%v", hintData.processors)
 							}
