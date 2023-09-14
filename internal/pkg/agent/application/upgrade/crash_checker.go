@@ -75,13 +75,9 @@ func (ch *CrashChecker) Run(ctx context.Context) {
 				ch.log.Error(err)
 			}
 
-<<<<<<< HEAD
-=======
-			ch.log.Infof("retrieved service PID [%d]", pid)
->>>>>>> 66fa5a7a92 (Improve Upgrade-related logging (#3382))
 			ch.q.Push(pid)
 			restarts := ch.q.Distinct()
-			ch.log.Debugf("retrieved service PID [%d] changed %d times within %d", pid, restarts, evaluatedPeriods)
+			ch.log.Infof("retrieved service PID [%d] changed %d times within %d", pid, restarts, evaluatedPeriods)
 			if restarts > crashesAllowed {
 				ch.notifyChan <- errors.New(fmt.Sprintf("service restarted '%d' times within '%v' seconds", restarts, ch.checkInterval.Seconds()))
 			}
