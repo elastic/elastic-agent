@@ -327,6 +327,10 @@ func killWatcher(pt ProgressTrackerStep) error {
 		if len(pids) == 0 {
 			if s != nil {
 				s.Succeeded()
+			} else {
+				// step was never started so no watcher was found on first loop
+				s = pt.StepStart("Stopping upgrade watcher; none found")
+				s.Succeeded()
 			}
 			return nil
 		}
