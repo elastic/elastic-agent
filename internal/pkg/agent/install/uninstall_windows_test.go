@@ -22,6 +22,8 @@ func TestRemovePath(t *testing.T) {
 		binaryName = pkgName + ".exe"
 	)
 
+	t.Skip("https://github.com/elastic/elastic-agent/issues/3221")
+
 	// Create a temporary directory that we can safely remove. The directory is created as a new
 	// sub-directory. This avoids having Microsoft Defender quarantine the file if it is exec'd from
 	// the default temporary directory.
