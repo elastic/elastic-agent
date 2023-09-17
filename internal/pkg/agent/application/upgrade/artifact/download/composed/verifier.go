@@ -33,8 +33,6 @@ func NewVerifier(verifiers ...download.Verifier) *Verifier {
 // Verify checks the package from configured source.
 func (e *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
 	var err error
-	var checksumMismatchErr *download.ChecksumMismatchError
-	var invalidSignatureErr *download.InvalidSignatureError
 
 	for _, v := range e.vv {
 		e := v.Verify(a, version, skipDefaultPgp, pgpBytes...)
@@ -44,11 +42,6 @@ func (e *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bo
 		}
 
 		err = multierror.Append(err, e)
-
-		if errors.As(e, &checksumMismatchErr) || errors.As(err, &invalidSignatureErr) {
-			// Stop verification chain on checksum/signature errors.
-			break
-		}
 	}
 
 	return err
