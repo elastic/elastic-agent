@@ -59,11 +59,11 @@ func TestVerifier(t *testing.T) {
 			expectedResult: true,
 		}, {
 			verifiers:      []CheckableVerifier{&FailVerifier{}, &ErrorVerifier{}, &SuccVerifier{}},
-			checkFunc:      func(d []CheckableVerifier) bool { return d[0].Called() && !d[1].Called() && !d[2].Called() },
+			checkFunc:      func(d []CheckableVerifier) bool { return d[0].Called() && d[1].Called() && d[2].Called() },
 			expectedResult: true,
 		}, {
 			verifiers:      []CheckableVerifier{&ErrorVerifier{}, &FailVerifier{}, &SuccVerifier{}},
-			checkFunc:      func(d []CheckableVerifier) bool { return d[0].Called() && d[1].Called() && !d[2].Called() },
+			checkFunc:      func(d []CheckableVerifier) bool { return d[0].Called() && d[1].Called() && d[2].Called() },
 			expectedResult: true,
 		}, {
 			verifiers:      []CheckableVerifier{&ErrorVerifier{}, &ErrorVerifier{}, &SuccVerifier{}},
