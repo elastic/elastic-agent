@@ -1,0 +1,40 @@
+// begin 8.10.1 relnotes
+
+[[release-notes-8.10.1]]
+==  8.10.1
+
+Review important information about the  8.10.1 release.
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.10.1]]
+=== Enhancements
+
+
+elastic-agent::
+
+* Improve Logging During Agent Upgrades. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3382[#https://github.com/elastic/elastic-agent/pull/3382] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.10.1]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Rollback Elastic Agent Upgrade If Upgraded Agent Process Crashes Immediately. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3166[#https://github.com/elastic/elastic-agent/pull/3166] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3124[#https://github.com/elastic/elastic-agent/issues/3124]
+
+// end 8.10.1 relnotes
