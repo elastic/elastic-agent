@@ -112,7 +112,7 @@ func RemovePath(path string) error {
 			_ = removeBlockingExe(lastErr)
 		}
 
-		time.Sleep(time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)
