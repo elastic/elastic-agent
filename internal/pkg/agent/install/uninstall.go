@@ -109,13 +109,13 @@ func RemovePath(path string) error {
 
 		if isBlockingOnExe(lastErr) {
 			// try to remove the blocking exe and try again to clean up the path
-			removeBlockingExe(lastErr)
+			_ = removeBlockingExe(lastErr)
 		}
 
 		time.Sleep(time.Millisecond)
 	}
 
-	return fmt.Errorf("timed out while removing %q. Last error: %s", path, lastErr)
+	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)
 }
 
 func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
