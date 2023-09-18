@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/hashicorp/go-multierror"
 
 	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
@@ -30,6 +31,10 @@ import (
 const (
 	PgpSourceRawPrefix = "pgp_raw:"
 	PgpSourceURIPrefix = "pgp_uri:"
+)
+
+var (
+	ErrRemotePGPDownloadFailed = errors.New("Remote PGP download failed")
 )
 
 // ChecksumMismatchError indicates the expected checksum for a file does not
@@ -206,7 +211,7 @@ func fetchPgpFromURI(uri string, client http.Client) ([]byte, error) {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, multierror.Append(err, ErrRemotePGPDownloadFailed)
 	}
 	defer resp.Body.Close()
 

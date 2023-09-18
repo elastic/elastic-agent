@@ -123,6 +123,10 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultPgp
 		}
 		raw, err := download.PgpBytesFromSource(check, v.client)
 		if err != nil {
+			if errors.Is(err, download.ErrRemotePGPDownloadFailed) {
+				v.log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", strings.TrimPrefix(check, download.PgpSourceURIPrefix), err)
+				continue
+			}
 			return err
 		}
 		if len(raw) == 0 {
