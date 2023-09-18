@@ -328,7 +328,7 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 
 	customPGP := CustomPGP{
 		PGP:    newPgp,
-		PGPUri: "http://127.0.0.1:3456/non/existing/path",
+		PGPUri: "https://127.0.0.1:3456/non/existing/path",
 	}
 
 	testStandaloneUpgrade(ctx, t, agentFixture, fromVersion, toVersion, "", false, false, true, customPGP)
