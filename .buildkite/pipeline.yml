@@ -12,3 +12,16 @@ steps:
       - "build/TEST-**"
     agents:
       provider: "gcp"
+<<<<<<< HEAD
+=======
+      machineType: "n1-standard-8"
+
+  - wait: ~
+    continue_on_failure: true
+  - label: "Processing test results"
+    agents:
+      provider: "gcp"
+    plugins:
+      - junit-annotate#v2.4.1:
+          artifacts: build/TEST-go-*.xml
+>>>>>>> 23fe2ef05c (Structure the BK pipeline output for failures (#3359))
