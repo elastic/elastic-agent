@@ -7,12 +7,14 @@
 package install
 
 import (
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/otiai10/copy"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,8 +23,6 @@ func TestRemovePath(t *testing.T) {
 		pkgName    = "testblocking"
 		binaryName = pkgName + ".exe"
 	)
-
-	t.Skip("https://github.com/elastic/elastic-agent/issues/3221")
 
 	// Create a temporary directory that we can safely remove. The directory is created as a new
 	// sub-directory. This avoids having Microsoft Defender quarantine the file if it is exec'd from
@@ -51,5 +51,7 @@ func TestRemovePath(t *testing.T) {
 
 	// Ensure the directory containing the executable can be removed.
 	err = RemovePath(destDir)
-	require.NoError(t, err)
+	assert.NoError(t, err)
+	_, err = os.Stat(destDir)
+	assert.ErrorIsf(t, err, fs.ErrNotExist, "path %q still exists after removal", destDir)
 }
