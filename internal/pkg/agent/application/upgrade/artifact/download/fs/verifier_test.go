@@ -175,9 +175,7 @@ func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFile
 func TestVerify(t *testing.T) {
 	log, obs := logger.NewTesting("TestVerify")
 	targetDir, err := ioutil.TempDir(os.TempDir(), "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	timeout := 30 * time.Second
 
@@ -191,44 +189,37 @@ func TestVerify(t *testing.T) {
 		},
 	}
 
-	if err := prepareTestCase(beatSpec, version, config); err != nil {
-		t.Fatal(err)
-	}
+	err = prepareTestCase(beatSpec, version, config)
+	require.NoError(t, err)
 
 	testClient := NewDownloader(config)
 	artifact, err := testClient.Download(context.Background(), beatSpec, version)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.Remove(artifact)
+		os.Remove(artifact + ".sha512")
+		os.RemoveAll(config.DropPath)
+	})
 
 	_, err = os.Stat(artifact)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	testVerifier, err := NewVerifier(log, config, true, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	err = testVerifier.Verify(beatSpec, version, false)
 	require.NoError(t, err)
 
 	// log message informing remote PGP was skipped
 	logs := obs.FilterMessageSnippet("Skipped remote PGP located at")
-	require.Equal(t, 0, logs.Len())
-
-	os.Remove(artifact)
-	os.Remove(artifact + ".sha512")
-	os.RemoveAll(config.DropPath)
+	require.Empty(t, logs)
 }
 
 func TestVerifyUnreachableUri(t *testing.T) {
 	log, obs := logger.NewTesting("TestVerifyUnreachableUri")
 	targetDir, err := ioutil.TempDir(os.TempDir(), "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	timeout := 30 * time.Second
 
@@ -242,25 +233,24 @@ func TestVerifyUnreachableUri(t *testing.T) {
 		},
 	}
 
-	if err := prepareTestCase(beatSpec, version, config); err != nil {
-		t.Fatal(err)
-	}
+	err = prepareTestCase(beatSpec, version, config)
+	require.NoError(t, err)
 
 	testClient := NewDownloader(config)
 	artifact, err := testClient.Download(context.Background(), beatSpec, version)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.Remove(artifact)
+		os.Remove(artifact + ".sha512")
+		os.RemoveAll(config.DropPath)
+	})
 
 	_, err = os.Stat(artifact)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	testVerifier, err := NewVerifier(log, config, true, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	unreachableURI := "https://127.0.0.1:3452/path/does/not/exist"
 	unreachablePGP := download.PgpSourceURIPrefix + unreachableURI
@@ -271,10 +261,6 @@ func TestVerifyUnreachableUri(t *testing.T) {
 	// log message informing remote PGP was skipped
 	logs := obs.FilterMessageSnippet(fmt.Sprintf("Skipped remote PGP located at %q", unreachableURI))
 	require.Equal(t, 1, logs.Len())
-
-	os.Remove(artifact)
-	os.Remove(artifact + ".sha512")
-	os.RemoveAll(config.DropPath)
 }
 
 func prepareTestCase(a artifact.Artifact, version string, cfg *artifact.Config) error {

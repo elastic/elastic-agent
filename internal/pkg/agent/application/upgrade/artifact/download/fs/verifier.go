@@ -122,13 +122,14 @@ func (v *Verifier) verifyAsc(fullPath string, skipDefaultPgp bool, pgpSources ..
 			continue
 		}
 		raw, err := download.PgpBytesFromSource(check, v.client)
+		if errors.Is(err, download.ErrRemotePGPDownloadFailed) {
+			v.log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", strings.TrimPrefix(check, download.PgpSourceURIPrefix), err)
+			continue
+		}
 		if err != nil {
-			if errors.Is(err, download.ErrRemotePGPDownloadFailed) {
-				v.log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", strings.TrimPrefix(check, download.PgpSourceURIPrefix), err)
-				continue
-			}
 			return err
 		}
+
 		if len(raw) == 0 {
 			continue
 		}
