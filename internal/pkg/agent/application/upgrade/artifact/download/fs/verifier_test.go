@@ -173,7 +173,7 @@ func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFile
 }
 
 func TestVerify(t *testing.T) {
-	log, _ := logger.New("", false)
+	log, obs := logger.NewTesting("TestVerify")
 	targetDir, err := ioutil.TempDir(os.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
@@ -213,6 +213,10 @@ func TestVerify(t *testing.T) {
 
 	err = testVerifier.Verify(beatSpec, version, false)
 	require.NoError(t, err)
+
+	// log message informing remote PGP was skipped
+	logs := obs.FilterMessageSnippet("Skipped remote PGP located at")
+	require.Equal(t, 0, logs.Len())
 
 	os.Remove(artifact)
 	os.Remove(artifact + ".sha512")
