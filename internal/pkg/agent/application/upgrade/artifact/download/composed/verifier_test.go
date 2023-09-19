@@ -53,22 +53,27 @@ func TestVerifier(t *testing.T) {
 			verifiers:      []CheckableVerifier{&ErrorVerifier{}, &SuccVerifier{}, &FailVerifier{}},
 			checkFunc:      func(d []CheckableVerifier) bool { return d[0].Called() && d[1].Called() && !d[2].Called() },
 			expectedResult: true,
+			expectedErrors: true,
 		}, {
 			verifiers:      []CheckableVerifier{&SuccVerifier{}, &ErrorVerifier{}, &FailVerifier{}},
 			checkFunc:      func(d []CheckableVerifier) bool { return d[0].Called() && !d[1].Called() && !d[2].Called() },
 			expectedResult: true,
+			expectedErrors: false,
 		}, {
 			verifiers:      []CheckableVerifier{&FailVerifier{}, &ErrorVerifier{}, &SuccVerifier{}},
 			checkFunc:      func(d []CheckableVerifier) bool { return d[0].Called() && d[1].Called() && d[2].Called() },
 			expectedResult: true,
+			expectedErrors: true,
 		}, {
 			verifiers:      []CheckableVerifier{&ErrorVerifier{}, &FailVerifier{}, &SuccVerifier{}},
 			checkFunc:      func(d []CheckableVerifier) bool { return d[0].Called() && d[1].Called() && d[2].Called() },
 			expectedResult: true,
+			expectedErrors: true,
 		}, {
 			verifiers:      []CheckableVerifier{&ErrorVerifier{}, &ErrorVerifier{}, &FailVerifier{}},
 			checkFunc:      func(d []CheckableVerifier) bool { return d[0].Called() && d[1].Called() && d[2].Called() },
 			expectedResult: false,
+			expectedErrors: true,
 		},
 	}
 
@@ -77,7 +82,7 @@ func TestVerifier(t *testing.T) {
 		success, err := d.Verify(artifact.Artifact{Name: "a", Cmd: "a", Artifact: "a/a"}, "b", false)
 
 		assert.Equal(t, tc.expectedResult, success == true)
-		assert.Equal(t, tc.expectedResult, err == nil)
+		assert.Equal(t, tc.expectedErrors, err != nil)
 
 		assert.True(t, tc.checkFunc(tc.verifiers))
 	}
@@ -92,4 +97,5 @@ type verifyTestCase struct {
 	verifiers      []CheckableVerifier
 	checkFunc      func(verifiers []CheckableVerifier) bool
 	expectedResult bool
+	expectedErrors bool
 }
