@@ -18,9 +18,9 @@ type ErrorVerifier struct {
 	called bool
 }
 
-func (d *ErrorVerifier) Verify(a artifact.Artifact, version string, _ bool, _ ...string) error {
+func (d *ErrorVerifier) Verify(a artifact.Artifact, version string, _ bool, _ ...string) (bool, error) {
 	d.called = true
-	return errors.New("failing")
+	return false, errors.New("failing")
 }
 
 func (d *ErrorVerifier) Called() bool { return d.called }
@@ -29,9 +29,9 @@ type FailVerifier struct {
 	called bool
 }
 
-func (d *FailVerifier) Verify(a artifact.Artifact, version string, _ bool, _ ...string) error {
+func (d *FailVerifier) Verify(a artifact.Artifact, version string, _ bool, _ ...string) (bool, error) {
 	d.called = true
-	return &download.InvalidSignatureError{}
+	return false, &download.InvalidSignatureError{}
 }
 
 func (d *FailVerifier) Called() bool { return d.called }
@@ -40,9 +40,9 @@ type SuccVerifier struct {
 	called bool
 }
 
-func (d *SuccVerifier) Verify(a artifact.Artifact, version string, _ bool, _ ...string) error {
+func (d *SuccVerifier) Verify(a artifact.Artifact, version string, _ bool, _ ...string) (bool, error) {
 	d.called = true
-	return nil
+	return true, nil
 }
 
 func (d *SuccVerifier) Called() bool { return d.called }
@@ -74,8 +74,9 @@ func TestVerifier(t *testing.T) {
 
 	for _, tc := range testCases {
 		d := NewVerifier(tc.verifiers[0], tc.verifiers[1], tc.verifiers[2])
-		err := d.Verify(artifact.Artifact{Name: "a", Cmd: "a", Artifact: "a/a"}, "b", false)
+		success, err := d.Verify(artifact.Artifact{Name: "a", Cmd: "a", Artifact: "a/a"}, "b", false)
 
+		assert.Equal(t, tc.expectedResult, success == true)
 		assert.Equal(t, tc.expectedResult, err == nil)
 
 		assert.True(t, tc.checkFunc(tc.verifiers))

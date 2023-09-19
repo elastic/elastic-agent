@@ -70,9 +70,10 @@ func TestFetchVerify(t *testing.T) {
 	// first download verify should fail:
 	// download skipped, as invalid package is prepared upfront
 	// verify fails and cleans download
-	err = verifier.Verify(s, version, false)
+	success, err := verifier.Verify(s, version, false)
 	var checksumErr *download.ChecksumMismatchError
 	assert.ErrorAs(t, err, &checksumErr)
+	assert.False(t, success)
 
 	_, err = os.Stat(targetFilePath)
 	assert.True(t, os.IsNotExist(err))
@@ -93,8 +94,9 @@ func TestFetchVerify(t *testing.T) {
 	_, err = os.Stat(hashTargetFilePath)
 	assert.NoError(t, err)
 
-	err = verifier.Verify(s, version, false)
+	success, err = verifier.Verify(s, version, false)
 	assert.NoError(t, err)
+	assert.True(t, success)
 
 	// Enable GPG signature validation.
 	verifier.allowEmptyPgp = false
@@ -113,8 +115,9 @@ func TestFetchVerify(t *testing.T) {
 
 	// Missing .asc file.
 	{
-		err = verifier.Verify(s, version, false)
+		success, err = verifier.Verify(s, version, false)
 		require.Error(t, err)
+		assert.False(t, success)
 
 		// Don't delete these files when GPG validation failure.
 		assertFileExists(t, targetFilePath)
@@ -126,9 +129,10 @@ func TestFetchVerify(t *testing.T) {
 		err = ioutil.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
 		require.NoError(t, err)
 
-		err = verifier.Verify(s, version, false)
+		success, err = verifier.Verify(s, version, false)
 		var invalidSigErr *download.InvalidSignatureError
 		assert.ErrorAs(t, err, &invalidSigErr)
+		assert.False(t, success)
 
 		// Don't delete these files when GPG validation failure.
 		assertFileExists(t, targetFilePath)
@@ -211,8 +215,9 @@ func TestVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = testVerifier.Verify(beatSpec, version, false)
+	success, err := testVerifier.Verify(beatSpec, version, false)
 	require.NoError(t, err)
+	assert.True(t, success)
 
 	os.Remove(artifact)
 	os.Remove(artifact + ".sha512")

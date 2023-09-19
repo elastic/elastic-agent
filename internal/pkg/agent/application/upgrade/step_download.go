@@ -81,10 +81,13 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return "", errors.New(err, "initiating verifier")
 	}
 
-	if err := verifier.Verify(agentArtifact, parsedVersion.VersionWithPrerelease(), skipDefaultPgp, pgpBytes...); err != nil {
+	success, err := verifier.Verify(agentArtifact, parsedVersion.VersionWithPrerelease(), skipDefaultPgp, pgpBytes...)
+	if !success {
 		return "", errors.New(err, "failed verification of agent binary")
 	}
-
+	if err != nil {
+		u.log.Warnw("agent binary verification was successful but some verifiers failed", "error.message", err)
+	}
 	return path, nil
 }
 

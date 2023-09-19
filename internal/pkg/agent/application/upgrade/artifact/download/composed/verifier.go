@@ -31,20 +31,20 @@ func NewVerifier(verifiers ...download.Verifier) *Verifier {
 }
 
 // Verify checks the package from configured source.
-func (e *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
+func (e *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) (bool, error) {
 	var err error
 
 	for _, v := range e.vv {
-		e := v.Verify(a, version, skipDefaultPgp, pgpBytes...)
-		if e == nil {
+		success, e := v.Verify(a, version, skipDefaultPgp, pgpBytes...)
+		if success {
 			// Success
-			return nil
+			return success, err
 		}
 
 		err = multierror.Append(err, e)
 	}
 
-	return err
+	return false, err
 }
 
 func (e *Verifier) Reload(c *artifact.Config) error {

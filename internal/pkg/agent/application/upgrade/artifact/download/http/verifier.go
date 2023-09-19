@@ -84,10 +84,10 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
+func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) (bool, error) {
 	fullPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
-		return errors.New(err, "retrieving package path")
+		return false, errors.New(err, "retrieving package path")
 	}
 
 	if err = download.VerifySHA512Hash(fullPath); err != nil {
@@ -96,7 +96,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bo
 			os.Remove(fullPath)
 			os.Remove(fullPath + ".sha512")
 		}
-		return err
+		return false, err
 	}
 
 	if err = v.verifyAsc(a, version, skipDefaultPgp, pgpBytes...); err != nil {
@@ -104,10 +104,10 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bo
 		if errors.As(err, &invalidSignatureErr) {
 			os.Remove(fullPath + ".asc")
 		}
-		return err
+		return false, err
 	}
 
-	return nil
+	return true, nil
 }
 
 func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultPgp bool, pgpSources ...string) error {
