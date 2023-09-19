@@ -35,6 +35,7 @@ type progressTrackerStep struct {
 
 	rootstep bool
 	substeps bool
+	mu       sync.Mutex
 	step     *progressTrackerStep
 }
 
@@ -82,15 +83,28 @@ func (pts *progressTrackerStep) StepStart(msg string) ProgressTrackerStep {
 	}
 	pts.tracker.printf("%s%s...", prefix, strings.TrimSpace(msg))
 	s := newProgressTrackerStep(pts.tracker, prefix, func() {
-		pts.step = nil
+		pts.setStep(nil)
 	})
-	pts.step = s
+	pts.setStep(s)
 	return s
 }
 
+func (pts *progressTrackerStep) getStep() *progressTrackerStep {
+	pts.mu.Lock()
+	defer pts.mu.Unlock()
+	return pts.step
+}
+
+func (pts *progressTrackerStep) setStep(step *progressTrackerStep) {
+	pts.mu.Lock()
+	defer pts.mu.Unlock()
+	pts.step = step
+}
+
 func (pts *progressTrackerStep) tick() {
-	if pts.step != nil {
-		pts.step.tick()
+	step := pts.getStep()
+	if step != nil {
+		step.tick()
 		return
 	}
 	if !pts.rootstep {
@@ -135,8 +149,9 @@ func (pt *ProgressTracker) Start() ProgressTrackerStep {
 			case <-pt.stop:
 				return
 			case <-timer.C:
-				if pt.step != nil {
-					pt.step.tick()
+				step := pt.getStep()
+				if step != nil {
+					step.tick()
 				}
 				timer = time.NewTimer(pt.calculateTickInterval())
 			}
@@ -144,11 +159,11 @@ func (pt *ProgressTracker) Start() ProgressTrackerStep {
 	}()
 
 	s := newProgressTrackerStep(pt, "", func() {
-		pt.step = nil
+		pt.setStep(nil)
 		pt.stop <- struct{}{}
 	})
 	s.rootstep = true // is the root step
-	pt.step = s
+	pt.setStep(s)
 	return s
 }
 
@@ -156,6 +171,18 @@ func (pt *ProgressTracker) printf(format string, a ...any) {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
 	_, _ = fmt.Fprintf(pt.writer, format, a...)
+}
+
+func (pt *ProgressTracker) getStep() *progressTrackerStep {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+	return pt.step
+}
+
+func (pt *ProgressTracker) setStep(step *progressTrackerStep) {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+	pt.step = step
 }
 
 func (pt *ProgressTracker) calculateTickInterval() time.Duration {
