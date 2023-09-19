@@ -219,6 +219,60 @@ func TestVerify(t *testing.T) {
 	os.RemoveAll(config.DropPath)
 }
 
+func TestVerifyUnreachableUri(t *testing.T) {
+	log, obs := logger.NewTesting("TestVerifyUnreachableUri")
+	targetDir, err := ioutil.TempDir(os.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	timeout := 30 * time.Second
+
+	config := &artifact.Config{
+		TargetDirectory: targetDir,
+		DropPath:        filepath.Join(targetDir, "drop"),
+		OperatingSystem: "linux",
+		Architecture:    "32",
+		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+			Timeout: timeout,
+		},
+	}
+
+	if err := prepareTestCase(beatSpec, version, config); err != nil {
+		t.Fatal(err)
+	}
+
+	testClient := NewDownloader(config)
+	artifact, err := testClient.Download(context.Background(), beatSpec, version)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = os.Stat(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testVerifier, err := NewVerifier(log, config, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unreachableURI := "https://127.0.0.1:3452/path/does/not/exist"
+	unreachablePGP := download.PgpSourceURIPrefix + unreachableURI
+	err = testVerifier.Verify(beatSpec, version, false, unreachablePGP)
+	// verification is successful using default PGP
+	require.NoError(t, err)
+
+	// log message informing remote PGP was skipped
+	logs := obs.FilterMessageSnippet(fmt.Sprintf("Skipped remote PGP located at %q", unreachableURI))
+	require.Equal(t, 1, logs.Len())
+
+	os.Remove(artifact)
+	os.Remove(artifact + ".sha512")
+	os.RemoveAll(config.DropPath)
+}
+
 func prepareTestCase(a artifact.Artifact, version string, cfg *artifact.Config) error {
 	filename, err := artifact.GetArtifactName(a, version, cfg.OperatingSystem, cfg.Architecture)
 	if err != nil {
