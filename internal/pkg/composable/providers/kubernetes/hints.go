@@ -271,7 +271,7 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 						containers, _ := con.(mapstr.M)
 						if cname, err := containers.GetValue("name"); err == nil {
 							if parts[0] == cname {
-								// If there are hints like co.elastic.hints.<container_name>/ then add add the values after the / to the corresponding container
+								// If there are hints like co.elastic.hints.<container_name>/ then add the values after the / to the corresponding container
 								hints = utils.GenerateHints(annotations, parts[0], prefix)
 								// Processors for specific container
 								// We need to make an extra check if we have processors added only to the specific containers
