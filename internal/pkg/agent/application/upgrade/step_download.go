@@ -30,7 +30,8 @@ import (
 )
 
 const (
-	defaultUpgradeFallbackPGP = "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
+	defaultUpgradeFallbackPGP     = "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
+	fleetUpgradeFallbackPGPFormat = "/api/agents/upgrades/%d.%d.%d/pgp-public-key"
 )
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
@@ -40,7 +41,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		span.End()
 	}()
 
-	pgpBytes = appendFallbackPGP(pgpBytes)
+	pgpBytes = u.appendFallbackPGP(version, pgpBytes)
 
 	// do not update source config
 	settings := *u.settings
@@ -88,13 +89,26 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 	return path, nil
 }
 
-func appendFallbackPGP(pgpBytes []string) []string {
+func (u *Upgrader) appendFallbackPGP(targetVersion string, pgpBytes []string) []string {
 	if pgpBytes == nil {
 		pgpBytes = make([]string, 0, 1)
 	}
 
 	fallbackPGP := download.PgpSourceURIPrefix + defaultUpgradeFallbackPGP
 	pgpBytes = append(pgpBytes, fallbackPGP)
+
+	// add a secondary fallback if fleet server is configured
+	if u.fleetServerURI != "" {
+		tpv, err := agtversion.ParseVersion(targetVersion)
+		if err != nil {
+			// best effort log failure
+			u.log.Warnf("failed to parse secondary fallback %q: %v", u.fleetServerURI, err)
+		} else {
+			secondaryFallback := download.PgpSourceURIPrefix + u.fleetServerURI + fmt.Sprintf(fleetUpgradeFallbackPGPFormat, tpv.Major(), tpv.Minor(), tpv.Patch())
+			pgpBytes = append(pgpBytes, secondaryFallback)
+		}
+	}
+
 	return pgpBytes
 }
 

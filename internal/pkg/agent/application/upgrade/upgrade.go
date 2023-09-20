@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -45,10 +46,11 @@ var ErrSameVersion = errors.New("upgrade did not occur because its the same vers
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log         *logger.Logger
-	settings    *artifact.Config
-	agentInfo   *info.AgentInfo
-	upgradeable bool
+	log            *logger.Logger
+	settings       *artifact.Config
+	agentInfo      *info.AgentInfo
+	upgradeable    bool
+	fleetServerURI string
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -66,6 +68,15 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.
 		agentInfo:   agentInfo,
 		upgradeable: IsUpgradeable(),
 	}
+}
+
+// SetClient reloads URI based on up to date fleet client
+func (u *Upgrader) SetClient(c client.Sender) {
+	if c == nil {
+		u.fleetServerURI = ""
+	}
+
+	u.fleetServerURI = c.URI()
 }
 
 // Reload reloads the artifact configuration for the upgrader.
