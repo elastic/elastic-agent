@@ -44,5 +44,5 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 	}
 	verifiers = append(verifiers, remoteVer)
 
-	return composed.NewVerifier(verifiers...), nil
+	return composed.NewVerifier(log, verifiers...), nil
 }
