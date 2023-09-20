@@ -263,38 +263,45 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 		annotations, _ := ann.(mapstr.M)
 
 		if containerEntries, err := annotations.GetValue(prefix + ".hints"); err == nil {
-			entries, _ := containerEntries.(mapstr.M)
-			if len(entries) > 0 {
+			entries, ok := containerEntries.(mapstr.M)
+			if ok && len(entries) > 0 {
 				for key := range entries {
 					parts := strings.Split(key, "/")
-					if con, ok := k8sMapping["container"]; ok {
-						containers, _ := con.(mapstr.M)
-						if cname, err := containers.GetValue("name"); err == nil {
-							if parts[0] == cname {
-								// If there are hints like co.elastic.hints.<container_name>/ then add the values after the / to the corresponding container
-								hints = utils.GenerateHints(annotations, parts[0], prefix)
-								// Processors for specific container
-								// We need to make an extra check if we have processors added only to the specific containers
-								containerProcessors = utils.GetConfigs(annotations, prefix, "hints."+parts[0]+"/processors")
 
-							} else {
-								// If there are top level hints like co.elastic.hints/ then just add the values after the /
-								hints = utils.GenerateHints(annotations, "", prefix)
-							}
-							if len(hints) > 0 {
-								logger.Debugf("Extracted hints are :%v", hints)
-								hintData.composableMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
-								logger.Debugf("Generated hints mappings are :%v", hintData.composableMapping)
+					if len(parts) > 0 {
+						if con, ok := k8sMapping["container"]; ok {
+							containers, ok := con.(mapstr.M)
+							if ok {
+								if cname, err := containers.GetValue("name"); err == nil {
+									if parts[0] == cname {
+										// If there are hints like co.elastic.hints.<container_name>/ then add the values after the / to the corresponding container
+										hints = utils.GenerateHints(annotations, parts[0], prefix)
+										// Processors for specific container
+										// We need to make an extra check if we have processors added only to the specific containers
+										containerProcessors = utils.GetConfigs(annotations, prefix, "hints."+parts[0]+"/processors")
 
-								hintData.processors = utils.GetConfigs(annotations, prefix, processorhints)
-								// Only if there are processors defined in a specific container we append them to the processors of the pod
-								if len(containerProcessors) > 0 {
-									hintData.processors = append(hintData.processors, containerProcessors...)
+									} else {
+										// If there are top level hints like co.elastic.hints/ then just add the values after the /
+										hints = utils.GenerateHints(annotations, "", prefix)
+									}
+									if len(hints) > 0 {
+										logger.Debugf("Extracted hints are :%v", hints)
+										hintData.composableMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
+										logger.Debugf("Generated hints mappings are :%v", hintData.composableMapping)
+
+										hintData.processors = utils.GetConfigs(annotations, prefix, processorhints)
+										// Only if there are processors defined in a specific container we append them to the processors of the pod
+										if len(containerProcessors) > 0 {
+											hintData.processors = append(hintData.processors, containerProcessors...)
+										}
+										logger.Debugf("Generated Processors are :%v", hintData.processors)
+									}
 								}
-								logger.Debugf("Generated Processors are :%v", hintData.processors)
 							}
+
 						}
 					}
+
 				}
 			}
 
