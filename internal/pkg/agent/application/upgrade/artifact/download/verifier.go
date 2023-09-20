@@ -38,7 +38,7 @@ var (
 	ErrInvalidLocation         = errors.New("Remote PGP location is invalid")
 )
 
-// warnLogger is a logger that only needs to implement Infof and Warnf, as those are the only functions
+// warnLogger is a logger that only needs to implement Warnf, as that is the only functions
 // that the downloadProgressReporter uses.
 type warnLogger interface {
 	Warnf(format string, args ...interface{})
