@@ -149,18 +149,18 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, ctx context.Context, info
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient))
+		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient, policy.ID))
 	})
 
 	t.Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, policy.ID, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	t.Logf("Upgrade Elastic Agent to version %s...", toVersion)
-	err = tools.UpgradeAgent(kibClient, toVersion)
+	err = tools.UpgradeAgent(kibClient, policy.ID, toVersion)
 	require.NoError(t, err)
 
 	t.Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, policy.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
 
 	// Upgrade Watcher check disabled until
 	// https://github.com/elastic/elastic-agent/issues/2977 is resolved.
@@ -171,7 +171,7 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, ctx context.Context, info
 	// version was used as the target version for the upgrade.
 	require.Eventually(t, func() bool {
 		t.Log("Getting Agent version...")
-		newVersion, err := tools.GetAgentVersion(kibClient)
+		newVersion, err := tools.GetAgentVersion(kibClient, policy.ID)
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
 			return false

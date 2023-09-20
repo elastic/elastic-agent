@@ -118,27 +118,23 @@ func Uninstall(cfgFile, topPath, uninstallToken string, pt ProgressTrackerStep) 
 func RemovePath(path string) error {
 	const arbitraryTimeout = 5 * time.Second
 	start := time.Now()
-	nextSleep := 1 * time.Millisecond
-	for {
-		err := os.RemoveAll(path)
-		if err == nil {
-			return nil
-		}
-		if isBlockingOnExe(err) {
-			// try to remove the blocking exe
-			err = removeBlockingExe(err)
-		}
-		if err == nil {
-			return nil
-		}
-		if !isRetryableError(err) {
-			return err
+	var lastErr error
+	for time.Since(start) <= arbitraryTimeout {
+		lastErr = os.RemoveAll(path)
+
+		if lastErr == nil || !isRetryableError(lastErr) {
+			return lastErr
 		}
 
-		if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
-			return err
+		if isBlockingOnExe(lastErr) {
+			// try to remove the blocking exe and try again to clean up the path
+			_ = removeBlockingExe(lastErr)
 		}
+
+		time.Sleep(50 * time.Millisecond)
 	}
+
+	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)
 }
 
 func RemoveBut(path string, bestEffort bool, exceptions ...string) error {

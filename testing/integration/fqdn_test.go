@@ -56,19 +56,6 @@ func TestFQDN(t *testing.T) {
 	origHostname, err := getHostname(context.Background())
 	require.NoError(t, err)
 
-	t.Cleanup(func() {
-		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient))
-
-		t.Log("Restoring hostname...")
-		err := setHostname(context.Background(), origHostname, t.Log)
-		require.NoError(t, err)
-
-		t.Log("Restoring original /etc/hosts...")
-		err = setEtcHosts(origEtcHosts)
-		require.NoError(t, err)
-	})
-
 	ctx := context.Background()
 	kibClient := info.KibanaClient
 
@@ -101,8 +88,21 @@ func TestFQDN(t *testing.T) {
 	policy, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 
+	t.Cleanup(func() {
+		t.Log("Un-enrolling Elastic Agent...")
+		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient, policy.ID))
+
+		t.Log("Restoring hostname...")
+		err := setHostname(context.Background(), origHostname, t.Log)
+		require.NoError(t, err)
+
+		t.Log("Restoring original /etc/hosts...")
+		err = setEtcHosts(origEtcHosts)
+		require.NoError(t, err)
+	})
+
 	t.Log("Verify that agent name is short hostname")
-	agent := verifyAgentName(t, shortName, info.KibanaClient)
+	agent := verifyAgentName(t, policy.ID, shortName, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname")
 	verifyHostNameInIndices(t, "logs-*", shortName, info.Namespace, info.ESClient)
@@ -133,7 +133,7 @@ func TestFQDN(t *testing.T) {
 	)
 
 	t.Log("Verify that agent name is FQDN")
-	verifyAgentName(t, fqdn, info.KibanaClient)
+	verifyAgentName(t, policy.ID, fqdn, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is FQDN")
 	verifyHostNameInIndices(t, "logs-*", fqdn, info.Namespace, info.ESClient)
@@ -164,7 +164,7 @@ func TestFQDN(t *testing.T) {
 	)
 
 	t.Log("Verify that agent name is short hostname again")
-	verifyAgentName(t, shortName, info.KibanaClient)
+	verifyAgentName(t, policy.ID, shortName, info.KibanaClient)
 
 	// TODO: Re-enable assertion once https://github.com/elastic/elastic-agent/issues/3078 is
 	// investigated for root cause and resolved.
@@ -173,7 +173,7 @@ func TestFQDN(t *testing.T) {
 	// verifyHostNameInIndices(t, "metrics-*", shortName, info.ESClient)
 }
 
-func verifyAgentName(t *testing.T, hostname string, kibClient *kibana.Client) *kibana.AgentExisting {
+func verifyAgentName(t *testing.T, policyID, hostname string, kibClient *kibana.Client) *kibana.AgentExisting {
 	t.Helper()
 
 	var agent *kibana.AgentExisting
@@ -182,7 +182,7 @@ func verifyAgentName(t *testing.T, hostname string, kibClient *kibana.Client) *k
 	require.Eventually(
 		t,
 		func() bool {
-			agent, err = tools.GetAgentByHostnameFromList(kibClient, hostname)
+			agent, err = tools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policyID, hostname)
 			return err == nil && agent != nil
 		},
 		5*time.Minute,

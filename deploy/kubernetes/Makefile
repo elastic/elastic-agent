@@ -30,7 +30,7 @@ $(ALL):
 ifdef WITHOUTCONFIG
 	@echo "Generating $@-kubernetes-without-configmap.yaml"
 	@rm -f $@-kubernetes-without-configmap.yaml
-	@for f in $(shell ls $@/*.yaml | grep -v daemonset-configmap); do \
+	@for f in $(shell ls $@/*.yaml | grep -v configmap ); do \
 		sed -e "s/%VERSION%/VERSION/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $$f >> $@-kubernetes-without-configmap.yaml; \
 		echo --- >> $@-kubernetes-without-configmap.yaml; \
 	done
