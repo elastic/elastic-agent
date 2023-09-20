@@ -275,26 +275,24 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 								if cname, err := containers.GetValue("name"); err == nil {
 									if parts[0] == cname {
 										// If there are hints like co.elastic.hints.<container_name>/ then add the values after the / to the corresponding container
-										hints = utils.GenerateHints(annotations, parts[0], prefix)
-										// Processors for specific container
-										// We need to make an extra check if we have processors added only to the specific containers
-										containerProcessors = utils.GetConfigs(annotations, prefix, "hints."+parts[0]+"/processors")
-
+										// Eg Annotation "co.elastic.hints.nginx/stream: stderr" will create a hints entry for container nginx
+										//Eg co.elastic.hints.nginx/processors.add_fields.fields.name: "myproject", will add also a processor entry only for container nginx
+										hints, containerProcessors = GenerateHintsForContainer(annotations, parts[0], prefix)
 									} else {
 										// If there are top level hints like co.elastic.hints/ then just add the values after the /
+										// Eg. Annotation "co.elastic.hints/stream: stderr" will will create a hints entries for all containers in the pod
 										hints = utils.GenerateHints(annotations, "", prefix)
 									}
-									if len(hints) > 0 {
-										logger.Debugf("Extracted hints are :%v", hints)
-										hintData.composableMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
-										logger.Debugf("Generated hints mappings are :%v", hintData.composableMapping)
+									logger.Debugf("Extracted hints are :%v", hints)
 
-										hintData.processors = utils.GetConfigs(annotations, prefix, processorhints)
+									if len(hints) > 0 {
+										hintData = GenerateHintsResult(hints, k8sMapping, annotations, logger, prefix, cID)
+
 										// Only if there are processors defined in a specific container we append them to the processors of the pod
 										if len(containerProcessors) > 0 {
 											hintData.processors = append(hintData.processors, containerProcessors...)
 										}
-										logger.Debugf("Generated Processors are :%v", hintData.processors)
+										logger.Debugf("Generated Processors mapping :%v", hintData.processors)
 									}
 								}
 							}
@@ -308,5 +306,31 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 		}
 
 	}
+	return hintData
+}
+
+// Generates hints and processors list for specific containers
+func GenerateHintsForContainer(annotations mapstr.M, parts string, prefix string) (mapstr.M, []mapstr.M) {
+	hints := utils.GenerateHints(annotations, parts, prefix)
+	// Processors for specific container
+	// We need to make an extra check if we have processors added only to the specific containers
+	containerProcessors := utils.GetConfigs(annotations, prefix, "hints."+parts+"/processors")
+
+	return hints, containerProcessors
+}
+
+// Generates the final hintData (hints and processors) struct that will be emmitted in pods.
+func GenerateHintsResult(hints mapstr.M, k8sMapping map[string]interface{}, annotations mapstr.M, logger *logp.Logger, prefix string, cID string) hintsData {
+	hintData := hintsData{
+		composableMapping: mapstr.M{},
+		processors:        []mapstr.M{},
+	}
+
+	hintData.composableMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
+	logger.Debugf("Generated hints mappings :%v", hintData.composableMapping)
+
+	// Eg  co.elastic.hints/processors.decode_json_fields.fields: "message" will add a processor in all containers of pod
+	hintData.processors = utils.GetConfigs(annotations, prefix, processorhints)
+
 	return hintData
 }
