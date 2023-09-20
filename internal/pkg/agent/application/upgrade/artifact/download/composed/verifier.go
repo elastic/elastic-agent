@@ -22,7 +22,7 @@ type Verifier struct {
 	log *logger.Logger
 }
 
-func (e *Verifier) Name() string {
+func (v *Verifier) Name() string {
 	return "composed.verifier"
 }
 

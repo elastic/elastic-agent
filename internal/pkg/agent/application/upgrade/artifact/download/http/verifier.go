@@ -36,7 +36,7 @@ type Verifier struct {
 	log           progressLogger
 }
 
-func (e *Verifier) Name() string {
+func (v *Verifier) Name() string {
 	return "http.verifier"
 }
 

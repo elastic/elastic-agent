@@ -18,7 +18,7 @@ type Verifier struct {
 	versionOverride *agtversion.ParsedSemVer
 }
 
-func (e *Verifier) Name() string {
+func (v *Verifier) Name() string {
 	return "snapshot.verifier"
 }
 
@@ -41,17 +41,17 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 }
 
 // Verify checks the package from configured source.
-func (e *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
-	return e.verifier.Verify(a, version, skipDefaultPgp, pgpBytes...)
+func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
+	return v.verifier.Verify(a, version, skipDefaultPgp, pgpBytes...)
 }
 
-func (e *Verifier) Reload(c *artifact.Config) error {
-	reloader, ok := e.verifier.(artifact.ConfigReloader)
+func (v *Verifier) Reload(c *artifact.Config) error {
+	reloader, ok := v.verifier.(artifact.ConfigReloader)
 	if !ok {
 		return nil
 	}
 
-	cfg, err := snapshotConfig(c, e.versionOverride)
+	cfg, err := snapshotConfig(c, v.versionOverride)
 	if err != nil {
 		return errors.New(err, "snapshot.downloader: failed to generate snapshot config")
 	}
