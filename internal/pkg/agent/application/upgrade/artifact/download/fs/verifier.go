@@ -33,6 +33,10 @@ type Verifier struct {
 	log           *logger.Logger
 }
 
+func (v *Verifier) Name() string {
+	return "fs.verifier"
+}
+
 // NewVerifier creates a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
 func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
