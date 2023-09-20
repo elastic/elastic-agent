@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
@@ -125,11 +124,7 @@ func (v *Verifier) verifyAsc(fullPath string, skipDefaultPgp bool, pgpSources ..
 		if len(check) == 0 {
 			continue
 		}
-		raw, err := download.PgpBytesFromSource(check, v.client)
-		if errors.Is(err, download.ErrRemotePGPDownloadFailed) {
-			v.log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", strings.TrimPrefix(check, download.PgpSourceURIPrefix), err)
-			continue
-		}
+		raw, err := download.PgpBytesFromSource(v.log, check, v.client)
 		if err != nil {
 			return err
 		}

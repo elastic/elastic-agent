@@ -35,7 +35,14 @@ const (
 
 var (
 	ErrRemotePGPDownloadFailed = errors.New("Remote PGP download failed")
+	ErrInvalidLocation         = errors.New("Remote PGP location is invalid")
 )
+
+// warnLogger is a logger that only needs to implement Infof and Warnf, as those are the only functions
+// that the downloadProgressReporter uses.
+type warnLogger interface {
+	Warnf(format string, args ...interface{})
+}
 
 // ChecksumMismatchError indicates the expected checksum for a file does not
 // match the computed checksum.
@@ -173,13 +180,17 @@ func VerifyGPGSignature(file string, asciiArmorSignature, publicKey []byte) erro
 	return nil
 }
 
-func PgpBytesFromSource(source string, client http.Client) ([]byte, error) {
+func PgpBytesFromSource(log warnLogger, source string, client http.Client) ([]byte, error) {
 	if strings.HasPrefix(source, PgpSourceRawPrefix) {
 		return []byte(strings.TrimPrefix(source, PgpSourceRawPrefix)), nil
 	}
 
 	if strings.HasPrefix(source, PgpSourceURIPrefix) {
-		return fetchPgpFromURI(strings.TrimPrefix(source, PgpSourceURIPrefix), client)
+		pgpBytes, err := fetchPgpFromURI(strings.TrimPrefix(source, PgpSourceURIPrefix), client)
+		if errors.Is(err, ErrRemotePGPDownloadFailed) || errors.Is(err, ErrInvalidLocation) {
+			log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", strings.TrimPrefix(source, PgpSourceURIPrefix), err)
+		}
+		return pgpBytes, nil
 	}
 
 	return nil, errors.New("unknown pgp source")
@@ -192,7 +203,7 @@ func CheckValidDownloadUri(rawURI string) error {
 	}
 
 	if !strings.EqualFold(uri.Scheme, "https") {
-		return fmt.Errorf("failed to check URI %q: HTTPS is required", rawURI)
+		return multierror.Append(fmt.Errorf("failed to check URI %q: HTTPS is required", rawURI), ErrInvalidLocation)
 	}
 
 	return nil
