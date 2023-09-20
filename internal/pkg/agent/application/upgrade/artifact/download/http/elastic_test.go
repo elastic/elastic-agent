@@ -127,9 +127,8 @@ func TestVerify(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			success, err := testVerifier.Verify(beatSpec, version, false)
+			err = testVerifier.Verify(beatSpec, version, false)
 			require.NoError(t, err)
-			require.True(t, success)
 
 			os.Remove(artifact)
 			os.Remove(artifact + ".sha512")

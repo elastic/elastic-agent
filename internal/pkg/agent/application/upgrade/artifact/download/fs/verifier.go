@@ -33,6 +33,10 @@ type Verifier struct {
 	log           *logger.Logger
 }
 
+func (e *Verifier) Name() string {
+	return "fs.verifier"
+}
+
 // NewVerifier creates a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
 func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
@@ -63,10 +67,10 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) (bool, error) {
+func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
-		return false, errors.New(err, "retrieving package name")
+		return errors.New(err, "retrieving package name")
 	}
 
 	fullPath := filepath.Join(v.config.TargetDirectory, filename)
@@ -77,7 +81,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bo
 			os.Remove(fullPath)
 			os.Remove(fullPath + ".sha512")
 		}
-		return false, err
+		return err
 	}
 
 	if err = v.verifyAsc(fullPath, skipDefaultPgp, pgpBytes...); err != nil {
@@ -85,10 +89,10 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bo
 		if errors.As(err, &invalidSignatureErr) {
 			os.Remove(fullPath + ".asc")
 		}
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 func (v *Verifier) Reload(c *artifact.Config) error {

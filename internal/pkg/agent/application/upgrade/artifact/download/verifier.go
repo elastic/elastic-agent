@@ -60,12 +60,13 @@ func (e *InvalidSignatureError) Unwrap() error { return e.Err }
 // Verifier is an interface verifying the SHA512 checksum and GPG signature and
 // of a downloaded artifact.
 type Verifier interface {
+	Name() string
 	// Verify should verify the artifact and return if succeed status (true|false) and an error if any checks fail.
 	// If the checksum does no match Verify returns a
 	// *download.ChecksumMismatchError. And if the GPG signature is invalid then
 	// Verify returns a *download.InvalidSignatureError. Use errors.As() to
 	// check error types.
-	Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) (bool, error)
+	Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error
 }
 
 // VerifySHA512Hash checks that a sidecar file containing a sha512 checksum

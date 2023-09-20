@@ -18,6 +18,10 @@ type Verifier struct {
 	versionOverride *agtversion.ParsedSemVer
 }
 
+func (e *Verifier) Name() string {
+	return "snapshot.verifier"
+}
+
 // NewVerifier creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
 func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte, versionOverride *agtversion.ParsedSemVer) (download.Verifier, error) {
@@ -37,7 +41,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 }
 
 // Verify checks the package from configured source.
-func (e *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) (bool, error) {
+func (e *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
 	return e.verifier.Verify(a, version, skipDefaultPgp, pgpBytes...)
 }
 
