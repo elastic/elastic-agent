@@ -57,6 +57,23 @@ var (
 	ErrNoComponent = errors.New("no component under control of this manager")
 )
 
+type actionRequest struct {
+	ctx        context.Context
+	comp       component.Component
+	unit       component.Unit
+	name       string
+	actionType proto.ActionRequest_Type
+	params     map[string]interface{}
+
+	responseChan chan actionResponse
+}
+
+type actionResponse struct {
+	result      map[string]interface{}
+	diagnostics []*proto.ActionDiagnosticUnitResult
+	err         error
+}
+
 // ComponentComponentState provides a structure to map a component to current component state.
 type ComponentComponentState struct {
 	Component component.Component `yaml:"component"`
@@ -116,17 +133,28 @@ type Manager struct {
 
 	shipperConns map[string]*shipperConn
 
-	subMx         sync.RWMutex
-	subscriptions map[string][]*Subscription
-	subAllMx      sync.RWMutex
-	subscribeAll  []*SubscriptionAll
+	//subMx            sync.RWMutex
+	//subscriptions    map[string][]*Subscription
+	stateChangeChan chan ComponentComponentState
 
-	errCh chan error
+	updateChan chan updateRequest
+	actionChan chan actionRequest
+
+	errorChan chan error
+	//subAllMx      sync.RWMutex
+	//subscribeAll  []*SubscriptionAll
+
+	//errCh chan error
 
 	// upon creation the Manager is neither running not shutting down, thus both
 	// flags are needed.
 	running      atomic.Bool
 	shuttingDown atomic.Bool
+}
+
+type updateRequest struct {
+	componentModel component.Model
+	tearDown       bool
 }
 
 // NewManager creates a new manager.
@@ -144,19 +172,19 @@ func NewManager(
 		return nil, err
 	}
 	m := &Manager{
-		logger:        logger,
-		baseLogger:    baseLogger,
-		ca:            ca,
-		listenAddr:    listenAddr,
-		agentInfo:     agentInfo,
-		tracer:        tracer,
-		current:       make(map[string]*componentRuntimeState),
-		shipperConns:  make(map[string]*shipperConn),
-		subscriptions: make(map[string][]*Subscription),
-		errCh:         make(chan error),
-		monitor:       monitor,
-		grpcConfig:    grpcConfig,
-		serverReady:   atomic.NewBool(false),
+		logger:       logger,
+		baseLogger:   baseLogger,
+		ca:           ca,
+		listenAddr:   listenAddr,
+		agentInfo:    agentInfo,
+		tracer:       tracer,
+		current:      make(map[string]*componentRuntimeState),
+		shipperConns: make(map[string]*shipperConn),
+		//subscriptions: make(map[string][]*Subscription),
+		errCh:       make(chan error),
+		monitor:     monitor,
+		grpcConfig:  grpcConfig,
+		serverReady: atomic.NewBool(false),
 	}
 	return m, nil
 }
@@ -228,7 +256,25 @@ func (m *Manager) Run(ctx context.Context) error {
 		}
 	}()
 
-	<-ctx.Done()
+	// updateErrChan is a local placeholder that holds m.errorChan when
+	// we have a result to send from an update call and nil otherwise.
+	var updateErrChan chan error
+	var updateErr error
+	for ctx.Err() == nil {
+
+		select {
+		case <-ctx.Done():
+		case req := <-m.updateChan:
+			// Begin the update, and point updateErrChan at our error reporting
+			// channel so we can notify Coordinator of the result.
+			updateErr = m.update(req.componentModel, req.tearDown)
+			updateErrChan = m.errorChan
+		case updateErrChan <- updateErr:
+			// We sent the most recent update result, clear the channel until the
+			// next update
+			updateErrChan = nil
+		}
+	}
 	m.running.Store(false)
 	m.shuttingDown.Store(true)
 	m.shutdown()
@@ -244,7 +290,7 @@ func (m *Manager) Run(ctx context.Context) error {
 
 // Errors returns channel that errors are reported on.
 func (m *Manager) Errors() <-chan error {
-	return m.errCh
+	return m.errorChan
 }
 
 // Update updates the currComp state of the running components.
@@ -259,71 +305,78 @@ func (m *Manager) Update(model component.Model) error {
 	}
 	// teardown is true because the public `Update` method would be coming directly from
 	// policy so if a component was removed it needs to be torn down.
-	return m.update(model, true)
-}
-
-// State returns the current component states.
-func (m *Manager) State() []ComponentComponentState {
-	m.currentMx.RLock()
-	defer m.currentMx.RUnlock()
-	states := make([]ComponentComponentState, 0, len(m.current))
-	for _, crs := range m.current {
-		crs.latestMx.RLock()
-		var legacyPID string
-		if crs.runtime != nil {
-			if commandRuntime, ok := crs.runtime.(*commandRuntime); ok {
-				if commandRuntime != nil {
-					procInfo := commandRuntime.proc
-					if procInfo != nil {
-						legacyPID = fmt.Sprint(commandRuntime.proc.PID)
-					}
-				}
-			}
-		}
-		states = append(states, ComponentComponentState{
-			Component: crs.getCurrent(),
-			State:     crs.latestState.Copy(),
-			LegacyPID: legacyPID,
-		})
-		crs.latestMx.RUnlock()
-	}
-	return states
+	m.updateChan <- updateRequest{model, true}
+	return nil
 }
 
 // PerformAction executes an action on a unit.
 func (m *Manager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
-	id, err := uuid.NewV4()
+	req := actionRequest{
+		ctx:        ctx,
+		comp:       comp,
+		unit:       unit,
+		name:       name,
+		actionType: proto.ActionRequest_CUSTOM,
+		params:     params,
+
+		responseChan: make(chan actionResponse, 1),
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case m.actionChan <- req:
+	}
+	// If the request sent, then we're guaranteed to get some response
+	response := <-req.responseChan
+	return response.result, response.err
+}
+
+func (m *Manager) handleAction(req actionRequest) (map[string]interface{}, error) {
+	runtime := m.getRuntimeFromUnit(req.comp, req.unit)
+	if runtime == nil {
+		return nil, ErrNoUnit
+	}
+
+	res, err := runtime.performAction(req)
 	if err != nil {
 		return nil, err
 	}
-	paramBytes := []byte("{}")
-	if params != nil {
-		paramBytes, err = json.Marshal(params)
+
+	if res.Result != nil {
+		err = json.Unmarshal(res.Result, &respBody)
 		if err != nil {
 			return nil, err
 		}
 	}
+	return respBody, nil
+}
+
+func (m *Manager) performDiagAction(ctx context.Context, comp component.Component, unit component.Unit) ([]*proto.ActionDiagnosticUnitResult, error) {
 	runtime := m.getRuntimeFromUnit(comp, unit)
 	if runtime == nil {
 		return nil, ErrNoUnit
 	}
 
-	req := &proto.ActionRequest{
-		Id:       id.String(),
-		Name:     name,
-		Params:   paramBytes,
-		UnitId:   unit.ID,
-		UnitType: proto.UnitType(unit.Type),
-		Type:     proto.ActionRequest_CUSTOM,
-	}
+	ctx, cancel := context.WithTimeout(ctx, diagnosticTimeout)
+	defer cancel()
 
-	res, err := runtime.performAction(ctx, req)
+	id, err := uuid.NewV4()
 	if err != nil {
 		return nil, err
 	}
 
-	var respBody map[string]interface{}
+	req := &proto.ActionRequest{
+		Id:       id.String(),
+		UnitId:   unit.ID,
+		UnitType: proto.UnitType(unit.Type),
+		Type:     proto.ActionRequest_DIAGNOSTICS,
+	}
+	res, err := runtime.performAction(req)
+	if err != nil {
+		return nil, err
+	}
 	if res.Status == proto.ActionResponse_FAILED {
+		var respBody map[string]interface{}
 		if res.Result != nil {
 			err = json.Unmarshal(res.Result, &respBody)
 			if err != nil {
@@ -337,15 +390,9 @@ func (m *Manager) PerformAction(ctx context.Context, comp component.Component, u
 				}
 			}
 		}
-		return nil, errors.New("generic action failure")
+		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
 	}
-	if res.Result != nil {
-		err = json.Unmarshal(res.Result, &respBody)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return respBody, nil
+	return res.Diagnostic, nil
 }
 
 // PerformComponentDiagnostics executes the diagnostic action for the given components. If no components are provided then
@@ -470,105 +517,8 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDi
 	return results
 }
 
-// Subscribe to changes in a component.
-//
-// Allows a component without that ID to exist. Once a component starts matching that ID then changes will start to
-// be provided over the channel. Cancelling the context results in the subscription being unsubscribed.
-//
-// Note: Not reading from a subscription channel will cause the Manager to block.
-func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscription {
-	sub := newSubscription(ctx)
-
-	// add latestState to channel
-	m.currentMx.RLock()
-	comp, ok := m.current[componentID]
-	m.currentMx.RUnlock()
-	if ok {
-		comp.latestMx.RLock()
-		latestState := comp.latestState.Copy()
-		comp.latestMx.RUnlock()
-		go func() {
-			select {
-			case <-ctx.Done():
-			case sub.ch <- latestState:
-			}
-		}()
-	}
-
-	// add subscription for future changes
-	m.subMx.Lock()
-	m.subscriptions[componentID] = append(m.subscriptions[componentID], sub)
-	m.subMx.Unlock()
-
-	go func() {
-		<-ctx.Done()
-
-		// unsubscribe
-		m.subMx.Lock()
-		defer m.subMx.Unlock()
-		for key, subs := range m.subscriptions {
-			for i, s := range subs {
-				if sub == s {
-					m.subscriptions[key] = append(m.subscriptions[key][:i], m.subscriptions[key][i+1:]...)
-					return
-				}
-			}
-		}
-	}()
-
-	return sub
-}
-
-// SubscribeAll subscribes to all changes in all components.
-//
-// This provides the current state for existing components at the time of first subscription. Cancelling the context
-// results in the subscription being unsubscribed.
-//
-// Note: Not reading from a subscription channel will cause the Manager to block.
-func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
-	sub := newSubscriptionAll(ctx)
-
-	// add the latest states
-	m.currentMx.RLock()
-	latest := make([]ComponentComponentState, 0, len(m.current))
-	for _, comp := range m.current {
-		comp.latestMx.RLock()
-		latest = append(latest, ComponentComponentState{Component: comp.getCurrent(), State: comp.latestState.Copy()})
-		comp.latestMx.RUnlock()
-	}
-	m.currentMx.RUnlock()
-	if len(latest) > 0 {
-		go func() {
-			for _, l := range latest {
-				select {
-				case <-ctx.Done():
-					return
-				case sub.ch <- l:
-				}
-			}
-		}()
-	}
-
-	// add subscription for future changes
-	m.subAllMx.Lock()
-	m.subscribeAll = append(m.subscribeAll, sub)
-	m.subAllMx.Unlock()
-
-	go func() {
-		<-ctx.Done()
-
-		// unsubscribe
-		m.subAllMx.Lock()
-		defer m.subAllMx.Unlock()
-		for i, s := range m.subscribeAll {
-			if sub == s {
-				m.subscribeAll = append(m.subscribeAll[:i], m.subscribeAll[i+1:]...)
-				return
-			}
-		}
-	}()
-
-	return sub
+func (m *Manager) StateChangeChan() <-chan ComponentComponentState {
+	return m.stateChangeChan
 }
 
 // Checkin is called by v1 sub-processes and has been removed.
@@ -801,27 +751,12 @@ func (m *Manager) shutdown() {
 
 // stateChanged notifies of the state change and returns true if the state is final (stopped)
 func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentState) (exit bool) {
-	m.subAllMx.RLock()
-	for _, sub := range m.subscribeAll {
-		select {
-		case <-sub.ctx.Done():
-		case sub.ch <- ComponentComponentState{
-			Component: state.getCurrent(),
-			State:     latest,
-		}:
-		}
-	}
-	m.subAllMx.RUnlock()
 
-	m.subMx.RLock()
-	subs := m.subscriptions[state.id]
-	for _, sub := range subs {
-		select {
-		case <-sub.ctx.Done():
-		case sub.ch <- latest:
-		}
+	// TODO: select on this with overall Manager channel
+	m.stateChangeChan <- ComponentComponentState{
+		Component: state.getCurrent(),
+		State:     latest,
 	}
-	m.subMx.RUnlock()
 
 	shutdown := state.shuttingDown.Load()
 	if shutdown && latest.State == client.UnitStateStopped {

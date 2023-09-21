@@ -286,24 +286,26 @@ func (m *managedConfigManager) waitForFleetServer(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	sub := m.runtime.SubscribeAll(ctx)
+	subChan := m.coord.StateSubscribe(ctx, 0)
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case compState := <-sub.Ch():
-			if compState.Component.InputSpec != nil && compState.Component.InputSpec.InputType == "fleet-server" {
-				if fleetServerRunning(compState.State) {
-					m.log.With("state", compState.State).Debugf("Fleet Server is running")
-					return nil
+		case state := <-subChan:
+			for _, compState := range state.Components {
+				if compState.Component.InputType == "fleet-server" {
+					if componentHealthy(compState.State) {
+						m.log.With("state", compState.State).Debugf("Fleet Server is running")
+						return nil
+					}
+					m.log.With("state", compState.State).Debugf("Fleet Server is not running")
 				}
-				m.log.With("state", compState.State).Debugf("Fleet Server is not running")
 			}
 		}
 	}
 }
 
-func fleetServerRunning(state runtime.ComponentState) bool {
+func componentHealthy(state runtime.ComponentState) bool {
 	if state.State == client.UnitStateHealthy {
 		if len(state.Units) == 0 {
 			return false

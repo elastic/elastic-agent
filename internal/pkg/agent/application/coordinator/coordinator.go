@@ -96,13 +96,13 @@ type RuntimeManager interface {
 	Update(model component.Model) error
 
 	// State returns the current components model state.
-	State() []runtime.ComponentComponentState
+	//State() []runtime.ComponentComponentState
 
 	// PerformAction executes an action on a unit.
 	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
 
 	// SubscribeAll provides an interface to watch for changes in all components.
-	SubscribeAll(context.Context) *runtime.SubscriptionAll
+	//SubscribeAll(context.Context) *runtime.SubscriptionAll
 
 	// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 	// it performs diagnostics for all current units.
@@ -503,9 +503,9 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 	// A real Coordinator will always have a runtime manager, but unit tests
 	// may not initialize all managers -- in that case we leave subChan nil,
 	// and just idle until Coordinator shuts down.
-	if c.runtimeMgr != nil {
+	/*if c.runtimeMgr != nil {
 		subChan = c.runtimeMgr.SubscribeAll(ctx).Ch()
-	}
+	}*/
 	for {
 		select {
 		case <-ctx.Done():

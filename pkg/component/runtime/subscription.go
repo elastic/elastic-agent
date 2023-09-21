@@ -4,15 +4,12 @@
 
 package runtime
 
-import (
-	"context"
-)
-
 // Subscription provides a channel for notifications on a component state.
-type Subscription struct {
+/*type Subscription struct {
 	ctx context.Context
 	ch  chan ComponentState
 }
+
 
 func newSubscription(ctx context.Context) *Subscription {
 	return &Subscription{
@@ -25,7 +22,8 @@ func newSubscription(ctx context.Context) *Subscription {
 func (s *Subscription) Ch() <-chan ComponentState {
 	return s.ch
 }
-
+*/
+/*
 // SubscriptionAll provides a channel for notifications on all component state changes.
 type SubscriptionAll struct {
 	ctx context.Context
@@ -52,3 +50,4 @@ func NewSubscriptionAllWithChannel(ctx context.Context, evtChan chan ComponentCo
 func (s *SubscriptionAll) Ch() <-chan ComponentComponentState {
 	return s.ch
 }
+*/

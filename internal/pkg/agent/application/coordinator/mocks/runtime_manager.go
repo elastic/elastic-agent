@@ -279,7 +279,7 @@ func (_c *RuntimeManager_State_Call) RunAndReturn(run func() []runtime.Component
 }
 
 // SubscribeAll provides a mock function with given fields: _a0
-func (_m *RuntimeManager) SubscribeAll(_a0 context.Context) *runtime.SubscriptionAll {
+/*func (_m *RuntimeManager) SubscribeAll(_a0 context.Context) *runtime.SubscriptionAll {
 	ret := _m.Called(_a0)
 
 	var r0 *runtime.SubscriptionAll
@@ -320,7 +320,7 @@ func (_c *RuntimeManager_SubscribeAll_Call) Return(_a0 *runtime.SubscriptionAll)
 func (_c *RuntimeManager_SubscribeAll_Call) RunAndReturn(run func(context.Context) *runtime.SubscriptionAll) *RuntimeManager_SubscribeAll_Call {
 	_c.Call.Return(run)
 	return _c
-}
+}*/
 
 // Update provides a mock function with given fields: _a0
 func (_m *RuntimeManager) Update(_a0 component.Model) error {
