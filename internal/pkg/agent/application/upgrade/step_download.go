@@ -85,7 +85,6 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 	if err := verifier.Verify(agentArtifact, parsedVersion.VersionWithPrerelease(), skipDefaultPgp, pgpBytes...); err != nil {
 		return "", errors.New(err, "failed verification of agent binary")
 	}
-
 	return path, nil
 }
 
@@ -155,7 +154,7 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 		return nil, err
 	}
 
-	return composed.NewVerifier(fsVerifier, snapshotVerifier, remoteVerifier), nil
+	return composed.NewVerifier(log, fsVerifier, snapshotVerifier, remoteVerifier), nil
 }
 
 func (u *Upgrader) downloadWithRetries(
