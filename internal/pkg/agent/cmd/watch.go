@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/elastic/elastic-agent/version"
+
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/spf13/cobra"
@@ -47,6 +49,9 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 				os.Exit(3)
 			}
 
+			// Make sure to flush any buffered logs before we're done.
+			defer log.Sync() //nolint:errcheck // flushing buffered logs is best effort.
+
 			if err := watchCmd(log, cfg); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
@@ -59,6 +64,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 }
 
 func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
+	log.Infow("Upgrade Watcher started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion())
 	marker, err := upgrade.LoadMarker()
 	if err != nil {
 		log.Error("failed to load marker", err)
@@ -66,14 +72,14 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	}
 	if marker == nil {
 		// no marker found we're not in upgrade process
-		log.Debugf("update marker not present at '%s'", paths.Data())
+		log.Infof("update marker not present at '%s'", paths.Data())
 		return nil
 	}
 
 	locker := filelock.NewAppLocker(paths.Top(), watcherLockFile)
 	if err := locker.TryLock(); err != nil {
 		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
-			log.Debugf("exiting, lock already exists")
+			log.Info("exiting, lock already exists")
 			return nil
 		}
 
@@ -86,7 +92,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 
 	isWithinGrace, tilGrace := gracePeriod(marker, cfg.Settings.Upgrade.Watcher.GracePeriod)
 	if !isWithinGrace {
-		log.Debugf("not within grace [updatedOn %v] %v", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String())
+		log.Infof("not within grace [updatedOn %v] %v", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String())
 		// if it is started outside of upgrade loop
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
@@ -171,11 +177,11 @@ WATCHLOOP:
 			break WATCHLOOP
 		// Agent in degraded state.
 		case err := <-errChan:
-			log.Error("Agent Error detected", err)
+			log.Errorf("Agent Error detected: %s", err.Error())
 			return err
 		// Agent keeps crashing unexpectedly
 		case err := <-crashChan:
-			log.Error("Agent crash detected", err)
+			log.Errorf("Agent crash detected: %s", err.Error())
 			return err
 		}
 	}
