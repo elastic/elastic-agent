@@ -6,8 +6,11 @@ package kubernetessecrets
 
 import (
 	"context"
+	"fmt"
 	"testing"
-	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 
@@ -16,10 +19,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sclient "k8s.io/client-go/kubernetes"
-	k8sfake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
@@ -30,23 +30,6 @@ const (
 )
 
 func Test_K8sSecretsProvider_Fetch(t *testing.T) {
-	client := k8sfake.NewSimpleClientset()
-	secret := &v1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "apps/v1beta1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "testing_secret",
-			Namespace: ns,
-		},
-		Data: map[string][]byte{
-			"secret_value": []byte(pass),
-		},
-	}
-	_, err := client.CoreV1().Secrets(ns).Create(context.Background(), secret, metav1.CreateOptions{})
-	require.NoError(t, err)
-
 	logger := logp.NewLogger("test_k8s_secrets")
 	cfg, err := config.NewConfigFrom(map[string]string{"a": "b"})
 	require.NoError(t, err)
@@ -54,12 +37,28 @@ func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 	p, err := ContextProviderBuilder(logger, cfg, true)
 	require.NoError(t, err)
 
-	fp, _ := p.(*contextProviderK8sSecrets)
+	fp, ok := p.(*contextProviderK8sSecrets)
+	require.True(t, ok, "cannot cast ContextProvider into contextProviderK8sSecrets")
 
-	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
-		return client, nil
-	}
-	require.NoError(t, err)
+	// Use a fake reader provider that will handle requests for the fake ns
+	fp.k8sReaderProvider = newFakeReaderProvider().WithReader(
+		ns,
+		fake.NewFakeClient(
+			&v1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "apps/v1beta1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testing_secret",
+					Namespace: ns,
+				},
+				Data: map[string][]byte{
+					"secret_value": []byte(pass),
+				},
+			},
+		),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -68,16 +67,6 @@ func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 	go func() {
 		_ = fp.Run(ctx, comm)
 	}()
-
-	for {
-		fp.clientMx.Lock()
-		client := fp.client
-		fp.clientMx.Unlock()
-		if client != nil {
-			break
-		}
-		<-time.After(10 * time.Millisecond)
-	}
 
 	val, found := fp.Fetch("kubernetes_secrets.test_namespace.testing_secret.secret_value")
 	assert.True(t, found)
@@ -85,23 +74,6 @@ func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 }
 
 func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
-	client := k8sfake.NewSimpleClientset()
-	secret := &v1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "apps/v1beta1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "testing_secret",
-			Namespace: ns,
-		},
-		Data: map[string][]byte{
-			"secret_value": []byte(pass),
-		},
-	}
-	_, err := client.CoreV1().Secrets(ns).Create(context.Background(), secret, metav1.CreateOptions{})
-	require.NoError(t, err)
-
 	logger := logp.NewLogger("test_k8s_secrets")
 	cfg, err := config.NewConfigFrom(map[string]string{"a": "b"})
 	require.NoError(t, err)
@@ -111,10 +83,25 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 
 	fp, _ := p.(*contextProviderK8sSecrets)
 
-	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
-		return client, nil
-	}
-	require.NoError(t, err)
+	// Use a fake reader provider that will handle requests for the fake ns
+	fp.k8sReaderProvider = newFakeReaderProvider().WithReader(
+		ns,
+		fake.NewFakeClient(
+			&v1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "apps/v1beta1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testing_secret",
+					Namespace: ns,
+				},
+				Data: map[string][]byte{
+					"secret_value": []byte(pass),
+				},
+			},
+		),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -124,17 +111,34 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 		_ = fp.Run(ctx, comm)
 	}()
 
-	for {
-		fp.clientMx.Lock()
-		client := fp.client
-		fp.clientMx.Unlock()
-		if client != nil {
-			break
-		}
-		<-time.After(10 * time.Millisecond)
-	}
-
 	val, found := fp.Fetch("kubernetes_secrets.test_namespace.testing_secretHACK.secret_value")
 	assert.False(t, found)
 	assert.EqualValues(t, val, "")
+}
+
+// -- Fixtures
+
+type fakeReaderProvider struct {
+	readers map[string]client.Reader
+}
+
+var _ k8sReaderProvider = &fakeReaderProvider{}
+
+func newFakeReaderProvider() *fakeReaderProvider {
+	return &fakeReaderProvider{
+		readers: make(map[string]client.Reader),
+	}
+}
+
+func (f *fakeReaderProvider) WithReader(namespace string, r client.Reader) *fakeReaderProvider {
+	f.readers[namespace] = r
+	return f
+}
+
+func (f *fakeReaderProvider) getReader(namespace string) (client.Reader, error) {
+	reader, exists := f.readers[namespace]
+	if !exists {
+		return nil, fmt.Errorf("no reader for namespace %s", namespace)
+	}
+	return reader, nil
 }
