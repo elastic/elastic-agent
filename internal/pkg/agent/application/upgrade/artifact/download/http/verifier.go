@@ -125,10 +125,11 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultPgp
 		if len(check) == 0 {
 			continue
 		}
-		raw, err := download.PgpBytesFromSource(check, v.client)
+		raw, err := download.PgpBytesFromSource(v.log, check, v.client)
 		if err != nil {
 			return err
 		}
+
 		if len(raw) == 0 {
 			continue
 		}

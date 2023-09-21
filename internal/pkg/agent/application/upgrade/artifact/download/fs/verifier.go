@@ -124,10 +124,11 @@ func (v *Verifier) verifyAsc(fullPath string, skipDefaultPgp bool, pgpSources ..
 		if len(check) == 0 {
 			continue
 		}
-		raw, err := download.PgpBytesFromSource(check, v.client)
+		raw, err := download.PgpBytesFromSource(v.log, check, v.client)
 		if err != nil {
 			return err
 		}
+
 		if len(raw) == 0 {
 			continue
 		}
