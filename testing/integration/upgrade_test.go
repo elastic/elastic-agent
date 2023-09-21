@@ -1027,7 +1027,7 @@ inputs:
 	require.NoError(t, err, "error configuring agent fixture")
 
 	t.Log("Install the built Agent")
-	output, err := tools.InstallStandaloneAgent(agentFixture)
+	output, err := tools.InstallStandaloneAgent(ctx, agentFixture)
 	t.Log(string(output))
 	require.NoError(t, err)
 
