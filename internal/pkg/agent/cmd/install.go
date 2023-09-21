@@ -179,20 +179,43 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
+<<<<<<< HEAD
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
 		err = install.Install(cfgFile, topPath)
+=======
+	pt := install.NewProgressTracker(streams.Out)
+	s := pt.Start()
+	defer func() {
+		if err != nil {
+			s.Failed()
+		} else {
+			s.Succeeded()
+		}
+	}()
+
+	cfgFile := paths.ConfigFile()
+	if status != install.PackageInstall {
+		err = install.Install(cfgFile, topPath, s)
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 		if err != nil {
 			return err
 		}
 
 		defer func() {
 			if err != nil {
-				_ = install.Uninstall(cfgFile, topPath, "")
+				uninstallStep := s.StepStart("Uninstalling")
+				innerErr := install.Uninstall(cfgFile, topPath, "", uninstallStep)
+				if innerErr != nil {
+					uninstallStep.Failed()
+				} else {
+					uninstallStep.Succeeded()
+				}
 			}
 		}()
 
 		if !delayEnroll {
+<<<<<<< HEAD
 			err = install.StartService(topPath)
 			if err != nil {
 				fmt.Fprintf(streams.Out, "Installation failed to start Elastic Agent service.\n")
@@ -202,6 +225,26 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			defer func() {
 				if err != nil {
 					_ = install.StopService(topPath)
+=======
+			startServiceStep := s.StepStart("Starting service")
+			err = install.StartService(topPath)
+			if err != nil {
+				startServiceStep.Failed()
+				fmt.Fprintf(streams.Out, "Installation failed to start Elastic Agent service.\n")
+				return err
+			}
+			startServiceStep.Succeeded()
+
+			defer func() {
+				if err != nil {
+					stoppingServiceStep := s.StepStart("Stopping service")
+					innerErr := install.StopService(topPath)
+					if innerErr != nil {
+						stoppingServiceStep.Failed()
+					} else {
+						stoppingServiceStep.Succeeded()
+					}
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 				}
 			}()
 		}
@@ -214,12 +257,21 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		enrollCmd.Stdin = os.Stdin
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
+<<<<<<< HEAD
 		err = enrollCmd.Start()
 		if err != nil {
+=======
+
+		enrollStep := s.StepStart("Enrolling Elastic Agent with Fleet")
+		err = enrollCmd.Start()
+		if err != nil {
+			enrollStep.Failed()
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 			return fmt.Errorf("failed to execute enroll command: %w", err)
 		}
 		err = enrollCmd.Wait()
 		if err != nil {
+<<<<<<< HEAD
 			if status != install.PackageInstall {
 				var exitErr *exec.ExitError
 				_ = install.Uninstall(cfgFile, topPath, "")
@@ -229,6 +281,14 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			}
 			return fmt.Errorf("enroll command failed for unknown reason: %w", err)
 		}
+=======
+			enrollStep.Failed()
+			// uninstall doesn't need to be performed here the defer above will
+			// catch the error and perform the uninstall
+			return fmt.Errorf("enroll command failed for unknown reason: %w", err)
+		}
+		enrollStep.Succeeded()
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 	}
 
 	if err := info.CreateInstallMarker(topPath); err != nil {

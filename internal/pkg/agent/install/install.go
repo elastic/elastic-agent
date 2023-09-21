@@ -22,7 +22,11 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
+<<<<<<< HEAD
 func Install(cfgFile, topPath string) error {
+=======
+func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 	dir, err := findDirectory()
 	if err != nil {
 		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
@@ -33,13 +37,24 @@ func Install(cfgFile, topPath string) error {
 	// There is no uninstall token for "install" command.
 	// Uninstall will fail on protected agent.
 	// The protected Agent will need to be uninstalled first before it can be installed.
+<<<<<<< HEAD
 	err = Uninstall(cfgFile, topPath, "")
 	if err != nil {
+=======
+	s := pt.StepStart("Uninstalling current Elastic Agent")
+	err = Uninstall(cfgFile, topPath, "", s)
+	if err != nil {
+		s.Failed()
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
 			errors.M("directory", filepath.Dir(topPath)))
 	}
+<<<<<<< HEAD
+=======
+	s.Succeeded()
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 
 	// ensure parent directory exists, copy source into install path
 	err = os.MkdirAll(filepath.Dir(topPath), 0755)
@@ -49,6 +64,12 @@ func Install(cfgFile, topPath string) error {
 			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)),
 			errors.M("directory", filepath.Dir(topPath)))
 	}
+<<<<<<< HEAD
+=======
+
+	// copy source into install path
+	s = pt.StepStart("Copying files")
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
@@ -56,11 +77,19 @@ func Install(cfgFile, topPath string) error {
 		Sync: true,
 	})
 	if err != nil {
+<<<<<<< HEAD
+=======
+		s.Failed()
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
 			errors.M("source", dir), errors.M("destination", topPath))
 	}
+<<<<<<< HEAD
+=======
+	s.Succeeded()
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
@@ -124,17 +153,33 @@ func Install(cfgFile, topPath string) error {
 	}
 
 	// install service
+<<<<<<< HEAD
 	svc, err := newService(topPath)
 	if err != nil {
+=======
+	s = pt.StepStart("Installing service")
+	svc, err := newService(topPath)
+	if err != nil {
+		s.Failed()
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 		return err
 	}
 	err = svc.Install()
 	if err != nil {
+<<<<<<< HEAD
+=======
+		s.Failed()
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
 			errors.M("service", paths.ServiceName))
 	}
+<<<<<<< HEAD
+=======
+	s.Succeeded()
+
+>>>>>>> 7e86d24cd3 (Uninstall finds and kills any running `elastic-agent watch` process (#3384))
 	return nil
 }
 
