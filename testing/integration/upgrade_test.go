@@ -386,12 +386,7 @@ func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
 	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false, true, false, CustomPGP{})
 }
 
-func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion string) (upgradableVersions []*version.ParsedSemVer) {
-	t.Helper()
-
-	const currentMajorVersions = 2
-	const previousMajorVersions = 1
-
+func getNoOfUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion string, noOfCurrentMajor, noOfPreviousMajor int, skipSnapshots bool) (upgradableVersions []*version.ParsedSemVer) {
 	aac := tools.NewArtifactAPIClient()
 	vList, err := aac.GetVersions(ctx)
 	require.NoError(t, err, "error retrieving versions from Artifact API")
@@ -416,7 +411,7 @@ func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion s
 	sort.Sort(sort.Reverse(sortedParsedVersions))
 
 	for _, parsedVersion := range sortedParsedVersions {
-		if currentMajorSelected == currentMajorVersions && previousMajorSelected == previousMajorVersions {
+		if currentMajorSelected == noOfCurrentMajor && previousMajorSelected == noOfPreviousMajor {
 			// we got all the versions we need, break the loop
 			break
 		}
@@ -427,18 +422,18 @@ func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion s
 			continue
 		}
 
-		if parsedVersion.IsSnapshot() {
+		if skipSnapshots && parsedVersion.IsSnapshot() {
 			// skip all snapshots
 			continue
 		}
 
-		if parsedVersion.Major() == currentMajor && currentMajorSelected < currentMajorVersions {
+		if parsedVersion.Major() == currentMajor && currentMajorSelected < noOfCurrentMajor {
 			upgradableVersions = append(upgradableVersions, parsedVersion)
 			currentMajorSelected++
 			continue
 		}
 
-		if parsedVersion.Major() < currentMajor && previousMajorSelected < previousMajorVersions {
+		if parsedVersion.Major() < currentMajor && previousMajorSelected < noOfPreviousMajor {
 			upgradableVersions = append(upgradableVersions, parsedVersion)
 			previousMajorSelected++
 			continue
@@ -446,6 +441,15 @@ func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion s
 
 	}
 	return
+}
+
+func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion string) (upgradableVersions []*version.ParsedSemVer) {
+	t.Helper()
+
+	const currentMajorVersions = 2
+	const previousMajorVersions = 1
+
+	return getNoOfUpgradableVersions(ctx, t, upgradeToVersion, currentMajorVersions, previousMajorVersions, true)
 }
 
 func testStandaloneUpgrade(
@@ -908,18 +912,22 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	versionList, err := aac.GetVersions(ctx)
 	require.NoError(t, err)
 	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
-	latestVersion := versionList.Versions[len(versionList.Versions)-1]
 
-	t.Logf("Upgrading to version %q", latestVersion)
+	// transform and reverse the version list and find the most recent version that is different from the broken version returned
+
+	// look for 1 version with the current major that is lower than the current one
+	upgradableVersions := getNoOfUpgradableVersions(ctx, t, actualVersion, 1, 0, false)
+	require.NotEmpty(t, upgradableVersions, "No version found to downgrade to from Artifact API")
 
 	err = c.Connect(ctx)
 	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
 
-	_, err = c.Upgrade(ctx, latestVersion, "", false, false)
-	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", latestVersion)
-	parsedLatestVersion, err := version.ParseVersion(latestVersion)
-	require.NoError(t, err)
+	downgradeParsedVersion := upgradableVersions[0]
+	downgradeVersion := downgradeParsedVersion.CoreVersion()
+
+	_, err = c.Upgrade(ctx, downgradeVersion, "", false, false)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", downgradeVersion)
 
 	require.Eventuallyf(t, func() bool {
 		state, err := c.State(ctx)
@@ -928,8 +936,8 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 			return false
 		}
 		t.Logf("current agent state: %+v", state)
-		return state.Info.Version == parsedLatestVersion.CoreVersion() &&
-			state.Info.Snapshot == parsedLatestVersion.IsSnapshot() &&
+		return state.Info.Version == downgradeParsedVersion.CoreVersion() &&
+			state.Info.Snapshot == downgradeParsedVersion.IsSnapshot() &&
 			state.State == v2proto.State_HEALTHY
 	}, 5*time.Minute, 10*time.Second, "agent never upgraded to expected version")
 }
