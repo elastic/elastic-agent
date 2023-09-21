@@ -15,15 +15,112 @@ import (
 	"golang.org/x/exp/rand"
 )
 
+// ProgressTrackerStep is a currently running step.
+//
+// A step can produce a sub-step that is a step that is part of another step.
+type ProgressTrackerStep interface {
+	// Succeeded step is done and successful.
+	Succeeded()
+	// Failed step has failed.
+	Failed()
+	// StepStart creates a new step.
+	StepStart(msg string) ProgressTrackerStep
+}
+
+type progressTrackerStep struct {
+	tracker *ProgressTracker
+	prefix  string
+
+	finalizeFunc func()
+
+	rootstep bool
+	substeps bool
+	mu       sync.Mutex
+	step     *progressTrackerStep
+}
+
+func newProgressTrackerStep(tracker *ProgressTracker, prefix string, finalizeFunc func()) *progressTrackerStep {
+	return &progressTrackerStep{
+		tracker:      tracker,
+		prefix:       prefix,
+		finalizeFunc: finalizeFunc,
+	}
+}
+
+// Succeeded step is done and successful.
+func (pts *progressTrackerStep) Succeeded() {
+	prefix := " "
+	if pts.substeps {
+		prefix = pts.prefix + "   "
+	}
+	if !pts.rootstep {
+		pts.tracker.printf("%sDONE\n", prefix)
+	}
+	pts.finalizeFunc()
+}
+
+// Failed step has failed.
+func (pts *progressTrackerStep) Failed() {
+	prefix := " "
+	if pts.substeps {
+		prefix = pts.prefix + "   "
+	}
+	if !pts.rootstep {
+		pts.tracker.printf("%sFAILED\n", prefix)
+	}
+	pts.finalizeFunc()
+}
+
+// StepStart creates a new step.
+func (pts *progressTrackerStep) StepStart(msg string) ProgressTrackerStep {
+	prefix := pts.prefix
+	if !pts.rootstep {
+		prefix += "   "
+		if !pts.substeps {
+			prefix = "\n" + prefix
+			pts.substeps = true
+		}
+	}
+	pts.tracker.printf("%s%s...", prefix, strings.TrimSpace(msg))
+	s := newProgressTrackerStep(pts.tracker, prefix, func() {
+		pts.setStep(nil)
+	})
+	pts.setStep(s)
+	return s
+}
+
+func (pts *progressTrackerStep) getStep() *progressTrackerStep {
+	pts.mu.Lock()
+	defer pts.mu.Unlock()
+	return pts.step
+}
+
+func (pts *progressTrackerStep) setStep(step *progressTrackerStep) {
+	pts.mu.Lock()
+	defer pts.mu.Unlock()
+	pts.step = step
+}
+
+func (pts *progressTrackerStep) tick() {
+	step := pts.getStep()
+	if step != nil {
+		step.tick()
+		return
+	}
+	if !pts.rootstep {
+		pts.tracker.printf(".")
+	}
+}
+
 type ProgressTracker struct {
 	writer io.Writer
 
 	tickInterval          time.Duration
 	randomizeTickInterval bool
 
-	stepInProgress bool
-	mu             sync.RWMutex
-	stop           chan struct{}
+	step *progressTrackerStep
+	mu   sync.Mutex
+	stop chan struct{}
 }
 
 func NewProgressTracker(writer io.Writer) *ProgressTracker {
@@ -43,7 +140,7 @@ func (pt *ProgressTracker) DisableRandomizedTickIntervals() {
 	pt.randomizeTickInterval = false
 }
 
-func (pt *ProgressTracker) Start() {
+func (pt *ProgressTracker) Start() ProgressTrackerStep {
 	timer := time.NewTimer(pt.calculateTickInterval())
 	go func() {
 		defer timer.Stop()
@@ -52,44 +149,40 @@ func (pt *ProgressTracker) Start() {
 			case <-pt.stop:
 				return
 			case <-timer.C:
-				pt.mu.RLock()
-				if pt.stepInProgress {
-					_, _ = pt.writer.Write([]byte("."))
+				step := pt.getStep()
+				if step != nil {
+					step.tick()
 				}
-				pt.mu.RUnlock()
-
 				timer = time.NewTimer(pt.calculateTickInterval())
 			}
 		}
 	}()
+
+	s := newProgressTrackerStep(pt, "", func() {
+		pt.setStep(nil)
+		pt.stop <- struct{}{}
+	})
+	s.rootstep = true // is the root step
+	pt.setStep(s)
+	return s
 }
 
-func (pt *ProgressTracker) StepStart(msg string) {
+func (pt *ProgressTracker) printf(format string, a ...any) {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-
-	pt.stepInProgress = true
-	fmt.Fprintf(pt.writer, strings.TrimSpace(msg)+"...")
+	_, _ = fmt.Fprintf(pt.writer, format, a...)
 }
 
-func (pt *ProgressTracker) StepSucceeded() {
+func (pt *ProgressTracker) getStep() *progressTrackerStep {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-
-	fmt.Fprintln(pt.writer, " DONE")
-	pt.stepInProgress = false
+	return pt.step
 }
 
-func (pt *ProgressTracker) StepFailed() {
+func (pt *ProgressTracker) setStep(step *progressTrackerStep) {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-
-	fmt.Fprintln(pt.writer, " FAILED")
-	pt.stepInProgress = false
-}
-
-func (pt *ProgressTracker) Stop() {
-	pt.stop <- struct{}{}
+	pt.step = step
 }
 
 func (pt *ProgressTracker) calculateTickInterval() time.Duration {
