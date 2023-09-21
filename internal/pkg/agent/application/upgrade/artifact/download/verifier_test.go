@@ -10,9 +10,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/stretchr/testify/require"
 )
 
 func TestPgpBytesFromSource(t *testing.T) {
@@ -28,7 +29,7 @@ func TestPgpBytesFromSource(t *testing.T) {
 		ExpectedLogMessage string
 	}{
 		{
-			"successfull call",
+			"successful call",
 			PgpSourceURIPrefix + "https://location/path",
 			nil,
 			[]byte("pgp-body"),
