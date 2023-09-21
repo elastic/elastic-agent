@@ -14,14 +14,15 @@ require (
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/e2e-testing v1.1.0
 	github.com/elastic/elastic-agent-autodiscover v0.6.2
-	github.com/elastic/elastic-agent-client/v7 v7.3.0
-	github.com/elastic/elastic-agent-libs v0.3.13
+	github.com/elastic/elastic-agent-client/v7 v7.4.0
+	github.com/elastic/elastic-agent-libs v0.3.14
 	github.com/elastic/elastic-agent-system-metrics v0.6.1
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
-	github.com/elastic/go-elasticsearch/v8 v8.8.2
+	github.com/elastic/go-elasticsearch/v8 v8.10.0
 	github.com/elastic/go-licenser v0.4.1
-	github.com/elastic/go-sysinfo v1.11.0
+	github.com/elastic/go-sysinfo v1.11.1
 	github.com/elastic/go-ucfg v0.8.6
+	github.com/fatih/color v1.15.0
 	github.com/gofrs/flock v0.8.1
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.5.9
@@ -89,7 +90,6 @@ require (
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
-	github.com/fatih/color v1.15.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect

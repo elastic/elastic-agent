@@ -33,6 +33,10 @@ type Verifier struct {
 	log           *logger.Logger
 }
 
+func (v *Verifier) Name() string {
+	return "fs.verifier"
+}
+
 // NewVerifier creates a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
 func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
@@ -120,10 +124,11 @@ func (v *Verifier) verifyAsc(fullPath string, skipDefaultPgp bool, pgpSources ..
 		if len(check) == 0 {
 			continue
 		}
-		raw, err := download.PgpBytesFromSource(check, v.client)
+		raw, err := download.PgpBytesFromSource(v.log, check, v.client)
 		if err != nil {
 			return err
 		}
+
 		if len(raw) == 0 {
 			continue
 		}

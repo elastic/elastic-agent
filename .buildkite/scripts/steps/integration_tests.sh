@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euxo pipefail
+set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
@@ -8,7 +8,7 @@ DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=
 
 # Run integration tests
 set +e
-TEST_INTEG_CLEAN_ON_EXIT=true SNAPSHOT=true mage integration:test
+TEST_INTEG_AUTH_ESS_REGION=azure-eastus2 TEST_INTEG_CLEAN_ON_EXIT=true SNAPSHOT=true mage integration:test
 TESTS_EXIT_STATUS=$?
 set -e
 

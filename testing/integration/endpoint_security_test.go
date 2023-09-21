@@ -19,6 +19,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/google/uuid"
@@ -135,6 +136,11 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
 
+	t.Cleanup(func() {
+		t.Log("Un-enrolling Elastic Agent...")
+		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient, policy.ID))
+	})
+
 	t.Log("Installing Elastic Defend")
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policy.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
@@ -238,7 +244,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	hostname, err := os.Hostname()
 	require.NoError(t, err)
 
-	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, hostname)
+	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, policy.ID, hostname)
 	require.NoError(t, err)
 
 	_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{ID: agentID})

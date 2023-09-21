@@ -9,6 +9,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -44,19 +45,12 @@ import (
 	agtversion "github.com/elastic/elastic-agent/version"
 )
 
-// The watcher will need the default 10 minutes to complete for a Fleet managed agent, see https://github.com/elastic/elastic-agent/issues/2977.
-const defaultWatcherDuration = 10 * time.Minute
-
-// Configure standalone agents to complete faster to speed up tests.
-const standaloneWatcherDuration = time.Minute
-
-// Note: this configuration can't apply to Fleet managed upgrades until https://github.com/elastic/elastic-agent/issues/2977 is resolved
-var fastWatcherCfg = fmt.Sprintf(`
+const fastWatcherCfg = `
 agent.upgrade.watcher:
-  grace_period: %s
+  grace_period: 1m
   error_check.interval: 15s
   crash_check.interval: 15s
-`, standaloneWatcherDuration)
+`
 
 // notable versions used in tests
 
@@ -100,11 +94,8 @@ func TestFleetManagedUpgrade(t *testing.T) {
 			err = agentFixture.Prepare(ctx)
 			require.NoError(t, err, "error preparing agent fixture")
 
-			t.Cleanup(func() {
-				// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-				waitForUpgradeWatcherToComplete(t, agentFixture, parsedVersion, defaultWatcherDuration)
-			})
-
+			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+			require.NoError(t, err, "error configuring agent fixture")
 			testUpgradeFleetManagedElasticAgent(t, ctx, info, agentFixture, parsedVersion, define.Version())
 		})
 	}
@@ -158,25 +149,25 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, ctx context.Context, info
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient))
+		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient, policy.ID))
 	})
 
 	t.Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, policy.ID, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	t.Logf("Upgrade Elastic Agent to version %s...", toVersion)
-	err = tools.UpgradeAgent(kibClient, toVersion)
+	err = tools.UpgradeAgent(kibClient, policy.ID, toVersion)
 	require.NoError(t, err)
 
 	t.Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, policy.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
 
 	// We remove the `-SNAPSHOT` suffix because, post-upgrade, the version reported
 	// by the Agent will not contain this suffix, even if a `-SNAPSHOT`-suffixed
 	// version was used as the target version for the upgrade.
 	require.Eventually(t, func() bool {
 		t.Log("Getting Agent version...")
-		newVersion, err := tools.GetAgentVersion(kibClient)
+		newVersion, err := tools.GetAgentVersion(kibClient, policy.ID)
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
 			return false
@@ -214,27 +205,19 @@ func TestStandaloneUpgrade(t *testing.T) {
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
 
-			t.Cleanup(func() {
-				// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-				waitForUpgradeWatcherToComplete(t, agentFixture, parsedVersion, standaloneWatcherDuration)
-			})
-
 			parsedUpgradeVersion, err := version.ParseVersion(define.Version())
 			require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
 			skipVerify := version_8_7_0.Less(*parsedVersion)
-			testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, parsedUpgradeVersion, "", skipVerify, true, false, "")
+			testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, parsedUpgradeVersion, "", skipVerify, true, false, CustomPGP{})
 		})
 	}
 }
 
-func TestStandaloneDowngradeWithGPGFallback(t *testing.T) {
+func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-
-	t.Skip("snapshot downloader has a bug which break this test between releases: " +
-		"https://github.com/elastic/elastic-agent/issues/3313")
 
 	minVersion := version_8_10_0_SNAPSHOT
 	fromVersion, err := version.ParseVersion(define.Version())
@@ -262,19 +245,67 @@ func TestStandaloneDowngradeWithGPGFallback(t *testing.T) {
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
 
-	t.Cleanup(func() {
-		// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-		waitForUpgradeWatcherToComplete(t, agentFixture, fromVersion, standaloneWatcherDuration)
-	})
-
 	_, defaultPGP := release.PGP()
 	firstSeven := string(defaultPGP[:7])
-	customPGP := strings.Replace(
+	newPgp := strings.Replace(
 		string(defaultPGP),
 		firstSeven,
 		"abcDEFg",
 		1,
 	)
+
+	customPGP := CustomPGP{
+		PGP: newPgp,
+	}
+
+	testStandaloneUpgrade(ctx, t, agentFixture, fromVersion, toVersion, "", false, false, true, customPGP)
+}
+
+func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+
+	minVersion := version_8_10_0_SNAPSHOT
+	fromVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	if fromVersion.Less(*minVersion) {
+		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// previous
+	toVersion, err := fromVersion.GetPreviousMinor()
+	require.NoError(t, err, "failed to get previous minor")
+	agentFixture, err := define.NewFixture(
+		t,
+		define.Version(),
+	)
+	require.NoError(t, err, "error creating fixture")
+
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err, "error preparing agent fixture")
+
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	_, defaultPGP := release.PGP()
+	firstSeven := string(defaultPGP[:7])
+	newPgp := strings.Replace(
+		string(defaultPGP),
+		firstSeven,
+		"abcDEFg",
+		1,
+	)
+
+	customPGP := CustomPGP{
+		PGP:    newPgp,
+		PGPUri: "https://127.0.0.1:3456/non/existing/path",
+	}
 
 	testStandaloneUpgrade(ctx, t, agentFixture, fromVersion, toVersion, "", false, false, true, customPGP)
 }
@@ -351,14 +382,8 @@ func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
 
 	t.Logf("Targeting upgrade to version %+v", upgradeInputVersion)
 	parsedFromVersion, err := version.ParseVersion(define.Version())
-
-	t.Cleanup(func() {
-		// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-		waitForUpgradeWatcherToComplete(t, agentFixture, parsedFromVersion, standaloneWatcherDuration)
-	})
-
 	require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
-	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false, true, false, "")
+	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false, true, false, CustomPGP{})
 }
 
 func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion string) (upgradableVersions []*version.ParsedSemVer) {
@@ -433,7 +458,7 @@ func testStandaloneUpgrade(
 	allowLocalPackage bool,
 	skipVerify bool,
 	skipDefaultPgp bool,
-	customPgp string,
+	customPgp CustomPGP,
 ) {
 
 	var nonInteractiveFlag bool
@@ -485,8 +510,16 @@ func testStandaloneUpgrade(
 		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-default-pgp")
 	}
 
-	if len(customPgp) > 0 {
-		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp", customPgp)
+	if len(customPgp.PGP) > 0 {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp", customPgp.PGP)
+	}
+
+	if len(customPgp.PGPUri) > 0 {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp-uri", customPgp.PGPUri)
+	}
+
+	if len(customPgp.PGPPath) > 0 {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp-path", customPgp.PGPPath)
 	}
 
 	upgradeTriggerOutput, err := f.Exec(ctx, upgradeCmdArgs)
@@ -496,6 +529,8 @@ func testStandaloneUpgrade(
 	require.Eventuallyf(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, f, parsedUpgradeVersion.CoreVersion(), parsedUpgradeVersion.IsSnapshot(), expectedAgentHashAfterUpgrade)
 	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
+
+	checkUpgradeWatcherRan(t, f, parsedFromVersion)
 
 	if expectedAgentHashAfterUpgrade != "" {
 		aVersion, err := c.Version(ctx)
@@ -574,17 +609,28 @@ func checkLegacyAgentHealthAndVersion(t *testing.T, ctx context.Context, f *ates
 
 }
 
-// waitForUpgradeWatcherToComplete asserts that the Upgrade Watcher finished running.
-func waitForUpgradeWatcherToComplete(t *testing.T, f *atesting.Fixture, fromVersion *version.ParsedSemVer, timeout time.Duration) {
+// checkUpgradeWatcherRan asserts that the Upgrade Watcher finished running. We use the
+// presence of the update marker file as evidence that the Upgrade Watcher is still running
+// and the absence of that file as evidence that the Upgrade Watcher is no longer running.
+func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture, fromVersion *version.ParsedSemVer) {
 	t.Helper()
 
 	if fromVersion.Less(*version_8_9_0_SNAPSHOT) {
-		t.Logf("Version %q is too old for a quick update marker check", fromVersion)
-		timeout = defaultWatcherDuration
+		t.Logf("Version %q is too old for a quick update marker check, skipping...", fromVersion)
+		return
 	}
 
-	t.Logf("Waiting %s for upgrade watcher to finish running", timeout)
-	time.Sleep(timeout)
+	t.Log("Waiting for upgrade watcher to finish running...")
+
+	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
+	require.FileExists(t, updateMarkerFile)
+
+	now := time.Now()
+	require.Eventuallyf(t, func() bool {
+		_, err := os.Stat(updateMarkerFile)
+		return errors.Is(err, fs.ErrNotExist)
+	}, 2*time.Minute, 15*time.Second, "agent never removed update marker")
+	t.Logf("Upgrade Watcher completed in %s", time.Now().Sub(now))
 }
 
 func extractCommitHashFromArtifact(t *testing.T, ctx context.Context, artifactVersion *version.ParsedSemVer, agentProject tools.Project) string {
@@ -664,11 +710,6 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
-
-	t.Cleanup(func() {
-		// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-		waitForUpgradeWatcherToComplete(t, agentFixture, upgradeFromVersion, standaloneWatcherDuration)
-	})
 
 	t.Log("Install the built Agent")
 	output, err := tools.InstallStandaloneAgent(ctx, agentFixture)
@@ -756,6 +797,8 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	t.Log("Waiting for upgrade to finish")
 	wg.Wait()
 
+	checkUpgradeWatcherRan(t, agentFixture, upgradeFromVersion)
+
 	t.Log("Check Agent version to ensure upgrade is successful")
 	currentVersion, err = getVersion(t, ctx, agentFixture)
 	require.NoError(t, err)
@@ -817,9 +860,6 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	f, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	fromVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
-
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
 	err = f.Prepare(context.Background())
 	require.NoError(t, err)
@@ -829,11 +869,6 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 
 	err = f.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
-
-	t.Cleanup(func() {
-		// The watcher needs to finish before the agent is uninstalled: https://github.com/elastic/elastic-agent/issues/3371
-		waitForUpgradeWatcherToComplete(t, f, fromVersion, standaloneWatcherDuration)
-	})
 
 	output, err := tools.InstallStandaloneAgent(ctx, f)
 	t.Logf("Agent installation output: %q", string(output))
@@ -924,4 +959,104 @@ func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) {
 		err = os.Remove(vFile)
 		require.NoErrorf(t, err, "error removing package version file %q", vFile)
 	}
+}
+
+// TestStandaloneUpgradeFailsStatus tests the scenario where upgrading to a new version
+// of Agent fails due to the new Agent binary reporting an unhealthy status. It checks
+// that the Agent is rolled back to the previous version.
+func TestStandaloneUpgradeFailsStatus(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+	})
+
+	t.Skip("Affected by https://github.com/elastic/elastic-agent/issues/3371, watcher left running at end of test")
+
+	upgradeFromVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Get available versions from Artifacts API
+	aac := tools.NewArtifactAPIClient()
+	versionList, err := aac.GetVersions(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
+
+	// Determine the version that's TWO versions behind the latest. This is necessary for two reasons:
+	// 1. We don't want to necessarily use the latest version as it might be the same as the
+	// local one, which will then cause the invalid input in the Agent test policy (defined further
+	// below in this test) to come into play with the Agent version we're upgrading from, thus preventing
+	// it from ever becoming healthy.
+	// 2. We don't want to necessarily use the version that's one before the latest because sometimes we
+	// are in a situation where the latest version has been advanced to the next release (e.g. 8.10.0)
+	// but the version before that (e.g. 8.9.0) hasn't been released yet.
+	require.GreaterOrEqual(t, len(versionList.Versions), 3)
+	upgradeToVersionStr := versionList.Versions[len(versionList.Versions)-3]
+
+	upgradeToVersion, err := version.ParseVersion(upgradeToVersionStr)
+	require.NoError(t, err)
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
+
+	agentFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err, "error preparing agent fixture")
+
+	// Configure Agent with fast watcher configuration and also an invalid
+	// input when the Agent version matches the upgraded Agent version. This way
+	// the pre-upgrade version of the Agent runs healthy, but the post-upgrade
+	// version doesn't.
+	invalidInputPolicy := fastWatcherCfg + fmt.Sprintf(`
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+
+inputs:
+  - condition: '${agent.version.version} == "%s"'
+    type: invalid
+    id: invalid-input
+`, upgradeToVersion.CoreVersion())
+
+	err = agentFixture.Configure(ctx, []byte(invalidInputPolicy))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	t.Log("Install the built Agent")
+	output, err := tools.InstallStandaloneAgent(agentFixture)
+	t.Log(string(output))
+	require.NoError(t, err)
+
+	c := agentFixture.Client()
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	toVersion := upgradeToVersion.String()
+	t.Logf("Upgrading Agent to %s", toVersion)
+	err = c.Connect(ctx)
+	require.NoError(t, err, "error connecting client to agent")
+	defer c.Disconnect()
+
+	_, err = c.Upgrade(ctx, toVersion, "", false, false)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion)
+
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeToVersion.CoreVersion(), upgradeToVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 250*time.Millisecond, "Upgraded Agent never became healthy")
+
+	t.Log("Ensure the we have rolled back and the correct version is running")
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 10*time.Second, "Rolled back Agent never became healthy")
+}
+
+type CustomPGP struct {
+	PGP     string
+	PGPUri  string
+	PGPPath string
 }

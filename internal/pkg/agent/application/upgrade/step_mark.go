@@ -139,7 +139,7 @@ func UpdateActiveCommit(log *logger.Logger, hash string) error {
 // CleanMarker removes a marker from disk.
 func CleanMarker(log *logger.Logger) error {
 	markerFile := markerFilePath()
-	log.Debugw("Removing marker file", "file.path", markerFile)
+	log.Infow("Removing marker file", "file.path", markerFile)
 	if err := os.Remove(markerFile); !os.IsNotExist(err) {
 		return err
 	}

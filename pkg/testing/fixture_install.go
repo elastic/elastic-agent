@@ -86,6 +86,7 @@ func (i InstallOpts) toCmdArgs() []string {
 //   - the combined output of stdout and stderr
 //   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 	installArgs := []string{"install"}
 	if installOpts != nil {
 		installArgs = append(installArgs, installOpts.toCmdArgs()...)
@@ -109,6 +110,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
+		f.t.Logf("[test %s] Inside fixture cleanup function", f.t.Name())
 		if !f.installed {
 			f.t.Logf("skipping uninstall; agent not installed (fixture.installed is false)")
 			// not installed; no need to clean up or collect diagnostics
@@ -130,12 +132,14 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 
 		// environment variable AGENT_KEEP_INSTALLED=true will skip the uninstall
 		// useful to debug the issue with the Elastic Agent
-		if keepInstalled() && f.t.Failed() {
-			f.t.Logf("skipping uninstall; AGENT_KEEP_INSTALLED=true")
+		if f.t.Failed() && keepInstalled() {
+			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
 			return
-		} else {
+		}
+
+		if keepInstalled() {
 			f.t.Logf("ignoring AGENT_KEEP_INSTALLED=true as test succeeded, " +
-				"keeping the agent installed will jeperdise other tests")
+				"keeping the agent installed will jeopardise other tests")
 		}
 
 		// 5 minute timeout, to ensure that it at least doesn't get stuck.
