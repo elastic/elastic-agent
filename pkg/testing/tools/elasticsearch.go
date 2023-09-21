@@ -180,6 +180,30 @@ func GetIndexTemplatesForPattern(ctx context.Context, client elastictransport.In
 	return parsed, nil
 }
 
+// DeleteIndexTemplatesDataStreams deletes any data streams, then associcated index templates.
+func DeleteIndexTemplatesDataStreams(ctx context.Context, client elastictransport.Interface, name string) error {
+	req := esapi.IndicesDeleteDataStreamRequest{Name: []string{name}, ExpandWildcards: "all,hidden"}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return fmt.Errorf("error deleting data streams: %w", err)
+	}
+	_, err = handleResponseRaw(resp)
+	if err != nil {
+		return fmt.Errorf("error handling HTTP response for data stream delete: %w", err)
+	}
+
+	patternReq := esapi.IndicesDeleteIndexTemplateRequest{Name: name}
+	resp, err = patternReq.Do(ctx, client)
+	if err != nil {
+		return fmt.Errorf("error deleting index templates: %w", err)
+	}
+	_, err = handleResponseRaw(resp)
+	if err != nil {
+		return fmt.Errorf("error handling HTTP response for index template delete: %w", err)
+	}
+	return nil
+}
+
 // GetPipelines returns a list of installed pipelines that match the given name/pattern
 func GetPipelines(ctx context.Context, client elastictransport.Interface, name string) (map[string]Pipeline, error) {
 	req := esapi.IngestGetPipelineRequest{PipelineID: name}
@@ -198,6 +222,20 @@ func GetPipelines(ctx context.Context, client elastictransport.Interface, name s
 		return nil, fmt.Errorf("error unmarshaling json response: %w", err)
 	}
 	return parsed, nil
+}
+
+// DeletePipelines deletes all pipelines that match the given pattern
+func DeletePipelines(ctx context.Context, client elastictransport.Interface, name string) error {
+	req := esapi.IngestDeletePipelineRequest{PipelineID: name}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return fmt.Errorf("error deleting index template")
+	}
+	_, err = handleResponseRaw(resp)
+	if err != nil {
+		return fmt.Errorf("error handling HTTP response: %w", err)
+	}
+	return nil
 }
 
 // FindMatchingLogLinesWithContext returns any logs with message fields that match the given line

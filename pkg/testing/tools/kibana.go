@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -30,6 +31,23 @@ type Dashboard struct {
 	Version    string    `json:"version"`
 }
 
+// DeleteDashboard removes the selected dashboard
+func DeleteDashboard(ctx context.Context, client *kibana.Client, id string) error {
+	// In the future there should be logic to check if we need this header, waiting for https://github.com/elastic/kibana/pull/164850
+	headers := http.Header{}
+	headers.Add("x-elastic-internal-origin", "integration-tests")
+	status, resp, err := client.Connection.Request("DELETE", fmt.Sprintf("/api/saved_objects/dashboard/%s", id), nil, headers, nil)
+	if err != nil {
+		return fmt.Errorf("error making API request: %w, response: '%s'", err, string(resp))
+	}
+
+	if status != 200 {
+		return fmt.Errorf("non-200 return code: %v, response: '%s'", status, string(resp))
+	}
+	return nil
+
+}
+
 // GetDashboards returns a list of known dashboards on the system
 func GetDashboards(ctx context.Context, client *kibana.Client) ([]Dashboard, error) {
 	params := url.Values{}
@@ -39,7 +57,9 @@ func GetDashboards(ctx context.Context, client *kibana.Client) ([]Dashboard, err
 	dashboards := []Dashboard{}
 	page := 1
 	for {
-		status, resp, err := client.Connection.Request("GET", "/api/saved_objects/_find", params, nil, nil)
+		headers := http.Header{}
+		headers.Add("x-elastic-internal-origin", "integration-tests")
+		status, resp, err := client.Connection.Request("GET", "/api/saved_objects/_find", params, headers, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error making api request: %w", err)
 		}
