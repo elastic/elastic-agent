@@ -989,8 +989,6 @@ func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) {
 		require.NoErrorf(t, err, "error removing package version file %q", vFile)
 	}
 }
-<<<<<<< HEAD
-=======
 
 // TestStandaloneUpgradeFailsStatus tests the scenario where upgrading to a new version
 // of Agent fails due to the new Agent binary reporting an unhealthy status. It checks
@@ -1094,4 +1092,3 @@ type CustomPGP struct {
 	PGPUri  string
 	PGPPath string
 }
->>>>>>> b1d2e6b040 ([Bug] Do not fail when remote PGPs are not available (#3427))
