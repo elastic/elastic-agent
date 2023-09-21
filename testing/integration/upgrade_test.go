@@ -162,10 +162,6 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, ctx context.Context, info
 	t.Log(`Waiting for enrolled Agent status to be "online"...`)
 	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, policy.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
 
-	// Upgrade Watcher check disabled until
-	// https://github.com/elastic/elastic-agent/issues/2977 is resolved.
-	// checkUpgradeWatcherRan(t, s.agentFixture)
-
 	// We remove the `-SNAPSHOT` suffix because, post-upgrade, the version reported
 	// by the Agent will not contain this suffix, even if a `-SNAPSHOT`-suffixed
 	// version was used as the target version for the upgrade.
@@ -212,7 +208,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 			parsedUpgradeVersion, err := version.ParseVersion(define.Version())
 			require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
 			skipVerify := version_8_7_0.Less(*parsedVersion)
-			testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, parsedUpgradeVersion, "", skipVerify, true, false, "")
+			testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, parsedUpgradeVersion, "", skipVerify, true, false, CustomPGP{})
 		})
 	}
 }
@@ -251,12 +247,65 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 
 	_, defaultPGP := release.PGP()
 	firstSeven := string(defaultPGP[:7])
-	customPGP := strings.Replace(
+	newPgp := strings.Replace(
 		string(defaultPGP),
 		firstSeven,
 		"abcDEFg",
 		1,
 	)
+
+	customPGP := CustomPGP{
+		PGP: newPgp,
+	}
+
+	testStandaloneUpgrade(ctx, t, agentFixture, fromVersion, toVersion, "", false, false, true, customPGP)
+}
+
+func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+
+	minVersion := version_8_10_0_SNAPSHOT
+	fromVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	if fromVersion.Less(*minVersion) {
+		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// previous
+	toVersion, err := fromVersion.GetPreviousMinor()
+	require.NoError(t, err, "failed to get previous minor")
+	agentFixture, err := define.NewFixture(
+		t,
+		define.Version(),
+	)
+	require.NoError(t, err, "error creating fixture")
+
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err, "error preparing agent fixture")
+
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	_, defaultPGP := release.PGP()
+	firstSeven := string(defaultPGP[:7])
+	newPgp := strings.Replace(
+		string(defaultPGP),
+		firstSeven,
+		"abcDEFg",
+		1,
+	)
+
+	customPGP := CustomPGP{
+		PGP:    newPgp,
+		PGPUri: "https://127.0.0.1:3456/non/existing/path",
+	}
 
 	testStandaloneUpgrade(ctx, t, agentFixture, fromVersion, toVersion, "", false, false, true, customPGP)
 }
@@ -334,8 +383,7 @@ func TestStandaloneDowngradeToPreviousSnapshotBuild(t *testing.T) {
 	t.Logf("Targeting upgrade to version %+v", upgradeInputVersion)
 	parsedFromVersion, err := version.ParseVersion(define.Version())
 	require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
-	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false, true, false, "")
-
+	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false, true, false, CustomPGP{})
 }
 
 func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion string) (upgradableVersions []*version.ParsedSemVer) {
@@ -410,7 +458,7 @@ func testStandaloneUpgrade(
 	allowLocalPackage bool,
 	skipVerify bool,
 	skipDefaultPgp bool,
-	customPgp string,
+	customPgp CustomPGP,
 ) {
 
 	var nonInteractiveFlag bool
@@ -462,8 +510,16 @@ func testStandaloneUpgrade(
 		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-default-pgp")
 	}
 
-	if len(customPgp) > 0 {
-		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp", customPgp)
+	if len(customPgp.PGP) > 0 {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp", customPgp.PGP)
+	}
+
+	if len(customPgp.PGPUri) > 0 {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp-uri", customPgp.PGPUri)
+	}
+
+	if len(customPgp.PGPPath) > 0 {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp-path", customPgp.PGPPath)
 	}
 
 	upgradeTriggerOutput, err := f.Exec(ctx, upgradeCmdArgs)
@@ -811,6 +867,9 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	err = f.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
 	output, err := tools.InstallStandaloneAgent(f)
 	t.Logf("Agent installation output: %q", string(output))
 	require.NoError(t, err)
@@ -994,4 +1053,10 @@ inputs:
 	require.Eventually(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
 	}, 2*time.Minute, 10*time.Second, "Rolled back Agent never became healthy")
+}
+
+type CustomPGP struct {
+	PGP     string
+	PGPUri  string
+	PGPPath string
 }
