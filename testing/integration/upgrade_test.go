@@ -288,6 +288,8 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
+	t.Skip("Fails upgrading to a version that doesn't exist: https://github.com/elastic/elastic-agent/issues/3397")
+
 	minVersion := version_8_10_0_SNAPSHOT
 	fromVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
