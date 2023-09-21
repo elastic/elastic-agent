@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -103,7 +104,11 @@ func (u *Upgrader) appendFallbackPGP(targetVersion string, pgpBytes []string) []
 			// best effort log failure
 			u.log.Warnf("failed to parse secondary fallback %q: %v", u.fleetServerURI, err)
 		} else {
-			secondaryFallback := download.PgpSourceURIPrefix + u.fleetServerURI + fmt.Sprintf(fleetUpgradeFallbackPGPFormat, tpv.Major(), tpv.Minor(), tpv.Patch())
+			secondaryPath := path.Join(
+				u.fleetServerURI,
+				fmt.Sprintf(fleetUpgradeFallbackPGPFormat, tpv.Major(), tpv.Minor(), tpv.Patch()),
+			)
+			secondaryFallback := download.PgpSourceURIPrefix + secondaryPath
 			pgpBytes = append(pgpBytes, secondaryFallback)
 		}
 	}
