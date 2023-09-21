@@ -176,6 +176,12 @@ func (s *componentRuntimeState) setCurrent(current component.Component) {
 	s.currCompMx.Unlock()
 }
 
+func (s *componentRuntimeState) getLatest() ComponentState {
+	s.latestMx.RLock()
+	defer s.latestMx.RUnlock()
+	return s.latestState.Copy()
+}
+
 func (s *componentRuntimeState) start() error {
 	return s.runtime.Start()
 }

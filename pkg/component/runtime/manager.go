@@ -268,7 +268,6 @@ func (m *Manager) State() []ComponentComponentState {
 	defer m.currentMx.RUnlock()
 	states := make([]ComponentComponentState, 0, len(m.current))
 	for _, crs := range m.current {
-		crs.latestMx.RLock()
 		var legacyPID string
 		if crs.runtime != nil {
 			if commandRuntime, ok := crs.runtime.(*commandRuntime); ok {
@@ -282,10 +281,9 @@ func (m *Manager) State() []ComponentComponentState {
 		}
 		states = append(states, ComponentComponentState{
 			Component: crs.getCurrent(),
-			State:     crs.latestState.Copy(),
+			State:     crs.getLatest(),
 			LegacyPID: legacyPID,
 		})
-		crs.latestMx.RUnlock()
 	}
 	return states
 }
@@ -484,9 +482,7 @@ func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscripti
 	comp, ok := m.current[componentID]
 	m.currentMx.RUnlock()
 	if ok {
-		comp.latestMx.RLock()
-		latestState := comp.latestState.Copy()
-		comp.latestMx.RUnlock()
+		latestState := comp.getLatest()
 		go func() {
 			select {
 			case <-ctx.Done():
@@ -532,9 +528,7 @@ func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
 	m.currentMx.RLock()
 	latest := make([]ComponentComponentState, 0, len(m.current))
 	for _, comp := range m.current {
-		comp.latestMx.RLock()
-		latest = append(latest, ComponentComponentState{Component: comp.getCurrent(), State: comp.latestState.Copy()})
-		comp.latestMx.RUnlock()
+		latest = append(latest, ComponentComponentState{Component: comp.getCurrent(), State: comp.getLatest()})
 	}
 	m.currentMx.RUnlock()
 	if len(latest) > 0 {
@@ -759,9 +753,7 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 
 	timeoutCh := time.After(timeout)
 	for {
-		comp.latestMx.RLock()
-		latestState := comp.latestState
-		comp.latestMx.RUnlock()
+		latestState := comp.getLatest()
 		if latestState.State == client.UnitStateStopped {
 			return
 		}
