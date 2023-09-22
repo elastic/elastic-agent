@@ -4,7 +4,7 @@ set -euxo pipefail
 source .buildkite/scripts/common.sh
 
 # PACKAGE
-DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
+AGENT_PACKAGE_VERSION=8.10.2 DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
 
 # Run integration tests
 set +e
