@@ -924,7 +924,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	defer c.Disconnect()
 
 	downgradeParsedVersion := upgradableVersions[0]
-	downgradeVersion := downgradeParsedVersion.CoreVersion()
+	downgradeVersion := downgradeParsedVersion.VersionWithPrerelease()
 
 	_, err = c.Upgrade(ctx, downgradeVersion, "", false, false)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", downgradeVersion)
