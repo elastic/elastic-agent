@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/pkg/limits"
 )
 
@@ -100,7 +101,89 @@ func ExpectedConfig(cfg map[string]interface{}) (*proto.UnitExpectedConfig, erro
 		return nil, err
 	}
 
+	if err := updateDataStreamsFromSource(result); err != nil {
+		return nil, fmt.Errorf("could not dedot 'data_stream': %w", err)
+	}
+
 	return result, nil
+}
+
+// dataStreamAndSource is a generic way to represent proto mesages
+// that contain a source field and a datastream field.
+type dataStreamAndSource interface {
+	GetDataStream() *proto.DataStream
+	GetSource() *structpb.Struct
+}
+
+func deDotDataStream(raw dataStreamAndSource) (*proto.DataStream, error) {
+	ds := raw.GetDataStream()
+	if ds == nil {
+		ds = &proto.DataStream{}
+	}
+
+	tmp := struct {
+		DataStream struct {
+			Dataset   string `config:"dataset" yaml:"dataset"`
+			Type      string `config:"type" yaml:"type"`
+			Namespace string `config:"namespace" yaml:"namespace"`
+		} `config:"data_stream" yaml:"data_stream"`
+	}{}
+
+	cfg, err := config.NewConfigFrom(raw.GetSource().AsMap())
+	if err != nil {
+		return nil, fmt.Errorf("cannot generate config from source field: %w", err)
+	}
+
+	if err := cfg.Unpack(&tmp); err != nil {
+		return nil, fmt.Errorf("cannot unpack source field into struct: %w", err)
+	}
+
+	if (ds.Dataset != tmp.DataStream.Dataset) && (ds.Dataset != "" && tmp.DataStream.Dataset != "") {
+		return nil, errors.New("duplicated key 'datastream.dataset'")
+	}
+
+	if (ds.Type != tmp.DataStream.Type) && (ds.Type != "" && tmp.DataStream.Type != "") {
+		return nil, errors.New("duplicated key 'datastream.type'")
+	}
+
+	if (ds.Namespace != tmp.DataStream.Namespace) && (ds.Namespace != "" && tmp.DataStream.Namespace != "") {
+		return nil, errors.New("duplicated key 'datastream.namespace'")
+	}
+
+	ret := &proto.DataStream{
+		Dataset:   merge(tmp.DataStream.Dataset, ds.Dataset),
+		Type:      merge(tmp.DataStream.Type, ds.Type),
+		Namespace: merge(tmp.DataStream.Namespace, ds.Namespace),
+		Source:    raw.GetDataStream().GetSource(),
+	}
+
+	return ret, nil
+}
+
+// merge returns b if a is an empty string
+func merge(a, b string) string {
+	if a == "" {
+		return b
+	}
+	return a
+}
+
+func updateDataStreamsFromSource(unitConfig *proto.UnitExpectedConfig) error {
+	var err error
+	unitConfig.DataStream, err = deDotDataStream(unitConfig)
+	if err != nil {
+		return fmt.Errorf("could not parse data_stream from input: %w", err)
+	}
+
+	for i, stream := range unitConfig.Streams {
+		stream.DataStream, err = deDotDataStream(stream)
+		if err != nil {
+			return fmt.Errorf("could not parse data_stream from stream [%d]: %w",
+				i, err)
+		}
+	}
+
+	return nil
 }
 
 func setSource(val interface{}, cfg map[string]interface{}) error {

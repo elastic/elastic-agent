@@ -83,7 +83,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	// Stage 3: Make sure metricbeat logs are populated
 	t.Log("Making sure metricbeat logs are populated")
 	docs := findESDocs(t, func() (estools.Documents, error) {
-		return estools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
+		return estools.GetLogsForDataset(info.ESClient, "elastic_agent.metricbeat")
 	})
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
 	require.NotZero(t, len(docs.Hits.Hits))
