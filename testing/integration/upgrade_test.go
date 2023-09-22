@@ -620,6 +620,13 @@ func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture, fromVe
 		return
 	}
 
+	// (blakerouse): Need to determine why on Windows this is not removed. It is explicitly
+	// not removed on Windows, it's not a bug that it's not removed.
+	if runtime.GOOS == define.Windows {
+		t.Logf("Skipping check for upgrade watcher, as its not removed on Windows...")
+		return
+	}
+
 	t.Log("Waiting for upgrade watcher to finish running...")
 
 	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
