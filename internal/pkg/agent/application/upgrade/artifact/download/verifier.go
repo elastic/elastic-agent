@@ -20,10 +20,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/hashicorp/go-multierror"
 
 	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
@@ -31,6 +32,17 @@ const (
 	PgpSourceRawPrefix = "pgp_raw:"
 	PgpSourceURIPrefix = "pgp_uri:"
 )
+
+var (
+	ErrRemotePGPDownloadFailed = errors.New("Remote PGP download failed")
+	ErrInvalidLocation         = errors.New("Remote PGP location is invalid")
+)
+
+// warnLogger is a logger that only needs to implement Warnf, as that is the only functions
+// that the downloadProgressReporter uses.
+type warnLogger interface {
+	Warnf(format string, args ...interface{})
+}
 
 // ChecksumMismatchError indicates the expected checksum for a file does not
 // match the computed checksum.
@@ -168,13 +180,17 @@ func VerifyGPGSignature(file string, asciiArmorSignature, publicKey []byte) erro
 	return nil
 }
 
-func PgpBytesFromSource(source string, client http.Client) ([]byte, error) {
+func PgpBytesFromSource(log warnLogger, source string, client http.Client) ([]byte, error) {
 	if strings.HasPrefix(source, PgpSourceRawPrefix) {
 		return []byte(strings.TrimPrefix(source, PgpSourceRawPrefix)), nil
 	}
 
 	if strings.HasPrefix(source, PgpSourceURIPrefix) {
-		return fetchPgpFromURI(strings.TrimPrefix(source, PgpSourceURIPrefix), client)
+		pgpBytes, err := fetchPgpFromURI(strings.TrimPrefix(source, PgpSourceURIPrefix), client)
+		if errors.Is(err, ErrRemotePGPDownloadFailed) || errors.Is(err, ErrInvalidLocation) {
+			log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", strings.TrimPrefix(source, PgpSourceURIPrefix), err)
+		}
+		return pgpBytes, nil
 	}
 
 	return nil, errors.New("unknown pgp source")
@@ -187,7 +203,7 @@ func CheckValidDownloadUri(rawURI string) error {
 	}
 
 	if !strings.EqualFold(uri.Scheme, "https") {
-		return fmt.Errorf("failed to check URI %q: HTTPS is required", rawURI)
+		return multierror.Append(fmt.Errorf("failed to check URI %q: HTTPS is required", rawURI), ErrInvalidLocation)
 	}
 
 	return nil
@@ -207,7 +223,7 @@ func fetchPgpFromURI(uri string, client http.Client) ([]byte, error) {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, multierror.Append(err, ErrRemotePGPDownloadFailed)
 	}
 	defer resp.Body.Close()
 
