@@ -25,9 +25,8 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == 
   if [[ -z "${WORKSPACE-""}" ]]; then
       WORKSPACE=$(git rev-parse --show-toplevel)
   fi
-
   source "${WORKSPACE}/.buildkite/scripts/common.sh"
   
-# Perform cleanup of integration tests resources
-TEST_INTEG_AUTH_ESS_REGION=azure-eastus2 SNAPSHOT=true mage integration:clean
+  # Perform cleanup of integration tests resources
+  TEST_INTEG_AUTH_ESS_REGION=azure-eastus2 SNAPSHOT=true mage integration:clean
 fi
