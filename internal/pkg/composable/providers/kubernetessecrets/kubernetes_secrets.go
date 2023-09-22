@@ -130,7 +130,7 @@ func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
 	secret := corev1.Secret{}
 	if err := reader.Get(context.TODO(), client.ObjectKey{Namespace: ns, Name: secretName}, &secret); err != nil {
 		if k8serrors.IsNotFound(err) {
-			p.logger.Errorf("Secret %s/%s not found: %v", err)
+			p.logger.Errorf("Secret %s/%s not found: %v", ns, secretName, err)
 			return "", false
 		}
 		p.logger.Errorf("Could not retrieve secret from k8s API: %v", err)
