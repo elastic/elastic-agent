@@ -2,6 +2,16 @@
 
 set -eo pipefail
 
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
+  if [[ -z "${WORKSPACE-""}" ]]; then
+      WORKSPACE=$(git rev-parse --show-toplevel)
+  fi
+  source "${WORKSPACE}/.buildkite/scripts/common.sh"
+
+  # Perform cleanup of integration tests resources
+  TEST_INTEG_AUTH_ESS_REGION=azure-eastus2 SNAPSHOT=true mage integration:clean
+fi
+
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
   if test -f "$GOOGLE_APPLICATION_CREDENTIALS"; then
     rm $GOOGLE_APPLICATION_CREDENTIALS
@@ -19,14 +29,4 @@ source .buildkite/scripts/unset-secrets.sh
 if command -v docker &>/dev/null; then
   DOCKER_REGISTRY="docker.elastic.co"
   docker logout $DOCKER_REGISTRY
-fi
-
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
-  if [[ -z "${WORKSPACE-""}" ]]; then
-      WORKSPACE=$(git rev-parse --show-toplevel)
-  fi
-  source "${WORKSPACE}/.buildkite/scripts/common.sh"
-  
-  # Perform cleanup of integration tests resources
-  TEST_INTEG_AUTH_ESS_REGION=azure-eastus2 SNAPSHOT=true mage integration:clean
 fi
