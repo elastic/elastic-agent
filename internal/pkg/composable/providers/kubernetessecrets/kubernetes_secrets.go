@@ -76,11 +76,13 @@ func (p *contextProviderK8sSecrets) getReader(namespace string) (client.Reader, 
 		if err != nil {
 			return nil, err
 		}
-		if err := newReader.Start(p.ctx); err != nil {
-			return nil, err
-		}
 		p.readers[namespace] = newReader
 		reader = newReader
+		go func() {
+			if err := newReader.Start(p.ctx); err != nil {
+				p.logger.Errorf("Could not start K8S client: %v", err)
+			}
+		}()
 	}
 	return reader, nil
 }
