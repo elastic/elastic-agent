@@ -3,7 +3,3 @@ testonly: False
 with-expecter: True
 keeptree: True
 case: underscore
-note: |
-  Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-  // or more contributor license agreements. Licensed under the Elastic License;
-  // you may not use this file except in compliance with the Elastic License.

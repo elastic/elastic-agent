@@ -173,50 +173,60 @@ func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFile
 }
 
 func TestVerify(t *testing.T) {
-	log, _ := logger.New("", false)
-	targetDir, err := ioutil.TempDir(os.TempDir(), "")
-	if err != nil {
-		t.Fatal(err)
+	tt := []struct {
+		Name             string
+		RemotePGPUris    []string
+		UnreachableCount int
+	}{
+		{"default", nil, 0},
+		{"unreachable local path", []string{download.PgpSourceURIPrefix + "https://127.0.0.1:2874/path/does/not/exist"}, 1},
 	}
 
-	timeout := 30 * time.Second
+	for _, tc := range tt {
+		t.Run(tc.Name, func(t *testing.T) {
+			log, obs := logger.NewTesting("TestVerify")
+			targetDir, err := ioutil.TempDir(os.TempDir(), "")
+			require.NoError(t, err)
 
-	config := &artifact.Config{
-		TargetDirectory: targetDir,
-		DropPath:        filepath.Join(targetDir, "drop"),
-		OperatingSystem: "linux",
-		Architecture:    "32",
-		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
-			Timeout: timeout,
-		},
+			timeout := 30 * time.Second
+
+			config := &artifact.Config{
+				TargetDirectory: targetDir,
+				DropPath:        filepath.Join(targetDir, "drop"),
+				OperatingSystem: "linux",
+				Architecture:    "32",
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: timeout,
+				},
+			}
+
+			err = prepareTestCase(beatSpec, version, config)
+			require.NoError(t, err)
+
+			testClient := NewDownloader(config)
+			artifact, err := testClient.Download(context.Background(), beatSpec, version)
+			require.NoError(t, err)
+
+			t.Cleanup(func() {
+				os.Remove(artifact)
+				os.Remove(artifact + ".sha512")
+				os.RemoveAll(config.DropPath)
+			})
+
+			_, err = os.Stat(artifact)
+			require.NoError(t, err)
+
+			testVerifier, err := NewVerifier(log, config, true, nil)
+			require.NoError(t, err)
+
+			err = testVerifier.Verify(beatSpec, version, false, tc.RemotePGPUris...)
+			require.NoError(t, err)
+
+			// log message informing remote PGP was skipped
+			logs := obs.FilterMessageSnippet("Skipped remote PGP located at")
+			require.Equal(t, tc.UnreachableCount, logs.Len())
+		})
 	}
-
-	if err := prepareTestCase(beatSpec, version, config); err != nil {
-		t.Fatal(err)
-	}
-
-	testClient := NewDownloader(config)
-	artifact, err := testClient.Download(context.Background(), beatSpec, version)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = os.Stat(artifact)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testVerifier, err := NewVerifier(log, config, true, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = testVerifier.Verify(beatSpec, version, false)
-	require.NoError(t, err)
-
-	os.Remove(artifact)
-	os.Remove(artifact + ".sha512")
-	os.RemoveAll(config.DropPath)
 }
 
 func prepareTestCase(a artifact.Artifact, version string, cfg *artifact.Config) error {

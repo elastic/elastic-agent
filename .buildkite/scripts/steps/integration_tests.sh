@@ -4,11 +4,12 @@ set -euxo pipefail
 source .buildkite/scripts/common.sh
 
 # PACKAGE
-DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
+AGENT_PACKAGE_VERSION=8.10.2 DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
 
 # Run integration tests
 set +e
-TEST_INTEG_CLEAN_ON_EXIT=true SNAPSHOT=true mage integration:test
+# Use 8.10.2-SNAPSHOT until the first 8.10.3-SNAPSHOT is produced.
+AGENT_VERSION="8.10.2-SNAPSHOT" TEST_INTEG_AUTH_ESS_REGION=azure-eastus2 TEST_INTEG_CLEAN_ON_EXIT=true SNAPSHOT=true mage integration:test
 TESTS_EXIT_STATUS=$?
 set -e
 

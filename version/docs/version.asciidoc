@@ -1,4 +1,4 @@
-:stack-version: 8.10.1
+:stack-version: 8.10.2
 :doc-branch: 8.10
 // FIXME: once elastic.co docs have been switched over to use `main`, remove
 // the `doc-site-branch` line below as well as any references to it in the code.

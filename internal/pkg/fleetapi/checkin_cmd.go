@@ -77,8 +77,9 @@ func (e *CheckinRequest) Validate() error {
 // CheckinResponse is the response send back from the server which contains all the action that
 // need to be executed or proxy to running processes.
 type CheckinResponse struct {
-	AckToken string  `json:"ack_token"`
-	Actions  Actions `json:"actions"`
+	AckToken     string  `json:"ack_token"`
+	Actions      Actions `json:"actions"`
+	FleetWarning string  `json:"-"`
 }
 
 // Validate validates the response send from the server.
@@ -140,6 +141,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 	}
 
 	checkinResponse := &CheckinResponse{}
+	checkinResponse.FleetWarning = resp.Header.Get("Warning")
 	decoder := json.NewDecoder(bytes.NewReader(rs))
 	if err := decoder.Decode(checkinResponse); err != nil {
 		return nil, sendDuration, errors.New(err,
