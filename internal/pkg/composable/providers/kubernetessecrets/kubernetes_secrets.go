@@ -88,6 +88,8 @@ func (p *contextProviderK8sSecrets) getReader(namespace string) (client.Reader, 
 				p.logger.Errorf("Could not start K8S client: %v", err)
 			}
 		}()
+		// Wait for the cache to be initialized.
+		newReader.WaitForCacheSync(p.ctx)
 	}
 	return reader, nil
 }
