@@ -24,10 +24,6 @@ import (
 
 var _ corecomp.FetchContextProvider = (*contextProviderK8sSecrets)(nil)
 
-type k8sReaderProvider interface {
-	getReader(namespace string) (client.Reader, error)
-}
-
 func init() {
 	composable.Providers.MustAddContextProvider("kubernetes_secrets", ContextProviderBuilder)
 }
@@ -38,7 +34,7 @@ type contextProviderK8sSecrets struct {
 
 	clientMx sync.Mutex
 
-	k8sReaderProvider k8sReaderProvider
+	k8sCacheProvider cacheProvider
 
 	// readers holds a set of cached K8S reader per namespace.
 	// We restrict each cache to watch only 1 namespace. Watching all the namespaces would consume a lot of memory
@@ -47,6 +43,28 @@ type contextProviderK8sSecrets struct {
 
 	// ctx is the context used to start the informers. Informers will be stopped once the context is done.
 	ctx context.Context
+}
+
+type cacheProvider interface {
+	new(cfg *Config, namespace string) (cache.Cache, error)
+}
+
+type defaultCacheProvider struct{}
+
+func (dcp defaultCacheProvider) new(cfg *Config, namespace string) (cache.Cache, error) {
+	restConfig, err := kubernetes.BuildConfig(cfg.KubeConfig)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.KubeClientOptions.QPS > 0 {
+		restConfig.QPS = cfg.KubeClientOptions.QPS
+	}
+	if cfg.KubeClientOptions.Burst > 0 {
+		restConfig.Burst = cfg.KubeClientOptions.Burst
+	}
+	return cache.New(restConfig, cache.Options{
+		DefaultNamespaces: map[string]cache.Config{namespace: {}},
+	})
 }
 
 // getReader returns a cached client associated to a given Kubernetes namespace.
@@ -59,20 +77,7 @@ func (p *contextProviderK8sSecrets) getReader(namespace string) (client.Reader, 
 			"Create new cached reader for namespace %s",
 			namespace,
 		)
-		cfg, err := kubernetes.BuildConfig(p.config.KubeConfig)
-		if err != nil {
-			return nil, err
-		}
-		opt := p.config.KubeClientOptions
-		if opt.QPS > 0 {
-			cfg.QPS = opt.QPS
-		}
-		if cfg.Burst > 0 {
-			cfg.Burst = opt.Burst
-		}
-		newReader, err := cache.New(cfg, cache.Options{
-			DefaultNamespaces: map[string]cache.Config{namespace: {}},
-		})
+		newReader, err := p.k8sCacheProvider.new(p.config, namespace)
 		if err != nil {
 			return nil, err
 		}
@@ -97,12 +102,11 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, _ bool) (co
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
 	contextProviderK8sSecrets := &contextProviderK8sSecrets{
-		readers: make(map[string]client.Reader),
-		logger:  logger,
-		config:  &cfg,
+		readers:          make(map[string]client.Reader),
+		k8sCacheProvider: &defaultCacheProvider{},
+		logger:           logger,
+		config:           &cfg,
 	}
-	// Use contextProviderK8sSecrets itself as the default reader provider, can be overridden in unit tests.
-	contextProviderK8sSecrets.k8sReaderProvider = contextProviderK8sSecrets
 	return contextProviderK8sSecrets, nil
 }
 
@@ -121,7 +125,7 @@ func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
 		return "", false
 	}
 	ns := tokens[1]
-	reader, err := p.k8sReaderProvider.getReader(ns)
+	reader, err := p.getReader(ns)
 	if err != nil {
 		p.logger.Errorf("Could not create K8S client: %v", err)
 		return "", false

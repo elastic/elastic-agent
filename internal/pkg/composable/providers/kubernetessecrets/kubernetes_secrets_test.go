@@ -9,9 +9,6 @@ import (
 	"fmt"
 	"testing"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,6 +16,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -41,23 +42,21 @@ func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 	require.True(t, ok, "cannot cast ContextProvider into contextProviderK8sSecrets")
 
 	// Use a fake reader provider that will handle requests for the fake ns
-	fp.k8sReaderProvider = newFakeReaderProvider().WithReader(
-		ns,
-		fake.NewFakeClient(
-			&v1.Secret{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Secret",
-					APIVersion: "apps/v1beta1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "testing_secret",
-					Namespace: ns,
-				},
-				Data: map[string][]byte{
-					"secret_value": []byte(pass),
-				},
+	fp.k8sCacheProvider = newFakeCacheProvider().withSecret(
+		t,
+		&v1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Secret",
+				APIVersion: "apps/v1beta1",
 			},
-		),
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "testing_secret",
+				Namespace: ns,
+			},
+			Data: map[string][]byte{
+				"secret_value": []byte(pass),
+			},
+		},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -84,23 +83,21 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 	fp, _ := p.(*contextProviderK8sSecrets)
 
 	// Use a fake reader provider that will handle requests for the fake ns
-	fp.k8sReaderProvider = newFakeReaderProvider().WithReader(
-		ns,
-		fake.NewFakeClient(
-			&v1.Secret{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Secret",
-					APIVersion: "apps/v1beta1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "testing_secret",
-					Namespace: ns,
-				},
-				Data: map[string][]byte{
-					"secret_value": []byte(pass),
-				},
+	fp.k8sCacheProvider = newFakeCacheProvider().withSecret(
+		t,
+		&v1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Secret",
+				APIVersion: "apps/v1beta1",
 			},
-		),
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "testing_secret",
+				Namespace: ns,
+			},
+			Data: map[string][]byte{
+				"secret_value": []byte(pass),
+			},
+		},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -118,27 +115,49 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 
 // -- Fixtures
 
-type fakeReaderProvider struct {
-	readers map[string]client.Reader
+type fakeCacheProvider struct {
+	readers map[string]fakeCache
 }
 
-var _ k8sReaderProvider = &fakeReaderProvider{}
+var _ cacheProvider = &fakeCacheProvider{}
 
-func newFakeReaderProvider() *fakeReaderProvider {
-	return &fakeReaderProvider{
-		readers: make(map[string]client.Reader),
+func newFakeCacheProvider() *fakeCacheProvider {
+	return &fakeCacheProvider{
+		readers: make(map[string]fakeCache),
 	}
 }
 
-func (f *fakeReaderProvider) WithReader(namespace string, r client.Reader) *fakeReaderProvider {
-	f.readers[namespace] = r
+func (f *fakeCacheProvider) withSecret(t *testing.T, obj client.Object) *fakeCacheProvider {
+	t.Helper()
+	c, exists := f.readers[obj.GetNamespace()]
+	if !exists {
+		c = fakeCache{
+			client: fake.NewFakeClient(),
+		}
+		f.readers[obj.GetNamespace()] = c
+	}
+	if err := c.client.Create(context.TODO(), obj); err != nil {
+		t.Fatalf("Error while adding secret: %v", err)
+	}
 	return f
 }
 
-func (f *fakeReaderProvider) getReader(namespace string) (client.Reader, error) {
-	reader, exists := f.readers[namespace]
+func (f *fakeCacheProvider) new(_ *Config, namespace string) (cache.Cache, error) {
+	fakeCache, exists := f.readers[namespace]
 	if !exists {
-		return nil, fmt.Errorf("no reader for namespace %s", namespace)
+		return nil, fmt.Errorf("no cache for namespace %s", namespace)
 	}
-	return reader, nil
+	return &fakeCache, nil
+}
+
+type fakeCache struct {
+	// We use informertest.FakeInformers as a base cache.Cache implementation.
+	informertest.FakeInformers
+
+	// client is the client that returns objects in that fake cache implementation.
+	client client.Client
+}
+
+func (f fakeCache) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	return f.client.Get(ctx, key, obj, opts...)
 }
