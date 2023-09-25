@@ -32,7 +32,8 @@ type contextProviderK8sSecrets struct {
 	logger *logger.Logger
 	config *Config
 
-	clientMx sync.Mutex
+	clientMx    sync.Mutex
+	initialized sync.WaitGroup
 
 	k8sCacheProvider cacheProvider
 
@@ -69,6 +70,7 @@ func (dcp defaultCacheProvider) new(cfg *Config, namespace string) (cache.Cache,
 
 // getReader returns a cached client associated to a given Kubernetes namespace.
 func (p *contextProviderK8sSecrets) getReader(namespace string) (client.Reader, error) {
+	p.initialized.Wait()
 	p.clientMx.Lock()
 	defer p.clientMx.Unlock()
 	reader, exist := p.readers[namespace]
@@ -109,6 +111,7 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, _ bool) (co
 		logger:           logger,
 		config:           &cfg,
 	}
+	contextProviderK8sSecrets.initialized.Add(1)
 	return contextProviderK8sSecrets, nil
 }
 
@@ -155,6 +158,7 @@ func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
 // Run initializes the k8s secrets context provider.
 func (p *contextProviderK8sSecrets) Run(_ context.Context, comm corecomp.ContextProviderComm) error {
 	p.ctx = comm
+	p.initialized.Done()
 	<-comm.Done()
 	return comm.Err()
 }
