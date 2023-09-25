@@ -73,10 +73,12 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.
 // SetClient reloads URI based on up to date fleet client
 func (u *Upgrader) SetClient(c client.Sender) {
 	if c == nil {
+		u.log.Debug("client nil, resetting Fleet Server URI")
 		u.fleetServerURI = ""
 	}
 
 	u.fleetServerURI = c.URI()
+	u.log.Debugf("Set client changed URI to %s", u.fleetServerURI)
 }
 
 // Reload reloads the artifact configuration for the upgrader.

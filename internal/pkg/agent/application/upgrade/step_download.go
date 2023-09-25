@@ -7,8 +7,8 @@ package upgrade
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -98,18 +98,23 @@ func (u *Upgrader) appendFallbackPGP(targetVersion string, pgpBytes []string) []
 	pgpBytes = append(pgpBytes, fallbackPGP)
 
 	// add a secondary fallback if fleet server is configured
+	u.log.Debugf("Considering fleet server uri for pgp check fallback %q", u.fleetServerURI)
 	if u.fleetServerURI != "" {
 		tpv, err := agtversion.ParseVersion(targetVersion)
 		if err != nil {
 			// best effort log failure
 			u.log.Warnf("failed to parse secondary fallback %q: %v", u.fleetServerURI, err)
 		} else {
-			secondaryPath := path.Join(
+			secondaryPath, err := url.JoinPath(
 				u.fleetServerURI,
 				fmt.Sprintf(fleetUpgradeFallbackPGPFormat, tpv.Major(), tpv.Minor(), tpv.Patch()),
 			)
-			secondaryFallback := download.PgpSourceURIPrefix + secondaryPath
-			pgpBytes = append(pgpBytes, secondaryFallback)
+			if err != nil {
+				u.log.Warnf("failed to compose Fleet Server URI: %v", err)
+			} else {
+				secondaryFallback := download.PgpSourceURIPrefix + secondaryPath
+				pgpBytes = append(pgpBytes, secondaryFallback)
+			}
 		}
 	}
 
