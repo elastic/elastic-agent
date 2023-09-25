@@ -87,7 +87,7 @@ func (p *contextProviderK8sSecrets) getReader(namespace string) (client.Reader, 
 		reader = newReader
 		go func() {
 			if err := newReader.Start(p.ctx); err != nil {
-				p.logger.Errorf("Could not start K8S client: %v", err)
+				p.logger.Errorf("Could not start K8s client reader: %v", err)
 			}
 		}()
 		// Wait for the cache to be initialized.
@@ -141,10 +141,10 @@ func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
 	secret := corev1.Secret{}
 	if err := reader.Get(context.TODO(), client.ObjectKey{Namespace: ns, Name: secretName}, &secret); err != nil {
 		if k8serrors.IsNotFound(err) {
-			p.logger.Errorf("Secret %s/%s not found: %v", ns, secretName, err)
+			p.logger.Debugf("Secret %s/%s not found: %v", ns, secretName, err)
 			return "", false
 		}
-		p.logger.Errorf("Could not retrieve secret from k8s API: %v", err)
+		p.logger.Debugf("Could not retrieve secret from k8s API: %v", err)
 		return "", false
 	}
 	if _, ok := secret.Data[secretVar]; !ok {
