@@ -220,11 +220,28 @@ func (c *Client) Send(
 			c.log.With("error", err).Debugf(msg)
 			continue
 		}
+		c.checkApiVersionHeaders(reqID, resp)
 
 		return resp, nil
 	}
 
 	return nil, fmt.Errorf("all hosts failed: %w", multiErr)
+}
+
+func (c *Client) checkApiVersionHeaders(reqID string, resp *http.Response) {
+	const elasticApiVersionHeaderKey = "Elastic-Api-Version"
+	const warningHeaderKey = "Warning"
+
+	warning := resp.Header.Get(warningHeaderKey)
+	if warning != "" {
+		c.log.With("http.request.id", reqID).Warnf("warning in fleet response: %q", warning)
+	}
+
+	if downgradeVersion := resp.Header.Get(elasticApiVersionHeaderKey); resp.StatusCode == http.StatusBadRequest && downgradeVersion != "" {
+		// fleet server requested a downgrade to a different api version, we should bubble up an error until some kind
+		// of fallback mechanism can instantiate the requested version. This is not yet implemented so we log an error
+		c.log.With("http.request.id", reqID).Errorf("fleet requested a different api version %q but this is currently not implemented: %q", downgradeVersion)
+	}
 }
 
 // URI returns the remote URI.
