@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/spf13/cobra"
 
@@ -64,6 +65,14 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	}
 	defer c.Disconnect()
 
+	isBeingUpgraded, err := isUpgradeInProgress(c)
+	if err != nil {
+		return fmt.Errorf("failed to check if upgrade is already in progress: %w", err)
+	}
+	if isBeingUpgraded {
+		return errors.New("an upgrade is already in progress; please try again later.")
+	}
+
 	skipVerification, _ := cmd.Flags().GetBool(flagSkipVerify)
 	var pgpChecks []string
 	if !skipVerification {
@@ -101,4 +110,13 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	}
 	fmt.Fprintf(streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
 	return nil
+}
+
+func isUpgradeInProgress(c client.Client) (bool, error) {
+	state, err := c.State(context.Background())
+	if err != nil {
+		return false, fmt.Errorf("failed to get agent state: %w", err)
+	}
+
+	return state.State == cproto.State_UPGRADING, nil
 }
