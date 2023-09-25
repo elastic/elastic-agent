@@ -28,27 +28,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
 	}
 
-	// Uninstall current installation
-	//
-	// There is no uninstall token for "install" command.
-	// Uninstall will fail on protected agent.
-	// The protected Agent will need to be uninstalled first before it can be installed.
-	s := pt.StepStart("Uninstalling current Elastic Agent")
-	err = Uninstall(cfgFile, topPath, "", s)
-	if err != nil {
-		s.Failed()
-		return errors.New(
-			err,
-			fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
-			errors.M("directory", filepath.Dir(topPath)))
-	}
-	s.Succeeded()
-=======
-	// We only uninstall currently-installed Agent if --force
-	// is present.
-=======
 	// We only uninstall Agent if it is currently installed.
->>>>>>> df1d9888d (Don't pass force)
 	status, _ := Status(topPath)
 	if status == Installed {
 		// Uninstall current installation
@@ -56,18 +36,17 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 		// There is no uninstall token for "install" command.
 		// Uninstall will fail on protected agent.
 		// The protected Agent will need to be uninstalled first before it can be installed.
-		pt.StepStart("Uninstalling current Elastic Agent")
-		err = Uninstall(cfgFile, topPath, "")
+		s := pt.StepStart("Uninstalling current Elastic Agent")
+		err = Uninstall(cfgFile, topPath, "", s)
 		if err != nil {
-			pt.StepFailed()
+			s.Failed()
 			return errors.New(
 				err,
 				fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
 				errors.M("directory", filepath.Dir(topPath)))
 		}
-		pt.StepSucceeded()
+		s.Succeeded()
 	}
->>>>>>> 369e7d8ba (Only uninstall if --force is present)
 
 	// ensure parent directory exists
 	err = os.MkdirAll(filepath.Dir(topPath), 0755)
