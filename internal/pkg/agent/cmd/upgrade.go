@@ -112,6 +112,8 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	return nil
 }
 
+// TODO: check if Upgrade Watcher is running
+// TODO: move to upgrade package?
 func isUpgradeInProgress(c client.Client) (bool, error) {
 	state, err := c.State(context.Background())
 	if err != nil {
