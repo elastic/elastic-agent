@@ -3,12 +3,30 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
+# Override the agent package version using a string with format <major>.<minor>.<patch>
+# NOTE: use only after version bump when the new version is not yet available, for example:
+# OVERRIDE_AGENT_PACKAGE_VERSION="8.10.3"
+OVERRIDE_AGENT_PACKAGE_VERSION=""
+
+if [[ -n "$OVERRIDE_AGENT_PACKAGE_VERSION" ]]; then
+  OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
+else
+ OVERRIDE_TEST_AGENT_VERSION=""
+fi
 # PACKAGE
+<<<<<<< HEAD
 DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
 
 # Run integration tests
 set +e
 TEST_INTEG_AUTH_ESS_REGION=azure-eastus2 TEST_INTEG_CLEAN_ON_EXIT=true SNAPSHOT=true mage integration:test
+=======
+AGENT_PACKAGE_VERSION="${OVERRIDE_AGENT_PACKAGE_VERSION}" DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
+
+# Run integration tests
+set +e
+AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}" TEST_INTEG_AUTH_ESS_REGION=azure-eastus2 TEST_INTEG_CLEAN_ON_EXIT=true SNAPSHOT=true mage integration:test
+>>>>>>> a7b2514bd1 (Refactor agent version pinning in integration test script (#3469))
 TESTS_EXIT_STATUS=$?
 set -e
 
