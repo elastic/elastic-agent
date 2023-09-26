@@ -1204,7 +1204,7 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	require.Equal(t, "an upgrade is already in progress; please try again later.", err.Error())
 }
 
-func twoMinorsPrevious(t *testing.T, ctx context.Context()) *version.ParsedSemVer {
+func twoMinorsPrevious(t *testing.T, ctx context.Context) *version.ParsedSemVer {
 	t.Helper()
 
 	// Get available versions from Artifacts API
