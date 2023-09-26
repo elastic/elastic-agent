@@ -10,12 +10,13 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/elastic/elastic-agent/pkg/control"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/utils"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -65,7 +66,7 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	}
 	defer c.Disconnect()
 
-	isBeingUpgraded, err := isUpgradeInProgress(c)
+	isBeingUpgraded, err := upgrade.IsInProgress(c, utils.GetWatcherPIDs)
 	if err != nil {
 		return fmt.Errorf("failed to check if upgrade is already in progress: %w", err)
 	}
@@ -110,15 +111,4 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	}
 	fmt.Fprintf(streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
 	return nil
-}
-
-// TODO: check if Upgrade Watcher is running
-// TODO: move to upgrade package?
-func isUpgradeInProgress(c client.Client) (bool, error) {
-	state, err := c.State(context.Background())
-	if err != nil {
-		return false, fmt.Errorf("failed to get agent state: %w", err)
-	}
-
-	return state.State == cproto.State_UPGRADING, nil
 }

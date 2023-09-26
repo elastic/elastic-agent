@@ -11,6 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 
@@ -365,4 +368,22 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		Sync:    true,
 		OnError: onErr,
 	})
+}
+
+func IsInProgress(c client.Client, watcherPIDsFetcher func() ([]int, error)) (bool, error) {
+	state, err := c.State(context.Background())
+	if err != nil {
+		return false, fmt.Errorf("failed to get agent state: %w", err)
+	}
+
+	if state.State == cproto.State_UPGRADING {
+		return true, nil
+	}
+
+	watcherPIDs, err := watcherPIDsFetcher()
+	if err != nil {
+		return false, fmt.Errorf("failed to determine if upgrade watcher is running: %w", err)
+	}
+
+	return len(watcherPIDs) > 0, nil
 }
