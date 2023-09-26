@@ -1,16 +1,20 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package upgradetest
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
-	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-	"github.com/elastic/elastic-agent/pkg/version"
 	"path/filepath"
 	"time"
 
+	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
+	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 // CustomPGP allows for custom PGP options on upgrade.
