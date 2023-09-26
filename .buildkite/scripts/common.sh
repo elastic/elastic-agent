@@ -92,7 +92,7 @@ google_cloud_auth() {
 
     gcloud auth activate-service-account --key-file ${keyFile} 2> /dev/null
 
-    export GOOGLE_APPLICATIONS_CREDENTIALS=${secretFileLocation}
+    export GOOGLE_APPLICATION_CREDENTIALS=${secretFileLocation}
 }
 
 retry() {
