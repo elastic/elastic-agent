@@ -114,7 +114,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 		t.Fatalf("could not get hostname to filter Agent: %s", err)
 	}
 
-	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, hostname)
+	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, policy.ID, hostname)
 	require.NoError(t, err, "could not get Agent ID by hostname")
 	t.Logf("Agent ID: %q", agentID)
 

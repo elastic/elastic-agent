@@ -54,7 +54,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		}
 	}
 
-	u.log.Debugw("Downloading upgrade artifact", "version", version,
+	u.log.Infow("Downloading upgrade artifact", "version", version,
 		"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 		"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 
@@ -84,7 +84,6 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 	if err := verifier.Verify(agentArtifact, parsedVersion.VersionWithPrerelease(), skipDefaultPgp, pgpBytes...); err != nil {
 		return "", errors.New(err, "failed verification of agent binary")
 	}
-
 	return path, nil
 }
 
@@ -141,7 +140,7 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 		return nil, err
 	}
 
-	return composed.NewVerifier(fsVerifier, snapshotVerifier, remoteVerifier), nil
+	return composed.NewVerifier(log, fsVerifier, snapshotVerifier, remoteVerifier), nil
 }
 
 func (u *Upgrader) downloadWithRetries(
@@ -162,7 +161,7 @@ func (u *Upgrader) downloadWithRetries(
 
 	opFn := func() error {
 		attempt++
-		u.log.Debugf("download attempt %d", attempt)
+		u.log.Infof("download attempt %d", attempt)
 
 		downloader, err := downloaderCtor(version, u.log, settings)
 		if err != nil {

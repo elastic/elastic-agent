@@ -2000,11 +2000,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-transpo
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/go-elasticsearch/v8
-Version: v8.8.2
+Version: v8.10.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearch/v8@v8.8.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearch/v8@v8.10.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -2423,11 +2423,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-licenser@v0.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/go-sysinfo
-Version: v1.11.0
+Version: v1.11.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/go-sysinfo@v1.11.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-sysinfo@v1.11.1/LICENSE.txt:
 
 
                                  Apache License
