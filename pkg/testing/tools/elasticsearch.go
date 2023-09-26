@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
@@ -103,6 +104,23 @@ type Version struct {
 	BuildFlavor string `json:"build_flavor"`
 }
 
+// APIKeyRequest contains the needed data to create an API key in Elasticsearch
+type APIKeyRequest struct {
+	Name            string   `json:"name"`
+	Expiration      string   `json:"expiration"`
+	RoleDescriptors mapstr.M `json:"role_descriptors,omitempty"`
+	Metadata        mapstr.M `json:"metadata,omitempty"`
+}
+
+// APIKeyResponse contains the response data for an API request
+type APIKeyResponse struct {
+	Id         string `json:"id"`
+	Name       string `json:"name"`
+	Expiration int    `json:"expiration"`
+	APIKey     string `json:"api_key"`
+	Encoded    string `json:"encoded"`
+}
+
 // GetAllindicies returns a list of indicies on the target ES instance
 func GetAllindicies(client elastictransport.Interface) ([]Index, error) {
 	return GetIndicesWithContext(context.Background(), client, []string{})
@@ -132,6 +150,33 @@ func GetIndicesWithContext(ctx context.Context, client elastictransport.Interfac
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 	return respData, nil
+}
+
+// CreateAPIKey creates an API key with the given request data
+func CreateAPIKey(ctx context.Context, client elastictransport.Interface, req APIKeyRequest) (APIKeyResponse, error) {
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(req)
+	if err != nil {
+		return APIKeyResponse{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	apiReq := esapi.SecurityCreateAPIKeyRequest{Body: &buf}
+	resp, err := apiReq.Do(ctx, client)
+	if err != nil {
+		return APIKeyResponse{}, fmt.Errorf("error creating API key: %w", err)
+	}
+	resultBuf, err := handleResponseRaw(resp)
+	if err != nil {
+		return APIKeyResponse{}, fmt.Errorf("error handling HTTP response: %w", err)
+	}
+
+	parsed := APIKeyResponse{}
+	err = json.Unmarshal(resultBuf, &parsed)
+	if err != nil {
+		return parsed, fmt.Errorf("error unmarshaling json response: %w", err)
+	}
+
+	return parsed, nil
 }
 
 // FindMatchingLogLines returns any logs with message fields that match the given line

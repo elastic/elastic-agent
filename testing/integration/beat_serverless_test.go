@@ -87,8 +87,7 @@ func (runner *BeatRunner) SetupSuite() {
 	beatOutConfig := `
 output.elasticsearch:
   hosts: ["%s"]
-  username: %s
-  password: %s
+  api_key: "%s:%s"
 setup.kibana:
   host: %s
 metricbeat.config.modules:
@@ -121,6 +120,9 @@ processors:
 `
 	}
 
+	apiResp, err := tools.CreateAPIKey(ctx, runner.requirementsInfo.ESClient, tools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
+	require.NoError(runner.T(), err)
+
 	// beats likes to add standard ports to URLs that don't have them, and ESS will sometimes return a URL without a port, assuming :443
 	// so try to fix that here
 	fixedKibanaHost := runner.kibHost
@@ -142,7 +144,7 @@ processors:
 	testUuid, err := uuid.NewV4()
 	require.NoError(runner.T(), err)
 	runner.testUuid = testUuid.String()
-	parsedCfg := fmt.Sprintf(beatOutConfig, fixedESHost, runner.user, runner.pass, fixedKibanaHost, testUuid.String())
+	parsedCfg := fmt.Sprintf(beatOutConfig, fixedESHost, apiResp.Id, apiResp.APIKey, fixedKibanaHost, testUuid.String())
 	err = runner.agentFixture.WriteFileToWorkDir(ctx, parsedCfg, fmt.Sprintf("%s.yml", runner.testbeatName))
 	require.NoError(runner.T(), err)
 }
@@ -287,8 +289,7 @@ func (runner *BeatRunner) TestIndexManagementNoILM() {
 
 // tests beat setup --index-management with ILM explicitly set
 // On serverless, this should fail.
-// Will not pass right now, may need to change
-func (runner *BeatRunner) TestIndexManagementILMEnabledWarning() {
+func (runner *BeatRunner) TestIndexManagementILMEnabledFailure() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	info, err := tools.GetPing(ctx, runner.requirementsInfo.ESClient)
@@ -304,8 +305,8 @@ func (runner *BeatRunner) TestIndexManagementILMEnabledWarning() {
 		"--index-management",
 		"--E=setup.ilm.enabled=true", "--E=setup.ilm.overwrite=true"})
 	runner.T().Logf("got response from management setup: %s", string(resp))
-	require.NoError(runner.T(), err)
-	assert.Contains(runner.T(), string(resp), "not supported")
+	require.Error(runner.T(), err)
+	assert.Contains(runner.T(), string(resp), "error creating")
 }
 
 // tests beat setup ilm-policy
