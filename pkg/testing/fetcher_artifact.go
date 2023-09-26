@@ -68,7 +68,9 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 	}
 	preVersion := version
 	if uri == "" {
-		version = fmt.Sprintf("%s-SNAPSHOT", version)
+		if !strings.HasSuffix(version, "-SNAPSHOT") {
+			version += "-SNAPSHOT"
+		}
 		uri, err = findURI(ctx, f.doer, version)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find snapshot URI for version %s: %w", preVersion, err)

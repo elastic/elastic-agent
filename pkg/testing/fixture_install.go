@@ -141,7 +141,8 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 				"keeping the agent installed will jeopardise other tests")
 		}
 
-		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
+		// don't use current `ctx` as it could be cancelled
+		out, err := f.Uninstall(context.Background(), &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
 		f.setClient(nil)
 		if err != nil &&
 			(errors.Is(err, ErrNotInstalled) ||
