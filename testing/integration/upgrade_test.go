@@ -1146,24 +1146,29 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 // to initiate a second upgrade. The test expects Elastic Agent to not allow
 // the second upgrade.
 func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
-	upgradeToVersion := twoMinorsPrevious(t, ctx)
-
 	define.Require(t, define.Requirements{
 		Local:   false, // requires Agent installation
 		Isolate: false,
 		Sudo:    true, // requires Agent installation
 	})
 
-	upgradeFromVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
+	// For this test we start with a version of Agent that's two minors older
+	// than the current version and upgrade to the current version. Then we attempt
+	// upgrading to the current version again, expecting Elastic Agent to disallow
+	// this second upgrade.
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	upgradeToVersion := twoMinorsPrevious(t, ctx)
+	upgradeFromVersion, err := version.ParseVersion(twoMinorsPrevious(t, ctx))
+	require.NoError(t, err)
+
+	upgradeToVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
 
-	agentFixture, err := define.NewFixture(t, define.Version())
+	agentFixture, err := atesting.NewFixture(t, upgradeFromVersion.String())
 	require.NoError(t, err)
 
 	err = agentFixture.Prepare(ctx)
@@ -1185,7 +1190,7 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 
 	// Upgrade Elastic Agent via commandline
 	toVersion := upgradeToVersion.String()
-	t.Logf("Upgrading Agent to %s", toVersion)
+	t.Logf("Upgrading Agent to %s for the first time", toVersion)
 	var wg sync.WaitGroup
 	go func() {
 		wg.Add(1)
