@@ -1366,12 +1366,12 @@ SOFTWARE
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.3.14
+Dependency : github.com/blakerouse/elastic-agent-libs
+Version: v0.0.0-20230926172220-41d3cf512094
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.3.14/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/blakerouse/elastic-agent-libs@v0.0.0-20230926172220-41d3cf512094/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
