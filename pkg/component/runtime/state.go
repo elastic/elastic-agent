@@ -102,7 +102,10 @@ func newComponentState(comp *component.Component) (s ComponentState) {
 	s.expectedFeaturesIdx = 1
 	s.expectedComponentIdx = 1
 
-	s.syncComponent(comp)
+	// Merge initial component state.
+	s.syncExpected(comp)
+	s.syncUnits(comp)
+
 	return s
 }
 
@@ -131,15 +134,6 @@ func (s *ComponentState) Copy() (c ComponentState) {
 	return c
 }
 
-func (s *ComponentState) syncComponent(comp *component.Component) bool {
-	changed := s.syncExpected(comp)
-	s.syncUnits(comp)
-	if changed {
-		return true
-	}
-	return s.unsettled()
-}
-
 func (s *ComponentState) syncExpected(comp *component.Component) bool {
 	changed := false
 	touched := make(map[ComponentUnitKey]bool)
@@ -151,34 +145,34 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 		}
 
 		touched[key] = true
-		existing, ok := s.expectedUnits[key]
+		expected, ok := s.expectedUnits[key]
 		if ok {
-			if existing.logLevel != unit.LogLevel {
-				existing.logLevel = unit.LogLevel
+			if expected.logLevel != unit.LogLevel {
+				expected.logLevel = unit.LogLevel
 				changed = true
 			}
-			if !gproto.Equal(existing.config, unit.Config) {
-				existing.config = unit.Config
-				existing.configStateIdx++
+			if !gproto.Equal(expected.config, unit.Config) {
+				expected.config = unit.Config
+				expected.configStateIdx++
 				changed = true
 			}
 		} else {
-			existing.state = client.UnitStateHealthy
-			existing.logLevel = unit.LogLevel
-			existing.config = unit.Config
-			existing.configStateIdx = 1
+			expected.state = client.UnitStateHealthy
+			expected.logLevel = unit.LogLevel
+			expected.config = unit.Config
+			expected.configStateIdx = 1
 			changed = true
 		}
 
-		if !errors.Is(existing.err, unit.Err) {
-			existing.err = unit.Err
-			if existing.err != nil {
-				existing.state = client.UnitStateFailed
+		if !errors.Is(expected.err, unit.Err) {
+			expected.err = unit.Err
+			if expected.err != nil {
+				expected.state = client.UnitStateFailed
 			}
 			changed = true
 		}
 
-		s.expectedUnits[key] = existing
+		s.expectedUnits[key] = expected
 	}
 
 	for key, unit := range s.expectedUnits {
@@ -320,27 +314,28 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 	}
 
 	for key, unit := range s.Units {
-		_, ok := touched[key]
-		if !ok {
-			unit.unitState = client.UnitStateStarting
-			unit.unitMessage = ""
-			unit.unitPayload = nil
-			unit.configStateIdx = 0
-			if unit.err != nil {
-				errMsg := unit.err.Error()
-				if unit.State != client.UnitStateFailed || unit.Message != errMsg || diffPayload(unit.Payload, nil) {
-					changed = true
-					unit.State = client.UnitStateFailed
-					unit.Message = errMsg
-					unit.Payload = nil
-				}
-			} else if unit.State != client.UnitStateStarting && unit.State != client.UnitStateStopped {
-				if unit.State != client.UnitStateFailed || unit.Message != missingMsg || diffPayload(unit.Payload, nil) {
-					changed = true
-					unit.State = client.UnitStateFailed
-					unit.Message = missingMsg
-					unit.Payload = nil
-				}
+		// Look for units that weren't in the checkin.
+		if _, ok := touched[key]; ok {
+			continue
+		}
+		unit.unitState = client.UnitStateStarting
+		unit.unitMessage = ""
+		unit.unitPayload = nil
+		unit.configStateIdx = 0
+		if unit.err != nil {
+			errMsg := unit.err.Error()
+			if unit.State != client.UnitStateFailed || unit.Message != errMsg || diffPayload(unit.Payload, nil) {
+				changed = true
+				unit.State = client.UnitStateFailed
+				unit.Message = errMsg
+				unit.Payload = nil
+			}
+		} else if unit.State != client.UnitStateStarting && unit.State != client.UnitStateStopped {
+			if unit.State != client.UnitStateFailed || unit.Message != missingMsg || diffPayload(unit.Payload, nil) {
+				changed = true
+				unit.State = client.UnitStateFailed
+				unit.Message = missingMsg
+				unit.Payload = nil
 			}
 		}
 
