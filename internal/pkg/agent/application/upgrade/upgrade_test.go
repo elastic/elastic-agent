@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client/mocks"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/gofrs/flock"
@@ -140,41 +141,6 @@ func TestShutdownCallback(t *testing.T) {
 	require.Equal(t, content, newContent, "contents are not equal")
 }
 
-type mockClient struct {
-	stateErr string
-	state    cproto.State
-}
-
-func (mc *mockClient) Connect(ctx context.Context) error { return nil }
-func (mc *mockClient) Disconnect()                       {}
-func (mc *mockClient) Version(ctx context.Context) (client.Version, error) {
-	return client.Version{}, nil
-}
-func (mc *mockClient) State(ctx context.Context) (*client.AgentState, error) {
-	if mc.stateErr != "" {
-		return nil, errors.New(mc.stateErr)
-	}
-
-	return &client.AgentState{State: mc.state}, nil
-}
-func (mc *mockClient) StateWatch(ctx context.Context) (client.ClientStateWatch, error) {
-	return nil, nil
-}
-func (mc *mockClient) Restart(ctx context.Context) error { return nil }
-func (mc *mockClient) Upgrade(ctx context.Context, version string, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error) {
-	return "", nil
-}
-func (mc *mockClient) DiagnosticAgent(ctx context.Context, additionalDiags []client.AdditionalMetrics) ([]client.DiagnosticFileResult, error) {
-	return nil, nil
-}
-func (mc *mockClient) DiagnosticUnits(ctx context.Context, units ...client.DiagnosticUnitRequest) ([]client.DiagnosticUnitResult, error) {
-	return nil, nil
-}
-func (mc *mockClient) DiagnosticComponents(ctx context.Context, additionalDiags []client.AdditionalMetrics, components ...client.DiagnosticComponentRequest) ([]client.DiagnosticComponentResult, error) {
-	return nil, nil
-}
-func (mc *mockClient) Configure(ctx context.Context, config string) error { return nil }
-
 func TestIsInProgress(t *testing.T) {
 	tests := map[string]struct {
 		state              cproto.State
@@ -220,8 +186,21 @@ func TestIsInProgress(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mc := mockClient{state: test.state, stateErr: test.stateErr}
-			inProgress, err := IsInProgress(&mc, test.watcherPIDsFetcher)
+			// Expect client.State() call to be made only if no Upgrade Watcher PIDs
+			// are returned (i.e. no Upgrade Watcher is found to be running).
+			mc := mocks.NewClient(t)
+			if test.watcherPIDsFetcher != nil {
+				pids, _ := test.watcherPIDsFetcher()
+				if len(pids) == 0 {
+					if test.stateErr != "" {
+						mc.EXPECT().State(context.Background()).Return(nil, errors.New(test.stateErr)).Once()
+					} else {
+						mc.EXPECT().State(context.Background()).Return(&client.AgentState{State: test.state}, nil).Once()
+					}
+				}
+			}
+
+			inProgress, err := IsInProgress(mc, test.watcherPIDsFetcher)
 			if test.expectedErr != "" {
 				require.Equal(t, test.expectedErr, err.Error())
 			} else {
