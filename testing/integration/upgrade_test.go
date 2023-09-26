@@ -980,26 +980,7 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Get available versions from Artifacts API
-	aac := tools.NewArtifactAPIClient()
-	versionList, err := aac.GetVersions(ctx)
-	require.NoError(t, err)
-	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
-
-	// Determine the version that's TWO versions behind the latest. This is necessary for two reasons:
-	// 1. We don't want to necessarily use the latest version as it might be the same as the
-	// local one, which will then cause the invalid input in the Agent test policy (defined further
-	// below in this test) to come into play with the Agent version we're upgrading from, thus preventing
-	// it from ever becoming healthy.
-	// 2. We don't want to necessarily use the version that's one before the latest because sometimes we
-	// are in a situation where the latest version has been advanced to the next release (e.g. 8.10.0)
-	// but the version before that (e.g. 8.9.0) hasn't been released yet.
-	require.GreaterOrEqual(t, len(versionList.Versions), 3)
-	upgradeToVersionStr := versionList.Versions[len(versionList.Versions)-3]
-
-	upgradeToVersion, err := version.ParseVersion(upgradeToVersionStr)
-	require.NoError(t, err)
-
+	upgradeToVersion := twoMinorsPrevious(t, ctx)
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
 
 	agentFixture, err := define.NewFixture(t, define.Version())
@@ -1158,4 +1139,93 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, fromF, fromVersionParsed.CoreVersion(), false, "")
 	}, 2*time.Minute, 10*time.Second, "Installed Agent never became healthy")
+}
+
+// TestStandaloneUpgradeFailsWhenUpgradeIsInProgress initiates an upgrade for a
+// standalone Elastic Agent and, while that upgrade is still in progress, attempts
+// to initiate a second upgrade. The test expects Elastic Agent to not allow
+// the second upgrade.
+func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
+	upgradeToVersion := twoMinorsPrevious(t, ctx)
+
+	define.Require(t, define.Requirements{
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+	})
+
+	upgradeFromVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	upgradeToVersion := twoMinorsPrevious(t, ctx)
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
+
+	agentFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err, "error preparing agent fixture")
+
+	// Configure Agent with fast watcher configuration.
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	t.Log("Install the built Agent")
+	output, err := tools.InstallStandaloneAgent(agentFixture)
+	t.Log(string(output))
+	require.NoError(t, err)
+
+	c := agentFixture.Client()
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	// Upgrade Elastic Agent via commandline
+	toVersion := upgradeToVersion.String()
+	t.Logf("Upgrading Agent to %s", toVersion)
+	var wg sync.WaitGroup
+	go func() {
+		wg.Add(1)
+
+		err := upgradeAgent(ctx, toVersion, agentFixture, t.Log)
+
+		wg.Done()
+		require.NoError(t, err)
+	}()
+
+	wg.Wait()
+
+	// Attempt to upgrade Elastic Agent again, while upgrade is still in progress
+	t.Logf("Attempting to upgrade Agent again to %s", toVersion)
+	err := upgradeAgent(ctx, toVersion, agentFixture, t.Log)
+	require.Equal(t, "an upgrade is already in progress; please try again later.", err.Error())
+}
+
+func twoMinorsPrevious(t *testing.T, ctx context.Context()) *version.ParsedSemVer {
+	t.Helper()
+
+	// Get available versions from Artifacts API
+	aac := tools.NewArtifactAPIClient()
+	versionList, err := aac.GetVersions(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
+
+	// Determine the version that's TWO versions behind the latest. This is necessary for two reasons:
+	// 1. We don't want to necessarily use the latest version as it might be the same as the
+	// local one, which will then cause the invalid input in the Agent test policy (defined further
+	// below in this test) to come into play with the Agent version we're upgrading from, thus preventing
+	// it from ever becoming healthy.
+	// 2. We don't want to necessarily use the version that's one before the latest because sometimes we
+	// are in a situation where the latest version has been advanced to the next release (e.g. 8.10.0)
+	// but the version before that (e.g. 8.9.0) hasn't been released yet.
+	require.GreaterOrEqual(t, len(versionList.Versions), 3)
+	vStr := versionList.Versions[len(versionList.Versions)-3]
+
+	v, err := version.ParseVersion(vStr)
+	require.NoError(t, err)
+
+	return v
 }
