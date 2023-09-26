@@ -1160,9 +1160,7 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	upgradeFromVersion, err := version.ParseVersion(twoMinorsPrevious(t, ctx))
-	require.NoError(t, err)
-
+	upgradeFromVersion := twoMinorsPrevious(t, ctx)
 	upgradeToVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
@@ -1183,7 +1181,6 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	t.Log(string(output))
 	require.NoError(t, err)
 
-	c := agentFixture.Client()
 	require.Eventually(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
 	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
@@ -1205,7 +1202,7 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 
 	// Attempt to upgrade Elastic Agent again, while upgrade is still in progress
 	t.Logf("Attempting to upgrade Agent again to %s", toVersion)
-	err := upgradeAgent(ctx, toVersion, agentFixture, t.Log)
+	err = upgradeAgent(ctx, toVersion, agentFixture, t.Log)
 	require.Equal(t, "an upgrade is already in progress; please try again later.", err.Error())
 }
 
