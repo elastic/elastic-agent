@@ -456,7 +456,7 @@ func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (A
 	return inspect, err
 }
 
-// ExecVersion executes to version subcommand on the prepared Elastic Agent binary
+// ExecVersion executes the version subcommand on the prepared Elastic Agent binary
 // with '--binary-only'. It returns the parsed YAML output.
 func (f *Fixture) ExecVersion(ctx context.Context, opts ...process.CmdOption) (AgentVersionOutput, error) {
 	out, err := f.Exec(ctx, []string{"version", "--binary-only", "--yaml"}, opts...)

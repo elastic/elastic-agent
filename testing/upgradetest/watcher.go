@@ -24,6 +24,10 @@ agent.upgradetest.watcher:
 
 // ConfigureFastWatcher writes an Elastic Agent configuration that
 // adjusts the watcher to be faster.
+//
+// Note: Not all versions or modes of the Elastic Agent respect this option
+// that is why the `WaitForNoWatcher` should also be used to ensure that the
+// watcher stops or is killed before continuing.
 func ConfigureFastWatcher(ctx context.Context, f *atesting.Fixture) error {
 	return f.Configure(ctx, []byte(FastWatcherCfg))
 }

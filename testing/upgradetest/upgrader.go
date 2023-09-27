@@ -189,10 +189,7 @@ func PerformUpgrade(
 
 	logger.Logf("Upgrading from version %q to version %q", startParsedVersion, endVersionInfo.Binary.String())
 
-	// always pull from local path (as fixture is required)
-	// doesn't mean
 	upgradeCmdArgs := []string{"upgrade", endVersionInfo.Binary.String()}
-
 	if upgradeOpts.sourceURI != "" {
 		// specific ---source-uri
 		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", upgradeOpts.sourceURI)
