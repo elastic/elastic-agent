@@ -63,8 +63,9 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 	}
 
 	var uri string
+	var prevErr error
 	if !f.snapshotOnly {
-		uri, _ = findURI(ctx, f.doer, version)
+		uri, prevErr = findURI(ctx, f.doer, version)
 	}
 	preVersion := version
 	if uri == "" {
@@ -73,7 +74,7 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 		}
 		uri, err = findURI(ctx, f.doer, version)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find snapshot URI for version %s: %w", preVersion, err)
+			return nil, fmt.Errorf("failed to find snapshot URI for version %s: %w (previous error: %s)", preVersion, err, prevErr.Error())
 		}
 	}
 
