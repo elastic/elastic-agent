@@ -70,10 +70,6 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...", define.Version(), endVersionInfo.Binary.String())
 
-	// start fixture gets the agent configured to use a faster watcher
-	err = upgradetest.ConfigureFastWatcher(ctx, startFixture)
-	require.NoError(t, err)
-
 	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture)
 }
 

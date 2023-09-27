@@ -190,18 +190,25 @@ func PerformUpgrade(
 	logger.Logf("Upgrading from version %q to version %q", startParsedVersion, endVersionInfo.Binary.String())
 
 	upgradeCmdArgs := []string{"upgrade", endVersionInfo.Binary.String()}
-	if upgradeOpts.sourceURI != "" {
-		// specific ---source-uri
-		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", upgradeOpts.sourceURI)
-	} else if upgradeOpts.customPgp == nil {
+	if upgradeOpts.customPgp == nil {
 		// unless a custom PGP configuration is provided, upgrade is always using --source-uri
-		srcPkg, err := endFixture.SrcPackage(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get end agent source package path: %w", err)
+		if upgradeOpts.sourceURI != "" {
+			// specific ---source-uri
+			upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", upgradeOpts.sourceURI)
+		} else {
+			// --source-uri from the endFixture
+			srcPkg, err := endFixture.SrcPackage(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get end agent source package path: %w", err)
+			}
+			sourceURI := "file://" + filepath.Dir(srcPkg)
+			upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
 		}
-		sourceURI := "file://" + filepath.Dir(srcPkg)
-		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
 	} else {
+		if upgradeOpts.sourceURI != "" {
+			upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", upgradeOpts.sourceURI)
+		}
+
 		if len(upgradeOpts.customPgp.PGP) > 0 {
 			upgradeCmdArgs = append(upgradeCmdArgs, "--pgp", upgradeOpts.customPgp.PGP)
 		}
