@@ -121,6 +121,27 @@ type APIKeyResponse struct {
 	Encoded    string `json:"encoded"`
 }
 
+// DataStreams represents the response from an ES _data_stream API
+type DataStreams struct {
+	DataStreams []DataStream `json:"data_streams"`
+}
+
+// DataStream represents a data stream template
+type DataStream struct {
+	Name      string              `json:"name"`
+	Indicies  []map[string]string `json:"indicies"`
+	Status    string              `json:"status"`
+	Template  string              `json:"template"`
+	Lifecycle Lifecycle           `json:"lifecycle"`
+	Hidden    bool                `json:"hidden"`
+	System    bool                `json:"system"`
+}
+
+type Lifecycle struct {
+	Enabled       bool   `json:"enabled"`
+	DataRetention string `json:"data_retention"`
+}
+
 // GetAllindicies returns a list of indicies on the target ES instance
 func GetAllindicies(client elastictransport.Interface) ([]Index, error) {
 	return GetIndicesWithContext(context.Background(), client, []string{})
@@ -223,6 +244,27 @@ func GetIndexTemplatesForPattern(ctx context.Context, client elastictransport.In
 	}
 
 	return parsed, nil
+}
+
+func GetDataStreamsForPattern(ctx context.Context, client elastictransport.Interface, namePattern string) (DataStreams, error) {
+	req := esapi.IndicesGetDataStreamRequest{Name: []string{namePattern}, ExpandWildcards: "all,hidden"}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return DataStreams{}, fmt.Errorf("error fetching data streams")
+	}
+
+	raw, err := handleResponseRaw(resp)
+	if err != nil {
+		return DataStreams{}, fmt.Errorf("error handling HTTP response for data stream get: %w", err)
+	}
+
+	data := DataStreams{}
+	err = json.Unmarshal(raw, &data)
+	if err != nil {
+		return DataStreams{}, fmt.Errorf("error unmarshalling datastream: %w", err)
+	}
+
+	return data, nil
 }
 
 // DeleteIndexTemplatesDataStreams deletes any data streams, then associcated index templates.

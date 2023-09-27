@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -153,6 +154,10 @@ processors:
 func (runner *BeatRunner) TestRunAndCheckData() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*4)
 	defer cancel()
+
+	// in case there's already a running template, delete it, forcing the beat to re-install
+	_ = tools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("*%s*", runner.testbeatName))
+
 	err := runner.agentFixture.Run(ctx)
 	require.NoError(runner.T(), err)
 
@@ -287,6 +292,52 @@ func (runner *BeatRunner) TestIndexManagementNoILM() {
 	}
 }
 
+// TestWithCustomLifecyclePolicy uploads a custom DSL policy
+func (runner *BeatRunner) TestWithCustomLifecyclePolicy() {
+	//create a custom policy file
+	dslPolicy := mapstr.M{
+		"data_retention": "1d",
+	}
+
+	lctemp := runner.T().TempDir()
+	raw, err := json.MarshalIndent(dslPolicy, "", " ")
+	require.NoError(runner.T(), err)
+
+	lifecyclePath := filepath.Join(lctemp, "dsl_policy.json")
+
+	err = os.WriteFile(lifecyclePath, raw, 0o744)
+	require.NoError(runner.T(), err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	// pre-delete in case something else missed cleanup
+	_ = tools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+
+	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
+		runner.agentFixture.WorkDir(),
+		"setup",
+		"--index-management",
+		"--E=setup.dsl.enabled=true", fmt.Sprintf("--E=setup.dsl.policy_file=%s", lifecyclePath)})
+	runner.T().Logf("got response from management setup: %s", string(resp))
+	require.NoError(runner.T(), err)
+
+	streams, err := tools.GetDataStreamsForPattern(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+	require.NoError(runner.T(), err)
+
+	foundCustom := false
+	for _, stream := range streams.DataStreams {
+		if stream.Lifecycle.DataRetention == "1d" {
+			foundCustom = true
+			break
+		}
+	}
+	require.True(runner.T(), foundCustom, "did not find our custom lifecycle policy. Found: %#v", streams)
+
+	err = tools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+	require.NoError(runner.T(), err)
+}
+
 // tests beat setup --index-management with ILM explicitly set
 // On serverless, this should fail.
 func (runner *BeatRunner) TestIndexManagementILMEnabledFailure() {
@@ -309,7 +360,54 @@ func (runner *BeatRunner) TestIndexManagementILMEnabledFailure() {
 	assert.Contains(runner.T(), string(resp), "error creating")
 }
 
-// tests beat setup ilm-policy
+// tests setup with both ILM and DSL enabled, should fail
+func (runner *BeatRunner) TestBothLifecyclesEnabled() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
+		runner.agentFixture.WorkDir(),
+		"setup",
+		"--index-management",
+		"--E=setup.ilm.enabled=true", "--E=setup.dsl.enabled=true"})
+	runner.T().Logf("got response from management setup: %s", string(resp))
+	require.Error(runner.T(), err)
+}
+
+// disable all lifecycle management, ensure it's actually disabled
+func (runner *BeatRunner) TestAllLifecyclesDisabled() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	// in case there's already a running template, delete it, forcing the beat to re-install
+	_ = tools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("*%s*", runner.testbeatName))
+
+	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
+		runner.agentFixture.WorkDir(),
+		"setup",
+		"--index-management",
+		"--E=setup.ilm.enabled=false", "--E=setup.dsl.enabled=false"})
+	runner.T().Logf("got response from management setup: %s", string(resp))
+	require.NoError(runner.T(), err)
+
+	// make sure we have data streams, but there's no lifecycles
+	streams, err := tools.GetDataStreamsForPattern(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("*%s*", runner.testbeatName))
+	require.NoError(runner.T(), err)
+
+	require.NotEmpty(runner.T(), streams.DataStreams, "found no datastreams")
+	foundPolicy := false
+	for _, stream := range streams.DataStreams {
+		if stream.Lifecycle.DataRetention != "" {
+			foundPolicy = true
+			break
+		}
+	}
+	require.False(runner.T(), foundPolicy, "Found a lifecycle policy despite disabling lifecycles. Found: %#v", streams)
+
+	err = tools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("*%s*", runner.testbeatName))
+	require.NoError(runner.T(), err)
+}
+
 // the export command doesn't actually make a network connection,
 // so this won't fail
 func (runner *BeatRunner) TestExport() {
@@ -324,7 +422,7 @@ func (runner *BeatRunner) TestExport() {
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
 		runner.agentFixture.WorkDir(),
-		"export", "ilm-policy", "--E=setup.ilm.overwrite=true"})
+		"export", "ilm-policy", "--E=setup.ilm.enabled=true"})
 	runner.T().Logf("got response from export: %s", string(resp))
 	assert.NoError(runner.T(), err)
 	// check to see if we got a valid output
@@ -333,7 +431,23 @@ func (runner *BeatRunner) TestExport() {
 	require.NoError(runner.T(), err)
 
 	require.NotEmpty(runner.T(), policy["policy"])
+}
 
+// tests beat export with DSL
+func (runner *BeatRunner) TestExportDSL() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
+		runner.agentFixture.WorkDir(),
+		"export", "ilm-policy", "--E=setup.dsl.enabled=true"})
+	runner.T().Logf("got response from export: %s", string(resp))
+	assert.NoError(runner.T(), err)
+	// check to see if we got a valid output
+	policy := map[string]interface{}{}
+	err = json.Unmarshal(resp, &policy)
+	require.NoError(runner.T(), err)
+
+	require.NotEmpty(runner.T(), policy["data_retention"])
 }
 
 func (runner *BeatRunner) SubtestExportTemplates() {
