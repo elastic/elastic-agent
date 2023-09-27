@@ -350,7 +350,7 @@ func WaitHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo
 		select {
 		case <-ctx.Done():
 			if lastErr != nil {
-				return fmt.Errorf("failed waiting for healthy agent and version (%s): %w", ctx.Err(), lastErr)
+				return fmt.Errorf("failed waiting for healthy agent and version (%w): %w", ctx.Err(), lastErr)
 			}
 			return ctx.Err()
 		case <-t.C:
