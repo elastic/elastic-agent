@@ -64,8 +64,8 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	require.NoError(t, err)
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err)
-	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
-		t.Skipf("Build under test is the same as the build from the artifacts repository (commit: %s)", startVersionInfo.Binary.Commit)
+	if startVersionInfo.Binary.String() == endVersionInfo.Binary.String() && startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("Build under test is the same as the build from the artifacts repository (version: %s) [commit: %s]", startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
 	}
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...", define.Version(), endVersionInfo.Binary.String())

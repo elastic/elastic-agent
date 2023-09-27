@@ -25,7 +25,7 @@ type CustomPGP struct {
 }
 
 type upgradeOpts struct {
-	sourceURI string
+	sourceURI *string
 
 	skipVerify     bool
 	skipDefaultPgp bool
@@ -45,7 +45,7 @@ type upgradeOpt func(opts *upgradeOpts)
 // in the endFixture variable.
 func WithSourceURI(sourceURI string) upgradeOpt {
 	return func(opts *upgradeOpts) {
-		opts.sourceURI = sourceURI
+		opts.sourceURI = &sourceURI
 	}
 }
 
@@ -190,25 +190,20 @@ func PerformUpgrade(
 	logger.Logf("Upgrading from version %q to version %q", startParsedVersion, endVersionInfo.Binary.String())
 
 	upgradeCmdArgs := []string{"upgrade", endVersionInfo.Binary.String()}
-	if upgradeOpts.customPgp == nil {
-		// unless a custom PGP configuration is provided, upgrade is always using --source-uri
-		if upgradeOpts.sourceURI != "" {
-			// specific ---source-uri
-			upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", upgradeOpts.sourceURI)
-		} else {
-			// --source-uri from the endFixture
-			srcPkg, err := endFixture.SrcPackage(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get end agent source package path: %w", err)
-			}
-			sourceURI := "file://" + filepath.Dir(srcPkg)
-			upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
+	if upgradeOpts.sourceURI == nil {
+		// no --source-uri set so it comes from the endFixture
+		srcPkg, err := endFixture.SrcPackage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get end agent source package path: %w", err)
 		}
-	} else {
-		if upgradeOpts.sourceURI != "" {
-			upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", upgradeOpts.sourceURI)
-		}
+		sourceURI := "file://" + filepath.Dir(srcPkg)
+		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
+	} else if *upgradeOpts.sourceURI != "" {
+		// specific ---source-uri
+		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", *upgradeOpts.sourceURI)
+	}
 
+	if upgradeOpts.customPgp != nil {
 		if len(upgradeOpts.customPgp.PGP) > 0 {
 			upgradeCmdArgs = append(upgradeCmdArgs, "--pgp", upgradeOpts.customPgp.PGP)
 		}
