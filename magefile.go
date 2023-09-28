@@ -1540,31 +1540,6 @@ func (Integration) Single(ctx context.Context, testName string) error {
 	return integRunner(ctx, false, testName)
 }
 
-// Run beat serverless tests
-func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
-	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
-	err := os.Setenv("AGENT_BUILD_DIR", beatBuildPath)
-	if err != nil {
-		return fmt.Errorf("error setting build dir: %s", err)
-	}
-
-	// a bit of bypass logic; run as serverless by default
-	if os.Getenv("STACK_PROVISIONER") == "" {
-		err = os.Setenv("STACK_PROVISIONER", "serverless")
-		if err != nil {
-			return fmt.Errorf("error setting serverless stack var: %w", err)
-		}
-	} else if os.Getenv("STACK_PROVISIONER") == "ess" {
-		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
-	}
-
-	err = os.Setenv("TEST_BINARY_NAME", beatname)
-	if err != nil {
-		return fmt.Errorf("error setting binary name: %w", err)
-	}
-	return integRunner(ctx, false, "TestMetricbeatSeverless")
-}
-
 // PrepareOnRemote shouldn't be called locally (called on remote host to prepare it for testing)
 func (Integration) PrepareOnRemote() {
 	mg.Deps(mage.InstallGoTestTools)
@@ -1789,6 +1764,8 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
 	}
 
+	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
+	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
 	binaryName := os.Getenv("TEST_BINARY_NAME")
 	if binaryName == "" {
 		binaryName = "elastic-agent"
