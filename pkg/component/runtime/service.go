@@ -124,6 +124,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		lastCheckin    time.Time
 		missedCheckins int
 		tearingDown    bool
+		stopping       bool
 		ignoreCheckins bool
 	)
 
@@ -136,6 +137,11 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 	defer cisStop()
 
 	onStop := func(am actionMode) {
+		if stopping {
+			s.log.Debugf("service %s is already stopping: skipping...", s.name())
+			return
+		}
+		stopping = true
 		// Stop check-in timer
 		s.log.Debugf("stop check-in timer for %s service", s.name())
 		checkinTimer.Stop()
