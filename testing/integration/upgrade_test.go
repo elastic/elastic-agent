@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/kibana"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	cmdVersion "github.com/elastic/elastic-agent/internal/pkg/basecmd/version"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
@@ -1092,4 +1093,102 @@ type CustomPGP struct {
 	PGP     string
 	PGPUri  string
 	PGPPath string
+}
+
+// TestStandaloneUpgradeFailsRestart tests the scenario where upgrading to a new version
+// of Agent fails due to the new Agent binary not starting up. It checks that the Agent is
+// rolled back to the previous version.
+func TestStandaloneUpgradeFailsRestart(t *testing.T) {
+	define.Require(t, define.Requirements{
+		// We require sudo for this test to run
+		// `elastic-agent install`.
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	toVersion := define.Version()
+	toVersionParsed, err := version.ParseVersion(toVersion)
+	require.NoError(t, err)
+
+	// For the fromVersion, we go back TWO minors because sometimes we are in a
+	// situation where the current version has been advanced to the next
+	// release (e.g. 8.10.0) but the version before that (e.g. 8.9.0) hasn't been
+	// released yet.
+	fromVersionParsed, err := toVersionParsed.GetPreviousMinor()
+	require.NoError(t, err)
+	fromVersionParsed, err = fromVersionParsed.GetPreviousMinor()
+	require.NoError(t, err)
+
+	// Drop the SNAPSHOT and metadata as we may have stopped publishing snapshots
+	// for versions that are two minors old.
+	fromVersion := fromVersionParsed.CoreVersion()
+
+	t.Logf("Upgrading Elastic Agent from %s to %s", fromVersion, toVersion)
+
+	// Get path to Elastic Agent executable
+	fromF, err := atesting.NewFixture(t, fromVersion)
+	require.NoError(t, err)
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fromF.Prepare(context.Background())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	err = fromF.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	output, err := tools.InstallStandaloneAgent(fromF)
+	t.Logf("Agent installation output: %q", string(output))
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, fromF, fromVersion, false, "")
+	}, 2*time.Minute, 10*time.Second, "Installed Agent never became healthy")
+
+	t.Logf("Attempting upgrade to %s", toVersion)
+	toF, err := define.NewFixture(t, toVersion)
+	require.NoError(t, err)
+
+	packagePath, err := toF.SrcPackage(ctx)
+	require.NoError(t, err)
+
+	upgradeCmdArgs := []string{
+		"upgrade", toVersion,
+		"--source-uri", "file://" + filepath.Dir(packagePath),
+		"--skip-verify",
+	}
+
+	upgradeTriggerOutput, err := fromF.Exec(ctx, upgradeCmdArgs)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s",
+		toVersion, upgradeTriggerOutput)
+
+	// Ensure new (post-upgrade) version is running and Agent is healthy
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, fromF, toVersionParsed.CoreVersion(), toVersionParsed.IsSnapshot(), "")
+	}, 2*time.Minute, 10*time.Second, "Installed Agent never became healthy")
+
+	// A few seconds after the upgrade, deliberately restart upgraded Agent a
+	// couple of times to simulate Agent crashing.
+	for restartIdx := 0; restartIdx < 3; restartIdx++ {
+		time.Sleep(10 * time.Second)
+		topPath := paths.Top()
+
+		t.Logf("Restarting Agent via service to simulate crashing")
+		err = install.RestartService(topPath)
+		require.NoError(t, err)
+	}
+
+	// Ensure that the Upgrade Watcher has stopped running.
+	checkUpgradeWatcherRan(t, fromF, fromVersionParsed)
+
+	// Ensure that the original version of Agent is running again.
+	t.Log("Check Agent version to ensure rollback is successful")
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, fromF, fromVersionParsed.CoreVersion(), false, "")
+	}, 2*time.Minute, 10*time.Second, "Installed Agent never became healthy")
 }
