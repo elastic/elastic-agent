@@ -78,6 +78,7 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 		}
 	}
 
+	version, _ = splitBuildID(version)
 	path := fmt.Sprintf("elastic-agent-%s-%s", version, suffix)
 	downloadSrc := fmt.Sprintf("%s%s", uri, path)
 	return &artifactResult{
@@ -115,6 +116,7 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 }
 
 func findURI(ctx context.Context, doer httpDoer, version string) (string, error) {
+	version, buildID := splitBuildID(version)
 	artifactsURI := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/elastic-agent", version)
 	req, err := http.NewRequestWithContext(ctx, "GET", artifactsURI, nil)
 	if err != nil {
@@ -168,11 +170,33 @@ func findURI(ctx context.Context, doer httpDoer, version string) (string, error)
 		// https://snapshots.elastic.co/8.7.0-d050210c/downloads/elastic-agent-shipper/elastic-agent-shipper-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
 		index := strings.Index(uri, "/beats/elastic-agent/")
 		if index != -1 {
-			return fmt.Sprintf("%s/beats/elastic-agent/", uri[:index]), nil
+			if buildID == "" {
+				// no build id, first is selected
+				return fmt.Sprintf("%s/beats/elastic-agent/", uri[:index]), nil
+			}
+			if strings.Contains(uri, fmt.Sprintf("%s-%s", stripSnapshot(version), buildID)) {
+				return fmt.Sprintf("%s/beats/elastic-agent/", uri[:index]), nil
+			}
 		}
 	}
 
 	return "", fmt.Errorf("uri not detected")
+}
+
+func splitBuildID(version string) (string, string) {
+	split := strings.SplitN(version, "+", 2)
+	if len(split) == 1 {
+		// no build ID
+		return split[0], ""
+	}
+	return split[0], split[1]
+}
+
+func stripSnapshot(version string) string {
+	if strings.HasSuffix(version, "-SNAPSHOT") {
+		return strings.TrimSuffix(version, "-SNAPSHOT")
+	}
+	return version
 }
 
 func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {

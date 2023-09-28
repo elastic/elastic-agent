@@ -39,7 +39,7 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 
 	// Start at old version, we want this test to upgrade to our
 	// build to ensure that the uninstall will kill the watcher.
-	startVersion, err := upgradetest.BackwardTwoMinors(define.Version())
+	startVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
 	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,

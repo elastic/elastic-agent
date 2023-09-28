@@ -32,10 +32,7 @@ var (
 )
 
 // GetUpgradableVersions returns the version that the upgradeToVersion can upgrade from.
-func GetUpgradableVersions(ctx context.Context, upgradeToVersion string) ([]*version.ParsedSemVer, error) {
-	const currentMajorVersions = 2
-	const previousMajorVersions = 1
-
+func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int) ([]*version.ParsedSemVer, error) {
 	aac := tools.NewArtifactAPIClient()
 	vList, err := aac.GetVersions(ctx)
 	if err != nil {
@@ -100,4 +97,18 @@ func GetUpgradableVersions(ctx context.Context, upgradeToVersion string) ([]*ver
 
 	}
 	return upgradableVersions, nil
+}
+
+// PreviousMinor gets the previous minor version of the provided version.
+//
+// This checks with the artifact API to ensure to only return version that have actual builds.
+func PreviousMinor(ctx context.Context, version string) (string, error) {
+	versions, err := GetUpgradableVersions(ctx, version, 1, 0)
+	if err != nil {
+		return "", err
+	}
+	if len(version) == 0 {
+		return "", fmt.Errorf("no previous minor")
+	}
+	return versions[0].String(), nil
 }

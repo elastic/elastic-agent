@@ -43,8 +43,8 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	startFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	// Upgrade to an old build, see `BackwardTwoMinors` for why.
-	upgradeToVersion, err := upgradetest.BackwardTwoMinors(define.Version())
+	// Upgrade to an old build.
+	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
 	require.NoError(t, err)
 	endFixture, err := atesting.NewFixture(
 		t,
@@ -98,8 +98,8 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	startFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	// Upgrade to an old build, see `BackwardTwoMinors` for why.
-	upgradeToVersion, err := upgradetest.BackwardTwoMinors(define.Version())
+	// Upgrade to an old build.
+	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
 	require.NoError(t, err)
 	endFixture, err := atesting.NewFixture(
 		t,

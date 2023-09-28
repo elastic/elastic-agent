@@ -28,7 +28,8 @@ func TestStandaloneUpgrade(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	versionList, err := upgradetest.GetUpgradableVersions(ctx, define.Version())
+	// test 2 current 8.x version and 1 previous 7.x version
+	versionList, err := upgradetest.GetUpgradableVersions(ctx, define.Version(), 2, 1)
 	require.NoError(t, err)
 
 	for _, startVersion := range versionList {

@@ -40,8 +40,8 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get start agent build version info")
 
-	// Upgrade to an old build, see `BackwardTwoMinors` for why.
-	upgradeToVersion, err := upgradetest.BackwardTwoMinors(define.Version())
+	// Upgrade to an old build.
+	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
 	require.NoError(t, err)
 	endFixture, err := atesting.NewFixture(
 		t,
