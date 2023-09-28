@@ -19,7 +19,7 @@ import (
 // The following was agreed upon for upcoming releases
 // 8.10  - default is disabled
 // 8.11+ - default is enabled
-const defaultTamperProtection = false
+const defaultTamperProtection = true
 
 var (
 	current = Flags{
@@ -182,6 +182,8 @@ func Parse(policy any) (*Flags, error) {
 	// Tamper protection flag is optional, fallback on default value if missing
 	if parsedFlags.Agent.Features.TamperProtection != nil {
 		flags.setTamperProtection(parsedFlags.Agent.Features.TamperProtection.Enabled)
+	} else {
+		flags.setTamperProtection(defaultTamperProtection)
 	}
 
 	if err := flags.setSource(parsedFlags); err != nil {
