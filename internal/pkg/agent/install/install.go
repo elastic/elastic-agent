@@ -28,21 +28,25 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
 	}
 
-	// Uninstall current installation
-	//
-	// There is no uninstall token for "install" command.
-	// Uninstall will fail on protected agent.
-	// The protected Agent will need to be uninstalled first before it can be installed.
-	s := pt.StepStart("Uninstalling current Elastic Agent")
-	err = Uninstall(cfgFile, topPath, "", s)
-	if err != nil {
-		s.Failed()
-		return errors.New(
-			err,
-			fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
-			errors.M("directory", filepath.Dir(topPath)))
+	// We only uninstall Agent if it is currently installed.
+	status, _ := Status(topPath)
+	if status == Installed {
+		// Uninstall current installation
+		//
+		// There is no uninstall token for "install" command.
+		// Uninstall will fail on protected agent.
+		// The protected Agent will need to be uninstalled first before it can be installed.
+		s := pt.StepStart("Uninstalling current Elastic Agent")
+		err = Uninstall(cfgFile, topPath, "", s)
+		if err != nil {
+			s.Failed()
+			return errors.New(
+				err,
+				fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
+				errors.M("directory", filepath.Dir(topPath)))
+		}
+		s.Succeeded()
 	}
-	s.Succeeded()
 
 	// ensure parent directory exists
 	err = os.MkdirAll(filepath.Dir(topPath), 0755)
@@ -54,7 +58,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	}
 
 	// copy source into install path
-	s = pt.StepStart("Copying files")
+	s := pt.StepStart("Copying files")
 	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
