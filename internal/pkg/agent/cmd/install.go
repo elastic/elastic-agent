@@ -40,7 +40,7 @@ would like the Agent to operate.
 		},
 	}
 
-	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
+	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current installation and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	addEnrollFlags(cmd)
@@ -83,7 +83,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 	if nonInteractive {
-		fmt.Fprintf(streams.Out, "Installing in non-interactive mode.")
+		fmt.Fprintln(streams.Out, "Installing in non-interactive mode.")
 	}
 
 	if status == install.PackageInstall {
@@ -180,37 +180,53 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	pt := install.NewProgressTracker(streams.Out)
-	pt.Start()
-	defer pt.Stop()
+	s := pt.Start()
+	defer func() {
+		if err != nil {
+			s.Failed()
+		} else {
+			s.Succeeded()
+		}
+	}()
 
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
-		err = install.Install(cfgFile, topPath, pt)
+		err = install.Install(cfgFile, topPath, s)
 		if err != nil {
 			return err
 		}
 
 		defer func() {
 			if err != nil {
-				_ = install.Uninstall(cfgFile, topPath, "")
+				uninstallStep := s.StepStart("Uninstalling")
+				innerErr := install.Uninstall(cfgFile, topPath, "", uninstallStep)
+				if innerErr != nil {
+					uninstallStep.Failed()
+				} else {
+					uninstallStep.Succeeded()
+				}
 			}
 		}()
 
 		if !delayEnroll {
-			pt.StepStart("Starting service")
+			startServiceStep := s.StepStart("Starting service")
 			err = install.StartService(topPath)
 			if err != nil {
-				pt.StepFailed()
+				startServiceStep.Failed()
 				fmt.Fprintf(streams.Out, "Installation failed to start Elastic Agent service.\n")
 				return err
 			}
-			pt.StepSucceeded()
+			startServiceStep.Succeeded()
 
 			defer func() {
 				if err != nil {
-					fmt.Fprint(streams.Out, "Stopping service... ")
-					_ = install.StopService(topPath)
-					pt.StepSucceeded()
+					stoppingServiceStep := s.StepStart("Stopping service")
+					innerErr := install.StopService(topPath)
+					if innerErr != nil {
+						stoppingServiceStep.Failed()
+					} else {
+						stoppingServiceStep.Succeeded()
+					}
 				}
 			}()
 		}
@@ -224,25 +240,20 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
 
-		fmt.Fprint(streams.Out, "Enrolling Elastic Agent with Fleet... ")
+		enrollStep := s.StepStart("Enrolling Elastic Agent with Fleet")
 		err = enrollCmd.Start()
 		if err != nil {
-			pt.StepFailed()
+			enrollStep.Failed()
 			return fmt.Errorf("failed to execute enroll command: %w", err)
 		}
 		err = enrollCmd.Wait()
 		if err != nil {
-			pt.StepFailed()
-			if status != install.PackageInstall {
-				var exitErr *exec.ExitError
-				_ = install.Uninstall(cfgFile, topPath, "")
-				if err != nil && errors.As(err, &exitErr) {
-					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
-				}
-			}
+			enrollStep.Failed()
+			// uninstall doesn't need to be performed here the defer above will
+			// catch the error and perform the uninstall
 			return fmt.Errorf("enroll command failed for unknown reason: %w", err)
 		}
-		pt.StepSucceeded()
+		enrollStep.Succeeded()
 	}
 
 	if err := info.CreateInstallMarker(topPath); err != nil {

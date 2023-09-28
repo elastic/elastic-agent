@@ -6,6 +6,7 @@ package install
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	aerrors "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -27,10 +28,11 @@ import (
 	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath, uninstallToken string) error {
+func Uninstall(cfgFile, topPath, uninstallToken string, pt ProgressTrackerStep) error {
 	// uninstall the current service
 	svc, err := newService(topPath)
 	if err != nil {
@@ -38,53 +40,70 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	}
 	status, _ := svc.Status()
 
+	s := pt.StepStart("Stopping service")
 	if status == service.StatusRunning {
 		err := svc.Stop()
 		if err != nil {
-			return errors.New(
+			s.Failed()
+			return aerrors.New(
 				err,
 				fmt.Sprintf("failed to stop service (%s)", paths.ServiceName),
-				errors.M("service", paths.ServiceName))
+				aerrors.M("service", paths.ServiceName))
 		}
+	}
+	s.Succeeded()
+
+	// kill any running watcher
+	if err := killWatcher(pt); err != nil {
+		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
 	}
 
 	// Uninstall components first
-	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken); err != nil {
+	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken, pt); err != nil {
 		// If service status was running it was stopped to uninstall the components.
 		// If the components uninstall failed start the service again
 		if status == service.StatusRunning {
 			if startErr := svc.Start(); startErr != nil {
-				return errors.New(
+				return aerrors.New(
 					err,
 					fmt.Sprintf("failed to restart service (%s), after failed components uninstall: %v", paths.ServiceName, startErr),
-					errors.M("service", paths.ServiceName))
+					aerrors.M("service", paths.ServiceName))
 			}
 		}
 		return err
 	}
 
 	// Uninstall service only after components were uninstalled successfully
-	_ = svc.Uninstall()
+	s = pt.StepStart("Removing service")
+	err = svc.Uninstall()
+	if err != nil {
+		s.Failed()
+	} else {
+		s.Succeeded()
+	}
 
 	// remove, if present on platform
 	if paths.ShellWrapperPath != "" {
 		err = os.Remove(paths.ShellWrapperPath)
 		if !os.IsNotExist(err) && err != nil {
-			return errors.New(
+			return aerrors.New(
 				err,
 				fmt.Sprintf("failed to remove shell wrapper (%s)", paths.ShellWrapperPath),
-				errors.M("destination", paths.ShellWrapperPath))
+				aerrors.M("destination", paths.ShellWrapperPath))
 		}
 	}
 
 	// remove existing directory
+	s = pt.StepStart("Removing install directory")
 	err = RemovePath(topPath)
 	if err != nil {
-		return errors.New(
+		s.Failed()
+		return aerrors.New(
 			err,
 			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
-			errors.M("directory", paths.Top()))
+			aerrors.M("directory", paths.Top()))
 	}
+	s.Succeeded()
 
 	return nil
 }
@@ -158,7 +177,7 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	return false
 }
 
-func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string) error {
+func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, pt ProgressTrackerStep) error {
 	log, err := logger.NewWithLogpLevel("", logp.ErrorLevel, false)
 	if err != nil {
 		return err
@@ -212,7 +231,7 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 			// This component is not active
 			continue
 		}
-		if err := uninstallServiceComponent(ctx, log, comp, uninstallToken); err != nil {
+		if err := uninstallServiceComponent(ctx, log, comp, uninstallToken, pt); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 			// The decision was made to change the behaviour and leave the Agent installed if Endpoint uninstall fails
 			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
@@ -224,17 +243,24 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 	return nil
 }
 
-func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string) error {
+func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string, pt ProgressTrackerStep) error {
 	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
 	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
 	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
-	return comprt.UninstallService(ctx, log, comp, uninstallToken)
+	s := pt.StepStart(fmt.Sprintf("Uninstalling service component %s", comp.InputType))
+	err := comprt.UninstallService(ctx, log, comp, uninstallToken)
+	if err != nil {
+		s.Failed()
+		return err
+	}
+	s.Succeeded()
+	return nil
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
 	mm, err := cfg.ToMapStr()
 	if err != nil {
-		return nil, errors.New("failed to create a map from config", err)
+		return nil, aerrors.New("failed to create a map from config", err)
 	}
 	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil)
 	if err != nil {
@@ -275,7 +301,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 		}
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
-			return nil, errors.New("inserting rendered inputs failed", err)
+			return nil, aerrors.New("inserting rendered inputs failed", err)
 		}
 	}
 
@@ -285,4 +311,61 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	}
 
 	return config.NewConfigFrom(finalConfig)
+}
+
+// killWatcher finds and kills any running Elastic Agent watcher.
+func killWatcher(pt ProgressTrackerStep) error {
+	var s ProgressTrackerStep
+	for {
+		// finding and killing watchers is performed in a loop until no
+		// more watchers are existing, this ensures that during uninstall
+		// that no matter what the watchers are dead before going any further
+		pids, err := utils.GetWatcherPIDs()
+		if err != nil {
+			if s != nil {
+				s.Failed()
+			}
+			return err
+		}
+		if len(pids) == 0 {
+			if s != nil {
+				s.Succeeded()
+			} else {
+				// step was never started so no watcher was found on first loop
+				s = pt.StepStart("Stopping upgrade watcher; none found")
+				s.Succeeded()
+			}
+			return nil
+		}
+
+		if s == nil {
+			var pidsStr []string
+			for _, pid := range pids {
+				pidsStr = append(pidsStr, fmt.Sprintf("%d", pid))
+			}
+			s = pt.StepStart(fmt.Sprintf("Stopping upgrade watcher (%s)", strings.Join(pidsStr, ", ")))
+		}
+
+		var errs error
+		for _, pid := range pids {
+			proc, err := os.FindProcess(pid)
+			if err != nil {
+				errs = errors.Join(errs, fmt.Errorf("failed to load watcher process with pid %d: %w", pid, err))
+				continue
+			}
+			err = proc.Kill()
+			if err != nil && !errors.Is(err, os.ErrProcessDone) {
+				errs = errors.Join(errs, fmt.Errorf("failed to kill watcher process with pid %d: %w", pid, err))
+				continue
+			}
+		}
+		if errs != nil {
+			if s != nil {
+				s.Failed()
+			}
+			return errs
+		}
+		// wait 1 second before performing the loop again
+		<-time.After(1 * time.Second)
+	}
 }
