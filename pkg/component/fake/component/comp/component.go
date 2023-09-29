@@ -29,6 +29,7 @@ import (
 const (
 	Fake        = "fake"
 	fakeShipper = "fake-shipper"
+	APM         = "fake-apm"
 
 	configuringMsg = "Configuring"
 	stoppingMsg    = "Stopping"
@@ -288,8 +289,8 @@ type fakeInput struct {
 	state    client.UnitState
 	stateMsg string
 
-	features *proto.Features
-
+	features        *proto.Features
+	apmConfig       *proto.APMConfig
 	canceller       context.CancelFunc
 	killerCanceller context.CancelFunc
 }
@@ -302,12 +303,13 @@ func newFakeInput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *
 	}
 
 	i := &fakeInput{
-		logger:   logger,
-		manager:  manager,
-		unit:     unit,
-		cfg:      cfg,
-		state:    state,
-		stateMsg: msg,
+		logger:    logger,
+		manager:   manager,
+		unit:      unit,
+		cfg:       cfg,
+		state:     state,
+		stateMsg:  msg,
+		apmConfig: unit.Expected().APMConfig,
 	}
 
 	logger.Trace().Msg("registering set_state action for unit")
@@ -318,6 +320,8 @@ func newFakeInput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *
 	unit.RegisterAction(&killAction{i.logger})
 	logger.Trace().Msg("registering " + ActionRetrieveFeatures + " action for unit")
 	unit.RegisterAction(&retrieveFeaturesAction{i})
+	logger.Trace().Msg("registering " + ActionRetrieveAPMConfig + " action for unit")
+	unit.RegisterAction(&retrieveAPMConfigAction{i})
 
 	logger.Debug().
 		Str("state", i.state.String()).
@@ -409,6 +413,13 @@ func (f *fakeInput) Update(u *client.Unit, triggers client.Trigger) error {
 			Source: nil,
 			Fqdn:   &proto.FQDNFeature{Enabled: expected.Features.Fqdn.Enabled},
 		}
+	}
+
+	if triggers&client.TriggeredAPMChange == client.TriggeredAPMChange {
+		f.logger.Info().
+			Interface("apmConfig", expected.APMConfig).
+			Msg("updating apm configuration")
+		f.apmConfig = expected.APMConfig
 	}
 
 	return nil

@@ -68,29 +68,33 @@ func run() error {
 		case <-ctx.Done():
 			return nil
 		case change := <-c.UnitChanges():
-			if change.Unit != nil {
-				u := change.Unit
-				state, _, _ := u.State()
-				logger.Info().
-					Str("state", state.String()).
-					Str("expectedState", u.Expected().State.String()).
-					Msg("unit change received")
-			} else {
-				logger.Info().Msg("unit change received, but no unit on it")
-			}
-
-			switch change.Type {
-			case client.UnitChangedAdded:
-				s.Added(change.Unit)
-			case client.UnitChangedModified:
-				s.Modified(change)
-			case client.UnitChangedRemoved:
-				s.Removed(change.Unit)
-			}
+			handleChange(logger, s, change)
 		case err := <-c.Errors():
 			if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
 				fmt.Fprintf(os.Stderr, "GRPC client error: %+v\n", err)
 			}
 		}
+	}
+}
+
+func handleChange(logger zerolog.Logger, s *comp.StateManager, change client.UnitChanged) {
+	if change.Unit != nil {
+		u := change.Unit
+		state, _, _ := u.State()
+		logger.Info().
+			Str("state", state.String()).
+			Str("expectedState", u.Expected().State.String()).
+			Msg("unit change received")
+	} else {
+		logger.Info().Msg("unit change received, but no unit on it")
+	}
+
+	switch change.Type {
+	case client.UnitChangedAdded:
+		s.Added(change.Unit)
+	case client.UnitChangedModified:
+		s.Modified(change)
+	case client.UnitChangedRemoved:
+		s.Removed(change.Unit)
 	}
 }

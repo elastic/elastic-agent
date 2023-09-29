@@ -203,7 +203,8 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 				sendExpected = true
 			}
 			if sendExpected {
-				comm.CheckinExpected(c.state.toCheckinExpected(), checkin)
+				checkinExpected := c.state.toCheckinExpected()
+				comm.CheckinExpected(checkinExpected, checkin)
 			}
 			if changed {
 				c.sendObserved()
