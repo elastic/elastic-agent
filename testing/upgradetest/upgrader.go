@@ -247,6 +247,13 @@ func PerformUpgrade(
 	// wait for the agent to be healthy and correct version
 	err = WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, logger)
 	if err != nil {
+		// agent never got healthy, but we need to ensure the watcher is stopped before continuing
+		// this kills the watcher instantly and waits for it to be gone before continuing
+		watcherErr := WaitForNoWatcher(ctx, 1*time.Minute, time.Second, 100*time.Millisecond)
+		if watcherErr != nil {
+			logger.Logf("failed to kill watcher due to agent not becoming healthy: %s", watcherErr)
+		}
+
 		// error context added by WaitHealthyAndVersion
 		return err
 	}

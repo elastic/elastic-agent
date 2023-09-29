@@ -44,14 +44,19 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	require.NoError(t, err)
 
 	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
+	// 2 builds are required to be available for the test to work. This is because
+	// if we upgrade to the latest build there would be no difference then passing the version
+	// string without the buildid, being agent would pick that build anyway.
+	// We pick the build that is 2 builds back to upgrade to, to ensure that the buildid is
+	// working correctly and agent is not only picking the latest build.
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
 	require.NoError(t, err)
-	if len(builds.Builds) == 0 {
-		t.Skipf("no SNAPSHOT's exists for version %s", latestSnapshotVersion.VersionWithPrerelease())
+	if len(builds.Builds) < 2 {
+		t.Skipf("not enough SNAPSHOT builds exist for version %s. Found %d", latestSnapshotVersion.VersionWithPrerelease(), len(builds.Builds))
 	}
 
 	// find the specific build to use for the test
-	upgradeVersionString := builds.Builds[0]
+	upgradeVersionString := builds.Builds[1]
 	buildFragments := strings.Split(upgradeVersionString, "-")
 	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
 	endParsedVersion := version.NewParsedSemVer(

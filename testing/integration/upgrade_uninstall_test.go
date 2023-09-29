@@ -70,6 +70,14 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 
 	// wait for the agent to be healthy and at the new version
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 10*time.Minute, 10*time.Second, t)
+	if err != nil {
+		// agent never got healthy, but we need to ensure the watcher is stopped before continuing
+		// this kills the watcher instantly and waits for it to be gone before continuing
+		watcherErr := upgradetest.WaitForNoWatcher(ctx, 1*time.Minute, time.Second, 100*time.Millisecond)
+		if watcherErr != nil {
+			t.Logf("failed to kill watcher due to agent not becoming healthy: %s", watcherErr)
+		}
+	}
 	require.NoError(t, err)
 
 	// call uninstall now, do not wait for the watcher to finish running
