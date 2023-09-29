@@ -13,9 +13,11 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install/pkgmgr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
@@ -139,6 +141,12 @@ func getStringValue(m map[string]interface{}, key string) (string, error) {
 	}
 
 	return s, nil
+}
+
+type ElasticAPM config.APMConfig
+
+type APMConfig struct {
+	Elastic *ElasticAPM `yaml:"elastic"`
 }
 
 // Component is a set of units that needs to run.

@@ -26,6 +26,7 @@ import (
 	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent-system-metrics/report"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
