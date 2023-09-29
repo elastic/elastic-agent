@@ -475,55 +475,11 @@ func testStandaloneUpgrade(
 	t.Logf("Agent installation output: %q", string(output))
 	require.NoError(t, err)
 
-	c := f.Client()
-
-	err = c.Connect(ctx)
-	require.NoError(t, err, "error connecting client to agent")
-	defer c.Disconnect()
-
 	require.Eventually(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, f, parsedFromVersion.CoreVersion(), parsedFromVersion.IsSnapshot(), "")
 	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 
-	t.Logf("Upgrading from version %q to version %q", parsedFromVersion, parsedUpgradeVersion)
-
-	upgradeCmdArgs := []string{"upgrade", parsedUpgradeVersion.String()}
-
-	useLocalPackage := allowLocalPackage && version_8_7_0.Less(*parsedFromVersion)
-	if useLocalPackage {
-		// if we are upgrading from a version > 8.7.0 (min version to skip signature verification) we pass :
-		// - a file:// sourceURI pointing the agent package under test
-		// - flag --skip-verify to bypass pgp signature verification (we don't produce signatures for PR/main builds)
-		tof, err := define.NewFixture(t, parsedUpgradeVersion.String())
-		require.NoError(t, err)
-
-		srcPkg, err := tof.SrcPackage(ctx)
-		require.NoError(t, err)
-		sourceURI := "file://" + filepath.Dir(srcPkg)
-		t.Logf("setting sourceURI to : %q", sourceURI)
-		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
-	}
-	if useLocalPackage || skipVerify {
-		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-verify")
-	}
-
-	if skipDefaultPgp {
-		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-default-pgp")
-	}
-
-	if len(customPgp.PGP) > 0 {
-		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp", customPgp.PGP)
-	}
-
-	if len(customPgp.PGPUri) > 0 {
-		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp-uri", customPgp.PGPUri)
-	}
-
-	if len(customPgp.PGPPath) > 0 {
-		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp-path", customPgp.PGPPath)
-	}
-
-	upgradeTriggerOutput, err := f.Exec(ctx, upgradeCmdArgs)
+	upgradeTriggerOutput, err := upgradeAgent(ctx, t, f, parsedFromVersion, parsedUpgradeVersion, allowLocalPackage, skipVerify, skipDefaultPgp, customPgp)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s",
 		parsedUpgradeVersion, upgradeTriggerOutput)
 
@@ -534,6 +490,12 @@ func testStandaloneUpgrade(
 	checkUpgradeWatcherRan(t, f, parsedFromVersion)
 
 	if expectedAgentHashAfterUpgrade != "" {
+		c := f.Client()
+
+		err = c.Connect(ctx)
+		require.NoError(t, err, "error connecting client to agent")
+		defer c.Disconnect()
+
 		aVersion, err := c.Version(ctx)
 		assert.NoError(t, err, "error checking version after upgrade")
 		assert.Equal(t, expectedAgentHashAfterUpgrade, aVersion.Commit, "agent commit hash changed after upgrade")
@@ -690,10 +652,9 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	// We go back TWO minors because sometimes we are in a situation where
 	// the current version has been advanced to the next release (e.g. 8.10.0)
 	// but the version before that (e.g. 8.9.0) hasn't been released yet.
-	previousVersion, err := upgradeFromVersion.GetPreviousMinor()
-	require.NoError(t, err)
-	previousVersion, err = previousVersion.GetPreviousMinor()
-	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	previousVersion := twoMinorsPrevious(t, ctx)
 
 	// For testing the upgrade we actually perform a downgrade
 	upgradeToVersion := previousVersion
@@ -702,9 +663,6 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	err = agentFixture.Prepare(ctx)
 	require.NoError(t, err, "error preparing agent fixture")
@@ -760,7 +718,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	go func() {
 		wg.Add(1)
 
-		err := upgradeAgent(ctx, toVersion, agentFixture, t.Log)
+		_, err := upgradeAgent(ctx, t, agentFixture, upgradeFromVersion, upgradeToVersion, false, false, false, CustomPGP{})
 
 		wg.Done()
 		require.NoError(t, err)
@@ -835,15 +793,63 @@ func restoreEtcHosts() error {
 	return cmd.Run()
 }
 
-func upgradeAgent(ctx context.Context, version string, agentFixture *atesting.Fixture, log func(args ...any)) error {
-	args := []string{"upgrade", version}
-	output, err := agentFixture.Exec(ctx, args)
-	if err != nil {
-		log("Upgrade command output after error: ", string(output))
-		return err
+func upgradeAgent(
+	ctx context.Context,
+	t *testing.T,
+	agentFixture *atesting.Fixture,
+	parsedFromVersion *version.ParsedSemVer,
+	parsedToVersion *version.ParsedSemVer,
+	allowLocalPackage bool,
+	skipVerify bool,
+	skipDefaultPgp bool,
+	customPgp CustomPGP,
+) ([]byte, error) {
+	t.Helper()
+
+	c := agentFixture.Client()
+
+	err := c.Connect(ctx)
+	require.NoError(t, err, "error connecting client to agent")
+	defer c.Disconnect()
+
+	t.Logf("Upgrading from version %q to version %q", parsedFromVersion, parsedToVersion)
+	upgradeCmdArgs := []string{"upgrade", parsedToVersion.String()}
+
+	useLocalPackage := allowLocalPackage && version_8_7_0.Less(*parsedFromVersion)
+	if useLocalPackage {
+		// if we are upgrading from a version > 8.7.0 (min version to skip signature verification) we pass :
+		// - a file:// sourceURI pointing the agent package under test
+		// - flag --skip-verify to bypass pgp signature verification (we don't produce signatures for PR/main builds)
+		tof, err := define.NewFixture(t, parsedToVersion.String())
+		require.NoError(t, err)
+
+		srcPkg, err := tof.SrcPackage(ctx)
+		require.NoError(t, err)
+		sourceURI := "file://" + filepath.Dir(srcPkg)
+		t.Logf("setting sourceURI to : %q", sourceURI)
+		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
+	}
+	if useLocalPackage || skipVerify {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-verify")
 	}
 
-	return nil
+	if skipDefaultPgp {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-default-pgp")
+	}
+
+	if len(customPgp.PGP) > 0 {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp", customPgp.PGP)
+	}
+
+	if len(customPgp.PGPUri) > 0 {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp-uri", customPgp.PGPUri)
+	}
+
+	if len(customPgp.PGPPath) > 0 {
+		upgradeCmdArgs = append(upgradeCmdArgs, "--pgp-path", customPgp.PGPPath)
+	}
+
+	return agentFixture.Exec(ctx, upgradeCmdArgs)
 }
 
 func TestUpgradeBrokenPackageVersion(t *testing.T) {
@@ -980,26 +986,7 @@ func TestStandaloneUpgradeFailsStatus(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Get available versions from Artifacts API
-	aac := tools.NewArtifactAPIClient()
-	versionList, err := aac.GetVersions(ctx)
-	require.NoError(t, err)
-	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
-
-	// Determine the version that's TWO versions behind the latest. This is necessary for two reasons:
-	// 1. We don't want to necessarily use the latest version as it might be the same as the
-	// local one, which will then cause the invalid input in the Agent test policy (defined further
-	// below in this test) to come into play with the Agent version we're upgrading from, thus preventing
-	// it from ever becoming healthy.
-	// 2. We don't want to necessarily use the version that's one before the latest because sometimes we
-	// are in a situation where the latest version has been advanced to the next release (e.g. 8.10.0)
-	// but the version before that (e.g. 8.9.0) hasn't been released yet.
-	require.GreaterOrEqual(t, len(versionList.Versions), 3)
-	upgradeToVersionStr := versionList.Versions[len(versionList.Versions)-3]
-
-	upgradeToVersion, err := version.ParseVersion(upgradeToVersionStr)
-	require.NoError(t, err)
-
+	upgradeToVersion := twoMinorsPrevious(t, ctx)
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
 
 	agentFixture, err := define.NewFixture(t, define.Version())
@@ -1158,4 +1145,96 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, fromF, fromVersionParsed.CoreVersion(), false, "")
 	}, 2*time.Minute, 10*time.Second, "Installed Agent never became healthy")
+}
+
+// TestStandaloneUpgradeFailsWhenUpgradeIsInProgress initiates an upgrade for a
+// standalone Elastic Agent and, while that upgrade is still in progress, attempts
+// to initiate a second upgrade. The test expects Elastic Agent to not allow
+// the second upgrade.
+func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+	})
+
+	// For this test we start with a version of Agent that's two minors older
+	// than the current version and upgrade to the current version. Then we attempt
+	// upgrading to the current version again, expecting Elastic Agent to disallow
+	// this second upgrade.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	upgradeFromVersion := twoMinorsPrevious(t, ctx)
+
+	upgradeToVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
+
+	agentFixture, err := atesting.NewFixture(t, upgradeFromVersion.String())
+	require.NoError(t, err)
+
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err, "error preparing agent fixture")
+
+	// Configure Agent with fast watcher configuration.
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	t.Log("Install the built Agent")
+	output, err := tools.InstallStandaloneAgent(agentFixture)
+	t.Log(string(output))
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, agentFixture, upgradeFromVersion.CoreVersion(), upgradeFromVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	// Upgrade Elastic Agent via commandline
+	toVersion := upgradeToVersion.String()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		t.Logf("Upgrading Agent to %s for the first time", toVersion)
+		_, err := upgradeAgent(ctx, t, agentFixture, upgradeFromVersion, upgradeToVersion, true, true, false, CustomPGP{})
+		require.NoError(t, err)
+	}()
+
+	wg.Wait()
+
+	// Attempt to upgrade Elastic Agent again, while upgrade is still in progress. The
+	// Upgrade Watcher from the previous upgrade attempt should still be running at this
+	// point, so Elastic Agent should prevent this second upgrade attempt.
+	t.Logf("Attempting to upgrade Agent again to %s", toVersion)
+	output, err = upgradeAgent(ctx, t, agentFixture, upgradeToVersion, upgradeToVersion, true, true, false, CustomPGP{})
+	require.NotNil(t, err)
+	require.Contains(t, string(output), "an upgrade is already in progress; please try again later.")
+}
+
+func twoMinorsPrevious(t *testing.T, ctx context.Context) *version.ParsedSemVer {
+	t.Helper()
+
+	// Get available versions from Artifacts API
+	aac := tools.NewArtifactAPIClient()
+	versionList, err := aac.GetVersions(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
+
+	// Determine the version that's TWO versions behind the latest. This is necessary for two reasons:
+	// 1. We don't want to necessarily use the latest version as it might be the same as the
+	// local one, which will then cause the invalid input in the Agent test policy (defined further
+	// below in this test) to come into play with the Agent version we're upgrading from, thus preventing
+	// it from ever becoming healthy.
+	// 2. We don't want to necessarily use the version that's one before the latest because sometimes we
+	// are in a situation where the latest version has been advanced to the next release (e.g. 8.10.0)
+	// but the version before that (e.g. 8.9.0) hasn't been released yet.
+	require.GreaterOrEqual(t, len(versionList.Versions), 3)
+	vStr := versionList.Versions[len(versionList.Versions)-3]
+
+	v, err := version.ParseVersion(vStr)
+	require.NoError(t, err)
+
+	return v
 }
