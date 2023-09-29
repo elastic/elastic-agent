@@ -1747,10 +1747,10 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
 	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
 	if stackProvisionerMode == "" {
-		stackProvisionerMode = "ess"
+		stackProvisionerMode = "stateful"
 	}
-	if stackProvisionerMode != "ess" && stackProvisionerMode != "serverless" {
-		return nil, errors.New("STACK_PROVISIONER environment variable must be one of 'serverless' or 'ess'")
+	if stackProvisionerMode != "stateful" && stackProvisionerMode != "serverless" {
+		return nil, errors.New("STACK_PROVISIONER environment variable must be one of 'serverless' or 'stateful'")
 	}
 	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
@@ -1823,7 +1823,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Region:     essRegion,
 	}
 	var stackProvisioner runner.StackProvisioner
-	if stackProvisionerMode == "ess" {
+	if stackProvisionerMode == "stateful" {
 		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err
