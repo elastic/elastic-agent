@@ -180,7 +180,10 @@ func findURI(ctx context.Context, doer httpDoer, version string) (string, error)
 		}
 	}
 
-	return "", fmt.Errorf("uri not detected")
+	if buildID == "" {
+		return "", fmt.Errorf("uri not detected")
+	}
+	return "", fmt.Errorf("uri not detected with specific buildid %s", buildID)
 }
 
 func splitBuildID(version string) (string, string) {
