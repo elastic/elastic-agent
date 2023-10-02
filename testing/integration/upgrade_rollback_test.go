@@ -93,7 +93,8 @@ inputs:
 	// wait for the agent to be healthy and back at the start version
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 10*time.Minute, 10*time.Second, t)
 	if err != nil {
-		// agent never got healthy, but we need to ensure the watcher is stopped before continuing
+		// agent never got healthy, but we need to ensure the watcher is stopped before continuing (this
+		// prevents this test failure from interfering with another test)
 		// this kills the watcher instantly and waits for it to be gone before continuing
 		watcherErr := upgradetest.WaitForNoWatcher(ctx, 1*time.Minute, time.Second, 100*time.Millisecond)
 		if watcherErr != nil {

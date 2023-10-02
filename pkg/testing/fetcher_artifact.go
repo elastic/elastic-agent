@@ -68,6 +68,7 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 		uri, prevErr = findURI(ctx, f.doer, version)
 	}
 	preVersion := version
+	version, _ = splitBuildID(version)
 	if uri == "" {
 		if !strings.HasSuffix(version, "-SNAPSHOT") {
 			version += "-SNAPSHOT"
@@ -78,7 +79,6 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 		}
 	}
 
-	version, _ = splitBuildID(version)
 	path := fmt.Sprintf("elastic-agent-%s-%s", version, suffix)
 	downloadSrc := fmt.Sprintf("%s%s", uri, path)
 	return &artifactResult{
