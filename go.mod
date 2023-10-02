@@ -41,7 +41,7 @@ require (
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/oklog/ulid v1.3.1
-	github.com/otiai10/copy v1.11.0
+	github.com/otiai10/copy v1.14.0
 	github.com/pierrre/gotestcover v0.0.0-20160517101806-924dca7d15f0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.27.0
@@ -179,8 +179,6 @@ replace (
 	github.com/fsnotify/fsnotify => github.com/adriansr/fsnotify v1.4.8-0.20211018144411-a81f2b630e7c
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
-
-replace github.com/otiai10/copy => github.com/otiai10/copy v0.0.0-20230907065344-4118a68e2521 // until https://github.com/otiai10/copy/pull/123 is merged
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
