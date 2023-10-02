@@ -26,7 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -74,7 +74,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.
 }
 
 // SetClient reloads URI based on up to date fleet client
-func (u *Upgrader) SetClient(c client.Sender) {
+func (u *Upgrader) SetClient(c fleetclient.Sender) {
 	if c == nil {
 		u.log.Debug("client nil, resetting Fleet Server URI")
 		u.fleetServerURI = ""
