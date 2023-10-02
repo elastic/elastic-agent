@@ -10,6 +10,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -168,6 +170,13 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 
 		t.Logf("Restarting Agent via service to simulate crashing")
 		err = install.RestartService(topPath)
+		if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
+			// Due to the quick restarts every 10 seconds its possible that this is faster than Windows
+			// can handle. Decrementing restartIdx means that the loop will occur again.
+			t.Logf("Got an allowed error on Windows: %s", err)
+			restartIdx--
+			continue
+		}
 		require.NoError(t, err)
 	}
 
