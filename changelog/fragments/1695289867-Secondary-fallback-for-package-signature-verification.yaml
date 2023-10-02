@@ -15,7 +15,7 @@ summary: Secondary fallback for package signature verification
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: Ability to upgrade securely in Air gapped environment where fleet server is only reachable URI.
+description: Ability to upgrade securely in Air gapped environment where fleet server is the only reachable URI.
 
 # Affected component; a word indicating the component this changeset affects.
 component: elastic-agent
