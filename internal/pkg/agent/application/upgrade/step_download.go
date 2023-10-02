@@ -103,7 +103,7 @@ func (u *Upgrader) appendFallbackPGP(targetVersion string, pgpBytes []string) []
 		tpv, err := agtversion.ParseVersion(targetVersion)
 		if err != nil {
 			// best effort, log failure
-			u.log.Warnf("failed to parse secondary fallback %q: %v", u.fleetServerURI, err)
+			u.log.Warnf("failed to parse agent version (%q) for secondary GPG fallback: %v", targetVersion, err)
 		} else {
 			secondaryPath, err := url.JoinPath(
 				u.fleetServerURI,
