@@ -705,8 +705,8 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 		var stoppedWg sync.WaitGroup
 		stoppedWg.Add(len(stop))
 		for _, existing := range stop {
-			if existing.getLatest().State == client.UnitStateStopped {
-				// it's already stopped, move on
+			if existing.shuttingDown.Load() {
+				// it's already shutting down, move on
 				stoppedWg.Done()
 				continue
 			}
