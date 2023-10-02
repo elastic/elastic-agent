@@ -10,11 +10,13 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/elastic/elastic-agent/pkg/control"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/utils"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -63,6 +65,14 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 	}
 	defer c.Disconnect()
+
+	isBeingUpgraded, err := upgrade.IsInProgress(c, utils.GetWatcherPIDs)
+	if err != nil {
+		return fmt.Errorf("failed to check if upgrade is already in progress: %w", err)
+	}
+	if isBeingUpgraded {
+		return errors.New("an upgrade is already in progress; please try again later.")
+	}
 
 	skipVerification, _ := cmd.Flags().GetBool(flagSkipVerify)
 	var pgpChecks []string

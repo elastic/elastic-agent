@@ -5,9 +5,11 @@
 package testing
 
 import (
+	"archive/zip"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -141,7 +143,8 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 				"keeping the agent installed will jeopardise other tests")
 		}
 
-		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
+		// don't use current `ctx` as it could be cancelled
+		out, err := f.Uninstall(context.Background(), &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
 		f.setClient(nil)
 		if err != nil &&
 			(errors.Is(err, ErrNotInstalled) ||
@@ -231,12 +234,68 @@ func (f *Fixture) collectDiagnostics() {
 		f.t.Logf("failed to collect diagnostics; failed to create %s: %s", diagPath, err)
 		return
 	}
-	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", f.t.Name(), time.Now().Format(time.RFC3339)))
+
+	// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
+	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
+	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
 
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics to %s (%s): %s", outputPath, err, output)
+
+		// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
+		f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
+		zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
+		err = f.archiveInstallDirectory(f.workDir, zipPath)
+		if err != nil {
+			f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)
+		}
 	}
+}
+
+func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string) error {
+	file, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("creating zip output file %s: %w", outputPath, err)
+	}
+	defer file.Close()
+
+	w := zip.NewWriter(file)
+	defer w.Close()
+
+	walker := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			f.t.Logf("failed to add %s to zip, continuing: %s", path, err)
+			return nil
+		}
+		defer file.Close()
+
+		f, err := w.Create(path)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(f, file)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	err = filepath.Walk(f.workDir, walker)
+	if err != nil {
+		return fmt.Errorf("walking %s to create zip: %w", f.workDir, err)
+	}
+
+	return nil
 }
 
 func collectDiagFlag() bool {

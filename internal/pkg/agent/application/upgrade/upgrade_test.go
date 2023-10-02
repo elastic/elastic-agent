@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -13,9 +14,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client/mocks"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+
 	"github.com/gofrs/flock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -133,4 +139,73 @@ func TestShutdownCallback(t *testing.T) {
 	newContent, err := ioutil.ReadFile(newFilename)
 	require.NoError(t, err, "reading file failed")
 	require.Equal(t, content, newContent, "contents are not equal")
+}
+
+func TestIsInProgress(t *testing.T) {
+	tests := map[string]struct {
+		state              cproto.State
+		stateErr           string
+		watcherPIDsFetcher func() ([]int, error)
+
+		expected    bool
+		expectedErr string
+	}{
+		"state_error": {
+			state:              cproto.State_STARTING,
+			stateErr:           "some error",
+			watcherPIDsFetcher: func() ([]int, error) { return nil, nil },
+
+			expected:    false,
+			expectedErr: "failed to get agent state: some error",
+		},
+		"state_upgrading": {
+			state:              cproto.State_UPGRADING,
+			stateErr:           "",
+			watcherPIDsFetcher: func() ([]int, error) { return nil, nil },
+
+			expected:    true,
+			expectedErr: "",
+		},
+		"state_healthy_no_watcher": {
+			state:              cproto.State_HEALTHY,
+			stateErr:           "",
+			watcherPIDsFetcher: func() ([]int, error) { return []int{}, nil },
+
+			expected:    false,
+			expectedErr: "",
+		},
+		"state_healthy_with_watcher": {
+			state:              cproto.State_HEALTHY,
+			stateErr:           "",
+			watcherPIDsFetcher: func() ([]int, error) { return []int{9999}, nil },
+
+			expected:    true,
+			expectedErr: "",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Expect client.State() call to be made only if no Upgrade Watcher PIDs
+			// are returned (i.e. no Upgrade Watcher is found to be running).
+			mc := mocks.NewClient(t)
+			if test.watcherPIDsFetcher != nil {
+				pids, _ := test.watcherPIDsFetcher()
+				if len(pids) == 0 {
+					if test.stateErr != "" {
+						mc.EXPECT().State(context.Background()).Return(nil, errors.New(test.stateErr)).Once()
+					} else {
+						mc.EXPECT().State(context.Background()).Return(&client.AgentState{State: test.state}, nil).Once()
+					}
+				}
+			}
+
+			inProgress, err := IsInProgress(mc, test.watcherPIDsFetcher)
+			if test.expectedErr != "" {
+				require.Equal(t, test.expectedErr, err.Error())
+			} else {
+				require.Equal(t, test.expected, inProgress)
+			}
+		})
+	}
 }
