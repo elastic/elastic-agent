@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/kibana"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	cmdVersion "github.com/elastic/elastic-agent/internal/pkg/basecmd/version"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
@@ -1082,8 +1083,6 @@ type CustomPGP struct {
 	PGPUri  string
 	PGPPath string
 }
-<<<<<<< HEAD
-=======
 
 // TestStandaloneUpgradeFailsRestart tests the scenario where upgrading to a new version
 // of Agent fails due to the new Agent binary not starting up. It checks that the Agent is
@@ -1274,4 +1273,3 @@ func twoMinorsPrevious(t *testing.T, ctx context.Context) *version.ParsedSemVer 
 
 	return v
 }
->>>>>>> bc1982aebe ([Standalone Agent] Disallow upgrade if upgrade is already in progress (#3473))
