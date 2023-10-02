@@ -16,7 +16,7 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.6.2
 	github.com/elastic/elastic-agent-client/v7 v7.4.0
 	github.com/elastic/elastic-agent-libs v0.5.0
-	github.com/elastic/elastic-agent-system-metrics v0.6.1
+	github.com/elastic/elastic-agent-system-metrics v0.7.0
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
 	github.com/elastic/go-elasticsearch/v8 v8.10.0
 	github.com/elastic/go-licenser v0.4.1
@@ -79,7 +79,7 @@ require (
 	github.com/akavel/rsrc v0.8.0 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/cavaliercoder/badio v0.0.0-20160213150051-ce5280129e9e // indirect
-	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
+	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
