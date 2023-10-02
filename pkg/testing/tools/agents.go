@@ -118,6 +118,7 @@ func UpgradeAgent(client *kibana.Client, policyID, version string) error {
 	upgradeAgentReq := kibana.UpgradeAgentRequest{
 		ID:      agentID,
 		Version: version,
+		Force:   true,
 	}
 	_, err = client.UpgradeAgent(context.Background(), upgradeAgentReq)
 	if err != nil {
