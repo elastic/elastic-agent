@@ -4824,12 +4824,12 @@ Contents of probable licence file $GOMODCACHE/github.com/oklog/ulid@v1.3.1/LICEN
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/ycombinator/copy
-Version: v0.0.0-20230901032348-510839011b29
+Dependency : github.com/otiai10/copy
+Version: v1.14.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/ycombinator/copy@v0.0.0-20230901032348-510839011b29/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/otiai10/copy@v1.14.0/LICENSE:
 
 The MIT License (MIT)
 
@@ -6485,11 +6485,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/sync
-Version: v0.1.0
+Version: v0.3.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/sync@v0.1.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/sync@v0.3.0/LICENSE:
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
