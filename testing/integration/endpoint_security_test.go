@@ -76,7 +76,19 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
+<<<<<<< HEAD
 	policyResp, err := tools.InstallAgentWithPolicy(t, fixture, info.KibanaClient, createPolicyReq)
+=======
+
+	policy, err := tools.InstallAgentWithPolicy(ctx, t,
+		installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoError(t, err, "failed to install agent with policy")
+
+	t.Cleanup(func() {
+		t.Log("Un-enrolling Elastic Agent...")
+		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient, policy.ID))
+	})
+>>>>>>> 35dbbdea9b (Add Windows support to integration testing runner (#2941))
 
 	t.Log("Installing Elastic Defend")
 	installElasticDefendPackage(t, info, policyResp.ID)
@@ -132,7 +144,16 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
+<<<<<<< HEAD
 	policyResp, err := tools.InstallAgentWithPolicy(t, fixture, info.KibanaClient, createPolicyReq)
+=======
+
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
+	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoError(t, err)
+>>>>>>> 35dbbdea9b (Add Windows support to integration testing runner (#2941))
 
 	t.Log("Installing Elastic Defend")
 	installElasticDefendPackage(t, info, policyResp.ID)
@@ -214,6 +235,128 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+// Tests that the agent can install and uninstall the endpoint-security service
+// after the Elastic Defend integration was removed from the policy
+// while remaining healthy.
+//
+// Installing endpoint-security requires a Fleet managed agent with the Elastic Defend integration
+// installed. The endpoint-security service is uninstalled the Elastic Defend integration was removed from the policy.
+//
+// Like the CLI uninstall test, the agent is uninstalled from the command line at the end of the test
+// but at this point endpoint should be already uninstalled.
+
+func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack:   &define.Stack{},
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+
+	for _, tc := range protectionTests {
+		t.Run(tc.name, func(t *testing.T) {
+			testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t, info, tc.protected)
+		})
+	}
+}
+
+func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, info *define.Info, protected bool) {
+	// Get path to agent executable.
+	fixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	t.Log("Enrolling the agent in Fleet")
+	policyUUID := uuid.New().String()
+	createPolicyReq := buildPolicyWithTamperProtection(
+		kibana.AgentPolicy{
+			Name:        "test-policy-" + policyUUID,
+			Namespace:   "default",
+			Description: "Test policy " + policyUUID,
+			MonitoringEnabled: []kibana.MonitoringEnabledOption{
+				kibana.MonitoringEnabledLogs,
+				kibana.MonitoringEnabledMetrics,
+			},
+		},
+		protected,
+	)
+
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
+	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoError(t, err)
+
+	t.Log("Installing Elastic Defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policy.ID)
+	require.NoErrorf(t, err, "Policy Response was: %#v", pkgPolicyResp)
+
+	t.Log("Polling for endpoint-security to become Healthy")
+	ctx, cancel := context.WithTimeout(context.Background(), endpointHealthPollingTimeout)
+	defer cancel()
+
+	agentClient := fixture.Client()
+	err = agentClient.Connect(ctx)
+	require.NoError(t, err)
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy.",
+	)
+	t.Log("Verified endpoint component and units are healthy")
+
+	t.Logf("Removing Elastic Defend: %v", fmt.Sprintf("/api/fleet/package_policies/%v", pkgPolicyResp.Item.ID))
+	_, err = info.KibanaClient.DeleteFleetPackage(ctx, pkgPolicyResp.Item.ID)
+	require.NoError(t, err)
+
+	t.Log("Waiting for endpoint to stop")
+	require.Eventually(t,
+		func() bool { return agentIsHealthyNoEndpoint(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are still present.",
+	)
+	t.Log("Verified endpoint component and units are removed")
+
+	// Verify that the Endpoint directory was correctly removed.
+	// Regression test for https://github.com/elastic/elastic-agent/issues/3077
+	agentInstallPath := fixture.WorkDir()
+	files, err := os.ReadDir(filepath.Clean(filepath.Join(agentInstallPath, "..")))
+	require.NoError(t, err)
+
+	t.Logf("Checking directories at install path %s", agentInstallPath)
+	for _, f := range files {
+		if !f.IsDir() {
+			continue
+		}
+
+		t.Log("Found directory", f.Name())
+		require.False(t, strings.Contains(f.Name(), "Endpoint"), "Endpoint directory was not removed")
+	}
+}
+
+// This is a subset of kibana.AgentPolicyUpdateRequest, using until elastic-agent-libs PR https://github.com/elastic/elastic-agent-libs/pull/141 is merged
+// TODO: replace with the elastic-agent-libs when available
+type agentPolicyUpdateRequest struct {
+	// Name of the policy. Required in an update request.
+	Name string `json:"name"`
+	// Namespace of the policy. Required in an update request.
+	Namespace   string `json:"namespace"`
+	IsProtected bool   `json:"is_protected"`
+}
+
+>>>>>>> 35dbbdea9b (Add Windows support to integration testing runner (#2941))
 // Installs the Elastic Defend package to cause the agent to install the endpoint-security service.
 func installElasticDefendPackage(t *testing.T, info *define.Info, policyID string) {
 	t.Helper()
@@ -244,7 +387,63 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 
 	pkgResp, err := tools.InstallFleetPackage(ctx, info.KibanaClient, &packagePolicyReq)
 	require.NoError(t, err)
+<<<<<<< HEAD
 	t.Logf("Endpoint package Policy Response:\n%+v", pkgResp)
+=======
+
+	t.Log("Enrolling the agent in Fleet")
+	policyUUID := uuid.New().String()
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		BasePath:       filepath.Join(paths.DefaultBasePath, "not_default"),
+	}
+	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
+
+	t.Log("Installing Elastic Defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	c := fixture.Client()
+
+	require.Eventually(t, func() bool {
+		err := c.Connect(ctx)
+		if err != nil {
+			t.Logf("connecting client to agent: %v", err)
+			return false
+		}
+		defer c.Disconnect()
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("agent state: %+v", state)
+		if state.State != cproto.State_DEGRADED {
+			return false
+		}
+		for _, c := range state.Components {
+			if strings.Contains(c.Message,
+				"Elastic Defend requires Elastic Agent be installed at the default installation path") {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Minute, 10*time.Second, "Agent never became DEGRADED with default install message")
+>>>>>>> 35dbbdea9b (Add Windows support to integration testing runner (#2941))
 }
 
 func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient client.Client) bool {

@@ -61,13 +61,13 @@ type OSRunnerResult struct {
 // OSRunner provides an interface to run the tests on the OS.
 type OSRunner interface {
 	// Prepare prepares the runner to actual run on the host.
-	Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string) error
+	Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string) error
 	// Copy places the required files on the host.
-	Copy(ctx context.Context, c *ssh.Client, logger Logger, repoArchive string, build Build) error
+	Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, build Build) error
 	// Run runs the actual tests and provides the result.
-	Run(ctx context.Context, verbose bool, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
+	Run(ctx context.Context, verbose bool, sshClient SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
 	// Diagnostics gathers any diagnostics from the host.
-	Diagnostics(ctx context.Context, c *ssh.Client, logger Logger, destination string) error
+	Diagnostics(ctx context.Context, sshClient SSHClient, logger Logger, destination string) error
 }
 
 // Logger is a simple logging interface used by each runner type.
@@ -322,9 +322,10 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	}
 
 	logger.Logf("Starting SSH; connect with `ssh -i %s %s@%s`", sshPrivateKeyPath, instance.Username, instance.IP)
+	client := NewSSHClient(instance.IP, instance.Username, sshAuth)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
-	client, err := sshConnect(connectCtx, instance.IP, instance.Username, sshAuth)
+	err = client.Connect(connectCtx)
 	if err != nil {
 		logger.Logf("Failed to connect to instance %s: %s", instance.IP, err)
 		return OSRunnerResult{}, fmt.Errorf("failed to connect to instance %s: %w", instance.Name, err)

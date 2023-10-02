@@ -93,7 +93,15 @@ func TestFQDN(t *testing.T) {
 			},
 		},
 	}
+<<<<<<< HEAD
 	policy, err := tools.InstallAgentWithPolicy(t, agentFixture, kibClient, createPolicyReq)
+=======
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, agentFixture, kibClient, createPolicyReq)
+>>>>>>> 35dbbdea9b (Add Windows support to integration testing runner (#2941))
 	require.NoError(t, err)
 
 	t.Log("Verify that agent name is short hostname")

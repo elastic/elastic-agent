@@ -54,7 +54,11 @@ func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, 
 // InstallAgentWithPolicy creates the given policy, enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.
+<<<<<<< HEAD
 func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (*kibana.PolicyResponse, error) {
+=======
+func InstallAgentWithPolicy(ctx context.Context, t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (kibana.PolicyResponse, error) {
+>>>>>>> 35dbbdea9b (Add Windows support to integration testing runner (#2941))
 	t.Helper()
 
 	policy, err := kibClient.CreatePolicy(context.TODO(), createPolicyReq)
@@ -62,6 +66,45 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 		return nil, fmt.Errorf("unable to create policy: %w", err)
 	}
 
+<<<<<<< HEAD
+=======
+	if createPolicyReq.IsProtected {
+		// If protected fetch uninstall token and set it for the fixture
+		resp, err := kibClient.GetPolicyUninstallTokens(ctx, policy.ID)
+		if err != nil {
+			return policy, fmt.Errorf("failed to fetch uninstal tokens: %w", err)
+		}
+		if len(resp.Items) == 0 {
+			return policy, fmt.Errorf("expected non-zero number of tokens: %w", err)
+		}
+
+		if len(resp.Items[0].Token) == 0 {
+			return policy, fmt.Errorf("expected non-empty token: %w", err)
+		}
+
+		uninstallToken := resp.Items[0].Token
+		t.Logf("Protected with uninstall token: %v", uninstallToken)
+		agentFixture.SetUninstallToken(uninstallToken)
+	}
+
+	err = InstallAgentForPolicy(ctx, t, installOpts, agentFixture, kibClient, policy.ID)
+	return policy, err
+}
+
+// InstallAgentForPolicy enrolls the provided agent fixture in Fleet using the
+// default Fleet Server, waits for the agent to come online, and returns either
+// an error or nil.
+// If the context (ctx) has a deadline, it will wait for the agent to become
+// online until the deadline of the context, or if not, a default 5-minute
+// deadline will be applied.
+func InstallAgentForPolicy(ctx context.Context, t *testing.T,
+	installOpts atesting.InstallOpts,
+	agentFixture *atesting.Fixture,
+	kibClient *kibana.Client,
+	policyID string) error {
+	t.Helper()
+
+>>>>>>> 35dbbdea9b (Add Windows support to integration testing runner (#2941))
 	// Create enrollment API key
 	createEnrollmentAPIKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policy.ID,
@@ -91,7 +134,7 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 		URL:             fleetServerURL,
 		EnrollmentToken: enrollmentToken.APIKey,
 	}
-	output, err := InstallAgent(installOpts, agentFixture)
+	output, err := InstallAgent(ctx, installOpts, agentFixture)
 	if err != nil {
 		t.Log(string(output))
 		return nil, fmt.Errorf("unable to enroll Elastic Agent: %w", err)

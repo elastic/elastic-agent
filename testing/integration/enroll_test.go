@@ -78,7 +78,16 @@ func (runner *EnrollRunner) TestEnroll() {
 	}
 	// Stage 1: Install
 	// As part of the cleanup process, we'll uninstall the agent
+<<<<<<< HEAD:testing/integration/enroll_test.go
 	policy, err := tools.InstallAgentWithPolicy(t, runner.agentFixture, kibClient, createPolicyReq)
+=======
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+	policy, err := tools.InstallAgentWithPolicy(ctx, t,
+		installOpts, agentFixture, info.KibanaClient, createPolicyReq)
+>>>>>>> 35dbbdea9b (Add Windows support to integration testing runner (#2941)):testing/integration/monitoring_logs_test.go
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 
