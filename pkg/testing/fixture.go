@@ -223,7 +223,7 @@ func (f *Fixture) WriteFileToWorkDir(ctx context.Context, data string, name stri
 // configuration. This must be called after `Prepare` is called but before `Run`
 // or `Install` can be called.
 func (f *Fixture) Configure(ctx context.Context, yamlConfig []byte) error {
-	err := f.ensurePrepared(ctx)
+	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,7 @@ func (f *Fixture) WorkDir() string {
 
 // SrcPackage returns the location on disk of the elastic agent package used by this fixture.
 func (f *Fixture) SrcPackage(ctx context.Context) (string, error) {
-	err := f.ensurePrepared(ctx)
+	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -293,7 +293,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	}
 
 	var err error
-	err = f.ensurePrepared(ctx)
+	err = f.EnsurePrepared(ctx)
 	if err != nil {
 		return err
 	}
@@ -422,7 +422,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 
 // Exec provides a way of performing subcommand on the prepared Elastic Agent binary.
 func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
-	err := f.ensurePrepared(ctx)
+	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare before exec: %w", err)
 	}
@@ -441,7 +441,7 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 
 // PrepareAgentCommand creates an exec.Cmd ready to execute an elastic-agent command.
 func (f *Fixture) PrepareAgentCommand(ctx context.Context, args []string, opts ...process.CmdOption) (*exec.Cmd, error) {
-	err := f.ensurePrepared(ctx)
+	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare before exec: %w", err)
 	}
@@ -528,6 +528,23 @@ func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (A
 	return inspect, err
 }
 
+// ExecVersion executes the version subcommand on the prepared Elastic Agent binary
+// with '--binary-only'. It returns the parsed YAML output.
+func (f *Fixture) ExecVersion(ctx context.Context, opts ...process.CmdOption) (AgentVersionOutput, error) {
+	out, err := f.Exec(ctx, []string{"version", "--binary-only", "--yaml"}, opts...)
+	version := AgentVersionOutput{}
+	if uerr := yaml.Unmarshal(out, &version); uerr != nil {
+		return AgentVersionOutput{},
+			fmt.Errorf("could not unmarshal agent version output: %w",
+				errors.Join(&ExecErr{
+					err:    err,
+					Output: out,
+				}, uerr))
+	}
+
+	return version, err
+}
+
 // IsHealthy returns if the prepared Elastic Agent reports itself as healthy.
 // It returns false, err if it cannot determine the state of the agent.
 // It should work with any 8.6+ agent
@@ -540,7 +557,8 @@ func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) (boo
 	return status.State == int(cproto.State_HEALTHY), nil
 }
 
-func (f *Fixture) ensurePrepared(ctx context.Context) error {
+// EnsurePrepared ensures that the fixture has been prepared.
+func (f *Fixture) EnsurePrepared(ctx context.Context) error {
 	if f.workDir == "" {
 		return f.Prepare(ctx)
 	}
@@ -688,8 +706,11 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 		if err := copy.Copy(comp.BinaryPath, destBinary); err != nil {
 			return fmt.Errorf("failed to copy %s to %s: %w", comp.BinaryPath, destBinary, err)
 		}
-		if err := os.Chown(destBinary, os.Geteuid(), os.Getgid()); err != nil {
-			return fmt.Errorf("failed to chown %s: %w", destBinary, err)
+		if runtime.GOOS != "windows" {
+			// chown is not supported on Windows
+			if err := os.Chown(destBinary, os.Geteuid(), os.Getgid()); err != nil {
+				return fmt.Errorf("failed to chown %s: %w", destBinary, err)
+			}
 		}
 		if err := os.Chmod(destBinary, 0755); err != nil {
 			return fmt.Errorf("failed to chmod %s: %w", destBinary, err)
@@ -991,4 +1012,24 @@ type AgentInspectOutput struct {
 	Signed struct {
 		Data string `yaml:"data"`
 	} `yaml:"signed"`
+}
+
+type AgentBinaryVersion struct {
+	Version   string `yaml:"version"`
+	Commit    string `yaml:"commit"`
+	BuildTime string `yaml:"build_time"`
+	Snapshot  bool   `yaml:"snapshot"`
+}
+
+// String returns the version string.
+func (v *AgentBinaryVersion) String() string {
+	s := v.Version
+	if v.Snapshot {
+		s += "-SNAPSHOT"
+	}
+	return s
+}
+
+type AgentVersionOutput struct {
+	Binary AgentBinaryVersion `yaml:"binary"`
 }

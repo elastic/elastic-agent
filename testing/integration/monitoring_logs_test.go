@@ -64,7 +64,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 		NonInteractive: true,
 		Force:          true,
 	}
-	policy, err := tools.InstallAgentWithPolicy(t, ctx,
+	policy, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, agentFixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)

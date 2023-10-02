@@ -11,6 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 
@@ -23,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -45,10 +49,11 @@ var ErrSameVersion = errors.New("upgrade did not occur because its the same vers
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log         *logger.Logger
-	settings    *artifact.Config
-	agentInfo   *info.AgentInfo
-	upgradeable bool
+	log            *logger.Logger
+	settings       *artifact.Config
+	agentInfo      *info.AgentInfo
+	upgradeable    bool
+	fleetServerURI string
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -66,6 +71,17 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.
 		agentInfo:   agentInfo,
 		upgradeable: IsUpgradeable(),
 	}
+}
+
+// SetClient reloads URI based on up to date fleet client
+func (u *Upgrader) SetClient(c fleetclient.Sender) {
+	if c == nil {
+		u.log.Debug("client nil, resetting Fleet Server URI")
+		u.fleetServerURI = ""
+	}
+
+	u.fleetServerURI = c.URI()
+	u.log.Debugf("Set client changed URI to %s", u.fleetServerURI)
 }
 
 // Reload reloads the artifact configuration for the upgrader.
@@ -365,4 +381,29 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		Sync:    true,
 		OnError: onErr,
 	})
+}
+
+// IsInProgress checks if an Elastic Agent upgrade is already in progress. It
+// returns true if so and false if not.
+// `c client.Client` is expected to be a connected client.
+func IsInProgress(c client.Client, watcherPIDsFetcher func() ([]int, error)) (bool, error) {
+	// First we check if any Upgrade Watcher processes are running. If they are,
+	// it means an upgrade is in progress. We check this before checking the Elastic
+	// Agent's status because the Elastic Agent GRPC server may briefly be
+	// unavailable during an upgrade and so the client connection might fail.
+	watcherPIDs, err := watcherPIDsFetcher()
+	if err != nil {
+		return false, fmt.Errorf("failed to determine if upgrade watcher is running: %w", err)
+	}
+	if len(watcherPIDs) > 0 {
+		return true, nil
+	}
+
+	// Next we check the Elastic Agent's status using the GRPC client.
+	state, err := c.State(context.Background())
+	if err != nil {
+		return false, fmt.Errorf("failed to get agent state: %w", err)
+	}
+
+	return state.State == cproto.State_UPGRADING, nil
 }

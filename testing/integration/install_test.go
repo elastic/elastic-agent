@@ -58,8 +58,11 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	_, err = fixture.Install(context.Background(), &atesting.InstallOpts{Force: true})
-	require.NoError(t, err)
+	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{Force: true})
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
 
 	// Check that Agent was installed in default base path
 	checkInstallSuccess(t, topPath)
@@ -101,11 +104,14 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	_, err = fixture.Install(context.Background(), &atesting.InstallOpts{
+	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{
 		BasePath: randomBasePath,
 		Force:    true,
 	})
-	require.NoError(t, err)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
@@ -119,7 +125,7 @@ func checkInstallSuccess(t *testing.T, topPath string) {
 	require.NoError(t, err)
 
 	// Check that a few expected installed files are present
-	installedBinPath := filepath.Join(topPath, "elastic-agent")
+	installedBinPath := filepath.Join(topPath, exeOnWindows("elastic-agent"))
 	installedDataPath := filepath.Join(topPath, "data")
 	installMarkerPath := filepath.Join(topPath, ".installed")
 
@@ -141,4 +147,11 @@ func randStr(length int) string {
 	}
 
 	return string(runes)
+}
+
+func exeOnWindows(filename string) string {
+	if runtime.GOOS == define.Windows {
+		return filename + ".exe"
+	}
+	return filename
 }
