@@ -255,7 +255,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	coord.RegisterMonitoringServer(monitoringServer)
 	defer func() {
 		if monitoringServer != nil {
-			monitoringServer.Stop()
+			_ = monitoringServer.Stop()
 		}
 	}()
 
