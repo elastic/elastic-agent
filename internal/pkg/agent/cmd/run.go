@@ -248,12 +248,15 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	}
 	defer composable.Close()
 
-	serverStopFn, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
+	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
 		return err
 	}
+	coord.RegisterMonitoringServer(monitoringServer)
 	defer func() {
-		_ = serverStopFn()
+		if monitoringServer != nil {
+			monitoringServer.Stop()
+		}
 	}()
 
 	diagHooks := diagnostics.GlobalHooks()
@@ -547,7 +550,7 @@ func setupMetrics(
 	cfg *monitoringCfg.MonitoringConfig,
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
-) (func() error, error) {
+) (*monitoring.ServerReloader, error) {
 	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
 		return nil, err
 	}
@@ -558,14 +561,12 @@ func setupMetrics(
 		Host:    monitoring.AgentMonitoringEndpoint(operatingSystem, cfg),
 	}
 
-	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg), operatingSystem)
+	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg), operatingSystem, cfg)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}
-	s.Start()
 
-	// return server stopper
-	return s.Stop, nil
+	return s, nil
 }
 
 func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
