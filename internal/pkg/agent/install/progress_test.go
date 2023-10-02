@@ -51,7 +51,7 @@ func TestProgress(t *testing.T) {
 		rs := pt.Start()
 
 		s := rs.StepStart("step 1 starting")
-		time.Sleep(15 * time.Millisecond) // to simulate work being done
+		time.Sleep(100 * time.Millisecond) // to simulate work being done
 		s.Failed()
 
 		rs.Failed()
