@@ -1184,7 +1184,7 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 	}
 
 	// Ensure that the Upgrade Watcher has stopped running.
-	checkUpgradeWatcherRan(t, fromF, fromVersionParsed)
+	waitForUpgradeWatcherToComplete(t, fromF, fromVersionParsed, standaloneWatcherDuration)
 
 	// Ensure that the original version of Agent is running again.
 	t.Log("Check Agent version to ensure rollback is successful")
