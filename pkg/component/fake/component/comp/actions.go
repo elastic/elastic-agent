@@ -12,11 +12,13 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 )
 
 const ActionRetrieveFeatures = "retrieve_features"
+const ActionRetrieveAPMConfig = "retrieve_apm_config"
 
 type retrieveFeaturesAction struct {
 	input *fakeInput
@@ -32,6 +34,10 @@ type sendEventAction struct {
 
 type killAction struct {
 	logger zerolog.Logger
+}
+
+type retrieveAPMConfigAction struct {
+	input *fakeInput
 }
 
 func (s *stateSetterAction) Name() string {
@@ -129,7 +135,26 @@ func newRunningUnit(logger zerolog.Logger, manager *StateManager, unit *client.U
 	switch expected.Config.Type {
 	case Fake:
 		return newFakeInput(logger, expected.LogLevel, manager, unit, expected.Config)
+	case APM:
+		return newFakeAPMInput(logger, expected.LogLevel, unit)
 	}
 	return nil, fmt.Errorf("unknown input unit config type: %s",
 		expected.Config.Type)
+}
+
+func (a *retrieveAPMConfigAction) Name() string {
+	return ActionRetrieveAPMConfig
+}
+
+func (a *retrieveAPMConfigAction) Execute(
+	_ context.Context,
+	_ map[string]interface{}) (map[string]interface{}, error) {
+
+	a.input.logger.Info().Msg("executing " + ActionRetrieveAPMConfig + " action")
+	a.input.logger.Debug().Msgf("stored apm config %v", a.input.apmConfig)
+	if a.input.apmConfig == nil {
+		return map[string]interface{}{"apm": nil}, nil
+	}
+	marshaledBytes, err := protojson.Marshal(a.input.apmConfig)
+	return map[string]interface{}{"apm": string(marshaledBytes)}, err
 }
