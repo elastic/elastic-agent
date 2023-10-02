@@ -13,10 +13,10 @@ import (
 
 // InstallAgent force install the Elastic Agent through agentFixture.
 func InstallAgent(ctx context.Context, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture) ([]byte, error) {
-	// 5 minute timeout, to ensure that it at least doesn't get stuck.
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	// 2 minute timeout, to ensure that it at least doesn't get stuck.
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	return agentFixture.Install(context.Background(), &installOpts)
+	return agentFixture.Install(ctx, &installOpts)
 }
 
 // InstallStandaloneAgent force install the Elastic Agent through agentFixture.
