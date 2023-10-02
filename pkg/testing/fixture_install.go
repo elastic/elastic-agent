@@ -200,6 +200,7 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	if err != nil {
 		return out, fmt.Errorf("error running uninstall command: %w", err)
 	}
+	f.installed = false
 
 	// Check that Elastic Agent files are actually removed
 	basePath := f.installOpts.BasePath
