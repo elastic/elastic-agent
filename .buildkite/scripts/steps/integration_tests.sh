@@ -3,6 +3,19 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
+STACK_PROVISIONER="$1"
+if [[ -z "$STACK_PROVISIONER" ]]; then
+  STACK_PROVISIONER="stateful"
+fi
+
+MAGE_TARGET="$2"
+if [[ -z "$MAGE_TARGET" ]]; then
+  MAGE_TARGET="integration:test"
+fi
+
+MAGE_SUBTARGET="$3"
+
+
 # Override the agent package version using a string with format <major>.<minor>.<patch>
 # NOTE: use only after version bump when the new version is not yet available, for example:
 # OVERRIDE_AGENT_PACKAGE_VERSION="8.10.3"
@@ -18,10 +31,8 @@ AGENT_PACKAGE_VERSION="${OVERRIDE_AGENT_PACKAGE_VERSION}" DEV=true EXTERNAL=true
 
 # Run integration tests
 set +e
-AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}" TEST_INTEG_CLEAN_ON_EXIT=true SNAPSHOT=true mage integration:test
+AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}" STACK_PROVISIONER="$STACK_PROVISIONER" TEST_INTEG_CLEAN_ON_EXIT=true SNAPSHOT=true mage $MAGE_TARGET $MAGE_SUBTARGET
 TESTS_EXIT_STATUS=$?
-AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}" STACK_PROVISIONER="serverless" TEST_INTEG_CLEAN_ON_EXIT=true SNAPSHOT=true mage integration:single TestMonitoringLogsShipped
-TESTS_EXIT_STATUS+=$?
 set -e
 
 # HTML report
