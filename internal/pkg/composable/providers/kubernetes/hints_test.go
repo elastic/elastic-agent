@@ -479,44 +479,44 @@ func TestGenerateHintsMappingWithProcessors(t *testing.T) {
 // mappings.container.name = nginx defines the container we want to emmit the new configuration. Annotations for other containers like co.elastic.hints.webapp should be excluded
 func TestGenerateHintsMappingWithProcessorsForContainer(t *testing.T) {
 	logger := getLogger()
-	pod := &kubernetes.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "testpod",
-			UID:       types.UID(uid),
-			Namespace: "testns",
-			Labels: map[string]string{
-				"foo":        "bar",
-				"with-dash":  "dash-value",
-				"with/slash": "some/path",
-			},
-			Annotations: map[string]string{
-				"app":                      "production",
-				"co.elastic.hints/package": "apache",
-				"co.elastic.hints/processors.decode_json_fields.fields":         "message",
-				"co.elastic.hints/processors.decode_json_fields.add_error_key":  "true",
-				"co.elastic.hints/processors.decode_json_fields.overwrite_keys": "true",
-				"co.elastic.hints/processors.decode_json_fields.target":         "team",
-				"co.elastic.hints.nginx/stream":                                 "stderr",
-				"co.elastic.hints.nginx/processors.add_fields.fields.name":      "myproject",
-				"co.elastic.hints.webapp/processors.add_fields.fields.name":     "myproject2",
-			},
-		},
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		Spec: kubernetes.PodSpec{
-			NodeName: "testnode",
-		},
-		Status: kubernetes.PodStatus{PodIP: "127.0.0.5"},
-	}
+	// pod := &kubernetes.Pod{
+	// 	ObjectMeta: metav1.ObjectMeta{
+	// 		Name:      "testpod",
+	// 		UID:       types.UID(uid),
+	// 		Namespace: "testns",
+	// 		Labels: map[string]string{
+	// 			"foo":        "bar",
+	// 			"with-dash":  "dash-value",
+	// 			"with/slash": "some/path",
+	// 		},
+	// 		Annotations: map[string]string{
+	// 			"app":                      "production",
+	// 			"co.elastic.hints/package": "apache",
+	// 			"co.elastic.hints/processors.decode_json_fields.fields":         "message",
+	// 			"co.elastic.hints/processors.decode_json_fields.add_error_key":  "true",
+	// 			"co.elastic.hints/processors.decode_json_fields.overwrite_keys": "true",
+	// 			"co.elastic.hints/processors.decode_json_fields.target":         "team",
+	// 			"co.elastic.hints.nginx/stream":                                 "stderr",
+	// 			"co.elastic.hints.nginx/processors.add_fields.fields.name":      "myproject",
+	// 			"co.elastic.hints.webapp/processors.add_fields.fields.name":     "myproject2",
+	// 		},
+	// 	},
+	// 	TypeMeta: metav1.TypeMeta{
+	// 		Kind:       "Pod",
+	// 		APIVersion: "v1",
+	// 	},
+	// 	Spec: kubernetes.PodSpec{
+	// 		NodeName: "testnode",
+	// 	},
+	// 	Status: kubernetes.PodStatus{PodIP: "127.0.0.5"},
+	// }
 
 	mapping := map[string]interface{}{
-		"namespace": pod.GetNamespace(),
+		"namespace": "testns",
 		"pod": mapstr.M{
-			"uid":  string(pod.GetUID()),
-			"name": pod.GetName(),
-			"ip":   pod.Status.PodIP,
+			"uid":  string(types.UID(uid)),
+			"name": "testpod",
+			"ip":   "127.0.0.5",
 		},
 		"namespace_annotations": mapstr.M{
 			"nsa": "nsb",
