@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/jaypipes/ghw"
+
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 
@@ -362,8 +364,13 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		}
 	}
 
+	block, err := ghw.Block()
+	if err != nil {
+		return fmt.Errorf("ghw.Block() returned error: %w", err)
+	}
+
 	copyConcurrency := 1
-	if install.HasAllSSDs() {
+	if install.HasAllSSDs(*block) {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 

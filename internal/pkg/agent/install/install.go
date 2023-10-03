@@ -59,8 +59,13 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	}
 
 	// copy source into install path
+	block, err := ghw.Block()
+	if err != nil {
+		return fmt.Errorf("ghw.Block() returned error: %w", err)
+	}
+
 	copyConcurrency := 1
-	if HasAllSSDs() {
+	if HasAllSSDs(*block) {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 	s := pt.StepStart("Copying files")
@@ -247,13 +252,7 @@ func verifyDirectory(dir string) error {
 
 // HasAllSSDs returns true if the host we are on uses SSDs for
 // all its persistent storage; false otherwise or on error
-func HasAllSSDs() bool {
-	block, err := ghw.Block()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "HasAllSSDs: ghw.Block() returned error: %s\n", err.Error())
-		return false
-	}
-
+func HasAllSSDs(block ghw.BlockInfo) bool {
 	for _, disk := range block.Disks {
 		switch disk.DriveType {
 		case ghw.DRIVE_TYPE_FDD, ghw.DRIVE_TYPE_ODD:
