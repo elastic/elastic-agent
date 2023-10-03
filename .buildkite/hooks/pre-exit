@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == *"integration-tests" ]]; then
   if [[ -z "${WORKSPACE-""}" ]]; then
       WORKSPACE=$(git rev-parse --show-toplevel)
   fi

@@ -1449,6 +1449,7 @@ func majorMinor() string {
 
 // Clean cleans up the integration testing leftovers
 func (Integration) Clean() error {
+	fmt.Println("--- Clean mage artifacts")
 	_ = os.RemoveAll(".agent-testing")
 
 	// Clean out .integration-cache/.ogc-cache always
