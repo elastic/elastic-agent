@@ -257,18 +257,14 @@ func HasAllSSDs(block ghw.BlockInfo) bool {
 		switch disk.DriveType {
 		case ghw.DRIVE_TYPE_FDD, ghw.DRIVE_TYPE_ODD:
 			// Floppy or optical drive; we don't care about these
-			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a FDD or ODD\n", disk.Name)
 			continue
 		case ghw.DRIVE_TYPE_SSD:
 			// SSDs
-			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a SSD\n", disk.Name)
 			continue
 		case ghw.DRIVE_TYPE_HDD:
 			// HDD (spinning hard disk)
-			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is a HDD\n", disk.Name)
 			return false
 		default:
-			fmt.Fprintf(os.Stdout, "HasAllSSDs: %s is of unknown type\n", disk.Name)
 			return false
 		}
 	}
