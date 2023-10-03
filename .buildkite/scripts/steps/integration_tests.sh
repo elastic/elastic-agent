@@ -3,9 +3,9 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-STACK_PROVISIONER="${$1:-"stateful"}"
-MAGE_TARGET="${$2:-"integration:test"}"
-MAGE_SUBTARGET="${$3:-""}"
+STACK_PROVISIONER="${1:-"stateful"}"
+MAGE_TARGET="${2:-"integration:test"}"
+MAGE_SUBTARGET="${3:-""}"
 
 
 # Override the agent package version using a string with format <major>.<minor>.<patch>
