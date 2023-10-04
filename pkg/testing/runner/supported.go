@@ -12,9 +12,6 @@ import (
 )
 
 const (
-	// Google is for the Google Cloud Platform (GCP)
-	Google = "google"
-
 	// Ubuntu is a Linux distro.
 	Ubuntu = "ubuntu"
 )
@@ -73,6 +70,60 @@ var (
 		},
 		Runner: DebianRunner{},
 	}
+	// WindowsAMD64_2022 - Windows (amd64) Server 2022
+	WindowsAMD64_2022 = SupportedOS{
+		OS: define.OS{
+			Type:    define.Windows,
+			Arch:    define.AMD64,
+			Version: "2022",
+		},
+		Runner: WindowsRunner{},
+	}
+	// WindowsAMD64_2022_Core - Windows (amd64) Server 2022 Core
+	WindowsAMD64_2022_Core = SupportedOS{
+		OS: define.OS{
+			Type:    define.Windows,
+			Arch:    define.AMD64,
+			Version: "2022-core",
+		},
+		Runner: WindowsRunner{},
+	}
+	// WindowsAMD64_2019 - Windows (amd64) Server 2019
+	WindowsAMD64_2019 = SupportedOS{
+		OS: define.OS{
+			Type:    define.Windows,
+			Arch:    define.AMD64,
+			Version: "2019",
+		},
+		Runner: WindowsRunner{},
+	}
+	// WindowsAMD64_2019_Core - Windows (amd64) Server 2019 Core
+	WindowsAMD64_2019_Core = SupportedOS{
+		OS: define.OS{
+			Type:    define.Windows,
+			Arch:    define.AMD64,
+			Version: "2019-core",
+		},
+		Runner: WindowsRunner{},
+	}
+	// WindowsAMD64_2016 - Windows (amd64) Server 2016
+	WindowsAMD64_2016 = SupportedOS{
+		OS: define.OS{
+			Type:    define.Windows,
+			Arch:    define.AMD64,
+			Version: "2016",
+		},
+		Runner: WindowsRunner{},
+	}
+	// WindowsAMD64_2016_Core - Windows (amd64) Server 2016 Core
+	WindowsAMD64_2016_Core = SupportedOS{
+		OS: define.OS{
+			Type:    define.Windows,
+			Arch:    define.AMD64,
+			Version: "2016-core",
+		},
+		Runner: WindowsRunner{},
+	}
 )
 
 // supported defines the set of supported OS's.
@@ -88,6 +139,12 @@ var supported = []SupportedOS{
 	UbuntuAMD64_2004,
 	UbuntuARM64_2204,
 	UbuntuARM64_2004,
+	WindowsAMD64_2022,
+	WindowsAMD64_2022_Core,
+	WindowsAMD64_2019,
+	WindowsAMD64_2019_Core,
+	WindowsAMD64_2016,
+	WindowsAMD64_2016_Core,
 }
 
 // osMatch returns true when the specific OS is a match for a non-specific OS.
@@ -154,7 +211,7 @@ func allowedByPlatform(os define.OS, platform define.OS) bool {
 			return false
 		}
 	}
-	if os.Version == "" {
+	if platform.Version == "" {
 		// not specific on version
 		return true
 	}

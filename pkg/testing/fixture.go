@@ -630,8 +630,11 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 		if err := copy.Copy(comp.BinaryPath, destBinary); err != nil {
 			return fmt.Errorf("failed to copy %s to %s: %w", comp.BinaryPath, destBinary, err)
 		}
-		if err := os.Chown(destBinary, os.Geteuid(), os.Getgid()); err != nil {
-			return fmt.Errorf("failed to chown %s: %w", destBinary, err)
+		if runtime.GOOS != "windows" {
+			// chown is not supported on Windows
+			if err := os.Chown(destBinary, os.Geteuid(), os.Getgid()); err != nil {
+				return fmt.Errorf("failed to chown %s: %w", destBinary, err)
+			}
 		}
 		if err := os.Chmod(destBinary, 0755); err != nil {
 			return fmt.Errorf("failed to chmod %s: %w", destBinary, err)

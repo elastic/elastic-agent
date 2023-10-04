@@ -132,7 +132,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 		Force:          true,
 	}
 
-	policy, err := tools.InstallAgentWithPolicy(t, ctx,
+	policy, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
 
@@ -216,7 +216,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	policy, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
@@ -355,7 +355,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	policy, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
@@ -497,7 +497,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 		Force:          true,
 		BasePath:       filepath.Join(paths.DefaultBasePath, "not_default"),
 	}
-	policyResp, err := tools.InstallAgentWithPolicy(t, ctx, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
 
 	t.Log("Installing Elastic Defend")
