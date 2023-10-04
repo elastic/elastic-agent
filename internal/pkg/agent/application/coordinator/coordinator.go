@@ -158,7 +158,7 @@ type ComponentsModifier func(comps []component.Component, cfg map[string]interfa
 // CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
 var CoordinatorShutdownTimeout = time.Second * 5
 
-type ConfigReloader interface {
+type configReloader interface {
 	Reload(*config.Config) error
 }
 
@@ -177,7 +177,7 @@ type Coordinator struct {
 	upgradeMgr UpgradeManager
 	monitorMgr MonitorManager
 
-	monitoringServerReloader ConfigReloader
+	monitoringServerReloader configReloader
 
 	runtimeMgr RuntimeManager
 	configMgr  ConfigManager
@@ -371,7 +371,7 @@ func (c *Coordinator) State() State {
 	return c.stateBroadcaster.Get()
 }
 
-func (c *Coordinator) RegisterMonitoringServer(s ConfigReloader) {
+func (c *Coordinator) RegisterMonitoringServer(s configReloader) {
 	c.monitoringServerReloader = s
 }
 
