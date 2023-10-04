@@ -8,7 +8,7 @@ endif
 ifeq (${SNAPSHOT}, 0)
 SNAPSHOT_SUFFIX:=""
 endif
-VERSION:=$(shell grep defaultBeatVersion ${REPO_ROOT}/version/version.go | cut -d\" -f2)${SNAPSHOT_SUFFIX}
+VERSION:=$(shell grep "const defaultBeatVersion =" ${REPO_ROOT}/version/version.go | cut -d\" -f2)${SNAPSHOT_SUFFIX}
 
 export DOCKER_BUILDKIT=1
 
