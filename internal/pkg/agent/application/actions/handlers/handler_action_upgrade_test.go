@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -35,7 +37,7 @@ func (u *mockUpgradeManager) Reload(rawConfig *config.Config) error {
 	return nil
 }
 
-func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, detailsSetter func(details *coordinator.UpgradeDetails), skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	select {
 	case <-time.After(2 * time.Second):
 		u.msgChan <- "completed " + version

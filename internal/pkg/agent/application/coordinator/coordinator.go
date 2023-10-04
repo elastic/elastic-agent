@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+
 	"github.com/hashicorp/go-multierror"
 
 	"go.elastic.co/apm"
@@ -59,7 +61,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *UpgradeDetails, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -445,14 +447,10 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// override the overall state to upgrading until the re-execution is complete
 	c.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
-	details := &UpgradeDetails{
-		TargetVersion: version,
-		ActionID:      action.ActionID,
-		Metadata: UpgradeDetailsMetadata{
-			ScheduledAt: action.ActionStartTime,
-		},
-		setter: c.setUpgradeDetails,
-	}
+	details := details.NewDetails(version, details.StateRequested, action.ActionID, details.DetailsMetadata{
+		ScheduledAt: action.ActionStartTime},
+	)
+	details.RegisterObserver(c.setUpgradeDetails)
 
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, details, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {

@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package upgrade
+package details
 
 type State string
 
@@ -18,7 +18,3 @@ const (
 	StateCompleted   State = "UPG_COMPLETED"
 	StateFailed      State = "UPG_FAILED"
 )
-
-func (s State) String() string {
-	return string(s)
-}

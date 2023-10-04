@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 
 	"github.com/cenkalti/backoff/v4"
 
@@ -37,7 +37,7 @@ const (
 	fleetUpgradeFallbackPGPFormat = "/api/agents/upgrades/%d.%d.%d/pgp-public-key"
 )
 
-func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, details *coordinator.UpgradeDetails, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
