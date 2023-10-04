@@ -15,8 +15,9 @@ ifndef MAGE_PRESENT
 	@echo Installing mage $(MAGE_VERSION).
 	@go install ${MAGE_IMPORT_PATH}@$(MAGE_VERSION)
 	@-mage -clean
+else
+	@echo Mage $(MAGE_VERSION) already installed.
 endif
-	@true
 
 ## help : Show this help.
 help: Makefile
