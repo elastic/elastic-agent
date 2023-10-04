@@ -14,7 +14,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// ServerController controlls the server runtime
+// ServerController controls the server runtime
 type ServerController interface {
 	Start()
 	Stop() error
