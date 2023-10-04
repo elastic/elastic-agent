@@ -7,7 +7,6 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -31,8 +30,7 @@ import (
 )
 
 const (
-	defaultUpgradeFallbackPGP     = "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
-	fleetUpgradeFallbackPGPFormat = "/api/agents/upgrades/%d.%d.%d/pgp-public-key"
+	defaultUpgradeFallbackPGP = "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
 )
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
@@ -42,7 +40,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		span.End()
 	}()
 
-	pgpBytes = u.appendFallbackPGP(version, pgpBytes)
+	pgpBytes = appendFallbackPGP(pgpBytes)
 
 	// do not update source config
 	settings := *u.settings
@@ -89,35 +87,13 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 	return path, nil
 }
 
-func (u *Upgrader) appendFallbackPGP(targetVersion string, pgpBytes []string) []string {
+func appendFallbackPGP(pgpBytes []string) []string {
 	if pgpBytes == nil {
 		pgpBytes = make([]string, 0, 1)
 	}
 
 	fallbackPGP := download.PgpSourceURIPrefix + defaultUpgradeFallbackPGP
 	pgpBytes = append(pgpBytes, fallbackPGP)
-
-	// add a secondary fallback if fleet server is configured
-	u.log.Debugf("Considering fleet server uri for pgp check fallback %q", u.fleetServerURI)
-	if u.fleetServerURI != "" {
-		tpv, err := agtversion.ParseVersion(targetVersion)
-		if err != nil {
-			// best effort, log failure
-			u.log.Warnf("failed to parse agent version (%q) for secondary GPG fallback: %v", targetVersion, err)
-		} else {
-			secondaryPath, err := url.JoinPath(
-				u.fleetServerURI,
-				fmt.Sprintf(fleetUpgradeFallbackPGPFormat, tpv.Major(), tpv.Minor(), tpv.Patch()),
-			)
-			if err != nil {
-				u.log.Warnf("failed to compose Fleet Server URI: %v", err)
-			} else {
-				secondaryFallback := download.PgpSourceURIPrefix + secondaryPath
-				pgpBytes = append(pgpBytes, secondaryFallback)
-			}
-		}
-	}
-
 	return pgpBytes
 }
 
