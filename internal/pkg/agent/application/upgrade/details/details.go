@@ -45,7 +45,7 @@ func (d *Details) SetState(s State) {
 	defer d.mu.Unlock()
 
 	d.State = s
-	d.NotifyObservers()
+	d.notifyObservers()
 }
 
 // Fail is a convenience method to set the state of the upgrade
@@ -58,7 +58,7 @@ func (d *Details) Fail(err error) {
 	d.Metadata.FailedState = d.State
 	d.Metadata.ErrorMsg = err.Error()
 	d.State = StateFailed
-	d.NotifyObservers()
+	d.notifyObservers()
 }
 
 // RegisterObserver allows an interested consumer of Details to register
@@ -76,7 +76,10 @@ func (d *Details) RegisterObserver(observer Observer) {
 func (d *Details) NotifyObservers() {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
+	d.notifyObservers()
+}
 
+func (d *Details) notifyObservers() {
 	for _, observer := range d.observers {
 		if d.State == StateCompleted {
 			observer(nil)
