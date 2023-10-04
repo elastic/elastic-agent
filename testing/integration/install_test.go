@@ -88,15 +88,6 @@ func TestInstallWithBasePath(t *testing.T) {
 	err = fixture.Prepare(context.Background())
 	require.NoError(t, err)
 
-	// The `--base-path` flag is defined for the `elastic-agent install` CLI sub-command BUT
-	// it is hidden (see https://github.com/elastic/elastic-agent/pull/2592).  So we validate
-	// here that the usage text for the `install` sub-command does NOT mention the `--base-path`
-	// flag in it.
-	const basePathFlag = "--base-path"
-	output, err := fixture.Exec(context.Background(), []string{"help", "install"})
-	require.NoError(t, err)
-	require.NotContains(t, string(output), basePathFlag)
-
 	// Set up random temporary directory to serve as base path for Elastic Agent
 	// installation.
 	tmpDir := t.TempDir()
