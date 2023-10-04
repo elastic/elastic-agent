@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -143,8 +144,12 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 				"keeping the agent installed will jeopardise other tests")
 		}
 
-		// don't use current `ctx` as it could be cancelled
-		out, err := f.Uninstall(context.Background(), &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
+		// 5 minute timeout, to ensure that it at least doesn't get stuck.
+		// original context is not used as it could have a timeout on the context
+		// for the install and we don't want that context to prevent the uninstall
+		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer uninstallCancel()
+		out, err := f.Uninstall(uninstallCtx, &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
 		f.setClient(nil)
 		if err != nil &&
 			(errors.Is(err, ErrNotInstalled) ||
@@ -195,6 +200,7 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	if err != nil {
 		return out, fmt.Errorf("error running uninstall command: %w", err)
 	}
+	f.installed = false
 
 	// Check that Elastic Agent files are actually removed
 	basePath := f.installOpts.BasePath
@@ -235,20 +241,37 @@ func (f *Fixture) collectDiagnostics() {
 		return
 	}
 
+	stamp := time.Now().Format(time.RFC3339)
+	if runtime.GOOS == "windows" {
+		// on Windows a filename cannot contain a ':' as this collides with disk labels (aka. C:\)
+		stamp = strings.ReplaceAll(stamp, ":", "-")
+	}
+
 	// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
 	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
-	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
+	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", sanitizedTestName, stamp))
 
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics to %s (%s): %s", outputPath, err, output)
 
-		// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
-		f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
-		zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
-		err = f.archiveInstallDirectory(f.workDir, zipPath)
+		// possible that the test was so fast that the Elastic Agent was just installed, the control protocol is
+		// not fully running yet. wait 15 seconds to try again, ensuring that best effort is performed in fetching
+		// diagnostics
+		if strings.Contains(string(output), "connection error") {
+			f.t.Logf("retrying in 15 seconds due to connection error; possible Elastic Agent was not fully started")
+			time.Sleep(15 * time.Second)
+			output, err = f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
+			f.t.Logf("failed to collect diagnostics a second time at %s (%s): %s", outputPath, err, output)
+		}
 		if err != nil {
-			f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)
+			// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
+			f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
+			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
+			err = f.archiveInstallDirectory(f.workDir, zipPath)
+			if err != nil {
+				f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)
+			}
 		}
 	}
 }

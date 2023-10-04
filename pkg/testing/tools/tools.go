@@ -53,7 +53,7 @@ func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, 
 // InstallAgentWithPolicy creates the given policy, enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.
-func InstallAgentWithPolicy(t *testing.T, ctx context.Context, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (kibana.PolicyResponse, error) {
+func InstallAgentWithPolicy(ctx context.Context, t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (kibana.PolicyResponse, error) {
 	t.Helper()
 
 	// Create policy
@@ -81,7 +81,7 @@ func InstallAgentWithPolicy(t *testing.T, ctx context.Context, installOpts atest
 		agentFixture.SetUninstallToken(uninstallToken)
 	}
 
-	err = InstallAgentForPolicy(t, ctx, installOpts, agentFixture, kibClient, policy.ID)
+	err = InstallAgentForPolicy(ctx, t, installOpts, agentFixture, kibClient, policy.ID)
 	return policy, err
 }
 
@@ -91,7 +91,7 @@ func InstallAgentWithPolicy(t *testing.T, ctx context.Context, installOpts atest
 // If the context (ctx) has a deadline, it will wait for the agent to become
 // online until the deadline of the context, or if not, a default 5-minute
 // deadline will be applied.
-func InstallAgentForPolicy(t *testing.T, ctx context.Context,
+func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 	installOpts atesting.InstallOpts,
 	agentFixture *atesting.Fixture,
 	kibClient *kibana.Client,
@@ -121,7 +121,7 @@ func InstallAgentForPolicy(t *testing.T, ctx context.Context,
 		URL:             fleetServerURL,
 		EnrollmentToken: enrollmentToken.APIKey,
 	}
-	output, err := InstallAgent(installOpts, agentFixture)
+	output, err := InstallAgent(ctx, installOpts, agentFixture)
 	if err != nil {
 		t.Log(string(output))
 		return fmt.Errorf("unable to enroll Elastic Agent: %w", err)

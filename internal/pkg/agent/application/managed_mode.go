@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
@@ -39,18 +38,17 @@ import (
 const dispatchFlushInterval = time.Minute * 5
 
 type managedConfigManager struct {
-	log                  *logger.Logger
-	agentInfo            *info.AgentInfo
-	cfg                  *configuration.Configuration
-	client               *remote.Client
-	store                storage.Store
-	stateStore           *store.StateStore
-	actionQueue          *queue.ActionQueue
-	dispatcher           *dispatcher.ActionDispatcher
-	runtime              *runtime.Manager
-	coord                *coordinator.Coordinator
-	fleetInitTimeout     time.Duration
-	initialClientSetters []actions.ClientSetter
+	log              *logger.Logger
+	agentInfo        *info.AgentInfo
+	cfg              *configuration.Configuration
+	client           *remote.Client
+	store            storage.Store
+	stateStore       *store.StateStore
+	actionQueue      *queue.ActionQueue
+	dispatcher       *dispatcher.ActionDispatcher
+	runtime          *runtime.Manager
+	coord            *coordinator.Coordinator
+	fleetInitTimeout time.Duration
 
 	ch    chan coordinator.ConfigChange
 	errCh chan error
@@ -64,7 +62,6 @@ func newManagedConfigManager(
 	storeSaver storage.Store,
 	runtime *runtime.Manager,
 	fleetInitTimeout time.Duration,
-	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
@@ -91,19 +88,18 @@ func newManagedConfigManager(
 	}
 
 	return &managedConfigManager{
-		log:                  log,
-		agentInfo:            agentInfo,
-		cfg:                  cfg,
-		client:               client,
-		store:                storeSaver,
-		stateStore:           stateStore,
-		actionQueue:          actionQueue,
-		dispatcher:           actionDispatcher,
-		runtime:              runtime,
-		fleetInitTimeout:     fleetInitTimeout,
-		ch:                   make(chan coordinator.ConfigChange),
-		errCh:                make(chan error),
-		initialClientSetters: clientSetters,
+		log:              log,
+		agentInfo:        agentInfo,
+		cfg:              cfg,
+		client:           client,
+		store:            storeSaver,
+		stateStore:       stateStore,
+		actionQueue:      actionQueue,
+		dispatcher:       actionDispatcher,
+		runtime:          runtime,
+		fleetInitTimeout: fleetInitTimeout,
+		ch:               make(chan coordinator.ConfigChange),
+		errCh:            make(chan error),
 	}, nil
 }
 
@@ -199,9 +195,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	if m.cfg.Fleet.Server == nil {
 		policyChanger.AddSetter(gateway)
 		policyChanger.AddSetter(ack)
-	}
-	for _, cs := range m.initialClientSetters {
-		policyChanger.AddSetter(cs)
 	}
 
 	// Proxy errors from the gateway to our own channel.
