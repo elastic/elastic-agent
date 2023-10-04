@@ -476,6 +476,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	det.RegisterObserver(c.logUpgradeDetails)
 
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+
 	if err != nil {
 		c.ClearOverrideState()
 		det.Fail(err)

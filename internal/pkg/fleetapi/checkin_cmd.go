@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
@@ -47,11 +49,12 @@ type CheckinComponent struct {
 
 // CheckinRequest consists of multiple events reported to fleet ui.
 type CheckinRequest struct {
-	Status     string             `json:"status"`
-	AckToken   string             `json:"ack_token,omitempty"`
-	Metadata   *info.ECSMeta      `json:"local_metadata,omitempty"`
-	Message    string             `json:"message"`    // V2 Agent message
-	Components []CheckinComponent `json:"components"` // V2 Agent components
+	Status         string             `json:"status"`
+	AckToken       string             `json:"ack_token,omitempty"`
+	Metadata       *info.ECSMeta      `json:"local_metadata,omitempty"`
+	Message        string             `json:"message"`    // V2 Agent message
+	Components     []CheckinComponent `json:"components"` // V2 Agent components
+	UpgradeDetails *details.Details   `json:"upgrade_details,omitempty"`
 }
 
 // SerializableEvent is a representation of the event to be send to the Fleet Server API via the checkin

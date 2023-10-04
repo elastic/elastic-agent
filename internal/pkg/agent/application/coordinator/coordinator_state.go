@@ -8,9 +8,7 @@ import (
 	"fmt"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-
 	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
