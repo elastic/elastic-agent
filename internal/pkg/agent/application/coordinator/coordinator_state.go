@@ -7,6 +7,8 @@ package coordinator
 import (
 	"fmt"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -30,6 +32,37 @@ type State struct {
 
 	Components []runtime.ComponentComponentState `yaml:"components"`
 	LogLevel   logp.Level                        `yaml:"log_level"`
+
+	UpgradeDetails *UpgradeDetails `yaml:"upgrade_details,omitempty"`
+}
+
+// UpgradeDetails consists of details regarding an ongoing upgrade.
+type UpgradeDetails struct {
+	TargetVersion string                 `yaml:"target_version", json:"target_version"`
+	ActionID      string                 `yaml:"action_id", json:"action_id"`
+	State         string                 `yaml:"state", json:"state"`
+	Metadata      UpgradeDetailsMetadata `yaml:"metadata", json:"metadata"`
+
+	setter func(details *UpgradeDetails)
+}
+
+func (ud *UpgradeDetails) Set() {
+	ud.setter(ud)
+}
+
+func (ud *UpgradeDetails) Fail(err error) {
+	ud.Metadata.FailedState = ud.State
+	ud.Metadata.ErrorMsg = err.Error()
+	ud.State = upgrade.StateFailed.String()
+	ud.Set()
+}
+
+// UpgradeDetailsMetadata consists of metadata relating to a specific upgrade state
+type UpgradeDetailsMetadata struct {
+	ScheduledAt     string  `yaml:"scheduled_at", json:"scheduled_at"`
+	DownloadPercent float64 `yaml:"download_percent", json:"download_percent"`
+	FailedState     string  `yaml:"failed_state", json:"failed_state"`
+	ErrorMsg        string  `yaml:"error_msg", json:"error_msg"`
 }
 
 type coordinatorOverrideState struct {
@@ -231,6 +264,13 @@ func (c *Coordinator) setFleetState(state agentclient.State, message string) {
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) setLogLevel(logLevel logp.Level) {
 	c.state.LogLevel = logLevel
+	c.stateNeedsRefresh = true
+}
+
+// setUpgradeDetails changes upgrade details state of the coordinator.
+// Must be called on the main Coordinator goroutine.
+func (c *Coordinator) setUpgradeDetails(upgradeDetails *UpgradeDetails) {
+	c.state.UpgradeDetails = upgradeDetails
 	c.stateNeedsRefresh = true
 }
 
