@@ -36,7 +36,6 @@ const (
 var (
 	ErrRemotePGPDownloadFailed = errors.New("Remote PGP download failed")
 	ErrInvalidLocation         = errors.New("Remote PGP location is invalid")
-	ErrUnknownPGPSource        = errors.New("unknown pgp source")
 )
 
 // warnLogger is a logger that only needs to implement Warnf, as that is the only functions
@@ -181,7 +180,7 @@ func VerifyGPGSignature(file string, asciiArmorSignature, publicKey []byte) erro
 	return nil
 }
 
-func PgpBytesFromSource(log warnLogger, source string, client HTTPClient) ([]byte, error) {
+func PgpBytesFromSource(log warnLogger, source string, client http.Client) ([]byte, error) {
 	if strings.HasPrefix(source, PgpSourceRawPrefix) {
 		return []byte(strings.TrimPrefix(source, PgpSourceRawPrefix)), nil
 	}
@@ -190,14 +189,11 @@ func PgpBytesFromSource(log warnLogger, source string, client HTTPClient) ([]byt
 		pgpBytes, err := fetchPgpFromURI(strings.TrimPrefix(source, PgpSourceURIPrefix), client)
 		if errors.Is(err, ErrRemotePGPDownloadFailed) || errors.Is(err, ErrInvalidLocation) {
 			log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", strings.TrimPrefix(source, PgpSourceURIPrefix), err)
-		} else if err != nil {
-			log.Warnf("Failed to fetch remote PGP")
 		}
-
 		return pgpBytes, nil
 	}
 
-	return nil, ErrUnknownPGPSource
+	return nil, errors.New("unknown pgp source")
 }
 
 func CheckValidDownloadUri(rawURI string) error {
@@ -213,7 +209,7 @@ func CheckValidDownloadUri(rawURI string) error {
 	return nil
 }
 
-func fetchPgpFromURI(uri string, client HTTPClient) ([]byte, error) {
+func fetchPgpFromURI(uri string, client http.Client) ([]byte, error) {
 	if err := CheckValidDownloadUri(uri); err != nil {
 		return nil, err
 	}
@@ -225,7 +221,7 @@ func fetchPgpFromURI(uri string, client HTTPClient) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, multierror.Append(err, ErrRemotePGPDownloadFailed)
 	}
@@ -236,8 +232,4 @@ func fetchPgpFromURI(uri string, client HTTPClient) ([]byte, error) {
 	}
 
 	return ioutil.ReadAll(resp.Body)
-}
-
-type HTTPClient interface {
-	Do(*http.Request) (*http.Response, error)
 }

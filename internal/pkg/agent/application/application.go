@@ -160,7 +160,7 @@ func New(
 				EndpointSignedComponentModifier(),
 			)
 
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, upgrader)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout)
 			if err != nil {
 				return nil, nil, nil, err
 			}
