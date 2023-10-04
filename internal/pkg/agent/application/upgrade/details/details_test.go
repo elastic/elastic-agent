@@ -91,5 +91,4 @@ func TestDetailsDownloadRateJSON(t *testing.T) {
 		require.Equal(t, math.Inf(1), float64(unmarshalledDetails.Metadata.DownloadRate))
 		require.Equal(t, 0.99, unmarshalledDetails.Metadata.DownloadPercent)
 	})
-
 }
