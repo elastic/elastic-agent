@@ -247,10 +247,6 @@ func (c *Client) checkApiVersionHeaders(reqID string, resp *http.Response) {
 // URI returns the remote URI.
 func (c *Client) URI() string {
 	host := c.config.GetHosts()[0]
-	if strings.HasPrefix(host, string(ProtocolHTTPS)+"://") ||
-		strings.HasPrefix(host, string(ProtocolHTTP)+"://") {
-		return host + "/" + c.config.Path
-	}
 	return string(c.config.Protocol) + "://" + host + "/" + c.config.Path
 }
 
