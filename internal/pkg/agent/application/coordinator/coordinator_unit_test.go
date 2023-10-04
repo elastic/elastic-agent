@@ -24,10 +24,12 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -520,6 +522,137 @@ inputs:
 	}
 }
 
+func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
+	// Send a test policy to the Coordinator as a Config Manager update,
+	// verify it generates the right component model and sends it to the
+	// runtime manager, then send an empty policy and verify it calls
+	// another runtime manager update with an empty component model.
+
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	configChan := make(chan ConfigChange, 1)
+
+	// Create a mocked runtime manager that will report the update call
+	runtimeManager := &fakeRuntimeManager{
+		updateCallback: func(comp []component.Component) error {
+			return nil
+		},
+	}
+
+	monitoringServer := &fakeMonitoringServer{}
+	newServerFn := func() (reload.ServerController, error) {
+		return monitoringServer, nil
+	}
+	monitoringReloader := reload.NewServerReloader(newServerFn, logger, monitoringCfg.DefaultConfig())
+
+	coord := &Coordinator{
+		logger:           logger,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+		},
+		runtimeMgr: runtimeManager,
+		vars:       emptyVars(t),
+	}
+	coord.RegisterMonitoringServer(monitoringReloader)
+
+	// Create a policy with one input and one output
+	cfg := config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`)
+
+	// Send the policy change and make sure it was acknowledged.
+	cfgChange := &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+
+	// server is started by default
+	assert.True(t, monitoringServer.startTriggered)
+	assert.True(t, monitoringServer.isRunning)
+
+	// disable monitoring
+	cfgDisableMonitoring := config.MustNewConfigFrom(`
+agent.monitoring.enabled: false
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`)
+
+	// Send the policy change and make sure it was acknowledged.
+	monitoringServer.Reset()
+	cfgChange = &configChange{cfg: cfgDisableMonitoring}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+
+	// server is started by default
+	assert.True(t, monitoringServer.stopTriggered)
+	assert.False(t, monitoringServer.isRunning)
+
+	// enable monitoring
+	cfgEnabledMonitoring := config.MustNewConfigFrom(`
+agent.monitoring.enabled: true
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`)
+
+	// Send the policy change and make sure it was acknowledged.
+	monitoringServer.Reset()
+	cfgChange = &configChange{cfg: cfgEnabledMonitoring}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+
+	// server is started by default
+	assert.True(t, monitoringServer.startTriggered)
+	assert.True(t, monitoringServer.isRunning)
+
+	// enable monitoring and disable metrics
+	cfgEnabledMonitoringNoMetrics := config.MustNewConfigFrom(`
+agent.monitoring.enabled: true
+agent.monitoring.metrics: false
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`)
+
+	// Send the policy change and make sure it was acknowledged.
+	monitoringServer.Reset()
+	cfgChange = &configChange{cfg: cfgEnabledMonitoringNoMetrics}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+
+	// server is started by default
+	assert.True(t, monitoringServer.stopTriggered)
+	assert.False(t, monitoringServer.isRunning)
+}
+
 func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
 	// Send a test policy to the Coordinator as a Config Manager update,
 	// verify it generates the right component model and sends it to the
@@ -860,4 +993,26 @@ func emptyAST(t *testing.T) *transpiler.AST {
 	ast, err := transpiler.NewAST(nil)
 	require.NoError(t, err, "AST creation must succeed")
 	return ast
+}
+
+type fakeMonitoringServer struct {
+	startTriggered bool
+	stopTriggered  bool
+	isRunning      bool
+}
+
+func (fs *fakeMonitoringServer) Start() {
+	fs.startTriggered = true
+	fs.isRunning = true
+}
+
+func (fs *fakeMonitoringServer) Stop() error {
+	fs.stopTriggered = true
+	fs.isRunning = false
+	return nil
+}
+
+func (fs *fakeMonitoringServer) Reset() {
+	fs.stopTriggered = false
+	fs.startTriggered = false
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
@@ -550,7 +551,7 @@ func setupMetrics(
 	cfg *monitoringCfg.MonitoringConfig,
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
-) (*monitoring.ServerReloader, error) {
+) (*reload.ServerReloader, error) {
 	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
 		return nil, err
 	}

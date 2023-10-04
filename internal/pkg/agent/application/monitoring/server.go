@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 
 	"github.com/gorilla/mux"
 	"go.elastic.co/apm"
@@ -21,102 +20,11 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-
-	aConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 )
-
-type serverConstructor func() (*api.Server, error)
-type ServerReloader struct {
-	s           *api.Server
-	log         *logger.Logger
-	newServerFn serverConstructor
-
-	config              *monitoringCfg.MonitoringConfig
-	isServerRunning     bool
-	isServerRunningLock sync.Mutex
-}
-
-func NewServerReloader(newServerFn serverConstructor, log *logger.Logger, mcfg *monitoringCfg.MonitoringConfig) *ServerReloader {
-	sr := &ServerReloader{
-		log:         log,
-		config:      mcfg,
-		newServerFn: newServerFn,
-	}
-
-	return sr
-}
-
-func (sr *ServerReloader) Start() {
-	sr.isServerRunningLock.Lock()
-	defer sr.isServerRunningLock.Unlock()
-
-	sr.start()
-}
-
-func (sr *ServerReloader) start() {
-	sr.log.Info("Starting server")
-	var err error
-	sr.s, err = sr.newServerFn()
-	if err != nil {
-		sr.log.Errorf("Failed creating a server: %v", err)
-		return
-	}
-
-	sr.s.Start()
-	sr.log.Debugf("Server started")
-	sr.isServerRunning = true
-}
-
-func (sr *ServerReloader) Stop() error {
-	sr.isServerRunningLock.Lock()
-	defer sr.isServerRunningLock.Unlock()
-
-	return sr.stop()
-}
-
-func (sr *ServerReloader) stop() error {
-	sr.log.Info("Stopping server")
-
-	sr.isServerRunning = false
-	if err := sr.s.Stop(); err != nil {
-		return err
-	}
-
-	sr.log.Debugf("Server stopped")
-	sr.s = nil
-	return nil
-}
-
-func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
-	sr.isServerRunningLock.Lock()
-	defer sr.isServerRunningLock.Unlock()
-
-	newConfig := configuration.DefaultConfiguration()
-	if err := rawConfig.Unpack(&newConfig); err != nil {
-		return errors.New(err, "failed to unpack monitoring config during reload")
-	}
-
-	sr.config = newConfig.Settings.MonitoringConfig
-
-	shouldRunMetrics := sr.config.Enabled && sr.config.MonitorMetrics
-	if shouldRunMetrics && !sr.isServerRunning {
-		sr.start()
-
-		sr.isServerRunning = true
-		return nil
-	}
-
-	if !shouldRunMetrics && sr.isServerRunning {
-		sr.isServerRunning = false
-		return sr.stop()
-	}
-
-	return nil
-}
 
 // New creates a new server exposing metrics and process information.
 func NewServer(
@@ -128,7 +36,7 @@ func NewServer(
 	enableProcessStats bool,
 	operatingSystem string,
 	mcfg *monitoringCfg.MonitoringConfig,
-) (*ServerReloader, error) {
+) (*reload.ServerReloader, error) {
 	if err := createAgentMonitoringDrop(endpointConfig.Host); err != nil {
 		// log but ignore
 		log.Errorf("failed to create monitoring drop: %v", err)
@@ -151,7 +59,7 @@ func exposeMetricsEndpoint(
 	enableProcessStats bool,
 	operatingSystem string,
 	mcfg *monitoringCfg.MonitoringConfig,
-) (*ServerReloader, error) {
+) (*reload.ServerReloader, error) {
 	r := mux.NewRouter()
 	if tracer != nil {
 		r.Use(apmgorilla.Middleware(apmgorilla.WithTracer(tracer)))
@@ -169,7 +77,7 @@ func exposeMetricsEndpoint(
 	mux := http.NewServeMux()
 	mux.Handle("/", r)
 
-	newServerFn := func() (*api.Server, error) {
+	newServerFn := func() (reload.ServerController, error) {
 		apiServer, err := api.New(log, mux, config)
 		if err != nil {
 			return nil, errors.New(err, "failed to create api server")
@@ -177,7 +85,7 @@ func exposeMetricsEndpoint(
 		return apiServer, nil
 	}
 
-	return NewServerReloader(newServerFn, log, mcfg), nil
+	return reload.NewServerReloader(newServerFn, log, mcfg), nil
 }
 
 func createAgentMonitoringDrop(drop string) error {
