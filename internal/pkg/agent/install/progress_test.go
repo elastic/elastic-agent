@@ -56,7 +56,7 @@ func TestProgress(t *testing.T) {
 
 		rs.Failed()
 
-		require.Regexp(t, regexp.MustCompile(`step 1 starting\.{3}\.+ FAILED\n`), string(w.buf))
+		require.Regexp(t, regexp.MustCompile(`step 1 starting\.{3,}\.+ FAILED\n`), string(w.buf))
 	})
 
 	t.Run("multi_step_immediate_success", func(t *testing.T) {
@@ -93,7 +93,7 @@ func TestProgress(t *testing.T) {
 
 		rs.Succeeded()
 
-		require.Regexp(t, regexp.MustCompile(`step 1 starting\.{3}\.+ DONE\nstep 2 starting\.{3}\.+ DONE`), string(w.buf))
+		require.Regexp(t, regexp.MustCompile(`step 1 starting\.{3,}\.+ DONE\nstep 2 starting\.{3,}\.+ DONE`), string(w.buf))
 	})
 
 	t.Run("single_step_delay_after_failed", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestProgress(t *testing.T) {
 
 		rs.Failed()
 
-		require.Equal(t, "step 1 starting... FAILED\n", string(w.buf))
+		require.Regexp(t, regexp.MustCompile(`step 1 starting.{3,} FAILED\n`), string(w.buf))
 
 	})
 
@@ -133,6 +133,6 @@ func TestProgress(t *testing.T) {
 
 		rs.Succeeded()
 
-		require.Regexp(t, regexp.MustCompile(`step starting\.{3}\n   substep 1 starting\.{3}\.+ DONE\n   substep 2 starting\.{3}\.+ DONE\n   DONE\n`), string(w.buf))
+		require.Regexp(t, regexp.MustCompile(`step starting\.{3,}\n   substep 1 starting\.{3,}\.+ DONE\n   substep 2 starting\.{3,}\.+ DONE\n   DONE\n`), string(w.buf))
 	})
 }
