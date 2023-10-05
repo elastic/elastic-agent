@@ -153,7 +153,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	newHash, err := u.unpack(version, archivePath)
 	if err != nil {
-		det.Fail(err)
 		return nil, err
 	}
 
@@ -167,26 +166,22 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	if err := copyActionStore(u.log, newHash); err != nil {
-		det.Fail(err)
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
 	if err := copyRunDirectory(u.log, newHash); err != nil {
-		det.Fail(err)
 		return nil, errors.New(err, "failed to copy run directory")
 	}
 
 	det.SetState(details.StateReplacing)
 
 	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
-		det.Fail(err)
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
 
 	if err := u.markUpgrade(ctx, u.log, newHash, action); err != nil {
-		det.Fail(err)
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
@@ -195,7 +190,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	det.SetState(details.StateWatching)
 
 	if err := InvokeWatcher(u.log); err != nil {
-		det.Fail(err)
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
