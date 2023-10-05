@@ -199,9 +199,16 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	if m.cfg.Fleet.Server == nil {
 		policyChanger.AddSetter(gateway)
 		policyChanger.AddSetter(ack)
-	}
-	for _, cs := range m.initialClientSetters {
-		policyChanger.AddSetter(cs)
+
+		for _, cs := range m.initialClientSetters {
+			policyChanger.AddSetter(cs)
+		}
+	} else {
+		// locally managed fleet server
+		// init with local address
+		for _, cs := range m.initialClientSetters {
+			cs.SetClient(m.client)
+		}
 	}
 
 	// Proxy errors from the gateway to our own channel.
