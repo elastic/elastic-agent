@@ -332,12 +332,11 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
-		AckToken:       ackToken,
-		Metadata:       ecsMeta,
-		Status:         agentStateToString(state.State),
-		Message:        state.Message,
-		Components:     components,
-		UpgradeDetails: state.UpgradeDetails,
+		AckToken:   ackToken,
+		Metadata:   ecsMeta,
+		Status:     agentStateToString(state.State),
+		Message:    state.Message,
+		Components: components,
 	}
 
 	resp, took, err := cmd.Execute(ctx, req)
