@@ -18,7 +18,7 @@ type Config struct {
 
 func defaultConfig() *Config {
 	return &Config{
-		BaseUrl: `https://console.qa.cld.elstc.co/api/v1`,
+		BaseUrl: `https://staging.found.no/api/v1`,
 	}
 }
 
