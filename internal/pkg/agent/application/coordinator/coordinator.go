@@ -459,6 +459,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		return err
 	}
 	if cb != nil {
+		det.SetState(details.StateRestarting)
 		c.ReExec(cb)
 	}
 	return nil
