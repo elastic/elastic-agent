@@ -9,24 +9,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/jaypipes/ghw"
 
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
-
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -361,12 +364,23 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		}
 	}
 
+	block, err := ghw.Block()
+	if err != nil {
+		return fmt.Errorf("ghw.Block() returned error: %w", err)
+	}
+
+	copyConcurrency := 1
+	if install.HasAllSSDs(*block) {
+		copyConcurrency = runtime.NumCPU() * 4
+	}
+
 	return copy.Copy(from, to, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
-		Sync:    true,
-		OnError: onErr,
+		Sync:         true,
+		OnError:      onErr,
+		NumOfWorkers: int64(copyConcurrency),
 	})
 }
 

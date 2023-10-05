@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/jaypipes/ghw"
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -58,12 +59,22 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	}
 
 	// copy source into install path
+	block, err := ghw.Block()
+	if err != nil {
+		return fmt.Errorf("ghw.Block() returned error: %w", err)
+	}
+
+	copyConcurrency := 1
+	if HasAllSSDs(*block) {
+		copyConcurrency = runtime.NumCPU() * 4
+	}
 	s := pt.StepStart("Copying files")
 	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
-		Sync: true,
+		Sync:         true,
+		NumOfWorkers: int64(copyConcurrency),
 	})
 	if err != nil {
 		s.Failed()
@@ -237,4 +248,26 @@ func verifyDirectory(dir string) error {
 		return fmt.Errorf("missing %s", paths.BinaryName)
 	}
 	return nil
+}
+
+// HasAllSSDs returns true if the host we are on uses SSDs for
+// all its persistent storage; false otherwise or on error
+func HasAllSSDs(block ghw.BlockInfo) bool {
+	for _, disk := range block.Disks {
+		switch disk.DriveType {
+		case ghw.DRIVE_TYPE_FDD, ghw.DRIVE_TYPE_ODD:
+			// Floppy or optical drive; we don't care about these
+			continue
+		case ghw.DRIVE_TYPE_SSD:
+			// SSDs
+			continue
+		case ghw.DRIVE_TYPE_HDD:
+			// HDD (spinning hard disk)
+			return false
+		default:
+			return false
+		}
+	}
+
+	return true
 }
