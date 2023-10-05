@@ -73,7 +73,8 @@ func (d *Details) RegisterObserver(observer Observer) {
 }
 
 // NotifyObservers sends the current upgrade details to all registered
-// observers.
+// observers. When an upgrade has completed (StateCompleted), the observers
+// will be sent a nil value.
 func (d *Details) NotifyObservers() {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
