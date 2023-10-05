@@ -41,7 +41,7 @@ func DeleteDashboard(ctx context.Context, client *kibana.Client, id string) erro
 		return fmt.Errorf("error making API request: %w, response: '%s'", err, string(resp))
 	}
 
-	if status != 200 {
+	if status != http.StatusOK {
 		return fmt.Errorf("non-200 return code: %v, response: '%s'", status, string(resp))
 	}
 	return nil
@@ -64,7 +64,7 @@ func GetDashboards(ctx context.Context, client *kibana.Client) ([]Dashboard, err
 			return nil, fmt.Errorf("error making api request: %w", err)
 		}
 
-		if status != 200 {
+		if status != http.StatusOK {
 			return nil, fmt.Errorf("non-200 return code: %v, response: '%s'", status, string(resp))
 		}
 

@@ -1747,7 +1747,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		instanceProvisionerMode = "ogc"
 	}
 	if instanceProvisionerMode != "ogc" && instanceProvisionerMode != "multipass" {
-		return nil, errors.New("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass'")
+		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
 	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
@@ -1755,7 +1755,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		stackProvisionerMode = "stateful"
 	}
 	if stackProvisionerMode != "stateful" && stackProvisionerMode != "serverless" {
-		return nil, errors.New("STACK_PROVISIONER environment variable must be one of 'serverless' or 'stateful'")
+		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of 'serverless' or 'stateful', not %s", stackProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 

@@ -268,7 +268,7 @@ func (srv *ServerlessClient) ResetCredentials(ctx context.Context) (CredResetRes
 
 	if resp.StatusCode != http.StatusOK {
 		p, _ := io.ReadAll(resp.Body)
-		return CredResetResponse{}, fmt.Errorf("Non-201 status code returned by server: %d, body: %s", resp.StatusCode, string(p))
+		return CredResetResponse{}, fmt.Errorf("Non-200 status code returned by server: %d, body: %s", resp.StatusCode, string(p))
 	}
 
 	updated := CredResetResponse{}

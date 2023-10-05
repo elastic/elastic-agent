@@ -186,6 +186,7 @@ func CreateAPIKey(ctx context.Context, client elastictransport.Interface, req AP
 	if err != nil {
 		return APIKeyResponse{}, fmt.Errorf("error creating API key: %w", err)
 	}
+	defer resp.Body.Close()
 	resultBuf, err := handleResponseRaw(resp)
 	if err != nil {
 		return APIKeyResponse{}, fmt.Errorf("error handling HTTP response: %w", err)
@@ -231,6 +232,7 @@ func GetIndexTemplatesForPattern(ctx context.Context, client elastictransport.In
 	if err != nil {
 		return TemplateResponse{}, fmt.Errorf("error fetching index templates: %w", err)
 	}
+	defer resp.Body.Close()
 
 	resultBuf, err := handleResponseRaw(resp)
 	if err != nil {
@@ -252,6 +254,7 @@ func GetDataStreamsForPattern(ctx context.Context, client elastictransport.Inter
 	if err != nil {
 		return DataStreams{}, fmt.Errorf("error fetching data streams")
 	}
+	defer resp.Body.Close()
 
 	raw, err := handleResponseRaw(resp)
 	if err != nil {
@@ -274,6 +277,8 @@ func DeleteIndexTemplatesDataStreams(ctx context.Context, client elastictranspor
 	if err != nil {
 		return fmt.Errorf("error deleting data streams: %w", err)
 	}
+	defer resp.Body.Close()
+
 	_, err = handleResponseRaw(resp)
 	if err != nil {
 		return fmt.Errorf("error handling HTTP response for data stream delete: %w", err)
@@ -284,6 +289,7 @@ func DeleteIndexTemplatesDataStreams(ctx context.Context, client elastictranspor
 	if err != nil {
 		return fmt.Errorf("error deleting index templates: %w", err)
 	}
+	defer resp.Body.Close()
 	_, err = handleResponseRaw(resp)
 	if err != nil {
 		return fmt.Errorf("error handling HTTP response for index template delete: %w", err)
@@ -298,6 +304,7 @@ func GetPipelines(ctx context.Context, client elastictransport.Interface, name s
 	if err != nil {
 		return nil, fmt.Errorf("error fetching index templates: %w", err)
 	}
+	defer resp.Body.Close()
 	resultBuf, err := handleResponseRaw(resp)
 	if err != nil {
 		return nil, fmt.Errorf("error handling HTTP response: %w", err)
@@ -318,6 +325,7 @@ func DeletePipelines(ctx context.Context, client elastictransport.Interface, nam
 	if err != nil {
 		return fmt.Errorf("error deleting index template")
 	}
+	defer resp.Body.Close()
 	_, err = handleResponseRaw(resp)
 	if err != nil {
 		return fmt.Errorf("error handling HTTP response: %w", err)
@@ -483,6 +491,7 @@ func GetPing(ctx context.Context, client elastictransport.Interface) (Ping, erro
 	if err != nil {
 		return Ping{}, fmt.Errorf("error in ping request")
 	}
+	defer resp.Body.Close()
 
 	respData, err := handleResponseRaw(resp)
 	if err != nil {
