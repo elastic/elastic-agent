@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/docker/go-units"
+
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
