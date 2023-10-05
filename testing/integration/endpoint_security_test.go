@@ -19,10 +19,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/google/uuid"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -31,6 +30,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 )
 
@@ -90,6 +90,60 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	}
 }
 
+// Tests that the agent can install and uninstall the endpoint-security service while remaining
+// healthy. In this case endpoint-security is uninstalled because the agent was unenrolled, which
+// triggers the creation of an empty agent policy removing all inputs (only when not force
+// unenrolling). The empty agent policy triggers the uninstall of endpoint because endpoint was
+// removed from the policy.
+//
+// Like the CLI uninstall test, the agent is uninstalled from the command line at the end of the test
+// but at this point endpoint is already uninstalled.
+func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack:   &define.Stack{},
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+
+	for _, tc := range protectionTests {
+		t.Run(tc.name, func(t *testing.T) {
+			testInstallAndUnenrollWithEndpointSecurity(t, info, tc.protected)
+		})
+	}
+}
+
+// Tests that the agent can install and uninstall the endpoint-security service
+// after the Elastic Defend integration was removed from the policy
+// while remaining healthy.
+//
+// Installing endpoint-security requires a Fleet managed agent with the Elastic Defend integration
+// installed. The endpoint-security service is uninstalled the Elastic Defend integration was removed from the policy.
+//
+// Like the CLI uninstall test, the agent is uninstalled from the command line at the end of the test
+// but at this point endpoint should be already uninstalled.
+
+func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack:   &define.Stack{},
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+
+	for _, tc := range protectionTests {
+		t.Run(tc.name, func(t *testing.T) {
+			testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t, info, tc.protected)
+		})
+	}
+}
+
 // buildPolicyWithTamperProtection helper function to build the policy request with or without tamper protection
 func buildPolicyWithTamperProtection(policy kibana.AgentPolicy, protected bool) kibana.AgentPolicy {
 	if protected {
@@ -109,7 +163,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 
 	// Get path to agent executable.
 	fixture, err := define.NewFixture(t, define.Version())
-	require.NoError(t, err)
+	require.NoError(t, err, "could not create agent fixture")
 
 	t.Log("Enrolling the agent in Fleet")
 	policyUUID := uuid.New().String()
@@ -138,7 +192,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient, policy.ID))
+		assert.NoError(t, fleettools.UnEnrollAgent(info.KibanaClient, policy.ID))
 	})
 
 	t.Log("Installing Elastic Defend")
@@ -151,7 +205,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 
 	agentClient := fixture.Client()
 	err = agentClient.Connect(ctx)
-	require.NoError(t, err)
+	require.NoError(t, err, "could not connect to local agent")
 
 	require.Eventually(t,
 		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
@@ -160,32 +214,6 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 		"Endpoint component or units are not healthy.",
 	)
 	t.Log("Verified endpoint component and units are healthy")
-}
-
-// Tests that the agent can install and uninstall the endpoint-security service while remaining
-// healthy. In this case endpoint-security is uninstalled because the agent was unenrolled, which
-// triggers the creation of an empty agent policy removing all inputs (only when not force
-// unenrolling). The empty agent policy triggers the uninstall of endpoint because endpoint was
-// removed from the policy.
-//
-// Like the CLI uninstall test, the agent is uninstalled from the command line at the end of the test
-// but at this point endpoint is already uninstalled.
-func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
-		OS: []define.OS{
-			{Type: define.Linux},
-		},
-	})
-
-	for _, tc := range protectionTests {
-		t.Run(tc.name, func(t *testing.T) {
-			testInstallAndUnenrollWithEndpointSecurity(t, info, tc.protected)
-		})
-	}
 }
 
 func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info, protected bool) {
@@ -244,7 +272,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	hostname, err := os.Hostname()
 	require.NoError(t, err)
 
-	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, policy.ID, hostname)
+	agentID, err := fleettools.GetAgentIDByHostname(info.KibanaClient, policy.ID, hostname)
 	require.NoError(t, err)
 
 	_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{ID: agentID})
@@ -296,34 +324,6 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 
 		t.Log("Found directory", f.Name())
 		require.False(t, strings.Contains(f.Name(), "Endpoint"), "Endpoint directory was not removed")
-	}
-}
-
-// Tests that the agent can install and uninstall the endpoint-security service
-// after the Elastic Defend integration was removed from the policy
-// while remaining healthy.
-//
-// Installing endpoint-security requires a Fleet managed agent with the Elastic Defend integration
-// installed. The endpoint-security service is uninstalled the Elastic Defend integration was removed from the policy.
-//
-// Like the CLI uninstall test, the agent is uninstalled from the command line at the end of the test
-// but at this point endpoint should be already uninstalled.
-
-func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
-		OS: []define.OS{
-			{Type: define.Linux},
-		},
-	})
-
-	for _, tc := range protectionTests {
-		t.Run(tc.name, func(t *testing.T) {
-			testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t, info, tc.protected)
-		})
 	}
 }
 
@@ -404,7 +404,29 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 		}
 
 		t.Log("Found directory", f.Name())
-		require.False(t, strings.Contains(f.Name(), "Endpoint"), "Endpoint directory was not removed")
+		// If Endpoint was not currently removed, let's see what was left
+		if strings.Contains(f.Name(), "Endpoint") {
+			info, err := f.Info()
+			if err != nil {
+				t.Logf("could not get file info for %q to check what was left"+
+					"behind: %v", f.Name(), err)
+			}
+			ls, err := os.ReadDir(info.Name())
+			if err != nil {
+				t.Logf("could not list fileson for %q to check what was left"+
+					"behind: %v", f.Name(), err)
+			}
+			var dirEntries []string
+			for _, de := range ls {
+				dirEntries = append(dirEntries, de.Name())
+			}
+
+			if len(dirEntries) == 0 {
+				t.Fatalf("Endpoint directory was not removed, but it's empty")
+			}
+			t.Fatalf("Endpoint directory was not removed, the directory content is: %s",
+				strings.Join(dirEntries, ", "))
+		}
 	}
 }
 
@@ -545,7 +567,7 @@ func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient c
 	}
 
 	if state.State != client.Healthy {
-		t.Logf("Agent is not Healthy\n%+v", state)
+		t.Logf("local Agent is not Healthy: current state: %+v", state)
 		return false
 	}
 
@@ -554,7 +576,7 @@ func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient c
 	for _, comp := range state.Components {
 		isEndpointComponent := strings.Contains(comp.Name, "endpoint")
 		if comp.State != client.Healthy {
-			t.Logf("Component is not Healthy\n%+v", comp)
+			t.Logf("endpoint component is not Healthy: current state: %+v", comp)
 			return false
 		}
 
@@ -569,7 +591,7 @@ func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient c
 			}
 
 			if unit.State != client.Healthy {
-				t.Logf("Unit is not Healthy\n%+v", unit)
+				t.Logf("unit %q is not Healthy\n%+v", unit.UnitID, unit)
 				return false
 			}
 		}
@@ -577,7 +599,7 @@ func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient c
 
 	// Ensure both the endpoint input and output units were found and healthy.
 	if !foundEndpointInputUnit || !foundEndpointOutputUnit {
-		t.Logf("State did not contain endpoint units!\n%+v", state)
+		t.Logf("State did not contain endpoint units. state: %+v", state)
 		return false
 	}
 

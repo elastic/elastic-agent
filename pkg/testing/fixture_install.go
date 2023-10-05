@@ -83,8 +83,12 @@ func (i InstallOpts) toCmdArgs() []string {
 	return args
 }
 
-// Install installs the prepared Elastic Agent binary and returns:
-//   - the combined output of stdout and stderr
+// Install installs the prepared Elastic Agent binary and registers a t.Cleanup
+// function to uninstall the agent if it hasn't been uninstalled. It also takes
+// care of collecting a diagnostics when AGENT_COLLECT_DIAG=true or the test
+// has failed.
+// It returns:
+//   - the combined output of Install command stdout and stderr
 //   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
@@ -133,12 +137,12 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 
 		// environment variable AGENT_KEEP_INSTALLED=true will skip the uninstall
 		// useful to debug the issue with the Elastic Agent
-		if f.t.Failed() && keepInstalled() {
+		if f.t.Failed() && keepInstalledFlag() {
 			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
 			return
 		}
 
-		if keepInstalled() {
+		if keepInstalledFlag() {
 			f.t.Logf("ignoring AGENT_KEEP_INSTALLED=true as test succeeded, " +
 				"keeping the agent installed will jeopardise other tests")
 		}
@@ -303,7 +307,7 @@ func collectDiagFlag() bool {
 	return v
 }
 
-func keepInstalled() bool {
+func keepInstalledFlag() bool {
 	// failure reports false (ignore error)
 	v, _ := strconv.ParseBool(os.Getenv("AGENT_KEEP_INSTALLED"))
 	return v
