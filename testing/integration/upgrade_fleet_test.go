@@ -17,10 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
@@ -105,7 +106,7 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 	require.NoError(t, err)
 
 	t.Log("Getting default Fleet Server URL...")
-	fleetServerURL, err := tools.GetDefaultFleetServerURL(kibClient)
+	fleetServerURL, err := fleettools.DefaultURL(kibClient)
 	require.NoError(t, err)
 
 	t.Log("Enrolling Elastic Agent...")
@@ -125,7 +126,7 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient, policy.ID))
+		assert.NoError(t, fleettools.UnEnrollAgent(info.KibanaClient, policy.ID))
 	})
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
@@ -133,10 +134,10 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, policy.ID, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policy.ID, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	t.Logf("Upgrading from version %q to version %q...", startParsedVersion, endVersionInfo.Binary.String())
-	err = tools.UpgradeAgent(kibClient, policy.ID, endVersionInfo.Binary.String(), true)
+	err = fleettools.UpgradeAgent(kibClient, policy.ID, endVersionInfo.Binary.String(), true)
 	require.NoError(t, err)
 
 	// wait for the watcher to show up
@@ -150,12 +151,12 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, policy.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policy.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
 
 	// wait for version
 	require.Eventually(t, func() bool {
 		t.Log("Getting Agent version...")
-		newVersion, err := tools.GetAgentVersion(kibClient, policy.ID)
+		newVersion, err := fleettools.GetAgentVersion(kibClient, policy.ID)
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
 			return false

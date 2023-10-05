@@ -1371,52 +1371,59 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
-				} else {
-					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "good-input"}]
-					if ok {
-						if unitGood {
-							if unit.State == client.UnitStateFailed {
-								subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-							} else if unit.State == client.UnitStateHealthy {
-								// good unit it; now make it bad
-								t.Logf("marking good-input as having a hard-error for config")
-								updatedComp := comp
-								updatedComp.Units = make([]component.Unit, len(comp.Units))
-								copy(updatedComp.Units, comp.Units)
-								updatedComp.Units[1] = component.Unit{
-									ID:   "good-input",
-									Type: client.UnitTypeInput,
-									Err:  errors.New("hard-error for config"),
-								}
-								unitGood = false
-								err := m.Update(component.Model{Components: []component.Component{updatedComp}})
-								if err != nil {
-									subErrCh <- err
-								}
-							} else if unit.State == client.UnitStateStarting {
-								// acceptable
-							} else {
-								// unknown state that should not have occurred
-								subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
-							}
-						} else {
-							if unit.State == client.UnitStateFailed {
-								// went to failed; stop whole component
-								err := m.Update(component.Model{Components: []component.Component{}})
-								if err != nil {
-									subErrCh <- err
-								}
-							} else if unit.State == client.UnitStateStopped {
-								// unit was stopped
-								subErrCh <- nil
-							} else {
-								subErrCh <- errors.New("good-input unit should be either failed or stopped")
-							}
+					return
+				}
+
+				unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "good-input"}]
+				if !ok {
+					subErrCh <- errors.New("unit missing: good-input")
+					return
+				}
+				if unitGood {
+					switch unit.State {
+					case client.UnitStateFailed:
+						subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+						return
+					case client.UnitStateHealthy:
+						// good unit it; now make it bad
+						t.Logf("marking good-input as having a hard-error for config")
+						updatedComp := comp
+						updatedComp.Units = make([]component.Unit, len(comp.Units))
+						copy(updatedComp.Units, comp.Units)
+						updatedComp.Units[1] = component.Unit{
+							ID:   "good-input",
+							Type: client.UnitTypeInput,
+							Err:  errors.New("hard-error for config"),
 						}
-					} else {
-						subErrCh <- errors.New("unit missing: good-input")
+						unitGood = false
+						err := m.Update(component.Model{Components: []component.Component{updatedComp}})
+						if err != nil {
+							subErrCh <- err
+						}
+					case client.UnitStateStarting:
+						// acceptable
+					default:
+						// unknown state that should not have occurred
+						subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+					}
+				} else {
+					switch unit.State {
+					case client.UnitStateFailed:
+						// went to failed; stop whole component
+						err := m.Update(component.Model{Components: []component.Component{}})
+						if err != nil {
+							subErrCh <- err
+						}
+					case client.UnitStateStopped:
+						// unit was stopped
+						subErrCh <- nil
+					default:
+						subErrCh <- fmt.Errorf(
+							"good-input unit should be either failed or stopped, but it's '%s'",
+							unit.State)
 					}
 				}
+
 			}
 		}
 	}()

@@ -2,21 +2,15 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package tools
+package fleettools
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"testing"
-	"time"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
 // GetAgentByPolicyIDAndHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
@@ -45,6 +39,14 @@ func GetAgentByPolicyIDAndHostnameFromList(client *kibana.Client, policyID, host
 	}
 
 	return hostnameAgents[0], nil
+}
+
+func GetAgentIDByHostname(client *kibana.Client, policyID, hostname string) (string, error) {
+	agent, err := GetAgentByPolicyIDAndHostnameFromList(client, policyID, hostname)
+	if err != nil {
+		return "", err
+	}
+	return agent.Agent.ID, nil
 }
 
 func GetAgentStatus(client *kibana.Client, policyID string) (string, error) {
@@ -97,15 +99,8 @@ func UnEnrollAgent(client *kibana.Client, policyID string) error {
 	return nil
 }
 
-func GetAgentIDByHostname(client *kibana.Client, policyID, hostname string) (string, error) {
-	agent, err := GetAgentByPolicyIDAndHostnameFromList(client, policyID, hostname)
-	if err != nil {
-		return "", err
-	}
-	return agent.Agent.ID, nil
-}
-
 func UpgradeAgent(client *kibana.Client, policyID, version string, force bool) error {
+	// TODO: fix me: this does not work if FQDN is enabled
 	hostname, err := os.Hostname()
 	if err != nil {
 		return err
@@ -128,7 +123,7 @@ func UpgradeAgent(client *kibana.Client, policyID, version string, force bool) e
 	return nil
 }
 
-func GetDefaultFleetServerURL(client *kibana.Client) (string, error) {
+func DefaultURL(client *kibana.Client) (string, error) {
 	req := kibana.ListFleetServerHostsRequest{}
 	resp, err := client.ListFleetServerHosts(context.Background(), req)
 	if err != nil {
@@ -144,23 +139,5 @@ func GetDefaultFleetServerURL(client *kibana.Client) (string, error) {
 		}
 	}
 
-	return "", errors.New("unable to determine default fleet server host")
-}
-
-func WaitForAgent(ctx context.Context, t *testing.T, c client.Client) {
-	require.Eventually(t, func() bool {
-		err := c.Connect(ctx)
-		if err != nil {
-			t.Logf("connecting client to agent: %v", err)
-			return false
-		}
-		defer c.Disconnect()
-		state, err := c.State(ctx)
-		if err != nil {
-			t.Logf("error getting the agent state: %v", err)
-			return false
-		}
-		t.Logf("agent state: %+v", state)
-		return state.State == cproto.State_HEALTHY
-	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+	return "", errors.New("unable to determine default fleet server URL")
 }

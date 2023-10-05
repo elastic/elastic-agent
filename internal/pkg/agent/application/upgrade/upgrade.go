@@ -9,24 +9,28 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/jaypipes/ghw"
 
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
-
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -48,10 +52,11 @@ var ErrSameVersion = errors.New("upgrade did not occur because its the same vers
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log         *logger.Logger
-	settings    *artifact.Config
-	agentInfo   *info.AgentInfo
-	upgradeable bool
+	log            *logger.Logger
+	settings       *artifact.Config
+	agentInfo      *info.AgentInfo
+	upgradeable    bool
+	fleetServerURI string
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -69,6 +74,17 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.
 		agentInfo:   agentInfo,
 		upgradeable: IsUpgradeable(),
 	}
+}
+
+// SetClient reloads URI based on up to date fleet client
+func (u *Upgrader) SetClient(c fleetclient.Sender) {
+	if c == nil {
+		u.log.Debug("client nil, resetting Fleet Server URI")
+		u.fleetServerURI = ""
+	}
+
+	u.fleetServerURI = c.URI()
+	u.log.Debugf("Set client changed URI to %s", u.fleetServerURI)
 }
 
 // Reload reloads the artifact configuration for the upgrader.
@@ -361,12 +377,23 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		}
 	}
 
+	block, err := ghw.Block()
+	if err != nil {
+		return fmt.Errorf("ghw.Block() returned error: %w", err)
+	}
+
+	copyConcurrency := 1
+	if install.HasAllSSDs(*block) {
+		copyConcurrency = runtime.NumCPU() * 4
+	}
+
 	return copy.Copy(from, to, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
-		Sync:    true,
-		OnError: onErr,
+		Sync:         true,
+		OnError:      onErr,
+		NumOfWorkers: int64(copyConcurrency),
 	})
 }
 

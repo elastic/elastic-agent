@@ -60,3 +60,7 @@ func (c *Client) doPost(ctx context.Context, relativeUrl, contentType string, bo
 
 	return c.client.Do(req)
 }
+
+func (c *Client) BaseURL() string {
+	return c.config.BaseUrl
+}
