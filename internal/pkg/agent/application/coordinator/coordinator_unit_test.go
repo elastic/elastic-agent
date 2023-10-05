@@ -601,7 +601,7 @@ inputs:
 	coord.runLoopIteration(ctx)
 	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
 
-	// server is started by default
+	// server is stopped: monitoring is disabled
 	assert.True(t, monitoringServer.stopTriggered)
 	assert.False(t, monitoringServer.isRunning)
 
@@ -624,7 +624,7 @@ inputs:
 	coord.runLoopIteration(ctx)
 	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
 
-	// server is started by default
+	// server is started again
 	assert.True(t, monitoringServer.startTriggered)
 	assert.True(t, monitoringServer.isRunning)
 
@@ -648,7 +648,7 @@ inputs:
 	coord.runLoopIteration(ctx)
 	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
 
-	// server is started by default
+	// server is stopped: monitoring.metrics is disabled
 	assert.True(t, monitoringServer.stopTriggered)
 	assert.False(t, monitoringServer.isRunning)
 }
