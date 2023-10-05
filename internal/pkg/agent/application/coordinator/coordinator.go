@@ -455,6 +455,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
+		det.Fail(err)
 		return err
 	}
 	if cb != nil {
