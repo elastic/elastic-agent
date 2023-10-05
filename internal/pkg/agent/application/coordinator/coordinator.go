@@ -447,9 +447,15 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// override the overall state to upgrading until the re-execution is complete
 	c.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
-	det := details.NewDetails(version, details.StateRequested, action.ActionID, details.DetailsMetadata{
-		ScheduledAt: action.ActionStartTime},
-	)
+
+	// initialize upgrade details
+	actionID := ""
+	detMetadata := details.DetailsMetadata{}
+	if action != nil {
+		actionID = action.ActionID
+		detMetadata.ScheduledAt = action.ActionStartTime
+	}
+	det := details.NewDetails(version, details.StateRequested, actionID, detMetadata)
 	det.RegisterObserver(c.setUpgradeDetails)
 
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
