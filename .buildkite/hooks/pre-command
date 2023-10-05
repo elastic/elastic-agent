@@ -55,7 +55,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == 
   export TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE=$(realpath ./gcp.json)
 
   # ESS credentials
-  export API_KEY_TOKEN=$(vault kv get -field api_key ${CI_ESS_STAGING_PATH})
+  export API_KEY_TOKEN=$(vault kv get -field apiKey ${CI_ESS_STAGING_PATH})
   echo ${API_KEY_TOKEN} > ./apiKey
   export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
 fi
