@@ -19,16 +19,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 func TestFQDN(t *testing.T) {
@@ -90,7 +89,7 @@ func TestFQDN(t *testing.T) {
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient, policy.ID))
+		assert.NoError(t, fleettools.UnEnrollAgent(info.KibanaClient, policy.ID))
 
 		t.Log("Restoring hostname...")
 		err := setHostname(context.Background(), origHostname, t.Log)
@@ -127,7 +126,7 @@ func TestFQDN(t *testing.T) {
 	expectedAgentPolicyRevision := agent.PolicyRevision + 1
 	require.Eventually(
 		t,
-		tools.WaitForPolicyRevision(t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsPolicyRevision(t, kibClient, agent.ID, expectedAgentPolicyRevision),
 		2*time.Minute,
 		1*time.Second,
 	)
@@ -158,7 +157,7 @@ func TestFQDN(t *testing.T) {
 	expectedAgentPolicyRevision++
 	require.Eventually(
 		t,
-		tools.WaitForPolicyRevision(t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsPolicyRevision(t, kibClient, agent.ID, expectedAgentPolicyRevision),
 		2*time.Minute,
 		1*time.Second,
 	)
@@ -182,7 +181,7 @@ func verifyAgentName(t *testing.T, policyID, hostname string, kibClient *kibana.
 	require.Eventually(
 		t,
 		func() bool {
-			agent, err = tools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policyID, hostname)
+			agent, err = fleettools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policyID, hostname)
 			return err == nil && agent != nil
 		},
 		5*time.Minute,

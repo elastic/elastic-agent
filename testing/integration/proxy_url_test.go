@@ -130,7 +130,7 @@ func TestProxyURL_EnrollProxyAndNoProxyInThePolicy(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	check.ConnectedToFleet(t, p.fixture)
+	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
 }
 
 func TestProxyURL_EnrollProxyAndEmptyProxyInThePolicy(t *testing.T) {
@@ -175,7 +175,7 @@ func TestProxyURL_EnrollProxyAndEmptyProxyInThePolicy(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	check.ConnectedToFleet(t, p.fixture)
+	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
 }
 
 func TestProxyURL_ProxyInThePolicyTakesPrecedence(t *testing.T) {
@@ -220,7 +220,7 @@ func TestProxyURL_ProxyInThePolicyTakesPrecedence(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	check.ConnectedToFleet(t, p.fixture)
+	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
 
 	// ensure the agent is communicating through the proxy set in the policy
 	want := fleetservertest.NewPathCheckin(p.policyData.AgentID)
@@ -282,7 +282,7 @@ func TestProxyURL_NoEnrollProxyAndProxyInThePolicy(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	check.ConnectedToFleet(t, p.fixture)
+	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
 
 	// ensure the agent is communicating through the new proxy
 	if !assert.Eventually(t, func() bool {
@@ -343,7 +343,7 @@ func TestProxyURL_RemoveProxyFromThePolicy(t *testing.T) {
 	}
 
 	// assert the agent is actually connected to fleet.
-	check.ConnectedToFleet(t, p.fixture)
+	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
 
 	// ensure the agent is communicating through the proxy set in the policy
 	if !assert.Eventually(t, func() bool {
@@ -389,7 +389,7 @@ func TestProxyURL_RemoveProxyFromThePolicy(t *testing.T) {
 	assert.Equal(t, inspect.Fleet.ProxyURL, want)
 
 	// assert, again, the agent is actually connected to fleet.
-	check.ConnectedToFleet(t, p.fixture)
+	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
 }
 
 func (p *ProxyURL) setupFleet(t *testing.T, fleetHost string) {
