@@ -75,11 +75,11 @@ func TestDownloadBodyError(t *testing.T) {
 }
 
 func TestDownloadLogProgressWithLength(t *testing.T) {
-	fileSize := 100 * units.MiB
+	fileSize := 100 * units.MB
 	chunks := 100
 	chunk := make([]byte, fileSize/chunks)
 	delayBetweenChunks := 10 * time.Millisecond
-	totalTime := time.Duration(chunks) * (delayBetweenChunks + 1*time.Millisecond)
+	totalTime := time.Duration(chunks) * delayBetweenChunks
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", strconv.Itoa(fileSize))
@@ -120,16 +120,66 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	log.lock.RLock()
 	defer log.lock.RUnlock()
 
-	// 2 files are downloaded so 4 log messages are expected in the info level and only the complete is over the warn
-	// window as 2 log messages for warn.
-	require.Len(t, log.info, 4)
-	assert.Equal(t, log.info[0].record, "download progress from %s is %s/%s (%.2f%% complete) @ %sps")
-	assert.Equal(t, log.info[1].record, "download from %s completed in %s @ %sps")
-	assert.Equal(t, log.info[2].record, "download progress from %s is %s/%s (%.2f%% complete) @ %sps")
-	assert.Equal(t, log.info[3].record, "download from %s completed in %s @ %sps")
-	require.Len(t, log.warn, 2)
-	assert.Equal(t, log.warn[0].record, "download from %s completed in %s @ %sps")
-	assert.Equal(t, log.warn[1].record, "download from %s completed in %s @ %sps")
+	// Two files are downloaded. Each file is being downloaded in 100 chunks with a delay of 10ms between chunks. The
+	// expected time to download is, therefore, 100 * 10ms = 1000ms. In reality, the actual download time will be a bit
+	// more than 1000ms because some time is spent downloading the chunk, in between inter-chunk delays.
+	// Reporting happens every 0.05 * 1000ms = 50ms. We expect there to be as many log messages at that INFO
+	// level as the actual total download time / 50ms, for each file. That works out to at least 1000ms / 50ms = 20 log
+	// messages at the INFO level for each file = 40 log messages at the INFO level for both files, about their download
+	// progress. Additionally, we should expect 1 INFO message per file about the download completing. So, all in all, we
+	// should expect at least 42 INFO messages.
+	require.GreaterOrEqual(t, len(log.info), 42)
+
+	// Verify that the first 20 INFO messages are about the download progress (for the first file).
+	i := 0
+	for ; i < 20; i++ {
+		assert.Equal(t, log.info[i].record, "download progress from %s is %s/%s (%.2f%% complete) @ %sps")
+	}
+
+	// Find the next INFO message that's about the download being completed (for the first file).
+	found := false
+	for ; i < len(log.info) && !found; i++ {
+		found = log.info[i].record == "download from %s completed in %s @ %sps"
+	}
+	assert.True(t, found)
+
+	// Verify that the next 20 INFO messages are about the download progress (for the second file).
+	for j := 0; j < 20; j++ {
+		assert.Equal(t, log.info[i+j].record, "download progress from %s is %s/%s (%.2f%% complete) @ %sps")
+	}
+
+	// Verify that the last INFO message is about the download being completed (for the second file).
+	assert.Equal(t, log.info[len(log.info)-1].record, "download from %s completed in %s @ %sps")
+
+	// Since the download of each file is expected to take 1000ms, and the progress logger
+	// starts issuing WARN messages once the download has taken more than 75% of the expected time,
+	// we should see warning messages for at least the last 250 seconds of the download. Given that
+	// reporting happens every 50 seconds, we should see at least 250s / 50s = 5 WARN messages
+	// per file being downloaded = at least 10 WARN messages for both files about their download progress.
+	// Additionally, we should expect 1 WARN message per file about the download completing. So, all in all, we
+	// should expect at least 12 WARN messages.
+	require.GreaterOrEqual(t, len(log.warn), 12)
+
+	// Verify that the first 5 WARN messages are about the download progress (for the first file).
+	i = 0
+	for ; i < 5; i++ {
+		assert.Equal(t, log.warn[i].record, "download progress from %s is %s/%s (%.2f%% complete) @ %sps")
+	}
+
+	// Find the next WARN message that's about the download being completed (for the first file).
+	found = false
+	for ; i < len(log.warn) && !found; i++ {
+		found = log.warn[i].record == "download from %s completed in %s @ %sps"
+	}
+	assert.True(t, found)
+
+	// Verify that the next 5 WARN messages are about the download progress (for the second file).
+	for j := 0; j < 5; j++ {
+		assert.Equal(t, log.warn[i+j].record, "download progress from %s is %s/%s (%.2f%% complete) @ %sps")
+	}
+
+	// Verify that the last WARN message is about the download being completed (for the second file).
+	assert.Equal(t, log.warn[len(log.warn)-1].record, "download from %s completed in %s @ %sps")
 }
 
 func TestDownloadLogProgressWithoutLength(t *testing.T) {
@@ -137,7 +187,7 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	chunks := 100
 	chunk := make([]byte, fileSize/chunks)
 	delayBetweenChunks := 10 * time.Millisecond
-	totalTime := time.Duration(chunks) * (delayBetweenChunks + 1*time.Millisecond)
+	totalTime := time.Duration(chunks) * delayBetweenChunks
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -177,16 +227,66 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	log.lock.RLock()
 	defer log.lock.RUnlock()
 
-	// 2 files are downloaded so 4 log messages are expected in the info level and only the complete is over the warn
-	// window as 2 log messages for warn.
-	require.Len(t, log.info, 4)
-	assert.Equal(t, log.info[0].record, "download progress from %s has fetched %s @ %sps")
-	assert.Equal(t, log.info[1].record, "download from %s completed in %s @ %sps")
-	assert.Equal(t, log.info[2].record, "download progress from %s has fetched %s @ %sps")
-	assert.Equal(t, log.info[3].record, "download from %s completed in %s @ %sps")
-	require.Len(t, log.warn, 2)
-	assert.Equal(t, log.warn[0].record, "download from %s completed in %s @ %sps")
-	assert.Equal(t, log.warn[1].record, "download from %s completed in %s @ %sps")
+	// Two files are downloaded. Each file is being downloaded in 100 chunks with a delay of 10ms between chunks. The
+	// expected time to download is, therefore, 100 * 10ms = 1000ms. In reality, the actual download time will be a bit
+	// more than 1000ms because some time is spent downloading the chunk, in between inter-chunk delays.
+	// Reporting happens every 0.05 * 1000ms = 50ms. We expect there to be as many log messages at that INFO
+	// level as the actual total download time / 50ms, for each file. That works out to at least 1000ms / 50ms = 20 log
+	// messages at the INFO level for each file = 40 log messages at the INFO level for both files, about their download
+	// progress. Additionally, we should expect 1 INFO message per file about the download completing. So, all in all, we
+	// should expect at least 42 INFO messages.
+	require.GreaterOrEqual(t, len(log.info), 42)
+
+	// Verify that the first 20 INFO messages are about the download progress (for the first file).
+	i := 0
+	for ; i < 20; i++ {
+		assert.Equal(t, log.info[i].record, "download progress from %s has fetched %s @ %sps")
+	}
+
+	// Find the next INFO message that's about the download being completed (for the first file).
+	found := false
+	for ; i < len(log.info) && !found; i++ {
+		found = log.info[i].record == "download from %s completed in %s @ %sps"
+	}
+	assert.True(t, found)
+
+	// Verify that the next 20 INFO messages are about the download progress (for the second file).
+	for j := 0; j < 20; j++ {
+		assert.Equal(t, log.info[i+j].record, "download progress from %s has fetched %s @ %sps")
+	}
+
+	// Verify that the last INFO message is about the download being completed (for the second file).
+	assert.Equal(t, log.info[len(log.info)-1].record, "download from %s completed in %s @ %sps")
+
+	// Since the download of each file is expected to take 1000ms, and the progress logger
+	// starts issuing WARN messages once the download has taken more than 75% of the expected time,
+	// we should see warning messages for at least the last 250 seconds of the download. Given that
+	// reporting happens every 50 seconds, we should see at least 250s / 50s = 5 WARN messages
+	// per file being downloaded = at least 10 WARN messages for both files about their download progress.
+	// Additionally, we should expect 1 WARN message per file about the download completing. So, all in all, we
+	// should expect at least 12 WARN messages.
+	require.GreaterOrEqual(t, len(log.warn), 12)
+
+	// Verify that the first 5 WARN messages are about the download progress (for the first file).
+	i = 0
+	for ; i < 5; i++ {
+		assert.Equal(t, log.warn[i].record, "download progress from %s has fetched %s @ %sps")
+	}
+
+	// Find the next WARN message that's about the download being completed (for the first file).
+	found = false
+	for ; i < len(log.warn) && !found; i++ {
+		found = log.warn[i].record == "download from %s completed in %s @ %sps"
+	}
+	assert.True(t, found)
+
+	// Verify that the next 5 WARN messages are about the download progress (for the second file).
+	for j := 0; j < 5; j++ {
+		assert.Equal(t, log.warn[i+j].record, "download progress from %s has fetched %s @ %sps")
+	}
+
+	// Verify that the last WARN message is about the download being completed (for the second file).
+	assert.Equal(t, log.warn[len(log.warn)-1].record, "download from %s completed in %s @ %sps")
 }
 
 type logMessage struct {

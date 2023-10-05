@@ -35,6 +35,10 @@ const (
 	// the default timeout is 10 minutes and this will have it log every 30 seconds.
 	downloadProgressIntervalPercentage = 0.05
 
+	// downloadProgressDefaultInterval defines the default interval at which the current download progress will be reported.
+	// This value is used if the timeout is not specified (and therefore equal to 0).
+	downloadProgressMinInterval = 10 * time.Second
+
 	// warningProgressIntervalPercentage defines how often to log messages as a warning once the amount of time
 	// passed is this percentage or more of the total allotted time to download.
 	warningProgressIntervalPercentage = 0.75
@@ -223,7 +227,6 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 type downloadProgressReporter struct {
 	log         progressLogger
 	sourceURI   string
-	timeout     time.Duration
 	interval    time.Duration
 	warnTimeout time.Duration
 	length      float64
@@ -233,11 +236,15 @@ type downloadProgressReporter struct {
 }
 
 func newDownloadProgressReporter(log progressLogger, sourceURI string, timeout time.Duration, length int) *downloadProgressReporter {
+	interval := time.Duration(float64(timeout) * downloadProgressIntervalPercentage)
+	if interval == 0 {
+		interval = downloadProgressMinInterval
+	}
+
 	return &downloadProgressReporter{
 		log:         log,
 		sourceURI:   sourceURI,
-		timeout:     timeout,
-		interval:    time.Duration(float64(timeout) * downloadProgressIntervalPercentage),
+		interval:    interval,
 		warnTimeout: time.Duration(float64(timeout) * warningProgressIntervalPercentage),
 		length:      float64(length),
 	}
@@ -259,7 +266,7 @@ func (dp *downloadProgressReporter) Report(ctx context.Context) {
 	interval := dp.interval
 
 	go func() {
-		t := time.NewTimer(interval)
+		t := time.NewTicker(interval)
 		defer t.Stop()
 		for {
 			select {
