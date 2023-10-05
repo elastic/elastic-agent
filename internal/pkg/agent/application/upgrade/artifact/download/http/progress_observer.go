@@ -15,26 +15,26 @@ type progressObserver interface {
 	// Report is called on a periodic basis with information about the download's progress so far.
 	Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64)
 
-	// ReportComplete is called when the download completes successfully.
-	ReportComplete(sourceURI string, timePast time.Duration, downloadRate float64)
+	// ReportCompleted is called when the download completes successfully.
+	ReportCompleted(sourceURI string, timePast time.Duration, downloadRate float64)
 
 	// ReportFailed is called if the download does not complete successfully.
 	ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64, err error)
 }
 
-type loggerProgressObserver struct {
+type loggingProgressObserver struct {
 	log         *logger.Logger
 	warnTimeout time.Duration
 }
 
-func newLoggerProgressObserver(log *logger.Logger, downloadTimeout time.Duration) *loggerProgressObserver {
-	return &loggerProgressObserver{
+func newLoggingProgressObserver(log *logger.Logger, downloadTimeout time.Duration) *loggingProgressObserver {
+	return &loggingProgressObserver{
 		log:         log,
 		warnTimeout: time.Duration(float64(downloadTimeout) * warningProgressIntervalPercentage),
 	}
 }
 
-func (plo *loggerProgressObserver) Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64) {
+func (plo *loggingProgressObserver) Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64) {
 	var msg string
 	var args []interface{}
 	if totalBytes > 0 {
@@ -60,7 +60,7 @@ func (plo *loggerProgressObserver) Report(sourceURI string, timePast time.Durati
 	}
 }
 
-func (plo *loggerProgressObserver) ReportComplete(sourceURI string, timePast time.Duration, downloadRate float64) {
+func (plo *loggingProgressObserver) ReportCompleted(sourceURI string, timePast time.Duration, downloadRate float64) {
 	msg := "download from %s completed in %s @ %sps"
 	args := []interface{}{
 		sourceURI, units.HumanDuration(timePast), units.HumanSize(downloadRate),
@@ -72,7 +72,7 @@ func (plo *loggerProgressObserver) ReportComplete(sourceURI string, timePast tim
 	}
 }
 
-func (plo *loggerProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64, err error) {
+func (plo *loggingProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64, err error) {
 	var msg string
 	var args []interface{}
 	if totalBytes > 0 {

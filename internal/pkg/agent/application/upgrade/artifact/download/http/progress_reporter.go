@@ -83,7 +83,7 @@ func (dp *downloadProgressReporter) ReportComplete() {
 	bytesPerSecond := downloaded / float64(timePast/time.Second)
 
 	for _, obs := range dp.progressObservers {
-		obs.ReportComplete(dp.sourceURI, timePast, bytesPerSecond)
+		obs.ReportCompleted(dp.sourceURI, timePast, bytesPerSecond)
 	}
 }
 

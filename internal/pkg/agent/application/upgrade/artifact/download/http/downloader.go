@@ -206,7 +206,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		}
 	}
 
-	plo := newLoggerProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
+	plo := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
 	reportCtx, reportCancel := context.WithCancel(ctx)
 	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, plo)
 	dp.Report(reportCtx)
