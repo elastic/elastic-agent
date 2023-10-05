@@ -24,6 +24,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
 func TestMonitoringLogsShipped(t *testing.T) {
@@ -69,11 +71,11 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 
-	check.ConnectedToFleet(t, agentFixture)
+	check.ConnectedToFleet(t, agentFixture, 5*time.Minute)
 
 	// Stage 2: check indices
 	// This is mostly for debugging
-	resp, err := tools.GetAllindicies(info.ESClient)
+	resp, err := estools.GetAllindicies(info.ESClient)
 	require.NoError(t, err)
 	for _, run := range resp {
 		t.Logf("%s: %d/%d deleted: %d\n",
@@ -82,8 +84,8 @@ func TestMonitoringLogsShipped(t *testing.T) {
 
 	// Stage 3: Make sure metricbeat logs are populated
 	t.Log("Making sure metricbeat logs are populated")
-	docs := findESDocs(t, func() (tools.Documents, error) {
-		return tools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
+	docs := findESDocs(t, func() (estools.Documents, error) {
+		return estools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
@@ -101,8 +103,8 @@ func TestMonitoringLogsShipped(t *testing.T) {
 
 	// Stage 5: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
-	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.FindMatchingLogLines(info.ESClient, info.Namespace,
+	docs = findESDocs(t, func() (estools.Documents, error) {
+		return estools.FindMatchingLogLines(info.ESClient, info.Namespace,
 			"Parsed configuration and determined agent is managed by Fleet")
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
@@ -114,7 +116,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 		t.Fatalf("could not get hostname to filter Agent: %s", err)
 	}
 
-	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, policy.ID, hostname)
+	agentID, err := fleettools.GetAgentIDByHostname(info.KibanaClient, policy.ID, hostname)
 	require.NoError(t, err, "could not get Agent ID by hostname")
 	t.Logf("Agent ID: %q", agentID)
 
@@ -122,8 +124,8 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	// this field is not mapped. There is an issue for that:
 	// https://github.com/elastic/integrations/issues/6545
 
-	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.GetLogsForAgentID(info.ESClient, agentID)
+	docs = findESDocs(t, func() (estools.Documents, error) {
+		return estools.GetLogsForAgentID(info.ESClient, agentID)
 	})
 	require.NoError(t, err, "could not get logs from Agent ID: %q, err: %s",
 		agentID, err)
@@ -151,8 +153,8 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	}
 }
 
-func findESDocs(t *testing.T, findFn func() (tools.Documents, error)) tools.Documents {
-	var docs tools.Documents
+func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.Documents {
+	var docs estools.Documents
 
 	require.Eventually(
 		t,

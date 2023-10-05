@@ -135,7 +135,7 @@ type ArtifactAPIClient struct {
 	url string
 }
 
-// Creates a new Artifact API client
+// NewArtifactAPIClient creates a new Artifact API client
 func NewArtifactAPIClient(opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
 	c := &ArtifactAPIClient{
 		url: defaultArtifactAPIURL,
@@ -204,7 +204,7 @@ func (aac ArtifactAPIClient) GetBuildDetails(ctx context.Context, version string
 	return checkResponseAndUnmarshal[BuildDetails](resp)
 }
 
-func (aac *ArtifactAPIClient) composeURL(relativePath string) (string, error) {
+func (aac ArtifactAPIClient) composeURL(relativePath string) (string, error) {
 	joinedURL, err := url.JoinPath(aac.url, relativePath)
 	if err != nil {
 		return "", fmt.Errorf("composing URL with %q %q: %w", aac.url, relativePath, err)
@@ -213,7 +213,7 @@ func (aac *ArtifactAPIClient) composeURL(relativePath string) (string, error) {
 	return joinedURL, nil
 }
 
-func (aac *ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL string) (*http.Response, error) {
+func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, URL, nil)
 	if err != nil {
 		err = fmt.Errorf("composing request: %w", err)
