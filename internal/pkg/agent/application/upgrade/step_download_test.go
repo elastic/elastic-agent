@@ -7,6 +7,7 @@ package upgrade
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,22 +33,40 @@ func (md *mockDownloader) Download(ctx context.Context, agentArtifact artifact.A
 
 func TestFallbackIsAppended(t *testing.T) {
 	testCases := []struct {
-		name        string
-		passedBytes []string
-		expectedLen int
+		name                 string
+		passedBytes          []string
+		expectedLen          int
+		expectedDefaultIdx   int
+		expectedSecondaryIdx int
+		fleetServerURI       string
+		targetVersion        string
 	}{
-		{"nil input", nil, 1},
-		{"empty input", []string{}, 1},
-		{"valid input", []string{"pgp-bytes"}, 2},
+		{"nil input", nil, 1, 0, -1, "", ""},
+		{"empty input", []string{}, 1, 0, -1, "", ""},
+		{"valid input with pgp", []string{"pgp-bytes"}, 2, 1, -1, "", ""},
+		{"valid input with pgp and version, no fleet uri", []string{"pgp-bytes"}, 2, 1, -1, "", "1.2.3"},
+		{"valid input with pgp and version and fleet uri", []string{"pgp-bytes"}, 3, 1, 2, "some-uri", "1.2.3"},
+		{"valid input with pgp and fleet uri no version", []string{"pgp-bytes"}, 2, 1, -1, "some-uri", ""},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res := appendFallbackPGP(tc.passedBytes)
+			l, _ := logger.NewTesting(tc.name)
+			u := Upgrader{
+				fleetServerURI: tc.fleetServerURI,
+				log:            l,
+			}
+			res := u.appendFallbackPGP(tc.targetVersion, tc.passedBytes)
 			// check default fallback is passed and is very last
 			require.NotNil(t, res)
 			require.Equal(t, tc.expectedLen, len(res))
-			require.Equal(t, download.PgpSourceURIPrefix+defaultUpgradeFallbackPGP, res[len(res)-1])
+			require.Equal(t, download.PgpSourceURIPrefix+defaultUpgradeFallbackPGP, res[tc.expectedDefaultIdx])
+
+			if tc.expectedSecondaryIdx >= 0 {
+				// last element is fleet uri
+				expectedPgpURI := download.PgpSourceURIPrefix + tc.fleetServerURI + strings.Replace(fleetUpgradeFallbackPGPFormat, "%d.%d.%d", tc.targetVersion, 1)
+				require.Equal(t, expectedPgpURI, res[len(res)-1])
+			}
 		})
 	}
 }
