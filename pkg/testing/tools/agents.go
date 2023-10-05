@@ -105,7 +105,7 @@ func GetAgentIDByHostname(client *kibana.Client, policyID, hostname string) (str
 	return agent.Agent.ID, nil
 }
 
-func UpgradeAgent(client *kibana.Client, policyID, version string) error {
+func UpgradeAgent(client *kibana.Client, policyID, version string, force bool) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return err
@@ -118,6 +118,7 @@ func UpgradeAgent(client *kibana.Client, policyID, version string) error {
 	upgradeAgentReq := kibana.UpgradeAgentRequest{
 		ID:      agentID,
 		Version: version,
+		Force:   force,
 	}
 	_, err = client.UpgradeAgent(context.Background(), upgradeAgentReq)
 	if err != nil {

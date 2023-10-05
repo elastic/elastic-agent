@@ -1495,7 +1495,11 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
 
-	goTestFlags := strings.SplitN(os.Getenv("GOTEST_FLAGS"), " ", -1)
+	var goTestFlags []string
+	rawTestFlags := os.Getenv("GOTEST_FLAGS")
+	if rawTestFlags != "" {
+		goTestFlags = strings.Split(rawTestFlags, " ")
+	}
 	params.ExtraFlags = goTestFlags
 
 	if testName == "all" {
