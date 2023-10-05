@@ -44,9 +44,11 @@ func TestDetailsObserver(t *testing.T) {
 
 	var observedDetails *Details
 	obs := func(updatedDetails *Details) { observedDetails = updatedDetails }
+
 	det.RegisterObserver(obs)
-	require.Nil(t, observedDetails)
 	require.Len(t, det.observers, 1)
+	require.NotNil(t, observedDetails)
+	require.Equal(t, StateRequested, observedDetails.State)
 
 	det.SetState(StateDownloading)
 	require.Equal(t, StateDownloading, det.State)

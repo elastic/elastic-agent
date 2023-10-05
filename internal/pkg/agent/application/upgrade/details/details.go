@@ -62,13 +62,14 @@ func (d *Details) Fail(err error) {
 }
 
 // RegisterObserver allows an interested consumer of Details to register
-// themselves as an Observer. When NotifyObservers is called, all registered
-// observers are sent the current upgrade details.
+// themselves as an Observer. The registered observer is immediately notified
+// of the current upgrade details.
 func (d *Details) RegisterObserver(observer Observer) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	d.observers = append(d.observers, observer)
+	d.notifyObserver(observer)
 }
 
 // NotifyObservers sends the current upgrade details to all registered
@@ -81,10 +82,14 @@ func (d *Details) NotifyObservers() {
 
 func (d *Details) notifyObservers() {
 	for _, observer := range d.observers {
-		if d.State == StateCompleted {
-			observer(nil)
-		} else {
-			observer(d)
-		}
+		d.notifyObserver(observer)
+	}
+}
+
+func (d *Details) notifyObserver(observer Observer) {
+	if d.State == StateCompleted {
+		observer(nil)
+	} else {
+		observer(d)
 	}
 }
