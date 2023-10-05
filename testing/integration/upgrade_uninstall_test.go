@@ -24,8 +24,9 @@ import (
 
 func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
+		Local:   false, // requires Agent installation
+		Sudo:    true,  // requires Agent installation
+		ShardID: "upgrade-standalone",
 	})
 
 	currentVersion, err := version.ParseVersion(define.Version())

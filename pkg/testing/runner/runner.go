@@ -947,6 +947,9 @@ func createBatchID(batch OSBatch) string {
 		id += "-" + batch.OS.Distro
 	}
 	id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
+	if batch.Batch.ShardID != "" {
+		id += "-" + strings.Replace(batch.Batch.ShardID, ".", "", -1)
+	}
 	if batch.Batch.Isolate {
 		if len(batch.Batch.Tests) > 0 {
 			// only ever has one test in an isolated batch

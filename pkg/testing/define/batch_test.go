@@ -329,6 +329,53 @@ func TestBatch(t *testing.T) {
 				},
 			},
 		},
+		{
+			OS: OS{
+				Type:    Linux,
+				Arch:    ARM64,
+				Version: "20.04",
+				Distro:  "ubuntu",
+			},
+			Stack: &Stack{
+				Version: "8.8.0",
+			},
+			ShardID: "One",
+			Tests: []BatchPackageTests{
+				{
+					Name: pkgName,
+					Tests: []BatchPackageTest{
+						{
+							Name:  "TestSpecificShardID_One_One",
+							Stack: true,
+						},
+						{
+							Name:  "TestSpecificShardID_One_Two",
+							Stack: true,
+						},
+					},
+				},
+			},
+		},
+		{
+			OS: OS{
+				Type: Linux,
+				Arch: ARM64,
+			},
+			ShardID: "Two",
+			Tests: []BatchPackageTests{
+				{
+					Name: pkgName,
+					Tests: []BatchPackageTest{
+						{
+							Name: "TestShardID_Two_One",
+						},
+						{
+							Name: "TestShardID_Two_Two",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	actual, err := DetermineBatches("testdata", "", "batch_test")

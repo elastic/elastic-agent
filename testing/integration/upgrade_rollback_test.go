@@ -30,8 +30,9 @@ import (
 // that the Agent is rolled back to the previous version.
 func TestStandaloneUpgradeRollback(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
+		Local:   false, // requires Agent installation
+		Sudo:    true,  // requires Agent installation
+		ShardID: "upgrade-rollback",
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -122,8 +123,9 @@ inputs:
 // rolled back to the previous version.
 func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
+		Local:   false, // requires Agent installation
+		Sudo:    true,  // requires Agent installation
+		ShardID: "upgrade-rollback",
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

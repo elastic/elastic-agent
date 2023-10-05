@@ -31,9 +31,10 @@ import (
 // versions as the standalone tests already perform those tests and would be redundant.
 func TestFleetManagedUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Stack: &define.Stack{},
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
+		Stack:   &define.Stack{},
+		Local:   false, // requires Agent installation
+		Sudo:    true,  // requires Agent installation
+		ShardID: "upgrade-fleet",
 	})
 
 	ctx, cancel := context.WithCancel(context.TODO())

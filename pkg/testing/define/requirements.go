@@ -104,6 +104,13 @@ type Requirements struct {
 	// Sudo defines that this test must run under superuser permissions. On Mac and Linux the
 	// test gets executed under sudo and on Windows it gets run under Administrator.
 	Sudo bool `json:"sudo"`
+
+	// ShardID defines an ID that will suffix the batch used to run this specific test.
+	// When multiple tests have the same ShardID they are placed with in the same batch.
+	//
+	// Useful when a tests take a long time to complete and sharding them across multiple
+	// host can improve the total amount of time to complete all the tests.
+	ShardID string `json:"shard_id,omitempty"`
 }
 
 // Validate returns an error if not valid.

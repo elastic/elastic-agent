@@ -170,3 +170,61 @@ func TestSpecificCombinationWithCloud(t *testing.T) {
 		},
 	})
 }
+
+func TestSpecificShardID_One_One(t *testing.T) {
+	define.Require(t, define.Requirements{
+		OS: []define.OS{
+			{
+				Type:    define.Linux,
+				Arch:    define.ARM64,
+				Distro:  "ubuntu",
+				Version: "20.04",
+			},
+		},
+		Stack: &define.Stack{
+			Version: "8.8.0",
+		},
+		ShardID: "One",
+	})
+}
+
+func TestSpecificShardID_One_Two(t *testing.T) {
+	define.Require(t, define.Requirements{
+		OS: []define.OS{
+			{
+				Type:    define.Linux,
+				Arch:    define.ARM64,
+				Distro:  "ubuntu",
+				Version: "20.04",
+			},
+		},
+		Stack: &define.Stack{
+			Version: "8.8.0",
+		},
+		ShardID: "One",
+	})
+}
+
+func TestShardID_Two_One(t *testing.T) {
+	define.Require(t, define.Requirements{
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+				Arch: define.ARM64,
+			},
+		},
+		ShardID: "Two",
+	})
+}
+
+func TestShardID_Two_Two(t *testing.T) {
+	define.Require(t, define.Requirements{
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+				Arch: define.ARM64,
+			},
+		},
+		ShardID: "Two",
+	})
+}

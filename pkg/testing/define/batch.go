@@ -50,6 +50,9 @@ type Batch struct {
 	// Isolate defines that this batch is isolated to a single test.
 	Isolate bool `json:"isolate"`
 
+	// ShardID defines the set of tests that are in this batch's shard.
+	ShardID string `json:"shard_id,omitempty"`
+
 	// Tests define the set of packages and tests that do not require sudo
 	// privileges to be performed.
 	Tests []BatchPackageTests `json:"tests"`
@@ -179,13 +182,14 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 		var batch Batch
 		batchIdx := -1
 		if !req.Isolate {
-			batchIdx = findBatchIdx(batches, o, req.Stack)
+			batchIdx = findBatchIdx(batches, o, req.Stack, req.ShardID)
 		}
 		if batchIdx == -1 {
 			// new batch required
 			batch = Batch{
 				OS:        o,
 				Isolate:   req.Isolate,
+				ShardID:   req.ShardID,
 				Tests:     nil,
 				SudoTests: nil,
 			}
@@ -241,7 +245,7 @@ func appendPackageTest(tests []BatchPackageTests, pkg string, name string, stack
 	return tests
 }
 
-func findBatchIdx(batches []Batch, os OS, stack *Stack) int {
+func findBatchIdx(batches []Batch, os OS, stack *Stack, shardID string) int {
 	for i, b := range batches {
 		if b.Isolate {
 			// never add to an isolate batch
@@ -260,6 +264,12 @@ func findBatchIdx(batches []Batch, os OS, stack *Stack) int {
 		if os.Version != "" {
 			// must have the same version
 			if b.OS.Version != "" && b.OS.Version != os.Version {
+				continue
+			}
+		}
+		if shardID != "" {
+			// must be in the same shard
+			if b.ShardID != shardID {
 				continue
 			}
 		}
