@@ -1877,7 +1877,7 @@ func testGroups() []string {
 	var groups []string
 	for _, g := range strings.Split(groupsStr, " ") {
 		if g != "" {
-			groups = append(groups, p)
+			groups = append(groups, g)
 		}
 	}
 	return groups
