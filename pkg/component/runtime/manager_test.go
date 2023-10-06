@@ -2481,18 +2481,21 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 				return
 			case state := <-sub.Ch():
 				t.Logf("component state changed: %+v", state)
-				if state.State == client.UnitStateStarting || state.State == client.UnitStateHealthy {
+
+				switch state.State {
+				case client.UnitStateStarting:
+				case client.UnitStateHealthy:
 					// starting and healthy are allowed
-				} else if state.State == client.UnitStateDegraded {
+				case client.UnitStateDegraded:
 					// should go to degraded first
 					wasDegraded = true
-				} else if state.State == client.UnitStateFailed {
+				case client.UnitStateFailed:
 					if wasDegraded {
 						subErrCh <- nil
 					} else {
 						subErrCh <- errors.New("should have been degraded before failed")
 					}
-				} else {
+				default:
 					subErrCh <- fmt.Errorf("unknown component state: %v", state.State)
 				}
 			}
