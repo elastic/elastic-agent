@@ -463,23 +463,22 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 	defer close(signal)
 	backExp := backoff.NewExpBackoff(signal, 10*time.Second, 1*time.Minute)
 
-	var i int
-	for ; i < 5; i++ {
+	for i := 0; i < 5; i++ {
 		backExp.Wait()
 		c.log.Info("Retrying to restart...")
 		err = c.daemonReload(ctx)
 		if err != nil &&
 			(errors.Is(err, context.DeadlineExceeded) ||
 				errors.Is(err, context.Canceled)) {
-			return fmt.Errorf("could not reload deamon after %d retries: %w",
+			return fmt.Errorf("could not reload daemon after %d retries: %w",
 				i+1, err)
 		}
 		if err == nil {
-			break
+			return nil
 		}
 	}
 
-	return nil
+	return fmt.Errorf("could not reload agent's daemon, all retries failed. Last error: %w", err)
 }
 
 func (c *enrollCmd) daemonReload(ctx context.Context) error {
