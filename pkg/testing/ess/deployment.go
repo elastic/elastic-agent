@@ -351,7 +351,7 @@ func jsonMarshal(in any) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s", jsonBytes), nil
+	return string(jsonBytes), nil
 }
 
 func createDeploymentTemplateContext(csp string, req CreateDeploymentRequest) (map[string]any, error) {
