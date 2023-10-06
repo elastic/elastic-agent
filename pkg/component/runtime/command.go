@@ -422,7 +422,7 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	go func() {
 		err := comm.WriteConnInfo(info.Stdin)
 		if err != nil {
-			c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err))
+			_, _ = c.logErr.Write([]byte(fmt.Sprintf("Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err)))
 			// kill instantly
 			_ = info.Kill()
 		} else {
