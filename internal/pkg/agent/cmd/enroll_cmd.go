@@ -460,6 +460,7 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 	}
 
 	signal := make(chan struct{})
+	defer close(signal)
 	backExp := backoff.NewExpBackoff(signal, 10*time.Second, 1*time.Minute)
 
 	var i int
@@ -467,15 +468,18 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 		backExp.Wait()
 		c.log.Info("Retrying to restart...")
 		err = c.daemonReload(ctx)
-		if err == nil ||
-			errors.Is(err, context.DeadlineExceeded) ||
-			errors.Is(err, context.Canceled) {
+		if err != nil &&
+			(errors.Is(err, context.DeadlineExceeded) ||
+				errors.Is(err, context.Canceled)) {
+			return fmt.Errorf("could not reload deamon after %d retries: %w",
+				i+1, err)
+		}
+		if err == nil {
 			break
 		}
 	}
 
-	close(signal)
-	return fmt.Errorf("could not reload deamon after %d retries: %w", i+1, err)
+	return nil
 }
 
 func (c *enrollCmd) daemonReload(ctx context.Context) error {
