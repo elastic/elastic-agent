@@ -7,10 +7,11 @@ package reload
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	aConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/stretchr/testify/require"
 )
 
 func TestReload(t *testing.T) {
