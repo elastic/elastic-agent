@@ -453,7 +453,7 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 	if err != nil &&
 		(errors.Is(err, context.DeadlineExceeded) ||
 			errors.Is(err, context.Canceled)) {
-		return fmt.Errorf("could not reload deamon: %w", err)
+		return fmt.Errorf("could not reload daemon: %w", err)
 	}
 	if err == nil {
 		return nil
