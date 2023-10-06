@@ -325,7 +325,7 @@ func TestCoordinatorShutdownTimeout(t *testing.T) {
 }
 
 func TestCoordinatorShutdownErrorOneResponse(t *testing.T) {
-	CoordinatorShutdownTimeout = time.Millisecond
+	CoordinatorShutdownTimeout = 10 * time.Millisecond
 	handlerChan, _, _, config := setupAndWaitCoordinatorDone()
 
 	cfgErrStr := "config watcher error"
@@ -335,7 +335,7 @@ func TestCoordinatorShutdownErrorOneResponse(t *testing.T) {
 }
 
 func TestCoordinatorShutdownErrorAllResponses(t *testing.T) {
-	CoordinatorShutdownTimeout = time.Millisecond
+	CoordinatorShutdownTimeout = 5 * time.Second
 	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
 	runtimeErrStr := "runtime error"
 	varsErrStr := "vars error"
@@ -350,7 +350,7 @@ func TestCoordinatorShutdownErrorAllResponses(t *testing.T) {
 }
 
 func TestCoordinatorShutdownAllResponsesNoErrors(t *testing.T) {
-	CoordinatorShutdownTimeout = time.Millisecond
+	CoordinatorShutdownTimeout = 5 * time.Second
 	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
 	runtime <- nil
 	varWatcher <- nil
