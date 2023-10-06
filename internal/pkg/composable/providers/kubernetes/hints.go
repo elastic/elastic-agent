@@ -306,7 +306,7 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 }
 
 // Generates hints and processors list for specific containers
-func GenerateHintsForContainer(annotations mapstr.M, parts string, prefix string) (mapstr.M, []mapstr.M) {
+func GenerateHintsForContainer(annotations mapstr.M, parts, prefix string) (mapstr.M, []mapstr.M) {
 	hints := utils.GenerateHints(annotations, parts, prefix)
 	// Processors for specific container
 	// We need to make an extra check if we have processors added only to the specific containers
