@@ -10,7 +10,7 @@ Go version should be at least the same than the one in [.go-version](https://git
 
 ### Configuration
 
-ESS (QA) API Key to create on https://console.qa.cld.elstc.co/deployment-features/keys
+ESS (staging) API Key to create on https://staging.found.no/account/keys
 
 Warning: if you never created a deployment on it, you won't have permission to get this key, so you will need to create one first.
 
