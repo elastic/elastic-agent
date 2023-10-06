@@ -44,6 +44,7 @@ inputs:
 
 func TestFakeComponent(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		Local: true,
 	})
 

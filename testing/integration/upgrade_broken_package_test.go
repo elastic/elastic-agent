@@ -25,9 +25,9 @@ import (
 
 func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local:   false, // requires Agent installation
-		Sudo:    true,  // requires Agent installation
-		ShardID: "upgrade-specific",
+		Group: "upgrade-specific",
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

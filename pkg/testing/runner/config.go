@@ -27,6 +27,10 @@ type Config struct {
 	// defined in this list.
 	Platforms []string
 
+	// Groups filters the tests to only run tests that are part of
+	// the groups defined in this list.
+	Groups []string
+
 	// Matrix enables matrix testing. This explodes each test to
 	// run on all supported platforms the runner supports.
 	Matrix bool

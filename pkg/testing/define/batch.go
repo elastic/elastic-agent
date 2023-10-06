@@ -41,6 +41,10 @@ var defaultOS = []OS{
 
 // Batch is a grouping of tests that all have the same requirements.
 type Batch struct {
+	// Group must be set on each test to define which group the tests belongs.
+	// Tests that are in the same group are executed on the same runner.
+	Group string `json:"shard_id,omitempty"`
+
 	// OS defines the operating systems this test batch needs.
 	OS OS `json:"os"`
 
@@ -49,9 +53,6 @@ type Batch struct {
 
 	// Isolate defines that this batch is isolated to a single test.
 	Isolate bool `json:"isolate"`
-
-	// ShardID defines the set of tests that are in this batch's shard.
-	ShardID string `json:"shard_id,omitempty"`
 
 	// Tests define the set of packages and tests that do not require sudo
 	// privileges to be performed.
@@ -182,14 +183,14 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 		var batch Batch
 		batchIdx := -1
 		if !req.Isolate {
-			batchIdx = findBatchIdx(batches, o, req.Stack, req.ShardID)
+			batchIdx = findBatchIdx(batches, req.Group, o, req.Stack)
 		}
 		if batchIdx == -1 {
 			// new batch required
 			batch = Batch{
+				Group:     req.Group,
 				OS:        o,
 				Isolate:   req.Isolate,
-				ShardID:   req.ShardID,
 				Tests:     nil,
 				SudoTests: nil,
 			}
@@ -245,10 +246,14 @@ func appendPackageTest(tests []BatchPackageTests, pkg string, name string, stack
 	return tests
 }
 
-func findBatchIdx(batches []Batch, os OS, stack *Stack, shardID string) int {
+func findBatchIdx(batches []Batch, group string, os OS, stack *Stack) int {
 	for i, b := range batches {
 		if b.Isolate {
 			// never add to an isolate batch
+			continue
+		}
+		if b.Group != group {
+			// must be in the same group
 			continue
 		}
 		if b.OS.Type != os.Type || b.OS.Arch != os.Arch {
@@ -264,12 +269,6 @@ func findBatchIdx(batches []Batch, os OS, stack *Stack, shardID string) int {
 		if os.Version != "" {
 			// must have the same version
 			if b.OS.Version != "" && b.OS.Version != os.Version {
-				continue
-			}
-		}
-		if shardID != "" {
-			// must be in the same shard
-			if b.ShardID != shardID {
 				continue
 			}
 		}

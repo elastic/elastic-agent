@@ -14,24 +14,28 @@ import (
 
 func TestAnyLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		Local: true,
 	})
 }
 
 func TestAnySudo(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Sudo: true,
+		Group: "default",
+		Sudo:  true,
 	})
 }
 
 func TestAnyIsolate(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group:   "default",
 		Isolate: true,
 	})
 }
 
 func TestDarwinLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type: define.Darwin,
@@ -43,6 +47,7 @@ func TestDarwinLocal(t *testing.T) {
 
 func TestDarwinSudo(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type: define.Darwin,
@@ -54,6 +59,7 @@ func TestDarwinSudo(t *testing.T) {
 
 func TestDarwinIsolate(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type: define.Darwin,
@@ -65,6 +71,7 @@ func TestDarwinIsolate(t *testing.T) {
 
 func TestLinuxLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type: define.Linux,
@@ -76,6 +83,7 @@ func TestLinuxLocal(t *testing.T) {
 
 func TestLinuxSudo(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type: define.Linux,
@@ -87,6 +95,7 @@ func TestLinuxSudo(t *testing.T) {
 
 func TestLinuxIsolate(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type: define.Linux,
@@ -98,6 +107,7 @@ func TestLinuxIsolate(t *testing.T) {
 
 func TestWindowsLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type: define.Windows,
@@ -109,6 +119,7 @@ func TestWindowsLocal(t *testing.T) {
 
 func TestWindowsSudo(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type: define.Windows,
@@ -120,6 +131,7 @@ func TestWindowsSudo(t *testing.T) {
 
 func TestWindowsIsolate(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type: define.Windows,
@@ -131,6 +143,7 @@ func TestWindowsIsolate(t *testing.T) {
 
 func TestSpecificCombinationOne(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
@@ -144,6 +157,7 @@ func TestSpecificCombinationOne(t *testing.T) {
 
 func TestSpecificCombinationTwo(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
@@ -157,6 +171,7 @@ func TestSpecificCombinationTwo(t *testing.T) {
 
 func TestSpecificCombinationWithCloud(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
@@ -171,8 +186,9 @@ func TestSpecificCombinationWithCloud(t *testing.T) {
 	})
 }
 
-func TestSpecificShardID_One_One(t *testing.T) {
+func TestGroup_One_One(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "one",
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
@@ -184,12 +200,12 @@ func TestSpecificShardID_One_One(t *testing.T) {
 		Stack: &define.Stack{
 			Version: "8.8.0",
 		},
-		ShardID: "One",
 	})
 }
 
-func TestSpecificShardID_One_Two(t *testing.T) {
+func TestGroup_One_Two(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "one",
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
@@ -201,30 +217,29 @@ func TestSpecificShardID_One_Two(t *testing.T) {
 		Stack: &define.Stack{
 			Version: "8.8.0",
 		},
-		ShardID: "One",
 	})
 }
 
-func TestShardID_Two_One(t *testing.T) {
+func TestGroup_Two_One(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "two",
 		OS: []define.OS{
 			{
 				Type: define.Linux,
 				Arch: define.ARM64,
 			},
 		},
-		ShardID: "Two",
 	})
 }
 
-func TestShardID_Two_Two(t *testing.T) {
+func TestGroup_Two_Two(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "two",
 		OS: []define.OS{
 			{
 				Type: define.Linux,
 				Arch: define.ARM64,
 			},
 		},
-		ShardID: "Two",
 	})
 }

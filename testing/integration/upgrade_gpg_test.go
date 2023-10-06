@@ -23,9 +23,9 @@ import (
 
 func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local:   false, // requires Agent installation
-		Sudo:    true,  // requires Agent installation
-		ShardID: "upgrade-gpg",
+		Group: "upgrade-gpg",
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 	})
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
@@ -79,9 +79,9 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 
 func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local:   false, // requires Agent installation
-		Sudo:    true,  // requires Agent installation
-		ShardID: "upgrade-gpg",
+		Group: "upgrade-gpg",
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 	})
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT

@@ -88,6 +88,7 @@ type componentAndUnitNames struct {
 
 func TestDiagnosticsOptionalValues(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		Local: false,
 	})
 
@@ -113,6 +114,7 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 
 func TestDiagnosticsCommand(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: "default",
 		Local: false,
 	})
 

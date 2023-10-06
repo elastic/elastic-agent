@@ -23,9 +23,9 @@ import (
 
 func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local:   false, // requires Agent installation
-		Sudo:    true,  // requires Agent installation
-		ShardID: "upgrade-specific",
+		Group: "upgrade-specific",
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 	})
 
 	// support for upgrading to a specific snapshot build was not

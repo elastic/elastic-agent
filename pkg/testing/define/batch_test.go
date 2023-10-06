@@ -93,6 +93,7 @@ func TestBatch(t *testing.T) {
 	}
 	expected := []Batch{
 		{
+			Group: "default",
 			OS: OS{
 				Type: Darwin,
 				Arch: AMD64,
@@ -101,6 +102,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: darwinSudoTests,
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Darwin,
 				Arch: ARM64,
@@ -109,6 +111,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: darwinSudoTests,
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Linux,
 				Arch: AMD64,
@@ -117,6 +120,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: linuxSudoTests,
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type:    Linux,
 				Arch:    ARM64,
@@ -152,6 +156,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: linuxSudoTests,
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Windows,
 				Arch: AMD64,
@@ -160,6 +165,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: windowsSudoTests,
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Darwin,
 				Arch: AMD64,
@@ -177,6 +183,7 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Darwin,
 				Arch: ARM64,
@@ -194,6 +201,7 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Linux,
 				Arch: AMD64,
@@ -211,6 +219,7 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Linux,
 				Arch: ARM64,
@@ -228,6 +237,7 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Windows,
 				Arch: AMD64,
@@ -245,6 +255,7 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Darwin,
 				Arch: AMD64,
@@ -262,6 +273,7 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Darwin,
 				Arch: ARM64,
@@ -279,6 +291,7 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Linux,
 				Arch: AMD64,
@@ -296,6 +309,7 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Linux,
 				Arch: ARM64,
@@ -313,6 +327,7 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "default",
 			OS: OS{
 				Type: Windows,
 				Arch: AMD64,
@@ -330,6 +345,7 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "one",
 			OS: OS{
 				Type:    Linux,
 				Arch:    ARM64,
@@ -339,17 +355,16 @@ func TestBatch(t *testing.T) {
 			Stack: &Stack{
 				Version: "8.8.0",
 			},
-			ShardID: "One",
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
 					Tests: []BatchPackageTest{
 						{
-							Name:  "TestSpecificShardID_One_One",
+							Name:  "TestGroup_One_One",
 							Stack: true,
 						},
 						{
-							Name:  "TestSpecificShardID_One_Two",
+							Name:  "TestGroup_One_Two",
 							Stack: true,
 						},
 					},
@@ -357,20 +372,20 @@ func TestBatch(t *testing.T) {
 			},
 		},
 		{
+			Group: "two",
 			OS: OS{
 				Type: Linux,
 				Arch: ARM64,
 			},
-			ShardID: "Two",
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
 					Tests: []BatchPackageTest{
 						{
-							Name: "TestShardID_Two_One",
+							Name: "TestGroup_Two_One",
 						},
 						{
-							Name: "TestShardID_Two_Two",
+							Name: "TestGroup_Two_Two",
 						},
 					},
 				},

@@ -24,9 +24,9 @@ import (
 // the second upgrade.
 func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local:   false, // requires Agent installation
-		Sudo:    true,  // requires Agent installation
-		ShardID: "upgrade-standalone",
+		Group: "upgrade-standalone",
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

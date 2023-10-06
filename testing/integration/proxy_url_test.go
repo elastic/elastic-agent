@@ -91,6 +91,7 @@ func TearDownTest(t *testing.T, p *ProxyURL) {
 
 func TestProxyURL_EnrollProxyAndNoProxyInThePolicy(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
+		Group: "default",
 		Local: false,
 		Sudo:  true,
 	})
@@ -135,6 +136,7 @@ func TestProxyURL_EnrollProxyAndNoProxyInThePolicy(t *testing.T) {
 
 func TestProxyURL_EnrollProxyAndEmptyProxyInThePolicy(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
+		Group: "default",
 		Local: false,
 		Sudo:  true,
 	})
@@ -180,6 +182,7 @@ func TestProxyURL_EnrollProxyAndEmptyProxyInThePolicy(t *testing.T) {
 
 func TestProxyURL_ProxyInThePolicyTakesPrecedence(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
+		Group: "default",
 		Local: false,
 		Sudo:  true,
 	})
@@ -239,6 +242,7 @@ func TestProxyURL_ProxyInThePolicyTakesPrecedence(t *testing.T) {
 
 func TestProxyURL_NoEnrollProxyAndProxyInThePolicy(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
+		Group: "default",
 		Local: false,
 		Sudo:  true,
 	})
@@ -302,6 +306,7 @@ func TestProxyURL_NoEnrollProxyAndProxyInThePolicy(t *testing.T) {
 
 func TestProxyURL_RemoveProxyFromThePolicy(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
+		Group: "default",
 		Local: false,
 		Sudo:  true,
 	})
