@@ -77,6 +77,7 @@ func (sr *ServerReloader) Stop() error {
 func (sr *ServerReloader) stop() error {
 	if sr.s == nil {
 		// stopping not started server
+		sr.isServerRunning = false
 		return nil
 	}
 	sr.log.Info("Stopping server")
