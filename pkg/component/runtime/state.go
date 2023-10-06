@@ -462,7 +462,9 @@ func (s *ComponentState) cleanupStopped() bool {
 	return cleaned
 }
 
-// forceState force updates the state for the entire component, forcing that state on all units.
+// forceState force updates the state for the entire component, forcing that
+// state on all units. It returns true if either the component state or any of
+// the units state changed, false otherwise.
 func (s *ComponentState) forceState(state client.UnitState, msg string) bool {
 	changed := false
 	if s.State != state || s.Message != msg {
