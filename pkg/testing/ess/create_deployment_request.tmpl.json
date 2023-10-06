@@ -96,6 +96,7 @@
   },
   "name": "{{ .request.Name }}",
   "metadata": {
-    "system_owned": false
+    "system_owned": false,
+    "tags": {{ json .request.Tags }}
   }
 }

@@ -10,19 +10,25 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"net/http"
 	"net/url"
 	"strings"
+	"text/template"
 	"time"
 
 	"gopkg.in/yaml.v2"
 )
 
+type Tag struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type CreateDeploymentRequest struct {
 	Name    string `json:"name"`
 	Region  string `json:"region"`
 	Version string `json:"version"`
+	Tags    []Tag  `json:"tags"`
 }
 
 type CreateDeploymentResponse struct {
@@ -324,7 +330,9 @@ func generateCreateDeploymentRequestBody(req CreateDeploymentRequest) ([]byte, e
 		return nil, fmt.Errorf("creating request template context: %w", err)
 	}
 
-	tpl, err := template.New("create_deployment_request").Parse(createDeploymentRequestTemplate)
+	tpl, err := template.New("create_deployment_request").
+		Funcs(template.FuncMap{"json": jsonMarshal}).
+		Parse(createDeploymentRequestTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse deployment creation template: %w", err)
 	}
@@ -335,6 +343,15 @@ func generateCreateDeploymentRequestBody(req CreateDeploymentRequest) ([]byte, e
 		return nil, fmt.Errorf("rendering create deployment request template with context %v : %w", templateContext, err)
 	}
 	return bBuf.Bytes(), nil
+}
+
+func jsonMarshal(in any) (string, error) {
+	jsonBytes, err := json.Marshal(in)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s", jsonBytes), nil
 }
 
 func createDeploymentTemplateContext(csp string, req CreateDeploymentRequest) (map[string]any, error) {
