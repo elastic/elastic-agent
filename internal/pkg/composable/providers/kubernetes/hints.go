@@ -316,7 +316,7 @@ func GenerateHintsForContainer(annotations mapstr.M, parts string, prefix string
 }
 
 // Generates the final hintData (hints and processors) struct that will be emitted in pods.
-func GenerateHintsResult(hints mapstr.M, k8sMapping map[string]interface{}, annotations mapstr.M, logger *logp.Logger, prefix string, cID string) hintsData {
+func GenerateHintsResult(hints mapstr.M, k8sMapping map[string]interface{}, annotations mapstr.M, logger *logp.Logger, prefix, cID string) hintsData {
 	hintData := hintsData{
 		composableMapping: mapstr.M{},
 		processors:        []mapstr.M{},
