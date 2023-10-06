@@ -49,6 +49,11 @@ func (sr *ServerReloader) Start() {
 }
 
 func (sr *ServerReloader) start() {
+	if sr.s != nil && sr.isServerRunning {
+		// server is already running
+		return
+	}
+
 	sr.log.Info("Starting server")
 	var err error
 	sr.s, err = sr.newServerFn()
@@ -70,6 +75,10 @@ func (sr *ServerReloader) Stop() error {
 }
 
 func (sr *ServerReloader) stop() error {
+	if sr.s == nil {
+		// stopping not started server
+		return nil
+	}
 	sr.log.Info("Stopping server")
 
 	sr.isServerRunning = false
