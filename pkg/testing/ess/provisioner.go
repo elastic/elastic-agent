@@ -67,7 +67,14 @@ func (p *provisioner) Provision(ctx context.Context, requests []runner.StackRequ
 	for _, r := range requests {
 		// allow up to 2 minutes for each create request
 		createCtx, createCancel := context.WithTimeout(ctx, 2*time.Minute)
-		resp, err := p.createDeployment(createCtx, r, map[string]string{"elastic-agent-integration-tests": "true", "team": "elastic-agent"})
+		resp, err := p.createDeployment(createCtx, r,
+			map[string]string{
+				"division":          "engineering",
+				"org":               "ingest",
+				"team":              "elastic-agent",
+				"project":           "elastic-agent",
+				"integration-tests": "true",
+			})
 		createCancel()
 		if err != nil {
 			return nil, err
