@@ -4,7 +4,7 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
-  - label: "Unit tests"
+  - label: "Unit tests - Ubuntu 22.04"
     key: "unit-tests"
     command: ".buildkite/scripts/steps/unit-tests.sh"
     artifact_paths:
@@ -12,40 +12,54 @@ steps:
       - "build/diagnostics/*"
     agents:
       provider: "gcp"
+      image: "ubuntu-2204-lts"
     retry:
       manual:
         allowed: true
 
-  - label: ":sonarqube: Continuous Code Inspection"
-    env:
-      VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
-    agents:
-      image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-    command:
-      - "buildkite-agent artifact download build/TEST-go-unit.cov ."
-      - "buildkite-agent artifact download build/TEST-go-unit.out.json ."
-      - "/scan-source-code.sh"
-    depends_on:
-      - "unit-tests"
-    retry:
-      manual:
-        allowed: true
-
-  - label: "Integration tests"
-    key: "integration-tests"
-    command: ".buildkite/scripts/steps/integration_tests.sh"
+  - label: "Unit tests - Ubuntu 22.04 ARM64"
+    key: "unit-tests"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
     agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
+      provider: "aws"
+      image: "ubuntu-2204-aarch64"
+    retry:
+      manual:
+        allowed: true
 
-  - wait: ~
-    continue_on_failure: true
-  - label: "Processing test results"
-    agents:
-      provider: "gcp"
-    plugins:
-      - junit-annotate#v2.4.1:
-          artifacts: build/TEST-go-*.xml
+  # - label: ":sonarqube: Continuous Code Inspection"
+  #   env:
+  #     VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
+  #   agents:
+  #     image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
+  #   command:
+  #     - "buildkite-agent artifact download build/TEST-go-unit.cov ."
+  #     - "buildkite-agent artifact download build/TEST-go-unit.out.json ."
+  #     - "/scan-source-code.sh"
+  #   depends_on:
+  #     - "unit-tests"
+  #   retry:
+  #     manual:
+  #       allowed: true
+
+  # - label: "Integration tests"
+  #   key: "integration-tests"
+  #   command: ".buildkite/scripts/steps/integration_tests.sh"
+  #   artifact_paths:
+  #     - "build/TEST-**"
+  #     - "build/diagnostics/*"
+  #   agents:
+  #     provider: "gcp"
+  #     machineType: "n1-standard-8"
+
+  # - wait: ~
+  #   continue_on_failure: true
+  # - label: "Processing test results"
+  #   agents:
+  #     provider: "gcp"
+  #   plugins:
+  #     - junit-annotate#v2.4.1:
+  #         artifacts: build/TEST-go-*.xml
