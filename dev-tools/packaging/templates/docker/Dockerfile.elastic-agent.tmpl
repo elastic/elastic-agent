@@ -126,17 +126,6 @@ COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
 COPY --from=home /opt /opt
 {{- end }}
 
-
-RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
-{{- if .linux_capabilities }}
-# Since the beat is stored at the other end of a symlink we must follow the symlink first
-# For security reasons setcap does not support symlinks. This is smart in the general case
-# but in our specific case since we're building a trusted image from trusted binaries this is
-# fine. Thus, we use readlink to follow the link and setcap on the actual binary
-    readlink -f {{ $beatBinary }} | xargs setcap {{ .linux_capabilities }} && \
-{{- end }}
-true
-
 {{- if eq .user "root" }}
 {{- if contains .image_name "-cloud" }}
 # Generate folder for a stub command that will be overwritten at runtime
@@ -154,6 +143,16 @@ RUN mkdir /app
 RUN chown {{ .user }} /app
 {{- end }}
 {{- end }}
+
+RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
+{{- if .linux_capabilities }}
+# Since the beat is stored at the other end of a symlink we must follow the symlink first
+# For security reasons setcap does not support symlinks. This is smart in the general case
+# but in our specific case since we're building a trusted image from trusted binaries this is
+# fine. Thus, we use readlink to follow the link and setcap on the actual binary
+    readlink -f {{ $beatBinary }} | xargs setcap {{ .linux_capabilities }} && \
+{{- end }}
+true
 
 {{- if (and (contains .image_name "-complete") (not (contains .from "ubi-minimal")))  }}
 USER root
