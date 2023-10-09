@@ -93,7 +93,7 @@ func TestBatch(t *testing.T) {
 	}
 	expected := []Batch{
 		{
-			Group: "default",
+			Group: Default,
 			OS: OS{
 				Type: Darwin,
 				Arch: AMD64,
@@ -102,7 +102,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: darwinSudoTests,
 		},
 		{
-			Group: "default",
+			Group: Default,
 			OS: OS{
 				Type: Darwin,
 				Arch: ARM64,
@@ -111,7 +111,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: darwinSudoTests,
 		},
 		{
-			Group: "default",
+			Group: Default,
 			OS: OS{
 				Type: Linux,
 				Arch: AMD64,
@@ -120,7 +120,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: linuxSudoTests,
 		},
 		{
-			Group: "default",
+			Group: Default,
 			OS: OS{
 				Type:    Linux,
 				Arch:    ARM64,
@@ -156,7 +156,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: linuxSudoTests,
 		},
 		{
-			Group: "default",
+			Group: Default,
 			OS: OS{
 				Type: Windows,
 				Arch: AMD64,
@@ -226,6 +226,7 @@ var testLinuxLocalTests = []BatchPackageTest{
 
 var testLinuxLocalBatch = []Batch{
 	{
+		Group: Default,
 		OS: OS{
 			Type: "linux",
 			Arch: "amd64",
@@ -238,6 +239,7 @@ var testLinuxLocalBatch = []Batch{
 		},
 	},
 	{
+		Group: Default,
 		OS: OS{
 			Type: "linux",
 			Arch: "arm64",

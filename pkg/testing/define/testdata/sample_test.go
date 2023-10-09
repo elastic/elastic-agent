@@ -14,21 +14,21 @@ import (
 
 func TestAnyLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		Local: true,
 	})
 }
 
 func TestAnySudo(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		Sudo:  true,
 	})
 }
 
 func TestDarwinLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Darwin,
@@ -40,7 +40,7 @@ func TestDarwinLocal(t *testing.T) {
 
 func TestDarwinSudo(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Darwin,
@@ -52,7 +52,7 @@ func TestDarwinSudo(t *testing.T) {
 
 func TestLinuxLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Linux,
@@ -64,7 +64,7 @@ func TestLinuxLocal(t *testing.T) {
 
 func TestLinuxSudo(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Linux,
@@ -76,7 +76,7 @@ func TestLinuxSudo(t *testing.T) {
 
 func TestWindowsLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Windows,
@@ -88,7 +88,7 @@ func TestWindowsLocal(t *testing.T) {
 
 func TestWindowsSudo(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Windows,
@@ -100,7 +100,7 @@ func TestWindowsSudo(t *testing.T) {
 
 func TestSpecificCombinationOne(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
@@ -114,7 +114,7 @@ func TestSpecificCombinationOne(t *testing.T) {
 
 func TestSpecificCombinationTwo(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
@@ -128,7 +128,7 @@ func TestSpecificCombinationTwo(t *testing.T) {
 
 func TestSpecificCombinationWithCloud(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
