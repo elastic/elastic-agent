@@ -9,7 +9,6 @@ FROM {{ .buildFrom }} AS home
 COPY beat {{ $beatHome }}
 
 RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/logs && \
-    chown -R root:root {{ $beatHome }} && \
     find {{ $beatHome }} -type d -exec chmod 0755 {} \; && \
     find {{ $beatHome }} -type f -exec chmod 0644 {} \; && \
     find {{ $beatHome }}/data -type d -exec chmod 0770 {} \; && \
@@ -144,8 +143,10 @@ true
 RUN mkdir /app
 {{- end }}
 {{- else }}
-RUN groupadd --gid 1000 {{ .BeatName }}
-RUN useradd -M --uid 1000 --gid 1000 --groups 0 --home {{ $beatHome }} {{ .user }}
+RUN groupadd --gid 1000 {{ .BeatName }} && \
+    useradd -M --uid 1000 --gid 1000 --groups 0 --home {{ $beatHome }} {{ .user }} && \
+    chown -R {{ .user }}:{{ .user }} {{ $beatHome }} && \
+    true
 
 {{- if contains .image_name "-cloud" }}
 # Generate folder for a stub command that will be overwritten at runtime
