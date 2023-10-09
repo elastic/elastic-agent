@@ -109,10 +109,6 @@ type Requirements struct {
 	// when a full test run is performed.
 	Local bool `json:"local"`
 
-	// Isolate defines that this test must be isolated to its own dedicated VM and the test
-	// cannot be shared with other tests.
-	Isolate bool `json:"isolate"`
-
 	// Sudo defines that this test must run under superuser permissions. On Mac and Linux the
 	// test gets executed under sudo and on Windows it gets run under Administrator.
 	Sudo bool `json:"sudo"`

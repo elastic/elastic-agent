@@ -490,11 +490,10 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 // path other than default
 func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group:   "endpoint",
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
+		Group: "endpoint",
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 	})
 
 	ctx, cn := context.WithCancel(context.Background())

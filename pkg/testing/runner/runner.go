@@ -962,16 +962,6 @@ func createBatchID(batch OSBatch) string {
 	}
 	id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
 	id += "-" + strings.Replace(batch.Batch.Group, ".", "", -1)
-	if batch.Batch.Isolate {
-		if len(batch.Batch.Tests) > 0 {
-			// only ever has one test in an isolated batch
-			id += "-" + batch.Batch.Tests[0].Tests[0].Name
-		}
-		if len(batch.Batch.SudoTests) > 0 {
-			// only ever has one test in an isolated batch
-			id += "-" + batch.Batch.SudoTests[0].Tests[0].Name
-		}
-	}
 	return strings.ToLower(id)
 }
 

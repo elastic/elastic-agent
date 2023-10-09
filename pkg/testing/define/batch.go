@@ -51,9 +51,6 @@ type Batch struct {
 	// Stack defines the stack required for this batch.
 	Stack *Stack `json:"stack,omitempty"`
 
-	// Isolate defines that this batch is isolated to a single test.
-	Isolate bool `json:"isolate"`
-
 	// Tests define the set of packages and tests that do not require sudo
 	// privileges to be performed.
 	Tests []BatchPackageTests `json:"tests"`
@@ -181,16 +178,12 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 	}
 	for _, o := range set {
 		var batch Batch
-		batchIdx := -1
-		if !req.Isolate {
-			batchIdx = findBatchIdx(batches, req.Group, o, req.Stack)
-		}
+		batchIdx := findBatchIdx(batches, req.Group, o, req.Stack)
 		if batchIdx == -1 {
 			// new batch required
 			batch = Batch{
 				Group:     req.Group,
 				OS:        o,
-				Isolate:   req.Isolate,
 				Tests:     nil,
 				SudoTests: nil,
 			}
@@ -248,10 +241,6 @@ func appendPackageTest(tests []BatchPackageTests, pkg string, name string, stack
 
 func findBatchIdx(batches []Batch, group string, os OS, stack *Stack) int {
 	for i, b := range batches {
-		if b.Isolate {
-			// never add to an isolate batch
-			continue
-		}
 		if b.Group != group {
 			// must be in the same group
 			continue

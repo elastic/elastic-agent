@@ -26,13 +26,6 @@ func TestAnySudo(t *testing.T) {
 	})
 }
 
-func TestAnyIsolate(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group:   "default",
-		Isolate: true,
-	})
-}
-
 func TestDarwinLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: "default",
@@ -54,18 +47,6 @@ func TestDarwinSudo(t *testing.T) {
 			},
 		},
 		Sudo: true,
-	})
-}
-
-func TestDarwinIsolate(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: "default",
-		OS: []define.OS{
-			{
-				Type: define.Darwin,
-			},
-		},
-		Isolate: true,
 	})
 }
 
@@ -93,18 +74,6 @@ func TestLinuxSudo(t *testing.T) {
 	})
 }
 
-func TestLinuxIsolate(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: "default",
-		OS: []define.OS{
-			{
-				Type: define.Linux,
-			},
-		},
-		Isolate: true,
-	})
-}
-
 func TestWindowsLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: "default",
@@ -126,18 +95,6 @@ func TestWindowsSudo(t *testing.T) {
 			},
 		},
 		Sudo: true,
-	})
-}
-
-func TestWindowsIsolate(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: "default",
-		OS: []define.OS{
-			{
-				Type: define.Windows,
-			},
-		},
-		Isolate: true,
 	})
 }
 
