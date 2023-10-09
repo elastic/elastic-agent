@@ -69,7 +69,7 @@ between, and it can be very specific or not very specific.
 
 #### Selecting specific group
 
-By default, the running will run all test groups. When working on groups of tests it's better to limit to a specific
+By default, the runner will run all test groups. Each group runs on a dedicated machine instance. When working on groups of tests it's better to limit to a specific
 group of tests instead of running all tests. This can be done by using the `TEST_GROUPS="default upgrade-standalone"`
 environment variable. This variable can take multiple groups with a space between.
 
@@ -180,7 +180,7 @@ package for helper utilities.
 
 ### Test group
 
-Every `define.Require` must define a `Group` that it belongs too. All tests with in the same group are executed
+Every `define.Require` must define a `Group` that it belongs too. Each group is executed on a separate instance with all tests with in the same group executed
 on the same instance. Placing similar tests in the same group allows those tests to run on its own instance
 as well as provides a way for a developer to select a specific group of tests with `TEST_GROUP="{group-name}"`.
 

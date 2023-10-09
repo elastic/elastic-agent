@@ -43,7 +43,7 @@ var defaultOS = []OS{
 type Batch struct {
 	// Group must be set on each test to define which group the tests belongs.
 	// Tests that are in the same group are executed on the same runner.
-	Group string `json:"shard_id,omitempty"`
+	Group string `json:"group,omitempty"`
 
 	// OS defines the operating systems this test batch needs.
 	OS OS `json:"os"`
