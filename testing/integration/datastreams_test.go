@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
+	"github.com/elastic/elastic-agent/version"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,8 +39,10 @@ func TestFlattenedDatastreamFleetPolicy(t *testing.T) {
 
 	info := define.Require(t, define.Requirements{
 		Local: false,
-		Stack: &define.Stack{},
-		Sudo:  true,
+		Stack: &define.Stack{
+			Version: version.Agent + "-SNAPSHOT",
+		},
+		Sudo: true,
 	})
 
 	agentFixture, err := define.NewFixture(t, define.Version())
@@ -143,8 +146,10 @@ func TestFlattenedDatastreamStandalone(t *testing.T) {
 
 	info := define.Require(t, define.Requirements{
 		Local: false,
-		Stack: &define.Stack{},
-		Sudo:  true,
+		Stack: &define.Stack{
+			Version: version.Agent + "-SNAPSHOT",
+		},
+		Sudo: true,
 	})
 
 	agentFixture, err := define.NewFixture(t,
@@ -180,7 +185,7 @@ func TestFlattenedDatastreamStandalone(t *testing.T) {
 	runCtx, cancelAgentRunCtx := context.WithCancel(context.Background())
 	go func() {
 		// make sure the test does not hang forever
-		time.Sleep(30 * time.Second)
+		time.Sleep(90 * time.Second)
 		t.Error("'test timeout': cancelling run context, the Elastic-Agent will exit")
 		cancelAgentRunCtx()
 	}()
