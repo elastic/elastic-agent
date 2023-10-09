@@ -63,15 +63,19 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 	}
 
 	var uri string
+	var prevErr error
 	if !f.snapshotOnly {
-		uri, _ = findURI(ctx, f.doer, version)
+		uri, prevErr = findURI(ctx, f.doer, version)
 	}
 	preVersion := version
+	version, _ = splitBuildID(version)
 	if uri == "" {
-		version = fmt.Sprintf("%s-SNAPSHOT", version)
+		if !strings.HasSuffix(version, "-SNAPSHOT") {
+			version += "-SNAPSHOT"
+		}
 		uri, err = findURI(ctx, f.doer, version)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find snapshot URI for version %s: %w", preVersion, err)
+			return nil, fmt.Errorf("failed to find snapshot URI for version %s: %w (previous error: %w)", preVersion, err, prevErr)
 		}
 	}
 
@@ -112,6 +116,7 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 }
 
 func findURI(ctx context.Context, doer httpDoer, version string) (string, error) {
+	version, buildID := splitBuildID(version)
 	artifactsURI := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/elastic-agent", version)
 	req, err := http.NewRequestWithContext(ctx, "GET", artifactsURI, nil)
 	if err != nil {
@@ -165,11 +170,36 @@ func findURI(ctx context.Context, doer httpDoer, version string) (string, error)
 		// https://snapshots.elastic.co/8.7.0-d050210c/downloads/elastic-agent-shipper/elastic-agent-shipper-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
 		index := strings.Index(uri, "/beats/elastic-agent/")
 		if index != -1 {
-			return fmt.Sprintf("%s/beats/elastic-agent/", uri[:index]), nil
+			if buildID == "" {
+				// no build id, first is selected
+				return fmt.Sprintf("%s/beats/elastic-agent/", uri[:index]), nil
+			}
+			if strings.Contains(uri, fmt.Sprintf("%s-%s", stripSnapshot(version), buildID)) {
+				return fmt.Sprintf("%s/beats/elastic-agent/", uri[:index]), nil
+			}
 		}
 	}
 
-	return "", fmt.Errorf("uri not detected")
+	if buildID == "" {
+		return "", fmt.Errorf("uri not detected")
+	}
+	return "", fmt.Errorf("uri not detected with specific buildid %s", buildID)
+}
+
+func splitBuildID(version string) (string, string) {
+	split := strings.SplitN(version, "+", 2)
+	if len(split) == 1 {
+		// no build ID
+		return split[0], ""
+	}
+	return split[0], split[1]
+}
+
+func stripSnapshot(version string) string {
+	if strings.HasSuffix(version, "-SNAPSHOT") {
+		return strings.TrimSuffix(version, "-SNAPSHOT")
+	}
+	return version
 }
 
 func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {

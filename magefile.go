@@ -1495,7 +1495,11 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
 
-	goTestFlags := strings.SplitN(os.Getenv("GOTEST_FLAGS"), " ", -1)
+	var goTestFlags []string
+	rawTestFlags := os.Getenv("GOTEST_FLAGS")
+	if rawTestFlags != "" {
+		goTestFlags = strings.Split(rawTestFlags, " ")
+	}
 	params.ExtraFlags = goTestFlags
 
 	if testName == "all" {
@@ -2090,8 +2094,8 @@ func authESS(ctx context.Context) error {
 
 		fmt.Fprintln(os.Stderr, "❌  ESS authentication unsuccessful. Retrying...")
 
-		prompt := "Please provide a ESS (QA) API key. To get your API key, " +
-			"visit https://console.qa.cld.elstc.co/deployment-features/keys:"
+		prompt := fmt.Sprintf("Please provide a ESS API key for %s. To get your API key, "+
+			"visit %s/deployment-features/keys:", client.BaseURL(), strings.TrimRight(client.BaseURL(), "/api/v1"))
 		essAPIKey, err = stringPrompt(prompt)
 		if err != nil {
 			return fmt.Errorf("unable to read ESS API key from prompt: %w", err)
