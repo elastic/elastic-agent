@@ -22,7 +22,7 @@ import (
 
 func TestPackageVersion(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "default",
+		Group: define.Default,
 		Local: true,
 	})
 

@@ -12,6 +12,11 @@ import (
 )
 
 const (
+	// Default constant can be used as the default group for tests.
+	Default = "default"
+)
+
+const (
 	// Darwin is macOS platform
 	Darwin = component.Darwin
 	// Linux is Linux platform

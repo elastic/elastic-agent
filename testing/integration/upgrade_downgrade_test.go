@@ -23,7 +23,7 @@ import (
 
 func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "upgrade-specific",
+		Group: "upgrade-versions",
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
