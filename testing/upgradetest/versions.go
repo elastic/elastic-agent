@@ -93,7 +93,7 @@ func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgrad
 			(parsedUpgradeToVersion.Minor()-parsedVersion.Minor()) <= 1
 
 		if parsedVersion.IsSnapshot() {
-			// Skip snapshot builds if the most recent version isn't unreleased and this isn't the current
+			// Skip snapshot builds if the most recent version is released or this isn't the current
 			// or previous possibly unreleased minor version.
 			if !mostRecentIsUnreleased || !isCurrentOrPrevMinor {
 				continue
