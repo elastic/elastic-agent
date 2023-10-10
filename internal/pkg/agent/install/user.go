@@ -1,8 +1,27 @@
 package install
 
+import "errors"
+
+var (
+	// ErrGroupNotFound returned when group is not found.
+	ErrGroupNotFound = errors.New("group not found")
+	// ErrUserNotFound returned when user is not found.
+	ErrUserNotFound = errors.New("user not found")
+)
+
+// FindGID returns the group's GID on the machine.
+func FindGID(name string) (string, error) {
+	return findGID(name)
+}
+
 // CreateGroup creates a group on the machine.
 func CreateGroup(name string) (string, error) {
 	return createGroup(name)
+}
+
+// FindUID returns the user's UID on the machine.
+func FindUID(name string) (string, error) {
+	return findUID(name)
 }
 
 // CreateUser creates a user on the machine.

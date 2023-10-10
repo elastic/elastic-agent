@@ -60,27 +60,40 @@ func Install(cfgFile, topPath string, nonRoot bool, pt ProgressTrackerStep) (str
 		username = elasticUsername
 		groupName = elasticGroupName
 
-		// create required group/user when install in non-root mode
-		s := pt.StepStart(fmt.Sprintf("Creating group %s", groupName))
-		gid, err = CreateGroup(groupName)
-		if err != nil {
-			s.Failed()
-			return "", "", fmt.Errorf("failed to create group %s: %w", groupName, err)
+		// ensure required group
+		gid, err = FindGID(groupName)
+		if err != nil && !errors.Is(err, ErrGroupNotFound) {
+			return "", "", fmt.Errorf("failed finding group %s: %w", groupName, err)
 		}
-		s.Succeeded()
+		if errors.Is(err, ErrGroupNotFound) {
+			s := pt.StepStart(fmt.Sprintf("Creating group %s", groupName))
+			gid, err = CreateGroup(groupName)
+			if err != nil {
+				s.Failed()
+				return "", "", fmt.Errorf("failed to create group %s: %w", groupName, err)
+			}
+			s.Succeeded()
+		}
 
-		s = pt.StepStart(fmt.Sprintf("Creating user %s", username))
-		uid, err = CreateUser(username, gid)
-		if err != nil {
-			s.Failed()
-			return "", "", fmt.Errorf("failed to create user %s: %w", username, err)
+		// ensure required user
+		gid, err = FindUID(username)
+		if err != nil && !errors.Is(err, ErrUserNotFound) {
+			return "", "", fmt.Errorf("failed finding username %s: %w", username, err)
 		}
-		err = AddUserToGroup(username, groupName)
-		if err != nil {
-			s.Failed()
-			return "", "", fmt.Errorf("failed to add user %s to group %s: %w", username, groupName, err)
+		if errors.Is(err, ErrUserNotFound) {
+			s := pt.StepStart(fmt.Sprintf("Creating user %s", username))
+			uid, err = CreateUser(username, gid)
+			if err != nil {
+				s.Failed()
+				return "", "", fmt.Errorf("failed to create user %s: %w", username, err)
+			}
+			err = AddUserToGroup(username, groupName)
+			if err != nil {
+				s.Failed()
+				return "", "", fmt.Errorf("failed to add user %s to group %s: %w", username, groupName, err)
+			}
+			s.Succeeded()
 		}
-		s.Succeeded()
 	}
 
 	// ensure parent directory exists

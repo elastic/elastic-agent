@@ -8,7 +8,15 @@ package install
 
 import "errors"
 
+func findGID(name string) (string, error) {
+	return "", errors.New("not implemented")
+}
+
 func createGroup(name string) (string, error) {
+	return "", errors.New("not implemented")
+}
+
+func findUID(name string) (string, error) {
 	return "", errors.New("not implemented")
 }
 

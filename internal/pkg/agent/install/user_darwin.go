@@ -9,7 +9,6 @@ package install
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"os/exec"
 	"sort"
@@ -17,7 +16,21 @@ import (
 	"strings"
 )
 
+func findGID(name string) (string, error) {
+	records, err := dsclList("/Groups", "PrimaryGroupID")
+	if err != nil {
+		return "", fmt.Errorf("failed listing: %w", err)
+	}
+	for _, record := range records {
+		if record[0] == name {
+			return record[1], nil
+		}
+	}
+	return "", ErrGroupNotFound
+}
+
 func createGroup(name string) (string, error) {
+	// find the next available ID
 	nextId, err := dsclNextID("/Groups", "PrimaryGroupID")
 	if err != nil {
 		return "", fmt.Errorf("failed getting next gid: %w", err)
@@ -34,7 +47,21 @@ func createGroup(name string) (string, error) {
 	return gid, nil
 }
 
+func findUID(name string) (string, error) {
+	records, err := dsclList("/Users", "UniqueID")
+	if err != nil {
+		return "", fmt.Errorf("failed listing: %w", err)
+	}
+	for _, record := range records {
+		if record[0] == name {
+			return record[1], nil
+		}
+	}
+	return "", ErrUserNotFound
+}
+
 func createUser(name string, gid string) (string, error) {
+	// find the next available ID
 	nextId, err := dsclNextID("/Users", "UniqueID")
 	if err != nil {
 		return "", fmt.Errorf("failed getting next uid: %w", err)
@@ -56,7 +83,7 @@ func createUser(name string, gid string) (string, error) {
 		return "", fmt.Errorf("dscl . -create failed: %w (output: %s)", err, output)
 	}
 
-	return uid, errors.New("not implemented")
+	return uid, nil
 }
 
 func addUserToGroup(username string, groupName string) error {
