@@ -42,6 +42,12 @@ func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, current
 		return nil, errors.New("retrieved versions list from Artifact API is empty")
 	}
 
+	return getUpgradableVersions(ctx, vList, upgradeToVersion, currentMajorVersions, previousMajorVersions)
+}
+
+// Internal version of GetUpgradableVersions() with the artifacts API dependency removed for testing.
+func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int) ([]*version.ParsedSemVer, error) {
+	fmt.Println(vList)
 	parsedUpgradeToVersion, err := version.ParseVersion(upgradeToVersion)
 	if err != nil {
 		return nil, fmt.Errorf("upgradeToVersion %q is not a valid version string: %w", upgradeToVersion, err)
