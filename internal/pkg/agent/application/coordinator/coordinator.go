@@ -158,6 +158,10 @@ type ComponentsModifier func(comps []component.Component, cfg map[string]interfa
 // CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
 var CoordinatorShutdownTimeout = time.Second * 5
 
+type configReloader interface {
+	Reload(*config.Config) error
+}
+
 // Coordinator manages the entire state of the Elastic Agent.
 //
 // All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
@@ -172,6 +176,8 @@ type Coordinator struct {
 	reexecMgr  ReExecManager
 	upgradeMgr UpgradeManager
 	monitorMgr MonitorManager
+
+	monitoringServerReloader configReloader
 
 	runtimeMgr RuntimeManager
 	configMgr  ConfigManager
@@ -363,6 +369,10 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 // Called by external goroutines.
 func (c *Coordinator) State() State {
 	return c.stateBroadcaster.Get()
+}
+
+func (c *Coordinator) RegisterMonitoringServer(s configReloader) {
+	c.monitoringServerReloader = s
 }
 
 // StateSubscribe returns a channel that reports changes in Coordinator state.
@@ -1004,6 +1014,12 @@ func (c *Coordinator) generateAST(cfg *config.Config) (err error) {
 
 	if c.monitorMgr != nil {
 		if err := c.monitorMgr.Reload(cfg); err != nil {
+			return fmt.Errorf("failed to reload monitor manager configuration: %w", err)
+		}
+	}
+
+	if c.monitoringServerReloader != nil {
+		if err := c.monitoringServerReloader.Reload(cfg); err != nil {
 			return fmt.Errorf("failed to reload monitor manager configuration: %w", err)
 		}
 	}
