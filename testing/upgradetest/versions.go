@@ -47,11 +47,11 @@ func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, current
 
 // Internal version of GetUpgradableVersions() with the artifacts API dependency removed for testing.
 func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int) ([]*version.ParsedSemVer, error) {
-	fmt.Println(vList)
 	parsedUpgradeToVersion, err := version.ParseVersion(upgradeToVersion)
 	if err != nil {
 		return nil, fmt.Errorf("upgradeToVersion %q is not a valid version string: %w", upgradeToVersion, err)
 	}
+
 	currentMajor := parsedUpgradeToVersion.Major()
 	var currentMajorSelected, previousMajorSelected int
 
@@ -72,6 +72,11 @@ func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgrad
 	// we want to sort in descending orders, so we sort them
 	sort.Sort(sort.Reverse(sortedParsedVersions))
 
+	// If the only available build of the most recent version is a snapshot it is unreleased.
+	// This is always true on main and true until the first release of each minor version branch.
+	mostRecentVersion := sortedParsedVersions[0]
+	mostRecentIsUnreleased := mostRecentVersion.IsSnapshot()
+
 	var upgradableVersions []*version.ParsedSemVer
 	for _, parsedVersion := range sortedParsedVersions {
 		if currentMajorSelected == currentMajorVersions && previousMajorSelected == previousMajorVersions {
@@ -84,9 +89,21 @@ func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgrad
 			continue
 		}
 
+		isCurrentOrPrevMinor := (parsedUpgradeToVersion.Major() == parsedVersion.Major()) &&
+			(parsedUpgradeToVersion.Minor()-parsedVersion.Minor()) <= 1
+
 		if parsedVersion.IsSnapshot() {
-			// skip all snapshots
-			continue
+			// Skip snapshot builds if the most recent version isn't unreleased and this isn't the current
+			// or previous possibly unreleased minor version.
+			if !mostRecentIsUnreleased || !isCurrentOrPrevMinor {
+				continue
+			}
+		} else {
+			// Skip non-snapshot builds if the most recent is unrelesed and this version is the current or
+			// previous minor since they are not released yet.
+			if mostRecentIsUnreleased && isCurrentOrPrevMinor {
+				continue
+			}
 		}
 
 		if parsedVersion.Major() == currentMajor && currentMajorSelected < currentMajorVersions {

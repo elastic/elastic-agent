@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/stretchr/testify/require"
 )
 
@@ -55,7 +54,7 @@ var versionListAfter8_11FeatureFreeze = tools.VersionList{
 	},
 }
 
-// Tests that versiontest.PreviousMinor behaves correctly during the feature freeze period
+// Tests that GetUpgradableVersions behaves correctly during the feature freeze period
 // where the both main and the previous minor release branch versions are unreleased.
 // Regression test for the problem described in https://github.com/elastic/elastic-agent/pull/3563#issuecomment-1756007790.
 func TestGetUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
@@ -69,17 +68,21 @@ func TestGetUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
 	currentVersion := "8.12.0"
 
 	// Since the 8.11.0 BC at staging.elastic.co isn't available to the agent by default,
-	// getUpgradableVersions should return 8.11.0-SNAPSHOT as the previous minor so an
-	// upgrade can proceed.
-	expectedPrevVersion := "8.11.0-SNAPSHOT"
-	expectedPrevParsed, err := version.ParseVersion(expectedPrevVersion)
-	require.NoError(t, err)
+	// getUpgradableVersions should return 8.12.0-SNAPSHOT as the previous minor so an
+	// upgrade can proceed. It should also allow upgrading to 8.11.0-SNAPSHOT instead of
+	// 8.11.0.
+	expectedUpgradableVersions := []string{
+		"8.12.0-SNAPSHOT", "8.11.0-SNAPSHOT", "8.10.3", "8.10.2", "7.17.14", "7.17.13",
+	}
 
-	// Duplicate the logic from PreviousMinor where only the first version returned is inspected.
-	versions, err := getUpgradableVersions(ctx, &versionListAfter8_11FeatureFreeze, currentVersion, 1, 0)
+	// Get several of the previous versions to ensure snapshot selection works correctly.
+	versions, err := getUpgradableVersions(ctx, &versionListAfter8_11FeatureFreeze, currentVersion, 4, 2)
 	require.NoError(t, err)
 	require.NotEmpty(t, versions)
 
-	prevMinor := versions[0]
-	require.Equal(t, expectedPrevParsed, prevMinor)
+	t.Logf("exp: %s", expectedUpgradableVersions)
+	t.Logf("act: %s", versions)
+	for i, exp := range expectedUpgradableVersions {
+		require.Equal(t, exp, versions[i].String())
+	}
 }
