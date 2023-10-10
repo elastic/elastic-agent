@@ -24,8 +24,10 @@ steps:
       - "build/TEST-**"
       - "build/diagnostics/*"
     agents:
-      provider: "gcp"
-      image: "family/core-ubuntu-2204-aarch64"
+      provider: "aws"
+      imagePrefix: "core-ubuntu-2204-aarch64"
+      diskSizeGb: 200
+      instanceType: "m6g.4xlarge"
     retry:
       manual:
         allowed: true
