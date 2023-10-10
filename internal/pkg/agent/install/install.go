@@ -20,13 +20,16 @@ import (
 
 const (
 	darwin = "darwin"
+
+	elasticUsername  = "elastic-agent"
+	elasticGroupName = "elastic-agent"
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
+func Install(cfgFile, topPath string, nonRoot bool, pt ProgressTrackerStep) (string, string, error) {
 	dir, err := findDirectory()
 	if err != nil {
-		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
+		return "", "", errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
 	}
 
 	// We only uninstall Agent if it is currently installed.
@@ -41,7 +44,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 		err = Uninstall(cfgFile, topPath, "", s)
 		if err != nil {
 			s.Failed()
-			return errors.New(
+			return "", "", errors.New(
 				err,
 				fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
 				errors.M("directory", filepath.Dir(topPath)))
@@ -49,10 +52,41 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 		s.Succeeded()
 	}
 
+	uid := "0"
+	gid := "0"
+	username := ""
+	groupName := ""
+	if nonRoot {
+		username = elasticUsername
+		groupName = elasticGroupName
+
+		// create required group/user when install in non-root mode
+		s := pt.StepStart(fmt.Sprintf("Creating group %s", groupName))
+		gid, err = CreateGroup(groupName)
+		if err != nil {
+			s.Failed()
+			return "", "", fmt.Errorf("failed to create group %s: %w", groupName, err)
+		}
+		s.Succeeded()
+
+		s = pt.StepStart(fmt.Sprintf("Creating user %s", username))
+		uid, err = CreateUser(username, gid)
+		if err != nil {
+			s.Failed()
+			return "", "", fmt.Errorf("failed to create user %s: %w", username, err)
+		}
+		err = AddUserToGroup(username, groupName)
+		if err != nil {
+			s.Failed()
+			return "", "", fmt.Errorf("failed to add user %s to group %s: %w", username, groupName, err)
+		}
+		s.Succeeded()
+	}
+
 	// ensure parent directory exists
 	err = os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
-		return errors.New(
+		return "", "", errors.New(
 			err,
 			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)),
 			errors.M("directory", filepath.Dir(topPath)))
@@ -61,7 +95,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	// copy source into install path
 	block, err := ghw.Block()
 	if err != nil {
-		return fmt.Errorf("ghw.Block() returned error: %w", err)
+		return "", "", fmt.Errorf("ghw.Block() returned error: %w", err)
 	}
 
 	copyConcurrency := 1
@@ -78,7 +112,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	})
 	if err != nil {
 		s.Failed()
-		return errors.New(
+		return "", "", errors.New(
 			err,
 			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
 			errors.M("source", dir), errors.M("destination", topPath))
@@ -90,7 +124,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 		pathDir := filepath.Dir(paths.ShellWrapperPath)
 		err = os.MkdirAll(pathDir, 0755)
 		if err != nil {
-			return errors.New(
+			return "", "", errors.New(
 				err,
 				fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, paths.ShellWrapperPath),
 				errors.M("directory", pathDir))
@@ -103,7 +137,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 			// Check if previous shell wrapper or symlink exists and remove it so it can be overwritten
 			if _, err := os.Lstat(paths.ShellWrapperPath); err == nil {
 				if err := os.Remove(paths.ShellWrapperPath); err != nil {
-					return errors.New(
+					return "", "", errors.New(
 						err,
 						fmt.Sprintf("failed to remove (%s)", paths.ShellWrapperPath),
 						errors.M("destination", paths.ShellWrapperPath))
@@ -111,7 +145,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 			}
 			err = os.Symlink(filepath.Join(topPath, paths.BinaryName), paths.ShellWrapperPath)
 			if err != nil {
-				return errors.New(
+				return "", "", errors.New(
 					err,
 					fmt.Sprintf("failed to create elastic-agent symlink (%s)", paths.ShellWrapperPath),
 					errors.M("destination", paths.ShellWrapperPath))
@@ -123,7 +157,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 			shellWrapper := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
 			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
 			if err != nil {
-				return errors.New(
+				return "", "", errors.New(
 					err,
 					fmt.Sprintf("failed to write shell wrapper (%s)", paths.ShellWrapperPath),
 					errors.M("destination", paths.ShellWrapperPath))
@@ -134,43 +168,53 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	// post install (per platform)
 	err = postInstall(topPath)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
 	// fix permissions
-	err = FixPermissions(topPath)
+	err = FixPermissions(topPath, uid, gid)
 	if err != nil {
-		return errors.New(
+		return "", "", errors.New(
 			err,
 			"failed to perform permission changes",
 			errors.M("destination", topPath))
 	}
+	if paths.ShellWrapperPath != "" {
+		err = FixPermissions(paths.ShellWrapperPath, uid, gid)
+		if err != nil {
+			return "", "", errors.New(
+				err,
+				"failed to perform permission changes on wrapper path",
+				errors.M("destination", paths.ShellWrapperPath))
+		}
+	}
 
 	// install service
 	s = pt.StepStart("Installing service")
-	svc, err := newService(topPath)
+	svc, err := newService(topPath, username, groupName)
 	if err != nil {
 		s.Failed()
-		return err
+		return "", "", err
 	}
 	err = svc.Install()
 	if err != nil {
 		s.Failed()
-		return errors.New(
+		return "", "", errors.New(
 			err,
 			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
 			errors.M("service", paths.ServiceName))
 	}
 	s.Succeeded()
 
-	return nil
+	return "", "", nil
 }
 
 // StartService starts the installed service.
 //
 // This should only be called after Install is successful.
 func StartService(topPath string) error {
-	svc, err := newService(topPath)
+	// only starting the service, so no need to set the username and group to any value
+	svc, err := newService(topPath, "", "")
 	if err != nil {
 		return err
 	}
@@ -186,7 +230,8 @@ func StartService(topPath string) error {
 
 // StopService stops the installed service.
 func StopService(topPath string) error {
-	svc, err := newService(topPath)
+	// only stopping the service, so no need to set the username and group to any value
+	svc, err := newService(topPath, "", "")
 	if err != nil {
 		return err
 	}
@@ -202,7 +247,8 @@ func StopService(topPath string) error {
 
 // RestartService restarts the installed service.
 func RestartService(topPath string) error {
-	svc, err := newService(topPath)
+	// only restarting the service, so no need to set the username and group to any value
+	svc, err := newService(topPath, "", "")
 	if err != nil {
 		return err
 	}
@@ -217,8 +263,8 @@ func RestartService(topPath string) error {
 }
 
 // FixPermissions fixes the permissions on the installed system.
-func FixPermissions(topPath string) error {
-	return fixPermissions(topPath)
+func FixPermissions(topPath string, uid string, gid string) error {
+	return fixPermissions(topPath, uid, gid)
 }
 
 // findDirectory returns the directory to copy into the installation location.

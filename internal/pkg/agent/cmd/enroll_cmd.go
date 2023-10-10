@@ -260,7 +260,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	}
 
 	if c.options.FixPermissions {
-		err = install.FixPermissions(paths.Top())
+		err = install.FixPermissions(paths.Top(), "", "")
 		if err != nil {
 			return errors.New(err, "failed to fix permissions")
 		}

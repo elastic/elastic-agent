@@ -16,7 +16,7 @@ import (
 )
 
 // fixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
-func fixPermissions(topPath string) error {
+func fixPermissions(topPath string, uid string, gid string) error {
 	return recursiveSystemAdminPermissions(topPath)
 }
 

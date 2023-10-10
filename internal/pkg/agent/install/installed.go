@@ -55,7 +55,8 @@ func Status(topPath string) (StatusType, string) {
 
 // checkService only checks the status of the service.
 func checkService(topPath string) (StatusType, string) {
-	svc, err := newService(topPath)
+	// only checking the service, so no need to set the username and group to any value
+	svc, err := newService(topPath, "", "")
 	if err != nil {
 		return NotInstalled, "unable to check service status"
 	}

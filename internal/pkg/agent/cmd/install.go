@@ -10,6 +10,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -21,7 +24,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-const flagInstallBasePath = "base-path"
+const (
+	flagInstallBasePath = "base-path"
+	flagInstallNonRoot  = "non-root"
+)
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -43,6 +49,7 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current installation and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
+	cmd.Flags().Bool(flagInstallNonRoot, false, "Installed Elastic Agent will create an 'elastic-agent' user and run as that user, instead of running as root.")
 	addEnrollFlags(cmd)
 
 	return cmd
@@ -66,6 +73,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
+	nonRoot, _ := cmd.Flags().GetBool(flagInstallNonRoot)
 
 	topPath := paths.InstallPath(basePath)
 
@@ -183,9 +191,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}()
 
+	uidStr := "0"
+	gidStr := "0"
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
-		err = install.Install(cfgFile, topPath, s)
+		uidStr, gidStr, err = install.Install(cfgFile, topPath, nonRoot, s)
 		if err != nil {
 			return err
 		}
@@ -233,6 +243,21 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		enrollCmd.Stdin = os.Stdin
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
+
+		if runtime.GOOS != "windows" {
+			uid, err := strconv.Atoi(uidStr)
+			if err != nil {
+				return fmt.Errorf("failed to convert uid(%s) to int: %w", uidStr, err)
+			}
+			gid, err := strconv.Atoi(gidStr)
+			if err != nil {
+				return fmt.Errorf("failed to convert gid(%s) to int: %w", gidStr, err)
+			}
+			enrollCmd.SysProcAttr.Credential = &syscall.Credential{
+				Uid: uint32(uid),
+				Gid: uint32(gid),
+			}
+		}
 
 		enrollStep := s.StepStart("Enrolling Elastic Agent with Fleet")
 		err = enrollCmd.Start()
