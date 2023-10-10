@@ -259,6 +259,8 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 		composableMapping: mapstr.M{},
 		processors:        []mapstr.M{},
 	}
+	cName := ""
+	cHost := ""
 
 	ann, ok := k8sMapping["annotations"]
 	if !ok {
@@ -266,8 +268,6 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 	}
 	annotations, _ := ann.(mapstr.M)
 
-	cName := ""
-	cHost := ""
 	// Get the name of the container from the metadata. We need it to extract the hints that affect it directly.
 	// E.g. co.elastic.hints.<container-name>/host: "..."
 	if con, ok := k8sMapping["container"]; ok {
