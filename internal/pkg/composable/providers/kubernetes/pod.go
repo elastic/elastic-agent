@@ -24,10 +24,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 )
 
-const (
-	processorhints = "hints/processors"
-)
-
 type pod struct {
 	watcher           kubernetes.Watcher
 	nodeWatcher       kubernetes.Watcher
