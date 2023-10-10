@@ -12,7 +12,7 @@ steps:
       - "build/diagnostics/*"
     agents:
       provider: "gcp"
-      image: "ubuntu-2204-lts"
+      image: "family/core-ubuntu-2204"
     retry:
       manual:
         allowed: true
@@ -24,8 +24,8 @@ steps:
       - "build/TEST-**"
       - "build/diagnostics/*"
     agents:
-      provider: "aws"
-      image: "ubuntu-2204-aarch64"
+      provider: "gcp"
+      image: "family/core-ubuntu-2204-aarch64"
     retry:
       manual:
         allowed: true
