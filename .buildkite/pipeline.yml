@@ -33,7 +33,7 @@ steps:
 
   - label: "Integration tests"
     key: "integration-tests"
-    command: ".buildkite/scripts/steps/integration_tests.sh"
+    command: ".buildkite/scripts/steps/integration_tests.sh stateful"
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
