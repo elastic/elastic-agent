@@ -265,18 +265,22 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 	if !ok {
 		return hintData
 	}
-	annotations, _ := ann.(mapstr.M)
+	annotations, ok := ann.(mapstr.M)
+	if !ok {
+		return hintData
+	}
 
 	// Get the name of the container from the metadata. We need it to extract the hints that affect it directly.
 	// E.g. co.elastic.hints.<container-name>/host: "..."
 	if con, ok := k8sMapping["container"]; ok {
-		containers, _ := con.(mapstr.M)
-		if name, err := containers.GetValue("name"); err == nil {
-			cName = name.(string)
-		}
-		if cPort, err := containers.GetValue("port"); err == nil {
-			// This is the default for the host value of a specific container.
-			cHost = "${kubernetes.pod.ip}:" + cPort.(string)
+		if containers, ok := con.(mapstr.M); ok {
+			if name, err := containers.GetValue("name"); err == nil {
+				cName = name.(string)
+			}
+			if cPort, err := containers.GetValue("port"); err == nil {
+				// This is the default for the host value of a specific container.
+				cHost = "${kubernetes.pod.ip}:" + cPort.(string)
+			}
 		}
 	}
 
@@ -287,9 +291,12 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 
 	// Check if host exists. Otherwise, add default entry for it.
 	if cHost != "" {
-		if hintsValues, ok := hintsExtracted[hints].(mapstr.M); ok {
-			if _, ok := hintsValues[host]; !ok {
-				hintsValues[host] = cHost
+		hintsValues, ok := hintsExtracted[hints]
+		if ok {
+			if hintsHostValues, ok := hintsValues.(mapstr.M); ok {
+				if _, ok := hintsHostValues[host]; !ok {
+					hintsHostValues[host] = cHost
+				}
 			}
 		} else {
 			hintsExtracted[hints] = mapstr.M{
