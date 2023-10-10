@@ -275,11 +275,15 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 	if con, ok := k8sMapping["container"]; ok {
 		if containers, ok := con.(mapstr.M); ok {
 			if name, err := containers.GetValue("name"); err == nil {
-				cName = name.(string)
+				if nameString, ok := name.(string); ok {
+					cName = nameString
+				}
 			}
 			if cPort, err := containers.GetValue("port"); err == nil {
 				// This is the default for the host value of a specific container.
-				cHost = "${kubernetes.pod.ip}:" + cPort.(string)
+				if portString, ok := cPort.(string); ok {
+					cHost = "${kubernetes.pod.ip}:" + portString
+				}
 			}
 		}
 	}
