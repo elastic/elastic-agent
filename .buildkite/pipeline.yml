@@ -31,9 +31,9 @@ steps:
       manual:
         allowed: true
 
-  - label: "Integration tests"
-    key: "integration-tests"
-    command: ".buildkite/scripts/steps/integration_tests.sh stateful"
+  - label: "Serverless integration test"
+    key: "serverless-integration-tests"
+    command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestMonitoringLogsShipped"
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
@@ -41,9 +41,9 @@ steps:
       provider: "gcp"
       machineType: "n1-standard-8"
 
-  - label: "Serverless integration test"
-    key: "serverless-integration-tests"
-    command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestMonitoringLogsShipped"
+  - label: "Integration tests"
+    key: "integration-tests"
+    command: ".buildkite/scripts/steps/integration_tests.sh stateful"
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
