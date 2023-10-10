@@ -16,9 +16,10 @@ import (
 )
 
 const (
+	hints = "hints"
+
 	integration = "package"
 	datastreams = "data_streams"
-
 	host        = "host"
 	period      = "period"
 	timeout     = "timeout"
@@ -26,9 +27,7 @@ const (
 	username    = "username"
 	password    = "password"
 	stream      = "stream" // this is the container stream: stdout/stderr
-
-	hints      = "hints"
-	processors = "processors"
+	processors  = "processors"
 )
 
 type hintsBuilder struct {
