@@ -54,6 +54,7 @@ const (
 	windowsOS = "windows"
 
 	// metricset execution period used for the monitoring metrics inputs
+	// we set this to 60s to reduce the load/data volume on the monitoring cluster
 	metricsCollectionInterval = 60 * time.Second
 )
 
