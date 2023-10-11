@@ -76,7 +76,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt ProgressTrackerStep) (str
 		}
 
 		// ensure required user
-		gid, err = FindUID(username)
+		uid, err = FindUID(username)
 		if err != nil && !errors.Is(err, ErrUserNotFound) {
 			return "", "", fmt.Errorf("failed finding username %s: %w", username, err)
 		}
