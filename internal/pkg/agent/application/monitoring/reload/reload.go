@@ -103,7 +103,7 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 
 	sr.config = newConfig.Settings.MonitoringConfig
 
-	shouldRunMetrics := sr.config.Enabled && sr.config.MonitorMetrics
+	shouldRunMetrics := sr.config.Enabled
 	if shouldRunMetrics && !sr.isServerRunning {
 		sr.start()
 
