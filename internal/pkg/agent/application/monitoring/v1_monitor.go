@@ -52,6 +52,9 @@ const (
 	agentName                  = "elastic-agent"
 
 	windowsOS = "windows"
+
+	// metricset execution period used for the monitoring metrics inputs
+	metricsCollectionInterval = 60 * time.Second
 )
 
 var (
@@ -518,7 +521,7 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 }
 
 func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component) error {
-	metricsCollectionInterval := 60 * time.Second
+
 	metricsCollectionIntervalString := metricsCollectionInterval.String()
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
