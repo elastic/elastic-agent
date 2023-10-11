@@ -36,12 +36,12 @@ func createGroup(name string) (string, error) {
 		return "", fmt.Errorf("failed getting next gid: %w", err)
 	}
 	gid := strconv.Itoa(nextId)
+	path := fmt.Sprintf("/Groups/%s", name)
 
 	// create the group entry
-	cmd := exec.Command("dscl", ".", "-create", fmt.Sprintf("/Groups/%s", name), "PrimaryGroupID", gid)
-	output, err := cmd.CombinedOutput()
+	err = dsclExec("-create", path, "PrimaryGroupID", gid)
 	if err != nil {
-		return "", fmt.Errorf("dscl . -create failed: %w (output: %s)", err, output)
+		return "", err
 	}
 
 	return gid, nil
@@ -70,17 +70,33 @@ func createUser(name string, gid string) (string, error) {
 	path := fmt.Sprintf("/Users/%s", name)
 
 	// create the user entry
-	cmd := exec.Command("dscl", ".", "-create", path, "UniqueID", uid)
-	output, err := cmd.CombinedOutput()
+	err = dsclExec("-create", path, "UniqueID", uid)
 	if err != nil {
-		return "", fmt.Errorf("dscl . -create failed: %w (output: %s)", err, output)
+		return "", err
 	}
 
 	// set primary group to gid
-	cmd = exec.Command("dscl", ".", "-create", path, "PrimaryGroupID", gid)
-	output, err = cmd.CombinedOutput()
+	err = dsclExec("-create", path, "PrimaryGroupID", gid)
 	if err != nil {
-		return "", fmt.Errorf("dscl . -create failed: %w (output: %s)", err, output)
+		return "", err
+	}
+
+	// set home directory to empty
+	err = dsclExec("-create", path, "NFSHomeDirectory", "/var/empty")
+	if err != nil {
+		return "", err
+	}
+
+	// set to no shell
+	err = dsclExec("-create", path, "UserShell", "/usr/bin/false")
+	if err != nil {
+		return "", err
+	}
+
+	// set to no password (aka. cannot authenticate)
+	err = dsclExec("-create", path, "Password", "*")
+	if err != nil {
+		return "", err
 	}
 
 	return uid, nil
@@ -137,4 +153,15 @@ func dsclList(path, field string) ([][]string, error) {
 		records = append(records, fields)
 	}
 	return records, nil
+}
+
+func dsclExec(args ...string) error {
+	args = append([]string{"."}, args...)
+	cmd := exec.Command("dscl", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		command := fmt.Sprintf("dscl %s", strings.Join(args, " "))
+		return fmt.Errorf("%s failed: %w (output: %s)", command, err, output)
+	}
+	return nil
 }
