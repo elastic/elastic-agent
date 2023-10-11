@@ -275,20 +275,94 @@ func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	return nil
 }
 
+// RunBeat runs the given given beat
+// the beat will run until an error, or the given timeout is reached
+func (f *Fixture) RunBeat(ctx context.Context) error {
+	if f.binaryName == "elastic-agent" {
+		return errors.New("RunBeat() can't be run against elastic-agent")
+	}
+
+	var err error
+	err = f.EnsurePrepared(ctx)
+	if err != nil {
+		return fmt.Errorf("error preparing beat: %w", err)
+	}
+
+	var logProxy Logger
+	if f.logOutput {
+		logProxy = f.t
+	}
+	stdOut := newLogWatcher(logProxy)
+	stdErr := newLogWatcher(logProxy)
+	args := []string{"run", "-e", "-c", filepath.Join(f.workDir, fmt.Sprintf("%s.yml", f.binaryName))}
+
+	args = append(args, f.additionalArgs...)
+
+	proc, err := process.Start(
+		f.binaryPath(),
+		process.WithContext(ctx),
+		process.WithArgs(args),
+		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+
+	if err != nil {
+		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
+	}
+
+	killProc := func() {
+		_ = proc.Kill()
+		<-proc.Wait()
+	}
+
+	var doneChan <-chan time.Time
+	if f.runLength != 0 {
+		doneChan = time.After(f.runLength)
+	}
+
+	stopping := false
+	for {
+		select {
+		case <-ctx.Done():
+			killProc()
+			return ctx.Err()
+		case ps := <-proc.Wait():
+			if stopping {
+				return nil
+			}
+			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
+		case err := <-stdOut.Watch():
+			if !f.allowErrs {
+				// no errors allowed
+				killProc()
+				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
+			}
+		case err := <-stdErr.Watch():
+			if !f.allowErrs {
+				// no errors allowed
+				killProc()
+				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
+			}
+		case <-doneChan:
+			if !stopping {
+				// trigger the stop
+				stopping = true
+				_ = proc.Stop()
+			}
+		}
+	}
+}
+
 // Run runs the provided binary.
 //
-// If `states` are provided and the binary is Elastic Agent, agent runs until each state has been reached. Once reached the
+// If `states` are provided, agent runs until each state has been reached. Once reached the
 // Elastic Agent is stopped. If at any time the Elastic Agent logs an error log and the Fixture is not started
 // with `WithAllowErrors()` then `Run` will exit early and return the logged error.
 //
 // If no `states` are provided then the Elastic Agent runs until the context is or the timeout specified with WithRunLength is reached.
 func (f *Fixture) Run(ctx context.Context, states ...State) error {
-	isBeat := false
 	if f.binaryName != "elastic-agent" {
-		isBeat = true
+		return errors.New("Run() can only be used with elastic-agent, use RunBeat()")
 	}
-
-	if !isBeat && f.installed {
+	if f.installed {
 		return errors.New("fixture is installed; cannot be run")
 	}
 
@@ -302,9 +376,6 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	defer cancel()
 
 	var smInstance *stateMachine
-	if states != nil && isBeat {
-		return errors.New("states not supported when running against beats")
-	}
 	if states != nil {
 		smInstance, err = newStateMachine(states)
 		if err != nil {
@@ -316,16 +387,15 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	var agentClient client.Client
 	var stateCh chan *client.AgentState
 	var stateErrCh chan error
-	if !isBeat {
-		cAddr, err := control.AddressFromPath(f.operatingSystem, f.workDir)
-		if err != nil {
-			return fmt.Errorf("failed to get control protcol address: %w", err)
-		}
-		agentClient = client.New(client.WithAddress(cAddr))
-		f.setClient(agentClient)
-		defer f.setClient(nil)
-		stateCh, stateErrCh = watchState(ctx, agentClient, f.connectTimout)
+
+	cAddr, err := control.AddressFromPath(f.operatingSystem, f.workDir)
+	if err != nil {
+		return fmt.Errorf("failed to get control protcol address: %w", err)
 	}
+	agentClient = client.New(client.WithAddress(cAddr))
+	f.setClient(agentClient)
+	defer f.setClient(nil)
+	stateCh, stateErrCh = watchState(ctx, agentClient, f.connectTimout)
 
 	var logProxy Logger
 	if f.logOutput {
@@ -335,9 +405,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	stdErr := newLogWatcher(logProxy)
 
 	args := []string{"run", "-e", "--disable-encrypted-store", "--testing-mode"}
-	if isBeat {
-		args = []string{"run", "-e", "-c", filepath.Join(f.workDir, fmt.Sprintf("%s.yml", f.binaryName))}
-	}
+
 	args = append(args, f.additionalArgs...)
 
 	proc, err := process.Start(
