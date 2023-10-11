@@ -648,9 +648,8 @@ inputs:
 	coord.runLoopIteration(ctx)
 	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
 
-	// server is stopped: monitoring.metrics is disabled
-	assert.True(t, monitoringServer.stopTriggered)
-	assert.False(t, monitoringServer.isRunning)
+	// server is running: monitoring.metrics is disabled does not have an effect
+	assert.True(t, monitoringServer.isRunning)
 }
 
 func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
