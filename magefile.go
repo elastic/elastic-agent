@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build mage
+// go:build mage
 
 package main
 
@@ -1013,7 +1013,8 @@ func packageAgent(platforms []string, packagingFn func()) {
 						// they might end up with a mishmash of packages from different versions.
 						// check to see if we have mismatched versions.
 						if !strings.Contains(f, packageVersion) {
-							fmt.Printf("WARNING: the file %s doesn't match agent version %s, beats might be out of date\n", f, packageVersion)
+							// if this panic hits weird edge cases where we don't want actual failures, revert to a printf statement.
+							panic(fmt.Sprintf("the file %s doesn't match agent version %s, beats might be out of date", f, packageVersion))
 						}
 
 						targetFile := filepath.Join(targetPath, filepath.Base(f))
