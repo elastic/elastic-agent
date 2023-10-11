@@ -5,8 +5,11 @@
 package info
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
@@ -28,10 +31,32 @@ func RunningInstalled() bool {
 	return true
 }
 
-func CreateInstallMarker(topPath string) error {
+func CreateInstallMarker(topPath string, uidStr string, gidStr string) error {
 	markerFilePath := filepath.Join(topPath, MarkerFileName)
 	if _, err := os.Create(markerFilePath); err != nil {
 		return err
+	}
+
+	var err error
+	if runtime.GOOS != "windows" {
+		uid := os.Getuid()
+		gid := os.Getgid()
+		if uidStr != "" {
+			uid, err = strconv.Atoi(uidStr)
+			if err != nil {
+				return fmt.Errorf("failed to convert uid(%s) to int: %w", uidStr, err)
+			}
+		}
+		if gidStr != "" {
+			gid, err = strconv.Atoi(gidStr)
+			if err != nil {
+				return fmt.Errorf("failed to convert gid(%s) to int: %w", gidStr, err)
+			}
+		}
+		err = os.Chown(markerFilePath, uid, gid)
+		if err != nil {
+			return fmt.Errorf("failed to chown %d:%d %s: %w", uid, gid, markerFilePath, err)
+		}
 	}
 
 	return nil

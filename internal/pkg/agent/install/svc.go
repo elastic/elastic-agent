@@ -5,6 +5,7 @@
 package install
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 
@@ -78,6 +79,11 @@ func newService(topPath string, username string, group string) (service.Service,
 		// of the prebuilt template with added ExitTimeOut option
 		cfg.Option["LaunchdConfig"] = darwinLaunchdConfig
 		cfg.Option["ExitTimeOut"] = darwinServiceExitTimeout
+
+		// Set the stdout and stderr logs to be inside the installation directory, ensures that the
+		// executing user for the service can write to the directory for the logs.
+		cfg.Option["StandardOutPath"] = filepath.Join(topPath, fmt.Sprintf("%s.out.log", paths.ServiceName))
+		cfg.Option["StandardErrorPath"] = filepath.Join(topPath, fmt.Sprintf("%s.err.log", paths.ServiceName))
 	}
 
 	return service.New(nil, cfg)
@@ -119,9 +125,9 @@ const darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
     <false/>
 
     <key>StandardOutPath</key>
-    <string>/usr/local/var/log/{{html .Name}}.out.log</string>
+    <string>{{html .Config.Option.StandardOutPath}}</string>
     <key>StandardErrorPath</key>
-    <string>/usr/local/var/log/{{html .Name}}.err.log</string>
+    <string>{{html .Config.Option.StandardErrorPath}}</string>
 
   </dict>
 </plist>

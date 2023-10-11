@@ -275,7 +275,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		enrollStep.Succeeded()
 	}
 
-	if err := info.CreateInstallMarker(topPath); err != nil {
+	if err := info.CreateInstallMarker(topPath, uidStr, gidStr); err != nil {
 		return fmt.Errorf("failed to create install marker: %w", err)
 	}
 

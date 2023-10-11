@@ -16,37 +16,33 @@ import (
 )
 
 // fixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
-func fixPermissions(topPath string, uid string, gid string) error {
-	var uidInt int
-	var gidInt int
+func fixPermissions(topPath string, uidStr string, gidStr string) error {
 	var err error
 
-	if uid == "" {
-		uidInt = os.Geteuid()
-	} else {
-		uidInt, err = strconv.Atoi(uid)
+	uid := os.Getuid()
+	gid := os.Getgid()
+	if uidStr != "" {
+		uid, err = strconv.Atoi(uidStr)
 		if err != nil {
-			return fmt.Errorf("failed to convert uid(%s) to int: %w", uid, err)
+			return fmt.Errorf("failed to convert uid(%s) to int: %w", uidStr, err)
+		}
+	}
+	if gidStr != "" {
+		gid, err = strconv.Atoi(gidStr)
+		if err != nil {
+			return fmt.Errorf("failed to convert gid(%s) to int: %w", gidStr, err)
 		}
 	}
 
-	if gid == "" {
-		gidInt = os.Getegid()
-	} else {
-		gidInt, err = strconv.Atoi(gid)
-		if err != nil {
-			return fmt.Errorf("failed to convert gid(%s) to int: %w", gid, err)
-		}
-	}
-
-	return recursiveRootPermissions(topPath, uidInt, gidInt)
+	return recursiveRootPermissions(topPath, uid, gid)
 }
 
 func recursiveRootPermissions(path string, uid int, gid int) error {
 	return filepath.Walk(path, func(name string, info fs.FileInfo, err error) error {
 		if err == nil {
-			// all files should be owned by root:root
-			err = os.Chown(name, uid, gid)
+			// all files should be owned by uid:gid
+			// uses `os.Lchown` so the symlink is updated to have the permissions
+			err = os.Lchown(name, uid, gid)
 			if err != nil {
 				return err
 			}

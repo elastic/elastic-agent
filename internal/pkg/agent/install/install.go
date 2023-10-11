@@ -219,7 +219,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt ProgressTrackerStep) (str
 	}
 	s.Succeeded()
 
-	return "", "", nil
+	return uid, gid, nil
 }
 
 // StartService starts the installed service.
@@ -273,11 +273,6 @@ func RestartService(topPath string) error {
 			errors.M("service", paths.ServiceName))
 	}
 	return nil
-}
-
-// FixPermissions fixes the permissions on the installed system.
-func FixPermissions(topPath string, uid string, gid string) error {
-	return fixPermissions(topPath, uid, gid)
 }
 
 // findDirectory returns the directory to copy into the installation location.

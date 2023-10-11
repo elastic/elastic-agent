@@ -616,7 +616,7 @@ func ensureInstallMarkerPresent() error {
 	// Otherwise, we're being upgraded from a version of an installed Agent
 	// that didn't use an installation marker file (that is, before v8.8.0).
 	// So create the file now.
-	if err := info.CreateInstallMarker(paths.Top()); err != nil {
+	if err := info.CreateInstallMarker(paths.Top(), "", ""); err != nil {
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
 
