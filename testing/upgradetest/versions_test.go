@@ -1,11 +1,16 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package upgradetest
 
 import (
 	"context"
 	"testing"
 
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
 // Response from https://artifacts-api.elastic.co/v1/versions shortly after the 8.11 feature freeze.
