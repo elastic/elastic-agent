@@ -64,7 +64,7 @@ func TestFetchVerify(t *testing.T) {
 	assert.NoError(t, err)
 
 	downloader := NewDownloader(config)
-	verifier, err := NewVerifier(log, config, true, nil)
+	verifier, err := NewVerifier(log, config, nil)
 	assert.NoError(t, err)
 
 	// first download verify should fail:
@@ -96,12 +96,9 @@ func TestFetchVerify(t *testing.T) {
 	err = verifier.Verify(s, version, false)
 	assert.NoError(t, err)
 
-	// Enable GPG signature validation.
-	verifier.allowEmptyPgp = false
-
 	// Bad GPG public key.
 	{
-		verifier.pgpBytes = []byte("garbage")
+		verifier.defaultKey = []byte("garbage")
 
 		// Don't delete anything.
 		assertFileExists(t, targetFilePath)
@@ -109,7 +106,7 @@ func TestFetchVerify(t *testing.T) {
 	}
 
 	// Setup proper GPG public key.
-	_, verifier.pgpBytes = release.PGP()
+	verifier.defaultKey = release.PGP()
 
 	// Missing .asc file.
 	{
@@ -216,7 +213,7 @@ func TestVerify(t *testing.T) {
 			_, err = os.Stat(artifact)
 			require.NoError(t, err)
 
-			testVerifier, err := NewVerifier(log, config, true, nil)
+			testVerifier, err := NewVerifier(log, config, nil)
 			require.NoError(t, err)
 
 			err = testVerifier.Verify(beatSpec, version, false, tc.RemotePGPUris...)

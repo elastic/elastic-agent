@@ -20,7 +20,7 @@ import (
 func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (download.Verifier, error) {
 	verifiers := make([]download.Verifier, 0, 3)
 
-	fsVer, err := fs.NewVerifier(log, config, allowEmptyPgp, pgp)
+	fsVer, err := fs.NewVerifier(log, config, pgp)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 		}
 	}
 
-	remoteVer, err := http.NewVerifier(log, config, allowEmptyPgp, pgp)
+	remoteVer, err := http.NewVerifier(log, config, pgp)
 	if err != nil {
 		return nil, err
 	}

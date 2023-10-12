@@ -30,10 +30,9 @@ const (
 // Verifier verifies a downloaded package by comparing with public ASC
 // file from elastic.co website.
 type Verifier struct {
-	config        *artifact.Config
-	client        http.Client
-	pgpBytes      []byte
-	allowEmptyPgp bool
+	config     *artifact.Config
+	client     http.Client
+	defaultKey []byte
 	log           *logger.Logger
 }
 
@@ -43,8 +42,8 @@ func (v *Verifier) Name() string {
 
 // NewVerifier create a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
-	if len(pgp) == 0 && !allowEmptyPgp {
+func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Verifier, error) {
+	if len(pgp) == 0 {
 		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)
 	}
 
@@ -59,11 +58,10 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 	}
 
 	v := &Verifier{
-		config:        config,
-		client:        *client,
-		allowEmptyPgp: allowEmptyPgp,
-		pgpBytes:      pgp,
-		log:           log,
+		config:     config,
+		client:     *client,
+		defaultKey: pgp,
+		log:        log,
 	}
 
 	return v, nil
@@ -90,24 +88,26 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
 func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
-	fullPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
+	artifactPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
 		return errors.New(err, "retrieving package path")
 	}
 
-	if err = download.VerifySHA512Hash(fullPath); err != nil {
-		var checksumMismatchErr *download.ChecksumMismatchError
-		if errors.As(err, &checksumMismatchErr) {
-			os.Remove(fullPath)
-			os.Remove(fullPath + ".sha512")
-		}
-		return err
+	if err = download.VerifySHA512HashWithCleanup(v.log, artifactPath); err != nil {
+		return fmt.Errorf("failed to verify SHA512 hash: %w", err)
 	}
 
 	if err = v.verifyAsc(a, version, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
-			os.Remove(fullPath + ".asc")
+			if err := os.Remove(artifactPath); err != nil {
+				v.log.Warnf("failed clean up after signature verification: failed to remove %q: %v",
+					artifactPath, err)
+			}
+			if err := os.Remove(artifactPath + ascSuffix); err != nil {
+				v.log.Warnf("failed clean up after sha512 check: failed to remove %q: %v",
+					artifactPath+ascSuffix, err)
+			}
 		}
 		return err
 	}
@@ -115,36 +115,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bo
 	return nil
 }
 
-func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultPgp bool, pgpSources ...string) error {
-	var pgpBytes [][]byte
-	if len(v.pgpBytes) > 0 && !skipDefaultPgp {
-		v.log.Infof("Default PGP being appended")
-		pgpBytes = append(pgpBytes, v.pgpBytes)
-	}
-
-	for _, check := range pgpSources {
-		if len(check) == 0 {
-			continue
-		}
-		raw, err := download.PgpBytesFromSource(v.log, check, &v.client)
-		if err != nil {
-			return err
-		}
-
-		if len(raw) == 0 {
-			continue
-		}
-
-		pgpBytes = append(pgpBytes, raw)
-	}
-
-	if len(pgpBytes) == 0 {
-		// no pgp available skip verification process
-		v.log.Infof("No checks defined")
-		return nil
-	}
-	v.log.Infof("Using %d PGP keys", len(pgpBytes))
-
+func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultKey bool, pgpSources ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return errors.New(err, "retrieving package name")
@@ -161,27 +132,49 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultPgp
 	}
 
 	ascBytes, err := v.getPublicAsc(ascURI)
-	if err != nil && v.allowEmptyPgp {
-		// asc not available but we allow empty for dev use-case
-		return nil
-	} else if err != nil {
+	if err != nil {
 		return errors.New(err, fmt.Sprintf("fetching asc file from %s", ascURI), errors.TypeNetwork, errors.M(errors.MetaKeyURI, ascURI))
 	}
 
-	for i, check := range pgpBytes {
-		err = download.VerifyGPGSignature(fullPath, ascBytes, check)
-		if err == nil {
-			// verify successful
-			v.log.Infof("Verification with PGP[%d] successful", i)
-			return nil
-		}
-		v.log.Warnf("Verification with PGP[%d] failed: %v", i, err)
+	pgpBytes, err := download.FetchPGPKeys(
+		v.log, v.client, v.defaultKey, skipDefaultKey, pgpSources)
+	if err != nil {
+		return fmt.Errorf("could not fetch pgp keys: %w", err)
 	}
 
-	v.log.Warnf("Verification failed")
+	return download.VerifyPGPSignatures(v.log, fullPath, ascBytes, pgpBytes)
+}
 
-	// return last error
-	return err
+func funcName(v *Verifier, skipDefaultPgp bool, pgpSources []string) ([][]byte, error, bool) {
+	var pgpBytes [][]byte
+	if len(v.defaultKey) > 0 && !skipDefaultPgp {
+		v.log.Infof("Default PGP being appended")
+		pgpBytes = append(pgpBytes, v.defaultKey)
+	}
+
+	for _, check := range pgpSources {
+		if len(check) == 0 {
+			continue
+		}
+		raw, err := download.PgpBytesFromSource(v.log, check, &v.client)
+		if err != nil {
+			return nil, err, true
+		}
+
+		if len(raw) == 0 {
+			continue
+		}
+
+		pgpBytes = append(pgpBytes, raw)
+	}
+
+	if len(pgpBytes) == 0 {
+		// no pgp available skip verification process
+		v.log.Infof("No checks defined")
+		return nil, nil, true
+	}
+	v.log.Infof("Using %d PGP keys", len(pgpBytes))
+	return pgpBytes, nil, false
 }
 
 func (v *Verifier) composeURI(filename, artifactName string) (string, error) {

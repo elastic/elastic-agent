@@ -29,7 +29,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 	if err != nil {
 		return nil, err
 	}
-	v, err := http.NewVerifier(log, cfg, allowEmptyPgp, pgp)
+	v, err := http.NewVerifier(log, cfg, pgp)
 	if err != nil {
 		return nil, errors.New(err, "failed to create snapshot verifier")
 	}

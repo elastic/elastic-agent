@@ -143,13 +143,13 @@ func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, setting
 }
 
 func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
-	allowEmptyPgp, pgp := release.PGP()
+	pgp := release.PGP()
 
 	if !version.IsSnapshot() {
 		return localremote.NewVerifier(log, settings, allowEmptyPgp, pgp)
 	}
 
-	fsVerifier, err := fs.NewVerifier(log, settings, allowEmptyPgp, pgp)
+	fsVerifier, err := fs.NewVerifier(log, settings, pgp)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 		return nil, err
 	}
 
-	remoteVerifier, err := http.NewVerifier(log, settings, allowEmptyPgp, pgp)
+	remoteVerifier, err := http.NewVerifier(log, settings, pgp)
 	if err != nil {
 		return nil, err
 	}

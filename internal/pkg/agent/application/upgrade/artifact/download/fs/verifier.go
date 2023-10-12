@@ -6,7 +6,6 @@ package fs
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,11 +25,10 @@ const (
 // The signature is validated against Elastic's public GPG key that is
 // embedded into Elastic Agent.
 type Verifier struct {
-	config        *artifact.Config
-	client        http.Client
-	pgpBytes      []byte
-	allowEmptyPgp bool
-	log           *logger.Logger
+	config     *artifact.Config
+	client     http.Client
+	defaultKey []byte
+	log        *logger.Logger
 }
 
 func (v *Verifier) Name() string {
@@ -39,8 +37,8 @@ func (v *Verifier) Name() string {
 
 // NewVerifier creates a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
-	if len(pgp) == 0 && !allowEmptyPgp {
+func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Verifier, error) {
+	if len(pgp) == 0 {
 		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)
 	}
 
@@ -55,11 +53,10 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 	}
 
 	v := &Verifier{
-		config:        config,
-		client:        *client,
-		allowEmptyPgp: allowEmptyPgp,
-		pgpBytes:      pgp,
-		log:           log,
+		config:     config,
+		client:     *client,
+		defaultKey: pgp,
+		log:        log,
 	}
 
 	return v, nil
@@ -70,24 +67,22 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
-		return errors.New(err, "retrieving package name")
+		return fmt.Errorf("could not get artifact name: %w", err)
 	}
 
-	fullPath := filepath.Join(v.config.TargetDirectory, filename)
+	artifactPath := filepath.Join(v.config.TargetDirectory, filename)
 
-	if err = download.VerifySHA512Hash(fullPath); err != nil {
-		var checksumMismatchErr *download.ChecksumMismatchError
-		if errors.As(err, &checksumMismatchErr) {
-			os.Remove(fullPath)
-			os.Remove(fullPath + ".sha512")
-		}
-		return err
+	if err = download.VerifySHA512HashWithCleanup(v.log, artifactPath); err != nil {
+		return fmt.Errorf("failed to verify SHA512 hash: %w", err)
 	}
 
-	if err = v.verifyAsc(fullPath, skipDefaultPgp, pgpBytes...); err != nil {
+	if err = v.verifyAsc(artifactPath, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
-			os.Remove(fullPath + ".asc")
+			if err := os.Remove(artifactPath + ".asc"); err != nil {
+				v.log.Warnf("failed clean up after signature verification: failed to remove %q: %v",
+					artifactPath+".asc", err)
+			}
 		}
 		return err
 	}
@@ -113,63 +108,25 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 	return nil
 }
 
-func (v *Verifier) verifyAsc(fullPath string, skipDefaultPgp bool, pgpSources ...string) error {
+func (v *Verifier) verifyAsc(fullPath string, skipDefaultKey bool, pgpSources ...string) error {
 	var pgpBytes [][]byte
-	if len(v.pgpBytes) > 0 && !skipDefaultPgp {
-		v.log.Infof("Default PGP being appended")
-		pgpBytes = append(pgpBytes, v.pgpBytes)
+	pgpBytes, err := download.FetchPGPKeys(
+		v.log, v.client, v.defaultKey, skipDefaultKey, pgpSources)
+	if err != nil {
+		return fmt.Errorf("could not fetch pgp keys: %w", err)
 	}
-
-	for _, check := range pgpSources {
-		if len(check) == 0 {
-			continue
-		}
-		raw, err := download.PgpBytesFromSource(v.log, check, &v.client)
-		if err != nil {
-			return err
-		}
-
-		if len(raw) == 0 {
-			continue
-		}
-
-		pgpBytes = append(pgpBytes, raw)
-	}
-
-	if len(pgpBytes) == 0 {
-		// no pgp available skip verification process
-		v.log.Infof("No checks defined")
-		return nil
-	}
-	v.log.Infof("Using %d PGP keys", len(pgpBytes))
 
 	ascBytes, err := v.getPublicAsc(fullPath)
-	if err != nil && v.allowEmptyPgp {
-		// asc not available but we allow empty for dev use-case
-		return nil
-	} else if err != nil {
-		return err
+	if err != nil {
+		return fmt.Errorf("could not get .asc file: %v", err)
 	}
 
-	for i, check := range pgpBytes {
-		err = download.VerifyGPGSignature(fullPath, ascBytes, check)
-		if err == nil {
-			// verify successful
-			v.log.Infof("Verification with PGP[%d] successful", i)
-			return nil
-		}
-		v.log.Warnf("Verification with PGP[%d] failed: %v", i, err)
-	}
-
-	v.log.Warnf("Verification failed")
-
-	// return last error
-	return err
+	return download.VerifyPGPSignatures(v.log, fullPath, ascBytes, pgpBytes)
 }
 
 func (v *Verifier) getPublicAsc(fullPath string) ([]byte, error) {
 	fullPath = fmt.Sprintf("%s%s", fullPath, ascSuffix)
-	b, err := ioutil.ReadFile(fullPath)
+	b, err := os.ReadFile(fullPath)
 	if err != nil {
 		return nil, errors.New(err, fmt.Sprintf("fetching asc file from '%s'", fullPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
 	}

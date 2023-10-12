@@ -25,7 +25,7 @@ var complete = "ELASTIC_AGENT_COMPLETE"
 
 // allowEmptyPgp is used as a debug flag and allows working
 // without valid pgp
-var allowEmptyPgp string
+// var allowEmptyPgp string
 
 // allowUpgrade is used as a debug flag and allows working
 // with upgrade without requiring Agent to be installed correctly
