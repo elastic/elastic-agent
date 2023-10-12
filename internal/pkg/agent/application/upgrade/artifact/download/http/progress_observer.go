@@ -35,7 +35,7 @@ func newLoggingProgressObserver(log *logger.Logger, downloadTimeout time.Duratio
 	}
 }
 
-func (plo *loggingProgressObserver) Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64) {
+func (lpObs *loggingProgressObserver) Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64) {
 	var msg string
 	var args []interface{}
 	if totalBytes > 0 {
@@ -52,28 +52,28 @@ func (plo *loggingProgressObserver) Report(sourceURI string, timePast time.Durat
 		}
 	}
 
-	plo.log.Infof(msg, args...)
-	if timePast >= plo.warnTimeout {
+	lpObs.log.Infof(msg, args...)
+	if timePast >= lpObs.warnTimeout {
 		// duplicate to warn when over the warnTimeout; this still has it logging to info that way if
 		// they are filtering the logs to info they still see the messages when over the warnTimeout, but
 		// when filtering only by warn they see these messages only
-		plo.log.Warnf(msg, args...)
+		lpObs.log.Warnf(msg, args...)
 	}
 }
 
-func (plo *loggingProgressObserver) ReportCompleted(sourceURI string, timePast time.Duration, downloadRate float64) {
+func (lpObs *loggingProgressObserver) ReportCompleted(sourceURI string, timePast time.Duration, downloadRate float64) {
 	msg := "download from %s completed in %s @ %sps"
 	args := []interface{}{
 		sourceURI, units.HumanDuration(timePast), units.HumanSize(downloadRate),
 	}
-	plo.log.Infof(msg, args...)
-	if timePast >= plo.warnTimeout {
+	lpObs.log.Infof(msg, args...)
+	if timePast >= lpObs.warnTimeout {
 		// see reason in `Report`
-		plo.log.Warnf(msg, args...)
+		lpObs.log.Warnf(msg, args...)
 	}
 }
 
-func (plo *loggingProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64, err error) {
+func (lpObs *loggingProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64, err error) {
 	var msg string
 	var args []interface{}
 	if totalBytes > 0 {
@@ -89,9 +89,9 @@ func (plo *loggingProgressObserver) ReportFailed(sourceURI string, timePast time
 			sourceURI, units.HumanSize(downloadedBytes), units.HumanSize(downloadRate), err,
 		}
 	}
-	plo.log.Infof(msg, args...)
-	if timePast >= plo.warnTimeout {
+	lpObs.log.Infof(msg, args...)
+	if timePast >= lpObs.warnTimeout {
 		// see reason in `Report`
-		plo.log.Warnf(msg, args...)
+		lpObs.log.Warnf(msg, args...)
 	}
 }
