@@ -107,8 +107,10 @@ const darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
     </array>
     {{if .UserName}}<key>UserName</key>
     <string>{{html .UserName}}</string>{{end}}
-	{{if .Config.Option.GroupName}}<key>GroupName</key>
-    <string>{{html .Config.Option.GroupName}}</string>{{end}}
+	{{if .Config.Option.GroupName -}}
+	<key>GroupName</key>
+    <string>{{html .Config.Option.GroupName}}</string>
+	{{- end}}
     {{if .ChRoot}}<key>RootDirectory</key>
     <string>{{html .ChRoot}}</string>{{end}}
     {{if .Config.Option.ExitTimeOut}}<key>ExitTimeOut</key>
@@ -148,7 +150,9 @@ ExecStart={{.Path|cmdEscape}}{{range .Arguments}} {{.|cmd}}{{end}}
 {{if .ChRoot}}RootDirectory={{.ChRoot|cmd}}{{end}}
 {{if .WorkingDirectory}}WorkingDirectory={{.WorkingDirectory|cmdEscape}}{{end}}
 {{if .UserName}}User={{.UserName}}{{end}}
-{{if .Config.Option.GroupName}}Group={{.Config.Option.GroupName}}{{end}}
+{{if .Config.Option.GroupName -}}
+Group={{.Config.Option.GroupName}}
+{{- end}}
 {{if .ReloadSignal}}ExecReload=/bin/kill -{{.ReloadSignal}} "$MAINPID"{{end}}
 {{if .PIDFile}}PIDFile={{.PIDFile|cmd}}{{end}}
 {{if and .LogOutput .HasOutputFileSupport -}}
