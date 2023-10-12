@@ -202,7 +202,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt ProgressTrackerStep) (str
 	// windows: uses npipe and doesn't need a directory created
 	if nonRoot && runtime.GOOS != "windows" {
 		path := filepath.Dir(strings.TrimPrefix(paths.ControlSocketNonRootPath, "unix://"))
-		err := os.Mkdir(path, 0644)
+		err := os.Mkdir(path, 0774)
 		if err != nil && !errors.Is(err, os.ErrExist) {
 			return "", "", fmt.Errorf("failed to create path %s: %w", path, err)
 		}
