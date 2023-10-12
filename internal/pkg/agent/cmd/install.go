@@ -73,7 +73,12 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
+
+	// only support Linux at the moment
 	nonRoot, _ := cmd.Flags().GetBool(flagInstallNonRoot)
+	if runtime.GOOS != "linux" {
+		return fmt.Errorf("unable to perform install command, non-root is currently only supported on Linux")
+	}
 
 	topPath := paths.InstallPath(basePath)
 
