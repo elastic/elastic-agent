@@ -293,6 +293,30 @@ func (runner *BeatRunner) TestIndexManagementNoILM() {
 	}
 }
 
+// tests setup with all default settings
+func (runner *BeatRunner) TestWithAllDefaults() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	// pre-delete in case something else missed cleanup
+	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+
+	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
+		runner.agentFixture.WorkDir(),
+		"setup",
+		"--index-management"})
+	runner.T().Logf("got response from management setup: %s", string(resp))
+	require.NoError(runner.T(), err)
+
+	streams, err := estools.GetDataStreamsForPattern(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+	require.NoError(runner.T(), err)
+
+	require.NotEmpty(runner.T(), streams.DataStreams)
+
+	err = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+	require.NoError(runner.T(), err)
+}
+
 // TestWithCustomLifecyclePolicy uploads a custom DSL policy
 func (runner *BeatRunner) TestWithCustomLifecyclePolicy() {
 	//create a custom policy file
