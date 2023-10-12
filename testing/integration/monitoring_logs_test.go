@@ -101,7 +101,18 @@ func TestMonitoringLogsShipped(t *testing.T) {
 			c.Name, client.Healthy, client.State(c.State))
 	}
 
-	// Stage 5: Make sure we have message confirming central management is running
+	// Stage 5: Make sure there are no errors in logs
+	t.Log("Making sure there are no error logs")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{})
+	})
+	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
+	for _, doc := range docs.Hits.Hits {
+		t.Logf("%#v", doc.Source)
+	}
+	require.Empty(t, docs.Hits.Hits)
+
+	// Stage 6: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
 	docs = findESDocs(t, func() (estools.Documents, error) {
 		return estools.FindMatchingLogLines(info.ESClient, info.Namespace,
@@ -109,7 +120,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
-	// Stage 6: verify logs from the monitoring components are not sent to the output
+	// Stage 7: verify logs from the monitoring components are not sent to the output
 	t.Log("Check monitoring logs")
 	hostname, err := os.Hostname()
 	if err != nil {
