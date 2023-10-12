@@ -10,6 +10,7 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 	"time"
