@@ -342,8 +342,8 @@ func HasAllSSDs(block ghw.BlockInfo) bool {
 
 func createSocketDir(uid int, gid int) error {
 	path := filepath.Dir(strings.TrimPrefix(paths.ControlSocketNonRootPath, "unix://"))
-	err := os.Mkdir(path, 0770)
-	if err != nil && !errors.Is(err, os.ErrExist) {
+	err := os.MkdirAll(path, 0770)
+	if err != nil {
 		return fmt.Errorf("failed to create path %s: %w", path, err)
 	}
 	err = os.Chown(path, uid, gid)
