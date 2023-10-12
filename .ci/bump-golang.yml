@@ -103,15 +103,6 @@ targets:
       content: '{{ source "latestGoVersion" }}'
       file: .golangci.yml
       matchpattern: '\d+.\d+.\d+'
-  update-govulncheck:
-    name: "Update govulncheck.yml"
-    sourceid: latestGoVersion
-    scmid: githubConfig
-    kind: file
-    spec:
-      content: '{{ source "latestGoVersion" }}'
-      file: .github/workflows/govulncheck.yml
-      matchpattern: '\d+.\d+.\d+'
   update-version.asciidoc:
     name: "Update version.asciidoc"
     sourceid: latestGoVersion
