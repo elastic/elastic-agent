@@ -73,15 +73,14 @@ func TestGetUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
 	currentVersion := "8.12.0"
 
 	// Since the 8.11.0 BC at staging.elastic.co isn't available to the agent by default,
-	// getUpgradableVersions should return 8.12.0-SNAPSHOT as the previous minor so an
-	// upgrade can proceed. It should also allow upgrading to 8.11.0-SNAPSHOT instead of
-	// 8.11.0.
+	// getUpgradableVersions should return 8.11.0-SNAPSHOT as the previous minor so an
+	// upgrade can proceed.
 	expectedUpgradableVersions := []string{
-		"8.12.0-SNAPSHOT", "8.11.0-SNAPSHOT", "8.10.3", "8.10.2", "7.17.14", "7.17.13",
+		"8.11.0-SNAPSHOT", "8.10.3", "8.10.2", "7.17.14", "7.17.13",
 	}
 
 	// Get several of the previous versions to ensure snapshot selection works correctly.
-	versions, err := getUpgradableVersions(ctx, &versionListAfter8_11FeatureFreeze, currentVersion, 4, 2)
+	versions, err := getUpgradableVersions(ctx, &versionListAfter8_11FeatureFreeze, currentVersion, 3, 2)
 	require.NoError(t, err)
 	require.NotEmpty(t, versions)
 

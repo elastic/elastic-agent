@@ -89,19 +89,19 @@ func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgrad
 			continue
 		}
 
-		isCurrentOrPrevMinor := (parsedUpgradeToVersion.Major() == parsedVersion.Major()) &&
-			(parsedUpgradeToVersion.Minor()-parsedVersion.Minor()) <= 1
+		isPrevMinor := (parsedUpgradeToVersion.Major() == parsedVersion.Major()) &&
+			(parsedUpgradeToVersion.Minor()-parsedVersion.Minor()) == 1
 
 		if parsedVersion.IsSnapshot() {
-			// Skip snapshot builds if the most recent version is released or this isn't the current
-			// or previous possibly unreleased minor version.
-			if !mostRecentIsUnreleased || !isCurrentOrPrevMinor {
+			// Allow returning the snapshot build of the previous minor if the current version is unreleased.
+			// In this situation the previous minor branch may also be unreleased immediately after feature freeze.
+			if !mostRecentIsUnreleased || !isPrevMinor {
 				continue
 			}
 		} else {
-			// Skip non-snapshot builds if the most recent is unrelesed and this version is the current or
-			// previous minor since they are not released yet.
-			if mostRecentIsUnreleased && isCurrentOrPrevMinor {
+			// Skip the non-snapshot build of the previous minor since it might only be available at
+			// staging.elastic.co which is not a default binary download location.
+			if mostRecentIsUnreleased && isPrevMinor {
 				continue
 			}
 		}
