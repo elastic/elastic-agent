@@ -44,6 +44,8 @@ func (dp *downloadProgressReporter) Write(b []byte) (int, error) {
 	return n, nil
 }
 
+// Report periodically reports download progress to registered observers. Callers MUST cancel
+// the context passed to this method to avoid resource leaks.
 func (dp *downloadProgressReporter) Report(ctx context.Context) {
 	started := time.Now()
 	dp.started = started
