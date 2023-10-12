@@ -66,6 +66,8 @@ func (dp *downloadProgressReporter) Report(ctx context.Context) {
 		defer t.Stop()
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-dp.done:
 				return
 			case <-dp.done:
