@@ -201,7 +201,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt ProgressTrackerStep) (str
 	// for the service to create the control socket)
 	// windows: uses npipe and doesn't need a directory created
 	if nonRoot && runtime.GOOS != "windows" {
-		path := filepath.Dir(paths.ControlSocketNonRootPath)
+		path := filepath.Dir(strings.TrimPrefix(paths.ControlSocketNonRootPath, "unix://"))
 		err := os.Mkdir(path, 0644)
 		if err != nil && !errors.Is(err, os.ErrExist) {
 			return "", "", fmt.Errorf("failed to create path %s: %w", path, err)
