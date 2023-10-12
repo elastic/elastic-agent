@@ -9,6 +9,7 @@ package control
 import (
 	"crypto/sha256"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -19,7 +20,11 @@ import (
 func Address() string {
 	// when installed the control address is fixed
 	if info.RunningInstalled() {
-		return paths.ControlSocketPath
+		root, _ := utils.HasRoot() // error is ignored
+		if root {
+			return paths.ControlSocketPath
+		}
+		return paths.ControlSocketNonRootPath
 	}
 
 	// unix socket path must be less than 104 characters

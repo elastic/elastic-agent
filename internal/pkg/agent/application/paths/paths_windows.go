@@ -22,6 +22,9 @@ const (
 	// ControlSocketPath is the control socket path used when installed.
 	ControlSocketPath = `\\.\pipe\elastic-agent-system`
 
+	// ControlSocketNonRootPath is the control socket path used when installed as non-root.
+	ControlSocketNonRootPath = `\\.\pipe\elastic-agent-system`
+
 	// ShipperSocketPipePattern is the socket path used when installed for a shipper pipe.
 	ShipperSocketPipePattern = `\\.\pipe\elastic-agent-%s-pipe.sock`
 

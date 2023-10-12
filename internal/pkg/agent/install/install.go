@@ -187,18 +187,28 @@ func Install(cfgFile, topPath string, nonRoot bool, pt ProgressTrackerStep) (str
 	// fix permissions
 	err = FixPermissions(topPath, uid, gid)
 	if err != nil {
-		return "", "", errors.New(
-			err,
-			"failed to perform permission changes",
-			errors.M("destination", topPath))
+		return "", "", fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 	}
 	if paths.ShellWrapperPath != "" {
 		err = FixPermissions(paths.ShellWrapperPath, uid, gid)
 		if err != nil {
-			return "", "", errors.New(
-				err,
-				"failed to perform permission changes on wrapper path",
-				errors.M("destination", paths.ShellWrapperPath))
+			return "", "", fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath, err)
+		}
+	}
+
+	// create socket path when installing as non-root
+	// now is the only time to do it while root is available (without doing this it will not be possible
+	// for the service to create the control socket)
+	// windows: uses npipe and doesn't need a directory created
+	if nonRoot && runtime.GOOS != "windows" {
+		path := filepath.Dir(paths.ControlSocketNonRootPath)
+		err := os.Mkdir(path, 0644)
+		if err != nil && !errors.Is(err, os.ErrExist) {
+			return "", "", fmt.Errorf("failed to create path %s: %w", path, err)
+		}
+		err = FixPermissions(path, uid, gid)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to perform permission changes on path %s: %w", path, err)
 		}
 	}
 
