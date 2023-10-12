@@ -89,6 +89,13 @@ func (dp *downloadProgressReporter) Report() {
 // either ReportComplete or ReportFailed when they no longer need the downloadProgressReporter
 // to avoid resource leaks.
 func (dp *downloadProgressReporter) ReportComplete() {
+	defer dp.close()
+
+	// If there are no observers to report progress to, there is nothing to do!
+	if len(dp.progressObservers) == 0 {
+		return
+	}
+
 	now := time.Now()
 	timePast := now.Sub(dp.started)
 	downloaded := float64(dp.downloaded.Load())
@@ -97,14 +104,19 @@ func (dp *downloadProgressReporter) ReportComplete() {
 	for _, obs := range dp.progressObservers {
 		obs.ReportCompleted(dp.sourceURI, timePast, bytesPerSecond)
 	}
-
-	dp.close()
 }
 
 // ReportFailed reports the failure of a download to registered observers. Callers MUST call
 // either ReportFailed or ReportComplete when they no longer need the downloadProgressReporter
 // to avoid resource leaks.
 func (dp *downloadProgressReporter) ReportFailed(err error) {
+	defer dp.close()
+
+	// If there are no observers to report progress to, there is nothing to do!
+	if len(dp.progressObservers) == 0 {
+		return
+	}
+
 	now := time.Now()
 	timePast := now.Sub(dp.started)
 	downloaded := float64(dp.downloaded.Load())
@@ -117,8 +129,6 @@ func (dp *downloadProgressReporter) ReportFailed(err error) {
 	for _, obs := range dp.progressObservers {
 		obs.ReportFailed(dp.sourceURI, timePast, downloaded, dp.length, percentComplete, bytesPerSecond, err)
 	}
-
-	dp.close()
 }
 
 func (dp *downloadProgressReporter) close() {
