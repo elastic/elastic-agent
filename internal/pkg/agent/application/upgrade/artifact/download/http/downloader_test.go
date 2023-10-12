@@ -132,6 +132,12 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 		`^download from ` + expectedURL + `(.sha512)? completed in \d+ \S+ @ \S+$`,
 	)
 
+	// Consider only progress logs
+	obs = obs.Filter(func(entry observer.LoggedEntry) bool {
+		return expectedProgressRegexp.MatchString(entry.Message) ||
+			expectedCompletedRegexp.MatchString(entry.Message)
+	})
+
 	// Two files are downloaded. Each file is being downloaded in 100 chunks with a delay of 10ms between chunks. The
 	// expected time to download is, therefore, 100 * 10ms = 1000ms. In reality, the actual download time will be a bit
 	// more than 1000ms because some time is spent downloading the chunk, in between inter-chunk delays.
@@ -199,6 +205,12 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	expectedCompletedRegexp := regexp.MustCompile(
 		`^download from ` + expectedURL + `(.sha512)? completed in \d+ \S+ @ \S+$`,
 	)
+
+	// Consider only progress logs
+	obs = obs.Filter(func(entry observer.LoggedEntry) bool {
+		return expectedProgressRegexp.MatchString(entry.Message) ||
+			expectedCompletedRegexp.MatchString(entry.Message)
+	})
 
 	// Two files are downloaded. Each file is being downloaded in 100 chunks with a delay of 10ms between chunks. The
 	// expected time to download is, therefore, 100 * 10ms = 1000ms. In reality, the actual download time will be a bit
