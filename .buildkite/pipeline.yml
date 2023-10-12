@@ -33,7 +33,7 @@ steps:
   #       allowed: true
 
   - label: "Unit tests - Windows 2022"
-    key: "unit-tests-2204-arm64"
+    key: "unit-tests-win2022"
     command: ".buildkite/scripts/steps/unit-tests.sh"
     artifact_paths:
       - "build/TEST-**"
@@ -41,6 +41,9 @@ steps:
     agents:
       provider: "gcp"
       image: "family/core-windows-2022"
+      machine_type: "n2-standard-8"
+      disk_size: 200
+      disk_type: "pd-ssd"
     retry:
       manual:
         allowed: true
