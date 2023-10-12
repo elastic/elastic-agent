@@ -207,17 +207,14 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	}
 
 	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
-	reportCtx, reportCancel := context.WithCancel(ctx)
 	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver)
-	dp.Report(reportCtx)
+	dp.Report()
 	_, err = io.Copy(destinationFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
-		reportCancel()
 		dp.ReportFailed(err)
 		// return path, file already exists and needs to be cleaned up
 		return fullPath, errors.New(err, "copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
-	reportCancel()
 	dp.ReportComplete()
 
 	return fullPath, nil
