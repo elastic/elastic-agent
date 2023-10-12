@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/jaypipes/ghw"
@@ -201,14 +202,17 @@ func Install(cfgFile, topPath string, nonRoot bool, pt ProgressTrackerStep) (str
 	// for the service to create the control socket)
 	// windows: uses npipe and doesn't need a directory created
 	if nonRoot && runtime.GOOS != "windows" {
-		path := filepath.Dir(strings.TrimPrefix(paths.ControlSocketNonRootPath, "unix://"))
-		err := os.Mkdir(path, 0774)
-		if err != nil && !errors.Is(err, os.ErrExist) {
-			return "", "", fmt.Errorf("failed to create path %s: %w", path, err)
-		}
-		err = FixPermissions(path, uid, gid)
+		uidInt, err := strconv.Atoi(uid)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to perform permission changes on path %s: %w", path, err)
+			return "", "", fmt.Errorf("failed to convert uid(%s) to int: %w", uid, err)
+		}
+		gidInt, err := strconv.Atoi(gid)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to convert gid(%s) to int: %w", gid, err)
+		}
+		err = createSocketDir(uidInt, gidInt)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create socket directory: %w", err)
 		}
 	}
 
@@ -334,4 +338,23 @@ func HasAllSSDs(block ghw.BlockInfo) bool {
 	}
 
 	return true
+}
+
+func createSocketDir(uid int, gid int) error {
+	path := filepath.Dir(strings.TrimPrefix(paths.ControlSocketNonRootPath, "unix://"))
+	err := os.Mkdir(path, 0770)
+	if err != nil && !errors.Is(err, os.ErrExist) {
+		return fmt.Errorf("failed to create path %s: %w", path, err)
+	}
+	err = os.Chown(path, uid, gid)
+	if err != nil {
+		return fmt.Errorf("failed to chown path %s: %w", path, err)
+	}
+	// possible that the directory existed, still set the
+	// permission again to ensure that they are correct
+	err = os.Chmod(path, 0770)
+	if err != nil {
+		return fmt.Errorf("failed to chmod path %s: %w", path, err)
+	}
+	return nil
 }
