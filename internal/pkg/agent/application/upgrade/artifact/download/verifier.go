@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-
 	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
@@ -39,10 +38,16 @@ var (
 	ErrUnknownPGPSource        = errors.New("unknown pgp source")
 )
 
-// warnLogger is a logger that only needs to implement Warnf, as that is the only functions
-// that the downloadProgressReporter uses.
+// warnLogger is a logger that only needs to implement Warnf.
 type warnLogger interface {
 	Warnf(format string, args ...interface{})
+}
+
+// loggerInfofWarnf is a logger that only needs to implement Infof and Warnf.
+type infoWarnLogger interface {
+	warnLogger
+
+	Infof(format string, args ...interface{})
 }
 
 // ChecksumMismatchError indicates the expected checksum for a file does not
@@ -85,7 +90,7 @@ type Verifier interface {
 // VerifySHA512HashWithCleanup calls VerifySHA512Hash and, in case of a
 // *ChecksumMismatchError, performs a cleanup by deleting both the filename and
 // filename.sha512 files. If the cleanup fails, it logs a warning.
-func VerifySHA512HashWithCleanup(log logger, filename string) error {
+func VerifySHA512HashWithCleanup(log infoWarnLogger, filename string) error {
 	if err := VerifySHA512Hash(filename); err != nil {
 		var checksumMismatchErr *ChecksumMismatchError
 		if errors.As(err, &checksumMismatchErr) {
@@ -180,15 +185,8 @@ func readChecksumFile(checksumFile, filename string) (string, error) {
 	return checksum, nil
 }
 
-// progressLogger is a logger that only needs to implement Infof and Warnf, as those are the only functions
-// that the downloadProgressReporter uses.
-type logger interface {
-	Infof(format string, args ...interface{})
-	Warnf(format string, args ...interface{})
-}
-
 func VerifyPGPSignatures(
-	log logger, file string, asciiArmorSignature []byte, publicKeys [][]byte) error {
+	log infoWarnLogger, file string, asciiArmorSignature []byte, publicKeys [][]byte) error {
 	var err error
 	for i, key := range publicKeys {
 		err = VerifyPGPSignature(file, asciiArmorSignature, key)
@@ -227,7 +225,7 @@ func VerifyPGPSignature(file string, asciiArmorSignature, publicKey []byte) erro
 	return nil
 }
 
-func FetchPGPKeys(log logger, client http.Client, defaultPGPKey []byte, skipDefaultPGP bool, pgpSources []string) ([][]byte, error) {
+func FetchPGPKeys(log infoWarnLogger, client http.Client, defaultPGPKey []byte, skipDefaultPGP bool, pgpSources []string) ([][]byte, error) {
 	var pgpKeys [][]byte
 	if len(defaultPGPKey) > 0 && !skipDefaultPGP {
 		pgpKeys = append(pgpKeys, defaultPGPKey)
