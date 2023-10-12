@@ -107,8 +107,6 @@ func (dp *downloadProgressReporter) ReportComplete() {
 	for _, obs := range dp.progressObservers {
 		obs.ReportCompleted(dp.sourceURI, timePast, bytesPerSecond)
 	}
-
-	dp.close()
 }
 
 // ReportFailed reports the failure of a download to registered observers. Callers MUST call
@@ -134,10 +132,4 @@ func (dp *downloadProgressReporter) ReportFailed(err error) {
 	for _, obs := range dp.progressObservers {
 		obs.ReportFailed(dp.sourceURI, timePast, downloaded, dp.length, percentComplete, bytesPerSecond, err)
 	}
-
-	dp.close()
-}
-
-func (dp *downloadProgressReporter) close() {
-	dp.done <- struct{}{}
 }
