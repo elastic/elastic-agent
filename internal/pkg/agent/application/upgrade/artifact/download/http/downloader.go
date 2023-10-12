@@ -206,9 +206,9 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		}
 	}
 
-	lpObs := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
+	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
 	reportCtx, reportCancel := context.WithCancel(ctx)
-	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, lpObs)
+	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver)
 	dp.Report(reportCtx)
 	_, err = io.Copy(destinationFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
