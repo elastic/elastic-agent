@@ -37,6 +37,9 @@ var (
 )
 
 func TestFetchVerify(t *testing.T) {
+	// See testdata/Readme.md for how to generate a key, export the public key,
+	// sign a file and verify it.
+	
 	log, _ := logger.New("", false)
 	timeout := 15 * time.Second
 	dropPath := filepath.Join("testdata", "drop")
