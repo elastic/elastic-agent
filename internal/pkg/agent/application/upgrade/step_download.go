@@ -146,7 +146,7 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 	pgp := release.PGP()
 
 	if !version.IsSnapshot() {
-		return localremote.NewVerifier(log, settings, allowEmptyPgp, pgp)
+		return localremote.NewVerifier(log, settings, pgp)
 	}
 
 	fsVerifier, err := fs.NewVerifier(log, settings, pgp)
@@ -154,7 +154,7 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 		return nil, err
 	}
 
-	snapshotVerifier, err := snapshot.NewVerifier(log, settings, allowEmptyPgp, pgp, version)
+	snapshotVerifier, err := snapshot.NewVerifier(log, settings, pgp, version)
 	if err != nil {
 		return nil, err
 	}

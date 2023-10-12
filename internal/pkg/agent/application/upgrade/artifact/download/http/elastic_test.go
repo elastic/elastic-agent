@@ -87,10 +87,7 @@ func TestDownload(t *testing.T) {
 }
 
 func TestVerify(t *testing.T) {
-	targetDir, err := ioutil.TempDir(os.TempDir(), "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetDir := t.TempDir()
 
 	log, _ := logger.New("", false)
 	timeout := 30 * time.Second

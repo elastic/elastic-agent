@@ -145,38 +145,6 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultKey
 	return download.VerifyPGPSignatures(v.log, fullPath, ascBytes, pgpBytes)
 }
 
-func funcName(v *Verifier, skipDefaultPgp bool, pgpSources []string) ([][]byte, error, bool) {
-	var pgpBytes [][]byte
-	if len(v.defaultKey) > 0 && !skipDefaultPgp {
-		v.log.Infof("Default PGP being appended")
-		pgpBytes = append(pgpBytes, v.defaultKey)
-	}
-
-	for _, check := range pgpSources {
-		if len(check) == 0 {
-			continue
-		}
-		raw, err := download.PgpBytesFromSource(v.log, check, &v.client)
-		if err != nil {
-			return nil, err, true
-		}
-
-		if len(raw) == 0 {
-			continue
-		}
-
-		pgpBytes = append(pgpBytes, raw)
-	}
-
-	if len(pgpBytes) == 0 {
-		// no pgp available skip verification process
-		v.log.Infof("No checks defined")
-		return nil, nil, true
-	}
-	v.log.Infof("Using %d PGP keys", len(pgpBytes))
-	return pgpBytes, nil, false
-}
-
 func (v *Verifier) composeURI(filename, artifactName string) (string, error) {
 	upstream := v.config.SourceURI
 	if !strings.HasPrefix(upstream, "http") && !strings.HasPrefix(upstream, "file") && !strings.HasPrefix(upstream, "/") {

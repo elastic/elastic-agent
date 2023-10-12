@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -18,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -30,7 +30,10 @@ const (
 )
 
 var (
-	beatSpec = artifact.Artifact{Name: "Filebeat", Cmd: "filebeat", Artifact: "beat/filebeat"}
+	beatSpec = artifact.Artifact{
+		Name:     "Elastic Agent",
+		Cmd:      "elastic-agent",
+		Artifact: "beat/elastic-agent"}
 )
 
 func TestFetchVerify(t *testing.T) {
@@ -40,11 +43,14 @@ func TestFetchVerify(t *testing.T) {
 	installPath := filepath.Join("testdata", "install")
 	targetPath := filepath.Join("testdata", "download")
 	ctx := context.Background()
-	s := artifact.Artifact{Name: "Beat", Cmd: "beat", Artifact: "beats/filebeat"}
+	a := artifact.Artifact{
+		Name: "elastic-agent", Cmd: "elastic-agent", Artifact: "beats/elastic-agent"}
 	version := "8.0.0"
 
-	targetFilePath := filepath.Join(targetPath, "beat-8.0.0-darwin-x86_64.tar.gz")
-	hashTargetFilePath := filepath.Join(targetPath, "beat-8.0.0-darwin-x86_64.tar.gz.sha512")
+	filename := "elastic-agent-8.0.0-darwin-x86_64.tar.gz"
+	targetFilePath := filepath.Join(targetPath, filename)
+	hashTargetFilePath := filepath.Join(targetPath, filename+".sha512")
+	ascTargetFilePath := filepath.Join(targetPath, filename+".asc")
 
 	// cleanup
 	defer os.RemoveAll(targetPath)
@@ -60,41 +66,48 @@ func TestFetchVerify(t *testing.T) {
 		},
 	}
 
-	err := prepareFetchVerifyTests(dropPath, targetPath, targetFilePath, hashTargetFilePath)
-	assert.NoError(t, err)
+	err := prepareFetchVerifyTests(dropPath, targetPath, filename, targetFilePath, hashTargetFilePath)
+	require.NoError(t, err)
 
-	downloader := NewDownloader(config)
-	verifier, err := NewVerifier(log, config, nil)
-	assert.NoError(t, err)
+	pgp, err := os.ReadFile(path.Join(dropPath, "public-key.pgp"))
+	require.NoError(t, err, "could not read public PGP key")
+	verifier, err := NewVerifier(log, config, pgp)
+	require.NoError(t, err, "could not create the verifier")
 
 	// first download verify should fail:
 	// download skipped, as invalid package is prepared upfront
 	// verify fails and cleans download
-	err = verifier.Verify(s, version, false)
+	err = verifier.Verify(a, version, false)
 	var checksumErr *download.ChecksumMismatchError
-	assert.ErrorAs(t, err, &checksumErr)
+	require.ErrorAs(t, err, &checksumErr)
 
 	_, err = os.Stat(targetFilePath)
-	assert.True(t, os.IsNotExist(err))
+	require.True(t, os.IsNotExist(err))
 
 	_, err = os.Stat(hashTargetFilePath)
-	assert.True(t, os.IsNotExist(err))
+	require.True(t, os.IsNotExist(err))
 
 	// second one should pass
 	// download not skipped: package missing
 	// verify passes because hash is not correct
-	_, err = downloader.Download(ctx, s, version)
-	assert.NoError(t, err)
+	_, err = NewDownloader(config).Download(ctx, a, version)
+	require.NoError(t, err)
+	asc, err := os.ReadFile(filepath.Join(dropPath, filename+".asc"))
+	require.NoErrorf(t, err, "could not open .asc for copy")
+	err = os.WriteFile(ascTargetFilePath, asc, 0o600)
+	require.NoErrorf(t, err, "could not save .asc (%q) to target path (%q)",
+		filepath.Join(dropPath, filename+".asc"), ascTargetFilePath)
 
 	// file downloaded ok
 	_, err = os.Stat(targetFilePath)
-	assert.NoError(t, err)
-
+	require.NoError(t, err)
 	_, err = os.Stat(hashTargetFilePath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	_, err = os.Stat(ascTargetFilePath)
+	require.NoError(t, err)
 
-	err = verifier.Verify(s, version, false)
-	assert.NoError(t, err)
+	err = verifier.Verify(a, version, false)
+	require.NoError(t, err)
 
 	// Bad GPG public key.
 	{
@@ -110,7 +123,7 @@ func TestFetchVerify(t *testing.T) {
 
 	// Missing .asc file.
 	{
-		err = verifier.Verify(s, version, false)
+		err = verifier.Verify(a, version, false)
 		require.Error(t, err)
 
 		// Don't delete these files when GPG validation failure.
@@ -120,10 +133,10 @@ func TestFetchVerify(t *testing.T) {
 
 	// Invalid signature.
 	{
-		err = ioutil.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
+		err = os.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
 		require.NoError(t, err)
 
-		err = verifier.Verify(s, version, false)
+		err = verifier.Verify(a, version, false)
 		var invalidSigErr *download.InvalidSignatureError
 		assert.ErrorAs(t, err, &invalidSigErr)
 
@@ -136,9 +149,14 @@ func TestFetchVerify(t *testing.T) {
 	}
 }
 
-func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFilePath string) error {
-	sourceFilePath := filepath.Join(dropPath, "beat-8.0.0-darwin-x86_64.tar.gz")
-	hashSourceFilePath := filepath.Join(dropPath, "beat-8.0.0-darwin-x86_64.tar.gz.sha512")
+func prepareFetchVerifyTests(
+	dropPath,
+	targetDir,
+	filename,
+	targetFilePath,
+	hashTargetFilePath string) error {
+	sourceFilePath := filepath.Join(dropPath, filename)
+	hashSourceFilePath := filepath.Join(dropPath, filename+".sha512")
 
 	// clean targets
 	os.Remove(targetFilePath)
@@ -160,13 +178,13 @@ func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFile
 	}
 	defer targretFile.Close()
 
-	hashContent, err := ioutil.ReadFile(hashSourceFilePath)
+	hashContent, err := os.ReadFile(hashSourceFilePath)
 	if err != nil {
 		return err
 	}
 
 	corruptedHash := append([]byte{1, 2, 3, 4, 5, 6}, hashContent[6:]...)
-	return ioutil.WriteFile(hashTargetFilePath, corruptedHash, 0666)
+	return os.WriteFile(hashTargetFilePath, corruptedHash, 0666)
 }
 
 func TestVerify(t *testing.T) {

@@ -39,7 +39,7 @@ func (v *Verifier) Name() string {
 // location against a key stored on elastic.co website.
 func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Verifier, error) {
 	if len(pgp) == 0 {
-		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)
+		return nil, errors.New("expecting PGP key but retrieved none", errors.TypeSecurity)
 	}
 
 	client, err := config.HTTPTransportSettings.Client(

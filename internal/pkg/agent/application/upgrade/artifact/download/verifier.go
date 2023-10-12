@@ -191,7 +191,7 @@ func VerifyPGPSignatures(
 	log logger, file string, asciiArmorSignature []byte, publicKeys [][]byte) error {
 	var err error
 	for i, key := range publicKeys {
-		err := VerifyPGPSignature(file, asciiArmorSignature, key)
+		err = VerifyPGPSignature(file, asciiArmorSignature, key)
 		if err == nil {
 			log.Infof("Verification with PGP[%d] successful", i)
 			return nil
