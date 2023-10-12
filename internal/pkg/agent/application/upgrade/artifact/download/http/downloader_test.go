@@ -145,7 +145,11 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	// the actual total download time / 50ms, for each file. That works out to at least 1000ms / 50ms = 20 INFO log
 	// messages, for each file, about its download progress. Additionally, we should expect 1 INFO log message, for
 	// each file, about the download completing.
-	assertLogs(t, obs.FilterLevelExact(zapcore.InfoLevel).TakeAll(), 20, expectedProgressRegexp, expectedCompletedRegexp)
+	logs := obs.FilterLevelExact(zapcore.InfoLevel).TakeAll()
+	failed := assertLogs(t, logs, 20, expectedProgressRegexp, expectedCompletedRegexp)
+	if failed {
+		printLogs(t, logs)
+	}
 
 	// By similar math as above, since the download of each file is expected to take 1000ms, and the progress logger
 	// starts issuing WARN messages once the download has taken more than 75% of the expected time,
@@ -153,7 +157,11 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	// reporting happens every 50 seconds, we should see at least 250s / 50s = 5 WARN log messages, for each file,
 	// about its download progress. Additionally, we should expect 1 WARN message, for each file, about the download
 	// completing.
-	assertLogs(t, obs.FilterLevelExact(zapcore.WarnLevel).TakeAll(), 5, expectedProgressRegexp, expectedCompletedRegexp)
+	logs = obs.FilterLevelExact(zapcore.WarnLevel).TakeAll()
+	failed = assertLogs(t, logs, 5, expectedProgressRegexp, expectedCompletedRegexp)
+	if failed {
+		printLogs(t, logs)
+	}
 }
 
 func TestDownloadLogProgressWithoutLength(t *testing.T) {
@@ -219,7 +227,11 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	// the actual total download time / 50ms, for each file. That works out to at least 1000ms / 50ms = 20 INFO log
 	// messages, for each file, about its download progress. Additionally, we should expect 1 INFO log message, for
 	// each file, about the download completing.
-	assertLogs(t, obs.FilterLevelExact(zapcore.InfoLevel).TakeAll(), 20, expectedProgressRegexp, expectedCompletedRegexp)
+	logs := obs.FilterLevelExact(zapcore.InfoLevel).TakeAll()
+	failed := assertLogs(t, logs, 20, expectedProgressRegexp, expectedCompletedRegexp)
+	if failed {
+		printLogs(t, logs)
+	}
 
 	// By similar math as above, since the download of each file is expected to take 1000ms, and the progress logger
 	// starts issuing WARN messages once the download has taken more than 75% of the expected time,
@@ -227,7 +239,11 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	// reporting happens every 50 seconds, we should see at least 250s / 50s = 5 WARN log messages, for each file,
 	// about its download progress. Additionally, we should expect 1 WARN message, for each file, about the download
 	// completing.
-	assertLogs(t, obs.FilterLevelExact(zapcore.WarnLevel).TakeAll(), 5, expectedProgressRegexp, expectedCompletedRegexp)
+	logs = obs.FilterLevelExact(zapcore.WarnLevel).TakeAll()
+	failed = assertLogs(t, logs, 5, expectedProgressRegexp, expectedCompletedRegexp)
+	if failed {
+		printLogs(t, logs)
+	}
 }
 
 func containsMessage(logs []observer.LoggedEntry, msg string) bool {
@@ -239,7 +255,7 @@ func containsMessage(logs []observer.LoggedEntry, msg string) bool {
 	return false
 }
 
-func assertLogs(t *testing.T, logs []observer.LoggedEntry, minExpectedProgressLogs int, expectedProgressRegexp, expectedCompletedRegexp *regexp.Regexp) {
+func assertLogs(t *testing.T, logs []observer.LoggedEntry, minExpectedProgressLogs int, expectedProgressRegexp, expectedCompletedRegexp *regexp.Regexp) bool {
 	t.Helper()
 
 	// Verify that we've logged at least minExpectedProgressLogs (about download progress) + 1 log
@@ -248,8 +264,9 @@ func assertLogs(t *testing.T, logs []observer.LoggedEntry, minExpectedProgressLo
 
 	// Verify that the first minExpectedProgressLogs messages are about the download progress (for the first file).
 	i := 0
+	failed := false
 	for ; i < minExpectedProgressLogs; i++ {
-		assert.Regexp(t, expectedProgressRegexp, logs[i].Message)
+		failed = failed || assert.Regexp(t, expectedProgressRegexp, logs[i].Message)
 	}
 
 	// Find the next message that's about the download being completed (for the first file).
@@ -257,13 +274,23 @@ func assertLogs(t *testing.T, logs []observer.LoggedEntry, minExpectedProgressLo
 	for ; i < len(logs) && !found; i++ {
 		found = expectedCompletedRegexp.MatchString(logs[i].Message)
 	}
-	assert.True(t, found)
+	failed = failed || assert.True(t, found)
 
 	// Verify that the next minExpectedProgressLogs messages are about the download progress (for the second file).
 	for j := 0; j < minExpectedProgressLogs; j++ {
-		assert.Regexp(t, expectedProgressRegexp, logs[i+j].Message)
+		failed = failed || assert.Regexp(t, expectedProgressRegexp, logs[i+j].Message)
 	}
 
 	// Verify that the last message is about the download being completed (for the second file).
-	assert.Regexp(t, expectedCompletedRegexp, logs[len(logs)-1].Message)
+	failed = failed || assert.Regexp(t, expectedCompletedRegexp, logs[len(logs)-1].Message)
+
+	return failed
+}
+
+// printLogs is called in case one of the assertions fails; it's useful for debugging
+func printLogs(t *testing.T, logs []observer.LoggedEntry) {
+	t.Helper()
+	for _, entry := range logs {
+		t.Logf("[%s] %s", entry.Level, entry.Message)
+	}
 }
