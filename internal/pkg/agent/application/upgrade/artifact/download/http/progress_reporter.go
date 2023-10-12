@@ -53,6 +53,11 @@ func (dp *downloadProgressReporter) Report(ctx context.Context) {
 	length := dp.length
 	interval := dp.interval
 
+	// If there are no observers to report progress to, there is nothing to do!
+	if len(dp.progressObservers) == 0 {
+		return
+	}
+
 	go func() {
 		t := time.NewTicker(interval)
 		defer t.Stop()
