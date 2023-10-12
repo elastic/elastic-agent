@@ -5,6 +5,7 @@
 package http
 
 import (
+	"context"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/atomic"
@@ -45,10 +46,10 @@ func (dp *downloadProgressReporter) Write(b []byte) (int, error) {
 	return n, nil
 }
 
-// Report periodically reports download progress to registered observers. Callers MUST call
-// either ReportComplete or ReportFailed when they no longer need the downloadProgressReporter
-// to avoid resource leaks.
-func (dp *downloadProgressReporter) Report() {
+// Report periodically reports download progress to registered observers. Callers MUST either
+// cancel the context provided to this method OR call either ReportComplete or ReportFailed when
+// they no longer need the downloadProgressReporter to avoid resource leaks.
+func (dp *downloadProgressReporter) Report(ctx context.Context) {
 	started := time.Now()
 	dp.started = started
 	sourceURI := dp.sourceURI
@@ -65,6 +66,8 @@ func (dp *downloadProgressReporter) Report() {
 		defer t.Stop()
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-dp.done:
 				return
 			case <-t.C:
@@ -89,7 +92,7 @@ func (dp *downloadProgressReporter) Report() {
 // either ReportComplete or ReportFailed when they no longer need the downloadProgressReporter
 // to avoid resource leaks.
 func (dp *downloadProgressReporter) ReportComplete() {
-	defer dp.close()
+	defer close(dp.done)
 
 	// If there are no observers to report progress to, there is nothing to do!
 	if len(dp.progressObservers) == 0 {
@@ -110,7 +113,7 @@ func (dp *downloadProgressReporter) ReportComplete() {
 // either ReportFailed or ReportComplete when they no longer need the downloadProgressReporter
 // to avoid resource leaks.
 func (dp *downloadProgressReporter) ReportFailed(err error) {
-	defer dp.close()
+	defer close(dp.done)
 
 	// If there are no observers to report progress to, there is nothing to do!
 	if len(dp.progressObservers) == 0 {
@@ -129,8 +132,4 @@ func (dp *downloadProgressReporter) ReportFailed(err error) {
 	for _, obs := range dp.progressObservers {
 		obs.ReportFailed(dp.sourceURI, timePast, downloaded, dp.length, percentComplete, bytesPerSecond, err)
 	}
-}
-
-func (dp *downloadProgressReporter) close() {
-	dp.done <- struct{}{}
 }
