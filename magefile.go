@@ -1550,6 +1550,31 @@ func (Integration) PrepareOnRemote() {
 	mg.Deps(mage.InstallGoTestTools)
 }
 
+// Run beat serverless tests
+func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
+	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
+	err := os.Setenv("AGENT_BUILD_DIR", beatBuildPath)
+	if err != nil {
+		return fmt.Errorf("error setting build dir: %s", err)
+	}
+
+	// a bit of bypass logic; run as serverless by default
+	if os.Getenv("STACK_PROVISIONER") == "" {
+		err = os.Setenv("STACK_PROVISIONER", "serverless")
+		if err != nil {
+			return fmt.Errorf("error setting serverless stack var: %w", err)
+		}
+	} else if os.Getenv("STACK_PROVISIONER") == "ess" {
+		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
+	}
+
+	err = os.Setenv("TEST_BINARY_NAME", beatname)
+	if err != nil {
+		return fmt.Errorf("error setting binary name: %w", err)
+	}
+	return integRunner(ctx, false, "TestMetricbeatSeverless")
+}
+
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	mg.Deps(Build.TestBinaries)
