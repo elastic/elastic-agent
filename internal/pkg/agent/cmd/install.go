@@ -253,9 +253,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			if err != nil {
 				return fmt.Errorf("failed to convert gid(%s) to int: %w", gidStr, err)
 			}
-			enrollCmd.SysProcAttr.Credential = &syscall.Credential{
-				Uid: uint32(uid),
-				Gid: uint32(gid),
+			enrollCmd.SysProcAttr = &syscall.SysProcAttr{
+				Credential: &syscall.Credential{
+					Uid: uint32(uid),
+					Gid: uint32(gid),
+				},
 			}
 		}
 
