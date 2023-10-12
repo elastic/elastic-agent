@@ -9,11 +9,11 @@ package control
 import (
 	"crypto/sha256"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/utils"
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // Address returns the address to connect to Elastic Agent daemon.
