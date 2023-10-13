@@ -95,7 +95,7 @@ func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runne
 			Kibana:        client.proj.Endpoints.Kibana,
 			Username:      client.proj.Credentials.Username,
 			Password:      client.proj.Credentials.Password,
-			Internal:      map[string]interface{}{"ID": proj.ID},
+			Internal:      map[string]interface{}{"deployment_id": proj.ID},
 		}
 		stacks = append(stacks, newStack)
 		prov.stacksMut.Lock()

@@ -75,8 +75,10 @@ func (p *provisioner) Provision(ctx context.Context, requests []runner.StackRequ
 		results[r] = resp
 	}
 
-	// wait 15 minutes for all stacks to be ready
-	readyCtx, readyCancel := context.WithTimeout(ctx, 15*time.Minute)
+	// set a long timeout
+	// this context travels up to the magefile, clients that want a shorter timeout can set
+	// it via mage's -t flag
+	readyCtx, readyCancel := context.WithTimeout(ctx, 25*time.Minute)
 	defer readyCancel()
 
 	g, gCtx := errgroup.WithContext(readyCtx)
