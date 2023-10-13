@@ -103,6 +103,7 @@ func createUser(name string, gid string) (string, error) {
 }
 
 func addUserToGroup(username string, groupName string) error {
+	// #nosec G204 -- user cannot set the groupName or username (hard coded in caller)
 	cmd := exec.Command("dscl", ".", "-append", fmt.Sprintf("/Groups/%s", groupName), "GroupMembership", username)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

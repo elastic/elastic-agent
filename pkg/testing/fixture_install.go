@@ -57,6 +57,7 @@ type InstallOpts struct {
 	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
+	NonRoot        bool   // --non-root
 
 	EnrollOpts
 }
@@ -77,6 +78,9 @@ func (i InstallOpts) toCmdArgs() []string {
 	}
 	if i.ProxyURL != "" {
 		args = append(args, "--proxy-url="+i.ProxyURL)
+	}
+	if i.NonRoot {
+		args = append(args, "--non-root")
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
