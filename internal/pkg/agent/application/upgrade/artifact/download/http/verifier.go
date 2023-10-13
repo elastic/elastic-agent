@@ -33,7 +33,7 @@ type Verifier struct {
 	config     *artifact.Config
 	client     http.Client
 	defaultKey []byte
-	log           *logger.Logger
+	log        *logger.Logger
 }
 
 func (v *Verifier) Name() string {
@@ -165,11 +165,12 @@ func (v *Verifier) composeURI(filename, artifactName string) (string, error) {
 func (v *Verifier) getPublicAsc(sourceURI string) ([]byte, error) {
 	ctx, cancelFn := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFn()
-	// Change NewRequest to NewRequestWithContext and pass context it
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURI, nil)
 	if err != nil {
 		return nil, errors.New(err, "failed create request for loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
+
+	// TODO: receive a http.Client
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, errors.New(err, "failed loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
