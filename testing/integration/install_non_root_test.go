@@ -106,15 +106,26 @@ func TestInstallNonRootWithBasePath(t *testing.T) {
 	err = fixture.Prepare(context.Background())
 	require.NoError(t, err)
 
-	// Set up random temporary directory to serve as base path for Elastic Agent
-	// installation.
-	tmpDir := t.TempDir()
-	randomBasePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
+	// Other test `TestInstallWithBasePath` uses a random directory for the base
+	// path and that works because its running root. When using a base path the
+	// base needs to be accessible by the `elastic-agent` user that will be
+	// executing the process, but is not created yet. Using a base that exists
+	// and is known to be accessible by standard users, ensures this tests
+	// works correctly and will not hit a permission issue when spawning the
+	// elastic-agent service.
+	var basePath string
+	switch runtime.GOOS {
+	case define.Linux:
+		// default is `/opt`
+		basePath = `/usr`
+	default:
+		t.Fatalf("only Linux is supported by this test; should have been skipped")
+	}
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{
-		BasePath: randomBasePath,
+		BasePath: basePath,
 		Force:    true,
 		NonRoot:  true,
 	})
@@ -124,7 +135,7 @@ func TestInstallNonRootWithBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in the custom base path
-	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
+	topPath := filepath.Join(basePath, "Elastic", "Agent")
 	checkInstallNonRootSuccess(t, topPath)
 }
 
