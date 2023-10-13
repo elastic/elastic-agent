@@ -478,9 +478,10 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	expectedErr := errors.New("some upgrade error")
 	upgradeManager := &fakeUpgradeManager{
 		upgradeable: true,
-		upgradeErr:  errors.New("some upgrade error"),
+		upgradeErr:  expectedErr,
 	}
 	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, WithUpgradeManager(upgradeManager))
 	go func() {
@@ -502,7 +503,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	cfgMgr.Config(ctx, cfg)
 
 	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
-	require.NoError(t, err)
+	require.ErrorIs(t, expectedErr, err)
 	cancel()
 
 	err = <-coordCh
@@ -510,7 +511,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 
 	require.Equal(t, details.StateFailed, coord.state.UpgradeDetails.State)
 	require.Equal(t, details.StateRequested, coord.state.UpgradeDetails.Metadata.FailedState)
-	require.Equal(t, "some upgrade error", coord.state.UpgradeDetails.Metadata.ErrorMsg)
+	require.Equal(t, expectedErr.Error(), coord.state.UpgradeDetails.Metadata.ErrorMsg)
 }
 
 type createCoordinatorOpts struct {
