@@ -11,7 +11,7 @@ const (
 	defaultGracePeriodDuration = 10 * time.Minute
 
 	// interval between checks for new (upgraded) Agent returning an error status.
-	defaultStatusCheckInterval = 30 * time.Second
+	defaultStatusCheckInterval = 10 * time.Second
 )
 
 // UpgradeConfig is the configuration related to Agent upgrades.

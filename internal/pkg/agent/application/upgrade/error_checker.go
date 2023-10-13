@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	statusCheckMissesAllowed = 4 // enable 2 minute start
-	evaluatedPeriods         = 2 // with 30s period this means we evaluate 60s of agent run
-	crashesAllowed           = 2 // means that within 60s one restart is allowed, additional one is considered crash
+	statusCheckMissesAllowed = 12 // enable 2 minute start (10 second periods)
+	evaluatedPeriods         = 6  // with 10s period this means we evaluate 60s of agent run
+	crashesAllowed           = 2  // means that within 60s one restart is allowed, additional one is considered crash
 )
 
 // ErrAgentStatusFailed is returned when agent reports FAILED status.
