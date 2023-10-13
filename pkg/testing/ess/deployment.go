@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -191,7 +192,8 @@ func (c *Client) ShutdownDeployment(ctx context.Context, deploymentID string) er
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return fmt.Errorf("got unexpected response code [%d] from deployment shutdown API", res.StatusCode)
+		resp, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("got unexpected response code [%d] from deployment shutdown API: %s", res.StatusCode, resp)
 	}
 
 	return nil

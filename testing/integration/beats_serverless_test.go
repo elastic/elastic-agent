@@ -286,11 +286,7 @@ func (runner *BeatRunner) TestIndexManagementNoILM() {
 	runner.Run("export templates", runner.SubtestExportTemplates)
 	runner.Run("export index patterns", runner.SubtestExportIndexPatterns)
 
-	// cleanup
-	err = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("*%s*", runner.testbeatName))
-	if err != nil {
-		runner.T().Logf("WARNING: could not clean up index templates/data streams: %s", err)
-	}
+	runner.CleanupTemplates(ctx)
 }
 
 // tests setup with all default settings
@@ -313,8 +309,7 @@ func (runner *BeatRunner) TestWithAllDefaults() {
 
 	require.NotEmpty(runner.T(), streams.DataStreams)
 
-	err = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
-	require.NoError(runner.T(), err)
+	runner.CleanupTemplates(ctx)
 }
 
 func (runner *BeatRunner) TestOverwriteWithCustomName() {
@@ -335,9 +330,7 @@ func (runner *BeatRunner) TestOverwriteWithCustomName() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	// pre-delete in case something else missed cleanup
-	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
-	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, "*custom-name*")
+	runner.CleanupTemplates(ctx)
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
 		runner.agentFixture.WorkDir(),
@@ -347,20 +340,21 @@ func (runner *BeatRunner) TestOverwriteWithCustomName() {
 	runner.T().Logf("got response from management setup: %s", string(resp))
 	require.NoError(runner.T(), err)
 
-	// check to make sure we have the default policy
-	streams, err := estools.GetDataStreamsForPattern(ctx, runner.requirementsInfo.ESClient, "*custom-name*")
-	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+	runner.CheckDSLPolicy(ctx, "*custom-name*", "7d")
+
+	resp, err = runner.agentFixture.Exec(ctx, []string{"--path.home",
+		runner.agentFixture.WorkDir(),
+		"setup",
+		"--index-management",
+		"--E=setup.dsl.enabled=true", "--E=setup.dsl.overwrite=true", "--E=setup.dsl.data_stream_pattern='custom-name'",
+		"--E=setup.template.name='custom-name'", "--E=setup.template.pattern='custom-name'", fmt.Sprintf("--E=setup.dsl.policy_file=%s", lifecyclePath)})
+	runner.T().Logf("got response from management setup: %s", string(resp))
 	require.NoError(runner.T(), err)
 
-	foundCustom := false
-	for _, stream := range streams.DataStreams {
-		if stream.Lifecycle.DataRetention == "7d" {
-			foundCustom = true
-			break
-		}
-	}
-	require.True(runner.T(), foundCustom, "did not find our custom lifecycle policy. Found: %#v", streams)
-	// TODO: now override
+	runner.CheckDSLPolicy(ctx, "*custom-name*", "1d")
+
+	runner.CleanupTemplates(ctx)
+
 }
 
 // TestWithCustomLifecyclePolicy uploads a custom DSL policy
@@ -382,8 +376,7 @@ func (runner *BeatRunner) TestWithCustomLifecyclePolicy() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	// pre-delete in case something else missed cleanup
-	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+	runner.CleanupTemplates(ctx)
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
 		runner.agentFixture.WorkDir(),
@@ -393,20 +386,9 @@ func (runner *BeatRunner) TestWithCustomLifecyclePolicy() {
 	runner.T().Logf("got response from management setup: %s", string(resp))
 	require.NoError(runner.T(), err)
 
-	streams, err := estools.GetDataStreamsForPattern(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
-	require.NoError(runner.T(), err)
+	runner.CheckDSLPolicy(ctx, fmt.Sprintf("%s*", runner.testbeatName), "1d")
 
-	foundCustom := false
-	for _, stream := range streams.DataStreams {
-		if stream.Lifecycle.DataRetention == "1d" {
-			foundCustom = true
-			break
-		}
-	}
-	require.True(runner.T(), foundCustom, "did not find our custom lifecycle policy. Found: %#v", streams)
-
-	err = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
-	require.NoError(runner.T(), err)
+	runner.CleanupTemplates(ctx)
 }
 
 // tests beat setup --index-management with ILM explicitly set
@@ -450,8 +432,7 @@ func (runner *BeatRunner) TestAllLifecyclesDisabled() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	// in case there's already a running template, delete it, forcing the beat to re-install
-	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("*%s*", runner.testbeatName))
+	runner.CleanupTemplates(ctx)
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
 		runner.agentFixture.WorkDir(),
@@ -475,8 +456,7 @@ func (runner *BeatRunner) TestAllLifecyclesDisabled() {
 	}
 	require.False(runner.T(), foundPolicy, "Found a lifecycle policy despite disabling lifecycles. Found: %#v", streams)
 
-	err = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("*%s*", runner.testbeatName))
-	require.NoError(runner.T(), err)
+	runner.CleanupTemplates(ctx)
 }
 
 // the export command doesn't actually make a network connection,
@@ -553,4 +533,26 @@ func (runner *BeatRunner) SubtestExportIndexPatterns() {
 	err = json.Unmarshal(rawPattern, &idxPattern)
 	require.NoError(runner.T(), err)
 	require.NotNil(runner.T(), idxPattern["attributes"])
+}
+
+// CheckDSLPolicy checks if we have a match for the given DSL policy given a template name and policy data_retention
+func (runner *BeatRunner) CheckDSLPolicy(ctx context.Context, tmpl string, policy string) {
+	streams, err := estools.GetDataStreamsForPattern(ctx, runner.requirementsInfo.ESClient, tmpl)
+	require.NoError(runner.T(), err)
+
+	foundCustom := false
+	for _, stream := range streams.DataStreams {
+		if stream.Lifecycle.DataRetention == policy {
+			foundCustom = true
+			break
+		}
+	}
+
+	require.True(runner.T(), foundCustom, "did not find our custom lifecycle policy. Found: %#v", streams)
+}
+
+// CleanupTemplates removes any existing index
+func (runner *BeatRunner) CleanupTemplates(ctx context.Context) {
+	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, "*custom-name*")
 }
