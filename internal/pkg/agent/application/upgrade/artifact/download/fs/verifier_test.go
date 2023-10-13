@@ -10,7 +10,6 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -73,7 +72,7 @@ func TestFetchVerify(t *testing.T) {
 	err := prepareFetchVerifyTests(dropPath, targetPath, filename, targetFilePath, hashTargetFilePath)
 	require.NoError(t, err)
 
-	pgp, err := os.ReadFile(path.Join(dropPath, "public-key.pgp"))
+	pgp, err := os.ReadFile(filepath.Join(dropPath, "public-key.pgp"))
 	require.NoError(t, err, "could not read public PGP key")
 	verifier, err := NewVerifier(log, config, pgp)
 	require.NoError(t, err, "could not create the verifier")
