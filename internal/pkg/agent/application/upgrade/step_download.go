@@ -37,7 +37,7 @@ const (
 	fleetUpgradeFallbackPGPFormat = "/api/agents/upgrades/%d.%d.%d/pgp-public-key"
 )
 
-func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -71,7 +71,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
 	}
 
-	path, err := u.downloadWithRetries(ctx, newDownloader, parsedVersion, &settings)
+	path, err := u.downloadWithRetries(ctx, newDownloader, parsedVersion, &settings, upgradeDetails)
 	if err != nil {
 		return "", errors.New(err, "failed download of agent binary")
 	}
@@ -123,20 +123,20 @@ func (u *Upgrader) appendFallbackPGP(targetVersion string, pgpBytes []string) []
 	return pgpBytes
 }
 
-func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
+func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
 	if !version.IsSnapshot() {
-		return localremote.NewDownloader(log, settings)
+		return localremote.NewDownloader(log, settings, upgradeDetails)
 	}
 
 	// TODO since we know if it's a snapshot or not, shouldn't we add EITHER the snapshot downloader OR the release one ?
 
 	// try snapshot repo before official
-	snapDownloader, err := snapshot.NewDownloader(log, settings, version)
+	snapDownloader, err := snapshot.NewDownloader(log, settings, version, upgradeDetails)
 	if err != nil {
 		return nil, err
 	}
 
-	httpDownloader, err := http.NewDownloader(log, settings)
+	httpDownloader, err := http.NewDownloader(log, settings, upgradeDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -171,9 +171,10 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 
 func (u *Upgrader) downloadWithRetries(
 	ctx context.Context,
-	downloaderCtor func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config) (download.Downloader, error),
+	downloaderCtor func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config, *details.Details) (download.Downloader, error),
 	version *agtversion.ParsedSemVer,
 	settings *artifact.Config,
+	upgradeDetails *details.Details,
 ) (string, error) {
 	cancelCtx, cancel := context.WithTimeout(ctx, settings.Timeout)
 	defer cancel()
@@ -189,7 +190,7 @@ func (u *Upgrader) downloadWithRetries(
 		attempt++
 		u.log.Infof("download attempt %d", attempt)
 
-		downloader, err := downloaderCtor(version, u.log, settings)
+		downloader, err := downloaderCtor(version, u.log, settings, upgradeDetails)
 		if err != nil {
 			return fmt.Errorf("unable to create fetcher: %w", err)
 		}

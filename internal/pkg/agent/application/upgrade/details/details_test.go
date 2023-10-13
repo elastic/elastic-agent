@@ -12,7 +12,7 @@ import (
 )
 
 func TestDetailsNew(t *testing.T) {
-	det := NewDetails("99.999.9999", StateRequested, "test_action_id", DetailsMetadata{})
+	det := NewDetails("99.999.9999", StateRequested, "test_action_id")
 	require.Equal(t, StateRequested, det.State)
 	require.Equal(t, "99.999.9999", det.TargetVersion)
 	require.Equal(t, "test_action_id", det.ActionID)
@@ -20,7 +20,7 @@ func TestDetailsNew(t *testing.T) {
 }
 
 func TestDetailsSetState(t *testing.T) {
-	det := NewDetails("99.999.9999", StateRequested, "test_action_id", DetailsMetadata{})
+	det := NewDetails("99.999.9999", StateRequested, "test_action_id")
 	require.Equal(t, StateRequested, det.State)
 
 	det.SetState(StateDownloading)
@@ -28,7 +28,7 @@ func TestDetailsSetState(t *testing.T) {
 }
 
 func TestDetailsFail(t *testing.T) {
-	det := NewDetails("99.999.9999", StateRequested, "test_action_id", DetailsMetadata{})
+	det := NewDetails("99.999.9999", StateRequested, "test_action_id")
 	require.Equal(t, StateRequested, det.State)
 
 	err := errors.New("test error")
@@ -39,7 +39,7 @@ func TestDetailsFail(t *testing.T) {
 }
 
 func TestDetailsObserver(t *testing.T) {
-	det := NewDetails("99.999.9999", StateRequested, "test_action_id", DetailsMetadata{})
+	det := NewDetails("99.999.9999", StateRequested, "test_action_id")
 	require.Equal(t, StateRequested, det.State)
 
 	var observedDetails *Details

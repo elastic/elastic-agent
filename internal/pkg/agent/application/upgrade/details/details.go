@@ -28,12 +28,12 @@ type DetailsMetadata struct {
 	ErrorMsg        string  `yaml:"error_msg" json:"error_msg"`
 }
 
-func NewDetails(targetVersion string, initialState State, actionID string, metadata DetailsMetadata) *Details {
+func NewDetails(targetVersion string, initialState State, actionID string) *Details {
 	return &Details{
 		TargetVersion: targetVersion,
 		State:         initialState,
 		ActionID:      actionID,
-		Metadata:      metadata,
+		Metadata:      DetailsMetadata{},
 		observers:     []Observer{},
 	}
 }
@@ -55,7 +55,14 @@ func (d *Details) Fail(err error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.Metadata.FailedState = d.State
+	// Record the state the upgrade process was in right before it
+	// failed, but only do this if we haven't already transitioned the
+	// state to the StateFailed state; otherwise we'll just end up recording
+	// the state we failed from as StateFailed which is not useful.
+	if d.State != StateFailed {
+		d.Metadata.FailedState = d.State
+	}
+
 	d.Metadata.ErrorMsg = err.Error()
 	d.State = StateFailed
 	d.notifyObservers()

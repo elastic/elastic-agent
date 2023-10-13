@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/go-units"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -94,4 +95,29 @@ func (lpObs *loggingProgressObserver) ReportFailed(sourceURI string, timePast ti
 		// see reason in `Report`
 		lpObs.log.Warnf(msg, args...)
 	}
+}
+
+type detailsProgressObserver struct {
+	upgradeDetails *details.Details
+}
+
+func newDetailsProgressObserver(upgradeDetails *details.Details) *detailsProgressObserver {
+	upgradeDetails.SetState(details.StateDownloading)
+	return &detailsProgressObserver{
+		upgradeDetails: upgradeDetails,
+	}
+}
+
+func (dpObs *detailsProgressObserver) Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64) {
+	dpObs.upgradeDetails.Metadata.DownloadPercent = percentComplete
+	dpObs.upgradeDetails.NotifyObservers()
+}
+
+func (dpObs *detailsProgressObserver) ReportCompleted(sourceURI string, timePast time.Duration, downloadRate float64) {
+	dpObs.upgradeDetails.Metadata.DownloadPercent = 1
+	dpObs.upgradeDetails.NotifyObservers()
+}
+
+func (dpObs *detailsProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64, err error) {
+	dpObs.upgradeDetails.Fail(err)
 }
