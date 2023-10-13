@@ -450,12 +450,10 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// initialize upgrade details
 	actionID := ""
-	detMetadata := details.DetailsMetadata{}
 	if action != nil {
 		actionID = action.ActionID
-		detMetadata.ScheduledAt = action.ActionStartTime
 	}
-	det := details.NewDetails(version, details.StateRequested, actionID, detMetadata)
+	det := details.NewDetails(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.setUpgradeDetails)
 
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
