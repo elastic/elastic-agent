@@ -194,8 +194,12 @@ type Coordinator struct {
 	// state should never be directly read or written outside the Coordinator
 	// goroutine. Callers who need to access or modify the state should use the
 	// public accessors like State(), SetLogLevel(), etc.
-	state             State
-	stateBroadcaster  *broadcaster.Broadcaster[State]
+	state            State
+	stateBroadcaster *broadcaster.Broadcaster[State]
+
+	// If you get a race detector error while accessing this field, it probably
+	// means you're calling private Coordinator methods from outside the
+	// Coordinator goroutine.
 	stateNeedsRefresh bool
 
 	// overrideState is used during the update process to report the overall
