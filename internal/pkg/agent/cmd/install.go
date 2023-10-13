@@ -11,8 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
-	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -248,22 +246,9 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		enrollCmd.Stdin = os.Stdin
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
-
-		if runtime.GOOS != "windows" {
-			uid, err := strconv.Atoi(uidStr)
-			if err != nil {
-				return fmt.Errorf("failed to convert uid(%s) to int: %w", uidStr, err)
-			}
-			gid, err := strconv.Atoi(gidStr)
-			if err != nil {
-				return fmt.Errorf("failed to convert gid(%s) to int: %w", gidStr, err)
-			}
-			enrollCmd.SysProcAttr = &syscall.SysProcAttr{
-				Credential: &syscall.Credential{
-					Uid: uint32(uid),
-					Gid: uint32(gid),
-				},
-			}
+		err = enrollCmdExtras(enrollCmd, uidStr, gidStr)
+		if err != nil {
+			return err
 		}
 
 		enrollStep := s.StepStart("Enrolling Elastic Agent with Fleet")
