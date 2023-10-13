@@ -317,6 +317,52 @@ func (runner *BeatRunner) TestWithAllDefaults() {
 	require.NoError(runner.T(), err)
 }
 
+func (runner *BeatRunner) TestOverwriteWithCustomName() {
+	//an updated policy that has a different value than the default of 7d
+	updatedPolicy := mapstr.M{
+		"data_retention": "1d",
+	}
+
+	lctemp := runner.T().TempDir()
+	raw, err := json.MarshalIndent(updatedPolicy, "", " ")
+	require.NoError(runner.T(), err)
+
+	lifecyclePath := filepath.Join(lctemp, "dsl_policy.json")
+
+	err = os.WriteFile(lifecyclePath, raw, 0o744)
+	require.NoError(runner.T(), err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	// pre-delete in case something else missed cleanup
+	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, "*custom-name*")
+
+	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
+		runner.agentFixture.WorkDir(),
+		"setup",
+		"--index-management",
+		"--E=setup.dsl.enabled=true", "--E=setup.dsl.data_stream_pattern='custom-name'", "--E=setup.template.name='custom-name'", "--E=setup.template.pattern='custom-name'"})
+	runner.T().Logf("got response from management setup: %s", string(resp))
+	require.NoError(runner.T(), err)
+
+	// check to make sure we have the default policy
+	streams, err := estools.GetDataStreamsForPattern(ctx, runner.requirementsInfo.ESClient, "*custom-name*")
+	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+	require.NoError(runner.T(), err)
+
+	foundCustom := false
+	for _, stream := range streams.DataStreams {
+		if stream.Lifecycle.DataRetention == "7d" {
+			foundCustom = true
+			break
+		}
+	}
+	require.True(runner.T(), foundCustom, "did not find our custom lifecycle policy. Found: %#v", streams)
+	// TODO: now override
+}
+
 // TestWithCustomLifecyclePolicy uploads a custom DSL policy
 func (runner *BeatRunner) TestWithCustomLifecyclePolicy() {
 	//create a custom policy file
