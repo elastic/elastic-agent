@@ -58,6 +58,11 @@ func (c *Coordinator) ClearOverrideState() {
 	c.overrideStateChan <- nil
 }
 
+// SetUpgradeDetails sets upgrade details. This is used during upgrades.
+func (c *Coordinator) SetUpgradeDetails(upgradeDetails *details.Details) {
+	c.upgradeDetailsChan <- upgradeDetails
+}
+
 // setRuntimeManagerError updates the error state for the runtime manager.
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) setRuntimeManagerError(err error) {
@@ -115,6 +120,13 @@ func (c *Coordinator) setRuntimeUpdateError(err error) {
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) setOverrideState(overrideState *coordinatorOverrideState) {
 	c.overrideState = overrideState
+	c.stateNeedsRefresh = true
+}
+
+// setUpgradeDetails is the internal helper to set upgrade details and set stateNeedsRefresh.
+// Must be called on the main Coordinator goroutine.
+func (c *Coordinator) setUpgradeDetails(upgradeDetails *details.Details) {
+	c.state.UpgradeDetails = upgradeDetails
 	c.stateNeedsRefresh = true
 }
 
@@ -236,13 +248,6 @@ func (c *Coordinator) setFleetState(state agentclient.State, message string) {
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) setLogLevel(logLevel logp.Level) {
 	c.state.LogLevel = logLevel
-	c.stateNeedsRefresh = true
-}
-
-// setUpgradeDetails changes upgrade details state of the coordinator.
-// Must be called on the main Coordinator goroutine.
-func (c *Coordinator) setUpgradeDetails(upgradeDetails *details.Details) {
-	c.state.UpgradeDetails = upgradeDetails
 	c.stateNeedsRefresh = true
 }
 

@@ -210,6 +210,10 @@ type Coordinator struct {
 	// SetOverrideState helper to the Coordinator goroutine.
 	overrideStateChan chan *coordinatorOverrideState
 
+	// upgradeDetailsChan forwards upgrade details from the publicly accessible
+	// SetUpgradeDetails helper to the Coordinator goroutine.
+	upgradeDetailsChan chan *details.Details
+
 	// loglevelCh forwards log level changes from the public API (SetLogLevel)
 	// to the run loop in Coordinator's main goroutine.
 	logLevelCh chan logp.Level
@@ -332,8 +336,9 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		// synchronization in the subscriber API, just set the input buffer to 0.
 		stateBroadcaster: broadcaster.New(state, 64, 32),
 
-		logLevelCh:        make(chan logp.Level),
-		overrideStateChan: make(chan *coordinatorOverrideState),
+		logLevelCh:         make(chan logp.Level),
+		overrideStateChan:  make(chan *coordinatorOverrideState),
+		upgradeDetailsChan: make(chan *details.Details),
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -458,7 +463,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		actionID = action.ActionID
 	}
 	det := details.NewDetails(version, details.StateRequested, actionID)
-	det.RegisterObserver(c.setUpgradeDetails)
+	det.RegisterObserver(c.SetUpgradeDetails)
 
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
@@ -894,6 +899,9 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case overrideState := <-c.overrideStateChan:
 		c.setOverrideState(overrideState)
+
+	case upgradeDetails := <-c.upgradeDetailsChan:
+		c.setUpgradeDetails(upgradeDetails)
 
 	case componentState := <-c.managerChans.runtimeManagerUpdate:
 		// New component change reported by the runtime manager via
