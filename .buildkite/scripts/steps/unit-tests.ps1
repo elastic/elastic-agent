@@ -6,5 +6,5 @@ Write-Host "GOPATH: $env:GOPATH"
 
 # run tests
 $Env:TEST_COVERAGE = $true
-mage unitTest
+.\gopath\mage unitTest
 
