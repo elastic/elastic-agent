@@ -6,6 +6,8 @@ package details
 
 type State string
 
+// The values of these State* constants should match those enumerated for
+// upgrade_details.state in https://github.com/elastic/fleet-server/blob/main/model/openapi.yml
 const (
 	StateRequested   State = "UPG_REQUESTED"
 	StateScheduled   State = "UPG_SCHEDULED"
