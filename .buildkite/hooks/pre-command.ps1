@@ -1,7 +1,7 @@
 # Install gvm and go
 $env:GvmVersion = "0.5.2"
 $Env:GOTMPDIR = $Env:BUILDKITE_BUILD_CHECKOUT_PATH #https://github.com/golang/go/issues/42224#issuecomment-1021149948
-$Env:GOPATH = $Env:BUILDKITE_BUILD_CHECKOUT_PATH\gopath
+$Env:GOPATH = "$Env:BUILDKITE_BUILD_CHECKOUT_PATH\gopath"
 
 [Net.ServicePointManager]::SecurityProtocol = "tls12"
 $env:GoVersion = Get-Content -Path .go-version
