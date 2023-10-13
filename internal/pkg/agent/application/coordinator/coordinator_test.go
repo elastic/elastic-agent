@@ -502,6 +502,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	cfgMgr.Config(ctx, cfg)
 
 	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	require.NoError(t, err)
 	cancel()
 
 	err = <-coordCh
