@@ -165,9 +165,9 @@ func checkInstallNonRootSuccess(t *testing.T, topPath string) {
 	// Check that the socket is created with the correct permissions.
 	socketPath := strings.TrimPrefix(paths.ControlSocketNonRootPath, "unix://")
 	require.Eventuallyf(t, func() bool {
-		_, err := os.Stat(socketPath)
+		_, err = os.Stat(socketPath)
 		return err == nil
-	}, 3*time.Minute, 1*time.Second, "%s socket never created", socketPath)
+	}, 3*time.Minute, 1*time.Second, "%s socket never created: %s", socketPath, err)
 	info, err = os.Stat(socketPath)
 	require.NoError(t, err)
 	fs, ok = info.Sys().(*syscall.Stat_t)

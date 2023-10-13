@@ -116,7 +116,11 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	}
 
 	// we just installed agent, the control socket is at a well-known location
-	c := client.New(client.WithAddress(paths.ControlSocketPath))
+	socketPath := paths.ControlSocketPath
+	if installOpts.NonRoot {
+		socketPath = paths.ControlSocketNonRootPath
+	}
+	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
