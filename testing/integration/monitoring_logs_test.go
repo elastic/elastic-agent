@@ -28,7 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
-func TestMonitoringLogsShipped(t *testing.T) {
+func TestLogIngestionFleetManaged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
 		Local: false,
@@ -36,11 +36,13 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	t.Logf("got namespace: %s", info.Namespace)
-
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
+	// 1. Create a policy in Fleet with monitoring enabled.
+	// To ensure there are no conflicts with previous test runs against
+	// the same ESS stack, we add the current time at the end of the policy
+	// name. This policy does not contain any integration.
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
@@ -58,29 +60,41 @@ func TestMonitoringLogsShipped(t *testing.T) {
 		},
 	}
 
-	// Stage 1: Install
-	// As part of the cleanup process, we'll uninstall the agent
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
 	}
-	policy, err := tools.InstallAgentWithPolicy(ctx, t,
-		installOpts, agentFixture, info.KibanaClient, createPolicyReq)
+
+	// 2. Install the Elastic-Agent with the policy that
+	// was just created.
+	policy, err := tools.InstallAgentWithPolicy(
+		ctx,
+		t,
+		installOpts,
+		agentFixture,
+		info.KibanaClient,
+		createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
-
 	check.ConnectedToFleet(t, agentFixture, 5*time.Minute)
 
-	// Stage 2: check indices
-	// This is mostly for debugging
-	resp, err := estools.GetAllindicies(info.ESClient)
-	require.NoError(t, err)
-	for _, run := range resp {
-		t.Logf("%s: %d/%d deleted: %d\n",
-			run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
-	}
+	t.Run("Monitoring logs are shipped", func(t *testing.T) {
+		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
+	})
 
-	// Stage 3: Make sure metricbeat logs are populated
+	t.Run("Normal logs with flattened data_stream are shipped", func(t *testing.T) {
+		testFlattenedDatastreamFleetPolicy(t, ctx, info, agentFixture, policy)
+	})
+}
+
+func testMonitoringLogsAreShipped(
+	t *testing.T,
+	ctx context.Context,
+	info *define.Info,
+	agentFixture *atesting.Fixture,
+	policy kibana.PolicyResponse,
+) {
+	// Stage 1: Make sure metricbeat logs are populated
 	t.Log("Making sure metricbeat logs are populated")
 	docs := findESDocs(t, func() (estools.Documents, error) {
 		return estools.GetLogsForDataset(info.ESClient, "elastic_agent.metricbeat")
@@ -88,7 +102,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
 	require.NotZero(t, len(docs.Hits.Hits))
 
-	// Stage 4: make sure all components are healthy
+	// Stage 2: make sure all components are healthy
 	t.Log("Making sure all components are healthy")
 	status, err := agentFixture.ExecStatus(ctx)
 	require.NoError(t, err,
@@ -99,7 +113,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 			c.Name, client.Healthy, client.State(c.State))
 	}
 
-	// Stage 5: Make sure there are no errors in logs
+	// Stage 3: Make sure there are no errors in logs
 	t.Log("Making sure there are no error logs")
 	docs = findESDocs(t, func() (estools.Documents, error) {
 		return estools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{
@@ -118,7 +132,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	}
 	require.Empty(t, docs.Hits.Hits)
 
-	// Stage 6: Make sure we have message confirming central management is running
+	// Stage 4: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
 	docs = findESDocs(t, func() (estools.Documents, error) {
 		return estools.FindMatchingLogLines(info.ESClient, info.Namespace,
@@ -126,7 +140,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
-	// Stage 7: verify logs from the monitoring components are not sent to the output
+	// Stage 5: verify logs from the monitoring components are not sent to the output
 	t.Log("Check monitoring logs")
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -140,6 +154,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	// We cannot search for `component.id` because at the moment of writing
 	// this field is not mapped. There is an issue for that:
 	// https://github.com/elastic/integrations/issues/6545
+	// TODO: use runtime fields while the above issue is not resolved.
 
 	docs = findESDocs(t, func() (estools.Documents, error) {
 		return estools.GetLogsForAgentID(info.ESClient, agentID)

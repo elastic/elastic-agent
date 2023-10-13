@@ -16,6 +16,7 @@ import (
 	"net/http/httputil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"text/template"
@@ -27,24 +28,21 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/version"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 )
 
-func TestFlattenedDatastreamFleetPolicy(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Local: false,
-		Stack: &define.Stack{
-			Version: version.Agent + "-SNAPSHOT",
-		},
-		Sudo: true,
-	})
-
+func testFlattenedDatastreamFleetPolicy(
+	t *testing.T,
+	ctx context.Context,
+	info *define.Info,
+	agentFixture *atesting.Fixture,
+	policy kibana.PolicyResponse,
+) {
 	dsType := "logs"
-	dsNamespace := strings.ToLower(fmt.Sprintf("%snamespace%d", t.Name(), rand.Uint64()))
-	dsDataset := strings.ToLower(fmt.Sprintf("%s-dataset", t.Name()))
+	dsNamespace := cleanString(fmt.Sprintf("%snamespace%d", t.Name(), rand.Uint64()))
+	dsDataset := cleanString(fmt.Sprintf("%s-dataset", t.Name()))
 	numEvents := 60
 
 	tempDir := t.TempDir()
@@ -56,41 +54,7 @@ func TestFlattenedDatastreamFleetPolicy(t *testing.T) {
 		t.Fatalf("could not create new fixture: %s", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// 1. Create a policy in Fleet with monitoring enabled.
-	// To ensure there are no conflicts with previous test runs against
-	// the same ESS stack, we add the current time at the end of the policy
-	// name. This policy does not contain any integration.
-	createPolicyReq := kibana.AgentPolicy{
-		Name:        t.Name() + "--" + time.Now().Format(time.RFC3339Nano),
-		Namespace:   info.Namespace,
-		Description: "Test policy for " + t.Name(),
-		MonitoringEnabled: []kibana.MonitoringEnabledOption{
-			kibana.MonitoringEnabledLogs,
-			kibana.MonitoringEnabledMetrics,
-		},
-		IsProtected: false,
-	}
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-	}
-
-	// 2. Install the Elastic-Agent with the policy that
-	// was just created.
-	policy, err := tools.InstallAgentWithPolicy(ctx,
-		t,
-		installOpts,
-		agentFixture,
-		info.KibanaClient,
-		createPolicyReq)
-	if err != nil {
-		t.Fatalf("could not install Elastic-AGent with Policy: %s", err)
-	}
-
-	// 3. Prepare a request to add an integration to the policy
+	// 1. Prepare a request to add an integration to the policy
 	tmpl, err := template.New(t.Name() + "custom-log-policy").Parse(policyJSON)
 	if err != nil {
 		t.Fatalf("cannot parse template: %s", err)
@@ -98,8 +62,8 @@ func TestFlattenedDatastreamFleetPolicy(t *testing.T) {
 
 	// The time here ensures there are no conflicts with the integration name
 	// in Fleet.
-	agentPolicyBuffer := bytes.Buffer{}
-	err = tmpl.Execute(&agentPolicyBuffer, plolicyVars{
+	agentPolicyBuilder := strings.Builder{}
+	err = tmpl.Execute(&agentPolicyBuilder, plolicyVars{
 		Name:        "Log-Input-" + t.Name() + "-" + time.Now().Format(time.RFC3339),
 		PolicyID:    policy.ID,
 		LogFilePath: logFilePath,
@@ -109,15 +73,17 @@ func TestFlattenedDatastreamFleetPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not render template: %s", err)
 	}
+	// We keep a copy of the policy for debugging prurposes
+	agentPolicy := agentPolicyBuilder.String()
 
-	// 4. Call Kibana to create the policy.
+	// 2. Call Kibana to create the policy.
 	// Docs: https://www.elastic.co/guide/en/fleet/current/fleet-api-docs.html#create-integration-policy-api
 	resp, err := info.KibanaClient.Connection.Send(
 		http.MethodPost,
 		"/api/fleet/package_policies",
 		nil,
 		nil,
-		&agentPolicyBuffer)
+		bytes.NewBufferString(agentPolicy))
 	if err != nil {
 		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
 	}
@@ -130,14 +96,20 @@ func TestFlattenedDatastreamFleetPolicy(t *testing.T) {
 		if err != nil {
 			t.Fatalf("could not dump error response from Kibana: %s", err)
 		}
-		t.Log("Kibana error response")
+		// Make debugging as easy as possible
+		t.Log("================================================================================")
+		t.Log("Kibana error response:")
 		t.Log(string(respDump))
+		t.Log("================================================================================")
+		t.Log("Rendered policy:")
+		t.Log(agentPolicy)
+		t.Log("================================================================================")
 		t.FailNow()
 	}
 
 	require.Eventually(
 		t,
-		ensureDocumentsInES(t, context.TODO(), info.ESClient, dsType, dsDataset, dsNamespace, int(numEvents)),
+		ensureDocumentsInES(t, ctx, info.ESClient, dsType, dsDataset, dsNamespace, numEvents),
 		120*time.Second,
 		time.Second,
 		"could not get all expected documents form ES")
@@ -152,6 +124,7 @@ func TestFlattenedDatastreamStandalone(t *testing.T) {
 		Sudo: true,
 	})
 
+	ctx := context.Background()
 	dsType := "logs"
 	dsNamespace := fmt.Sprintf("%s-namespace-%d", t.Name(), rand.Uint64())
 	dsDataset := fmt.Sprintf("%s-dataset", t.Name())
@@ -161,8 +134,10 @@ func TestFlattenedDatastreamStandalone(t *testing.T) {
 	logFilePath := filepath.Join(tempDir, "log.log")
 	generateLogFile(t, logFilePath, 2*time.Millisecond, numEvents)
 
-	agentFixture, err := define.NewFixture(t,
-		define.Version(), atesting.WithAllowErrors())
+	agentFixture, err := define.NewFixture(
+		t,
+		define.Version(),
+		atesting.WithAllowErrors())
 	if err != nil {
 		t.Fatalf("could not create new fixture: %s", err)
 	}
@@ -188,12 +163,12 @@ func TestFlattenedDatastreamStandalone(t *testing.T) {
 	})
 
 	// 1. The first thing to do is to prepare the fixture.
-	if err := agentFixture.Prepare(context.Background()); err != nil {
+	if err := agentFixture.Prepare(ctx); err != nil {
 		t.Fatalf("cannot prepare Elastic-Agent: %s", err)
 	}
 
 	// 2. Create a context with cancel to easily stop the Elastic-Agent
-	runCtx, cancelAgentRunCtx := context.WithCancel(context.Background())
+	runCtx, cancelAgentRunCtx := context.WithCancel(ctx)
 	go func() {
 		// make sure the test does not hang forever
 		time.Sleep(90 * time.Second)
@@ -272,7 +247,7 @@ func ensureDocumentsInES(
 			t.Logf("error quering ES, will retry later: %s", err)
 		}
 
-		if docs.Hits.Total.Value == int(numEvents) {
+		if docs.Hits.Total.Value == numEvents {
 			return true
 		}
 
@@ -333,6 +308,10 @@ func generateLogFile(t *testing.T, fullPath string, tick time.Duration, events i
 	}()
 }
 
+func cleanString(s string) string {
+	return nonAlphanumericRegex.ReplaceAllString(strings.ToLower(s), "")
+}
+
 type plolicyVars struct {
 	Name        string
 	PolicyID    string
@@ -344,6 +323,8 @@ type plolicyVars struct {
 	Dataset     string
 	Type        string
 }
+
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
 
 var policyJSON = `
 {
