@@ -18,4 +18,4 @@ go install gotest.tools/gotestsum
 
 # debug
 Write-Host "GOPATH: $env:GOPATH"
-Get-ChildItem -Path $env:GOPATH\bin
+#Get-ChildItem -Path $env:GOPATH\bin
