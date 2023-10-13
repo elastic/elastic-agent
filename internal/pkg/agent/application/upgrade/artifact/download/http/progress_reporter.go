@@ -70,8 +70,6 @@ func (dp *downloadProgressReporter) Report(ctx context.Context) {
 				return
 			case <-dp.done:
 				return
-			case <-dp.done:
-				return
 			case <-t.C:
 				now := time.Now()
 				timePast := now.Sub(started)
