@@ -5,6 +5,7 @@
 package http
 
 import (
+	"sync"
 	"time"
 
 	"github.com/docker/go-units"
@@ -99,6 +100,7 @@ func (lpObs *loggingProgressObserver) ReportFailed(sourceURI string, timePast ti
 
 type detailsProgressObserver struct {
 	upgradeDetails *details.Details
+	mu             sync.RWMutex
 }
 
 func newDetailsProgressObserver(upgradeDetails *details.Details) *detailsProgressObserver {
@@ -109,15 +111,24 @@ func newDetailsProgressObserver(upgradeDetails *details.Details) *detailsProgres
 }
 
 func (dpObs *detailsProgressObserver) Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64) {
+	dpObs.mu.Lock()
+	defer dpObs.mu.Unlock()
+
 	dpObs.upgradeDetails.Metadata.DownloadPercent = percentComplete
 	dpObs.upgradeDetails.NotifyObservers()
 }
 
 func (dpObs *detailsProgressObserver) ReportCompleted(sourceURI string, timePast time.Duration, downloadRate float64) {
+	dpObs.mu.Lock()
+	defer dpObs.mu.Unlock()
+
 	dpObs.upgradeDetails.Metadata.DownloadPercent = 1
 	dpObs.upgradeDetails.NotifyObservers()
 }
 
 func (dpObs *detailsProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64, err error) {
+	dpObs.mu.Lock()
+	defer dpObs.mu.Unlock()
+
 	dpObs.upgradeDetails.Fail(err)
 }
