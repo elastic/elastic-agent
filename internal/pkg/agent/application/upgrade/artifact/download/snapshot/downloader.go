@@ -88,6 +88,11 @@ func snapshotConfig(config *artifact.Config, versionOverride *agtversion.ParsedS
 }
 
 func snapshotURI(versionOverride *agtversion.ParsedSemVer, config *artifact.Config) (string, error) {
+	// Respect a non-default source URI even if the version is a snapshot.
+	if config.SourceURI != artifact.DefaultSourceURI {
+		return "", fmt.Errorf("skip snapshot download due to non-default sourceURI %s", config.SourceURI)
+	}
+
 	// snapshot downloader is used also by the 'localremote' impl in case of agent currently running off a snapshot build:
 	// the 'localremote' downloader does not pass a specific version, implying that we should update to the latest snapshot
 	// build of the same <major>.<minor>.<patch>-SNAPSHOT version
