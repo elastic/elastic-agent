@@ -1027,7 +1027,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 				// a very basic footcannon protector; if packages are missing and we need to rebuild them, check to see if those files were copied
 				// if we needed to repackage beats but still somehow copied nothing, could indicate an issue. Usually due to beats and agent being at different versions.
 				if packagesCopied == 0 {
-					fmt.Printf(">>> WARNING: no packages were copied, but we repackaged beats anyway. Check binary to see if intended beats are there.\n")
+					fmt.Println(">>> WARNING: no packages were copied, but we repackaged beats anyway. Check binary to see if intended beats are there.")
 				}
 			}
 		}
