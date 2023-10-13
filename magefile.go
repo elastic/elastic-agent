@@ -1014,7 +1014,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 						// check to see if we have mismatched versions.
 						if !strings.Contains(f, packageVersion) {
 							// if this panic hits weird edge cases where we don't want actual failures, revert to a printf statement.
-							panic(fmt.Sprintf("the file %s doesn't match agent version %s, beats might be out of date", f, packageVersion))
+							panic(fmt.Sprintf("the file %s doesn't match agent version %s, beats repo might be out of date", f, packageVersion))
 						}
 
 						targetFile := filepath.Join(targetPath, filepath.Base(f))
