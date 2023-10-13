@@ -8,10 +8,6 @@ package integration
 
 import (
 	"context"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,6 +19,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 func TestInstallNonRootWithoutBasePath(t *testing.T) {
