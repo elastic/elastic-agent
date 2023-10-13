@@ -34,7 +34,7 @@ steps:
 
   - label: "Unit tests - Windows 2022"
     key: "unit-tests-win2022"
-    command: ".buildkite/scripts/steps/unit-tests.sh"
+    command: ".buildkite/scripts/steps/unit-tests.ps1"
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
