@@ -5,10 +5,10 @@
 package fs
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha512"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/testing/pgptest"
 )
 
 const (
@@ -203,8 +204,7 @@ func TestVerify(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.Name, func(t *testing.T) {
 			log, obs := logger.NewTesting("TestVerify")
-			targetDir, err := ioutil.TempDir(os.TempDir(), "")
-			require.NoError(t, err)
+			targetDir := t.TempDir()
 
 			timeout := 30 * time.Second
 
@@ -218,23 +218,18 @@ func TestVerify(t *testing.T) {
 				},
 			}
 
-			err = prepareTestCase(beatSpec, version, config)
-			require.NoError(t, err)
+			pgpKey := prepareTestCase(t, beatSpec, version, config)
 
 			testClient := NewDownloader(config)
-			artifact, err := testClient.Download(context.Background(), beatSpec, version)
+			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+			require.NoError(t, err, "fs.Downloader could not download artifacts")
+			_, err = testClient.DownloadAsc(context.Background(), beatSpec, version)
+			require.NoError(t, err, "fs.Downloader could not download artifacts .asc file")
+
+			_, err = os.Stat(artifactPath)
 			require.NoError(t, err)
 
-			t.Cleanup(func() {
-				os.Remove(artifact)
-				os.Remove(artifact + ".sha512")
-				os.RemoveAll(config.DropPath)
-			})
-
-			_, err = os.Stat(artifact)
-			require.NoError(t, err)
-
-			testVerifier, err := NewVerifier(log, config, nil)
+			testVerifier, err := NewVerifier(log, config, pgpKey)
 			require.NoError(t, err)
 
 			err = testVerifier.Verify(beatSpec, version, false, tc.RemotePGPUris...)
@@ -247,25 +242,40 @@ func TestVerify(t *testing.T) {
 	}
 }
 
-func prepareTestCase(a artifact.Artifact, version string, cfg *artifact.Config) error {
-	filename, err := artifact.GetArtifactName(a, version, cfg.OperatingSystem, cfg.Architecture)
-	if err != nil {
-		return err
-	}
+// prepareTestCase prepares the test case by creating an artifact file defined by
+// a and version its corresponding checksum, .sha512, and signature, .asc, files.
+// It creates the necessary key to sing the artifact and returns the public key
+// to verify the signature.
+func prepareTestCase(
+	t *testing.T,
+	a artifact.Artifact,
+	version string,
+	cfg *artifact.Config) []byte {
 
-	if err := os.MkdirAll(cfg.DropPath, 0777); err != nil {
-		return err
-	}
+	filename, err := artifact.GetArtifactName(a, version, cfg.OperatingSystem, cfg.Architecture)
+	require.NoErrorf(t, err, "could not get artifact name")
+
+	err = os.MkdirAll(cfg.DropPath, 0777)
+	require.NoErrorf(t, err, "failed creating directory %q", cfg.DropPath)
+
+	filePath := filepath.Join(cfg.DropPath, filename)
+	filePathSHA := filePath + ".sha512"
+	filePathASC := filePath + ".asc"
 
 	content := []byte("sample content")
+	err = os.WriteFile(filePath, content, 0644)
+	require.NoErrorf(t, err, "could not write %q file", filePath)
+
 	hash := sha512.Sum512(content)
 	hashContent := fmt.Sprintf("%x %s", hash, filename)
+	err = os.WriteFile(filePathSHA, []byte(hashContent), 0644)
+	require.NoErrorf(t, err, "could not write %q file", filePathSHA)
 
-	if err := ioutil.WriteFile(filepath.Join(cfg.DropPath, filename), content, 0644); err != nil {
-		return err
-	}
+	pub, sig := pgptest.Sing(t, bytes.NewReader(content))
+	err = os.WriteFile(filePathASC, sig, 0644)
+	require.NoErrorf(t, err, "could not write %q file", filePathASC)
 
-	return ioutil.WriteFile(filepath.Join(cfg.DropPath, filename+".sha512"), []byte(hashContent), 0644)
+	return pub
 }
 
 func assertFileExists(t testing.TB, path string) {
