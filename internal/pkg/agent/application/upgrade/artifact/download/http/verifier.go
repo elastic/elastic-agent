@@ -44,7 +44,7 @@ func (v *Verifier) Name() string {
 // location against a key stored on elastic.co website.
 func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Verifier, error) {
 	if len(pgp) == 0 {
-		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)
+		return nil, errors.New("expecting PGP key received none", errors.TypeSecurity)
 	}
 
 	client, err := config.HTTPTransportSettings.Client(
@@ -142,7 +142,7 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultKey
 		return fmt.Errorf("could not fetch pgp keys: %w", err)
 	}
 
-	return download.VerifyPGPSignatures(v.log, fullPath, ascBytes, pgpBytes)
+	return download.VerifyPGPSignatureWithKeys(v.log, fullPath, ascBytes, pgpBytes)
 }
 
 func (v *Verifier) composeURI(filename, artifactName string) (string, error) {

@@ -37,8 +37,8 @@ var (
 )
 
 func TestFetchVerify(t *testing.T) {
-	// See testdata/Readme.md for how to generate a key, export the public key,
-	// sign a file and verify it.
+	// See docs/pgp-sign-verify-artifact.md for how to generate a key, export
+	// the public key, sign a file and verify it.
 
 	log, _ := logger.New("", false)
 	timeout := 15 * time.Second
@@ -241,8 +241,8 @@ func TestVerify(t *testing.T) {
 	}
 }
 
-// prepareTestCase prepares the test case by creating an artifact file defined by
-// a and version its corresponding checksum, .sha512, and signature, .asc, files.
+// prepareTestCase creates an artifact file, defined by 'a' and 'version',
+// its corresponding checksum (.sha512) and signature (.asc) files.
 // It creates the necessary key to sing the artifact and returns the public key
 // to verify the signature.
 func prepareTestCase(

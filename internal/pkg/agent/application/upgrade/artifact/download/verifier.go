@@ -80,10 +80,9 @@ func (e *InvalidSignatureError) Unwrap() error { return e.Err }
 type Verifier interface {
 	Name() string
 	// Verify should verify the artifact, returning an error if any checks fail.
-	// If the checksum does no match Verify returns a
-	// *download.ChecksumMismatchError. Ff the PGP signature is invalid then
-	// Verify returns a *download.InvalidSignatureError. Use errors.As() to
-	// check error types.
+	// If the checksum does no match Verify returns a *download.ChecksumMismatchError.
+	// If the PGP signature check fails then Verify returns a
+	// *download.InvalidSignatureError.
 	Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error
 }
 
@@ -185,7 +184,7 @@ func readChecksumFile(checksumFile, filename string) (string, error) {
 	return checksum, nil
 }
 
-func VerifyPGPSignatures(
+func VerifyPGPSignatureWithKeys(
 	log infoWarnLogger, file string, asciiArmorSignature []byte, publicKeys [][]byte) error {
 	var err error
 	for i, key := range publicKeys {

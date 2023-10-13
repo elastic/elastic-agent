@@ -28,7 +28,8 @@ func TestVerify(t *testing.T) {
 	testCases := getRandomTestCases()
 	server, pub := getElasticCoServer(t)
 	elasticClient := getElasticCoClient(server)
-	// http.Verifier uses http.DefaultClient, thus we need to change it
+	// artifact/download/http.Verifier uses http.DefaultClient, thus we need to
+	// change it.
 	http.DefaultClient = &elasticClient
 
 	config := &artifact.Config{
@@ -63,9 +64,6 @@ func TestVerify(t *testing.T) {
 
 			err = testVerifier.Verify(beatSpec, version, false)
 			require.NoError(t, err)
-
-			os.Remove(artifact)
-			os.Remove(artifact + ".sha512")
 		})
 	}
 }
