@@ -1009,7 +1009,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 					os.MkdirAll(targetPath, 0755)
 					for _, f := range files {
 						// safety check; if the user has an older version of the beats repo,
-						// for example right after a relase where you've `git pulled` from on repo and not the other,
+						// for example right after a release where you've `git pulled` from on repo and not the other,
 						// they might end up with a mishmash of packages from different versions.
 						// check to see if we have mismatched versions.
 						if !strings.Contains(f, packageVersion) {
