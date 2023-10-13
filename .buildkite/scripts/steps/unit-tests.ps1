@@ -6,5 +6,5 @@ Get-ChildItem -Path $env:GOPATH\bin
 
 # run tests
 $Env:TEST_COVERAGE = $true
-& "$env:GOPATH\bin\mage.exe" unitTest
+mage unitTest
 
