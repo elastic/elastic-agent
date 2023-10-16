@@ -67,7 +67,14 @@ func (p *provisioner) Provision(ctx context.Context, requests []runner.StackRequ
 	for _, r := range requests {
 		// allow up to 2 minutes for each create request
 		createCtx, createCancel := context.WithTimeout(ctx, 2*time.Minute)
-		resp, err := p.createDeployment(createCtx, r)
+		resp, err := p.createDeployment(createCtx, r,
+			map[string]string{
+				"division":          "engineering",
+				"org":               "ingest",
+				"team":              "elastic-agent",
+				"project":           "elastic-agent",
+				"integration-tests": "true",
+			})
 		createCancel()
 		if err != nil {
 			return nil, err
@@ -133,17 +140,30 @@ func (p *provisioner) Clean(ctx context.Context, stacks []runner.Stack) error {
 	return nil
 }
 
-func (p *provisioner) createDeployment(ctx context.Context, r runner.StackRequest) (*CreateDeploymentResponse, error) {
+func (p *provisioner) createDeployment(ctx context.Context, r runner.StackRequest, tags map[string]string) (*CreateDeploymentResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
 	p.logger.Logf("Creating stack %s (%s)", r.Version, r.ID)
 	name := fmt.Sprintf("%s-%s", strings.Replace(p.cfg.Identifier, ".", "-", -1), r.ID)
-	resp, err := p.client.CreateDeployment(ctx, CreateDeploymentRequest{
+
+	// prepare tags
+	tagArray := make([]Tag, 0, len(tags))
+	for k, v := range tags {
+		tagArray = append(tagArray, Tag{
+			Key:   k,
+			Value: v,
+		})
+	}
+
+	createDeploymentRequest := CreateDeploymentRequest{
 		Name:    name,
 		Region:  p.cfg.Region,
 		Version: r.Version,
-	})
+		Tags:    tagArray,
+	}
+
+	resp, err := p.client.CreateDeployment(ctx, createDeploymentRequest)
 	if err != nil {
 		p.logger.Logf("Failed to create ESS cloud %s: %s", r.Version, err)
 		return nil, fmt.Errorf("failed to create ESS cloud for version %s: %w", r.Version, err)
