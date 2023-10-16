@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ARG GO_VERSION=1.20.8
+=======
+ARG GO_VERSION=1.20.10
+>>>>>>> 05d4eaff31 ([Automation] Bump Golang version to 1.20.10 (#3601))
 FROM circleci/golang:${GO_VERSION}
 
 
