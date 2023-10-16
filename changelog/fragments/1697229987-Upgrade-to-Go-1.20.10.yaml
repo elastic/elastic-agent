@@ -8,7 +8,7 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: breaking-change
+kind: security
 
 # Change summary; a 80ish characters long description of the change.
 summary: Upgrade to Go 1.20.10.
@@ -16,7 +16,7 @@ summary: Upgrade to Go 1.20.10.
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: Elastic-agent-autodiscover library by default comes with add_resource_metadata.deployment=false and add_resource_metadata.cronjob=false. Pods that will be created from deployments or cronjobs will not have the extra metadata field for kubernetes.deployment or kubernetes.cronjob respectively.
+# description:
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: "elastic-agent"
