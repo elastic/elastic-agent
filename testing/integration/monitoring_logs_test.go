@@ -38,7 +38,6 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	ctx := context.Background()
 
 	t.Logf("got namespace: %s", info.Namespace)
-	t.Skip("Test is flaky; see https://github.com/elastic/elastic-agent/issues/3081")
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
@@ -90,7 +89,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
 
-	// Stage 4: make sure all components are health
+	// Stage 4: make sure all components are healthy
 	t.Log("Making sure all components are healthy")
 	status, err := agentFixture.ExecStatus(ctx)
 	require.NoError(t, err,
@@ -103,8 +102,11 @@ func TestMonitoringLogsShipped(t *testing.T) {
 
 	// Stage 5: Make sure there are no errors in logs
 	t.Log("Making sure there are no error logs")
-	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{})
+	docs = findESDocs(t, func() (estools.Documents, error) {
+		return estools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{
+			// acceptable error messages (include reason)
+			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused", // beat is running default config before its config gets updated
+		})
 	})
 	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
 	for _, doc := range docs.Hits.Hits {
