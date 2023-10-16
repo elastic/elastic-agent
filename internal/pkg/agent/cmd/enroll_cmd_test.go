@@ -166,15 +166,14 @@ func TestEnroll(t *testing.T) {
 			defer cancel()
 			err = cmd.Execute(ctx, streams)
 
-			if err != nil &&
-				// There is no agent running, therefore nothing to be restarted.
-				// However, this will cause the Enroll command to return an error
-				// which we'll ignore here.
-				!strings.Contains(err.Error(),
-					"could not reload agent daemon, unable to trigger restart") {
-				t.Fatalf("enrrol coms returned and unexpected error: %v", err)
-			}
-
+			// There is no agent running, therefore nothing to be restarted.
+			// However, this will cause the Enroll command to return an error
+			// which we'll ignore here.
+			require.ErrorContainsf(t, err,
+				"could not reload agent daemon, unable to trigger restart",
+				"enroll command returned an unexpected error")
+			require.ErrorContainsf(t, err, context.DeadlineExceeded.Error(),
+				"it should fail only due to %q", context.DeadlineExceeded)
 			config, err := readConfig(store.Content)
 			require.NoError(t, err)
 
