@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -56,6 +57,11 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
 
+	// We need to use the core version in the condition below because -SNAPSHOT is
+	// stripped from the ${agent.version.version} evaluation below.
+	parsedUpgradeToVersion, err := version.ParseVersion(upgradeToVersion)
+	require.NoError(t, err)
+
 	// Configure Agent with fast watcher configuration and also an invalid
 	// input when the Agent version matches the upgraded Agent version. This way
 	// the pre-upgrade version of the Agent runs healthy, but the post-upgrade
@@ -71,7 +77,7 @@ inputs:
   - condition: '${agent.version.version} == "%s"'
     type: invalid
     id: invalid-input
-`, upgradeToVersion)
+`, parsedUpgradeToVersion.CoreVersion())
 		return startFixture.Configure(ctx, []byte(invalidInputPolicy))
 	}
 
