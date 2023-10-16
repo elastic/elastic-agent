@@ -22,6 +22,7 @@ func Sing(t *testing.T, data io.Reader) ([]byte, []byte) {
 
 	// Create a new key. The openpgp.Entity hold the private and public keys.
 	entity, err := openpgp.NewEntity("somekey", "", "", nil)
+	require.NoError(t, err, "could not create PGP key")
 
 	// Create an encoder to serialize the public key.
 	wPubKey, err := armor.Encode(pub, openpgp.PublicKeyType, nil)

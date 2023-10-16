@@ -98,12 +98,12 @@ func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
 		if _, ok := correctValues[packageName]; !ok {
 			t.Errorf("mock elastic.co server: invalid package name: %q", packageName)
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte{})
+			_, _ = w.Write([]byte{})
 			return
 		}
 
 		_, err := w.Write(resp)
-		assert.NoErrorf(t, err, "mock elastic.co server: failes writing reponse")
+		assert.NoErrorf(t, err, "mock elastic.co server: failes writing response")
 	})
 
 	return httptest.NewServer(handler), pub

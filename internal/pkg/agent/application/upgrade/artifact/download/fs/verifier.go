@@ -118,7 +118,7 @@ func (v *Verifier) verifyAsc(fullPath string, skipDefaultKey bool, pgpSources ..
 
 	ascBytes, err := v.getPublicAsc(fullPath)
 	if err != nil {
-		return fmt.Errorf("could not get .asc file: %v", err)
+		return fmt.Errorf("could not get .asc file: %w", err)
 	}
 
 	return download.VerifyPGPSignatureWithKeys(v.log, fullPath, ascBytes, pgpBytes)

@@ -116,7 +116,7 @@ func VerifySHA512Hash(filename string) error {
 	// Read expected checksum.
 	expectedHash, err := readChecksumFile(filename+".sha512", filepath.Base(filename))
 	if err != nil {
-		return fmt.Errorf("could not read checksum file: %v", err)
+		return fmt.Errorf("could not read checksum file: %w", err)
 	}
 
 	// Compute sha512 checksum.
