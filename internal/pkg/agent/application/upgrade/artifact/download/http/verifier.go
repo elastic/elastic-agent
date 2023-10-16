@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -33,7 +34,7 @@ type Verifier struct {
 	client        http.Client
 	pgpBytes      []byte
 	allowEmptyPgp bool
-	log           progressLogger
+	log           *logger.Logger
 }
 
 func (v *Verifier) Name() string {
@@ -42,7 +43,7 @@ func (v *Verifier) Name() string {
 
 // NewVerifier create a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func NewVerifier(log progressLogger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
+func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
 	if len(pgp) == 0 && !allowEmptyPgp {
 		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)
 	}
