@@ -49,6 +49,7 @@ func newProgressTrackerStep(tracker *ProgressTracker, prefix string, finalizeFun
 
 // Succeeded step is done and successful.
 func (pts *progressTrackerStep) Succeeded() {
+	pts.mu.Lock()
 	prefix := " "
 	if pts.substeps {
 		prefix = pts.prefix + "   "
@@ -56,11 +57,13 @@ func (pts *progressTrackerStep) Succeeded() {
 	if !pts.rootstep {
 		pts.tracker.printf("%sDONE\n", prefix)
 	}
+	pts.mu.Unlock()
 	pts.finalizeFunc()
 }
 
 // Failed step has failed.
 func (pts *progressTrackerStep) Failed() {
+	pts.mu.Lock()
 	prefix := " "
 	if pts.substeps {
 		prefix = pts.prefix + "   "
@@ -68,6 +71,7 @@ func (pts *progressTrackerStep) Failed() {
 	if !pts.rootstep {
 		pts.tracker.printf("%sFAILED\n", prefix)
 	}
+	pts.mu.Unlock()
 	pts.finalizeFunc()
 }
 
@@ -89,12 +93,6 @@ func (pts *progressTrackerStep) StepStart(msg string) ProgressTrackerStep {
 	return s
 }
 
-func (pts *progressTrackerStep) getStep() *progressTrackerStep {
-	pts.mu.Lock()
-	defer pts.mu.Unlock()
-	return pts.step
-}
-
 func (pts *progressTrackerStep) setStep(step *progressTrackerStep) {
 	pts.mu.Lock()
 	defer pts.mu.Unlock()
@@ -102,7 +100,9 @@ func (pts *progressTrackerStep) setStep(step *progressTrackerStep) {
 }
 
 func (pts *progressTrackerStep) tick() {
-	step := pts.getStep()
+	pts.mu.Lock()
+	defer pts.mu.Unlock()
+	step := pts.step
 	if step != nil {
 		step.tick()
 		return
