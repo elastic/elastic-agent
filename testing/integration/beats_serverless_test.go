@@ -312,6 +312,26 @@ func (runner *BeatRunner) TestWithAllDefaults() {
 	runner.CleanupTemplates(ctx)
 }
 
+// test the setup process with mismatching template and DSL names
+func (runner *BeatRunner) TestCustomBadNames() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	runner.CleanupTemplates(ctx)
+
+	resp, err := runner.agentFixture.Exec(ctx, []string{"-e", "--path.home",
+		runner.agentFixture.WorkDir(),
+		"setup",
+		"--index-management",
+		"--E=setup.dsl.enabled=true", "--E=setup.dsl.data_stream_pattern='custom-bad-name'", "--E=setup.template.name='custom-name'", "--E=setup.template.pattern='custom-name'"})
+	runner.T().Logf("got response from management setup: %s", string(resp))
+	require.NoError(runner.T(), err)
+
+	require.True(runner.T(), strings.Contains(string(resp), "non-default template and policy names should be the same"))
+
+	runner.CleanupTemplates(ctx)
+}
+
 func (runner *BeatRunner) TestOverwriteWithCustomName() {
 	//an updated policy that has a different value than the default of 7d
 	updatedPolicy := mapstr.M{
