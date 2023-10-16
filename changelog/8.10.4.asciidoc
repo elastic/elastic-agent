@@ -15,16 +15,18 @@ Breaking changes can prevent your application from optimal operation and
 performance. Before you upgrade, review the breaking changes, then mitigate the
 impact to your application.
 
-// TODO: add details and impact
-
 elastic-agent::
 
 [discrete]
-[[breaking-https://github.com/elastic/elastic-agent/pull/3591]]
-.Elastic-Agent-Autodiscover To V0.6.4. Disables Metadata For Deployment And Cronjob. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3591[#https://github.com/elastic/elastic-agent/pull/3591] 
+[[breaking-3591]]
+.`elastic-agent-autodiscover` library has been updated to version 0.6.4, disabling metadata For `kubernetes.deployment` and `kubernetes.cronjob` fields.
 [%collapsible]
 ====
-Elastic-agent-autodiscover library by default comes with add_resource_metadata.deployment=false and add_resource_metadata.cronjob=false. Pods that will be created from deployments or cronjobs will not have the extra metadata field for kubernetes.deployment or kubernetes.cronjob respectively.
+*Details* +
+The `elastic-agent-autodiscover` Kubernetes library by default comes with `add_resource_metadata.deployment=false` and `add_resource_metadata.cronjob=false`.
+*Impact* +
+Pods that will be created from deployments or cronjobs will not have the extra metadata field for `kubernetes.deployment` or `kubernetes.cronjob`, respectively. This change was made to avoid the memory impact of keeping the feature enabled in big Kubernetes clusters.
+For more information, refer to {agent-pull}3591[#3591].
 ====
 
 
