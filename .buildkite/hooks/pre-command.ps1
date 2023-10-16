@@ -1,5 +1,6 @@
 # Install gcc TODO: Move to the VM image
 choco install mingw
+refreshenv
 
 # Install gvm and go
 # TODO: Move GVM download to the base VM image
