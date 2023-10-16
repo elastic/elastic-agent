@@ -705,11 +705,6 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 		var stoppedWg sync.WaitGroup
 		stoppedWg.Add(len(stop))
 		for _, existing := range stop {
-			if existing.shuttingDown.Load() {
-				// it's already shutting down, move on
-				stoppedWg.Done()
-				continue
-			}
 			m.logger.Debugf("Stopping component %q", existing.id)
 			_ = existing.stop(teardown, model.Signed)
 			// stop is async, wait for operation to finish,
