@@ -171,7 +171,7 @@ message StateAgentInfo {
 }
 
 // StateResponse is the current state of Elastic Agent.
-// Next unused id: 7
+// Next unused id: 8
 message StateResponse {
   // Overall information of Elastic Agent.
   StateAgentInfo info = 1;
@@ -188,6 +188,43 @@ message StateResponse {
 
   // State of each component in Elastic Agent.
   repeated ComponentState components = 4;
+
+  // Upgrade details
+  UpgradeDetails upgrade_details = 7;
+}
+
+// UpgradeDetails captures the details of an ongoing Agent upgrade.
+message UpgradeDetails {
+  // Version the Agent is being upgraded to.
+  string target_version = 1;
+
+  // Current state of the upgrade process.
+  string state = 2;
+
+  // Fleet Action ID that initiated the upgrade, if in managed mode.
+  string action_id = 3;
+
+  // Metadata about the upgrade process.
+  UpgradeDetailsMetadata metadata = 4;
+}
+
+// UpgradeDetailsMetadata has additional information about an Agent's
+// ongoing upgrade.
+message UpgradeDetailsMetadata {
+  // If the upgrade is a scheduled upgrade, the timestamp of when the
+  // upgrade is expected to start.
+  string scheduled_at = 1;
+
+  // If the upgrade is in the UPG_DOWNLOADING state, the percentage of
+  // the Elastic Agent artifact that has already been downloaded, to
+  // serve as an indicator of download progress.
+  float download_percent = 2;
+
+  // If the upgrade has failed, what upgrade state failed.
+  string failed_state = 3;
+
+  // Any error encountered during the upgrade process.
+  string error_msg = 4;
 }
 
 // DiagnosticFileResult is a file result from a diagnostic result.
