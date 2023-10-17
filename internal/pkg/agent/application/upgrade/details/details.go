@@ -24,8 +24,16 @@ type Details struct {
 type DetailsMetadata struct {
 	ScheduledAt     string
 	DownloadPercent float64
-	FailedState     State
-	ErrorMsg        string
+
+	// FailedState is the state an upgrade was in if/when it failed. Use the
+	// Fail() method of UpgradeDetails to correctly record details when
+	// an upgrade fails.
+	FailedState State
+
+	// ErrorMsg is any error message encountered if/when an upgrade fails. Use
+	// the Fail() method of UpgradeDetails to correctly record details when
+	// an upgrade fails.
+	ErrorMsg string
 }
 
 func NewDetails(targetVersion string, initialState State, actionID string) *Details {
