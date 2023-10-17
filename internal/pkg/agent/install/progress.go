@@ -37,6 +37,11 @@ type progressTrackerStep struct {
 	substeps bool
 	mu       sync.Mutex
 	step     *progressTrackerStep
+	// marks that either Succeeded() or Failed() has been called,
+	// and the tracker is completed. This is here so we can sync state despite tick() being called arbitrarily from a timer.
+	// Should only be called from inside a mutex lock,
+	// so the state can properly be synced between tick() and other methods
+	completed bool
 }
 
 func newProgressTrackerStep(tracker *ProgressTracker, prefix string, finalizeFunc func()) *progressTrackerStep {
@@ -49,7 +54,14 @@ func newProgressTrackerStep(tracker *ProgressTracker, prefix string, finalizeFun
 
 // Succeeded step is done and successful.
 func (pts *progressTrackerStep) Succeeded() {
+	// calling finalizeFunc outside a mutex prevents
+	// this from being a truly atomic method, but
+	// it's too easy for a mutex to get passed to the callback func and create a deadlock.
+	pts.finalizeFunc()
 	pts.mu.Lock()
+	defer pts.mu.Unlock()
+	pts.step = nil
+
 	prefix := " "
 	if pts.substeps {
 		prefix = pts.prefix + "   "
@@ -57,13 +69,17 @@ func (pts *progressTrackerStep) Succeeded() {
 	if !pts.rootstep {
 		pts.tracker.printf("%sDONE\n", prefix)
 	}
-	pts.mu.Unlock()
-	pts.finalizeFunc()
+	// mark as done before unlocking
+	pts.completed = true
 }
 
 // Failed step has failed.
 func (pts *progressTrackerStep) Failed() {
+	pts.finalizeFunc()
 	pts.mu.Lock()
+	defer pts.mu.Unlock()
+	pts.step = nil
+
 	prefix := " "
 	if pts.substeps {
 		prefix = pts.prefix + "   "
@@ -71,8 +87,8 @@ func (pts *progressTrackerStep) Failed() {
 	if !pts.rootstep {
 		pts.tracker.printf("%sFAILED\n", prefix)
 	}
-	pts.mu.Unlock()
-	pts.finalizeFunc()
+	// mark as done before unlocking
+	pts.completed = true
 }
 
 // StepStart creates a new step.
@@ -86,19 +102,19 @@ func (pts *progressTrackerStep) StepStart(msg string) ProgressTrackerStep {
 		}
 	}
 	pts.tracker.printf("%s%s...", prefix, strings.TrimSpace(msg))
-	s := newProgressTrackerStep(pts.tracker, prefix, func() {
-		pts.setStep(nil)
-	})
+	s := newProgressTrackerStep(pts.tracker, prefix, func() {})
 	pts.setStep(s)
 	return s
 }
 
+// setStep sets the current sub-step for the tracker
 func (pts *progressTrackerStep) setStep(step *progressTrackerStep) {
 	pts.mu.Lock()
 	defer pts.mu.Unlock()
 	pts.step = step
 }
 
+// tick iterates the tracker with a ".", traveling down to the last sub-tracker to do so.
 func (pts *progressTrackerStep) tick() {
 	pts.mu.Lock()
 	defer pts.mu.Unlock()
@@ -108,7 +124,10 @@ func (pts *progressTrackerStep) tick() {
 		return
 	}
 	if !pts.rootstep {
-		pts.tracker.printf(".")
+		// check completed state while we have the mutex
+		if !pts.completed {
+			pts.tracker.printf(".")
+		}
 	}
 }
 
@@ -118,11 +137,13 @@ type ProgressTracker struct {
 	tickInterval          time.Duration
 	randomizeTickInterval bool
 
-	step *progressTrackerStep
-	mu   sync.Mutex
-	stop chan struct{}
+	step        *progressTrackerStep
+	writerMutex sync.Mutex
+	stepMutex   sync.Mutex
+	stop        chan struct{}
 }
 
+// NewProgressTracker returns a new root tracker with the given writer
 func NewProgressTracker(writer io.Writer) *ProgressTracker {
 	return &ProgressTracker{
 		writer:                writer,
@@ -132,14 +153,17 @@ func NewProgressTracker(writer io.Writer) *ProgressTracker {
 	}
 }
 
+// SetTickInterval sets the tracker tick interval
 func (pt *ProgressTracker) SetTickInterval(d time.Duration) {
 	pt.tickInterval = d
 }
 
+// DisableRandomizedTickIntervals disables randomizing the tick interval
 func (pt *ProgressTracker) DisableRandomizedTickIntervals() {
 	pt.randomizeTickInterval = false
 }
 
+// Start the root tracker
 func (pt *ProgressTracker) Start() ProgressTrackerStep {
 	timer := time.NewTimer(pt.calculateTickInterval())
 	go func() {
@@ -159,6 +183,7 @@ func (pt *ProgressTracker) Start() ProgressTrackerStep {
 	}()
 
 	s := newProgressTrackerStep(pt, "", func() {
+		// callback here is what actually does the stopping
 		pt.setStep(nil)
 		pt.stop <- struct{}{}
 	})
@@ -167,24 +192,28 @@ func (pt *ProgressTracker) Start() ProgressTrackerStep {
 	return s
 }
 
+// printf the given statement to the tracker writer
 func (pt *ProgressTracker) printf(format string, a ...any) {
-	pt.mu.Lock()
-	defer pt.mu.Unlock()
+	pt.writerMutex.Lock()
+	defer pt.writerMutex.Unlock()
 	_, _ = fmt.Fprintf(pt.writer, format, a...)
 }
 
+// getStep returns the substep
 func (pt *ProgressTracker) getStep() *progressTrackerStep {
-	pt.mu.Lock()
-	defer pt.mu.Unlock()
+	pt.stepMutex.Lock()
+	defer pt.stepMutex.Unlock()
 	return pt.step
 }
 
+// setStep sets the substep
 func (pt *ProgressTracker) setStep(step *progressTrackerStep) {
-	pt.mu.Lock()
-	defer pt.mu.Unlock()
+	pt.stepMutex.Lock()
+	defer pt.stepMutex.Unlock()
 	pt.step = step
 }
 
+// calculateTickInterval returns the tick interval
 func (pt *ProgressTracker) calculateTickInterval() time.Duration {
 	if !pt.randomizeTickInterval {
 		return pt.tickInterval

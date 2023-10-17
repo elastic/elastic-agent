@@ -135,4 +135,25 @@ func TestProgress(t *testing.T) {
 
 		require.Regexp(t, regexp.MustCompile(`step starting\.{3,}\n   substep 1 starting\.{3,}\.+ DONE\n   substep 2 starting\.{3,}\.+ DONE\n   DONE\n`), string(w.buf))
 	})
+
+	t.Run("nested_step_out_of_order", func(t *testing.T) {
+		w := newTestWriter()
+		pt := NewProgressTracker(w)
+		pt.SetTickInterval(10 * time.Millisecond) // to speed up testing
+		pt.DisableRandomizedTickIntervals()
+
+		rs := pt.Start()
+
+		s := rs.StepStart("step starting")
+		ss := s.StepStart("substep 1 starting")
+		time.Sleep(55 * time.Millisecond) // to simulate work being done
+		ss.Succeeded()
+		ss = s.StepStart("substep 2 starting")
+		time.Sleep(25 * time.Millisecond) // to simulate work being done
+		rs.Succeeded()
+		s.Succeeded()
+		ss.Succeeded()
+
+		require.Regexp(t, regexp.MustCompile(`step starting\.{3,}\n   substep 1 starting\.{3,}\.+ DONE\n   substep 2 starting\.{3,}\.+   DONE\n DONE\n`), string(w.buf))
+	})
 }
