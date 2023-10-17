@@ -188,11 +188,11 @@ LOOP:
 					var compErr error
 					for _, comp := range state.Components {
 						if comp.State == client.Failed {
-							compErr = multierror.Append(compErr, errors.New(fmt.Sprintf("component %s[%v] failed: %s", comp.Name, comp.ID, comp.Message)))
+							compErr = multierror.Append(compErr, fmt.Errorf("component %s[%v] failed: %s", comp.Name, comp.ID, comp.Message))
 						}
 					}
 					if compErr != nil {
-						failedCh <- fmt.Errorf("%w: %s", ErrAgentComponentFailed, compErr)
+						failedCh <- fmt.Errorf("%w: %s", ErrAgentComponentFailed, compErr.Error())
 						continue
 					}
 				}
