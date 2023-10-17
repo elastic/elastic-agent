@@ -11,10 +11,10 @@ type Observer func(details *Details)
 
 // Details consists of details regarding an ongoing upgrade.
 type Details struct {
-	TargetVersion string          `yaml:"target_version" json:"target_version"`
-	State         State           `yaml:"state" json:"state"`
-	ActionID      string          `yaml:"action_id" json:"action_id"`
-	Metadata      DetailsMetadata `yaml:"metadata" json:"metadata"`
+	TargetVersion string
+	State         State
+	ActionID      string
+	Metadata      DetailsMetadata
 
 	observers []Observer
 	mu        sync.RWMutex
@@ -22,10 +22,10 @@ type Details struct {
 
 // DetailsMetadata consists of metadata relating to a specific upgrade state
 type DetailsMetadata struct {
-	ScheduledAt     string  `yaml:"scheduled_at" json:"scheduled_at"`
-	DownloadPercent float64 `yaml:"download_percent" json:"download_percent"`
-	FailedState     State   `yaml:"failed_state" json:"failed_state"`
-	ErrorMsg        string  `yaml:"error_msg" json:"error_msg"`
+	ScheduledAt     string
+	DownloadPercent float64
+	FailedState     State
+	ErrorMsg        string
 }
 
 func NewDetails(targetVersion string, initialState State, actionID string) *Details {
