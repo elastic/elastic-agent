@@ -106,10 +106,10 @@ func TestMonitoringLogsShipped(t *testing.T) {
 		return estools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{
 			// acceptable error messages (include reason)
 			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused", // beat is running default config before its config gets updated
-			"Global configuration artifact is not available", // Endpoint: failed to load user artifact due to connectivity issues
+			"Global configuration artifact is not available",                     // Endpoint: failed to load user artifact due to connectivity issues
 			"Failed to download artifact",
 			"Failed to initialize artifact",
-			"Failed to apply initial policy from on disk configuration"
+			"Failed to apply initial policy from on disk configuration",
 		})
 	})
 	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
