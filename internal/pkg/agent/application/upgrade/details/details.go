@@ -24,6 +24,7 @@ type Details struct {
 type DetailsMetadata struct {
 	ScheduledAt     string
 	DownloadPercent float64
+	DownloadRate    float64
 
 	// FailedState is the state an upgrade was in if/when it failed. Use the
 	// Fail() method of UpgradeDetails to correctly record details when
@@ -56,13 +57,14 @@ func (d *Details) SetState(s State) {
 	d.notifyObservers()
 }
 
-// SetDownloadPercent is a convenience method to set the download percent
+// SetDownloadProgress is a convenience method to set the download percent
 // when the upgrade is in UPG_DOWNLOADING state.
-func (d *Details) SetDownloadPercent(downloadPercent float64) {
+func (d *Details) SetDownloadProgress(downloadPercent, downloadRate float64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	d.Metadata.DownloadPercent = downloadPercent
+	d.Metadata.DownloadRate = downloadRate
 	d.notifyObservers()
 }
 
