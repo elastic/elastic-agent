@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH\temp"
+$env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH"
 
 Write-Host "--- Build"
 mage build
