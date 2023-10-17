@@ -18,7 +18,7 @@ Since version [8.10.4](https://www.elastic.co/guide/en/fleet/current/release-not
 
 Eg. Enabling the enrichment through `add_resource_metadata` in Managed Elastic Agent Policy
 
-> *Note:* Enabling deployment and cronjob metadata enrichment will utilize more memory because Elastic Agent keeps a local memory with the assets being discovered.
+> **Note:** Enabling deployment and cronjob metadata enrichment leads to increase of Elastic Agent's memory consumption. Elastic Agent utilizes local cache in order to keep records of the Kubernetes assets being discovered.
 
 ## Add deployment and cronjob for Kubernetes pods through ingest pipelines
 
@@ -65,4 +65,4 @@ The final `metrics-kubernetes.state_pod@custom` ingest pipeline:
 ]
 ```
 
-> *Note*: The ingest-pipeline does not check for the actual existence of deployment and cronjob ancestor, only adds the specific values.
+> **Note**: The ingest-pipeline does not check for the actual existence of deployment and cronjob ancestor, only adds the specific values.
