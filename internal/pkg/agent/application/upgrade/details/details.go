@@ -4,7 +4,10 @@
 
 package details
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 // Observer is a function that will be called with upgrade details
 type Observer func(details *Details)
@@ -22,7 +25,7 @@ type Details struct {
 
 // DetailsMetadata consists of metadata relating to a specific upgrade state
 type DetailsMetadata struct {
-	ScheduledAt     string
+	ScheduledAt     time.Time
 	DownloadPercent float64
 	DownloadRate    float64
 
