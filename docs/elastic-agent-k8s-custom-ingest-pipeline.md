@@ -65,4 +65,4 @@ The final `metrics-kubernetes.state_pod@custom` ingest pipeline:
 ]
 ```
 
-> *Note: The ingest-pipeline does not check for the actual existence of deployment and cronjob ancestor, only adds the specific values.
+> *Note*: The ingest-pipeline does not check for the actual existence of deployment and cronjob ancestor, only adds the specific values.
