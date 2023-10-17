@@ -48,6 +48,16 @@ func (d *Details) SetState(s State) {
 	d.notifyObservers()
 }
 
+// SetDownloadPercent is a convenience method to set the download percent
+// when the upgrade is in UPG_DOWNLOADING state.
+func (d *Details) SetDownloadPercent(downloadPercent float64) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.Metadata.DownloadPercent = downloadPercent
+	d.notifyObservers()
+}
+
 // Fail is a convenience method to set the state of the upgrade
 // to StateFailed, set metadata associated with the failure, and
 // notify all observers.
@@ -77,15 +87,6 @@ func (d *Details) RegisterObserver(observer Observer) {
 
 	d.observers = append(d.observers, observer)
 	d.notifyObserver(observer)
-}
-
-// NotifyObservers sends the current upgrade details to all registered
-// observers. When an upgrade has completed (StateCompleted), the observers
-// will be sent a nil value.
-func (d *Details) NotifyObservers() {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	d.notifyObservers()
 }
 
 func (d *Details) notifyObservers() {

@@ -114,16 +114,14 @@ func (dpObs *detailsProgressObserver) Report(sourceURI string, timePast time.Dur
 	dpObs.mu.Lock()
 	defer dpObs.mu.Unlock()
 
-	dpObs.upgradeDetails.Metadata.DownloadPercent = percentComplete
-	dpObs.upgradeDetails.NotifyObservers()
+	dpObs.upgradeDetails.SetDownloadPercent(percentComplete)
 }
 
 func (dpObs *detailsProgressObserver) ReportCompleted(sourceURI string, timePast time.Duration, downloadRate float64) {
 	dpObs.mu.Lock()
 	defer dpObs.mu.Unlock()
 
-	dpObs.upgradeDetails.Metadata.DownloadPercent = 1
-	dpObs.upgradeDetails.NotifyObservers()
+	dpObs.upgradeDetails.SetDownloadPercent(1)
 }
 
 func (dpObs *detailsProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64, err error) {
