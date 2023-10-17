@@ -426,7 +426,7 @@ func (s *mockDaemon) Start(opt ...grpc.ServerOption) error {
 	s.server = srv
 	cproto.RegisterElasticAgentControlServer(s.server, s)
 	go func() {
-		srv.Serve(lis)
+		_ = srv.Serve(lis)
 	}()
 	return nil
 }
