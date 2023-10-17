@@ -8,7 +8,7 @@ Custom pipelines can be used to add custom data processing, like adding fields, 
 
 The [Kubernetes Integration](https://docs.elastic.co/en/integrations/kubernetes) is used to collect logs and metrics from Kubernetes clusters with Elastic Agent. During the collection, integration enhances the collected information with extra useful information that can help users to correlate information and different Kubernetes assets with each other. All this additional information that are added on top of collected information like labels, annotations, ancestor names of Kubernetes assets etc. are called metadata.
 
-The [Kubernetes Provider](https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html) offers the `add_resource_metadata` option to configure the metadata enrichment options. 
+The [Kubernetes Provider](https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html) offers the `add_resource_metadata` option to configure the metadata enrichment options.
 
 Since version [8.10.4](https://www.elastic.co/guide/en/fleet/current/release-notes-8.10.4.html), the default configuration for metadata enrichment is `add_resource_metadata.deployment=false` and `add_resource_metadata.cronjob=false`. This means that pods that created from replicasets that belong to specific deployments would not be enriched with `kubernetes.deployment.name`. Additionally, pods that are created from jobs that belong to specific cronjobs, would not be enriched with `kubernetes.cronjob.name`.
 
@@ -18,7 +18,7 @@ Since version [8.10.4](https://www.elastic.co/guide/en/fleet/current/release-not
 
 Eg. Enabling the enrichment through `add_resource_metadata` in Managed Elastic Agent Policy
 
-Enabling deployment and cronjob metadata enrichment will utilize more memory because Elastic Agent keeps a local memory with the assets being discovered. 
+Enabling deployment and cronjob metadata enrichment will utilize more memory because Elastic Agent keeps a local memory with the assets being discovered.
 
 ## Add deployment and cronjob for Kubernetes pods through ingest pipelines
 
@@ -38,7 +38,7 @@ Create the following custom ingest pipeline with two processors:
 <center><img src="./images/gsub_cronjob.png" alt="Gsub Processor for cronjob"></center>
 
 
-The final `metrics-kubernetes.state_pod@custom` inget pipeline:
+The final `metrics-kubernetes.state_pod@custom` ingest pipeline:
 
 ```json
 [
