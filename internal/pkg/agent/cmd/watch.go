@@ -144,12 +144,8 @@ func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.
 		close(errChan)
 	}()
 
-	errorChecker, err := upgrade.NewErrorChecker(errChan, log, errorCheckInterval)
-	if err != nil {
-		return err
-	}
-
-	go errorChecker.Run(ctx)
+	agentWatcher := upgrade.NewAgentWatcher(errChan, log, errorCheckInterval)
+	go agentWatcher.Run(ctx)
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)

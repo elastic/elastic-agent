@@ -18,7 +18,7 @@ import (
 func dialContext(ctx context.Context, address string, maxMsgSize int) (*grpc.ClientConn, error) {
 	return grpc.DialContext(
 		ctx,
-		strings.TrimPrefix(address, "unix://"),
+		address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
@@ -27,5 +27,8 @@ func dialContext(ctx context.Context, address string, maxMsgSize int) (*grpc.Cli
 
 func dialer(ctx context.Context, addr string) (net.Conn, error) {
 	var d net.Dialer
-	return d.DialContext(ctx, "unix", addr)
+	if strings.HasPrefix(addr, "http://") {
+		return d.DialContext(ctx, "tcp", strings.TrimPrefix(addr, "http://"))
+	}
+	return d.DialContext(ctx, "unix", strings.TrimPrefix(addr, "unix://"))
 }

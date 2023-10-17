@@ -166,8 +166,6 @@ message StateAgentInfo {
   string buildTime = 4;
   // Current running version is a snapshot.
   bool snapshot = 5;
-  // Current running PID.
-  int32 pid = 6;
 }
 
 // StateResponse is the current state of Elastic Agent.
