@@ -211,7 +211,7 @@ func PerformUpgrade(
 		sourceURI := "file://" + filepath.Dir(srcPkg)
 		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
 	} else if *upgradeOpts.sourceURI != "" {
-		// specific ---source-uri
+		// specific --source-uri
 		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", *upgradeOpts.sourceURI)
 	}
 
