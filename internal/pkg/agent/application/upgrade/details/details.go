@@ -14,10 +14,10 @@ type Observer func(details *Details)
 
 // Details consists of details regarding an ongoing upgrade.
 type Details struct {
-	TargetVersion string
-	State         State
-	ActionID      string
-	Metadata      Metadata
+	TargetVersion string   `json:"target_version"`
+	State         State    `json:"state"`
+	ActionID      string   `json:"action_id,omitempty"`
+	Metadata      Metadata `json:"metadata"`
 
 	observers []Observer
 	mu        sync.Mutex
@@ -25,19 +25,19 @@ type Details struct {
 
 // Metadata consists of metadata relating to a specific upgrade state
 type Metadata struct {
-	ScheduledAt     time.Time
-	DownloadPercent float64
-	DownloadRate    float64
+	ScheduledAt     time.Time `json:"scheduled_at,omitempty"`
+	DownloadPercent float64   `json:"download_percent,omitempty"`
+	DownloadRate    float64   `json:"download_rate,omitempty"`
 
 	// FailedState is the state an upgrade was in if/when it failed. Use the
 	// Fail() method of UpgradeDetails to correctly record details when
 	// an upgrade fails.
-	FailedState State
+	FailedState State `json:"failed_state"`
 
 	// ErrorMsg is any error message encountered if/when an upgrade fails. Use
 	// the Fail() method of UpgradeDetails to correctly record details when
 	// an upgrade fails.
-	ErrorMsg string
+	ErrorMsg string `json:"error_msg"`
 }
 
 func NewDetails(targetVersion string, initialState State, actionID string) *Details {

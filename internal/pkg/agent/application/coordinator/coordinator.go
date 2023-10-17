@@ -464,6 +464,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	}
 	det := details.NewDetails(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.SetUpgradeDetails)
+	det.RegisterObserver(c.logUpgradeDetails)
 
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
@@ -476,6 +477,10 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		c.ReExec(cb)
 	}
 	return nil
+}
+
+func (c *Coordinator) logUpgradeDetails(details *details.Details) {
+	c.logger.Infow("updated upgrade details", "upgrade_details", details)
 }
 
 // AckUpgrade is the method used on startup to ack a previously successful upgrade action.
