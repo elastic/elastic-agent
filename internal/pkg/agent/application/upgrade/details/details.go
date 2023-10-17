@@ -17,14 +17,14 @@ type Details struct {
 	TargetVersion string
 	State         State
 	ActionID      string
-	Metadata      DetailsMetadata
+	Metadata      Metadata
 
 	observers []Observer
 	mu        sync.Mutex
 }
 
-// DetailsMetadata consists of metadata relating to a specific upgrade state
-type DetailsMetadata struct {
+// Metadata consists of metadata relating to a specific upgrade state
+type Metadata struct {
 	ScheduledAt     time.Time
 	DownloadPercent float64
 	DownloadRate    float64
@@ -45,7 +45,7 @@ func NewDetails(targetVersion string, initialState State, actionID string) *Deta
 		TargetVersion: targetVersion,
 		State:         initialState,
 		ActionID:      actionID,
-		Metadata:      DetailsMetadata{},
+		Metadata:      Metadata{},
 		observers:     []Observer{},
 	}
 }

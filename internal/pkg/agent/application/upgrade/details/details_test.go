@@ -16,7 +16,7 @@ func TestDetailsNew(t *testing.T) {
 	require.Equal(t, StateRequested, det.State)
 	require.Equal(t, "99.999.9999", det.TargetVersion)
 	require.Equal(t, "test_action_id", det.ActionID)
-	require.Equal(t, DetailsMetadata{}, det.Metadata)
+	require.Equal(t, Metadata{}, det.Metadata)
 }
 
 func TestDetailsSetState(t *testing.T) {
