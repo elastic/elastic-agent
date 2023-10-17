@@ -16,8 +16,11 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -159,14 +162,23 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
 
+			// There is no agent running, therefore nothing to be restarted.
+			// However, this will cause the Enroll command to return an error
+			// which we'll ignore here.
+			require.ErrorContainsf(t, err,
+				"could not reload agent daemon, unable to trigger restart",
+				"enroll command returned an unexpected error")
+			require.ErrorContainsf(t, err, context.DeadlineExceeded.Error(),
+				"it should fail only due to %q", context.DeadlineExceeded)
 			config, err := readConfig(store.Content)
-
 			require.NoError(t, err)
-			require.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			require.Equal(t, host, config.Client.Host)
+
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
+			assert.Equal(t, host, config.Client.Host)
 		},
 	))
 
@@ -216,16 +228,24 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			if err != nil &&
+				// There is no agent running, therefore nothing to be restarted.
+				// However, this will cause the Enroll command to return an error
+				// which we'll ignore here.
+				!strings.Contains(err.Error(),
+					"could not reload agent daemon, unable to trigger restart") {
+				t.Fatalf("enrrol coms returned and unexpected error: %v", err)
+			}
 
-			require.True(t, store.Called)
-
+			assert.True(t, store.Called)
 			config, err := readConfig(store.Content)
 
-			require.NoError(t, err)
-			require.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			require.Equal(t, host, config.Client.Host)
+			assert.NoError(t, err)
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
+			assert.Equal(t, host, config.Client.Host)
 		},
 	))
 
@@ -275,16 +295,24 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
 
-			require.True(t, store.Called)
+			if err != nil &&
+				// There is no agent running, therefore nothing to be restarted.
+				// However, this will cause the Enroll command to return an error
+				// which we'll ignore here.
+				!strings.Contains(err.Error(),
+					"could not reload agent daemon, unable to trigger restart") {
+				t.Fatalf("enrrol coms returned and unexpected error: %v", err)
+			}
 
+			assert.True(t, store.Called)
 			config, err := readConfig(store.Content)
-
 			require.NoError(t, err)
-			require.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			require.Equal(t, host, config.Client.Host)
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
+			assert.Equal(t, host, config.Client.Host)
 		},
 	))
 
