@@ -828,6 +828,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 		overrideStateChan:  overrideStateChan,
 		upgradeDetailsChan: upgradeDetailsChan,
 		upgradeMgr:         upgradeMgr,
+		logger:             logp.NewLogger("testing"),
 	}
 
 	// Call upgrade and make sure the upgrade manager receives an Upgrade call
