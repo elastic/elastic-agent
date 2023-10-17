@@ -110,6 +110,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 			"Failed to download artifact",
 			"Failed to initialize artifact",
 			"Failed to apply initial policy from on disk configuration",
+			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
 		})
 	})
 	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
