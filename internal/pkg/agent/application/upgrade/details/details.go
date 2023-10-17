@@ -98,6 +98,12 @@ func (d *Details) notifyObserver(observer Observer) {
 	if d.State == StateCompleted {
 		observer(nil)
 	} else {
-		observer(d)
+		dCopy := Details{
+			TargetVersion: d.TargetVersion,
+			State:         d.State,
+			ActionID:      d.ActionID,
+			Metadata:      d.Metadata,
+		}
+		observer(&dCopy)
 	}
 }
