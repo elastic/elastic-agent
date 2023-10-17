@@ -17,7 +17,7 @@ type Details struct {
 	Metadata      DetailsMetadata
 
 	observers []Observer
-	mu        sync.RWMutex
+	mu        sync.Mutex
 }
 
 // DetailsMetadata consists of metadata relating to a specific upgrade state
