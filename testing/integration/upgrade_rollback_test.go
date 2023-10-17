@@ -135,24 +135,24 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start at the build version as we want to test the retry
-	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
+	// Upgrade from an old build because the new watcher from the new build will
+	// be ran. Otherwise the test will run the old watcher from the old build.
+	upgradeFromVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	require.NoError(t, err)
+	startFixture, err := atesting.NewFixture(
+		t,
+		upgradeFromVersion,
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
 	require.NoError(t, err)
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get start agent build version info")
 
-	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
-	require.NoError(t, err)
-	endFixture, err := atesting.NewFixture(
-		t,
-		upgradeToVersion,
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
-	)
+	// Upgrade to the build under test.
+	endFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, define.Version())
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
