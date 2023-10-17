@@ -484,6 +484,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 		upgradeErr:  expectedErr,
 	}
 	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, WithUpgradeManager(upgradeManager))
+	require.Nil(t, coord.state.UpgradeDetails)
 	go func() {
 		err := coord.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -492,7 +493,6 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 		}
 		coordCh <- err
 	}()
-	require.Nil(t, coord.state.UpgradeDetails)
 
 	// no vars used by the config
 	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
