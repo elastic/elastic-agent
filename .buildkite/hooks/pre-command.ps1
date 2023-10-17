@@ -1,5 +1,6 @@
 # Install gcc TODO: Move to the VM image
 choco install mingw
+Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
 refreshenv
 
 # Install gvm and go
