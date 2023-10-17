@@ -48,6 +48,22 @@ steps:
       manual:
         allowed: true
 
+  - label: "Unit tests - Windows 2016"
+    key: "unit-tests-win2016"
+    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+    agents:
+      provider: "gcp"
+      image: "family/core-windows-2016"
+      machine_type: "n2-standard-8"
+      disk_size: 200
+      disk_type: "pd-ssd"
+    retry:
+      manual:
+        allowed: true
+
   # - label: ":sonarqube: Continuous Code Inspection"
   #   env:
   #     VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
