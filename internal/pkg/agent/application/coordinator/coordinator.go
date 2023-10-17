@@ -480,6 +480,9 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 }
 
 func (c *Coordinator) logUpgradeDetails(details *details.Details) {
+	if details == nil {
+		return
+	}
 	c.logger.Infow("updated upgrade details", "upgrade_details", details)
 }
 
