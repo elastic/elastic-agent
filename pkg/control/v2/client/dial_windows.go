@@ -9,6 +9,7 @@ package client
 import (
 	"context"
 	"net"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -27,5 +28,9 @@ func dialContext(ctx context.Context, address string, maxMsgSize int) (*grpc.Cli
 }
 
 func dialer(ctx context.Context, addr string) (net.Conn, error) {
+	if strings.HasPrefix(addr, "http://") {
+		var d net.Dialer
+		return d.DialContext(ctx, "tcp", strings.TrimPrefix(addr, "http://"))
+	}
 	return npipe.DialContext(addr)(ctx, "", "")
 }
