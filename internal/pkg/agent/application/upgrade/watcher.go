@@ -192,7 +192,7 @@ LOOP:
 						}
 					}
 					if compErr != nil {
-						failedCh <- fmt.Errorf("%w: %s", ErrAgentComponentFailed, compErr.Error())
+						failedCh <- fmt.Errorf("%w: %w", ErrAgentComponentFailed, compErr)
 						continue
 					}
 				}
