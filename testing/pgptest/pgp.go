@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/openpgp"
-	"golang.org/x/crypto/openpgp/armor"
+	"golang.org/x/crypto/openpgp"       //nolint:staticcheck // It still receives security fixes and it's just test code
+	"golang.org/x/crypto/openpgp/armor" //nolint:staticcheck // It still receives security fixes and it's just test code
 )
 
 // Sing signs data using RSA. It creates the key, sings data and returns the
