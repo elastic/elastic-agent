@@ -15,14 +15,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func dialContext(ctx context.Context, address string, maxMsgSize int) (*grpc.ClientConn, error) {
-	return grpc.DialContext(
-		ctx,
-		address,
+func dialContext(ctx context.Context, address string, maxMsgSize int, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	opts = append(opts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
 	)
+	return grpc.DialContext(ctx, address, opts...)
 }
 
 func dialer(ctx context.Context, addr string) (net.Conn, error) {

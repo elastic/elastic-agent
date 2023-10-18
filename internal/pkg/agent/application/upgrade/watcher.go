@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -128,10 +129,14 @@ LOOP:
 			return
 		case <-connectTimer.C:
 			ch.log.Info("Trying to connect to agent")
-			err := ch.agentClient.Connect(ctx)
+			// block on connection, don't retry connection, and fail on temp dial errors
+			// always a local connection it should connect quickly so the timeout is only 1 second
+			connectCtx, connectCancel := context.WithTimeout(ctx, 1*time.Second)
+			err := ch.agentClient.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry(), grpc.FailOnNonTempDialError(true))
+			connectCancel()
 			if err != nil {
 				ch.connectCounter++
-				ch.log.Error("Failed connecting to running daemon: %s", err)
+				ch.log.Error("Failed connecting to running daemon: ", err)
 				if ch.checkFailures() {
 					return
 				}
@@ -142,7 +147,7 @@ LOOP:
 			if err != nil {
 				// considered a connect error
 				ch.agentClient.Disconnect()
-				ch.log.Error("Failed to start state watch: %s", err)
+				ch.log.Error("Failed to start state watch: ", err)
 				ch.connectCounter++
 				if ch.checkFailures() {
 					return
@@ -170,7 +175,7 @@ LOOP:
 				if err != nil {
 					// agent has crashed or exited
 					ch.agentClient.Disconnect()
-					ch.log.Error("Failed reading next state: %s", err)
+					ch.log.Error("Lost connection: failed reading next state: ", err)
 					ch.lostCounter++
 					if ch.checkFailures() {
 						return

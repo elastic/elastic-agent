@@ -13,10 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/control"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
 // UnitType is the type of the unit
@@ -156,10 +157,11 @@ type DiagnosticComponentResult struct {
 }
 
 // Client communicates to Elastic Agent through the control protocol.
-// go:generate mockery --name Client
+//
+//go:generate mockery --name Client
 type Client interface {
 	// Connect connects to the running Elastic Agent.
-	Connect(ctx context.Context) error
+	Connect(ctx context.Context, opts ...grpc.DialOption) error
 	// Disconnect disconnects from the running Elastic Agent.
 	Disconnect()
 	// Version returns the current version of the running agent.
@@ -231,9 +233,9 @@ func New(opts ...Option) Client {
 }
 
 // Connect connects to the running Elastic Agent.
-func (c *client) Connect(ctx context.Context) error {
+func (c *client) Connect(ctx context.Context, opts ...grpc.DialOption) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	conn, err := dialContext(ctx, c.address, c.maxMsgSize)
+	conn, err := dialContext(ctx, c.address, c.maxMsgSize, opts...)
 	if err != nil {
 		return err
 	}
