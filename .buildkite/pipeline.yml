@@ -53,10 +53,10 @@ steps:
       BUILDKITE_REPO: "" # skip checkout
     command:
       - "go install github.com/wadey/gocovmerge@latest"
-      - "buildkite-agent artifact download --step unit-tests-2204 build/TEST-go-unit.cov ./unit-tests-2204"
-      - "buildkite-agent artifact download --step unit-tests-2204-arm64 build/TEST-go-unit.cov ./unit-tests-2204-arm64"
+      - "buildkite-agent artifact download --step unit-tests-2204 build/TEST-go-unit.cov coverage-unit-tests-2204.cov"
+      - "buildkite-agent artifact download --step unit-tests-2204-arm64 build/TEST-go-unit.cov coverage-unit-tests-2204-arm64.cov ./"
       - "ls ./unit-tests-2204"
-      - "gocovmerge ./unit-tests-2204/TEST-go-unit.cov unit-tests-2204-arm64/TEST-go-unit.cov > build/TEST-go-unit.cov"
+      - "gocovmerge coverage-unit-tests-2204.cov coverage-unit-tests-2204-arm64.cov > build/TEST-go-unit.cov"
       - "cat build/TEST-go-unit.cov"
     artifact_paths:
       - "build/TEST-**"
