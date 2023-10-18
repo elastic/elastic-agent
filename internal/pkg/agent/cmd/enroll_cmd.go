@@ -116,6 +116,23 @@ type enrollCmdOption struct {
 	Tags                 []string                   `yaml:"omitempty"`
 }
 
+type ErrDaemonReload struct {
+	err error
+}
+
+func (e *ErrDaemonReload) Error() string {
+	return e.err.Error()
+}
+
+func (e *ErrDaemonReload) Unwrap() error {
+	return e.err
+}
+
+func (e *ErrDaemonReload) Is(err error) bool {
+	var errDaemonReload *ErrDaemonReload
+	return errors.As(err, &errDaemonReload)
+}
+
 // remoteConfig returns the configuration used to connect the agent to a fleet process.
 func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	cfg, err := remote.NewConfigFromURL(e.URL)
@@ -463,9 +480,15 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 	return err
 }
 
-func (c *enrollCmd) daemonReload(ctx context.Context) error {
+func (c *enrollCmd) daemonReload(ctx context.Context) (err error) {
+	defer func() {
+		if err != nil {
+			err = &ErrDaemonReload{err: err}
+		}
+	}()
+
 	daemon := client.New()
-	err := daemon.Connect(ctx)
+	err = daemon.Connect(ctx)
 	if err != nil {
 		return err
 	}

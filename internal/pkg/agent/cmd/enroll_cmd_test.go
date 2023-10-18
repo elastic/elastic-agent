@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -414,6 +415,13 @@ func TestValidateEnrollFlags(t *testing.T) {
 		require.ErrorAs(t, err, &agentErr)
 		require.Equal(t, errors.TypeConfig, agentErr.Type())
 	})
+}
+
+func TestErrDaemonReload(t *testing.T) {
+	err := fmt.Errorf("some wrapping: %w",
+		&ErrDaemonReload{err: errors.New("some error")})
+
+	assert.True(t, errors.Is(err, &ErrDaemonReload{}))
 }
 
 func withServer(
