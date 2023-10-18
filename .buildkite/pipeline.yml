@@ -4,49 +4,68 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
-  # - label: "Unit tests - Ubuntu 22.04"
-  #   key: "unit-tests-2204"
-  #   command: ".buildkite/scripts/steps/unit-tests.sh"
-  #   artifact_paths:
-  #     - "build/TEST-**"
-  #     - "build/diagnostics/*"
-  #   agents:
-  #     provider: "gcp"
-  #     image: "family/core-ubuntu-2204"
-  #   retry:
-  #     manual:
-  #       allowed: true
-
-  # - label: "Unit tests - Ubuntu 22.04 ARM64"
-  #   key: "unit-tests-2204-arm64"
-  #   command: ".buildkite/scripts/steps/unit-tests.sh"
-  #   artifact_paths:
-  #     - "build/TEST-**"
-  #     - "build/diagnostics/*"
-  #   agents:
-  #     provider: "aws"
-  #     imagePrefix: "core-ubuntu-2204-aarch64"
-  #     diskSizeGb: 200
-  #     instanceType: "m6g.4xlarge"
-  #   retry:
-  #     manual:
-  #       allowed: true
-
-  - label: "Unit tests - Windows 2022"
-    key: "unit-tests-win2022"
-    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+  - label: "Unit tests - Ubuntu 22.04"
+    key: "unit-tests-2204"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
     agents:
       provider: "gcp"
-      image: "family/core-windows-2022"
-      machine_type: "n2-standard-8"
-      disk_size: 200
-      disk_type: "pd-ssd"
+      image: "family/core-ubuntu-2204"
     retry:
       manual:
         allowed: true
+
+  - label: "Unit tests - Ubuntu 22.04 ARM64"
+    key: "unit-tests-2204-arm64"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+    agents:
+      provider: "aws"
+      imagePrefix: "core-ubuntu-2204-aarch64"
+      diskSizeGb: 200
+      instanceType: "m6g.4xlarge"
+    retry:
+      manual:
+        allowed: true
+
+  # - label: "Unit tests - Windows 2022"
+  #   key: "unit-tests-win2022"
+  #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+  #   artifact_paths:
+  #     - "build/TEST-**"
+  #     - "build/diagnostics/*"
+  #   agents:
+  #     provider: "gcp"
+  #     image: "family/core-windows-2022"
+  #     machine_type: "n2-standard-8"
+  #     disk_size: 200
+  #     disk_type: "pd-ssd"
+  #   retry:
+  #     manual:
+  #       allowed: true
+  - label: "Merge coverage reports"
+    key: "merge-coverage"
+    env:
+      BUILDKITE_REPO: "" # skip checkout
+    command:
+      - "go install go.shabbyrobe.org/gocovmerge@latest"
+      - "buildkite-agent artifact download --step unit-tests-2204 build/TEST-go-unit.cov ./unit-tests-2204"
+      - "buildkite-agent artifact download --step unit-tests-2204-arm64 build/TEST-go-unit.cov ./unit-tests-2204-arm64"
+      - "ls ./unit-tests-2204"
+      - "gocovmerge ./unit-tests-2204/TEST-go-unit.cov unit-tests-2204-arm64/TEST-go-unit.cov > build/TEST-go-unit.cov"
+      - "cat build/TEST-go-unit.cov"
+    artifact_paths:
+      - "build/TEST-**"
+    agents:
+      image: "golang:1.20.10"
+    depends_on:
+      - "unit-tests"
+    # plugins:
+    #   - cultureamp/skip-checkout#v1.0.0: ~
 
   # - label: "Unit tests - Windows 2016"
   #   key: "unit-tests-win2016"
@@ -64,20 +83,20 @@ steps:
   #     manual:
   #       allowed: true
 
-  - label: ":sonarqube: Continuous Code Inspection"
-    env:
-      VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
-    agents:
-      image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-    command:
-      - "buildkite-agent artifact download build/TEST-go-unit.cov ."
-      - "buildkite-agent artifact download build/TEST-go-unit.out.json ."
-      - "/scan-source-code.sh"
-    depends_on:
-      - "unit-tests"
-    retry:
-      manual:
-        allowed: true
+  # - label: ":sonarqube: Continuous Code Inspection"
+  #   env:
+  #     VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
+  #   agents:
+  #     image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
+  #   command:
+  #     - "buildkite-agent artifact download build/TEST-go-unit.cov ."
+  #     - "buildkite-agent artifact download build/TEST-go-unit.out.json ."
+  #     - "/scan-source-code.sh"
+  #   depends_on:
+  #     - "unit-tests"
+  #   retry:
+  #     manual:
+  #       allowed: true
 
   # - label: "Integration tests"
   #   key: "integration-tests"

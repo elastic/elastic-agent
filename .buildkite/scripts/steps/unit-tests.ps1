@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH"
 
 Write-Host "--- Build"
+go env
 mage build
 
 if ($LASTEXITCODE -ne 0) {  
