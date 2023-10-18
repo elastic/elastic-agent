@@ -53,7 +53,6 @@ type AgentWatcher struct {
 func NewAgentWatcher(ch chan error, log *logger.Logger, checkInterval time.Duration) *AgentWatcher {
 	c := client.New()
 	ec := &AgentWatcher{
-		lastPid:       -1,
 		notifyChan:    ch,
 		agentClient:   c,
 		log:           log,
@@ -124,6 +123,7 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 
 LOOP:
 	for {
+		ch.lastPid = -1
 		connectTimer := time.NewTimer(ch.checkInterval)
 		select {
 		case <-ctx.Done():
@@ -194,9 +194,9 @@ LOOP:
 				// we are now talking to a different spawned Elastic Agent
 				if ch.lastPid == -1 {
 					ch.lastPid = state.Info.PID
-					ch.log.Info("Communicating with PID %d", ch.lastPid)
+					ch.log.Info(fmt.Sprintf("Communicating with PID %d", ch.lastPid))
 				} else if ch.lastPid != state.Info.PID {
-					ch.log.Error("Communication with PID %d lost, now communicating with PID %d", ch.lastPid, state.Info.PID)
+					ch.log.Error(fmt.Sprintf("Communication with PID %d lost, now communicating with PID %d", ch.lastPid, state.Info.PID))
 					ch.lastPid = state.Info.PID
 					// count the PID change as a lost connection, but allow
 					// the communication to continue unless has become a failure

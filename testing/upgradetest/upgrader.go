@@ -27,9 +27,10 @@ type CustomPGP struct {
 type upgradeOpts struct {
 	sourceURI *string
 
-	skipVerify     bool
-	skipDefaultPgp bool
-	customPgp      *CustomPGP
+	skipVerify       bool
+	skipDefaultPgp   bool
+	customPgp        *CustomPGP
+	customWatcherCfg string
 
 	preInstallHook  func() error
 	postInstallHook func() error
@@ -98,6 +99,13 @@ func WithPostUpgradeHook(hook func() error) upgradeOpt {
 	}
 }
 
+// WithCustomWatcherConfig sets a custom watcher configuration to use.
+func WithCustomWatcherConfig(cfg string) upgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.customWatcherCfg = cfg
+	}
+}
+
 // PerformUpgrade performs the upgrading of the Elastic Agent.
 func PerformUpgrade(
 	ctx context.Context,
@@ -126,7 +134,11 @@ func PerformUpgrade(
 	}
 
 	// start fixture gets the agent configured to use a faster watcher
-	err = ConfigureFastWatcher(ctx, startFixture)
+	if upgradeOpts.customWatcherCfg != "" {
+		err = startFixture.Configure(ctx, []byte(upgradeOpts.customWatcherCfg))
+	} else {
+		err = ConfigureFastWatcher(ctx, startFixture)
+	}
 	if err != nil {
 		return fmt.Errorf("failed configuring the start agent with faster watcher configuration: %w", err)
 	}

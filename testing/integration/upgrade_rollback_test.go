@@ -28,6 +28,12 @@ import (
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
+const reallyFastWatcherCfg = `
+agent.upgrade.watcher:
+  grace_period: 1m
+  error_check.interval: 5s
+`
+
 // TestStandaloneUpgradeRollback tests the scenario where upgrading to a new version
 // of Agent fails due to the new Agent binary reporting an unhealthy status. It checks
 // that the Agent is rolled back to the previous version.
@@ -165,7 +171,8 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
-		upgradetest.WithPostUpgradeHook(postUpgradeHook))
+		upgradetest.WithPostUpgradeHook(postUpgradeHook),
+		upgradetest.WithCustomWatcherConfig(reallyFastWatcherCfg))
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}
@@ -203,7 +210,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		err = install.StartService(topPath)
 		require.NoError(t, err)
 
-		// ensure that it's started before starting it again
+		// ensure that it's started before next loop
 		require.Eventuallyf(t, func() bool {
 			status, statusErr = install.StatusService(topPath)
 			if statusErr != nil {
