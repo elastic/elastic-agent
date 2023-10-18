@@ -21,7 +21,7 @@ var (
 	}
 )
 
-// BuildGoDaemon builds the go-daemon binary.
+// BuildGoDaemon builds the go-deamon binary.
 func BuildGoDaemon() error {
 	if GOOS != "linux" {
 		return errors.New("go-daemon only builds for linux")
