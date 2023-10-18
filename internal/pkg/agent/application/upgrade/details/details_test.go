@@ -5,7 +5,9 @@
 package details
 
 import (
+	"encoding/json"
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -57,4 +59,37 @@ func TestDetailsObserver(t *testing.T) {
 	det.SetState(StateCompleted)
 	require.Equal(t, StateCompleted, det.State)
 	require.Nil(t, nil, observedDetails)
+}
+
+func TestDetailsDownloadRateJSON(t *testing.T) {
+	det := NewDetails("99.999.9999", StateRequested, "test_action_id")
+
+	// Normal (non-infinity) download rate
+	t.Run("non_infinity", func(t *testing.T) {
+		det.SetDownloadProgress(.8, 1794.7)
+
+		data, err := json.Marshal(det)
+		require.NoError(t, err)
+
+		var unmarshalledDetails Details
+		err = json.Unmarshal(data, &unmarshalledDetails)
+		require.NoError(t, err)
+		require.Equal(t, 1794.7, float64(unmarshalledDetails.Metadata.DownloadRate))
+		require.Equal(t, .8, unmarshalledDetails.Metadata.DownloadPercent)
+	})
+
+	// Infinity download rate
+	t.Run("infinity", func(t *testing.T) {
+		det.SetDownloadProgress(0.99, math.Inf(1))
+
+		data, err := json.Marshal(det)
+		require.NoError(t, err)
+
+		var unmarshalledDetails Details
+		err = json.Unmarshal(data, &unmarshalledDetails)
+		require.NoError(t, err)
+		require.Equal(t, -1.0, float64(unmarshalledDetails.Metadata.DownloadRate))
+		require.Equal(t, 0.99, unmarshalledDetails.Metadata.DownloadPercent)
+	})
+
 }

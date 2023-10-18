@@ -5,9 +5,15 @@
 package details
 
 import (
+	"encoding/json"
+	"math"
 	"sync"
 	"time"
 )
+
+// downloadRate is a float64 that can be safely marshalled to JSON
+// when the value is Infinity.
+type downloadRate float64
 
 // Observer is a function that will be called with upgrade details
 type Observer func(details *Details)
@@ -25,9 +31,9 @@ type Details struct {
 
 // Metadata consists of metadata relating to a specific upgrade state
 type Metadata struct {
-	ScheduledAt     time.Time `json:"scheduled_at,omitempty"`
-	DownloadPercent float64   `json:"download_percent,omitempty"`
-	DownloadRate    float64   `json:"download_rate,omitempty"`
+	ScheduledAt     time.Time    `json:"scheduled_at,omitempty"`
+	DownloadPercent float64      `json:"download_percent,omitempty"`
+	DownloadRate    downloadRate `json:"download_rate,omitempty"`
 
 	// FailedState is the state an upgrade was in if/when it failed. Use the
 	// Fail() method of UpgradeDetails to correctly record details when
@@ -62,12 +68,12 @@ func (d *Details) SetState(s State) {
 
 // SetDownloadProgress is a convenience method to set the download percent
 // when the upgrade is in UPG_DOWNLOADING state.
-func (d *Details) SetDownloadProgress(downloadPercent, downloadRate float64) {
+func (d *Details) SetDownloadProgress(percent, rate float64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.Metadata.DownloadPercent = downloadPercent
-	d.Metadata.DownloadRate = downloadRate
+	d.Metadata.DownloadPercent = percent
+	d.Metadata.DownloadRate = downloadRate(rate)
 	d.notifyObservers()
 }
 
@@ -120,4 +126,16 @@ func (d *Details) notifyObserver(observer Observer) {
 		}
 		observer(&dCopy)
 	}
+}
+
+func (dr downloadRate) MarshalJSON() ([]byte, error) {
+	// When the Agent artifact is downloaded really fast during an upgrade, the download
+	// rate gets set to +Inf. This value is set on the m.DownloadRate field. Unfortunately,
+	// JSON does not support +/-Inf or NaN values; see https://www.rfc-editor.org/rfc/rfc8259.
+	// So we reset this field to a sentinel value of -1 before marshalling the object to JSON.
+	if math.IsInf(float64(dr), 0) {
+		return json.Marshal(-1.0)
+	}
+
+	return json.Marshal(float64(dr))
 }
