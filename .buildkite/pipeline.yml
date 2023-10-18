@@ -63,7 +63,8 @@ steps:
     agents:
       image: "golang:1.20.10"
     depends_on:
-      - "unit-tests"
+      - "unit-tests-2204"
+      - "unit-tests-2204-arm64"
     # plugins:
     #   - cultureamp/skip-checkout#v1.0.0: ~
 
