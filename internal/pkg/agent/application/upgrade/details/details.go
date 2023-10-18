@@ -129,10 +129,12 @@ func (d *Details) notifyObserver(observer Observer) {
 }
 
 func (dr downloadRate) MarshalJSON() ([]byte, error) {
-	// When the Agent artifact is downloaded really fast during an upgrade, the download
-	// rate gets set to +Inf. This value is set on the m.DownloadRate field. Unfortunately,
-	// JSON does not support +/-Inf or NaN values; see https://www.rfc-editor.org/rfc/rfc8259.
-	// So we reset this field to a sentinel value of -1 before marshalling the object to JSON.
+	// When the Agent artifact is downloaded really fast during an upgrade, the
+	// download rate gets set to +Inf. This value is set on the
+	// details.Metadata.DownloadRate field. Unfortunately, JSON does not support
+	// +/-Inf or NaN values; see https://www.rfc-editor.org/rfc/rfc8259. So we
+	// reset this field to a sentinel value of -1 before marshalling the object
+	// to JSON.
 	if math.IsInf(float64(dr), 0) {
 		return json.Marshal(-1.0)
 	}
