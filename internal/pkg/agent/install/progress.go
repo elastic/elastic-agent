@@ -31,7 +31,7 @@ func CreateAndStartNewSpinner(stream io.Writer) *progressbar.ProgressBar {
 				if progBar.IsFinished() {
 					return
 				}
-				progBar.RenderBlank()
+				_ = progBar.RenderBlank()
 				time.Sleep(time.Millisecond * 40)
 			}
 		}()

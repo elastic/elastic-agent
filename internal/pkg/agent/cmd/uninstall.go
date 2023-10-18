@@ -89,8 +89,8 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	} else {
 		progBar.Describe("Done")
 	}
-	progBar.Finish()
-	progBar.Exit()
+	_ = progBar.Finish()
+	_ = progBar.Exit()
 	fmt.Fprintf(streams.Out, "Elastic Agent has been uninstalled.\n")
 
 	_ = install.RemovePath(paths.Top())
