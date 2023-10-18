@@ -52,7 +52,7 @@ steps:
     env:
       BUILDKITE_REPO: "" # skip checkout
     command:
-      - "go install go.shabbyrobe.org/gocovmerge"
+      - "go install github.com/wadey/gocovmerge@latest"
       - "buildkite-agent artifact download --step unit-tests-2204 build/TEST-go-unit.cov ./unit-tests-2204"
       - "buildkite-agent artifact download --step unit-tests-2204-arm64 build/TEST-go-unit.cov ./unit-tests-2204-arm64"
       - "ls ./unit-tests-2204"
