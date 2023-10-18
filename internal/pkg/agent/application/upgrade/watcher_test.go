@@ -68,6 +68,168 @@ func TestWatcher_LostConnection(t *testing.T) {
 	}
 }
 
+func TestWatcher_PIDChange(t *testing.T) {
+	// timeout ensures that if it doesn't work; it doesn't block forever
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	errCh := make(chan error)
+	logger, _ := logger.NewTesting("watcher")
+	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
+
+	// error on watch (counts as lost connect)
+	mockHandler := func(srv cproto.ElasticAgentControl_StateWatchServer) error {
+		// starts with PID 1
+		err := srv.Send(&cproto.StateResponse{
+			Info: &cproto.StateAgentInfo{
+				Pid: 1,
+			},
+			State:   cproto.State_HEALTHY,
+			Message: "healthy",
+		})
+		if err != nil {
+			return err
+		}
+		// now with PID 2
+		err = srv.Send(&cproto.StateResponse{
+			Info: &cproto.StateAgentInfo{
+				Pid: 2,
+			},
+			State:   cproto.State_HEALTHY,
+			Message: "healthy",
+		})
+		if err != nil {
+			return err
+		}
+		// now with PID 3
+		err = srv.Send(&cproto.StateResponse{
+			Info: &cproto.StateAgentInfo{
+				Pid: 3,
+			},
+			State:   cproto.State_HEALTHY,
+			Message: "healthy",
+		})
+		if err != nil {
+			return err
+		}
+		// now with PID 4
+		err = srv.Send(&cproto.StateResponse{
+			Info: &cproto.StateAgentInfo{
+				Pid: 4,
+			},
+			State:   cproto.State_HEALTHY,
+			Message: "healthy",
+		})
+		if err != nil {
+			return err
+		}
+		// keep open until end (exiting will count as a lost connection)
+		<-ctx.Done()
+		return nil
+	}
+	mock := &mockDaemon{watch: mockHandler}
+	require.NoError(t, mock.Start())
+	defer mock.Stop()
+
+	// set client to mock; before running
+	w.agentClient = mock.Client()
+	go w.Run(ctx)
+
+	select {
+	case <-ctx.Done():
+		require.NoError(t, ctx.Err())
+	case err := <-errCh:
+		assert.ErrorIs(t, err, ErrLostConnection)
+	}
+}
+
+func TestWatcher_PIDChangeSuccess(t *testing.T) {
+	// test tests for success, which only happens when no error comes in
+	// during this time period
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	errCh := make(chan error)
+	logger, _ := logger.NewTesting("watcher")
+	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
+
+	// error on watch (counts as lost connect)
+	mockHandler := func(srv cproto.ElasticAgentControl_StateWatchServer) error {
+		// starts with PID 1
+		err := srv.Send(&cproto.StateResponse{
+			Info: &cproto.StateAgentInfo{
+				Pid: 1,
+			},
+			State:   cproto.State_HEALTHY,
+			Message: "healthy",
+		})
+		if err != nil {
+			return err
+		}
+		// now with PID 2
+		err = srv.Send(&cproto.StateResponse{
+			Info: &cproto.StateAgentInfo{
+				Pid: 2,
+			},
+			State:   cproto.State_HEALTHY,
+			Message: "healthy",
+		})
+		if err != nil {
+			return err
+		}
+		// now with PID 3
+		err = srv.Send(&cproto.StateResponse{
+			Info: &cproto.StateAgentInfo{
+				Pid: 3,
+			},
+			State:   cproto.State_HEALTHY,
+			Message: "healthy",
+		})
+		if err != nil {
+			return err
+		}
+		// still with PID 3
+		err = srv.Send(&cproto.StateResponse{
+			Info: &cproto.StateAgentInfo{
+				Pid: 3,
+			},
+			State:   cproto.State_HEALTHY,
+			Message: "healthy",
+		})
+		if err != nil {
+			return err
+		}
+		// still with PID 3
+		err = srv.Send(&cproto.StateResponse{
+			Info: &cproto.StateAgentInfo{
+				Pid: 3,
+			},
+			State:   cproto.State_HEALTHY,
+			Message: "healthy",
+		})
+		if err != nil {
+			return err
+		}
+		// keep open until end (exiting will count as a lost connection)
+		<-ctx.Done()
+		return nil
+	}
+	mock := &mockDaemon{watch: mockHandler}
+	require.NoError(t, mock.Start())
+	defer mock.Stop()
+
+	// set client to mock; before running
+	w.agentClient = mock.Client()
+	go w.Run(ctx)
+
+	select {
+	case <-ctx.Done():
+		require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+	case err := <-errCh:
+		assert.NoError(t, err, "error should not have been reported")
+	}
+}
+
 func TestWatcher_AgentError(t *testing.T) {
 	// timeout ensures that if it doesn't work; it doesn't block forever
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

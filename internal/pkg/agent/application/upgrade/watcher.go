@@ -41,6 +41,7 @@ var (
 type AgentWatcher struct {
 	connectCounter int
 	lostCounter    int
+	lastPid        int32
 
 	notifyChan    chan error
 	log           *logger.Logger
@@ -52,6 +53,7 @@ type AgentWatcher struct {
 func NewAgentWatcher(ch chan error, log *logger.Logger, checkInterval time.Duration) *AgentWatcher {
 	c := client.New()
 	ec := &AgentWatcher{
+		lastPid:       -1,
 		notifyChan:    ch,
 		agentClient:   c,
 		log:           log,
@@ -77,7 +79,7 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 		failedTimer.Stop()       // starts stopped
 		defer failedTimer.Stop() // stopped on exit always
 
-		var failedCount int
+		var flipFlopCount int
 		var failedErr error
 		for {
 			select {
@@ -85,13 +87,13 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 				return
 			case reset := <-failedReset:
 				if reset {
-					failedCount = 0
+					flipFlopCount = 0
 					failedTimer.Stop()
 				}
 			case err := <-failedCh:
 				if err != nil {
 					if failedErr == nil {
-						failedCount++
+						flipFlopCount++
 						failedTimer.Reset(ch.checkInterval)
 						ch.log.Error("Agent reported failure (starting failed timer): %s", err)
 					} else {
@@ -104,8 +106,8 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 					}
 				}
 				failedErr = err
-				if failedCount > statusFailureFlipFlopsAllowed {
-					err := fmt.Errorf("%w '%d' times in a row", ErrAgentFlipFlopFailed, failedCount)
+				if flipFlopCount > statusFailureFlipFlopsAllowed {
+					err := fmt.Errorf("%w '%d' times in a row", ErrAgentFlipFlopFailed, flipFlopCount)
 					ch.log.Error(err)
 					ch.notifyChan <- err
 				}
@@ -143,9 +145,12 @@ LOOP:
 				// agent is probably not running
 				continue
 			}
-			watch, err := ch.agentClient.StateWatch(ctx)
+
+			stateCtx, stateCancel := context.WithCancel(ctx)
+			watch, err := ch.agentClient.StateWatch(stateCtx)
 			if err != nil {
 				// considered a connect error
+				stateCancel()
 				ch.agentClient.Disconnect()
 				ch.log.Error("Failed to start state watch: ", err)
 				ch.connectCounter++
@@ -174,6 +179,7 @@ LOOP:
 				state, err := watch.Recv()
 				if err != nil {
 					// agent has crashed or exited
+					stateCancel()
 					ch.agentClient.Disconnect()
 					ch.log.Error("Lost connection: failed reading next state: ", err)
 					ch.lostCounter++
@@ -181,6 +187,25 @@ LOOP:
 						return
 					}
 					continue LOOP
+				}
+
+				// gRPC is good at hiding the fact that connection was lost
+				// to ensure that we don't miss a restart a changed PID means
+				// we are now talking to a different spawned Elastic Agent
+				if ch.lastPid == -1 {
+					ch.lastPid = state.Info.PID
+					ch.log.Info("Communicating with PID %d", ch.lastPid)
+				} else if ch.lastPid != state.Info.PID {
+					ch.log.Error("Communication with PID %d lost, now communicating with PID %d", ch.lastPid, state.Info.PID)
+					ch.lastPid = state.Info.PID
+					// count the PID change as a lost connection, but allow
+					// the communication to continue unless has become a failure
+					ch.lostCounter++
+					if ch.checkFailures() {
+						stateCancel()
+						ch.agentClient.Disconnect()
+						return
+					}
 				}
 
 				if state.State == client.Failed {

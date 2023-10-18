@@ -106,6 +106,7 @@ type AgentStateInfo struct {
 	Commit    string `json:"commit" yaml:"commit"`
 	BuildTime string `json:"build_time" yaml:"build_time"`
 	Snapshot  bool   `json:"snapshot" yaml:"snapshot"`
+	PID       int32  `json:"pid" yaml:"pid"`
 }
 
 // AgentState is the current state of the Elastic Agent.
@@ -472,6 +473,7 @@ func toState(res *cproto.StateResponse) (*AgentState, error) {
 			Commit:    res.Info.Commit,
 			BuildTime: res.Info.BuildTime,
 			Snapshot:  res.Info.Snapshot,
+			PID:       res.Info.Pid,
 		},
 		State:        res.State,
 		Message:      res.Message,

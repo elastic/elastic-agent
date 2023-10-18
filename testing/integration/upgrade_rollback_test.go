@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kardianos/service"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -174,16 +176,42 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		time.Sleep(10 * time.Second)
 		topPath := paths.Top()
 
-		t.Logf("Restarting Agent via service to simulate crashing")
-		err = install.RestartService(topPath)
+		t.Logf("Stopping agent via service to simulate crashing")
+		err = install.StopService(topPath)
 		if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
 			// Due to the quick restarts every 10 seconds its possible that this is faster than Windows
 			// can handle. Decrementing restartIdx means that the loop will occur again.
 			t.Logf("Got an allowed error on Windows: %s", err)
-			restartIdx--
-			continue
+			err = nil
 		}
 		require.NoError(t, err)
+
+		// ensure that it's stopped before starting it again
+		var status service.Status
+		var statusErr error
+		require.Eventuallyf(t, func() bool {
+			status, statusErr = install.StatusService(topPath)
+			if statusErr != nil {
+				return false
+			}
+			return status != service.StatusRunning
+		}, 2*time.Minute, 1*time.Second, "service never fully stopped (status: %v): %s", status, statusErr)
+		t.Logf("Stopped agent via service to simulate crashing")
+
+		// start it again
+		t.Logf("Starting agent via service to simulate crashing")
+		err = install.StartService(topPath)
+		require.NoError(t, err)
+
+		// ensure that it's started before starting it again
+		require.Eventuallyf(t, func() bool {
+			status, statusErr = install.StatusService(topPath)
+			if statusErr != nil {
+				return false
+			}
+			return status == service.StatusRunning
+		}, 2*time.Minute, 1*time.Second, "service never fully started (status: %v): %s", status, statusErr)
+		t.Logf("Started agent via service to simulate crashing")
 	}
 
 	// wait for the agent to be healthy and back at the start version
