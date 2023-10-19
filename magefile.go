@@ -698,7 +698,7 @@ func (Cloud) Image() {
 	os.Setenv(devEnv, "true")
 
 	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
-		// only disable SNAPSHOT build when explicitely defined
+		// only disable SNAPSHOT build when explicitly defined
 		os.Setenv(snapshotEnv, "false")
 		devtools.Snapshot = false
 	} else {
@@ -1840,6 +1840,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}
+
 	return r, nil
 }
 

@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	// Container is container platform
+	Container = component.Container
 	// Darwin is macOS platform
 	Darwin = component.Darwin
 	// Linux is Linux platform
@@ -19,6 +21,8 @@ const (
 	// Windows is Windows platform
 	Windows = component.Windows
 )
+
+var validTypes = []string{Darwin, Container, Linux, Windows}
 
 const (
 	// AMD64 is amd64 architecture
@@ -54,8 +58,9 @@ func (o OS) Validate() error {
 	if o.Type == "" {
 		return errors.New("type must be defined")
 	}
-	if o.Type != Darwin && o.Type != Linux && o.Type != Windows {
-		return errors.New("type must be either darwin, linux, or windows")
+
+	if !contains(validTypes, o.Type) {
+		return fmt.Errorf("type must be one of %s", validTypes)
 	}
 	if o.Arch != "" {
 		if o.Arch != AMD64 && o.Arch != ARM64 {
@@ -110,7 +115,7 @@ type Requirements struct {
 func (r Requirements) Validate() error {
 	for i, o := range r.OS {
 		if err := o.Validate(); err != nil {
-			return fmt.Errorf("invalid os %d: %w", i, err)
+			return fmt.Errorf("invalid os [%d]: %w", i, err)
 		}
 	}
 	return nil
@@ -123,7 +128,7 @@ func (r Requirements) runtimeAllowed(os string, arch string, version string, dis
 		return true
 	}
 	for _, o := range r.OS {
-		if o.Type != os {
+		if !(o.Type == Container && os == Linux) && o.Type != os {
 			// not valid on this runtime
 			continue
 		}
@@ -143,5 +148,15 @@ func (r Requirements) runtimeAllowed(os string, arch string, version string, dis
 		return true
 	}
 	// made it this far, not allowed
+	return false
+}
+
+func contains(s []string, v string) bool {
+	for _, e := range s {
+		if e == v {
+			return true
+		}
+	}
+
 	return false
 }

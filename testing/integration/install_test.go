@@ -56,7 +56,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	err = os.RemoveAll(topPath)
 	require.NoError(t, err, "failed to remove %q. The test requires this path not to exist.")
 
-	// Run `elastic-agent install`.  We use `--force` to prevent interactive
+	// Run `elastic-agent install`. We use `--force` to prevent interactive
 	// execution.
 	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{Force: true})
 	if err != nil {
@@ -93,7 +93,7 @@ func TestInstallWithBasePath(t *testing.T) {
 	tmpDir := t.TempDir()
 	randomBasePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
 
-	// Run `elastic-agent install`.  We use `--force` to prevent interactive
+	// Run `elastic-agent install`. We use `--force` to prevent interactive
 	// execution.
 	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{
 		BasePath: randomBasePath,

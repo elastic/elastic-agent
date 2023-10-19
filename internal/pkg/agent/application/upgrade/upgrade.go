@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/jaypipes/ghw"
-
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 
@@ -28,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"

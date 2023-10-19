@@ -17,6 +17,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
+const FleetStatusOnline = "online"
+
 // ConnectedToFleet checks if the agent defined in the fixture is connected to
 // Fleet Server. It uses assert.Eventually and if it fails the last error will
 // be printed. It returns if the agent is connected to Fleet Server or not.

@@ -15,11 +15,22 @@ import (
 )
 
 type localFetcher struct {
-	dir          string
-	snapshotOnly bool
+	dir           string
+	dockerOnly    bool
+	dockerFlavour string
+	snapshotOnly  bool
 }
 
 type localFetcherOpt func(f *localFetcher)
+
+// WithDockerOnly sets the LocalFetcher to only pull the docker artifact.
+// flavour can be empty, 'complete, 'cloud' or 'ubu8'.
+func WithDockerOnly(flavour string) localFetcherOpt {
+	return func(f *localFetcher) {
+		f.dockerOnly = true
+		f.dockerFlavour = flavour
+	}
+}
 
 // WithLocalSnapshotOnly sets the LocalFetcher to only pull the snapshot build.
 func WithLocalSnapshotOnly() localFetcherOpt {
@@ -46,7 +57,7 @@ func (f *localFetcher) Name() string {
 
 // Fetch fetches the Elastic Agent and places the resulting binary at the path.
 func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architecture string, version string) (FetcherResult, error) {
-	suffix, err := GetPackageSuffix(operatingSystem, architecture)
+	suffix, err := GetPackageSuffix(operatingSystem, architecture, false)
 	if err != nil {
 		return nil, err
 	}
@@ -57,13 +68,15 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 	}
 
 	mainBuildfmt := "elastic-agent-%s-%s"
+	if f.dockerOnly {
+		mainBuildfmt = "elastic-agent-" + f.dockerFlavour + "-%s-%s"
+	}
 	if f.snapshotOnly && !ver.IsSnapshot() {
 		if ver.Prerelease() == "" {
 			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "SNAPSHOT", ver.BuildMetadata())
 		} else {
 			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), ver.Prerelease()+"-SNAPSHOT", ver.BuildMetadata())
 		}
-
 	}
 
 	mainBuild := fmt.Sprintf(mainBuildfmt, ver, suffix)
@@ -74,6 +87,8 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 	if err != nil {
 		return nil, fmt.Errorf("failed to find build at %s: %w", f.dir, err)
 	}
+
+	fmt.Println("localfetcher:", f.dir, build)
 	return &localFetcherResult{src: f.dir, path: build}, nil
 }
 

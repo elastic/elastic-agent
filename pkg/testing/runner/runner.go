@@ -194,6 +194,7 @@ func (r *Runner) Logger() Logger {
 
 // Run runs all the tests.
 func (r *Runner) Run(ctx context.Context) (Result, error) {
+	fmt.Println("Runner.Run: batches:", r.batches)
 	// validate tests can even be performed
 	err := r.validate()
 	if err != nil {
@@ -439,15 +440,24 @@ func (r *Runner) validate() error {
 // getBuild returns the build for the batch.
 func (r *Runner) getBuild(b OSBatch) Build {
 	arch := b.OS.Arch
-	if arch == define.AMD64 {
+	if arch == define.AMD64 && b.OS.Type != define.Container {
 		arch = "x86_64"
 	}
 	ext := "tar.gz"
 	if b.OS.Type == define.Windows {
 		ext = "zip"
 	}
+	osType := b.OS.Type
+	if osType == define.Container {
+		osType = define.Linux
+		ext = "docker." + ext
+	}
+
 	hashExt := ".sha512"
-	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.OS.Type, arch, ext))
+	packageName := filepath.Join(r.cfg.BuildDir,
+		fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, osType, arch, ext))
+
+	fmt.Println("getBuild:")
 	return Build{
 		Version:    r.cfg.AgentVersion,
 		Type:       b.OS.Type,
@@ -826,6 +836,7 @@ func findBatchByID(id string, batches []OSBatch) (OSBatch, bool) {
 
 func createBatches(batch define.Batch, platforms []define.OS, matrix bool) ([]OSBatch, error) {
 	var batches []OSBatch
+
 	specifics, err := getSupported(batch.OS, platforms)
 	if errors.Is(err, ErrOSNotSupported) {
 		var s SupportedOS
@@ -849,6 +860,7 @@ func createBatches(batch define.Batch, platforms []define.OS, matrix bool) ([]OS
 	} else if err != nil {
 		return nil, err
 	}
+
 	if matrix {
 		for _, s := range specifics {
 			b := OSBatch{
@@ -934,6 +946,7 @@ func filterSupportedOS(batches []OSBatch, provisioner InstanceProvisioner) []OSB
 			filtered = append(filtered, batch)
 		}
 	}
+
 	return filtered
 }
 

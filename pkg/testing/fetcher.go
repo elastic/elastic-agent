@@ -30,17 +30,24 @@ var (
 // packageArchMap provides a mapping for the endings of the builds of Elastic Agent based on the
 // operating system and architecture.
 var packageArchMap = map[string]string{
-	"linux-amd64":   "linux-x86_64.tar.gz",
-	"linux-arm64":   "linux-arm64.tar.gz",
-	"windows-amd64": "windows-x86_64.zip",
-	"darwin-amd64":  "darwin-x86_64.tar.gz",
-	"darwin-arm64":  "darwin-aarch64.tar.gz",
+	"container-linux-amd64": "linux-amd64.docker.tar.gz",
+	"container-linux-arm64": "linux-arm64.docker.tar.gz",
+	"linux-amd64":           "linux-x86_64.tar.gz",
+	"linux-arm64":           "linux-arm64.tar.gz",
+	"windows-amd64":         "windows-x86_64.zip",
+	"darwin-amd64":          "darwin-x86_64.tar.gz",
+	"darwin-arm64":          "darwin-aarch64.tar.gz",
 }
 
 // GetPackageSuffix returns the suffix ending for the builds of Elastic Agent based on the
 // operating system and architecture.
-func GetPackageSuffix(operatingSystem string, architecture string) (string, error) {
-	suffix, ok := packageArchMap[fmt.Sprintf("%s-%s", operatingSystem, architecture)]
+func GetPackageSuffix(operatingSystem string, architecture string, container bool) (string, error) {
+	key := fmt.Sprintf("%s-%s", operatingSystem, architecture)
+	if container {
+		key = "container-" + key
+	}
+
+	suffix, ok := packageArchMap[key]
 	if !ok {
 		return "", fmt.Errorf("%w: %s/%s", ErrUnsupportedPlatform, operatingSystem, architecture)
 	}
