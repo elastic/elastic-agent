@@ -1,11 +1,12 @@
 #!/bin/bash
+
 # Downloads and merges coverage files from multiple steps into a single file (build/TEST-go-unit.cov).
 # Usage: merge.sh <step1> <step2> ... Where <step> is the id of the step that contains the coverage artifact.#  
 
 set -exuo pipefail
 
 COV_FILE="build/TEST-go-unit.cov"
-# Space 
+# Space separated list of paths to coverage files
 COV_PATHS=""
 
 go install github.com/wadey/gocovmerge@latest
