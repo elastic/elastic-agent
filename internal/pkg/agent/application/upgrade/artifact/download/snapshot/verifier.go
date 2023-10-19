@@ -24,12 +24,12 @@ func (v *Verifier) Name() string {
 
 // NewVerifier creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
-func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte, versionOverride *agtversion.ParsedSemVer) (download.Verifier, error) {
+func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte, versionOverride *agtversion.ParsedSemVer) (download.Verifier, error) {
 	cfg, err := snapshotConfig(config, versionOverride)
 	if err != nil {
 		return nil, err
 	}
-	v, err := http.NewVerifier(log, cfg, allowEmptyPgp, pgp)
+	v, err := http.NewVerifier(log, cfg, pgp)
 	if err != nil {
 		return nil, errors.New(err, "failed to create snapshot verifier")
 	}
