@@ -30,7 +30,6 @@ import (
 
 func TestMonitoringLogsShipped(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		OS:    []define.OS{{Type: define.Linux}},
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
