@@ -247,6 +247,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("failed to create install marker: %w", err)
 	}
 
+	progBar.Describe("Done")
 	_ = progBar.Finish()
 	_ = progBar.Exit()
 	fmt.Fprint(streams.Out, "\nElastic Agent has been successfully installed.\n")
