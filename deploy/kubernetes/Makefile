@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 ALL=elastic-agent-standalone elastic-agent-managed
 WORKSPACE=$(shell git rev-parse --show-toplevel)
 BEAT_VERSION=$(shell grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
