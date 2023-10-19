@@ -32,73 +32,73 @@ steps:
       manual:
         allowed: true
 
-  # - label: "Unit tests - Windows 2022"
-  #   key: "unit-tests-win2022"
-  #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-  #   artifact_paths:
-  #     - "build/TEST-**"
-  #     - "build/diagnostics/*"
-  #   agents:
-  #     provider: "gcp"
-  #     image: "family/core-windows-2022"
-  #     machine_type: "n2-standard-8"
-  #     disk_size: 200
-  #     disk_type: "pd-ssd"
-  #   retry:
-  #     manual:
-  #       allowed: true
+  - label: "Unit tests - Windows 2022"
+    key: "unit-tests-win2022"
+    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+    agents:
+      provider: "gcp"
+      image: "family/core-windows-2022"
+      machine_type: "n2-standard-8"
+      disk_size: 200
+      disk_type: "pd-ssd"
+    retry:
+      manual:
+        allowed: true
+
+  - label: "Unit tests - Windows 2016"
+    key: "unit-tests-win2016"
+    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+    agents:
+      provider: "gcp"
+      image: "family/core-windows-2016"
+      machine_type: "n2-standard-8"
+      disk_size: 200
+      disk_type: "pd-ssd"
+    retry:
+      manual:
+        allowed: true
+
   - label: "Merge coverage reports"
     key: "merge-coverage"
     env:
       BUILDKITE_REPO: "" # skip checkout
-    command: ".buildkite/scripts/steps/merge.sh"
+    command: "
+      .buildkite/scripts/steps/merge.sh
+      unit-tests-2204
+      unit-tests-2204-arm64
+      unit-tests-win2016
+      unit-tests-win2022
+      "
     artifact_paths:
       - "build/TEST-**"
     agents:
       image: "golang:1.20.10"
     depends_on:
-      - "unit-tests-2204"
-      - "unit-tests-2204-arm64"
-    # plugins:
-    #   - cultureamp/skip-checkout#v1.0.0: ~
+      - unit-tests-2204
+      - unit-tests-2204-arm64
+      - unit-tests-win2022
+      - unit-tests-win2016
+    allow_dependency_failure: true
 
-    # - "go install github.com/wadey/gocovmerge@latest"
-    # - "buildkite-agent artifact download --step unit-tests-2204 build/TEST-go-unit.cov coverage-unit-tests-2204.cov"
-    # - "buildkite-agent artifact download --step unit-tests-2204-arm64 build/TEST-go-unit.cov coverage-unit-tests-2204-arm64.cov ./"
-    # - "ls ./unit-tests-2204"
-    # - "gocovmerge coverage-unit-tests-2204.cov coverage-unit-tests-2204-arm64.cov > build/TEST-go-unit.cov"
-    # - "cat build/TEST-go-unit.cov"
-
-  # - label: "Unit tests - Windows 2016"
-  #   key: "unit-tests-win2016"
-  #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-  #   artifact_paths:
-  #     - "build/TEST-**"
-  #     - "build/diagnostics/*"
-  #   agents:
-  #     provider: "gcp"
-  #     image: "family/core-windows-2016"
-  #     machine_type: "n2-standard-8"
-  #     disk_size: 200
-  #     disk_type: "pd-ssd"
-  #   retry:
-  #     manual:
-  #       allowed: true
-
-  # - label: ":sonarqube: Continuous Code Inspection"
-  #   env:
-  #     VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
-  #   agents:
-  #     image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-  #   command:
-  #     - "buildkite-agent artifact download build/TEST-go-unit.cov ."
-  #     - "buildkite-agent artifact download build/TEST-go-unit.out.json ."
-  #     - "/scan-source-code.sh"
-  #   depends_on:
-  #     - "unit-tests"
-  #   retry:
-  #     manual:
-  #       allowed: true
+  - label: ":sonarqube: Continuous Code Inspection"
+    env:
+      VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
+    agents:
+      image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
+    command:
+      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
+      - "/scan-source-code.sh"
+    depends_on:
+      - "merge-coverage"
+    retry:
+      manual:
+        allowed: true
 
   # - label: "Integration tests"
   #   key: "integration-tests"
