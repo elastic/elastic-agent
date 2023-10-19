@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -43,13 +44,14 @@ const (
 
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
-	log    *logger.Logger
-	config *artifact.Config
-	client http.Client
+	log            *logger.Logger
+	config         *artifact.Config
+	client         http.Client
+	upgradeDetails *details.Details
 }
 
 // NewDownloader creates and configures Elastic Downloader
-func NewDownloader(log *logger.Logger, config *artifact.Config) (*Downloader, error) {
+func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details) (*Downloader, error) {
 	client, err := config.HTTPTransportSettings.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
@@ -59,15 +61,16 @@ func NewDownloader(log *logger.Logger, config *artifact.Config) (*Downloader, er
 	}
 
 	client.Transport = download.WithHeaders(client.Transport, download.Headers)
-	return NewDownloaderWithClient(log, config, *client), nil
+	return NewDownloaderWithClient(log, config, *client, upgradeDetails), nil
 }
 
 // NewDownloaderWithClient creates Elastic Downloader with specific client used
-func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client http.Client) *Downloader {
+func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client http.Client, upgradeDetails *details.Details) *Downloader {
 	return &Downloader{
-		log:    log,
-		config: config,
-		client: client,
+		log:            log,
+		config:         config,
+		client:         client,
+		upgradeDetails: upgradeDetails,
 	}
 }
 
@@ -206,7 +209,8 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	}
 
 	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
-	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver)
+	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
+	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver)
 	dp.Report(ctx)
 	_, err = io.Copy(destinationFile, io.TeeReader(resp.Body, dp))
 	if err != nil {

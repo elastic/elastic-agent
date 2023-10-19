@@ -17,6 +17,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -46,7 +47,8 @@ func TestVerify(t *testing.T) {
 			config.OperatingSystem = testCase.system
 			config.Architecture = testCase.arch
 
-			testClient := NewDownloaderWithClient(log, config, elasticClient)
+			upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
+			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
 			artifact, err := testClient.Download(context.Background(), beatSpec, version)
 			if err != nil {
 				t.Fatal(err)

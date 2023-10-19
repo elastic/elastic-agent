@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -32,13 +33,13 @@ type Downloader struct {
 // We need to pass the versionOverride separately from the config as
 // artifact.Config struct is part of agent configuration and a version
 // override makes no sense there
-func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer) (download.Downloader, error) {
+func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer, upgradeDetails *details.Details) (download.Downloader, error) {
 	cfg, err := snapshotConfig(config, versionOverride)
 	if err != nil {
 		return nil, fmt.Errorf("error creating snapshot config: %w", err)
 	}
 
-	httpDownloader, err := http.NewDownloader(log, cfg)
+	httpDownloader, err := http.NewDownloader(log, cfg, upgradeDetails)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create snapshot downloader: %w", err)
 	}
