@@ -29,7 +29,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -992,26 +991,4 @@ func emptyAST(t *testing.T) *transpiler.AST {
 	ast, err := transpiler.NewAST(nil)
 	require.NoError(t, err, "AST creation must succeed")
 	return ast
-}
-
-type fakeMonitoringServer struct {
-	startTriggered bool
-	stopTriggered  bool
-	isRunning      bool
-}
-
-func (fs *fakeMonitoringServer) Start() {
-	fs.startTriggered = true
-	fs.isRunning = true
-}
-
-func (fs *fakeMonitoringServer) Stop() error {
-	fs.stopTriggered = true
-	fs.isRunning = false
-	return nil
-}
-
-func (fs *fakeMonitoringServer) Reset() {
-	fs.stopTriggered = false
-	fs.startTriggered = false
 }
