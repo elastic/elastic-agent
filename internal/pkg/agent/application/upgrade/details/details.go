@@ -38,12 +38,12 @@ type Metadata struct {
 	// FailedState is the state an upgrade was in if/when it failed. Use the
 	// Fail() method of UpgradeDetails to correctly record details when
 	// an upgrade fails.
-	FailedState State `json:"failed_state"`
+	FailedState State `json:"failed_state,omitempty"`
 
 	// ErrorMsg is any error message encountered if/when an upgrade fails. Use
 	// the Fail() method of UpgradeDetails to correctly record details when
 	// an upgrade fails.
-	ErrorMsg string `json:"error_msg"`
+	ErrorMsg string `json:"error_msg,omitempty"`
 }
 
 func NewDetails(targetVersion string, initialState State, actionID string) *Details {
