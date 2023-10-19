@@ -1,9 +1,12 @@
 
 set -exuo pipefail
 
+$COV_FILE="build/TEST-go-unit.cov"
+
 go install github.com/wadey/gocovmerge@latest
-buildkite-agent artifact download --step unit-tests-2204 build/TEST-go-unit.cov coverage-unit-tests-2204.cov
-buildkite-agent artifact download --step unit-tests-2204-arm64 build/TEST-go-unit.cov coverage-unit-tests-2204-arm64.cov
-ls ./unit-tests-2204
-gocovmerge coverage-unit-tests-2204.cov coverage-unit-tests-2204-arm64.cov > build/TEST-go-unit.cov
+mkdir unit-tests-2204 && coverage-unit-tests-2204buildkite-agent artifact download --step unit-tests-2204 $COV_FILE unit-tests-2204
+mkdir unit-tests-2204-arm64 && buildkite-agent artifact download --step unit-tests-2204-arm64 $COV_FILE unit-tests-2204-arm64
+ls unit-tests-2204
+ls unit-tests-2204-arm64
+gocovmerge unit-tests-2204/$COV_FILE unit-tests-2204-arm64/$COV_FILE > build/TEST-go-unit.cov
 cat build/TEST-go-unit.cov
