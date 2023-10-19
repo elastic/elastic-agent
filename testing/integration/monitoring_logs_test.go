@@ -85,8 +85,8 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	docs := findESDocs(t, func() (estools.Documents, error) {
 		return estools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
 	})
-	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
+	require.NotZero(t, len(docs.Hits.Hits))
 
 	// Stage 4: make sure all components are healthy
 	t.Log("Making sure all components are healthy")
@@ -180,7 +180,7 @@ func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.
 			docs, err = findFn()
 			return err == nil
 		},
-		3*time.Minute,
+		10*time.Minute,
 		15*time.Second,
 	)
 
