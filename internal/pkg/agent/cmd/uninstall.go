@@ -80,7 +80,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
-	progBar := install.CreateAndStartNewSpinner(streams.Out)
+	progBar := install.CreateAndStartNewSpinner(streams.Out, "Uninstalling Elastic Agent...")
 
 	err = install.Uninstall(paths.ConfigFile(), paths.Top(), uninstallToken, progBar)
 	if err != nil {

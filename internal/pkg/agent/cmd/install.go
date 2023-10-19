@@ -173,7 +173,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
-	progBar := install.CreateAndStartNewSpinner(streams.Out)
+	progBar := install.CreateAndStartNewSpinner(streams.Out, "Installing Elastic Agent...")
 
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {

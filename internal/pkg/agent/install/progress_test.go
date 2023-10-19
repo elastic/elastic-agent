@@ -14,7 +14,7 @@ import (
 func TestProgressSpinner(t *testing.T) {
 	stringWriter := &bytes.Buffer{}
 
-	spinner := CreateAndStartNewSpinner(stringWriter)
+	spinner := CreateAndStartNewSpinner(stringWriter, "example")
 
 	spinner.Describe("test input")
 

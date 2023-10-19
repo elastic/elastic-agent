@@ -15,11 +15,12 @@ import (
 
 // CreateAndStartNewSpinner starts a new spinner that will update every 40ms.
 // when finished, it should be closed with Finish()
-func CreateAndStartNewSpinner(stream io.Writer) *progressbar.ProgressBar {
+func CreateAndStartNewSpinner(stream io.Writer, initialMessage string) *progressbar.ProgressBar {
 	progBar := progressbar.NewOptions(-1,
 		progressbar.OptionSetWriter(stream),
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionSpinnerType(51),
+		progressbar.OptionSetDescription(initialMessage),
 	)
 
 	// don't bother with the spinner refresh if we're not connected to stdout
