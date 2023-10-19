@@ -6,13 +6,17 @@ package details
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/docker/go-units"
 )
 
 // downloadRate is a float64 that can be safely marshalled to JSON
-// when the value is Infinity.
+// when the value is Infinity. The rate is always in bytes/second units.
 type downloadRate float64
 
 // Observer is a function that will be called with upgrade details
@@ -68,12 +72,12 @@ func (d *Details) SetState(s State) {
 
 // SetDownloadProgress is a convenience method to set the download percent
 // when the upgrade is in UPG_DOWNLOADING state.
-func (d *Details) SetDownloadProgress(percent, rate float64) {
+func (d *Details) SetDownloadProgress(percent, rateBytesPerSecond float64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	d.Metadata.DownloadPercent = percent
-	d.Metadata.DownloadRate = downloadRate(rate)
+	d.Metadata.DownloadRate = downloadRate(rateBytesPerSecond)
 	d.notifyObservers()
 }
 
@@ -128,16 +132,35 @@ func (d *Details) notifyObserver(observer Observer) {
 	}
 }
 
-func (dr downloadRate) MarshalJSON() ([]byte, error) {
-	// When the Agent artifact is downloaded really fast during an upgrade, the
-	// download rate gets set to +Inf. This value is set on the
-	// details.Metadata.DownloadRate field. Unfortunately, JSON does not support
-	// +/-Inf or NaN values; see https://www.rfc-editor.org/rfc/rfc8259. So we
-	// reset this field to a sentinel value of -1 before marshalling the object
-	// to JSON.
-	if math.IsInf(float64(dr), 0) {
-		return json.Marshal(-1.0)
+func (dr *downloadRate) MarshalJSON() ([]byte, error) {
+	downloadRateBytesPerSecond := float64(*dr)
+	if math.IsInf(downloadRateBytesPerSecond, 0) {
+		return json.Marshal("+Inf bps")
 	}
 
-	return json.Marshal(float64(dr))
+	return json.Marshal(
+		fmt.Sprintf("%sps", units.HumanSizeWithPrecision(downloadRateBytesPerSecond, 2)),
+	)
+}
+
+func (dr *downloadRate) UnmarshalJSON(data []byte) error {
+	var downloadRateStr string
+	err := json.Unmarshal(data, &downloadRateStr)
+	if err != nil {
+		return err
+	}
+
+	if downloadRateStr == "+Inf bps" {
+		*dr = downloadRate(math.Inf(1))
+		return nil
+	}
+
+	downloadRateStr = strings.TrimSuffix(downloadRateStr, "ps")
+	downloadRateBytesPerSecond, err := units.FromHumanSize(downloadRateStr)
+	if err != nil {
+		return err
+	}
+
+	*dr = downloadRate(downloadRateBytesPerSecond)
+	return nil
 }

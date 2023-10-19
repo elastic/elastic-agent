@@ -110,21 +110,21 @@ func newDetailsProgressObserver(upgradeDetails *details.Details) *detailsProgres
 	}
 }
 
-func (dpObs *detailsProgressObserver) Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64) {
+func (dpObs *detailsProgressObserver) Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRateBytesPerSecond float64) {
 	dpObs.mu.Lock()
 	defer dpObs.mu.Unlock()
 
-	dpObs.upgradeDetails.SetDownloadProgress(percentComplete, downloadRate)
+	dpObs.upgradeDetails.SetDownloadProgress(percentComplete, downloadRateBytesPerSecond)
 }
 
-func (dpObs *detailsProgressObserver) ReportCompleted(sourceURI string, timePast time.Duration, downloadRate float64) {
+func (dpObs *detailsProgressObserver) ReportCompleted(sourceURI string, timePast time.Duration, downloadRateBytesPerSecond float64) {
 	dpObs.mu.Lock()
 	defer dpObs.mu.Unlock()
 
-	dpObs.upgradeDetails.SetDownloadProgress(1, downloadRate)
+	dpObs.upgradeDetails.SetDownloadProgress(1, downloadRateBytesPerSecond)
 }
 
-func (dpObs *detailsProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64, err error) {
+func (dpObs *detailsProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRateBytesPerSecond float64, err error) {
 	dpObs.mu.Lock()
 	defer dpObs.mu.Unlock()
 
