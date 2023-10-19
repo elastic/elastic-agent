@@ -32,7 +32,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
@@ -249,15 +248,12 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	}
 	defer composable.Close()
 
-	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
+	serverStopFn, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
 		return err
 	}
-	coord.RegisterMonitoringServer(monitoringServer)
 	defer func() {
-		if monitoringServer != nil {
-			_ = monitoringServer.Stop()
-		}
+		_ = serverStopFn()
 	}()
 
 	diagHooks := diagnostics.GlobalHooks()
@@ -551,7 +547,7 @@ func setupMetrics(
 	cfg *monitoringCfg.MonitoringConfig,
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
-) (*reload.ServerReloader, error) {
+) (func() error, error) {
 	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
 		return nil, err
 	}
@@ -562,12 +558,14 @@ func setupMetrics(
 		Host:    monitoring.AgentMonitoringEndpoint(operatingSystem, cfg),
 	}
 
-	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg), operatingSystem, cfg)
+	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg), operatingSystem)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}
+	s.Start()
 
-	return s, nil
+	// return server stopper
+	return s.Stop, nil
 }
 
 func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {

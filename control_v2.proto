@@ -166,6 +166,8 @@ message StateAgentInfo {
   string buildTime = 4;
   // Current running version is a snapshot.
   bool snapshot = 5;
+  // Current running PID.
+  int32 pid = 6;
 }
 
 // StateResponse is the current state of Elastic Agent.
@@ -214,7 +216,7 @@ enum AdditionalDiagnosticRequest {
   CPU = 0;
 }
 
-// DiagnosticComponentsRequest is the message to request diagnostics from individual components. 
+// DiagnosticComponentsRequest is the message to request diagnostics from individual components.
 message DiagnosticComponentsRequest {
   repeated DiagnosticComponentRequest components  = 1;
   repeated AdditionalDiagnosticRequest additional_metrics = 2;
