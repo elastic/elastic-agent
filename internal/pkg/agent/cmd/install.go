@@ -249,6 +249,6 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	_ = progBar.Finish()
 	_ = progBar.Exit()
-	fmt.Fprint(streams.Out, "Elastic Agent has been successfully installed.\n")
+	fmt.Fprint(streams.Out, "\nElastic Agent has been successfully installed.\n")
 	return nil
 }
