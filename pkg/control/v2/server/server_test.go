@@ -7,6 +7,8 @@ package server
 import (
 	"testing"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -61,7 +63,7 @@ func TestStateMapping(t *testing.T) {
 				TargetVersion: "8.13.0",
 				State:         details.StateDownloading,
 				ActionID:      "",
-				Metadata: details.DetailsMetadata{
+				Metadata: details.Metadata{
 					DownloadPercent: 1.7,
 				},
 			},
@@ -162,7 +164,7 @@ func TestStateMapping(t *testing.T) {
 
 			if tc.upgradeDetails != nil {
 				expectedMetadata := &cproto.UpgradeDetailsMetadata{
-					ScheduledAt:     tc.upgradeDetails.Metadata.ScheduledAt,
+					ScheduledAt:     timestamppb.New(tc.upgradeDetails.Metadata.ScheduledAt),
 					DownloadPercent: float32(tc.upgradeDetails.Metadata.DownloadPercent),
 					FailedState:     string(tc.upgradeDetails.Metadata.FailedState),
 					ErrorMsg:        tc.upgradeDetails.Metadata.ErrorMsg,

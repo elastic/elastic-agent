@@ -213,7 +213,7 @@ message UpgradeDetails {
 message UpgradeDetailsMetadata {
   // If the upgrade is a scheduled upgrade, the timestamp of when the
   // upgrade is expected to start.
-  string scheduled_at = 1;
+  google.protobuf.Timestamp scheduled_at = 1;
 
   // If the upgrade is in the UPG_DOWNLOADING state, the percentage of
   // the Elastic Agent artifact that has already been downloaded, to
