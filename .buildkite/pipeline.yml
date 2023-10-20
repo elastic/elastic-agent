@@ -10,6 +10,7 @@ steps:
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
+      - "coverage.out"
     agents:
       provider: "gcp"
       image: "family/core-ubuntu-2204"
@@ -23,6 +24,7 @@ steps:
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
+      - "coverage.out"
     agents:
       provider: "aws"
       imagePrefix: "core-ubuntu-2204-aarch64"
@@ -38,6 +40,7 @@ steps:
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
+      - "coverage.out"
     agents:
       provider: "gcp"
       image: "family/core-windows-2022"
@@ -54,6 +57,7 @@ steps:
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
+      - "coverage.out"
     agents:
       provider: "gcp"
       image: "family/core-windows-2016"
