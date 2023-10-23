@@ -38,6 +38,7 @@ var (
 type executeServiceCommandFunc func(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error
 
 // serviceRuntime provides the command runtime for running a component as a service.
+// an instance of serviceRuntime is not reused: after being stopped, it cannot be started again.
 type serviceRuntime struct {
 	comp component.Component
 	log  *logger.Logger
@@ -124,6 +125,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		lastCheckin    time.Time
 		missedCheckins int
 		tearingDown    bool
+		// flag that signals if we are already stopping
 		stopping       bool
 		ignoreCheckins bool
 	)
@@ -141,6 +143,8 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			s.log.Debugf("service %s is already stopping: skipping...", s.name())
 			return
 		}
+		// the flag is set once and never reset since the serviceRuntime object
+		// is not supposed to be reused once it's stopping
 		stopping = true
 		// Stop check-in timer
 		s.log.Debugf("stop check-in timer for %s service", s.name())
