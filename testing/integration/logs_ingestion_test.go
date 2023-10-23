@@ -7,12 +7,19 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"net/http"
+	"net/http/httputil"
 	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -26,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 )
 
 func TestLogIngestionFleetManaged(t *testing.T) {
@@ -207,6 +215,208 @@ func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.
 	t.Log("--- debugging: results from ES --- END ---")
 
 	return docs
+}
+
+func testFlattenedDatastreamFleetPolicy(
+	t *testing.T,
+	ctx context.Context,
+	info *define.Info,
+	agentFixture *atesting.Fixture,
+	policy kibana.PolicyResponse,
+) {
+	dsType := "logs"
+	dsNamespace := cleanString(fmt.Sprintf("%snamespace%d", t.Name(), rand.Uint64()))
+	dsDataset := cleanString(fmt.Sprintf("%s-dataset", t.Name()))
+	numEvents := 60
+
+	tempDir := t.TempDir()
+	logFilePath := filepath.Join(tempDir, "log.log")
+	generateLogFile(t, logFilePath, 2*time.Millisecond, numEvents)
+
+	agentFixture, err := define.NewFixture(t, define.Version())
+	if err != nil {
+		t.Fatalf("could not create new fixture: %s", err)
+	}
+
+	// 1. Prepare a request to add an integration to the policy
+	tmpl, err := template.New(t.Name() + "custom-log-policy").Parse(policyJSON)
+	if err != nil {
+		t.Fatalf("cannot parse template: %s", err)
+	}
+
+	// The time here ensures there are no conflicts with the integration name
+	// in Fleet.
+	agentPolicyBuilder := strings.Builder{}
+	err = tmpl.Execute(&agentPolicyBuilder, plolicyVars{
+		Name:        "Log-Input-" + t.Name() + "-" + time.Now().Format(time.RFC3339),
+		PolicyID:    policy.ID,
+		LogFilePath: logFilePath,
+		Namespace:   dsNamespace,
+		Dataset:     dsDataset,
+	})
+	if err != nil {
+		t.Fatalf("could not render template: %s", err)
+	}
+	// We keep a copy of the policy for debugging prurposes
+	agentPolicy := agentPolicyBuilder.String()
+
+	// 2. Call Kibana to create the policy.
+	// Docs: https://www.elastic.co/guide/en/fleet/current/fleet-api-docs.html#create-integration-policy-api
+	resp, err := info.KibanaClient.Connection.Send(
+		http.MethodPost,
+		"/api/fleet/package_policies",
+		nil,
+		nil,
+		bytes.NewBufferString(agentPolicy))
+	if err != nil {
+		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		// On error dump the whole request response so we can easily spot
+		// what went wrong.
+		t.Errorf("received a non 200-OK when adding package to policy. "+
+			"Status code: %d", resp.StatusCode)
+		respDump, err := httputil.DumpResponse(resp, true)
+		if err != nil {
+			t.Fatalf("could not dump error response from Kibana: %s", err)
+		}
+		// Make debugging as easy as possible
+		t.Log("================================================================================")
+		t.Log("Kibana error response:")
+		t.Log(string(respDump))
+		t.Log("================================================================================")
+		t.Log("Rendered policy:")
+		t.Log(agentPolicy)
+		t.Log("================================================================================")
+		t.FailNow()
+	}
+
+	require.Eventually(
+		t,
+		ensureDocumentsInES(t, ctx, info.ESClient, dsType, dsDataset, dsNamespace, numEvents),
+		120*time.Second,
+		time.Second,
+		"could not get all expected documents form ES")
+}
+
+// ensureDocumentsInES asserts the documents were ingested into the correct
+// datastream
+func ensureDocumentsInES(
+	t *testing.T,
+	ctx context.Context,
+	esClient elastictransport.Interface,
+	dsType, dsDataset, dsNamespace string,
+	numEvents int,
+) func() bool {
+
+	f := func() bool {
+		t.Helper()
+
+		docs, err := estools.GetLogsForDatastream(ctx, esClient, dsType, dsDataset, dsNamespace)
+		if err != nil {
+			t.Logf("error quering ES, will retry later: %s", err)
+		}
+
+		if docs.Hits.Total.Value == numEvents {
+			return true
+		}
+
+		return false
+
+	}
+
+	return f
+}
+
+// generateLogFile generates a log file by appending new lines every tick
+// the lines are composed by the test name and the current time in RFC3339Nano
+// This function spans a new goroutine and does not block
+func generateLogFile(t *testing.T, fullPath string, tick time.Duration, events int) {
+	t.Helper()
+	f, err := os.Create(fullPath)
+	if err != nil {
+		t.Fatalf("could not create file '%s: %s", fullPath, err)
+	}
+
+	go func() {
+		t.Helper()
+		ticker := time.NewTicker(tick)
+		t.Cleanup(ticker.Stop)
+
+		done := make(chan struct{})
+		t.Cleanup(func() { close(done) })
+
+		defer func() {
+			if err := f.Close(); err != nil {
+				t.Errorf("could not close log file '%s': %s", fullPath, err)
+			}
+		}()
+
+		i := 0
+		for {
+			select {
+			case <-done:
+				return
+			case now := <-ticker.C:
+				i++
+				_, err := fmt.Fprintln(f, t.Name(), "Iteration: ", i, now.Format(time.RFC3339Nano))
+				if err != nil {
+					// The Go compiler does not allow me to call t.Fatalf from a non-test
+					// goroutine, t.Errorf is our only option
+					t.Errorf("could not write data to log file '%s': %s", fullPath, err)
+					return
+				}
+				// make sure log lines are synced as quickly as possible
+				if err := f.Sync(); err != nil {
+					t.Errorf("could not sync file '%s': %s", fullPath, err)
+				}
+				if i == events {
+					return
+				}
+			}
+		}
+	}()
+}
+
+func cleanString(s string) string {
+	return nonAlphanumericRegex.ReplaceAllString(strings.ToLower(s), "")
+}
+
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
+
+var policyJSON = `
+{
+  "policy_id": "{{.PolicyID}}",
+  "package": {
+    "name": "log",
+    "version": "2.3.0"
+  },
+  "name": "{{.Name}}",
+  "namespace": "{{.Namespace}}",
+  "inputs": {
+    "logs-logfile": {
+      "enabled": true,
+      "streams": {
+        "log.logs": {
+          "enabled": true,
+          "vars": {
+            "paths": [
+              "{{.LogFilePath}}"
+            ],
+            "data_stream.dataset": "{{.Dataset}}"
+          }
+        }
+      }
+    }
+  }
+}`
+
+type plolicyVars struct {
+	Name        string
+	PolicyID    string
+	LogFilePath string
+	Namespace   string
+	Dataset     string
 }
 
 type ESDocument struct {
