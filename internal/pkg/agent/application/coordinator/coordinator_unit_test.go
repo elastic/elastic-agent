@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -943,6 +944,9 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	// since a successful upgrade sets the override state twice.
 	overrideStateChan := make(chan *coordinatorOverrideState, 2)
 
+	// similarly, upgradeDetailsChan is a buffered channel as well.
+	upgradeDetailsChan := make(chan *details.Details, 2)
+
 	// Create a manager that will allow upgrade attempts but return a failure
 	// from Upgrade itself (success requires testing ReExec and we aren't
 	// quite ready to do that yet).
@@ -952,9 +956,11 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	}
 
 	coord := &Coordinator{
-		stateBroadcaster:  broadcaster.New(State{}, 0, 0),
-		overrideStateChan: overrideStateChan,
-		upgradeMgr:        upgradeMgr,
+		stateBroadcaster:   broadcaster.New(State{}, 0, 0),
+		overrideStateChan:  overrideStateChan,
+		upgradeDetailsChan: upgradeDetailsChan,
+		upgradeMgr:         upgradeMgr,
+		logger:             logp.NewLogger("testing"),
 	}
 
 	// Call upgrade and make sure the upgrade manager receives an Upgrade call

@@ -39,7 +39,7 @@ func NewServer(
 ) (*reload.ServerReloader, error) {
 	if err := createAgentMonitoringDrop(endpointConfig.Host); err != nil {
 		// log but ignore
-		log.Errorf("failed to create monitoring drop: %v", err)
+		log.Warnf("failed to create monitoring drop: %v", err)
 	}
 
 	cfg, err := config.NewConfigFrom(endpointConfig)
