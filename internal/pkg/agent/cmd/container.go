@@ -318,6 +318,10 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 		err = enroll.Wait()
 		if err != nil {
+			if errors.Is(err, &ErrDaemonReload{}) {
+				// there is no daemon to be reloaded on a container.
+				return nil
+			}
 			return errors.New("enrollment failed", err)
 		}
 	}

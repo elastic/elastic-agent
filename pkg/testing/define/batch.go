@@ -18,6 +18,14 @@ import (
 // defaultOS is the set of OS that are used in the case that a requirement doesn't define any
 var defaultOS = []OS{
 	{
+		Type: Container,
+		Arch: AMD64,
+	},
+	{
+		Type: Container,
+		Arch: ARM64,
+	},
+	{
 		Type: Darwin,
 		Arch: AMD64,
 	},

@@ -42,19 +42,26 @@ func (p *provisioner) SetLogger(l runner.Logger) {
 //
 // multipass only supports Ubuntu on the same architecture as the running host.
 func (p *provisioner) Supported(os define.OS) bool {
-	if os.Type != define.Linux {
+	// multipass only supports the same architecture of the host
+	if os.Arch != runtime.GOARCH {
+		return false
+	}
+
+	if os.Type != define.Linux && os.Type != define.Container {
 		return false
 	}
 	if os.Distro != Ubuntu {
 		return false
 	}
-	if os.Version != "20.04" && os.Version != "22.04" {
+
+	if os.Type == define.Linux &&
+		(os.Version != "20.04" && os.Version != "22.04") {
 		return false
 	}
-	// multipass only supports the same architecture of the host
-	if os.Arch != runtime.GOARCH {
+	if os.Type == define.Container && os.Version != "20.04" {
 		return false
 	}
+
 	return true
 }
 
@@ -146,8 +153,13 @@ func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runne
 	}
 
 	var output bytes.Buffer
-	p.logger.Logf("Launching multipass image %s", batch.ID)
-	proc, err := process.Start("multipass", process.WithContext(ctx), process.WithArgs(args), process.WithCmdOptions(runner.AttachOut(&output), runner.AttachErr(&output)))
+	p.logger.Logf("Launching multipass instance %s: 'multipass %s'",
+		batch.ID, args)
+	proc, err := process.Start(
+		"multipass",
+		process.WithContext(ctx),
+		process.WithArgs(args),
+		process.WithCmdOptions(runner.AttachOut(&output), runner.AttachErr(&output)))
 	if err != nil {
 		return fmt.Errorf("failed to run multipass launch: %w", err)
 	}

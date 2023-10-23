@@ -38,12 +38,13 @@ func (DebianRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Log
 				return fmt.Errorf("failed to run apt-get update: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 			}
 			return func() error {
-				// golang is installed below and not using the package manager, ensures that the exact version
-				// of golang is used for the running of the test
+				// Go is installed below and not using the package manager, ensures that the exact version
+				// of Go is used for the running of the test
 				installCtx, installCancel := context.WithTimeout(ctx, 1*time.Minute)
 				defer installCancel()
-				logger.Logf("Install build-essential and unzip")
-				stdOut, errOut, err = sshClient.ExecWithRetry(installCtx, "sudo", []string{"apt-get", "install", "-y", "build-essential", "unzip"}, 5*time.Second)
+				pkgs := []string{"build-essential", "docker.io", "unzip"}
+				logger.Logf("Install %s", pkgs)
+				stdOut, errOut, err = sshClient.ExecWithRetry(installCtx, "sudo", append([]string{"apt-get", "install", "-y"}, pkgs...), 5*time.Second)
 				if err != nil {
 					return fmt.Errorf("failed to install build-essential and unzip: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 				}
@@ -62,8 +63,8 @@ func (DebianRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Log
 		return err
 	}
 
-	// prepare golang
-	logger.Logf("Install golang %s (%s)", goVersion, arch)
+	// prepare Go
+	logger.Logf("Install Go %s (%s)", goVersion, arch)
 	downloadURL := fmt.Sprintf("https://go.dev/dl/go%s.linux-%s.tar.gz", goVersion, arch)
 	filename := path.Base(downloadURL)
 	stdOut, errOut, err := sshClient.Exec(ctx, "curl", []string{"-Ls", downloadURL, "--output", filename}, nil)

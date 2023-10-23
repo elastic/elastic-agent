@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/jaypipes/ghw"
-
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 

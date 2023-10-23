@@ -125,7 +125,7 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 
 	assert.Eventually(
 		t,
-		check.FleetAgentStatus(t, kibClient, policyID, "online"),
+		check.FleetAgentStatus(t, kibClient, policyID, check.FleetStatusOnline),
 		timeout,
 		10*time.Second,
 		"Elastic Agent status is not online",
@@ -133,7 +133,7 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 	// Wait for Agent to be healthy
 	assert.Eventually(
 		t,
-		check.FleetAgentStatus(t, kibClient, policyID, "online"),
+		check.FleetAgentStatus(t, kibClient, policyID, check.FleetStatusOnline),
 		timeout,
 		10*time.Second,
 		"Elastic Agent status is not online",

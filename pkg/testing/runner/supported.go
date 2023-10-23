@@ -30,6 +30,26 @@ type SupportedOS struct {
 }
 
 var (
+	// ContainerUbuntuAMD64_2004 - Ubuntu (amd64) 22.04
+	ContainerUbuntuAMD64_2004 = SupportedOS{
+		OS: define.OS{
+			Type:    define.Container,
+			Arch:    define.AMD64,
+			Distro:  Ubuntu,
+			Version: "20.04",
+		},
+		Runner: DebianRunner{},
+	}
+	// ContainerUbuntuARM64_2004 - Ubuntu (amd64) 20.04
+	ContainerUbuntuARM64_2004 = SupportedOS{
+		OS: define.OS{
+			Type:    define.Container,
+			Arch:    define.ARM64,
+			Distro:  Ubuntu,
+			Version: "20.04",
+		},
+		Runner: DebianRunner{},
+	}
 	// UbuntuAMD64_2204 - Ubuntu (amd64) 22.04
 	UbuntuAMD64_2204 = SupportedOS{
 		OS: define.OS{
@@ -135,6 +155,8 @@ var (
 // one in this list will be picked. So it's best to place the one that we want the
 // most testing at the top.
 var supported = []SupportedOS{
+	ContainerUbuntuAMD64_2004,
+	ContainerUbuntuARM64_2004,
 	UbuntuAMD64_2204,
 	UbuntuAMD64_2004,
 	UbuntuARM64_2204,

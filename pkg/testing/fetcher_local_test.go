@@ -30,7 +30,7 @@ func TestLocalFetcher(t *testing.T) {
 	noSnapshotContentHash := []byte("not snapshot contents hash")
 
 	testdata := t.TempDir()
-	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH)
+	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH, false)
 	require.NoError(t, err)
 
 	snapshotPath := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s", baseVersion, suffix)

@@ -8,6 +8,7 @@ package install
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -18,19 +19,26 @@ func fixPermissions(topPath string) error {
 	return recursiveRootPermissions(topPath)
 }
 
-func recursiveRootPermissions(path string) error {
-	return filepath.Walk(path, func(name string, info fs.FileInfo, err error) error {
-		if err == nil {
-			// all files should be owned by root:root
-			err = os.Chown(name, 0, 0)
-			if err != nil {
-				return err
-			}
-			// remove any world permissions from the file
-			err = os.Chmod(name, info.Mode().Perm()&0770)
-		} else if errors.Is(err, fs.ErrNotExist) {
+func recursiveRootPermissions(root string) error {
+	return filepath.Walk(root, func(path string, info fs.FileInfo, err error) error {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
-		return err
+		if err != nil {
+			return fmt.Errorf("walk on %q failed: %w", path, err)
+		}
+
+		// all files should be owned by root:root
+		err = os.Chown(path, 0, 0)
+		if err != nil {
+			return fmt.Errorf("could not fix ownership of %q: %w", path, err)
+		}
+		// remove any world permissions from the file
+		err = os.Chmod(path, info.Mode().Perm()&0770)
+		if err != nil {
+			return fmt.Errorf("could not fix permissions of %q: %w", path, err)
+		}
+
+		return nil
 	})
 }

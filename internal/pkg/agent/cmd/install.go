@@ -154,7 +154,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 				return fmt.Errorf("problem reading prompt response")
 			}
 			if url == "" {
-				fmt.Fprintf(streams.Out, "Enrollment cancelled because no URL was provided.\n")
+				fmt.Fprintln(streams.Out, "Enrollment cancelled because no URL was provided.")
 				return nil
 			}
 		}
@@ -224,6 +224,8 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 				}
 			}()
 		}
+
+		fmt.Fprintln(streams.Out, "Elastic Agent successfully installed, starting enrollment.")
 	}
 
 	if enroll {
