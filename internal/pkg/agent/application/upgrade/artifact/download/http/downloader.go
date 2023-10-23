@@ -21,7 +21,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/atomic"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"

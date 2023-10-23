@@ -49,9 +49,9 @@ func init() {
 	pgpBytes = packer.MustUnpack("{{ .Pack }}")["GPG-KEY-elasticsearch"]
 }
 
-// PGP return pgpbytes and a flag describing whether or not no pgp is valid.
-func PGP() (bool, []byte) {
-	return allowEmptyPgp == "true", pgpBytes
+// PGP return pgpbytes.
+func PGP() []byte {
+	return pgpBytes
 }
 `))
 

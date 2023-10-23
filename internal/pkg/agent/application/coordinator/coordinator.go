@@ -108,7 +108,7 @@ type RuntimeManager interface {
 	// it performs diagnostics for all current units.
 	PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
 
-	//PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
+	// PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
 	// then it performs the diagnostics for all current units.
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
@@ -415,7 +415,7 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 // Upgrade runs the upgrade process.
 // Called from external goroutines.
 func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) error {
-	// early check outside of upgrader before overridding the state
+	// early check outside of upgrader before overriding the state
 	if !c.upgradeMgr.Upgradeable() {
 		return ErrNotUpgradable
 	}

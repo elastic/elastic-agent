@@ -6,6 +6,7 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/assert"
@@ -24,6 +26,48 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 )
+
+func TestDownload(t *testing.T) {
+	targetDir, err := ioutil.TempDir(os.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log, _ := logger.New("", false)
+	timeout := 30 * time.Second
+	testCases := getTestCases()
+	server, _ := getElasticCoServer(t)
+	elasticClient := getElasticCoClient(server)
+
+	config := &artifact.Config{
+		SourceURI:       source,
+		TargetDirectory: targetDir,
+		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+			Timeout: timeout,
+		},
+	}
+
+	for _, testCase := range testCases {
+		testName := fmt.Sprintf("%s-binary-%s", testCase.system, testCase.arch)
+		t.Run(testName, func(t *testing.T) {
+			config.OperatingSystem = testCase.system
+			config.Architecture = testCase.arch
+
+			testClient := NewDownloaderWithClient(log, config, elasticClient)
+			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = os.Stat(artifactPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			os.Remove(artifactPath)
+		})
+	}
+}
 
 func TestDownloadBodyError(t *testing.T) {
 	// This tests the scenario where the download encounters a network error

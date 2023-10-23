@@ -6,10 +6,16 @@ package download
 
 import (
 	"bytes"
+	"crypto/sha512"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -116,6 +122,85 @@ func TestPgpBytesFromSource(t *testing.T) {
 
 		})
 	}
+}
+
+func TestVerifySHA512HashWithCleanup_success(t *testing.T) {
+	data := "I’m the Doctor. I’m a Time Lord. I’m from the planet " +
+		"Gallifrey in the constellation of Kasterborous. I’m 903 years old and " +
+		"I’m the man who’s going to save your lives and all 6 billion people on " +
+		"the planet below. You got a problem with that?"
+	dir := t.TempDir()
+	filename := "file"
+	path := filepath.Join(dir, filename)
+
+	f, err := os.Create(path)
+	require.NoError(t, err, "could not create file")
+	fsha512, err := os.Create(path + ".sha512")
+	require.NoError(t, err, "could not create .sha512 file")
+
+	_, err = fmt.Fprint(f, data)
+	require.NoError(t, err, "could not write to file")
+	hash := sha512.Sum512([]byte(data))
+	_, err = fmt.Fprintf(fsha512, "%s %s", hex.EncodeToString(hash[:]), filename)
+	require.NoError(t, err, "could not write to file")
+
+	err = f.Close()
+	require.NoError(t, err, "could not close file")
+	err = fsha512.Close()
+	require.NoError(t, err, "could not close .sha512 file")
+
+	err = VerifySHA512HashWithCleanup(testlogger{t: t}, path)
+	assert.NoErrorf(t, err, "failed verifying sha512")
+}
+
+func TestVerifySHA512HashWithCleanup_failure(t *testing.T) {
+	data := "I’m the Doctor. I’m a Time Lord. I’m from the planet " +
+		"Gallifrey in the constellation of Kasterborous. I’m 903 years old and " +
+		"I’m the man who’s going to save your lives and all 6 billion people on " +
+		"the planet below. You got a problem with that?"
+	dir := t.TempDir()
+	filename := "file"
+	path := filepath.Join(dir, filename)
+
+	f, err := os.Create(path)
+	require.NoError(t, err, "could not create file")
+	fsha512, err := os.Create(path + ".sha512")
+	require.NoError(t, err, "could not create .sha512 file")
+
+	_, err = fmt.Fprint(f, data)
+	require.NoError(t, err, "could not write to file")
+	_, err = fmt.Fprintf(fsha512, "%s %s", "wrong-sha512", filename)
+	require.NoError(t, err, "could not write to file")
+
+	err = f.Close()
+	require.NoError(t, err, "could not close file")
+	err = fsha512.Close()
+	require.NoError(t, err, "could not close .sha512 file")
+
+	err = VerifySHA512HashWithCleanup(testlogger{t: t}, path)
+	assert.Errorf(t, err, "checksum verification should have failed")
+
+	dirEntries, err := os.ReadDir(dir)
+	require.NoError(t, err, "could not read %q to check it's empty", dir)
+	if len(dirEntries) != 0 {
+		var files []string
+		for _, e := range dirEntries {
+			files = append(files, e.Name())
+		}
+
+		t.Errorf("there should be no files on %q. Found %v", dir, files)
+	}
+}
+
+type testlogger struct {
+	t *testing.T
+}
+
+func (l testlogger) Infof(format string, args ...interface{}) {
+	l.t.Logf("[INFO] "+format, args)
+}
+func (l testlogger) Warnf(format string, args ...interface{}) {
+	l.t.Logf("[WARN] "+format, args)
 }
 
 type MockClient struct {
