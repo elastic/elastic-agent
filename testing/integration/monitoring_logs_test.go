@@ -38,7 +38,6 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	ctx := context.Background()
 
 	t.Logf("got namespace: %s", info.Namespace)
-	t.Skip("Test is flaky; see https://github.com/elastic/elastic-agent/issues/3081")
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
@@ -90,7 +89,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
 
-	// Stage 4: make sure all components are health
+	// Stage 4: make sure all components are healthy
 	t.Log("Making sure all components are healthy")
 	status, err := agentFixture.ExecStatus(ctx)
 	require.NoError(t, err,
@@ -101,7 +100,26 @@ func TestMonitoringLogsShipped(t *testing.T) {
 			c.Name, client.Healthy, client.State(c.State))
 	}
 
-	// Stage 5: Make sure we have message confirming central management is running
+	// Stage 5: Make sure there are no errors in logs
+	t.Log("Making sure there are no error logs")
+	docs = findESDocs(t, func() (estools.Documents, error) {
+		return estools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{
+			// acceptable error messages (include reason)
+			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused", // beat is running default config before its config gets updated
+			"Global configuration artifact is not available",                     // Endpoint: failed to load user artifact due to connectivity issues
+			"Failed to download artifact",
+			"Failed to initialize artifact",
+			"Failed to apply initial policy from on disk configuration",
+			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
+		})
+	})
+	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
+	for _, doc := range docs.Hits.Hits {
+		t.Logf("%#v", doc.Source)
+	}
+	require.Empty(t, docs.Hits.Hits)
+
+	// Stage 6: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
 	docs = findESDocs(t, func() (estools.Documents, error) {
 		return estools.FindMatchingLogLines(info.ESClient, info.Namespace,
@@ -109,7 +127,7 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
-	// Stage 6: verify logs from the monitoring components are not sent to the output
+	// Stage 7: verify logs from the monitoring components are not sent to the output
 	t.Log("Check monitoring logs")
 	hostname, err := os.Hostname()
 	if err != nil {
