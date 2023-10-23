@@ -187,6 +187,10 @@ func (s *componentRuntimeState) start() error {
 }
 
 func (s *componentRuntimeState) stop(teardown bool, signed *component.Signed) error {
+	if s.shuttingDown.Load() {
+		// already stopping
+		return nil
+	}
 	s.shuttingDown.Store(true)
 	if teardown {
 		return s.runtime.Teardown(signed)
