@@ -56,15 +56,9 @@ require (
 	golang.org/x/crypto v0.11.0
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
-<<<<<<< HEAD
-	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.9.0
-	golang.org/x/text v0.9.0
-=======
 	golang.org/x/sync v0.3.0
 	golang.org/x/sys v0.10.0
 	golang.org/x/text v0.11.0
->>>>>>> 3c9380f66b (Update go grpc version to 1.58.3 (#3635))
 	golang.org/x/time v0.3.0
 	golang.org/x/tools v0.7.0
 	google.golang.org/grpc v1.58.3
