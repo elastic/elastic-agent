@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-
 	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
@@ -39,10 +38,16 @@ var (
 	ErrUnknownPGPSource        = errors.New("unknown pgp source")
 )
 
-// warnLogger is a logger that only needs to implement Warnf, as that is the only functions
-// that the downloadProgressReporter uses.
+// warnLogger is a logger that only needs to implement Warnf.
 type warnLogger interface {
 	Warnf(format string, args ...interface{})
+}
+
+// loggerInfofWarnf is a logger that only needs to implement Infof and Warnf.
+type infoWarnLogger interface {
+	warnLogger
+
+	Infof(format string, args ...interface{})
 }
 
 // ChecksumMismatchError indicates the expected checksum for a file does not
@@ -70,16 +75,38 @@ func (e *InvalidSignatureError) Error() string {
 // Unwrap returns the cause.
 func (e *InvalidSignatureError) Unwrap() error { return e.Err }
 
-// Verifier is an interface verifying the SHA512 checksum and GPG signature and
+// Verifier is an interface verifying the SHA512 checksum and PGP signature and
 // of a downloaded artifact.
 type Verifier interface {
 	Name() string
-	// Verify should verify the artifact and return if succeed status (true|false) and an error if any checks fail.
-	// If the checksum does no match Verify returns a
-	// *download.ChecksumMismatchError. And if the GPG signature is invalid then
-	// Verify returns a *download.InvalidSignatureError. Use errors.As() to
-	// check error types.
+	// Verify should verify the artifact, returning an error if any checks fail.
+	// If the checksum does no match Verify returns a *download.ChecksumMismatchError.
+	// If the PGP signature check fails then Verify returns a
+	// *download.InvalidSignatureError.
 	Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error
+}
+
+// VerifySHA512HashWithCleanup calls VerifySHA512Hash and, in case of a
+// *ChecksumMismatchError, performs a cleanup by deleting both the filename and
+// filename.sha512 files. If the cleanup fails, it logs a warning.
+func VerifySHA512HashWithCleanup(log infoWarnLogger, filename string) error {
+	if err := VerifySHA512Hash(filename); err != nil {
+		var checksumMismatchErr *ChecksumMismatchError
+		if errors.As(err, &checksumMismatchErr) {
+			if err := os.Remove(filename); err != nil {
+				log.Warnf("failed clean up after sha512 verification: failed to remove %q: %v",
+					filename, err)
+			}
+			if err := os.Remove(filename + ".sha512"); err != nil {
+				log.Warnf("failed clean up after sha512 check: failed to remove %q: %v",
+					filename+".sha512", err)
+			}
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 // VerifySHA512Hash checks that a sidecar file containing a sha512 checksum
@@ -89,7 +116,7 @@ func VerifySHA512Hash(filename string) error {
 	// Read expected checksum.
 	expectedHash, err := readChecksumFile(filename+".sha512", filepath.Base(filename))
 	if err != nil {
-		return err
+		return fmt.Errorf("could not read checksum file: %w", err)
 	}
 
 	// Compute sha512 checksum.
@@ -101,10 +128,10 @@ func VerifySHA512Hash(filename string) error {
 
 	hash := sha512.New()
 	if _, err := io.Copy(hash, f); err != nil {
-		return err
+		return fmt.Errorf("faled to read file to calculate hash")
 	}
-	computedHash := hex.EncodeToString(hash.Sum(nil))
 
+	computedHash := hex.EncodeToString(hash.Sum(nil))
 	if computedHash != expectedHash {
 		return &ChecksumMismatchError{
 			Expected: expectedHash,
@@ -157,11 +184,27 @@ func readChecksumFile(checksumFile, filename string) (string, error) {
 	return checksum, nil
 }
 
-// VerifyGPGSignature verifies the GPG signature of a file. It accepts the path
+func VerifyPGPSignatureWithKeys(
+	log infoWarnLogger, file string, asciiArmorSignature []byte, publicKeys [][]byte) error {
+	var err error
+	for i, key := range publicKeys {
+		err = VerifyPGPSignature(file, asciiArmorSignature, key)
+		if err == nil {
+			log.Infof("Verification with PGP[%d] successful", i)
+			return nil
+		}
+		log.Warnf("Verification with PGP[%d] failed: %v", i, err)
+	}
+
+	log.Warnf("Verification failed: %v", err)
+	return fmt.Errorf("could not verify PGP signature of %q: %w", file, err)
+}
+
+// VerifyPGPSignature verifies the GPG signature of a file. It accepts the path
 // to the file to verify, the ASCII armored signature, and the public key to
 // check against. If there is a problem with the signature then a
 // *download.InvalidSignatureError is returned.
-func VerifyGPGSignature(file string, asciiArmorSignature, publicKey []byte) error {
+func VerifyPGPSignature(file string, asciiArmorSignature, publicKey []byte) error {
 	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(publicKey))
 	if err != nil {
 		return errors.New(err, "read armored key ring", errors.TypeSecurity)
@@ -181,6 +224,39 @@ func VerifyGPGSignature(file string, asciiArmorSignature, publicKey []byte) erro
 	return nil
 }
 
+func FetchPGPKeys(log infoWarnLogger, client http.Client, defaultPGPKey []byte, skipDefaultPGP bool, pgpSources []string) ([][]byte, error) {
+	var pgpKeys [][]byte
+	if len(defaultPGPKey) > 0 && !skipDefaultPGP {
+		pgpKeys = append(pgpKeys, defaultPGPKey)
+		log.Infof("Default PGP appended")
+	}
+
+	for _, check := range pgpSources {
+		if len(check) == 0 {
+			continue
+		}
+
+		raw, err := PgpBytesFromSource(log, check, &client)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(raw) == 0 {
+			continue
+		}
+
+		pgpKeys = append(pgpKeys, raw)
+	}
+
+	if len(pgpKeys) == 0 {
+		log.Infof("No PGP key available, skipping verification process")
+		return nil, nil
+	}
+
+	log.Infof("Using %d PGP keys", len(pgpKeys))
+	return pgpKeys, nil
+}
+
 func PgpBytesFromSource(log warnLogger, source string, client HTTPClient) ([]byte, error) {
 	if strings.HasPrefix(source, PgpSourceRawPrefix) {
 		return []byte(strings.TrimPrefix(source, PgpSourceRawPrefix)), nil
@@ -191,7 +267,8 @@ func PgpBytesFromSource(log warnLogger, source string, client HTTPClient) ([]byt
 		if errors.Is(err, ErrRemotePGPDownloadFailed) || errors.Is(err, ErrInvalidLocation) {
 			log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", strings.TrimPrefix(source, PgpSourceURIPrefix), err)
 		} else if err != nil {
-			log.Warnf("Failed to fetch remote PGP")
+			log.Warnf("Failed to fetch remote PGP key from %q: %v",
+				strings.TrimPrefix(source, PgpSourceURIPrefix), err)
 		}
 
 		return pgpBytes, nil

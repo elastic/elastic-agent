@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/docker/go-units"
@@ -29,6 +30,49 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 )
+
+func TestDownload(t *testing.T) {
+	targetDir, err := ioutil.TempDir(os.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log, _ := logger.New("", false)
+	timeout := 30 * time.Second
+	testCases := getTestCases()
+	server, _ := getElasticCoServer(t)
+	elasticClient := getElasticCoClient(server)
+
+	config := &artifact.Config{
+		SourceURI:       source,
+		TargetDirectory: targetDir,
+		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+			Timeout: timeout,
+		},
+	}
+
+	for _, testCase := range testCases {
+		testName := fmt.Sprintf("%s-binary-%s", testCase.system, testCase.arch)
+		t.Run(testName, func(t *testing.T) {
+			config.OperatingSystem = testCase.system
+			config.Architecture = testCase.arch
+
+			upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
+			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
+			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = os.Stat(artifactPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			os.Remove(artifactPath)
+		})
+	}
+}
 
 func TestDownloadBodyError(t *testing.T) {
 	// This tests the scenario where the download encounters a network error
@@ -63,7 +107,8 @@ func TestDownloadBodyError(t *testing.T) {
 	}
 
 	log, obs := logger.NewTesting("downloader")
-	testClient := NewDownloaderWithClient(log, config, *client)
+	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
+	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	if err == nil {
@@ -119,7 +164,8 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	}
 
 	log, obs := logger.NewTesting("downloader")
-	testClient := NewDownloaderWithClient(log, config, *client)
+	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
+	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
@@ -201,7 +247,8 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	}
 
 	log, obs := logger.NewTesting("downloader")
-	testClient := NewDownloaderWithClient(log, config, *client)
+	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
+	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")

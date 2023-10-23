@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kardianos/service"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -25,6 +27,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
+
+const reallyFastWatcherCfg = `
+agent.upgrade.watcher:
+  grace_period: 1m
+  error_check.interval: 5s
+`
 
 // TestStandaloneUpgradeRollback tests the scenario where upgrading to a new version
 // of Agent fails due to the new Agent binary reporting an unhealthy status. It checks
@@ -38,28 +46,28 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start at the build version as we want to test the retry
-	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
+	// Upgrade from an old build because the new watcher from the new build will
+	// be ran. Otherwise the test will run the old watcher from the old build.
+	upgradeFromVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	require.NoError(t, err)
+	startFixture, err := atesting.NewFixture(
+		t,
+		upgradeFromVersion,
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
 	require.NoError(t, err)
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get start agent build version info")
 
-	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
-	require.NoError(t, err)
-	endFixture, err := atesting.NewFixture(
-		t,
-		upgradeToVersion,
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
-	)
+	// Upgrade to the build under test.
+	endFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, define.Version())
 
 	// We need to use the core version in the condition below because -SNAPSHOT is
 	// stripped from the ${agent.version.version} evaluation below.
-	parsedUpgradeToVersion, err := version.ParseVersion(upgradeToVersion)
+	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
 	// Configure Agent with fast watcher configuration and also an invalid
@@ -77,7 +85,7 @@ inputs:
   - condition: '${agent.version.version} == "%s"'
     type: invalid
     id: invalid-input
-`, parsedUpgradeToVersion.CoreVersion())
+`, endVersion.CoreVersion())
 		return startFixture.Configure(ctx, []byte(invalidInputPolicy))
 	}
 
@@ -135,24 +143,24 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start at the build version as we want to test the retry
-	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
+	// Upgrade from an old build because the new watcher from the new build will
+	// be ran. Otherwise the test will run the old watcher from the old build.
+	upgradeFromVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	require.NoError(t, err)
+	startFixture, err := atesting.NewFixture(
+		t,
+		upgradeFromVersion,
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
 	require.NoError(t, err)
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get start agent build version info")
 
-	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
-	require.NoError(t, err)
-	endFixture, err := atesting.NewFixture(
-		t,
-		upgradeToVersion,
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
-	)
+	// Upgrade to the build under test.
+	endFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, define.Version())
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
@@ -163,7 +171,8 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
-		upgradetest.WithPostUpgradeHook(postUpgradeHook))
+		upgradetest.WithPostUpgradeHook(postUpgradeHook),
+		upgradetest.WithCustomWatcherConfig(reallyFastWatcherCfg))
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}
@@ -174,16 +183,42 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		time.Sleep(10 * time.Second)
 		topPath := paths.Top()
 
-		t.Logf("Restarting Agent via service to simulate crashing")
-		err = install.RestartService(topPath)
+		t.Logf("Stopping agent via service to simulate crashing")
+		err = install.StopService(topPath)
 		if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
 			// Due to the quick restarts every 10 seconds its possible that this is faster than Windows
 			// can handle. Decrementing restartIdx means that the loop will occur again.
 			t.Logf("Got an allowed error on Windows: %s", err)
-			restartIdx--
-			continue
+			err = nil
 		}
 		require.NoError(t, err)
+
+		// ensure that it's stopped before starting it again
+		var status service.Status
+		var statusErr error
+		require.Eventuallyf(t, func() bool {
+			status, statusErr = install.StatusService(topPath)
+			if statusErr != nil {
+				return false
+			}
+			return status != service.StatusRunning
+		}, 2*time.Minute, 1*time.Second, "service never fully stopped (status: %v): %s", status, statusErr)
+		t.Logf("Stopped agent via service to simulate crashing")
+
+		// start it again
+		t.Logf("Starting agent via service to simulate crashing")
+		err = install.StartService(topPath)
+		require.NoError(t, err)
+
+		// ensure that it's started before next loop
+		require.Eventuallyf(t, func() bool {
+			status, statusErr = install.StatusService(topPath)
+			if statusErr != nil {
+				return false
+			}
+			return status == service.StatusRunning
+		}, 2*time.Minute, 1*time.Second, "service never fully started (status: %v): %s", status, statusErr)
+		t.Logf("Started agent via service to simulate crashing")
 	}
 
 	// wait for the agent to be healthy and back at the start version

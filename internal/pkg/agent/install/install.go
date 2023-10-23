@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/kardianos/service"
+
 	"github.com/jaypipes/ghw"
 	"github.com/otiai10/copy"
 	"github.com/schollz/progressbar/v3"
@@ -215,6 +217,15 @@ func RestartService(topPath string) error {
 			errors.M("service", paths.ServiceName))
 	}
 	return nil
+}
+
+// StatusService returns the status of the service.
+func StatusService(topPath string) (service.Status, error) {
+	svc, err := newService(topPath)
+	if err != nil {
+		return service.StatusUnknown, err
+	}
+	return svc.Status()
 }
 
 // FixPermissions fixes the permissions on the installed system.

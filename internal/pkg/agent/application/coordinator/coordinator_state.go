@@ -7,11 +7,13 @@ package coordinator
 import (
 	"fmt"
 
-	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+
 	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
 // State provides the current state of the coordinator along with all the current states of components and units.
@@ -30,6 +32,8 @@ type State struct {
 
 	Components []runtime.ComponentComponentState `yaml:"components"`
 	LogLevel   logp.Level                        `yaml:"log_level"`
+
+	UpgradeDetails *details.Details `yaml:"upgrade_details,omitempty"`
 }
 
 type coordinatorOverrideState struct {
@@ -52,6 +56,11 @@ func (c *Coordinator) SetOverrideState(state agentclient.State, message string) 
 // real internal state based on the health of its managers.
 func (c *Coordinator) ClearOverrideState() {
 	c.overrideStateChan <- nil
+}
+
+// SetUpgradeDetails sets upgrade details. This is used during upgrades.
+func (c *Coordinator) SetUpgradeDetails(upgradeDetails *details.Details) {
+	c.upgradeDetailsChan <- upgradeDetails
 }
 
 // setRuntimeManagerError updates the error state for the runtime manager.
@@ -114,6 +123,13 @@ func (c *Coordinator) setOverrideState(overrideState *coordinatorOverrideState) 
 	c.stateNeedsRefresh = true
 }
 
+// setUpgradeDetails is the internal helper to set upgrade details and set stateNeedsRefresh.
+// Must be called on the main Coordinator goroutine.
+func (c *Coordinator) setUpgradeDetails(upgradeDetails *details.Details) {
+	c.state.UpgradeDetails = upgradeDetails
+	c.stateNeedsRefresh = true
+}
+
 // Forward the current state to the broadcaster and clear the stateNeedsRefresh
 // flag. Must be called on the main Coordinator goroutine.
 func (c *Coordinator) refreshState() {
@@ -163,6 +179,7 @@ func (c *Coordinator) generateReportableState() (s State) {
 	s.FleetState = c.state.FleetState
 	s.FleetMessage = c.state.FleetMessage
 	s.LogLevel = c.state.LogLevel
+	s.UpgradeDetails = c.state.UpgradeDetails
 	s.Components = make([]runtime.ComponentComponentState, len(c.state.Components))
 	copy(s.Components, c.state.Components)
 
