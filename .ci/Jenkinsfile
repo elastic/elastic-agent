@@ -95,57 +95,7 @@ pipeline {
             values 'ubuntu-22 && immutable', 'aws && aarch64 && gobld/diskSizeGb:200', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable' //, 'macos12 && x86_64'
           }
         }
-        // stages {
-        //   stage('build'){
-        //     steps {
-        //       withGithubNotify(context: "Build-${PLATFORM}") {
-        //         deleteDir()
-        //         unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-        //         withMageEnv(){
-        //           dir("${BASE_DIR}"){
-        //             cmd(label: 'Go build', script: 'mage build')
-        //           }
-        //         }
-        //       }
-        //     }
-        //   }
-        //   stage('Test') {
-        //     steps {
-        //       withGithubNotify(context: "Test-${PLATFORM}") {
-        //         withMageEnv(){
-        //           dir("${BASE_DIR}"){
-        //             withEnv(["RACE_DETECTOR=true", "TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
-        //               cmd(label: 'Go unitTest', script: 'mage unitTest')
-        //             }
-        //           }
-        //         }
-        //       }
-        //     }
-        //     post {
-        //       always {
-        //         junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
-        //         whenTrue(isCodeCoverageEnabled()) {
-        //           coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
-        //         }
-        //       }
-        //     }
-        //   }
-          // stage('Integration tests') {
-          //   when {
-          //     // Always when running builds on branches/tags
-          //     // Enable if integration test related changes.
-          //     beforeAgent true
-          //     anyOf {
-          //       not { changeRequest() }
-          //       expression { return params.integration_tests_ci }
-          //       expression { return env.GITHUB_COMMENT?.contains('integration tests') }
-          //       expression { matchesPrLabel(label: 'ci:integration') }
-          //     }
-          //   }
-          //   steps {
-          //     echo 'TBD'
-          //   }
-          // }
+        stages {        
           stage('K8s') {
             when {
               beforeAgent true
