@@ -99,7 +99,7 @@ agent.monitoring.enabled: true
 				log,
 				cfg,
 			)
-			r.isServerRunning = tc.currRunning
+			r.isServerRunning.Store(tc.currRunning)
 			if tc.currRunning {
 				r.s = fsc
 			}
@@ -107,7 +107,7 @@ agent.monitoring.enabled: true
 			newCfg := aConfig.MustNewConfigFrom(tc.newConfig)
 			require.NoError(t, r.Reload(newCfg))
 
-			require.Equal(t, tc.expectedRunning, r.isServerRunning)
+			require.Equal(t, tc.expectedRunning, r.isServerRunning.Load())
 			require.Equal(t, tc.expectedStart, fsc.startTriggered)
 			require.Equal(t, tc.expectedStop, fsc.stopTriggered)
 		})
