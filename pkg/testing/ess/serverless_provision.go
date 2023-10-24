@@ -80,7 +80,7 @@ func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runne
 	for _, req := range requests {
 		client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
 		srvReq := ServerlessRequest{Name: req.ID, RegionID: prov.cfg.Region}
-		_, err := client.DeployStack(ctx, srvReq)
+		proj, err := client.DeployStack(ctx, srvReq)
 		if err != nil {
 			return nil, fmt.Errorf("error deploying stack for request %s: %w", req.ID, err)
 		}
@@ -95,6 +95,7 @@ func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runne
 			Kibana:        client.proj.Endpoints.Kibana,
 			Username:      client.proj.Credentials.Username,
 			Password:      client.proj.Credentials.Password,
+			Internal:      map[string]interface{}{"deployment_id": proj.ID},
 		}
 		stacks = append(stacks, newStack)
 		prov.stacksMut.Lock()

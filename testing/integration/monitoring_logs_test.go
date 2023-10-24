@@ -30,7 +30,6 @@ import (
 
 func TestMonitoringLogsShipped(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		OS:    []define.OS{{Type: define.Linux}},
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
@@ -86,8 +85,8 @@ func TestMonitoringLogsShipped(t *testing.T) {
 	docs := findESDocs(t, func() (estools.Documents, error) {
 		return estools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
 	})
-	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
+	require.NotZero(t, len(docs.Hits.Hits))
 
 	// Stage 4: make sure all components are healthy
 	t.Log("Making sure all components are healthy")

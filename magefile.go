@@ -1461,6 +1461,7 @@ func majorMinor() string {
 
 // Clean cleans up the integration testing leftovers
 func (Integration) Clean() error {
+	fmt.Println("--- Clean mage artifacts")
 	_ = os.RemoveAll(".agent-testing")
 
 	// Clean out .integration-cache/.ogc-cache always
@@ -1702,6 +1703,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if err != nil {
 		return nil, err
 	}
+
 	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
 	agentVersion := os.Getenv("AGENT_VERSION")
 	if agentVersion == "" {
@@ -1719,6 +1721,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 			agentVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
 		}
 	}
+
 	if agentStackVersion == "" {
 		agentStackVersion = agentVersion
 	}
@@ -1756,15 +1759,15 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		instanceProvisionerMode = "ogc"
 	}
 	if instanceProvisionerMode != "ogc" && instanceProvisionerMode != "multipass" {
-		return nil, errors.New("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass'")
+		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
 	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
 	if stackProvisionerMode == "" {
-		stackProvisionerMode = "ess"
+		stackProvisionerMode = "stateful"
 	}
-	if stackProvisionerMode != "ess" && stackProvisionerMode != "serverless" {
-		return nil, errors.New("STACK_PROVISIONER environment variable must be one of 'serverless' or 'ess'")
+	if stackProvisionerMode != "stateful" && stackProvisionerMode != "serverless" {
+		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of 'serverless' or 'stateful', not %s", stackProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
@@ -1778,24 +1781,37 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
 	}
 
+	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
+	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
+	binaryName := os.Getenv("TEST_BINARY_NAME")
+	if binaryName == "" {
+		binaryName = "elastic-agent"
+	}
+
+	repoDir := os.Getenv("TEST_INTEG_REPO_PATH")
+	if repoDir == "" {
+		repoDir = "."
+	}
+
 	diagDir := filepath.Join("build", "diagnostics")
 	_ = os.MkdirAll(diagDir, 0755)
 
 	cfg := runner.Config{
-		AgentVersion:      agentVersion,
-		AgentStackVersion: agentStackVersion,
-		BuildDir:          agentBuildDir,
-		GOVersion:         goVersion,
-		RepoDir:           ".",
-		StateDir:          ".integration-cache",
-		DiagnosticsDir:    diagDir,
-		Platforms:         testPlatforms(),
-		Matrix:            matrix,
-		SingleTest:        singleTest,
-		VerboseMode:       mg.Verbose(),
-		Timestamp:         timestamp,
-		TestFlags:         goTestFlags,
-		ExtraEnv:          extraEnv,
+		AgentVersion:   agentVersion,
+		StackVersion:   agentStackVersion,
+		BuildDir:       agentBuildDir,
+		GOVersion:      goVersion,
+		RepoDir:        repoDir,
+		DiagnosticsDir: diagDir,
+		StateDir:       ".integration-cache",
+		Platforms:      testPlatforms(),
+		Matrix:         matrix,
+		SingleTest:     singleTest,
+		VerboseMode:    mg.Verbose(),
+		Timestamp:      timestamp,
+		TestFlags:      goTestFlags,
+		ExtraEnv:       extraEnv,
+		BinaryName:     binaryName,
 	}
 	ogcCfg := ogc.Config{
 		ServiceTokenPath: serviceTokenPath,
@@ -1824,7 +1840,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Region:     essRegion,
 	}
 	var stackProvisioner runner.StackProvisioner
-	if stackProvisionerMode == "ess" {
+	if stackProvisionerMode == "stateful" {
 		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err
