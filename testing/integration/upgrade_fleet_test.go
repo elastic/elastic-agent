@@ -127,7 +127,7 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	s := newArtifactsServer(ctx, t, latest.String())
 	_ = s
 	host := "artifacts.elastic.co"
-	AirGap(nil, host)
+	AirGap(t, host)
 
 	rctx, _ := context.WithTimeout(ctx, time.Second)
 	req, err := http.NewRequestWithContext(rctx, http.MethodGet, "https://"+host, nil)
@@ -141,7 +141,8 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	_, _, err = stack.KibanaClient.Request(http.MethodGet, "/api/status",
 		nil, nil, nil)
 	require.NoErrorf(t, err,
-		"failed to interact with Kibana after blocking %q through iptables", host)
+		"failed to interact with Kibana after blocking %q through iptables. "+
+			"It should not affect the connection to the stack", host)
 
 	// =========================================================================
 	fixture, err := define.NewFixture(t, define.Version())
