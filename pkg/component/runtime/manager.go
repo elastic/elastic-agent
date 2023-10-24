@@ -705,6 +705,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 		var stoppedWg sync.WaitGroup
 		stoppedWg.Add(len(stop))
 		for _, existing := range stop {
+			m.logger.Debugf("Stopping component %q", existing.id)
 			_ = existing.stop(teardown, model.Signed)
 			// stop is async, wait for operation to finish,
 			// otherwise new instance may be started and components
@@ -755,6 +756,7 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 	for {
 		latestState := comp.getLatest()
 		if latestState.State == client.UnitStateStopped {
+			m.logger.Debugf("component %q stopped.", compID)
 			return
 		}
 
@@ -767,6 +769,7 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 
 		select {
 		case <-timeoutCh:
+			m.logger.Errorf("timeout exceeded waiting for component %q to stop", compID)
 			return
 		case <-time.After(stopCheckRetryPeriod):
 		}
