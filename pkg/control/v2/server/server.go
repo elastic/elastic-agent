@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/control"
@@ -368,6 +369,7 @@ func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.
 			Commit:    release.Commit(),
 			BuildTime: release.BuildTime().Format(control.TimeFormat()),
 			Snapshot:  release.Snapshot(),
+			Pid:       int32(os.Getpid()),
 		},
 		State:        state.State,
 		Message:      state.Message,

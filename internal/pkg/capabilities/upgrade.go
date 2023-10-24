@@ -65,7 +65,7 @@ func allowUpgrade(
 	for _, cap := range upgradeCaps {
 		result, err := cap.condition.Eval(varStore, true)
 		if err != nil {
-			log.Errorf("failed evaluating eql formula %q, skipping: %v", cap.conditionStr, err)
+			log.Warnf("failed evaluating eql formula %q, skipping: %v", cap.conditionStr, err)
 			continue
 		}
 		if result {

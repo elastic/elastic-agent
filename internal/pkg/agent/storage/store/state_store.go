@@ -95,7 +95,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	// and return an empty store.
 	reader, err := store.Load()
 	if err != nil {
-		log.Errorf("failed to load state store, returning empty contents: %v", err.Error())
+		log.Warnf("failed to load state store, returning empty contents: %v", err.Error())
 		return &StateStore{log: log, store: store}, nil
 	}
 	defer reader.Close()

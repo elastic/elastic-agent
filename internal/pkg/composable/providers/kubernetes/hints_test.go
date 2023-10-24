@@ -591,3 +591,134 @@ func TestGenerateHintsMappingWithProcessorsForContainer(t *testing.T) {
 		assert.Contains(t, expectedprocesors, hintData.processors[1])
 	}
 }
+
+func TestDefaultHost(t *testing.T) {
+	logger := getLogger()
+	cID := "abcd"
+
+	mapping := map[string]interface{}{
+		"namespace": "testns",
+		"pod": mapstr.M{
+			"uid":  string(types.UID(uid)),
+			"name": "testpod",
+			"ip":   "127.0.0.5",
+		},
+		"annotations": mapstr.M{
+			"app": "production",
+			"co": mapstr.M{
+				"elastic": mapstr.M{
+					"hints/package": "redis",
+					"hints": mapstr.M{
+						"redis-1/host":   "${kubernetes.pod.ip}:6379",
+						"redis-1/stream": "stderr",
+						"redis-2/host":   "${kubernetes.pod.ip}:6400",
+						"redis-4/stream": "stderr",
+					},
+				},
+			},
+		},
+	}
+
+	addContainerMapping := func(mapping map[string]interface{}, container mapstr.M) map[string]interface{} {
+		clone := make(map[string]interface{}, len(mapping))
+		for k, v := range mapping {
+			clone[k] = v
+		}
+		clone["container"] = container
+		return clone
+	}
+
+	tests := []struct {
+		msg      string
+		mapping  map[string]interface{}
+		expected mapstr.M
+	}{
+		{
+			msg: "Test container with two hints (redis-1), of which one is host.",
+			mapping: addContainerMapping(mapping,
+				mapstr.M{
+					"name": "redis-1",
+					"port": "6379",
+					"id":   cID,
+				},
+			),
+			expected: mapstr.M{
+				"container_id": cID,
+				"redis": mapstr.M{
+					"container_logs": mapstr.M{
+						"enabled": true,
+					},
+					"enabled": true,
+					"host":    "127.0.0.5:6379",
+					"stream":  "stderr",
+				},
+			},
+		},
+		{
+			msg: "Test container with only one hint for host (redis-2).",
+			mapping: addContainerMapping(mapping,
+				mapstr.M{
+					"name": "redis-2",
+					"port": "6400",
+					"id":   cID,
+				},
+			),
+			expected: mapstr.M{
+				"container_id": cID,
+				"redis": mapstr.M{
+					"container_logs": mapstr.M{
+						"enabled": true,
+					},
+					"enabled": true,
+					"host":    "127.0.0.5:6400",
+				},
+			},
+		},
+		{
+			msg: "Test container without hints and check for the default host (redis-3).",
+			mapping: addContainerMapping(mapping,
+				mapstr.M{
+					"name": "redis-3",
+					"port": "7000",
+					"id":   cID,
+				},
+			),
+			expected: mapstr.M{
+				"container_id": cID,
+				"redis": mapstr.M{
+					"container_logs": mapstr.M{
+						"enabled": true,
+					},
+					"enabled": true,
+					"host":    "127.0.0.5:7000",
+				},
+			},
+		},
+		{
+			msg: "Test container with one hint for stream and without port defined (redis-4).",
+			mapping: addContainerMapping(mapping,
+				mapstr.M{
+					"name": "redis-4",
+					"id":   cID,
+				},
+			),
+			expected: mapstr.M{
+				"container_id": cID,
+				"redis": mapstr.M{
+					"container_logs": mapstr.M{
+						"enabled": true,
+					},
+					"enabled": true,
+					"stream":  "stderr",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.msg, func(t *testing.T) {
+			hintData := GetHintsMapping(test.mapping, logger, "co.elastic", cID)
+			assert.Equal(t, test.expected, hintData.composableMapping)
+		})
+	}
+}

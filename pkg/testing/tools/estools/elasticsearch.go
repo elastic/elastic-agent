@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
@@ -72,6 +73,75 @@ type ESDoc struct {
 	Source map[string]interface{} `json:"_source"`
 }
 
+// TemplateResponse is the body of a template data request
+type TemplateResponse struct {
+	IndexTemplates []Template `json:"index_templates"`
+}
+
+// Template is an individual template
+type Template struct {
+	Name          string                 `json:"name"`
+	IndexTemplate map[string]interface{} `json:"index_template"`
+}
+
+// Pipeline is an individual pipeline
+type Pipeline struct {
+	Description string                   `json:"description"`
+	Processors  []map[string]interface{} `json:"processors"`
+}
+
+// Ping returns basic ES info
+type Ping struct {
+	Name        string  `json:"name"`
+	ClusterName string  `json:"cluster_name"`
+	ClusterUUID string  `json:"cluster_uuid"`
+	Version     Version `json:"version"`
+}
+
+// Version contains version and build info from an ES ping
+type Version struct {
+	Number      string `json:"number"`
+	BuildFlavor string `json:"build_flavor"`
+}
+
+// APIKeyRequest contains the needed data to create an API key in Elasticsearch
+type APIKeyRequest struct {
+	Name            string   `json:"name"`
+	Expiration      string   `json:"expiration"`
+	RoleDescriptors mapstr.M `json:"role_descriptors,omitempty"`
+	Metadata        mapstr.M `json:"metadata,omitempty"`
+}
+
+// APIKeyResponse contains the response data for an API request
+type APIKeyResponse struct {
+	Id         string `json:"id"`
+	Name       string `json:"name"`
+	Expiration int    `json:"expiration"`
+	APIKey     string `json:"api_key"`
+	Encoded    string `json:"encoded"`
+}
+
+// DataStreams represents the response from an ES _data_stream API
+type DataStreams struct {
+	DataStreams []DataStream `json:"data_streams"`
+}
+
+// DataStream represents a data stream template
+type DataStream struct {
+	Name      string              `json:"name"`
+	Indicies  []map[string]string `json:"indicies"`
+	Status    string              `json:"status"`
+	Template  string              `json:"template"`
+	Lifecycle Lifecycle           `json:"lifecycle"`
+	Hidden    bool                `json:"hidden"`
+	System    bool                `json:"system"`
+}
+
+type Lifecycle struct {
+	Enabled       bool   `json:"enabled"`
+	DataRetention string `json:"data_retention"`
+}
+
 // GetAllindicies returns a list of indicies on the target ES instance
 func GetAllindicies(client elastictransport.Interface) ([]Index, error) {
 	return GetIndicesWithContext(context.Background(), client, []string{})
@@ -103,9 +173,164 @@ func GetIndicesWithContext(ctx context.Context, client elastictransport.Interfac
 	return respData, nil
 }
 
+// CreateAPIKey creates an API key with the given request data
+func CreateAPIKey(ctx context.Context, client elastictransport.Interface, req APIKeyRequest) (APIKeyResponse, error) {
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(req)
+	if err != nil {
+		return APIKeyResponse{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	apiReq := esapi.SecurityCreateAPIKeyRequest{Body: &buf}
+	resp, err := apiReq.Do(ctx, client)
+	if err != nil {
+		return APIKeyResponse{}, fmt.Errorf("error creating API key: %w", err)
+	}
+	defer resp.Body.Close()
+	resultBuf, err := handleResponseRaw(resp)
+	if err != nil {
+		return APIKeyResponse{}, fmt.Errorf("error handling HTTP response: %w", err)
+	}
+
+	parsed := APIKeyResponse{}
+	err = json.Unmarshal(resultBuf, &parsed)
+	if err != nil {
+		return parsed, fmt.Errorf("error unmarshaling json response: %w", err)
+	}
+
+	return parsed, nil
+}
+
 // FindMatchingLogLines returns any logs with message fields that match the given line
 func FindMatchingLogLines(client elastictransport.Interface, namespace, line string) (Documents, error) {
 	return FindMatchingLogLinesWithContext(context.Background(), client, namespace, line)
+}
+
+// GetLatestDocumentMatchingQuery returns the last document that matches the given query.
+// the query field is inserted into a simple `query` POST request
+func GetLatestDocumentMatchingQuery(ctx context.Context, client elastictransport.Interface, query map[string]interface{}, indexPattern string) (Documents, error) {
+	queryRaw := map[string]interface{}{
+		"query": query,
+		"sort": map[string]interface{}{
+			"timestamp": "desc",
+		},
+		"size": 1,
+	}
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(queryRaw)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	return performQueryForRawQuery(ctx, queryRaw, indexPattern, client)
+}
+
+// GetIndexTemplatesForPattern lists all index templates on the system
+func GetIndexTemplatesForPattern(ctx context.Context, client elastictransport.Interface, name string) (TemplateResponse, error) {
+	req := esapi.IndicesGetIndexTemplateRequest{Name: name}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return TemplateResponse{}, fmt.Errorf("error fetching index templates: %w", err)
+	}
+	defer resp.Body.Close()
+
+	resultBuf, err := handleResponseRaw(resp)
+	if err != nil {
+		return TemplateResponse{}, fmt.Errorf("error handling HTTP response: %w", err)
+	}
+	parsed := TemplateResponse{}
+
+	err = json.Unmarshal(resultBuf, &parsed)
+	if err != nil {
+		return TemplateResponse{}, fmt.Errorf("error unmarshaling json response: %w", err)
+	}
+
+	return parsed, nil
+}
+
+func GetDataStreamsForPattern(ctx context.Context, client elastictransport.Interface, namePattern string) (DataStreams, error) {
+	req := esapi.IndicesGetDataStreamRequest{Name: []string{namePattern}, ExpandWildcards: "all,hidden"}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return DataStreams{}, fmt.Errorf("error fetching data streams")
+	}
+	defer resp.Body.Close()
+
+	raw, err := handleResponseRaw(resp)
+	if err != nil {
+		return DataStreams{}, fmt.Errorf("error handling HTTP response for data stream get: %w", err)
+	}
+
+	data := DataStreams{}
+	err = json.Unmarshal(raw, &data)
+	if err != nil {
+		return DataStreams{}, fmt.Errorf("error unmarshalling datastream: %w", err)
+	}
+
+	return data, nil
+}
+
+// DeleteIndexTemplatesDataStreams deletes any data streams, then associcated index templates.
+func DeleteIndexTemplatesDataStreams(ctx context.Context, client elastictransport.Interface, name string) error {
+	req := esapi.IndicesDeleteDataStreamRequest{Name: []string{name}, ExpandWildcards: "all,hidden"}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return fmt.Errorf("error deleting data streams: %w", err)
+	}
+	defer resp.Body.Close()
+
+	_, err = handleResponseRaw(resp)
+	if err != nil {
+		return fmt.Errorf("error handling HTTP response for data stream delete: %w", err)
+	}
+
+	patternReq := esapi.IndicesDeleteIndexTemplateRequest{Name: name}
+	resp, err = patternReq.Do(ctx, client)
+	if err != nil {
+		return fmt.Errorf("error deleting index templates: %w", err)
+	}
+	defer resp.Body.Close()
+	_, err = handleResponseRaw(resp)
+	if err != nil {
+		return fmt.Errorf("error handling HTTP response for index template delete: %w", err)
+	}
+	return nil
+}
+
+// GetPipelines returns a list of installed pipelines that match the given name/pattern
+func GetPipelines(ctx context.Context, client elastictransport.Interface, name string) (map[string]Pipeline, error) {
+	req := esapi.IngestGetPipelineRequest{PipelineID: name}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching index templates: %w", err)
+	}
+	defer resp.Body.Close()
+	resultBuf, err := handleResponseRaw(resp)
+	if err != nil {
+		return nil, fmt.Errorf("error handling HTTP response: %w", err)
+	}
+
+	parsed := map[string]Pipeline{}
+	err = json.Unmarshal(resultBuf, &parsed)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling json response: %w", err)
+	}
+	return parsed, nil
+}
+
+// DeletePipelines deletes all pipelines that match the given pattern
+func DeletePipelines(ctx context.Context, client elastictransport.Interface, name string) error {
+	req := esapi.IngestDeletePipelineRequest{PipelineID: name}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return fmt.Errorf("error deleting index template")
+	}
+	defer resp.Body.Close()
+	_, err = handleResponseRaw(resp)
+	if err != nil {
+		return fmt.Errorf("error handling HTTP response: %w", err)
+	}
+	return nil
 }
 
 // FindMatchingLogLinesWithContext returns any logs with message fields that match the given line
@@ -137,20 +362,8 @@ func FindMatchingLogLinesWithContext(ctx context.Context, client elastictranspor
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	es := esapi.New(client)
-	res, err := es.Search(
-		es.Search.WithIndex("*.ds-logs*"),
-		es.Search.WithExpandWildcards("all"),
-		es.Search.WithBody(&buf),
-		es.Search.WithTrackTotalHits(true),
-		es.Search.WithPretty(),
-		es.Search.WithContext(ctx),
-	)
-	if err != nil {
-		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
-	}
+	return performQueryForRawQuery(ctx, queryRaw, "*ds-logs*", client)
 
-	return handleDocsResponse(res)
 }
 
 // CheckForErrorsInLogs checks to see if any error-level lines exist
@@ -201,6 +414,13 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 								"log.level": "error",
 							},
 						},
+						{
+							"term": map[string]interface{}{
+								"data_stream.namespace": map[string]interface{}{
+									"value": namespace,
+								},
+							},
+						},
 					},
 					"must_not": excludeStatements,
 				},
@@ -214,20 +434,8 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	es := esapi.New(client)
-	res, err := es.Search(
-		es.Search.WithIndex("*.ds-logs*"),
-		es.Search.WithExpandWildcards("all"),
-		es.Search.WithBody(&buf),
-		es.Search.WithTrackTotalHits(true),
-		es.Search.WithPretty(),
-		es.Search.WithContext(ctx),
-	)
-	if err != nil {
-		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
-	}
+	return performQueryForRawQuery(ctx, queryRaw, "*ds-logs*", client)
 
-	return handleDocsResponse(res)
 }
 
 // GetLogsForDatastream returns any logs associated with the datastream
@@ -280,15 +488,41 @@ func GetLogsForDatastreamWithContext(ctx context.Context, client elastictranspor
 		},
 	}
 
+	return performQueryForRawQuery(ctx, indexQuery, "*ds-logs*", client)
+}
+
+// GetPing performs a basic ping and returns ES config info
+func GetPing(ctx context.Context, client elastictransport.Interface) (Ping, error) {
+	req := esapi.InfoRequest{}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return Ping{}, fmt.Errorf("error in ping request")
+	}
+	defer resp.Body.Close()
+
+	respData, err := handleResponseRaw(resp)
+	if err != nil {
+		return Ping{}, fmt.Errorf("error in HTTP response: %w", err)
+	}
+	pingData := Ping{}
+	err = json.Unmarshal(respData, &pingData)
+	if err != nil {
+		return pingData, fmt.Errorf("error unmarshalling JSON: %w", err)
+	}
+	return pingData, nil
+
+}
+
+func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{}, index string, client elastictransport.Interface) (Documents, error) {
 	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(indexQuery)
+	err := json.NewEncoder(&buf).Encode(queryRaw)
 	if err != nil {
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
 	es := esapi.New(client)
 	res, err := es.Search(
-		es.Search.WithIndex("*.ds-logs*"),
+		es.Search.WithIndex(index),
 		es.Search.WithExpandWildcards("all"),
 		es.Search.WithBody(&buf),
 		es.Search.WithTrackTotalHits(true),
@@ -303,13 +537,9 @@ func GetLogsForDatastreamWithContext(ctx context.Context, client elastictranspor
 }
 
 func handleDocsResponse(res *esapi.Response) (Documents, error) {
-	if res.StatusCode >= 300 || res.StatusCode < 200 {
-		return Documents{}, fmt.Errorf("non-200 return code: %v, response: '%s'", res.StatusCode, res.String())
-	}
-
-	resultBuf, err := io.ReadAll(res.Body)
+	resultBuf, err := handleResponseRaw(res)
 	if err != nil {
-		return Documents{}, fmt.Errorf("error reading response body: %w", err)
+		return Documents{}, fmt.Errorf("error in HTTP query: %w", err)
 	}
 	respData := Documents{}
 
@@ -319,4 +549,16 @@ func handleDocsResponse(res *esapi.Response) (Documents, error) {
 	}
 
 	return respData, err
+}
+
+func handleResponseRaw(res *esapi.Response) ([]byte, error) {
+	if res.StatusCode >= 300 || res.StatusCode < 200 {
+		return nil, fmt.Errorf("non-200 return code: %v, response: '%s'", res.StatusCode, res.String())
+	}
+
+	resultBuf, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+	return resultBuf, nil
 }

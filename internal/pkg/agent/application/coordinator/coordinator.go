@@ -17,8 +17,10 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -59,7 +61,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -108,7 +110,7 @@ type RuntimeManager interface {
 	// it performs diagnostics for all current units.
 	PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
 
-	//PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
+	// PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
 	// then it performs the diagnostics for all current units.
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
@@ -192,8 +194,12 @@ type Coordinator struct {
 	// state should never be directly read or written outside the Coordinator
 	// goroutine. Callers who need to access or modify the state should use the
 	// public accessors like State(), SetLogLevel(), etc.
-	state             State
-	stateBroadcaster  *broadcaster.Broadcaster[State]
+	state            State
+	stateBroadcaster *broadcaster.Broadcaster[State]
+
+	// If you get a race detector error while accessing this field, it probably
+	// means you're calling private Coordinator methods from outside the
+	// Coordinator goroutine.
 	stateNeedsRefresh bool
 
 	// overrideState is used during the update process to report the overall
@@ -203,6 +209,10 @@ type Coordinator struct {
 	// overrideStateChan forwards override states from the publicly accessible
 	// SetOverrideState helper to the Coordinator goroutine.
 	overrideStateChan chan *coordinatorOverrideState
+
+	// upgradeDetailsChan forwards upgrade details from the publicly accessible
+	// SetUpgradeDetails helper to the Coordinator goroutine.
+	upgradeDetailsChan chan *details.Details
 
 	// loglevelCh forwards log level changes from the public API (SetLogLevel)
 	// to the run loop in Coordinator's main goroutine.
@@ -326,8 +336,9 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		// synchronization in the subscriber API, just set the input buffer to 0.
 		stateBroadcaster: broadcaster.New(state, 64, 32),
 
-		logLevelCh:        make(chan logp.Level),
-		overrideStateChan: make(chan *coordinatorOverrideState),
+		logLevelCh:         make(chan logp.Level),
+		overrideStateChan:  make(chan *coordinatorOverrideState),
+		upgradeDetailsChan: make(chan *details.Details),
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -415,7 +426,7 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 // Upgrade runs the upgrade process.
 // Called from external goroutines.
 func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) error {
-	// early check outside of upgrader before overridding the state
+	// early check outside of upgrader before overriding the state
 	if !c.upgradeMgr.Upgradeable() {
 		return ErrNotUpgradable
 	}
@@ -445,15 +456,31 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// override the overall state to upgrading until the re-execution is complete
 	c.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+
+	// initialize upgrade details
+	actionID := ""
+	if action != nil {
+		actionID = action.ActionID
+	}
+	det := details.NewDetails(version, details.StateRequested, actionID)
+	det.RegisterObserver(c.SetUpgradeDetails)
+	det.RegisterObserver(c.logUpgradeDetails)
+
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
+		det.Fail(err)
 		return err
 	}
 	if cb != nil {
+		det.SetState(details.StateRestarting)
 		c.ReExec(cb)
 	}
 	return nil
+}
+
+func (c *Coordinator) logUpgradeDetails(details *details.Details) {
+	c.logger.Infow("updated upgrade details", "upgrade_details", details)
 }
 
 // AckUpgrade is the method used on startup to ack a previously successful upgrade action.
@@ -877,6 +904,9 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case overrideState := <-c.overrideStateChan:
 		c.setOverrideState(overrideState)
+
+	case upgradeDetails := <-c.upgradeDetailsChan:
+		c.setUpgradeDetails(upgradeDetails)
 
 	case componentState := <-c.managerChans.runtimeManagerUpdate:
 		// New component change reported by the runtime manager via

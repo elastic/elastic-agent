@@ -105,9 +105,8 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	}
 
 	errorCheckInterval := cfg.Settings.Upgrade.Watcher.ErrorCheck.Interval
-	crashCheckInterval := cfg.Settings.Upgrade.Watcher.CrashCheck.Interval
 	ctx := context.Background()
-	if err := watch(ctx, tilGrace, errorCheckInterval, crashCheckInterval, log); err != nil {
+	if err := watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
 		log.Error("Error detected proceeding to rollback: %v", err)
 		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
@@ -134,9 +133,8 @@ func isWindows() bool {
 	return runtime.GOOS == "windows"
 }
 
-func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval, crashCheckInterval time.Duration, log *logger.Logger) error {
+func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.Duration, log *logger.Logger) error {
 	errChan := make(chan error)
-	crashChan := make(chan error)
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -144,21 +142,10 @@ func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval, cras
 	defer func() {
 		cancel()
 		close(errChan)
-		close(crashChan)
 	}()
 
-	errorChecker, err := upgrade.NewErrorChecker(errChan, log, errorCheckInterval)
-	if err != nil {
-		return err
-	}
-
-	crashChecker, err := upgrade.NewCrashChecker(ctx, crashChan, log, crashCheckInterval)
-	if err != nil {
-		return err
-	}
-
-	go errorChecker.Run(ctx)
-	go crashChecker.Run(ctx)
+	agentWatcher := upgrade.NewAgentWatcher(errChan, log, errorCheckInterval)
+	go agentWatcher.Run(ctx)
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
@@ -181,10 +168,6 @@ WATCHLOOP:
 		// Agent in degraded state.
 		case err := <-errChan:
 			log.Errorf("Agent Error detected: %s", err.Error())
-			return err
-		// Agent keeps crashing unexpectedly
-		case err := <-crashChan:
-			log.Errorf("Agent crash detected: %s", err.Error())
 			return err
 		}
 	}

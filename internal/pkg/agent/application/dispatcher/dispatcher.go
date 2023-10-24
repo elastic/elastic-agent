@@ -248,7 +248,7 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	attempt := action.RetryAttempt()
 	d, err := ad.rt.GetWait(attempt)
 	if err != nil {
-		ad.log.Errorf("No more reties for action id %s: %v", action.ID(), err)
+		ad.log.Errorf("No more retries for action id %s: %v", action.ID(), err)
 		action.SetRetryAttempt(-1)
 		if err := acker.Ack(ctx, action); err != nil {
 			ad.log.Errorf("Unable to ack action failure (id %s) to fleet-server: %v", action.ID(), err)

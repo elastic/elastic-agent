@@ -104,19 +104,25 @@ steps:
   #     - unit-tests-win2016
   #   allow_dependency_failure: true
 
-  # - label: ":sonarqube: Continuous Code Inspection"
-  #   env:
-  #     VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
+  # - label: "Serverless integration test"
+  #   key: "serverless-integration-tests"
+  #   command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestMonitoringLogsShipped" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+  #   artifact_paths:
+  #     - "build/TEST-**"
+  #     - "build/diagnostics/*"
   #   agents:
-  #     image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-  #   command:
-  #     - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
-  #     - "/scan-source-code.sh"
-  #   depends_on:
-  #     - "merge-coverage"
-  #   retry:
-  #     manual:
-  #       allowed: true
+  #     provider: "gcp"
+  #     machineType: "n1-standard-8"
+
+  # - label: "Integration tests"
+  #   key: "integration-tests"
+  #   command: ".buildkite/scripts/steps/integration_tests.sh stateful"
+  #   artifact_paths:
+  #     - "build/TEST-**"
+  #     - "build/diagnostics/*"
+  #   agents:
+  #     provider: "gcp"
+  #     machineType: "n1-standard-8"
 
   # - label: "Integration tests"
   #   key: "integration-tests"

@@ -96,6 +96,16 @@ func (DebianRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger
 		return fmt.Errorf("failed to SCP repo archive %s: %w", repoArchive, err)
 	}
 
+	// remove build paths, on cases where the build path is different from agent.
+	for _, remoteBuildPath := range []string{build.Path, build.SHA512Path} {
+		relativeAgentDir := filepath.Join("agent", remoteBuildPath)
+		_, _, err := sshClient.Exec(ctx, "sudo", []string{"rm", "-rf", relativeAgentDir}, nil)
+		// doesn't need to be a fatal error.
+		if err != nil {
+			logger.Logf("error removing build dir %s: %w", relativeAgentDir, err)
+		}
+	}
+
 	// ensure that agent directory is removed (possible it already exists if instance already used)
 	stdout, stderr, err := sshClient.Exec(ctx,
 		"sudo", []string{"rm", "-rf", "agent"}, nil)

@@ -16,7 +16,7 @@ import (
 
 // FastWatcherCfg is configuration that makes the watcher run faster.
 const FastWatcherCfg = `
-agent.upgradetest.watcher:
+agent.upgrade.watcher:
   grace_period: 1m
   error_check.interval: 15s
   crash_check.interval: 15s
