@@ -195,7 +195,6 @@ func testMonitoringLogsAreShipped(
 
 func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.Documents {
 	var docs estools.Documents
-
 	require.Eventually(
 		t,
 		func() bool {
@@ -206,13 +205,6 @@ func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.
 		3*time.Minute,
 		15*time.Second,
 	)
-
-	// TODO: remove after debugging
-	t.Log("--- debugging: results from ES --- START ---")
-	for _, doc := range docs.Hits.Hits {
-		t.Logf("%#v", doc.Source)
-	}
-	t.Log("--- debugging: results from ES --- END ---")
 
 	return docs
 }
@@ -247,7 +239,7 @@ func testFlattenedDatastreamFleetPolicy(
 	// The time here ensures there are no conflicts with the integration name
 	// in Fleet.
 	agentPolicyBuilder := strings.Builder{}
-	err = tmpl.Execute(&agentPolicyBuilder, plolicyVars{
+	err = tmpl.Execute(&agentPolicyBuilder, policyVars{
 		Name:        "Log-Input-" + t.Name() + "-" + time.Now().Format(time.RFC3339),
 		PolicyID:    policy.ID,
 		LogFilePath: logFilePath,
@@ -411,7 +403,7 @@ var policyJSON = `
   }
 }`
 
-type plolicyVars struct {
+type policyVars struct {
 	Name        string
 	PolicyID    string
 	LogFilePath string
