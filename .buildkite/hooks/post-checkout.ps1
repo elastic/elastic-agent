@@ -53,5 +53,8 @@ Checkout-Merge $targetBranch $prCommit $mergeBranch
 Write-Host "Commit information"
 git --no-pager log --format=%B -n 1
 
+Write-Host "Fixing CRLF in git checkout --"
+git config core.autocrlf true
+
 # Ensure Buildkite groups are rendered
 Write-Host ""

@@ -1,5 +1,10 @@
 $ErrorActionPreference = "Stop"
 
+Write-Host "-- Fixing CRLF in git checkout --"
+git config core.autocrlf input
+git rm --quiet --cached -r .
+git reset --quiet --hard
+
 $env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH"
 
 Write-Host "--- Build"

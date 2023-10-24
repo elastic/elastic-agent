@@ -34,39 +34,39 @@ steps:
   #     manual:
   #       allowed: true
 
-  # - label: "Unit tests - Windows 2022"
-  #   key: "unit-tests-win2022"
-  #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-  #   artifact_paths:
-  #     - "build/TEST-**"
-  #     - "build/diagnostics/*"
-  #     - "coverage.out"
-  #   agents:
-  #     provider: "gcp"
-  #     image: "family/core-windows-2022"
-  #     machine_type: "n2-standard-8"
-  #     disk_size: 200
-  #     disk_type: "pd-ssd"
-  #   retry:
-  #     manual:
-  #       allowed: true
+  - label: "Unit tests - Windows 2022"
+    key: "unit-tests-win2022"
+    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+      - "coverage.out"
+    agents:
+      provider: "gcp"
+      image: "family/core-windows-2022"
+      machine_type: "n2-standard-8"
+      disk_size: 200
+      disk_type: "pd-ssd"
+    retry:
+      manual:
+        allowed: true
 
-  # - label: "Unit tests - Windows 2016"
-  #   key: "unit-tests-win2016"
-  #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-  #   artifact_paths:
-  #     - "build/TEST-**"
-  #     - "build/diagnostics/*"
-  #     - "coverage.out"
-  #   agents:
-  #     provider: "gcp"
-  #     image: "family/core-windows-2016"
-  #     machine_type: "n2-standard-8"
-  #     disk_size: 200
-  #     disk_type: "pd-ssd"
-  #   retry:
-  #     manual:
-  #       allowed: true
+  - label: "Unit tests - Windows 2016"
+    key: "unit-tests-win2016"
+    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+      - "coverage.out"
+    agents:
+      provider: "gcp"
+      image: "family/core-windows-2016"
+      machine_type: "n2-standard-8"
+      disk_size: 200
+      disk_type: "pd-ssd"
+    retry:
+      manual:
+        allowed: true
 
   - label: "Unit tests - MacOS 13 ARM"
     key: "unit-tests-macos-13-arm"
