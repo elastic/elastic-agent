@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// //go:build integration
+//go:build integration
 
 package integration
 
@@ -184,6 +184,17 @@ func (runner *BeatRunner) TestSetupDashboards() {
 	dashList, err := tools.GetDashboards(ctx, runner.requirementsInfo.KibanaClient)
 	require.NoError(runner.T(), err)
 
+	defer func() {
+		// cleanup
+		for _, dash := range dashList {
+			err = tools.DeleteDashboard(ctx, runner.requirementsInfo.KibanaClient, dash.ID)
+			if err != nil {
+				runner.T().Logf("WARNING: could not delete dashboards after test: %s", err)
+				break
+			}
+		}
+	}()
+
 	// interesting hack in cases where we don't have a clean environment
 	// check to see if any of the dashboards were created recently
 	found := false
@@ -197,14 +208,6 @@ func (runner *BeatRunner) TestSetupDashboards() {
 
 	runner.Run("export dashboards", runner.SubtestExportDashboards)
 
-	// cleanup
-	for _, dash := range dashList {
-		err = tools.DeleteDashboard(ctx, runner.requirementsInfo.KibanaClient, dash.ID)
-		if err != nil {
-			runner.T().Logf("WARNING: could not delete dashboards after test: %s", err)
-			break
-		}
-	}
 }
 
 // tests the [beat] export dashboard command
@@ -243,6 +246,14 @@ func (runner *BeatRunner) TestSetupPipelines() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
+	defer func() {
+		/// cleanup
+		err := estools.DeletePipelines(ctx, runner.requirementsInfo.ESClient, "*filebeat*")
+		if err != nil {
+			runner.T().Logf("WARNING: could not clean up pipelines: %s", err)
+		}
+	}()
+
 	// need to actually enable something that has pipelines
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home", runner.agentFixture.WorkDir(),
 		"setup", "--pipelines", "--modules", "apache", "-M", "apache.error.enabled=true", "-M", "apache.access.enabled=true"})
@@ -254,17 +265,15 @@ func (runner *BeatRunner) TestSetupPipelines() {
 	require.NoError(runner.T(), err)
 	require.NotEmpty(runner.T(), pipelines)
 
-	/// cleanup
-	err = estools.DeletePipelines(ctx, runner.requirementsInfo.ESClient, "*filebeat*")
-	if err != nil {
-		runner.T().Logf("WARNING: could not clean up pipelines: %s", err)
-	}
 }
 
 // test beat setup --index-management with ILM disabled
 func (runner *BeatRunner) TestIndexManagementNoILM() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
+	defer func() {
+		runner.CleanupTemplates(ctx)
+	}()
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
 		runner.agentFixture.WorkDir(),
@@ -286,13 +295,15 @@ func (runner *BeatRunner) TestIndexManagementNoILM() {
 	runner.Run("export templates", runner.SubtestExportTemplates)
 	runner.Run("export index patterns", runner.SubtestExportIndexPatterns)
 
-	runner.CleanupTemplates(ctx)
 }
 
 // tests setup with all default settings
 func (runner *BeatRunner) TestWithAllDefaults() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
+	defer func() {
+		runner.CleanupTemplates(ctx)
+	}()
 
 	// pre-delete in case something else missed cleanup
 	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
@@ -309,7 +320,6 @@ func (runner *BeatRunner) TestWithAllDefaults() {
 
 	require.NotEmpty(runner.T(), streams.DataStreams)
 
-	runner.CleanupTemplates(ctx)
 }
 
 // test the setup process with mismatching template and DSL names
@@ -317,7 +327,9 @@ func (runner *BeatRunner) TestCustomBadNames() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	runner.CleanupTemplates(ctx)
+	defer func() {
+		runner.CleanupTemplates(ctx)
+	}()
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"-e", "--path.home",
 		runner.agentFixture.WorkDir(),
@@ -327,9 +339,8 @@ func (runner *BeatRunner) TestCustomBadNames() {
 	runner.T().Logf("got response from management setup: %s", string(resp))
 	require.NoError(runner.T(), err)
 
-	require.True(runner.T(), strings.Contains(string(resp), "non-default template and policy names should be the same"))
+	require.True(runner.T(), strings.Contains(string(resp), "Additional updates & overwrites to this config will not work."))
 
-	runner.CleanupTemplates(ctx)
 }
 
 func (runner *BeatRunner) TestOverwriteWithCustomName() {
@@ -337,6 +348,11 @@ func (runner *BeatRunner) TestOverwriteWithCustomName() {
 	updatedPolicy := mapstr.M{
 		"data_retention": "1d",
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	defer func() {
+		runner.CleanupTemplates(ctx)
+	}()
 
 	lctemp := runner.T().TempDir()
 	raw, err := json.MarshalIndent(updatedPolicy, "", " ")
@@ -346,9 +362,6 @@ func (runner *BeatRunner) TestOverwriteWithCustomName() {
 
 	err = os.WriteFile(lifecyclePath, raw, 0o744)
 	require.NoError(runner.T(), err)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
 
 	runner.CleanupTemplates(ctx)
 
@@ -373,8 +386,6 @@ func (runner *BeatRunner) TestOverwriteWithCustomName() {
 
 	runner.CheckDSLPolicy(ctx, "*custom-name*", "1d")
 
-	runner.CleanupTemplates(ctx)
-
 }
 
 // TestWithCustomLifecyclePolicy uploads a custom DSL policy
@@ -384,6 +395,12 @@ func (runner *BeatRunner) TestWithCustomLifecyclePolicy() {
 		"data_retention": "1d",
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	defer func() {
+		runner.CleanupTemplates(ctx)
+	}()
+
 	lctemp := runner.T().TempDir()
 	raw, err := json.MarshalIndent(dslPolicy, "", " ")
 	require.NoError(runner.T(), err)
@@ -392,9 +409,6 @@ func (runner *BeatRunner) TestWithCustomLifecyclePolicy() {
 
 	err = os.WriteFile(lifecyclePath, raw, 0o744)
 	require.NoError(runner.T(), err)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
 
 	runner.CleanupTemplates(ctx)
 
@@ -451,6 +465,9 @@ func (runner *BeatRunner) TestBothLifecyclesEnabled() {
 func (runner *BeatRunner) TestAllLifecyclesDisabled() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
+	defer func() {
+		runner.CleanupTemplates(ctx)
+	}()
 
 	runner.CleanupTemplates(ctx)
 
@@ -475,8 +492,6 @@ func (runner *BeatRunner) TestAllLifecyclesDisabled() {
 		}
 	}
 	require.False(runner.T(), foundPolicy, "Found a lifecycle policy despite disabling lifecycles. Found: %#v", streams)
-
-	runner.CleanupTemplates(ctx)
 }
 
 // the export command doesn't actually make a network connection,
