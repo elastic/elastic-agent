@@ -381,7 +381,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		env["KIBANA_HOST"] = stack.Kibana
 		env["KIBANA_USERNAME"] = stack.Username
 		env["KIBANA_PASSWORD"] = stack.Password
-		logger.Logf("Using Stack with Kibana host %s, %s/%s", stack.Kibana, stack.Username, stack.Password)
+		logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
 	}
 
 	// set the go test flags
