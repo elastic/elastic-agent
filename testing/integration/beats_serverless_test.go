@@ -44,7 +44,7 @@ type BeatRunner struct {
 	testbeatName string
 }
 
-func TestMetricbeatSeverless(t *testing.T) {
+func TestBeatsServerless(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		OS: []define.OS{
 			{Type: define.Linux},
@@ -73,7 +73,7 @@ func (runner *BeatRunner) SetupSuite() {
 	}
 	runner.T().Logf("running serverless tests with %s", runner.testbeatName)
 
-	agentFixture, err := define.NewFixtureWithBinary(runner.T(), define.Version(), runner.testbeatName, "/home/ubuntu", atesting.WithRunLength(time.Minute), atesting.WithAdditionalArgs([]string{"-E", "output.elasticsearch.allow_older_versions=true"}))
+	agentFixture, err := define.NewFixtureWithBinary(runner.T(), define.Version(), runner.testbeatName, "/home/ubuntu", atesting.WithRunLength(time.Minute*3), atesting.WithAdditionalArgs([]string{"-E", "output.elasticsearch.allow_older_versions=true"}))
 	runner.agentFixture = agentFixture
 	require.NoError(runner.T(), err)
 
@@ -104,8 +104,7 @@ processors:
 		beatOutConfig = `
 output.elasticsearch:
   hosts: ["%s"]
-  username: %s
-  password: %s
+  api_key: "%s:%s"
 setup.kibana:
   host: %s
 filebeat.config.modules:
@@ -184,17 +183,6 @@ func (runner *BeatRunner) TestSetupDashboards() {
 	dashList, err := tools.GetDashboards(ctx, runner.requirementsInfo.KibanaClient)
 	require.NoError(runner.T(), err)
 
-	defer func() {
-		// cleanup
-		for _, dash := range dashList {
-			err = tools.DeleteDashboard(ctx, runner.requirementsInfo.KibanaClient, dash.ID)
-			if err != nil {
-				runner.T().Logf("WARNING: could not delete dashboards after test: %s", err)
-				break
-			}
-		}
-	}()
-
 	// interesting hack in cases where we don't have a clean environment
 	// check to see if any of the dashboards were created recently
 	found := false
@@ -207,6 +195,14 @@ func (runner *BeatRunner) TestSetupDashboards() {
 	require.True(runner.T(), found, fmt.Sprintf("could not find dashboard newer than 5 minutes, out of %d dashboards", len(dashList)))
 
 	runner.Run("export dashboards", runner.SubtestExportDashboards)
+	// cleanup
+	for _, dash := range dashList {
+		err = tools.DeleteDashboard(ctx, runner.requirementsInfo.KibanaClient, dash.ID)
+		if err != nil {
+			runner.T().Logf("WARNING: could not delete dashboards after test: %s", err)
+			break
+		}
+	}
 
 }
 

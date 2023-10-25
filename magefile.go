@@ -1584,7 +1584,7 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	if err != nil {
 		return fmt.Errorf("error setting binary name: %w", err)
 	}
-	return integRunner(ctx, false, "TestMetricbeatSeverless")
+	return integRunner(ctx, false, "TestBeatsServerless")
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
