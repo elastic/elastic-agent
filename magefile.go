@@ -1576,7 +1576,7 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 		if err != nil {
 			return fmt.Errorf("error setting serverless stack var: %w", err)
 		}
-	} else if os.Getenv("STACK_PROVISIONER") == "ess" {
+	} else if os.Getenv("STACK_PROVISIONER") == "stateful" {
 		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
 	}
 
