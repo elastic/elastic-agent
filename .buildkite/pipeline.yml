@@ -163,4 +163,4 @@ steps:
       provider: "gcp"
     plugins:
       - junit-annotate#v2.4.1:
-          artifacts: build/TEST-go-*.xml
+          artifacts: build/TEST-go-integration*.xml
