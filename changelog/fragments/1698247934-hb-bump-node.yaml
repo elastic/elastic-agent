@@ -11,12 +11,12 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: hb-bump-node-18.17
+summary: hb-bump-node-18.18.x
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: Bump NodeJS version bundled with Heartbeat to v18.17.1.
+description: Bump NodeJS version bundled with Heartbeat to v18.18.2.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: "elastic-agent"
