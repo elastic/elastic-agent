@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -123,15 +123,8 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 		timeout = time.Until(deadline)
 	}
 
-	assert.Eventually(
-		t,
-		check.FleetAgentStatus(t, kibClient, policyID, "online"),
-		timeout,
-		10*time.Second,
-		"Elastic Agent status is not online",
-	)
 	// Wait for Agent to be healthy
-	assert.Eventually(
+	require.Eventually(
 		t,
 		check.FleetAgentStatus(t, kibClient, policyID, "online"),
 		timeout,
