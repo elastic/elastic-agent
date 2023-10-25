@@ -99,7 +99,7 @@ steps:
   - label: "Merge coverage reports"
     key: "merge-coverage"
     env:
-      BUILDKITE_REPO: "" # skip checkout
+      BUILDKITE_REPO: ""
     command: "
       .buildkite/scripts/steps/merge.sh
       unit-tests-2204
@@ -121,6 +121,20 @@ steps:
       - unit-tests-macos-13
       - unit-tests-macos-13-arm
     allow_dependency_failure: true
+
+  - label: ":sonarqube: Continuous Code Inspection"
+    env:
+      VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
+    agents:
+      image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
+    command:
+      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
+      - "/scan-source-code.sh"
+    depends_on:
+      - "merge-coverage"
+    retry:
+      manual:
+        allowed: true
 
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
