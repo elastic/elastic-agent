@@ -414,6 +414,13 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 								"log.level": "error",
 							},
 						},
+						{
+							"term": map[string]interface{}{
+								"data_stream.namespace": map[string]interface{}{
+									"value": namespace,
+								},
+							},
+						},
 					},
 					"must_not": excludeStatements,
 				},

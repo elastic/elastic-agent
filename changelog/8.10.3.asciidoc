@@ -1,0 +1,41 @@
+// begin 8.10.3 relnotes
+
+[[release-notes-8.10.3]]
+==  8.10.3
+
+Review important information about the  8.10.3 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.10.3]]
+=== New features
+
+The 8.10.3 release adds the following new and notable features.
+
+
+elastic-agent::
+
+* Improve Agent Uninstall On Windows By Adding Delay Between Retries When File Removal Is Blocked By Busy Files. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3431[#https://github.com/elastic/elastic-agent/pull/3431] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3221[#https://github.com/elastic/elastic-agent/issues/3221]
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.10.3]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Resilient Handling Of Air Gapped Pgp Checks. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3427[#https://github.com/elastic/elastic-agent/pull/3427] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3368[#https://github.com/elastic/elastic-agent/issues/3368]
+
+// end 8.10.3 relnotes

@@ -128,6 +128,11 @@ func (ats *apmTracesSender) createNewTracer(cfg *proto.APMConfig) (*apm.Tracer, 
 		defer os.Unsetenv(envCACert)
 	}
 
+	if cfg.Elastic.GetGlobalLabels() != "" {
+		os.Setenv(envGlobalLabels, cfg.Elastic.GetGlobalLabels())
+		defer os.Unsetenv(envGlobalLabels)
+	}
+
 	ts, err := apmtransport.NewHTTPTransport()
 	if err != nil {
 		return nil, err
@@ -197,6 +202,10 @@ func (fai *fakeAPMInput) Update(u *client.Unit, triggers client.Trigger) error {
 
 func newFakeAPMInput(logger zerolog.Logger, logLevel client.UnitLogLevel, unit *client.Unit) (*fakeAPMInput, error) {
 	logger = logger.Level(toZerologLevel(logLevel))
+
+	// close the default tracer to avoid unnecessary logs
+	apm.DefaultTracer.Close()
+
 	apmInput := &fakeAPMInput{
 		logger: logger,
 		unit:   unit,
@@ -206,6 +215,7 @@ func newFakeAPMInput(logger zerolog.Logger, logLevel client.UnitLogLevel, unit *
 	if err != nil {
 		return apmInput, fmt.Errorf("error while setting starting state: %w", err)
 	}
+	logger.Info().Msgf("Starting fake APM traces sender with config %v", unit.Expected().APMConfig)
 	err = apmInput.sender.Start(context.Background(), unit.Expected().APMConfig)
 	if err != nil {
 		return apmInput, fmt.Errorf("error starting apm tracer sender: %w", err)
@@ -231,6 +241,7 @@ func senderErrorLogger(ctx context.Context, logger zerolog.Logger, errCh <-chan 
 			if err != nil {
 				logger.Err(err).Msg("sender error")
 				_ = unit.UpdateState(client.UnitStateDegraded, fmt.Sprintf("sender error: %s", err), nil)
+				continue
 			}
 			_ = unit.UpdateState(client.UnitStateHealthy, fmt.Sprintf("sender error: %s", err), nil)
 		}

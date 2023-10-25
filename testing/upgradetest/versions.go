@@ -42,10 +42,16 @@ func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, current
 		return nil, errors.New("retrieved versions list from Artifact API is empty")
 	}
 
+	return getUpgradableVersions(ctx, vList, upgradeToVersion, currentMajorVersions, previousMajorVersions)
+}
+
+// Internal version of GetUpgradableVersions() with the artifacts API dependency removed for testing.
+func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int) ([]*version.ParsedSemVer, error) {
 	parsedUpgradeToVersion, err := version.ParseVersion(upgradeToVersion)
 	if err != nil {
 		return nil, fmt.Errorf("upgradeToVersion %q is not a valid version string: %w", upgradeToVersion, err)
 	}
+
 	currentMajor := parsedUpgradeToVersion.Major()
 	var currentMajorSelected, previousMajorSelected int
 
@@ -66,6 +72,11 @@ func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, current
 	// we want to sort in descending orders, so we sort them
 	sort.Sort(sort.Reverse(sortedParsedVersions))
 
+	// If the only available build of the most recent version is a snapshot it is unreleased.
+	// This is always true on main and true until the first release of each minor version branch.
+	mostRecentVersion := sortedParsedVersions[0]
+	mostRecentIsUnreleased := mostRecentVersion.IsSnapshot()
+
 	var upgradableVersions []*version.ParsedSemVer
 	for _, parsedVersion := range sortedParsedVersions {
 		if currentMajorSelected == currentMajorVersions && previousMajorSelected == previousMajorVersions {
@@ -78,9 +89,21 @@ func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, current
 			continue
 		}
 
+		isPrevMinor := (parsedUpgradeToVersion.Major() == parsedVersion.Major()) &&
+			(parsedUpgradeToVersion.Minor()-parsedVersion.Minor()) == 1
+
 		if parsedVersion.IsSnapshot() {
-			// skip all snapshots
-			continue
+			// Allow returning the snapshot build of the previous minor if the current version is unreleased.
+			// In this situation the previous minor branch may also be unreleased immediately after feature freeze.
+			if !mostRecentIsUnreleased || !isPrevMinor {
+				continue
+			}
+		} else {
+			// Skip the non-snapshot build of the previous minor since it might only be available at
+			// staging.elastic.co which is not a default binary download location.
+			if mostRecentIsUnreleased && isPrevMinor {
+				continue
+			}
 		}
 
 		if parsedVersion.Major() == currentMajor && currentMajorSelected < currentMajorVersions {

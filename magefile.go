@@ -928,6 +928,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 			// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
+			// https://artifacts-snapshot.elastic.co/assetbeat/latest/8.11.0-SNAPSHOT.json
 			externalBinaries := map[string]string{
 				"auditbeat":             "beats",
 				"filebeat":              "beats",
@@ -943,6 +944,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 				"pf-elastic-collector":  "prodfiler",
 				"pf-elastic-symbolizer": "prodfiler",
 				"pf-host-agent":         "prodfiler",
+				"assetbeat":             "assetbeat", // only supporting linux/amd64 or linux/arm64
 			}
 
 			// Only log fatal logs for logs produced using logrus. This is the global logger
@@ -979,10 +981,10 @@ func packageAgent(platforms []string, packagingFn func()) {
 					panic(err)
 				}
 
-				packagesMissing := false
 				packagesCopied := 0
 
 				if !requiredPackagesPresent(pwd, b, packageVersion, requiredPackages) {
+					fmt.Printf("--- Package %s\n", pwd)
 					cmd := exec.Command("mage", "package")
 					cmd.Dir = pwd
 					cmd.Stdout = os.Stdout
@@ -1008,6 +1010,15 @@ func packageAgent(platforms []string, packagingFn func()) {
 					targetPath := filepath.Join(archivePath, rp)
 					os.MkdirAll(targetPath, 0755)
 					for _, f := range files {
+						// safety check; if the user has an older version of the beats repo,
+						// for example right after a release where you've `git pulled` from on repo and not the other,
+						// they might end up with a mishmash of packages from different versions.
+						// check to see if we have mismatched versions.
+						if !strings.Contains(f, packageVersion) {
+							// if this panic hits weird edge cases where we don't want actual failures, revert to a printf statement.
+							panic(fmt.Sprintf("the file %s doesn't match agent version %s, beats repo might be out of date", f, packageVersion))
+						}
+
 						targetFile := filepath.Join(targetPath, filepath.Base(f))
 						packagesCopied += 1
 						if err := sh.Copy(targetFile, f); err != nil {
@@ -1017,8 +1028,8 @@ func packageAgent(platforms []string, packagingFn func()) {
 				}
 				// a very basic footcannon protector; if packages are missing and we need to rebuild them, check to see if those files were copied
 				// if we needed to repackage beats but still somehow copied nothing, could indicate an issue. Usually due to beats and agent being at different versions.
-				if packagesMissing && packagesCopied == 0 {
-					fmt.Printf(">>> WARNING: no packages were copied, but we repackaged beats anyway. Check binary to see if intended beats are there.")
+				if packagesCopied == 0 {
+					fmt.Println(">>> WARNING: no packages were copied, but we repackaged beats anyway. Check binary to see if intended beats are there.")
 				}
 			}
 		}
@@ -1153,6 +1164,7 @@ func copyComponentSpecs(componentName, versionedDropPath string) (string, error)
 	targetPath := filepath.Join(versionedDropPath, specFileName)
 
 	if _, err := os.Stat(targetPath); err != nil {
+		fmt.Printf(">> File %s does not exist, reverting to local specfile\n", targetPath)
 		// spec not present copy from local
 		sourceSpecFile := filepath.Join("specs", specFileName)
 		if mg.Verbose() {
