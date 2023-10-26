@@ -23,19 +23,19 @@ func TestHost(t *testing.T) {
 logs: true
 metrics: true
 http:
-  enabled: true`, defaultHost},
+  enabled: true`, DefaultHost},
 		{"empty host", `enabled: true
 logs: true
 metrics: true
 http:
   enabled: true
-  host: ""`, defaultHost},
+  host: ""`, DefaultHost},
 		{"default", `enabled: true
 logs: true
 metrics: true
 http:
   enabled: true
-  host: localhost`, defaultHost},
+  host: localhost`, DefaultHost},
 		{"custom host", `enabled: true
 logs: true
 metrics: true
