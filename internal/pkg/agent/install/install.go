@@ -65,7 +65,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep, streams *cli.IOStr
 	copyConcurrency := 1
 	block, err := ghw.Block()
 	if err != nil {
-		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling concurrency: %s\n", err)
+		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling copy concurrency: %s\n", err)
 	} else {
 		if HasAllSSDs(*block) {
 			copyConcurrency = runtime.NumCPU() * 4

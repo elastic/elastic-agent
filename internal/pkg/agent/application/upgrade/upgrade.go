@@ -391,7 +391,7 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 	copyConcurrency := 1
 	block, err := ghw.Block()
 	if err != nil {
-		l.Warnw("Error detecting block storage type", "error.message", err)
+		l.Infow("Could not determine block storage type, disabling copy concurrency", "error.message", err)
 	} else {
 		if install.HasAllSSDs(*block) {
 			copyConcurrency = runtime.NumCPU() * 4
