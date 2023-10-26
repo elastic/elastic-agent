@@ -140,7 +140,7 @@ func (prov *ServerlessProvision) Clean(ctx context.Context, stacks []runner.Stac
 	for _, stack := range stacks {
 		prov.stacksMut.RLock()
 		// because of the way the provisioner initializes,
-		// we can't guarentee that we have a valid client/stack setup, as we might have just re-initialized from a file.
+		// we can't guarantee that we have a valid client/stack setup, as we might have just re-initialized from a file.
 		// If that's the case, create a new client
 		stackRef, ok := prov.stacks[stack.ID]
 		prov.stacksMut.RUnlock()
