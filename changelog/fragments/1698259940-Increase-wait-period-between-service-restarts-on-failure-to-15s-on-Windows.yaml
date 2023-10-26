@@ -16,7 +16,7 @@ summary: Increase wait period between service restarts on failure to 15s on Wind
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: This is the same value used by endpoint-security.
+description: This is the same value used by other Elastic windows services like endpoint-security.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: "elastic-agent"
