@@ -61,15 +61,18 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	}
 
 	// copy source into install path
-	block, err := ghw.Block()
-	if err != nil {
-		return fmt.Errorf("ghw.Block() returned error: %w", err)
+	copyConcurrency := 1
+	block, blockErr := ghw.Block()
+
+	// Detecting the block HW type may fail (particularly on MacOS) but this is not a fatal error.
+	// The error will be logged only if the copy failed to avoid showing errors to users when they
+	// first use Elastic Agent unnecessarily.
+	if blockErr == nil {
+		if HasAllSSDs(*block) {
+			copyConcurrency = runtime.NumCPU() * 4
+		}
 	}
 
-	copyConcurrency := 1
-	if HasAllSSDs(*block) {
-		copyConcurrency = runtime.NumCPU() * 4
-	}
 	s := pt.StepStart("Copying files")
 	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
@@ -80,10 +83,13 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	})
 	if err != nil {
 		s.Failed()
+		// If the copy fails also return any error we encountered detecting the block device.
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
-			errors.M("source", dir), errors.M("destination", topPath))
+			errors.M("source", dir), errors.M("destination", topPath),
+			errors.M("concurrency", copyConcurrency), errors.M("blkerror", blockErr),
+		)
 	}
 	s.Succeeded()
 
