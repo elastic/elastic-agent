@@ -5,6 +5,7 @@
 package config
 
 import (
+	"strings"
 	"time"
 
 	c "github.com/elastic/elastic-agent-libs/config"
@@ -61,7 +62,7 @@ func (c *MonitoringHTTPConfig) Unpack(cfg *c.C) error {
 		return err
 	}
 
-	if tmp.Host == "" {
+	if strings.TrimSpace(tmp.Host) == "" {
 		tmp.Host = DefaultHost
 	}
 

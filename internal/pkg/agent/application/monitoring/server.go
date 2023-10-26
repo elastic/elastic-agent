@@ -39,7 +39,7 @@ func NewServer(
 		log.Warnf("failed to create monitoring drop: %v", err)
 	}
 
-	if endpointConfig.Host == "" {
+	if strings.TrimSpace(endpointConfig.Host) == "" {
 		endpointConfig.Host = monitoringCfg.DefaultHost
 	}
 

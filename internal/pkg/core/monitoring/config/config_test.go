@@ -30,6 +30,12 @@ metrics: true
 http:
   enabled: true
   host: ""`, DefaultHost},
+		{"whitespace host", `enabled: true
+logs: true
+metrics: true
+http:
+  enabled: true
+  host: "   "`, DefaultHost},
 		{"default", `enabled: true
 logs: true
 metrics: true
