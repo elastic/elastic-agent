@@ -107,6 +107,12 @@ output.elasticsearch:
   api_key: "%s:%s"
 setup.kibana:
   host: %s
+filebeat.modules:
+  - module: system
+    syslog:
+      enabled: true
+    auth:
+      enabled: true
 filebeat.config.modules:
   - modules: system
     syslog:
@@ -418,7 +424,6 @@ func (runner *BeatRunner) TestWithCustomLifecyclePolicy() {
 
 	runner.CheckDSLPolicy(ctx, fmt.Sprintf("%s*", runner.testbeatName), "1d")
 
-	runner.CleanupTemplates(ctx)
 }
 
 // tests beat setup --index-management with ILM explicitly set
@@ -579,7 +584,7 @@ func (runner *BeatRunner) CheckDSLPolicy(ctx context.Context, tmpl string, polic
 		}
 	}
 
-	require.True(runner.T(), foundCustom, "did not find our custom lifecycle policy. Found: %#v", streams)
+	require.True(runner.T(), foundCustom, "did not find our lifecycle policy. Found: %#v", streams)
 }
 
 // CleanupTemplates removes any existing index
