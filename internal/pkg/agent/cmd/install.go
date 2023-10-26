@@ -185,7 +185,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
-		err = install.Install(cfgFile, topPath, s)
+		err = install.Install(cfgFile, topPath, s, streams)
 		if err != nil {
 			return err
 		}

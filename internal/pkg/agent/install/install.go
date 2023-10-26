@@ -11,13 +11,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/kardianos/service"
-
 	"github.com/jaypipes/ghw"
+	"github.com/kardianos/service"
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
+func Install(cfgFile, topPath string, pt ProgressTrackerStep, streams *cli.IOStreams) error {
 	dir, err := findDirectory()
 	if err != nil {
 		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
@@ -61,13 +61,12 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	}
 
 	// copy source into install path
-	copyConcurrency := 1
-	block, blockErr := ghw.Block()
-
 	// Detecting the block HW type may fail (particularly on MacOS) but this is not a fatal error.
-	// The error will be logged only if the copy failed to avoid showing errors to users when they
-	// first use Elastic Agent unnecessarily.
-	if blockErr == nil {
+	copyConcurrency := 1
+	block, err := ghw.Block()
+	if err != nil {
+		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling concurrency: %s\n", err)
+	} else {
 		if HasAllSSDs(*block) {
 			copyConcurrency = runtime.NumCPU() * 4
 		}
@@ -88,7 +87,6 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 			err,
 			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
 			errors.M("source", dir), errors.M("destination", topPath),
-			errors.M("concurrency", copyConcurrency), errors.M("blkerror", blockErr),
 		)
 	}
 	s.Succeeded()
