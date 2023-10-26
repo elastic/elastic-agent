@@ -95,7 +95,10 @@ func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runne
 			Kibana:        client.proj.Endpoints.Kibana,
 			Username:      client.proj.Credentials.Username,
 			Password:      client.proj.Credentials.Password,
-			Internal:      map[string]interface{}{"deployment_id": proj.ID},
+			Internal: map[string]interface{}{
+				"deployment_id":   proj.ID,
+				"deployment_type": proj.Type,
+			},
 		}
 		stacks = append(stacks, newStack)
 		prov.stacksMut.Lock()
@@ -136,15 +139,45 @@ func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runne
 func (prov *ServerlessProvision) Clean(ctx context.Context, stacks []runner.Stack) error {
 	for _, stack := range stacks {
 		prov.stacksMut.RLock()
+		// because of the way the provisioner initializes,
+		// we can't guarentee that we have a valid client/stack setup, as we might have just re-initialized from a file.
+		// If that's the case, create a new client
 		stackRef, ok := prov.stacks[stack.ID]
 		prov.stacksMut.RUnlock()
+		// we can't reference the client, it won't be created when we just run mage:clean
+		// instead, grab the project ID from `stacks`, create a new client
 		if ok {
 			err := stackRef.client.DeleteDeployment()
 			if err != nil {
 				prov.log.Logf("error removing deployment: %w", err)
 			}
 		} else {
-			prov.log.Logf("error: could not find deployment for ID %s", stack.ID)
+			// create a new client
+			client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
+			dep_id, ok := stack.Internal["deployment_id"]
+			if !ok {
+				return fmt.Errorf("could not find deployment_id for serverless")
+			}
+			dep_id_str, ok := dep_id.(string)
+			if !ok {
+				return fmt.Errorf("deployment_id is not a string: %v", dep_id)
+			}
+			client.proj.ID = dep_id_str
+
+			dep_type, ok := stack.Internal["deployment_type"]
+			if !ok {
+				return fmt.Errorf("could not find deployment_type in stack for serverless")
+			}
+			dep_type_str, ok := dep_type.(string)
+			if !ok {
+				return fmt.Errorf("deployment_type is not a string: %v", dep_id_str)
+			}
+			client.proj.Type = dep_type_str
+			err := client.DeleteDeployment()
+			if err != nil {
+				return fmt.Errorf("error removing deployment after re-creating client: %w", err)
+			}
+
 		}
 	}
 	return nil
