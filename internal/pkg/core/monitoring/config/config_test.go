@@ -13,6 +13,51 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
+func TestHost(t *testing.T) {
+	testCases := []struct {
+		name         string
+		config       string
+		expectedHost string
+	}{
+		{"no host", `enabled: true
+logs: true
+metrics: true
+http:
+  enabled: true`, defaultHost},
+		{"empty host", `enabled: true
+logs: true
+metrics: true
+http:
+  enabled: true
+  host: ""`, defaultHost},
+		{"default", `enabled: true
+logs: true
+metrics: true
+http:
+  enabled: true
+  host: localhost`, defaultHost},
+		{"custom host", `enabled: true
+logs: true
+metrics: true
+http:
+  enabled: true
+  host: custom`, "custom"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := config.NewConfigFrom(tc.config)
+			require.NoError(t, err, "failed to create config")
+
+			cfg := DefaultConfig()
+			c.Unpack(&cfg)
+			require.NoError(t, err, "failed to unpack config")
+
+			require.Equal(t, tc.expectedHost, cfg.HTTP.Host)
+		})
+	}
+}
+
 func TestAPMConfig(t *testing.T) {
 	tcs := map[string]struct {
 		in  map[string]interface{}

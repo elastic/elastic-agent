@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -36,6 +37,10 @@ func NewServer(
 	if err := createAgentMonitoringDrop(endpointConfig.Host); err != nil {
 		// log but ignore
 		log.Warnf("failed to create monitoring drop: %v", err)
+	}
+
+	if endpointConfig.Host == "" {
+		endpointConfig.Host = monitoringCfg.DefaultHost
 	}
 
 	cfg, err := config.NewConfigFrom(endpointConfig)
