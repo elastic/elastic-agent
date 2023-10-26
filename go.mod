@@ -15,8 +15,13 @@ require (
 	github.com/elastic/e2e-testing v1.1.0
 	github.com/elastic/elastic-agent-autodiscover v0.6.4
 	github.com/elastic/elastic-agent-client/v7 v7.4.0
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-libs v0.6.0
 	github.com/elastic/elastic-agent-system-metrics v0.6.1
+=======
+	github.com/elastic/elastic-agent-libs v0.6.2
+	github.com/elastic/elastic-agent-system-metrics v0.7.0
+>>>>>>> 872f329c29 (Bump github.com/elastic/elastic-agent-libs from 0.6.0 to 0.6.2 (#3660))
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
 	github.com/elastic/go-elasticsearch/v8 v8.10.0
 	github.com/elastic/go-licenser v0.4.1
@@ -53,12 +58,21 @@ require (
 	go.elastic.co/ecszap v1.0.1
 	go.elastic.co/go-licence-detector v0.5.0
 	go.uber.org/zap v1.25.0
+<<<<<<< HEAD
 	golang.org/x/crypto v0.11.0
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/sync v0.3.0
 	golang.org/x/sys v0.10.0
 	golang.org/x/text v0.11.0
+=======
+	golang.org/x/crypto v0.14.0
+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
+	golang.org/x/sync v0.3.0
+	golang.org/x/sys v0.13.0
+	golang.org/x/term v0.13.0
+	golang.org/x/text v0.13.0
+>>>>>>> 872f329c29 (Bump github.com/elastic/elastic-agent-libs from 0.6.0 to 0.6.2 (#3660))
 	golang.org/x/time v0.3.0
 	golang.org/x/tools v0.7.0
 	google.golang.org/grpc v1.58.3
@@ -143,7 +157,7 @@ require (
 	go.elastic.co/fastjson v1.1.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.9.0 // indirect
-	golang.org/x/net v0.12.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
 	golang.org/x/term v0.10.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
