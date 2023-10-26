@@ -14,6 +14,7 @@ import (
 	"github.com/jaypipes/ghw"
 	"github.com/kardianos/service"
 	"github.com/otiai10/copy"
+	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -25,7 +26,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, pt ProgressTrackerStep, streams *cli.IOStreams) error {
+func Install(cfgFile, topPath string, pt *progressbar.ProgressBar, streams *cli.IOStreams) error {
 	dir, err := findDirectory()
 	if err != nil {
 		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
@@ -39,16 +40,16 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep, streams *cli.IOStr
 		// There is no uninstall token for "install" command.
 		// Uninstall will fail on protected agent.
 		// The protected Agent will need to be uninstalled first before it can be installed.
-		s := pt.StepStart("Uninstalling current Elastic Agent")
-		err = Uninstall(cfgFile, topPath, "", s)
+		pt.Describe("Uninstalling current Elastic Agent")
+		err = Uninstall(cfgFile, topPath, "", pt)
 		if err != nil {
-			s.Failed()
+			pt.Describe("Failed to uninstall current Elastic Agent")
 			return errors.New(
 				err,
 				fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
 				errors.M("directory", filepath.Dir(topPath)))
 		}
-		s.Succeeded()
+		pt.Describe("Successfully uninstalled current Elastic Agent")
 	}
 
 	// ensure parent directory exists
@@ -72,7 +73,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep, streams *cli.IOStr
 		}
 	}
 
-	s := pt.StepStart("Copying files")
+	pt.Describe("Copying install files")
 	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
@@ -81,15 +82,14 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep, streams *cli.IOStr
 		NumOfWorkers: int64(copyConcurrency),
 	})
 	if err != nil {
-		s.Failed()
-		// If the copy fails also return any error we encountered detecting the block device.
+		pt.Describe("Error copying files")
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
 			errors.M("source", dir), errors.M("destination", topPath),
 		)
 	}
-	s.Succeeded()
+	pt.Describe("Successfully copied files")
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
@@ -140,7 +140,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep, streams *cli.IOStr
 	// post install (per platform)
 	err = postInstall(topPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("error running post-install steps: %w", err)
 	}
 
 	// fix permissions
@@ -153,21 +153,21 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep, streams *cli.IOStr
 	}
 
 	// install service
-	s = pt.StepStart("Installing service")
+	pt.Describe("Installing service")
 	svc, err := newService(topPath)
 	if err != nil {
-		s.Failed()
-		return err
+		pt.Describe("Failed to install service")
+		return fmt.Errorf("error installing new service: %w", err)
 	}
 	err = svc.Install()
 	if err != nil {
-		s.Failed()
+		pt.Describe("Failed to install service")
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
 			errors.M("service", paths.ServiceName))
 	}
-	s.Succeeded()
+	pt.Describe("Installed service")
 
 	return nil
 }
@@ -178,7 +178,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep, streams *cli.IOStr
 func StartService(topPath string) error {
 	svc, err := newService(topPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating new service handler: %w", err)
 	}
 	err = svc.Start()
 	if err != nil {
@@ -194,7 +194,7 @@ func StartService(topPath string) error {
 func StopService(topPath string) error {
 	svc, err := newService(topPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating new service handler: %w", err)
 	}
 	err = svc.Stop()
 	if err != nil {
@@ -210,7 +210,7 @@ func StopService(topPath string) error {
 func RestartService(topPath string) error {
 	svc, err := newService(topPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating new service handler: %w", err)
 	}
 	err = svc.Restart()
 	if err != nil {
@@ -242,16 +242,16 @@ func FixPermissions(topPath string) error {
 func findDirectory() (string, error) {
 	execPath, err := os.Executable()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error fetching executable of current process: %w", err)
 	}
 	execPath, err = filepath.Abs(execPath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error fetching absolute file path: %w", err)
 	}
 	sourceDir := paths.ExecDir(filepath.Dir(execPath))
 	err = verifyDirectory(sourceDir)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error verifying directory: %w", err)
 	}
 	return sourceDir, nil
 }
