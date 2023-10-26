@@ -50,7 +50,7 @@ http:
 			require.NoError(t, err, "failed to create config")
 
 			cfg := DefaultConfig()
-			c.Unpack(&cfg)
+			err = c.Unpack(&cfg)
 			require.NoError(t, err, "failed to unpack config")
 
 			require.Equal(t, tc.expectedHost, cfg.HTTP.Host)
