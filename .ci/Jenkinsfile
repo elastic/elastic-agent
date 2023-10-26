@@ -300,77 +300,7 @@ pipeline {
           }
         }
       }
-    }
-    stage('m1') {
-      agent { label 'orka && darwin && aarch64' }
-      options { skipDefaultCheckout() }
-      when {
-        // Always when running builds on branches/tags
-        // Enable if extended M1 support related changes.
-        beforeAgent true
-        anyOf {
-          not { changeRequest() }
-          expression { return isExtendedM1Enabled() && env.ONLY_DOCS == "false"}
-        }
-      }
-      stages {
-        stage('build'){
-          steps {
-            withGithubNotify(context: "Build-darwin-aarch64") {
-              deleteDir()
-              unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-              withMageEnv(){
-                dir("${BASE_DIR}"){
-                  cmd(label: 'Go build', script: 'mage build')
-                }
-              }
-            }
-          }
-        }
-        stage('Test') {
-          steps {
-            withGithubNotify(context: "Test-darwin-aarch64") {
-              withMageEnv(){
-                dir("${BASE_DIR}"){
-                  withEnv(["RACE_DETECTOR=true", "TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
-                    cmd(label: 'Go unitTest', script: 'mage unitTest')
-                  }
-                }
-              }
-            }
-          }
-          post {
-            always {
-              junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
-              whenTrue(isCodeCoverageEnabled()) {
-                coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
-              }
-            }
-          }
-        }
-      }
-    }
-    stage('e2e tests') {
-      when {
-        // Disable until we fix the e2e test.
-        // This should be running when there is a comment or the e2e label
-        beforeAgent true
-        anyOf {
-          // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
-          expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
-        }
-      }
-      steps {
-        runE2E(testMatrixFile: '.ci/.e2e-tests-for-elastic-agent.yaml',
-               beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
-               elasticAgentVersion: "${env.BEAT_VERSION}-SNAPSHOT",
-               gitHubCheckName: "e2e-tests",
-               gitHubCheckRepo: env.REPO,
-               gitHubCheckSha1: env.GIT_BASE_COMMIT,
-               propagate: true,
-               wait: true)
-      }
-    }
+    }        
   }
   post {
     cleanup {
