@@ -110,6 +110,8 @@ pipeline {
               }
             }
             steps {
+              deleteDir()
+              unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
               runK8s(k8sVersion: 'v1.27.3', kindVersion: 'v0.20.0', context: "K8s-${PLATFORM}")
             }
           }
