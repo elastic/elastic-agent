@@ -1,28 +1,4 @@
 inputs:
-    - name: filestream-stan
-      id: filestream-stan-${kubernetes.hints.container_id}
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.stan.log.enabled} == true or ${kubernetes.hints.stan.enabled} == true
-          data_stream:
-            dataset: stan.log
-            type: logs
-          exclude_files:
-            - .gz$
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.stan.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags:
-            - forwarded
-            - stan-log
-      data_stream.namespace: default
     - name: stan/metrics-stan
       id: stan/metrics-stan-${kubernetes.hints.container_id}
       type: stan/metrics
@@ -55,4 +31,28 @@ inputs:
           metricsets:
             - subscriptions
           period: ${kubernetes.hints.stan.subscriptions.period|kubernetes.hints.stan.period|'60s'}
+      data_stream.namespace: default
+    - name: filestream-stan
+      id: filestream-stan-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.stan.log.enabled} == true or ${kubernetes.hints.stan.enabled} == true
+          data_stream:
+            dataset: stan.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.stan.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - stan-log
       data_stream.namespace: default

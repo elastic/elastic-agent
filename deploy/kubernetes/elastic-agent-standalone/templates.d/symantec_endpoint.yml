@@ -1,33 +1,4 @@
 inputs:
-    - name: filestream-symantec_endpoint
-      id: filestream-symantec_endpoint-${kubernetes.hints.container_id}
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.symantec_endpoint.log.enabled} == true and ${kubernetes.hints.symantec_endpoint.enabled} == true
-          data_stream:
-            dataset: symantec_endpoint.log
-            type: logs
-          exclude_files:
-            - .gz$
-          fields:
-            _conf:
-                remove_mapped_fields: false
-                tz_offset: UTC
-          fields_under_root: true
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.symantec_endpoint.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags:
-            - symantec-endpoint-log
-            - forwarded
-      data_stream.namespace: default
     - name: tcp-symantec_endpoint
       id: tcp-symantec_endpoint-${kubernetes.hints.container_id}
       type: tcp
@@ -64,6 +35,35 @@ inputs:
           fields_under_root: true
           host: localhost:9008
           max_message_size: 1MiB
+          tags:
+            - symantec-endpoint-log
+            - forwarded
+      data_stream.namespace: default
+    - name: filestream-symantec_endpoint
+      id: filestream-symantec_endpoint-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.symantec_endpoint.log.enabled} == true and ${kubernetes.hints.symantec_endpoint.enabled} == true
+          data_stream:
+            dataset: symantec_endpoint.log
+            type: logs
+          exclude_files:
+            - .gz$
+          fields:
+            _conf:
+                remove_mapped_fields: false
+                tz_offset: UTC
+          fields_under_root: true
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.symantec_endpoint.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
           tags:
             - symantec-endpoint-log
             - forwarded
