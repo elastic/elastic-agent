@@ -212,7 +212,7 @@ func GetLatestDocumentMatchingQuery(ctx context.Context, client elastictransport
 	queryRaw := map[string]interface{}{
 		"query": query,
 		"sort": map[string]interface{}{
-			"timestamp": "desc",
+			"@timestamp": "desc",
 		},
 		"size": 1,
 	}

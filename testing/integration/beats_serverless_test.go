@@ -7,6 +7,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -88,25 +90,24 @@ func (runner *BeatRunner) SetupSuite() {
 
 	beatOutConfig := `
 output.elasticsearch:
-  hosts: ["%s"]
-  api_key: "%s:%s"
+  hosts: ["{{.es_host}}"]
+  api_key: "{{.key_user}}:{{.key_pass}}"
 setup.kibana:
-  host: %s
-metricbeat.config.modules:
-  path: ${path.config}/modules.d/*.yml
+  host: {{.kb_host}}
 processors:
   - add_fields:
       target: host
       fields:
-        test-id: %s
+        test-id: {{.test_id}}
+{{.beat_cfg}}
 `
-	if runner.testbeatName == "filebeat" {
-		beatOutConfig = `
-output.elasticsearch:
-  hosts: ["%s"]
-  api_key: "%s:%s"
-setup.kibana:
-  host: %s
+
+	mb_cfg := `
+metricbeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+`
+
+	fb_cfg := `
 filebeat.modules:
   - module: system
     syslog:
@@ -119,13 +120,9 @@ filebeat.config.modules:
       enabled: true
     auth:
       enabled: true
-processors:
-  - add_fields:
-      target: host
-      fields:
-        test-id: %s
 `
-	}
+	tmpl, err := template.New("config").Parse(beatOutConfig)
+	require.NoError(runner.T(), err)
 
 	apiResp, err := estools.CreateAPIKey(ctx, runner.requirementsInfo.ESClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
 	require.NoError(runner.T(), err)
@@ -151,8 +148,18 @@ processors:
 	testUuid, err := uuid.NewV4()
 	require.NoError(runner.T(), err)
 	runner.testUuid = testUuid.String()
-	parsedCfg := fmt.Sprintf(beatOutConfig, fixedESHost, apiResp.Id, apiResp.APIKey, fixedKibanaHost, testUuid.String())
-	err = runner.agentFixture.WriteFileToWorkDir(ctx, parsedCfg, fmt.Sprintf("%s.yml", runner.testbeatName))
+
+	additionalCfg := mb_cfg
+	if runner.testbeatName == "filebeat" {
+		additionalCfg = fb_cfg
+	}
+
+	tmpl_map := map[string]string{"es_host": fixedESHost, "key_user": apiResp.Id, "key_pass": apiResp.APIKey, "kb_host": fixedKibanaHost, "test_id": testUuid.String(), "beat_cfg": additionalCfg}
+	parsedCfg := bytes.Buffer{}
+	err = tmpl.Execute(&parsedCfg, tmpl_map)
+	require.NoError(runner.T(), err)
+
+	err = runner.agentFixture.WriteFileToWorkDir(ctx, parsedCfg.String(), fmt.Sprintf("%s.yml", runner.testbeatName))
 	require.NoError(runner.T(), err)
 }
 
