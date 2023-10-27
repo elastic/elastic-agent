@@ -393,7 +393,7 @@ var policyJSON = `
           "enabled": true,
           "vars": {
             "paths": [
-              "{{.LogFilePath}}"
+              "{{.LogFilePath | js}}" {{/* we need to escape windows paths */}}
             ],
             "data_stream.dataset": "{{.Dataset}}"
           }
