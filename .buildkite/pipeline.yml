@@ -53,8 +53,8 @@ steps:
 
   - label: "Serverless Beats Tests"
     key: "serverless-beats"
-    command: "echo 'ran serverless'"
-    if: "build.env('CRON') == 'yes'"
+    command: ".buildkite/scripts/steps/beats_tests.sh"
+    # if: "build.env('CRON') == 'yes'"
     retry:
       manual:
         allowed: true
