@@ -8,8 +8,8 @@ mkdir -p build
 cd build
 
 git clone git@github.com:elastic/beats.git
-cd beats
 
+cd beats/x-pack/mage
 export WORKSPACE=build/beats/x-pack/metricbeat
 
 SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64,windows/amd64 PACKAGES=tar.gz,zip mage package
