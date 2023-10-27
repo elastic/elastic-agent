@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd build
+source .buildkite/scripts/common.sh
+
+mkdir -p build & cd build
 
 git clone git@github.com:elastic/beats.git
 
