@@ -1565,14 +1565,16 @@ func (Integration) PrepareOnRemote() {
 // Run beat serverless tests
 func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
 	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
-	err := os.Setenv("AGENT_BUILD_DIR", beatBuildPath)
-	if err != nil {
-		return fmt.Errorf("error setting build dir: %s", err)
+	if os.Getenv("AGENT_BUILD_DIR") == "" {
+		err := os.Setenv("AGENT_BUILD_DIR", beatBuildPath)
+		if err != nil {
+			return fmt.Errorf("error setting build dir: %s", err)
+		}
 	}
 
 	// a bit of bypass logic; run as serverless by default
 	if os.Getenv("STACK_PROVISIONER") == "" {
-		err = os.Setenv("STACK_PROVISIONER", "serverless")
+		err := os.Setenv("STACK_PROVISIONER", "serverless")
 		if err != nil {
 			return fmt.Errorf("error setting serverless stack var: %w", err)
 		}
@@ -1580,7 +1582,7 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
 	}
 
-	err = os.Setenv("TEST_BINARY_NAME", beatname)
+	err := os.Setenv("TEST_BINARY_NAME", beatname)
 	if err != nil {
 		return fmt.Errorf("error setting binary name: %w", err)
 	}

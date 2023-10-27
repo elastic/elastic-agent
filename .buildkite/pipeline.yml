@@ -51,6 +51,11 @@ steps:
       provider: "gcp"
       machineType: "n1-standard-8"
 
+  - label: "Serverless Beats Tests"
+    key: "serverless-beats"
+    command: "echo 'ran serverless'"
+    if: build.env("CRON") == true
+
   - wait: ~
     continue_on_failure: true
   - label: "Processing test results"
