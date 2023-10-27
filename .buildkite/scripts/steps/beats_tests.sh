@@ -3,7 +3,8 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-mkdir -p build & cd build
+mkdir -p build
+cd build
 
 git clone git@github.com:elastic/beats.git
 
