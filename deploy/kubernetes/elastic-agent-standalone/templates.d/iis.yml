@@ -1,4 +1,31 @@
 inputs:
+    - name: iis/metrics-iis
+      id: iis/metrics-iis-${kubernetes.hints.container_id}
+      type: iis/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.iis.application_pool.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+          data_stream:
+            dataset: iis.application_pool
+            type: metrics
+          metricsets:
+            - application_pool
+          period: ${kubernetes.hints.iis.application_pool.period|kubernetes.hints.iis.period|'10s'}
+        - condition: ${kubernetes.hints.iis.webserver.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+          data_stream:
+            dataset: iis.webserver
+            type: metrics
+          metricsets:
+            - webserver
+          period: ${kubernetes.hints.iis.webserver.period|kubernetes.hints.iis.period|'10s'}
+        - condition: ${kubernetes.hints.iis.website.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+          data_stream:
+            dataset: iis.website
+            type: metrics
+          metricsets:
+            - website
+          period: ${kubernetes.hints.iis.website.period|kubernetes.hints.iis.period|'10s'}
+      data_stream.namespace: default
     - name: filestream-iis
       id: filestream-iis-${kubernetes.hints.container_id}
       type: filestream
@@ -44,31 +71,4 @@ inputs:
                 symlinks: true
           tags:
             - iis-error
-      data_stream.namespace: default
-    - name: iis/metrics-iis
-      id: iis/metrics-iis-${kubernetes.hints.container_id}
-      type: iis/metrics
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.iis.application_pool.enabled} == true or ${kubernetes.hints.iis.enabled} == true
-          data_stream:
-            dataset: iis.application_pool
-            type: metrics
-          metricsets:
-            - application_pool
-          period: ${kubernetes.hints.iis.application_pool.period|kubernetes.hints.iis.period|'10s'}
-        - condition: ${kubernetes.hints.iis.webserver.enabled} == true or ${kubernetes.hints.iis.enabled} == true
-          data_stream:
-            dataset: iis.webserver
-            type: metrics
-          metricsets:
-            - webserver
-          period: ${kubernetes.hints.iis.webserver.period|kubernetes.hints.iis.period|'10s'}
-        - condition: ${kubernetes.hints.iis.website.enabled} == true or ${kubernetes.hints.iis.enabled} == true
-          data_stream:
-            dataset: iis.website
-            type: metrics
-          metricsets:
-            - website
-          period: ${kubernetes.hints.iis.website.period|kubernetes.hints.iis.period|'10s'}
       data_stream.namespace: default

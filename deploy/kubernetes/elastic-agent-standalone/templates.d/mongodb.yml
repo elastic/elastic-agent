@@ -53,7 +53,7 @@ inputs:
           password: ${kubernetes.hints.mongodb.dbstats.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.dbstats.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: false
+          ssl.enabled: null
           ssl.key: null
           ssl.verification_mode: null
           username: ${kubernetes.hints.mongodb.dbstats.username|kubernetes.hints.mongodb.username|''}

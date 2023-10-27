@@ -1,4 +1,26 @@
 inputs:
+    - name: filestream-sentinel_one
+      id: filestream-sentinel_one-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.sentinel_one.container_logs.enabled} == true
+          data_stream:
+            dataset: sentinel_one.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default
     - name: httpjson-sentinel_one
       id: httpjson-sentinel_one-${kubernetes.hints.container_id}
       type: httpjson
@@ -194,26 +216,4 @@ inputs:
           tags:
             - forwarded
             - sentinel_one-threat
-      data_stream.namespace: default
-    - name: filestream-sentinel_one
-      id: filestream-sentinel_one-${kubernetes.hints.container_id}
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.sentinel_one.container_logs.enabled} == true
-          data_stream:
-            dataset: sentinel_one.container_logs
-            type: logs
-          exclude_files: []
-          exclude_lines: []
-          parsers:
-            - container:
-                format: auto
-                stream: all
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags: []
       data_stream.namespace: default

@@ -99,6 +99,7 @@ inputs:
             dataset: microsoft_sqlserver.transaction_log
             type: metrics
           driver: mssql
+          fetch_from_all_databases: false
           hosts:
             - sqlserver://${kubernetes.hints.microsoft_sqlserver.transaction_log.username|kubernetes.hints.microsoft_sqlserver.username|'domain\username'}:${kubernetes.hints.microsoft_sqlserver.transaction_log.password|kubernetes.hints.microsoft_sqlserver.password|'verysecurepassword'}@${kubernetes.hints.microsoft_sqlserver.transaction_log.host|kubernetes.hints.microsoft_sqlserver.host|'localhost'}
           metricsets:
@@ -110,24 +111,24 @@ inputs:
               response_format: table
             - query: SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_mb, l.active_log_size_mb,l.log_backup_time,l.log_since_last_log_backup_mb,l.log_since_last_checkpoint_mb,l.log_recovery_size_mb from sys.dm_db_log_stats(DB_ID('master')) l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('master') ;
               response_format: table
-            - query: USE [master] ; SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_in_bytes As total_log_size_bytes, l.used_log_space_in_bytes As used_log_space_bytes, l.used_log_space_in_percent As used_log_space_pct, l.log_space_in_bytes_since_last_backup from sys.dm_db_log_space_usage l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('master') ;
+            - query: USE [master]; SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_in_bytes As total_log_size_bytes, l.used_log_space_in_bytes As used_log_space_bytes, l.used_log_space_in_percent As used_log_space_pct, l.log_space_in_bytes_since_last_backup from sys.dm_db_log_space_usage l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('master') ;
               response_format: table
             - query: SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', database_id FROM sys.databases WHERE name='model';
               response_format: table
             - query: SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_mb, l.active_log_size_mb,l.log_backup_time,l.log_since_last_log_backup_mb,l.log_since_last_checkpoint_mb,l.log_recovery_size_mb from sys.dm_db_log_stats(DB_ID('model')) l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('model') ;
               response_format: table
-            - query: USE [model] ; SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_in_bytes As total_log_size_bytes, l.used_log_space_in_bytes As used_log_space_bytes, l.used_log_space_in_percent As used_log_space_pct, l.log_space_in_bytes_since_last_backup from sys.dm_db_log_space_usage l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('model') ;
+            - query: USE [model]; SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_in_bytes As total_log_size_bytes, l.used_log_space_in_bytes As used_log_space_bytes, l.used_log_space_in_percent As used_log_space_pct, l.log_space_in_bytes_since_last_backup from sys.dm_db_log_space_usage l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('model') ;
               response_format: table
             - query: SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', database_id FROM sys.databases WHERE name='tempdb';
               response_format: table
             - query: SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_mb, l.active_log_size_mb,l.log_backup_time,l.log_since_last_log_backup_mb,l.log_since_last_checkpoint_mb,l.log_recovery_size_mb from sys.dm_db_log_stats(DB_ID('tempdb')) l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('tempdb') ;
               response_format: table
-            - query: USE [tempdb] ; SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_in_bytes As total_log_size_bytes, l.used_log_space_in_bytes As used_log_space_bytes, l.used_log_space_in_percent As used_log_space_pct, l.log_space_in_bytes_since_last_backup from sys.dm_db_log_space_usage l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('tempdb') ;
+            - query: USE [tempdb]; SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_in_bytes As total_log_size_bytes, l.used_log_space_in_bytes As used_log_space_bytes, l.used_log_space_in_percent As used_log_space_pct, l.log_space_in_bytes_since_last_backup from sys.dm_db_log_space_usage l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('tempdb') ;
               response_format: table
             - query: SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', database_id FROM sys.databases WHERE name='msdb';
               response_format: table
             - query: SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_mb, l.active_log_size_mb,l.log_backup_time,l.log_since_last_log_backup_mb,l.log_since_last_checkpoint_mb,l.log_recovery_size_mb from sys.dm_db_log_stats(DB_ID('msdb')) l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('msdb') ;
               response_format: table
-            - query: USE [msdb] ; SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_in_bytes As total_log_size_bytes, l.used_log_space_in_bytes As used_log_space_bytes, l.used_log_space_in_percent As used_log_space_pct, l.log_space_in_bytes_since_last_backup from sys.dm_db_log_space_usage l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('msdb') ;
+            - query: USE [msdb]; SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_in_bytes As total_log_size_bytes, l.used_log_space_in_bytes As used_log_space_bytes, l.used_log_space_in_percent As used_log_space_pct, l.log_space_in_bytes_since_last_backup from sys.dm_db_log_space_usage l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('msdb') ;
               response_format: table
       data_stream.namespace: default
