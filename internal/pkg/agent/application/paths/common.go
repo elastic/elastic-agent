@@ -31,22 +31,25 @@ const (
 var ExternalInputsPattern = filepath.Join("inputs.d", "*.yml")
 
 var (
-	topPath         string
-	configPath      string
-	configFilePath  string
-	logsPath        string
-	downloadsPath   string
-	componentsPath  string
-	installPath     string
-	unversionedHome bool
-	tmpCreator      sync.Once
+	topPath              string
+	configPath           string
+	configFilePath       string
+	logsPath             string
+	downloadsPath        string
+	componentsPath       string
+	installPath          string
+	unversionedHome      bool
+	tmpCreator           sync.Once
+	unversionedHomeMutex sync.Mutex
 )
 
 func init() {
 	topPath = initialTop()
 	configPath = topPath
 	logsPath = topPath
+	unversionedHomeMutex.Lock()
 	unversionedHome = false // only versioned by container subcommand
+	unversionedHomeMutex.Unlock()
 
 	// these should never change
 	versionedHome := VersionedHome(topPath)
@@ -93,7 +96,9 @@ func TempDir() string {
 
 // Home returns a directory where binary lives
 func Home() string {
-	if unversionedHome {
+	unversionedHomeMutex.Lock()
+	defer unversionedHomeMutex.Unlock()
+	if unversionedHome { // Read
 		return topPath
 	}
 	return VersionedHome(topPath)
@@ -101,6 +106,8 @@ func Home() string {
 
 // IsVersionHome returns true if the Home path is versioned based on build.
 func IsVersionHome() bool {
+	unversionedHomeMutex.Lock()
+	defer unversionedHomeMutex.Unlock()
 	return !unversionedHome
 }
 
@@ -109,7 +116,9 @@ func IsVersionHome() bool {
 // Used by the container subcommand to adjust the home path allowing state can be maintained between container
 // restarts.
 func SetVersionHome(version bool) {
-	unversionedHome = !version
+	unversionedHomeMutex.Lock()
+	defer unversionedHomeMutex.Unlock()
+	unversionedHome = !version // Write
 }
 
 // Config returns a directory where configuration file lives
@@ -143,6 +152,8 @@ func ExternalInputs() string {
 
 // Data returns the data directory for Agent
 func Data() string {
+	unversionedHomeMutex.Lock()
+	defer unversionedHomeMutex.Unlock()
 	if unversionedHome {
 		// unversioned means the topPath is the data path
 		return topPath
