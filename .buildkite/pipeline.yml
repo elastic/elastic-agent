@@ -55,6 +55,9 @@ steps:
     key: "serverless-beats"
     command: ".buildkite/scripts/steps/beats_tests.sh"
     # if: "build.env('CRON') == 'yes'"
+    agents:
+      provider: "gcp"
+      machineType: "n1-standard-8"
     retry:
       manual:
         allowed: true
