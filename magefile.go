@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
@@ -493,7 +494,7 @@ func FixDRADockerArtifacts() error {
 }
 
 func getPackageName(beat, version, pkg string) (string, string) {
-	if _, ok := os.LookupEnv(snapshotEnv); ok {
+	if hasSnapshotEnv() {
 		version += "-SNAPSHOT"
 	}
 	return version, fmt.Sprintf("%s-%s-%s", beat, version, pkg)
@@ -958,19 +959,23 @@ func packageAgent(platforms []string, packagingFn func()) {
 			logrus.SetLevel(logrus.FatalLevel)
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
+			completedDownloads := &atomic.Int32{}
 			for binary, project := range externalBinaries {
 				for _, platform := range platforms {
 					reqPackage := platformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
-					errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath))
+					errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath, completedDownloads))
 				}
 			}
 
 			err := errGroup.Wait()
 			if err != nil {
 				panic(err)
+			}
+			if completedDownloads.Load() == 0 {
+				panic(fmt.Sprintf("No packages were successfully downloaded. You may be building against an invalid or unreleased version. version=%s. If this is an unreleased version, try SNAPSHOT=true or EXTERNAL=false", packageVersion))
 			}
 		} else {
 			packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
@@ -1143,15 +1148,17 @@ func packageAgent(platforms []string, packagingFn func()) {
 
 // Helper that wraps the fetchBinaryFromArtifactsApi in a way that is compatible with the errgroup.Go() function.
 // Ensures the arguments are captured by value before starting the goroutine.
-func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string) func() error {
+func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string, compl *atomic.Int32) func() error {
 	return func() error {
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
-				fmt.Printf("Done downloading %s: unsupported on %s, skipping\n", binary, platform)
+				fmt.Printf("Could not download %s: %s\n", binary, err)
 			} else {
 				return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
 			}
+		} else {
+			compl.Add(1)
 		}
 
 		fmt.Printf("Done downloading %s\n", packageName)
@@ -2171,6 +2178,7 @@ func hasSnapshotEnv() bool {
 		return false
 	}
 	b, _ := strconv.ParseBool(snapshot)
+
 	return b
 }
 
