@@ -12,8 +12,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jaypipes/ghw"
-
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 
@@ -389,13 +387,12 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
 	// otherwise fall back to the default.
 	copyConcurrency := 1
-	block, err := ghw.Block()
-	if err != nil {
-		l.Warnw("Error detecting block storage type", "error.message", err)
-	} else {
-		if install.HasAllSSDs(*block) {
-			copyConcurrency = runtime.NumCPU() * 4
-		}
+	hasSSDs, detectHWErr := install.HasAllSSDs()
+	if detectHWErr != nil {
+		l.Infow("Could not determine block storage type, disabling copy concurrency", "error.message", detectHWErr)
+	}
+	if hasSSDs {
+		copyConcurrency = runtime.NumCPU() * 4
 	}
 
 	return copy.Copy(from, to, copy.Options{
