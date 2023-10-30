@@ -20,6 +20,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -33,7 +35,8 @@ func NewServer(
 	coord *coordinator.Coordinator,
 	enableProcessStats bool,
 	operatingSystem string,
-) (*api.Server, error) {
+	mcfg *monitoringCfg.MonitoringConfig,
+) (*reload.ServerReloader, error) {
 	if err := createAgentMonitoringDrop(endpointConfig.Host); err != nil {
 		// log but ignore
 		log.Warnf("failed to create monitoring drop: %v", err)
@@ -48,7 +51,7 @@ func NewServer(
 		return nil, err
 	}
 
-	return exposeMetricsEndpoint(log, cfg, ns, tracer, coord, enableProcessStats, operatingSystem)
+	return exposeMetricsEndpoint(log, cfg, ns, tracer, coord, enableProcessStats, operatingSystem, mcfg)
 }
 
 func exposeMetricsEndpoint(
@@ -59,7 +62,8 @@ func exposeMetricsEndpoint(
 	coord *coordinator.Coordinator,
 	enableProcessStats bool,
 	operatingSystem string,
-) (*api.Server, error) {
+	mcfg *monitoringCfg.MonitoringConfig,
+) (*reload.ServerReloader, error) {
 	r := mux.NewRouter()
 	if tracer != nil {
 		r.Use(apmgorilla.Middleware(apmgorilla.WithTracer(tracer)))
@@ -77,7 +81,15 @@ func exposeMetricsEndpoint(
 	mux := http.NewServeMux()
 	mux.Handle("/", r)
 
-	return api.New(log, mux, config)
+	newServerFn := func() (reload.ServerController, error) {
+		apiServer, err := api.New(log, mux, config)
+		if err != nil {
+			return nil, errors.New(err, "failed to create api server")
+		}
+		return apiServer, nil
+	}
+
+	return reload.NewServerReloader(newServerFn, log, mcfg), nil
 }
 
 func createAgentMonitoringDrop(drop string) error {
