@@ -4,6 +4,8 @@ set +x
 
 source .buildkite/scripts/common.sh
 
+mage -l
+
 mkdir -p build
 cd build
 

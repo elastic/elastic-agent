@@ -59,7 +59,6 @@ mage() {
         make mage
     fi
     pushd "$WORKSPACE"
-    echo -e "in directory $(pwd)"
     command "mage" "$@"
     ACTUAL_EXIT_CODE=$?
     popd
