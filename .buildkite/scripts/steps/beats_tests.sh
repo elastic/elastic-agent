@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 
 source .buildkite/scripts/common.sh
 #run before setup, since this will install go and mage
@@ -21,8 +20,11 @@ STACK_PROVISIONER="${1:-"serverless"}"
 cd ..
 
 export AGENT_BUILD_DIR=build/beats/x-pack/metricbeat/build/distributions
+export WORKSPACE=$(pwd)
 
 set +e
 TEST_INTEG_CLEAN_ON_EXIT=true STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage integration:testBeatServerless metricbeat
 TESTS_EXIT_STATUS=$?
 set -e
+
+exit $TESTS_EXIT_STATUS
