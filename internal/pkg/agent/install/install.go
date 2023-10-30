@@ -11,14 +11,14 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/kardianos/service"
-
 	"github.com/jaypipes/ghw"
+	"github.com/kardianos/service"
 	"github.com/otiai10/copy"
 	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 const (
@@ -26,7 +26,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, pt *progressbar.ProgressBar) error {
+func Install(cfgFile, topPath string, pt *progressbar.ProgressBar, streams *cli.IOStreams) error {
 	dir, err := findDirectory()
 	if err != nil {
 		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
@@ -62,15 +62,18 @@ func Install(cfgFile, topPath string, pt *progressbar.ProgressBar) error {
 	}
 
 	// copy source into install path
-	block, err := ghw.Block()
-	if err != nil {
-		return fmt.Errorf("ghw.Block() returned error: %w", err)
-	}
-
+	//
+	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
+	// otherwise fall back to the default.
 	copyConcurrency := 1
-	if HasAllSSDs(*block) {
+	hasSSDs, detectHWErr := HasAllSSDs()
+	if detectHWErr != nil {
+		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling copy concurrency: %s\n", detectHWErr)
+	}
+	if hasSSDs {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
+
 	pt.Describe("Copying install files")
 	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
@@ -84,7 +87,8 @@ func Install(cfgFile, topPath string, pt *progressbar.ProgressBar) error {
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
-			errors.M("source", dir), errors.M("destination", topPath))
+			errors.M("source", dir), errors.M("destination", topPath),
+		)
 	}
 	pt.Describe("Successfully copied files")
 
@@ -263,8 +267,22 @@ func verifyDirectory(dir string) error {
 }
 
 // HasAllSSDs returns true if the host we are on uses SSDs for
-// all its persistent storage; false otherwise or on error
-func HasAllSSDs(block ghw.BlockInfo) bool {
+// all its persistent storage; false otherwise. Returns any error
+// encountered detecting the hardware type for informational purposes.
+// Errors from this function are not fatal. Note that errors may be
+// returned on some Mac hardware configurations as the ghw package
+// does not fully support MacOS.
+func HasAllSSDs() (bool, error) {
+	block, err := ghw.Block()
+	if err != nil {
+		return false, err
+	}
+
+	return hasAllSSDs(*block), nil
+}
+
+// Internal version of HasAllSSDs for testing.
+func hasAllSSDs(block ghw.BlockInfo) bool {
 	for _, disk := range block.Disks {
 		switch disk.DriveType {
 		case ghw.DRIVE_TYPE_FDD, ghw.DRIVE_TYPE_ODD:
