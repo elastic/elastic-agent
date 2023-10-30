@@ -4,17 +4,123 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
-  - label: "Unit tests"
-    key: "unit-tests"
+  - label: "Unit tests - Ubuntu 22.04"
+    key: "unit-tests-2204"
     command: ".buildkite/scripts/steps/unit-tests.sh"
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
+      - "coverage.out"
     agents:
       provider: "gcp"
+      image: "family/core-ubuntu-2204"
     retry:
       manual:
         allowed: true
+
+  - label: "Unit tests - Ubuntu 22.04 ARM64"
+    key: "unit-tests-2204-arm64"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+      - "coverage.out"
+    agents:
+      provider: "aws"
+      imagePrefix: "core-ubuntu-2204-aarch64"
+      diskSizeGb: 200
+      instanceType: "m6g.4xlarge"
+    retry:
+      manual:
+        allowed: true
+
+  - label: "Unit tests - Windows 2022"
+    key: "unit-tests-win2022"
+    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+      - "coverage.out"
+    agents:
+      provider: "gcp"
+      image: "family/core-windows-2022"
+      machine_type: "n2-standard-8"
+      disk_size: 200
+      disk_type: "pd-ssd"
+    retry:
+      manual:
+        allowed: true
+
+  - label: "Unit tests - Windows 2016"
+    key: "unit-tests-win2016"
+    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+      - "coverage.out"
+    agents:
+      provider: "gcp"
+      image: "family/core-windows-2016"
+      machine_type: "n2-standard-8"
+      disk_size: 200
+      disk_type: "pd-ssd"
+    retry:
+      manual:
+        allowed: true
+
+  - label: "Unit tests - MacOS 13 ARM"
+    key: "unit-tests-macos-13-arm"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+      - "coverage.out"
+    agents:
+      provider: orka
+      imagePrefix: generic-13-ventura-arm
+    retry:
+      manual:
+        allowed: true
+
+  - label: "Unit tests - MacOS 13"
+    key: "unit-tests-macos-13"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+      - "coverage.out"
+    agents:
+      provider: orka
+      imagePrefix: generic-13-ventura-x64
+    retry:
+      manual:
+        allowed: true
+
+  - label: "Merge coverage reports"
+    key: "merge-coverage"
+    env:
+      BUILDKITE_REPO: ""
+    command: "
+      .buildkite/scripts/steps/merge.sh
+      unit-tests-2204
+      unit-tests-2204-arm64
+      unit-tests-win2016
+      unit-tests-win2022
+      unit-tests-macos-13
+      unit-tests-macos-13-arm
+      "
+    artifact_paths:
+      - "build/TEST-**"
+    agents:
+      image: "golang:1.20.10"
+    depends_on:
+      - unit-tests-2204
+      - unit-tests-2204-arm64
+      - unit-tests-win2022
+      - unit-tests-win2016
+      - unit-tests-macos-13
+      - unit-tests-macos-13-arm
+    allow_dependency_failure: true
 
   - label: ":sonarqube: Continuous Code Inspection"
     env:
@@ -22,11 +128,10 @@ steps:
     agents:
       image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
     command:
-      - "buildkite-agent artifact download build/TEST-go-unit.cov ."
-      - "buildkite-agent artifact download build/TEST-go-unit.out.json ."
+      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
       - "/scan-source-code.sh"
     depends_on:
-      - "unit-tests"
+      - "merge-coverage"
     retry:
       manual:
         allowed: true
@@ -70,4 +175,4 @@ steps:
       provider: "gcp"
     plugins:
       - junit-annotate#v2.4.1:
-          artifacts: build/TEST-go-*.xml
+          artifacts: build/TEST-go-integration*.xml

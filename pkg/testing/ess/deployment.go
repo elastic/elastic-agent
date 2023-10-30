@@ -196,8 +196,8 @@ func (c *Client) ShutdownDeployment(ctx context.Context, deploymentID string) er
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		resp, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("got unexpected response code [%d] from deployment shutdown API: %s", res.StatusCode, resp)
+		resBytes, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("got unexpected response code [%d] from deployment shutdown API: %s", res.StatusCode, string(resBytes))
 	}
 
 	return nil

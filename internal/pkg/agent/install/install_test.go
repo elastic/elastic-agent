@@ -52,7 +52,7 @@ func TestHasAllSSDs(t *testing.T) {
 
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
-			actual := HasAllSSDs(test.block)
+			actual := hasAllSSDs(test.block)
 			require.Equal(t, test.expected, actual)
 		})
 	}
