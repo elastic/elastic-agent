@@ -240,7 +240,7 @@ func (c *Client) checkApiVersionHeaders(reqID string, resp *http.Response) {
 	if downgradeVersion := resp.Header.Get(elasticApiVersionHeaderKey); resp.StatusCode == http.StatusBadRequest && downgradeVersion != "" {
 		// fleet server requested a downgrade to a different api version, we should bubble up an error until some kind
 		// of fallback mechanism can instantiate the requested version. This is not yet implemented so we log an error
-		c.log.With("http.request.id", reqID).Errorf("fleet requested a different api version %q but this is currently not implemented: %q", downgradeVersion)
+		c.log.With("http.request.id", reqID).Errorf("fleet requested a different api version %q but this is currently not implemented", downgradeVersion)
 	}
 }
 
