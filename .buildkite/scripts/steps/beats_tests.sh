@@ -22,8 +22,6 @@ cd ..
 export AGENT_BUILD_DIR=build/beats/x-pack/metricbeat/build/distributions
 export WORKSPACE=$(pwd)
 
-mage integration:auth
-
 set +e
 TEST_INTEG_CLEAN_ON_EXIT=true STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage integration:testBeatServerless metricbeat
 TESTS_EXIT_STATUS=$?
