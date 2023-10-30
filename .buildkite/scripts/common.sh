@@ -53,7 +53,7 @@ getOSOptions() {
 # Wrapper function for executing mage
 mage() {
     go version
-    if ! command -v mage &> /dev/null;
+    if ! [ -x "$(type -p mage | sed 's/mage is //g')" ];
     then
         echo "installing mage ${SETUP_MAGE_VERSION}"
         make mage
@@ -68,7 +68,7 @@ mage() {
 # Wrapper function for executing go
 go(){
     # Search for the go in the Path
-    if ! command -v go &> /dev/null;
+    if ! [ -x "$(type -p go | sed 's/go is //g')" ];
     then
         getOSOptions
         echo "installing golang "${GO_VERSION}" for "${AGENT_OS_NAME}/${AGENT_OS_ARCH}" "
