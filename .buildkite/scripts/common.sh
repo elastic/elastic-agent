@@ -22,7 +22,7 @@ getOSOptions() {
       export AGENT_OS_NAME=linux
       ;;
     darwin*)
-      export AGENT_OS_NAME=osx
+      export AGENT_OS_NAME=darwin
       ;;
     msys*)
       export AGENT_OS_NAME=windows
