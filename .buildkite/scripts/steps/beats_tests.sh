@@ -49,11 +49,11 @@ cd ..
 
 # exit $TESTS_EXIT_STATUS
 
-if !run_test_for_beat metricbeat; then
+if ! run_test_for_beat metricbeat; then
     exit $?
 fi
 
-if !run_test_for_beat filebeat; then
+if ! run_test_for_beat filebeat; then
     exit $?
 fi
 
