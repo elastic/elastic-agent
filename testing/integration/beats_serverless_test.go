@@ -62,7 +62,7 @@ func TestBeatsServerless(t *testing.T) {
 }
 
 func (runner *BeatRunner) SetupSuite() {
-	runner.skipCleanup = true
+	runner.skipCleanup = false
 
 	runner.testbeatName = os.Getenv("TEST_BINARY_NAME")
 	if runner.testbeatName == "" {
