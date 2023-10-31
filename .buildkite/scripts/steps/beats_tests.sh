@@ -16,7 +16,7 @@ run_test_for_beat(){
     export WORKSPACE=$(pwd)
 
     set +e
-    TEST_INTEG_CLEAN_ON_EXIT=true TEST_PLATFORMS="linux/amd64" STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage integration:testBeatServerless metricbeat
+    TEST_INTEG_CLEAN_ON_EXIT=true TEST_PLATFORMS="linux/amd64" STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage integration:testBeatServerless $beat_name
     TESTS_EXIT_STATUS=$?
     set -e
 
@@ -49,12 +49,14 @@ cd ..
 
 # exit $TESTS_EXIT_STATUS
 
+echo "testing metricbeat..."
 if ! run_test_for_beat metricbeat; then
-    exit $?
+    exit 1
 fi
 
+echo "testing filebeat..."
 if ! run_test_for_beat filebeat; then
-    exit $?
+    exit 1
 fi
 
 

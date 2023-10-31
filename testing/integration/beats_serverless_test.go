@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// go:build integration
+//go:build integration
 
 package integration
 
@@ -72,7 +72,7 @@ func (runner *BeatRunner) SetupSuite() {
 		runner.T().Skipf("tests must be run against a beat, not elastic-agent")
 	}
 
-	if runner.testbeatName != "filebeat" && runner.testbeatName != "metricbeat" {
+	if runner.testbeatName != "filebeat" && runner.testbeatName != "metricbeat" && runner.testbeatName != "auditbeat" && runner.testbeatName != "packetbeat" {
 		runner.T().Skip("test only supports metricbeat or filebeat")
 	}
 	runner.T().Logf("running serverless tests with %s", runner.testbeatName)
@@ -104,12 +104,12 @@ processors:
 {{.beat_cfg}}
 `
 
-	mb_cfg := `
+	mbCfg := `
 metricbeat.config.modules:
   path: ${path.config}/modules.d/*.yml
 `
 
-	fb_cfg := `
+	fbCfg := `
 filebeat.modules:
   - module: system
     syslog:
@@ -123,6 +123,22 @@ filebeat.config.modules:
     auth:
       enabled: true
 `
+	auditbeatCfg := `
+auditbeat.modules:
+
+- module: file_integrity
+  paths:
+  - /bin
+  - /usr/bin
+  - /sbin
+  - /usr/sbin
+  - /etc
+`
+
+	packetbeatCfg := `
+packetbeat.interfaces.type: af_packet
+`
+
 	tmpl, err := template.New("config").Parse(beatOutConfig)
 	require.NoError(runner.T(), err)
 
@@ -151,9 +167,13 @@ filebeat.config.modules:
 	require.NoError(runner.T(), err)
 	runner.testUuid = testUuid.String()
 
-	additionalCfg := mb_cfg
+	additionalCfg := mbCfg
 	if runner.testbeatName == "filebeat" {
-		additionalCfg = fb_cfg
+		additionalCfg = fbCfg
+	} else if runner.testbeatName == "auditbeat" {
+		additionalCfg = auditbeatCfg
+	} else if runner.testbeatName == "packetbeat" {
+		additionalCfg = packetbeatCfg
 	}
 
 	tmpl_map := map[string]string{"es_host": fixedESHost, "key_user": apiResp.Id, "key_pass": apiResp.APIKey, "kb_host": fixedKibanaHost, "test_id": testUuid.String(), "beat_cfg": additionalCfg}
