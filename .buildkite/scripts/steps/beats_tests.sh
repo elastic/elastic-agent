@@ -60,3 +60,7 @@ if ! run_test_for_beat filebeat; then
 fi
 
 
+echo "testing auditbeat..."
+if ! run_test_for_beat auditbeat; then
+    exit 1
+fi

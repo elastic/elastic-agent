@@ -136,7 +136,6 @@ auditbeat.modules:
 `
 
 	packetbeatCfg := `
-packetbeat.interfaces.type: af_packet
 `
 
 	tmpl, err := template.New("config").Parse(beatOutConfig)
