@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+// go:build integration
 
 package integration
 
@@ -44,6 +44,8 @@ type BeatRunner struct {
 
 	testUuid     string
 	testbeatName string
+
+	skipCleanup bool
 }
 
 func TestBeatsServerless(t *testing.T) {
@@ -60,7 +62,7 @@ func TestBeatsServerless(t *testing.T) {
 }
 
 func (runner *BeatRunner) SetupSuite() {
-	runner.T().Logf("In SetupSuite")
+	runner.skipCleanup = true
 
 	runner.testbeatName = os.Getenv("TEST_BINARY_NAME")
 	if runner.testbeatName == "" {
@@ -169,7 +171,7 @@ func (runner *BeatRunner) TestRunAndCheckData() {
 	defer cancel()
 
 	// in case there's already a running template, delete it, forcing the beat to re-install
-	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("*%s*", runner.testbeatName))
+	runner.CleanupTemplates(ctx)
 
 	err := runner.agentFixture.RunBeat(ctx)
 	require.NoError(runner.T(), err)
@@ -209,14 +211,15 @@ func (runner *BeatRunner) TestSetupDashboards() {
 
 	runner.Run("export dashboards", runner.SubtestExportDashboards)
 	// cleanup
-	for _, dash := range dashList {
-		err = tools.DeleteDashboard(ctx, runner.requirementsInfo.KibanaClient, dash.ID)
-		if err != nil {
-			runner.T().Logf("WARNING: could not delete dashboards after test: %s", err)
-			break
+	if !runner.skipCleanup {
+		for _, dash := range dashList {
+			err = tools.DeleteDashboard(ctx, runner.requirementsInfo.KibanaClient, dash.ID)
+			if err != nil {
+				runner.T().Logf("WARNING: could not delete dashboards after test: %s", err)
+				break
+			}
 		}
 	}
-
 }
 
 // tests the [beat] export dashboard command
@@ -256,11 +259,14 @@ func (runner *BeatRunner) TestSetupPipelines() {
 	defer cancel()
 
 	defer func() {
-		/// cleanup
-		err := estools.DeletePipelines(ctx, runner.requirementsInfo.ESClient, "*filebeat*")
-		if err != nil {
-			runner.T().Logf("WARNING: could not clean up pipelines: %s", err)
+		// cleanup
+		if !runner.skipCleanup {
+			err := estools.DeletePipelines(ctx, runner.requirementsInfo.ESClient, "*filebeat*")
+			if err != nil {
+				runner.T().Logf("WARNING: could not clean up pipelines: %s", err)
+			}
 		}
+
 	}()
 
 	// need to actually enable something that has pipelines
@@ -315,7 +321,7 @@ func (runner *BeatRunner) TestWithAllDefaults() {
 	}()
 
 	// pre-delete in case something else missed cleanup
-	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+	runner.CleanupTemplates(ctx)
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
 		runner.agentFixture.WorkDir(),
@@ -596,6 +602,8 @@ func (runner *BeatRunner) CheckDSLPolicy(ctx context.Context, tmpl string, polic
 
 // CleanupTemplates removes any existing index
 func (runner *BeatRunner) CleanupTemplates(ctx context.Context) {
-	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
-	_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, "*custom-name*")
+	if !runner.skipCleanup {
+		_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, fmt.Sprintf("%s*", runner.testbeatName))
+		_ = estools.DeleteIndexTemplatesDataStreams(ctx, runner.requirementsInfo.ESClient, "*custom-name*")
+	}
 }
