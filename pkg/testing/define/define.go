@@ -78,19 +78,29 @@ func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*ate
 		buildsDir = filepath.Join(projectDir, "build", "distributions")
 	}
 
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir)
+
+}
+
+// NewFixture returns a new Elastic Agent testing fixture with a LocalFetcher and
+// the agent logging to the test logger.
+func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	ver, err := semver.ParseVersion(version)
 	if err != nil {
 		return nil, fmt.Errorf("%q is an invalid agent version: %w", version, err)
 	}
 
-	var f atesting.Fetcher
+	var binFetcher atesting.Fetcher
 	if ver.IsSnapshot() {
-		f = atesting.LocalFetcher(buildsDir, atesting.WithLocalSnapshotOnly())
+		binFetcher = atesting.LocalFetcher(buildsDir, atesting.WithLocalSnapshotOnly(), atesting.WithCustomBinaryName(binary))
 	} else {
-		f = atesting.LocalFetcher(buildsDir)
+		binFetcher = atesting.LocalFetcher(buildsDir, atesting.WithCustomBinaryName(binary))
 	}
 
-	opts = append(opts, atesting.WithFetcher(f), atesting.WithLogOutput())
+	opts = append(opts, atesting.WithFetcher(binFetcher), atesting.WithLogOutput())
+	if binary != "elastic-agent" {
+		opts = append(opts, atesting.WithBinaryName(binary))
+	}
 	return atesting.NewFixture(t, version, opts...)
 }
 

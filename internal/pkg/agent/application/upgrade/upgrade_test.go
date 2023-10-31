@@ -99,7 +99,7 @@ func Test_CopyFile(t *testing.T) {
 			}
 
 			err := copyDir(l, tc.From, tc.To, tc.IgnoreErr)
-			require.Equal(t, tc.ExpectedErr, err != nil)
+			require.Equal(t, tc.ExpectedErr, err != nil, err)
 		})
 	}
 }

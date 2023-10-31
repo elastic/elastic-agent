@@ -356,7 +356,6 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		logger.Logf("Failed to copy files instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to copy files to instance %s: %w", instance.Name, err)
 	}
-
 	// start with the ExtraEnv first preventing the other environment flags below
 	// from being overwritten
 	env := map[string]string{}
@@ -367,6 +366,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	// ensure that we have all the requirements for the stack if required
 	if batch.Batch.Stack != nil {
 		// wait for the stack to be ready before continuing
+		logger.Logf("Waiting for stacks to be ready...")
 		r.stacksReady.Wait()
 		if r.stacksErr != nil {
 			return OSRunnerResult{}, fmt.Errorf("%s unable to continue because stack never became ready: %w", instance.Name, r.stacksErr)
@@ -381,11 +381,12 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		env["KIBANA_HOST"] = stack.Kibana
 		env["KIBANA_USERNAME"] = stack.Username
 		env["KIBANA_PASSWORD"] = stack.Password
-		logger.Logf("Using Stack with Kibana host %s, %s/%s", stack.Kibana, stack.Username, stack.Password)
+		logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
 	}
 
 	// set the go test flags
 	env["GOTEST_FLAGS"] = r.cfg.TestFlags
+	env["TEST_BINARY_NAME"] = r.cfg.BinaryName
 
 	// run the actual tests on the host
 	result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, client, logger, r.cfg.AgentVersion, batch.ID, batch.Batch, env)
@@ -447,9 +448,13 @@ func (r *Runner) getBuild(b OSBatch) Build {
 		ext = "zip"
 	}
 	hashExt := ".sha512"
-	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.OS.Type, arch, ext))
+	name := "elastic-agent"
+	if r.cfg.BinaryName != "" {
+		name = r.cfg.BinaryName
+	}
+	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("%s-%s-%s-%s.%s", name, r.cfg.AgentVersion, b.OS.Type, arch, ext))
 	return Build{
-		Version:    r.cfg.AgentVersion,
+		Version:    r.cfg.ReleaseVersion,
 		Type:       b.OS.Type,
 		Arch:       arch,
 		Path:       packageName,
@@ -578,7 +583,7 @@ func (r *Runner) startStacks(ctx context.Context) error {
 		if !lb.Skip && lb.Batch.Stack != nil {
 			if lb.Batch.Stack.Version == "" {
 				// no version defined on the stack; set it to the defined stack version
-				lb.Batch.Stack.Version = r.cfg.AgentStackVersion
+				lb.Batch.Stack.Version = r.cfg.StackVersion
 			}
 			if !slices.Contains(versions, lb.Batch.Stack.Version) {
 				versions = append(versions, lb.Batch.Stack.Version)

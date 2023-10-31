@@ -4,10 +4,20 @@
 
 package config
 
-import "time"
+import (
+	"strings"
+	"time"
 
-const defaultPort = 6791
-const defaultNamespace = "default"
+	c "github.com/elastic/elastic-agent-libs/config"
+)
+
+const (
+	defaultPort      = 6791
+	defaultNamespace = "default"
+
+	// DefaultHost is used when host is not defined or empty
+	DefaultHost = "localhost"
+)
 
 // MonitoringConfig describes a configuration of a monitoring
 type MonitoringConfig struct {
@@ -33,6 +43,39 @@ type MonitoringHTTPConfig struct {
 	Buffer  *BufferConfig `yaml:"buffer" config:"buffer"`
 }
 
+// Unpack reads a config object into the settings.
+func (c *MonitoringHTTPConfig) Unpack(cfg *c.C) error {
+	// do not use MonitoringHTTPConfig, it will end up in a loop
+	tmp := struct {
+		Enabled bool          `yaml:"enabled" config:"enabled"`
+		Host    string        `yaml:"host" config:"host"`
+		Port    int           `yaml:"port" config:"port" validate:"min=0,max=65535,nonzero"`
+		Buffer  *BufferConfig `yaml:"buffer" config:"buffer"`
+	}{
+		Enabled: c.Enabled,
+		Host:    c.Host,
+		Port:    c.Port,
+		Buffer:  c.Buffer,
+	}
+
+	if err := cfg.Unpack(&tmp); err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(tmp.Host) == "" {
+		tmp.Host = DefaultHost
+	}
+
+	*c = MonitoringHTTPConfig{
+		Enabled: tmp.Enabled,
+		Host:    tmp.Host,
+		Port:    tmp.Port,
+		Buffer:  tmp.Buffer,
+	}
+
+	return nil
+}
+
 // PprofConfig is a struct for the pprof enablement flag.
 // It is a nil struct by default to allow the agent to use the a value that the user has injected into fleet.yml as the source of truth that is passed to beats
 // TODO get this value from Kibana?
@@ -55,7 +98,7 @@ func DefaultConfig() *MonitoringConfig {
 		MonitorTraces:  false,
 		HTTP: &MonitoringHTTPConfig{
 			Enabled: false,
-			Host:    "localhost",
+			Host:    DefaultHost,
 			Port:    defaultPort,
 		},
 		Namespace:   defaultNamespace,

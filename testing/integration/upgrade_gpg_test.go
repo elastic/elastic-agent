@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -55,7 +54,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
 
-	_, defaultPGP := release.PGP()
+	defaultPGP := release.PGP()
 	firstSeven := string(defaultPGP[:7])
 	newPgp := strings.Replace(
 		string(defaultPGP),
@@ -73,7 +72,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
 		upgradetest.WithSkipVerify(false))
-	assert.NoError(t, err)
+	require.NoError(t, err, "perform upgrade failed")
 }
 
 func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
@@ -110,7 +109,7 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
 
-	_, defaultPGP := release.PGP()
+	defaultPGP := release.PGP()
 	firstSeven := string(defaultPGP[:7])
 	newPgp := strings.Replace(
 		string(defaultPGP),
@@ -129,4 +128,5 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
 		upgradetest.WithSkipVerify(false))
+	require.NoError(t, err, "perform upgrade failed")
 }

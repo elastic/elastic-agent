@@ -12,8 +12,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jaypipes/ghw"
-
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 
@@ -21,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -28,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -127,7 +125,7 @@ func (u *Upgrader) Upgradeable() bool {
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
@@ -137,16 +135,21 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
 	}
 
+	det.SetState(details.StateDownloading)
+
 	sourceURI = u.sourceURI(sourceURI)
-	archivePath, err := u.downloadArtifact(ctx, version, sourceURI, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	archivePath, err := u.downloadArtifact(ctx, version, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
 		if dErr := cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version()); dErr != nil {
 			u.log.Errorw("Unable to remove file after verification failure", "error.message", dErr)
 		}
+
 		return nil, err
 	}
+
+	det.SetState(details.StateExtracting)
 
 	newHash, err := u.unpack(version, archivePath)
 	if err != nil {
@@ -170,6 +173,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, errors.New(err, "failed to copy run directory")
 	}
 
+	det.SetState(details.StateReplacing)
+
 	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
@@ -181,6 +186,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
+
+	det.SetState(details.StateWatching)
 
 	if err := InvokeWatcher(u.log); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
@@ -377,13 +384,14 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		}
 	}
 
-	block, err := ghw.Block()
-	if err != nil {
-		return fmt.Errorf("ghw.Block() returned error: %w", err)
-	}
-
+	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
+	// otherwise fall back to the default.
 	copyConcurrency := 1
-	if install.HasAllSSDs(*block) {
+	hasSSDs, detectHWErr := install.HasAllSSDs()
+	if detectHWErr != nil {
+		l.Infow("Could not determine block storage type, disabling copy concurrency", "error.message", detectHWErr)
+	}
+	if hasSSDs {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 

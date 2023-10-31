@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
@@ -493,7 +494,7 @@ func FixDRADockerArtifacts() error {
 }
 
 func getPackageName(beat, version, pkg string) (string, string) {
-	if _, ok := os.LookupEnv(snapshotEnv); ok {
+	if hasSnapshotEnv() {
 		version += "-SNAPSHOT"
 	}
 	return version, fmt.Sprintf("%s-%s-%s", beat, version, pkg)
@@ -928,6 +929,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 			// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
+			// https://artifacts-snapshot.elastic.co/assetbeat/latest/8.11.0-SNAPSHOT.json
 			externalBinaries := map[string]string{
 				"auditbeat":             "beats",
 				"filebeat":              "beats",
@@ -943,6 +945,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 				"pf-elastic-collector":  "prodfiler",
 				"pf-elastic-symbolizer": "prodfiler",
 				"pf-host-agent":         "prodfiler",
+				"assetbeat":             "assetbeat", // only supporting linux/amd64 or linux/arm64
 			}
 
 			// Only log fatal logs for logs produced using logrus. This is the global logger
@@ -956,19 +959,23 @@ func packageAgent(platforms []string, packagingFn func()) {
 			logrus.SetLevel(logrus.FatalLevel)
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
+			completedDownloads := &atomic.Int32{}
 			for binary, project := range externalBinaries {
 				for _, platform := range platforms {
 					reqPackage := platformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
-					errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath))
+					errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath, completedDownloads))
 				}
 			}
 
 			err := errGroup.Wait()
 			if err != nil {
 				panic(err)
+			}
+			if completedDownloads.Load() == 0 {
+				panic(fmt.Sprintf("No packages were successfully downloaded. You may be building against an invalid or unreleased version. version=%s. If this is an unreleased version, try SNAPSHOT=true or EXTERNAL=false", packageVersion))
 			}
 		} else {
 			packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
@@ -1141,15 +1148,17 @@ func packageAgent(platforms []string, packagingFn func()) {
 
 // Helper that wraps the fetchBinaryFromArtifactsApi in a way that is compatible with the errgroup.Go() function.
 // Ensures the arguments are captured by value before starting the goroutine.
-func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string) func() error {
+func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string, compl *atomic.Int32) func() error {
 	return func() error {
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
-				fmt.Printf("Done downloading %s: unsupported on %s, skipping\n", binary, platform)
+				fmt.Printf("Could not download %s: %s\n", binary, err)
 			} else {
 				return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
 			}
+		} else {
+			compl.Add(1)
 		}
 
 		fmt.Printf("Done downloading %s\n", packageName)
@@ -1459,6 +1468,7 @@ func majorMinor() string {
 
 // Clean cleans up the integration testing leftovers
 func (Integration) Clean() error {
+	fmt.Println("--- Clean mage artifacts")
 	_ = os.RemoveAll(".agent-testing")
 
 	// Clean out .integration-cache/.ogc-cache always
@@ -1700,6 +1710,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if err != nil {
 		return nil, err
 	}
+
 	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
 	agentVersion := os.Getenv("AGENT_VERSION")
 	if agentVersion == "" {
@@ -1717,6 +1728,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 			agentVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
 		}
 	}
+
 	if agentStackVersion == "" {
 		agentStackVersion = agentVersion
 	}
@@ -1754,15 +1766,15 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		instanceProvisionerMode = "ogc"
 	}
 	if instanceProvisionerMode != "ogc" && instanceProvisionerMode != "multipass" {
-		return nil, errors.New("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass'")
+		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
 	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
 	if stackProvisionerMode == "" {
-		stackProvisionerMode = "ess"
+		stackProvisionerMode = "stateful"
 	}
-	if stackProvisionerMode != "ess" && stackProvisionerMode != "serverless" {
-		return nil, errors.New("STACK_PROVISIONER environment variable must be one of 'serverless' or 'ess'")
+	if stackProvisionerMode != "stateful" && stackProvisionerMode != "serverless" {
+		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of 'serverless' or 'stateful', not %s", stackProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
@@ -1776,24 +1788,37 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
 	}
 
+	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
+	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
+	binaryName := os.Getenv("TEST_BINARY_NAME")
+	if binaryName == "" {
+		binaryName = "elastic-agent"
+	}
+
+	repoDir := os.Getenv("TEST_INTEG_REPO_PATH")
+	if repoDir == "" {
+		repoDir = "."
+	}
+
 	diagDir := filepath.Join("build", "diagnostics")
 	_ = os.MkdirAll(diagDir, 0755)
 
 	cfg := runner.Config{
-		AgentVersion:      agentVersion,
-		AgentStackVersion: agentStackVersion,
-		BuildDir:          agentBuildDir,
-		GOVersion:         goVersion,
-		RepoDir:           ".",
-		StateDir:          ".integration-cache",
-		DiagnosticsDir:    diagDir,
-		Platforms:         testPlatforms(),
-		Matrix:            matrix,
-		SingleTest:        singleTest,
-		VerboseMode:       mg.Verbose(),
-		Timestamp:         timestamp,
-		TestFlags:         goTestFlags,
-		ExtraEnv:          extraEnv,
+		AgentVersion:   agentVersion,
+		StackVersion:   agentStackVersion,
+		BuildDir:       agentBuildDir,
+		GOVersion:      goVersion,
+		RepoDir:        repoDir,
+		DiagnosticsDir: diagDir,
+		StateDir:       ".integration-cache",
+		Platforms:      testPlatforms(),
+		Matrix:         matrix,
+		SingleTest:     singleTest,
+		VerboseMode:    mg.Verbose(),
+		Timestamp:      timestamp,
+		TestFlags:      goTestFlags,
+		ExtraEnv:       extraEnv,
+		BinaryName:     binaryName,
 	}
 	ogcCfg := ogc.Config{
 		ServiceTokenPath: serviceTokenPath,
@@ -1822,7 +1847,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Region:     essRegion,
 	}
 	var stackProvisioner runner.StackProvisioner
-	if stackProvisionerMode == "ess" {
+	if stackProvisionerMode == "stateful" {
 		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err
@@ -2153,6 +2178,7 @@ func hasSnapshotEnv() bool {
 		return false
 	}
 	b, _ := strconv.ParseBool(snapshot)
+
 	return b
 }
 
