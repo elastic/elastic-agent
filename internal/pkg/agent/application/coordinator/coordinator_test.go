@@ -331,7 +331,7 @@ func TestCollectManagerErrorsTimeout(t *testing.T) {
 	}, handlerChan)
 }
 
-func TestCoordinatorShutdownErrorOneResponse(t *testing.T) {
+func TestCollectManagerErrorsOneResponse(t *testing.T) {
 	handlerChan, _, _, config := setupManagerShutdownChannels(10 * time.Millisecond)
 
 	// Send an error for the config manager -- we should also get a
@@ -347,7 +347,7 @@ func TestCoordinatorShutdownErrorOneResponse(t *testing.T) {
 	}, handlerChan)
 }
 
-func TestCoordinatorShutdownErrorAllResponses(t *testing.T) {
+func TestCollectManagerErrorsAllResponses(t *testing.T) {
 	handlerChan, runtime, varWatcher, config := setupManagerShutdownChannels(5 * time.Second)
 	runtimeErrStr := "runtime error"
 	varsErrStr := "vars error"
@@ -383,7 +383,7 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 	for {
 		select {
 		case <-waitCtx.Done():
-			t.Fatalf("handleCoordinatorDone timed out while waiting for shutdown")
+			t.Fatalf("timed out while waiting for response from collectManagerErrors")
 		case gotErr := <-handlerErr:
 			if handlerErr != nil {
 				if check(gotErr) {
