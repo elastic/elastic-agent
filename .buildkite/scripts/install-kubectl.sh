@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -exuo pipefail
 
+echo "--- Install kubectl"
+
 MSG="parameter missing."
 DEFAULT_HOME="/usr/local"
 K8S_VERSION=${K8S_VERSION:?$MSG}
@@ -20,7 +22,7 @@ then
     set -e
 fi
 
-echo "--- Installing kubectl"
+echo "Installing kubectl"
 
 mkdir -p "${HOME}/bin"
 

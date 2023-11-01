@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -exuo pipefail
 
+echo "--- Install Kind"
+
 MSG="environment variable missing."
 DEFAULT_HOME="/usr/local"
 KIND_VERSION=${KIND_VERSION:?$MSG}
@@ -20,7 +22,7 @@ then
     set -e
 fi
 
-echo "--- Installing Kind"
+echo "Installing Kind"
 
 OS=$(uname -s| tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m| tr '[:upper:]' '[:lower:]')
