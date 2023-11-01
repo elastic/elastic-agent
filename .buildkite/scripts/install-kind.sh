@@ -36,7 +36,7 @@ mkdir -p "${HOME}/bin"
 
 if curl -sSLo "${KIND_CMD}" "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-${OS}-${ARCH_SUFFIX}" ; then
     chmod +x "${KIND_CMD}"
-    PATH=$PATH:$KIND_CMD
+    export PATH=$PATH:$KIND_CMD
 else
     echo "Something bad with the download, let's delete the corrupted binary"
     if [ -e "${KIND_CMD}" ] ; then
