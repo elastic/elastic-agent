@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const agentName = "elastic-agent"
@@ -136,6 +137,12 @@ func DefaultLoggingConfig() *Config {
 	cfg.Files.Path = paths.Logs()
 	cfg.Files.Name = agentName
 	cfg.Files.MaxSize = 20 * 1024 * 1024
+	cfg.Files.Permissions = 0600 // default user only
+	root, _ := utils.HasRoot()   // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		cfg.Files.Permissions = 0660
+	}
 
 	return &cfg
 }
