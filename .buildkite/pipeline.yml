@@ -138,6 +138,8 @@ steps:
 
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
+    env:
+      TEST_INTEG_AUTH_ESS_REGION: aws-eu-central-1
     command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestMonitoringLogsShipped" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
     artifact_paths:
       - "build/TEST-**"
@@ -148,6 +150,8 @@ steps:
 
   - label: "Integration tests"
     key: "integration-tests"
+    env:
+      TEST_INTEG_AUTH_ESS_REGION: aws-eu-central-1
     command: ".buildkite/scripts/steps/integration_tests.sh stateful"
     artifact_paths:
       - "build/TEST-**"
