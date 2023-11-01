@@ -35,9 +35,15 @@ type Details struct {
 
 // Metadata consists of metadata relating to a specific upgrade state
 type Metadata struct {
-	ScheduledAt     time.Time    `json:"scheduled_at,omitempty" yaml:"scheduled_at,omitempty"`
-	DownloadPercent float64      `json:"download_percent,omitempty" yaml:"download_percent,omitempty"`
-	DownloadRate    downloadRate `json:"download_rate,omitempty" yaml:"download_rate,omitempty"`
+	ScheduledAt time.Time `json:"scheduled_at,omitempty" yaml:"scheduled_at,omitempty"`
+
+	// DownloadPercent is the percentage of the artifact that has been
+	// downloaded. Minimum value is 0 and maximum value is 1.
+	DownloadPercent float64 `json:"download_percent,omitempty" yaml:"download_percent,omitempty"`
+
+	// DownloadRate is the rate, in bytes per second, at which the download
+	// is progressing.
+	DownloadRate downloadRate `json:"download_rate,omitempty" yaml:"download_rate,omitempty"`
 
 	// FailedState is the state an upgrade was in if/when it failed. Use the
 	// Fail() method of UpgradeDetails to correctly record details when
@@ -71,7 +77,7 @@ func (d *Details) SetState(s State) {
 }
 
 // SetDownloadProgress is a convenience method to set the download percent
-// when the upgrade is in UPG_DOWNLOADING state.
+// and download rate when the upgrade is in UPG_DOWNLOADING state.
 func (d *Details) SetDownloadProgress(percent, rateBytesPerSecond float64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
