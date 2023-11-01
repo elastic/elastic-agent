@@ -17,6 +17,7 @@ import (
 type localFetcher struct {
 	dir          string
 	snapshotOnly bool
+	binaryName   string
 }
 
 type localFetcherOpt func(f *localFetcher)
@@ -28,10 +29,18 @@ func WithLocalSnapshotOnly() localFetcherOpt {
 	}
 }
 
+// WithCustomBinaryName sets the binary to a custom name, the default is `elastic-agent`
+func WithCustomBinaryName(name string) localFetcherOpt {
+	return func(f *localFetcher) {
+		f.binaryName = name
+	}
+}
+
 // LocalFetcher returns a fetcher that pulls the binary of the Elastic Agent from a local location.
 func LocalFetcher(dir string, opts ...localFetcherOpt) Fetcher {
 	f := &localFetcher{
-		dir: dir,
+		dir:        dir,
+		binaryName: "elastic-agent",
 	}
 	for _, o := range opts {
 		o(f)
@@ -56,7 +65,7 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 		return nil, fmt.Errorf("invalid version: %q: %w", ver, err)
 	}
 
-	mainBuildfmt := "elastic-agent-%s-%s"
+	mainBuildfmt := "%s-%s-%s"
 	if f.snapshotOnly && !ver.IsSnapshot() {
 		if ver.Prerelease() == "" {
 			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "SNAPSHOT", ver.BuildMetadata())
@@ -66,7 +75,7 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 
 	}
 
-	mainBuild := fmt.Sprintf(mainBuildfmt, ver, suffix)
+	mainBuild := fmt.Sprintf(mainBuildfmt, f.binaryName, ver, suffix)
 	mainBuildPath := filepath.Join(f.dir, mainBuild)
 	build := mainBuild
 	buildPath := mainBuildPath

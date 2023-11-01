@@ -54,7 +54,7 @@ func newService(topPath string, username string, group string) (service.Service,
 
 			// Windows setup restart on failure
 			"OnFailure":              "restart",
-			"OnFailureDelayDuration": "1s",
+			"OnFailureDelayDuration": "15s", // Matches the value used by endpoint-security.
 			"OnFailureResetPeriod":   10,
 		},
 	}

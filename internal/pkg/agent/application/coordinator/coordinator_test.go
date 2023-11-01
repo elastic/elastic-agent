@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -471,8 +473,50 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCoordinator_UpgradeDetails(t *testing.T) {
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	expectedErr := errors.New("some upgrade error")
+	upgradeManager := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  expectedErr,
+	}
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, WithUpgradeManager(upgradeManager))
+	require.Nil(t, coord.state.UpgradeDetails)
+	go func() {
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	// no vars used by the config
+	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
+
+	// no need for anything to really run
+	cfg, err := config.NewConfigFrom(nil)
+	require.NoError(t, err)
+	cfgMgr.Config(ctx, cfg)
+
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	require.ErrorIs(t, expectedErr, err)
+	cancel()
+
+	err = <-coordCh
+	require.NoError(t, err)
+
+	require.Equal(t, details.StateFailed, coord.state.UpgradeDetails.State)
+	require.Equal(t, details.StateRequested, coord.state.UpgradeDetails.Metadata.FailedState)
+	require.Equal(t, expectedErr.Error(), coord.state.UpgradeDetails.Metadata.ErrorMsg)
+}
+
 type createCoordinatorOpts struct {
-	managed bool
+	managed        bool
+	upgradeManager UpgradeManager
 }
 
 type CoordinatorOpt func(o *createCoordinatorOpts)
@@ -480,6 +524,12 @@ type CoordinatorOpt func(o *createCoordinatorOpts)
 func ManagedCoordinator(managed bool) CoordinatorOpt {
 	return func(o *createCoordinatorOpts) {
 		o.managed = managed
+	}
+}
+
+func WithUpgradeManager(upgradeManager UpgradeManager) CoordinatorOpt {
+	return func(o *createCoordinatorOpts) {
+		o.upgradeManager = upgradeManager
 	}
 }
 
@@ -527,7 +577,12 @@ func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt
 	cfgMgr := newFakeConfigManager()
 	varsMgr := newFakeVarsManager()
 
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, &fakeUpgradeManager{}, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed)
+	upgradeManager := o.upgradeManager
+	if upgradeManager == nil {
+		upgradeManager = &fakeUpgradeManager{}
+	}
+
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed)
 	return coord, cfgMgr, varsMgr
 }
 
@@ -574,7 +629,7 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
 	if f.upgradeErr != nil {
 		return nil, f.upgradeErr

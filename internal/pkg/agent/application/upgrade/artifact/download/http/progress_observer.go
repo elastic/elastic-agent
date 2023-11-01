@@ -5,10 +5,12 @@
 package http
 
 import (
+	"sync"
 	"time"
 
 	"github.com/docker/go-units"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -94,4 +96,37 @@ func (lpObs *loggingProgressObserver) ReportFailed(sourceURI string, timePast ti
 		// see reason in `Report`
 		lpObs.log.Warnf(msg, args...)
 	}
+}
+
+type detailsProgressObserver struct {
+	upgradeDetails *details.Details
+	mu             sync.RWMutex
+}
+
+func newDetailsProgressObserver(upgradeDetails *details.Details) *detailsProgressObserver {
+	upgradeDetails.SetState(details.StateDownloading)
+	return &detailsProgressObserver{
+		upgradeDetails: upgradeDetails,
+	}
+}
+
+func (dpObs *detailsProgressObserver) Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRateBytesPerSecond float64) {
+	dpObs.mu.Lock()
+	defer dpObs.mu.Unlock()
+
+	dpObs.upgradeDetails.SetDownloadProgress(percentComplete, downloadRateBytesPerSecond)
+}
+
+func (dpObs *detailsProgressObserver) ReportCompleted(sourceURI string, timePast time.Duration, downloadRateBytesPerSecond float64) {
+	dpObs.mu.Lock()
+	defer dpObs.mu.Unlock()
+
+	dpObs.upgradeDetails.SetDownloadProgress(1, downloadRateBytesPerSecond)
+}
+
+func (dpObs *detailsProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRateBytesPerSecond float64, err error) {
+	dpObs.mu.Lock()
+	defer dpObs.mu.Unlock()
+
+	dpObs.upgradeDetails.Fail(err)
 }
