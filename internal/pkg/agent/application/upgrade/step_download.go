@@ -37,6 +37,8 @@ const (
 	fleetUpgradeFallbackPGPFormat = "/api/agents/upgrades/%d.%d.%d/pgp-public-key"
 )
 
+type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config, *details.Details) (download.Downloader, error)
+
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
@@ -46,32 +48,55 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 
 	pgpBytes = u.appendFallbackPGP(version, pgpBytes)
 
+	parsedVersion, err := agtversion.ParseVersion(version)
+	if err != nil {
+		return "", fmt.Errorf("error parsing version %q: %w", version, err)
+	}
+
 	// do not update source config
 	settings := *u.settings
+	var factory downloaderFactory
+	var verifier download.Verifier
 	if sourceURI != "" {
 		if strings.HasPrefix(sourceURI, "file://") {
 			// update the DropPath so the fs.Downloader can download from this
 			// path instead of looking into the installed downloads directory
 			settings.DropPath = strings.TrimPrefix(sourceURI, "file://")
+
+			// set specific downloader, local file just uses the fs.NewDownloader
+			// no fallback is allowed because it was requested that this specific source be used
+			factory = func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+				return fs.NewDownloader(config), nil
+			}
+
+			// set specific verifier, local file verifies locally only
+			verifier, err = fs.NewVerifier(u.log, &settings, release.PGP())
+			if err != nil {
+				return "", errors.New(err, "initiating verifier")
+			}
+
+			// log that a local upgrade artifact is being used
+			u.log.Infow("Using local upgrade artifact", "version", version,
+				"drop_path", settings.DropPath,
+				"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 		} else {
 			settings.SourceURI = sourceURI
 		}
 	}
 
-	u.log.Infow("Downloading upgrade artifact", "version", version,
-		"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
-		"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
-
-	parsedVersion, err := agtversion.ParseVersion(version)
-	if err != nil {
-		return "", fmt.Errorf("error parsing version %q: %w", version, err)
+	if factory == nil {
+		// set the factory to the newDownloader factory
+		factory = newDownloader
+		u.log.Infow("Downloading upgrade artifact", "version", version,
+			"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
+			"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 	}
 
 	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
 		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
 	}
 
-	path, err := u.downloadWithRetries(ctx, newDownloader, parsedVersion, &settings, upgradeDetails)
+	path, err := u.downloadWithRetries(ctx, factory, parsedVersion, &settings, upgradeDetails)
 	if err != nil {
 		return "", errors.New(err, "failed download of agent binary")
 	}
@@ -80,9 +105,11 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return path, nil
 	}
 
-	verifier, err := newVerifier(parsedVersion, u.log, &settings)
-	if err != nil {
-		return "", errors.New(err, "initiating verifier")
+	if verifier == nil {
+		verifier, err = newVerifier(parsedVersion, u.log, &settings)
+		if err != nil {
+			return "", errors.New(err, "initiating verifier")
+		}
 	}
 
 	if err := verifier.Verify(agentArtifact, parsedVersion.VersionWithPrerelease(), skipDefaultPgp, pgpBytes...); err != nil {
@@ -171,7 +198,7 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 
 func (u *Upgrader) downloadWithRetries(
 	ctx context.Context,
-	downloaderCtor func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config, *details.Details) (download.Downloader, error),
+	factory downloaderFactory,
 	version *agtversion.ParsedSemVer,
 	settings *artifact.Config,
 	upgradeDetails *details.Details,
@@ -190,7 +217,7 @@ func (u *Upgrader) downloadWithRetries(
 		attempt++
 		u.log.Infof("download attempt %d", attempt)
 
-		downloader, err := downloaderCtor(version, u.log, settings, upgradeDetails)
+		downloader, err := factory(version, u.log, settings, upgradeDetails)
 		if err != nil {
 			return fmt.Errorf("unable to create fetcher: %w", err)
 		}
