@@ -96,25 +96,25 @@ pipeline {
           }
         }
         stages {        
-          stage('K8s') {
-            when {
-              beforeAgent true
-              // Always when running builds on branches/tags
-              // Enable if k8s related changes.
-              allOf {
-                expression { return env.PLATFORM == 'ubuntu-22 && immutable' }
-                anyOf {
-                  not { changeRequest() }                           // If no PR
-                  expression { return env.K8S_CHANGES == "true" }
-                }
-              }
-            }
-            steps {
-              deleteDir()
-              unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-              runK8s(k8sVersion: 'v1.27.3', kindVersion: 'v0.20.0', context: "K8s-${PLATFORM}")
-            }
-          }
+          // stage('K8s') {
+          //   when {
+          //     beforeAgent true
+          //     // Always when running builds on branches/tags
+          //     // Enable if k8s related changes.
+          //     allOf {
+          //       expression { return env.PLATFORM == 'ubuntu-22 && immutable' }
+          //       anyOf {
+          //         not { changeRequest() }                           // If no PR
+          //         expression { return env.K8S_CHANGES == "true" }
+          //       }
+          //     }
+          //   }
+          //   steps {
+          //     deleteDir()
+          //     unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+          //     runK8s(k8sVersion: 'v1.27.3', kindVersion: 'v0.20.0', context: "K8s-${PLATFORM}")
+          //   }
+          // }
           stage('Package') {
             when {
               beforeAgent true
