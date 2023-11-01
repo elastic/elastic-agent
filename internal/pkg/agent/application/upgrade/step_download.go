@@ -39,6 +39,8 @@ const (
 
 type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config, *details.Details) (download.Downloader, error)
 
+type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details) (string, error)
+
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
@@ -55,6 +57,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 
 	// do not update source config
 	settings := *u.settings
+	var downloaderFunc downloader
 	var factory downloaderFactory
 	var verifier download.Verifier
 	if sourceURI != "" {
@@ -62,6 +65,10 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 			// update the DropPath so the fs.Downloader can download from this
 			// path instead of looking into the installed downloads directory
 			settings.DropPath = strings.TrimPrefix(sourceURI, "file://")
+
+			// use specific function that doesn't perform retries on download as its
+			// local and no retry should be performed
+			downloaderFunc = u.downloadOnce
 
 			// set specific downloader, local file just uses the fs.NewDownloader
 			// no fallback is allowed because it was requested that this specific source be used
@@ -91,12 +98,15 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 			"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 			"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 	}
+	if downloaderFunc == nil {
+		downloaderFunc = u.downloadWithRetries
+	}
 
 	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
 		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
 	}
 
-	path, err := u.downloadWithRetries(ctx, factory, parsedVersion, &settings, upgradeDetails)
+	path, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails)
 	if err != nil {
 		return "", errors.New(err, "failed download of agent binary")
 	}
@@ -196,6 +206,29 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 	return composed.NewVerifier(log, fsVerifier, snapshotVerifier, remoteVerifier), nil
 }
 
+func (u *Upgrader) downloadOnce(
+	ctx context.Context,
+	factory downloaderFactory,
+	version *agtversion.ParsedSemVer,
+	settings *artifact.Config,
+	upgradeDetails *details.Details,
+) (string, error) {
+	downloader, err := factory(version, u.log, settings, upgradeDetails)
+	if err != nil {
+		return "", fmt.Errorf("unable to create fetcher: %w", err)
+	}
+	// All download artifacts expect a name that includes <major>.<minor.<patch>[-SNAPSHOT] so we have to
+	// make sure not to include build metadata we might have in the parsed version (for snapshots we already
+	// used that to configure the URL we download the files from)
+	path, err := downloader.Download(ctx, agentArtifact, version.VersionWithPrerelease())
+	if err != nil {
+		return "", fmt.Errorf("unable to download package: %w", err)
+	}
+
+	// Download successful
+	return path, nil
+}
+
 func (u *Upgrader) downloadWithRetries(
 	ctx context.Context,
 	factory downloaderFactory,
@@ -216,20 +249,11 @@ func (u *Upgrader) downloadWithRetries(
 	opFn := func() error {
 		attempt++
 		u.log.Infof("download attempt %d", attempt)
-
-		downloader, err := factory(version, u.log, settings, upgradeDetails)
+		var err error
+		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails)
 		if err != nil {
-			return fmt.Errorf("unable to create fetcher: %w", err)
+			return err
 		}
-		// All download artifacts expect a name that includes <major>.<minor.<patch>[-SNAPSHOT] so we have to
-		// make sure not to include build metadata we might have in the parsed version (for snapshots we already
-		// used that to configure the URL we download the files from)
-		path, err = downloader.Download(cancelCtx, agentArtifact, version.VersionWithPrerelease())
-		if err != nil {
-			return fmt.Errorf("unable to download package: %w", err)
-		}
-
-		// Download successful
 		return nil
 	}
 
