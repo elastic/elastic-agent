@@ -70,13 +70,13 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 			return "", "", fmt.Errorf("failed finding group %s: %w", groupName, err)
 		}
 		if errors.Is(err, ErrGroupNotFound) {
-			s := pt.StepStart(fmt.Sprintf("Creating group %s", groupName))
+			pt.Describe(fmt.Sprintf("Creating group %s", groupName))
 			gid, err = CreateGroup(groupName)
 			if err != nil {
-				s.Failed()
+				pt.Describe(fmt.Sprintf("Failed to create group %s", groupName))
 				return "", "", fmt.Errorf("failed to create group %s: %w", groupName, err)
 			}
-			s.Succeeded()
+			pt.Describe(fmt.Sprintf("Successfully created group %s", groupName))
 		}
 
 		// ensure required user
@@ -85,18 +85,18 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 			return "", "", fmt.Errorf("failed finding username %s: %w", username, err)
 		}
 		if errors.Is(err, ErrUserNotFound) {
-			s := pt.StepStart(fmt.Sprintf("Creating user %s", username))
+			pt.Describe(fmt.Sprintf("Creating user %s", username))
 			uid, err = CreateUser(username, gid)
 			if err != nil {
-				s.Failed()
+				pt.Describe(fmt.Sprintf("Failed to create user %s", username))
 				return "", "", fmt.Errorf("failed to create user %s: %w", username, err)
 			}
 			err = AddUserToGroup(username, groupName)
 			if err != nil {
-				s.Failed()
+				pt.Describe(fmt.Sprintf("Failed to add user %s to group %s", username, groupName))
 				return "", "", fmt.Errorf("failed to add user %s to group %s: %w", username, groupName, err)
 			}
-			s.Succeeded()
+			pt.Describe(fmt.Sprintf("Successfully created user %s", username))
 		}
 	}
 
