@@ -1218,7 +1218,7 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 
 // collectManagerErrors listens on the shutdown channels for the
 // runtime, config, and vars managers, and waits for up to
-// CoordinationShutdownTimeout for them to report their final status.
+// the specified timeout for them to report their final status.
 // It returns any resulting errors as a multierror, or nil if no errors
 // were reported.
 // Called on the main Coordinator goroutine.
