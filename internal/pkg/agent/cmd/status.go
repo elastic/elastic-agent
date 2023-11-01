@@ -169,7 +169,7 @@ func listUpgradeDetails(l list.Writer, upgradeDetails *cproto.UpgradeDetails) {
 		l.AppendItem("metadata")
 		l.Indent()
 		if upgradeDetails.Metadata.ScheduledAt != nil && !upgradeDetails.Metadata.ScheduledAt.AsTime().IsZero() {
-			l.AppendItem("scheduled_at: " + upgradeDetails.Metadata.ScheduledAt.String())
+			l.AppendItem("scheduled_at: " + upgradeDetails.Metadata.ScheduledAt.AsTime().UTC().Format(time.RFC3339))
 		}
 		if upgradeDetails.Metadata.FailedState != "" {
 			l.AppendItem("failed_state: " + upgradeDetails.Metadata.FailedState)

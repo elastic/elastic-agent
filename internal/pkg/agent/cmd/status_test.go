@@ -6,9 +6,13 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/jedib0t/go-pretty/v6/list"
 
@@ -153,6 +157,7 @@ func TestHumanOutput(t *testing.T) {
 }
 
 func TestListUpgradeDetails(t *testing.T) {
+	now := time.Now().UTC()
 	cases := map[string]struct {
 		upgradeDetails *cproto.UpgradeDetails
 		expectedOutput string
@@ -203,14 +208,16 @@ func TestListUpgradeDetails(t *testing.T) {
 				TargetVersion: "8.12.0",
 				State:         "UPG_DOWNLOADING",
 				Metadata: &cproto.UpgradeDetailsMetadata{
+					ScheduledAt:     timestamppb.New(now),
 					DownloadPercent: 0.17679,
 				},
 			},
-			expectedOutput: `── upgrade_details
+			expectedOutput: fmt.Sprintf(`── upgrade_details
    ├─ target_version: 8.12.0
    ├─ state: UPG_DOWNLOADING
    └─ metadata
-      └─ download_percent: 17.68%`,
+      ├─ scheduled_at: %s
+      └─ download_percent: 17.68%%`, now.Format(time.RFC3339)),
 		}}
 
 	for name, test := range cases {
