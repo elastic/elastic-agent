@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+#=========================
+# NOTE: This entire script is a temporary hack until we have buildkite set up on the beats repo.
+# until then, we need some kind of serverless integration tests, hence this script, which just clones the beats repo,
+# and runs the serverless integration suite against different beats
+# After buildkite is set up on beats, this file/PR should be reverted.
+#==========================
+
 source .buildkite/scripts/common.sh
 STACK_PROVISIONER="${1:-"serverless"}"
 
