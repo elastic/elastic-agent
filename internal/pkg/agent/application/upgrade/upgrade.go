@@ -181,13 +181,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
+	det.SetState(details.StateWatching)
+	// TODO: serialize upgrade details to upgrade marker
 	if err := u.markUpgrade(ctx, u.log, newHash, action); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
-
-	det.SetState(details.StateWatching)
 
 	if err := InvokeWatcher(u.log); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)

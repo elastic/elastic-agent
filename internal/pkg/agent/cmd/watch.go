@@ -108,6 +108,8 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	ctx := context.Background()
 	if err := watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
 		log.Error("Error detected proceeding to rollback: %v", err)
+		// TODO: deserialize upgrade details to marker file, update state, and
+		// serialize back to marker file.
 		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
 			log.Error("rollback failed", err)
