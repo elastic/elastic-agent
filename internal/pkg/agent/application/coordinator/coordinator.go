@@ -293,9 +293,6 @@ type managerChans struct {
 	varsManagerError  <-chan error
 }
 
-// ErrFatalCoordinator is returned when a coordinator sub-component returns an error, as opposed to a simple context-cancelled.
-var ErrFatalCoordinator = errors.New("fatal error in coordinator")
-
 // New creates a new coordinator.
 func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
@@ -643,11 +640,13 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		c.setCoordinatorState(agentclient.Stopped, "Requested to be stopped")
 		c.setFleetState(agentclient.Stopped, "Requested to be stopped")
 	} else {
-		// runner should always return a non-nil error, but if it doesn't,
-		// report it.
-		message := "Coordinator terminated with unknown error (runner returned nil)"
+		var message string
 		if err != nil {
 			message = fmt.Sprintf("Fatal coordinator error: %v", err.Error())
+		} else {
+			// runner should always return a non-nil error, but if it doesn't,
+			// report it.
+			message = "Coordinator terminated with unknown error (runner returned nil)"
 		}
 		c.setCoordinatorState(agentclient.Failed, message)
 		c.setFleetState(agentclient.Stopped, message)
