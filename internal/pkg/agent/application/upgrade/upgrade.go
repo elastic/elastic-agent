@@ -182,8 +182,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	det.SetState(details.StateWatching)
-	// TODO: serialize upgrade details to upgrade marker
-	if err := u.markUpgrade(ctx, u.log, newHash, action); err != nil {
+	if err := u.markUpgrade(ctx, u.log, newHash, action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
