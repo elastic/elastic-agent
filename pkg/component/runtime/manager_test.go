@@ -3304,7 +3304,7 @@ LOOP:
 	require.NoError(t, err)
 }
 
-func TestManager_FakeInput_OutputChange(t *testing.T) {
+func TestManager_FakeInput_StopInput0StartInput1(t *testing.T) {
 	testPaths(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -3376,7 +3376,7 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
 						"state":   int(client.UnitStateHealthy),
-						"message": "Fake Healthy 0-1",
+						"message": "Fake Healthy 0-2",
 					}),
 				},
 			},
@@ -3394,7 +3394,7 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
 						"state":   int(client.UnitStateHealthy),
-						"message": "Fake Healthy 0-0",
+						"message": "Fake Healthy 1-0",
 					}),
 				},
 				{
@@ -3403,16 +3403,16 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
 						"state":   int(client.UnitStateHealthy),
-						"message": "Fake Healthy 0-1",
+						"message": "Fake Healthy 1-1",
 					}),
 				},
 				{
-					ID:   "fake-input-1-1",
+					ID:   "fake-input-1-2",
 					Type: client.UnitTypeInput,
 					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
 						"state":   int(client.UnitStateHealthy),
-						"message": "Fake Healthy 0-1",
+						"message": "Fake Healthy 1-2",
 					}),
 				},
 			},
@@ -3423,7 +3423,6 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 		componentID string
 		state       ComponentState
 	}
-	var stateProgression []progressionStep
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -3463,9 +3462,20 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 
 	var stateProgressionWG sync.WaitGroup
 	stateProgressionWG.Add(1)
+	var comp0Progression []progressionStep
+	var comp1Progression []progressionStep
 	go func() {
 		for step := range stateProgressionCh {
-			stateProgression = append(stateProgression, step)
+			if step.componentID == IDComp0 {
+				if (len(comp0Progression) == 0) || (step.state.State != comp0Progression[len(comp0Progression)-1].state.State) {
+					comp0Progression = append(comp0Progression, step)
+				}
+			}
+			if step.componentID == IDComp1 {
+				if (len(comp1Progression) == 0) || (step.state.State != comp1Progression[len(comp1Progression)-1].state.State) {
+					comp1Progression = append(comp1Progression, step)
+				}
+			}
 		}
 		stateProgressionWG.Done()
 	}()
@@ -3512,14 +3522,14 @@ LOOP:
 			t.Logf("[subErrCh0] received: %v", err)
 			require.NoError(t, err)
 			count++
-			if count >= 2 {
+			if count >= 3 {
 				break LOOP
 			}
 		case err := <-subErrCh1:
 			t.Logf("[subErrCh1] received: %v", err)
 			require.NoError(t, err)
 			count++
-			if count >= 2 {
+			if count >= 3 {
 				break LOOP
 			}
 		}
@@ -3528,20 +3538,19 @@ LOOP:
 	subCancel()
 	cancel()
 
-	// check progression, require stop fake-0 before start fake-1
 	stateProgressionWG.Wait()
-	comp0Stopped := false
-	for _, step := range stateProgression {
-		if step.componentID == IDComp0 &&
-			step.state.State == client.UnitStateStopped {
-			comp0Stopped = true
-		}
-		if step.componentID == IDComp1 &&
-			step.state.State == client.UnitStateStarting {
-			require.True(t, comp0Stopped)
-			break
-		}
-	}
+
+	// check progressions:
+	// require stop fake-0 Starting -> Healthy -> Stopped
+	require.Truef(t, len(comp0Progression) >= 3, "comp0Progression should have at least 3 state changes. comp0Progression: %v", comp0Progression)
+	require.Equalf(t, client.UnitStateStarting, comp0Progression[0].state.State, "Comp0 must start with state Starting comp0Progression: %v", comp0Progression)
+	require.Equalf(t, client.UnitStateHealthy, comp0Progression[1].state.State, "Comp0 must transition from Starting to Healthy. comp0Progression: %v", comp0Progression)
+	require.Equalf(t, client.UnitStateStopped, comp0Progression[len(comp0Progression)-1].state.State, "Comp0 must transition end with Stopped. comp0Progression: %v", comp0Progression)
+
+	// require fake-1 Starting -> Healthy
+	require.Truef(t, len(comp1Progression) >= 2, "comp1Progression should have at least 2 state changes. comp1Progression: %v", comp1Progression)
+	require.Equalf(t, client.UnitStateStarting, comp1Progression[0].state.State, "Comp1 must start with state Starting. comp1Progression: %v", comp1Progression)
+	require.Equalf(t, client.UnitStateHealthy, comp1Progression[len(comp1Progression)-1].state.State, "Comp1 must end with Healthy. comp1Progression: %v", comp1Progression)
 
 	err = <-errCh
 	require.NoError(t, err)
