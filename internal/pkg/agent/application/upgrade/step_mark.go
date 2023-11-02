@@ -208,7 +208,12 @@ func markerFilePath() string {
 
 // WatchMarker watches the upgrade marker file for changes and
 // updates the c.State.UpgradeDetails accordingly.
-func WatchMarker(detailsObserver details.Observer, logger *logger.Logger, errCh chan error) {
+func WatchMarker(ctx context.Context, detailsObserver details.Observer, logger *logger.Logger, errCh chan error) {
+	upgradeMarkerFilePath := markerFilePath()
+	watchMarker(ctx, detailsObserver, logger, errCh, upgradeMarkerFilePath)
+}
+
+func watchMarker(ctx context.Context, detailsObserver details.Observer, logger *logger.Logger, errCh chan error, upgradeMarkerFilePath string) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		errCh <- fmt.Errorf("failed to create watch for upgrade marker: %w", err)
@@ -218,7 +223,6 @@ func WatchMarker(detailsObserver details.Observer, logger *logger.Logger, errCh 
 
 	// Watch the upgrade marker file's directory, not the file itself, so we
 	// notice the file even if it's deleted and recreated.
-	upgradeMarkerFilePath := markerFilePath()
 	err = w.Add(filepath.Dir(upgradeMarkerFilePath))
 	if err != nil {
 		errCh <- fmt.Errorf("failed to set watch on upgrade marker's directory: %w", err)
@@ -227,6 +231,8 @@ func WatchMarker(detailsObserver details.Observer, logger *logger.Logger, errCh 
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case err, ok := <-w.Errors:
 			if !ok { // Channel was closed (i.e. Watcher.Close() was called).
 				logger.Debug("upgrade marker watch's error channel was closed")
