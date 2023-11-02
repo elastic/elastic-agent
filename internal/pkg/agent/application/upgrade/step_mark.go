@@ -6,10 +6,13 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 
 	"gopkg.in/yaml.v2"
 
@@ -201,4 +204,58 @@ func saveMarker(marker *UpdateMarker) error {
 
 func markerFilePath() string {
 	return filepath.Join(paths.Data(), markerFilename)
+}
+
+// WatchMarker watches the upgrade marker file for changes and
+// updates the c.State.UpgradeDetails accordingly.
+func WatchMarker(detailsObserver details.Observer, logger *logger.Logger, errCh chan error) {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		errCh <- fmt.Errorf("failed to create watch for upgrade marker: %w", err)
+		return
+	}
+	defer w.Close()
+
+	// Watch the upgrade marker file's directory, not the file itself, so we
+	// notice the file even if it's deleted and recreated.
+	upgradeMarkerFilePath := markerFilePath()
+	err = w.Add(filepath.Dir(upgradeMarkerFilePath))
+	if err != nil {
+		errCh <- fmt.Errorf("failed to set watch on upgrade marker's directory: %w", err)
+		return
+	}
+
+	for {
+		select {
+		case err, ok := <-w.Errors:
+			if !ok { // Channel was closed (i.e. Watcher.Close() was called).
+				logger.Debug("upgrade marker watch's error channel was closed")
+				return
+			}
+			errCh <- fmt.Errorf("upgrade marker watch returned error: %w", err)
+		case e, ok := <-w.Events:
+			if !ok { // Channel was closed (i.e. Watcher.Close() was called).
+				logger.Debug("upgrade marker watch's events channel was closed")
+				return
+			}
+
+			if e.Name != filepath.Base(upgradeMarkerFilePath) {
+				// Event is for a file other than the upgrade marker; ignore it.
+				continue
+			}
+
+			switch e.Op {
+			case fsnotify.Create, fsnotify.Write:
+				// Upgrade marker file was created or updated; read upgrade details
+				// from it and set them in the coordinator's state.
+				marker, err := LoadMarker()
+				if err != nil {
+					errCh <- fmt.Errorf("unable to load upgrade marker from watch: %w", err)
+					continue
+				}
+
+				detailsObserver(marker.Details)
+			}
+		}
+	}
 }

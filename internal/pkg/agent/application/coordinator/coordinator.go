@@ -21,6 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -635,6 +636,10 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	c.refreshState()
 
 	err := c.runner(ctx)
+
+	errChan := make(chan error)
+	go upgrade.WatchMarker(c.setUpgradeDetails, c.logger, errChan)
+	// TODO: consume from errChan
 
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		c.setCoordinatorState(agentclient.Stopped, "Requested to be stopped")
