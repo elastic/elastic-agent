@@ -321,12 +321,19 @@ var createDeploymentRequestTemplate string
 var cloudProviderSpecificValues []byte
 
 func generateCreateDeploymentRequestBody(req CreateDeploymentRequest) ([]byte, error) {
-	regionParts := strings.Split(req.Region, "-")
-	if len(regionParts) < 2 {
-		return nil, fmt.Errorf("unable to parse CSP out of region [%s]", req.Region)
-	}
+	var csp string
+	// Special case: AWS us-east-1 region is just called
+	// us-east-1 (instead of aws-us-east-1)!
+	if req.Region == "us-east-1" {
+		csp = "aws"
+	} else {
+		regionParts := strings.Split(req.Region, "-")
+		if len(regionParts) < 2 {
+			return nil, fmt.Errorf("unable to parse CSP out of region [%s]", req.Region)
+		}
 
-	csp := regionParts[0]
+		csp = regionParts[0]
+	}
 	templateContext, err := createDeploymentTemplateContext(csp, req)
 	if err != nil {
 		return nil, fmt.Errorf("creating request template context: %w", err)
