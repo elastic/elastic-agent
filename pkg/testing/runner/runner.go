@@ -271,19 +271,19 @@ func (r *Runner) Clean() error {
 	}
 
 	var g errgroup.Group
-	if len(instances) > 0 {
-		g.Go(func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-			defer cancel()
-			return r.ip.Clean(ctx, r.cfg, instances)
-		})
-	}
+	g.Go(func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		return r.ip.Clean(ctx, r.cfg, instances)
+	})
 	for _, stack := range stacks {
-		g.Go(func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-			defer cancel()
-			return r.sp.Delete(ctx, stack)
-		})
+		g.Go(func(stack Stack) func() error {
+			return func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+				defer cancel()
+				return r.sp.Delete(ctx, stack)
+			}
+		}(stack))
 	}
 	return g.Wait()
 }

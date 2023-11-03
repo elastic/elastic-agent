@@ -101,6 +101,7 @@ func (prov *ServerlessProvision) Create(ctx context.Context, request runner.Stac
 			"deployment_id":   proj.ID,
 			"deployment_type": proj.Type,
 		},
+		Ready: false,
 	}
 	prov.log.Logf("Created serverless stack %s (%s) [id: %s]", request.Version, request.ID, proj.ID)
 	return stack, nil

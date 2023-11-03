@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -123,6 +124,7 @@ func (f *fakeInstanceProvisioner) Clean(_ context.Context, _ Config, instances [
 }
 
 type fakeStackProvisioner struct {
+	mx       sync.Mutex
 	requests []StackRequest
 	stacks   []Stack
 }
@@ -130,24 +132,30 @@ type fakeStackProvisioner struct {
 func (f *fakeStackProvisioner) SetLogger(_ Logger) {
 }
 
-func (f *fakeStackProvisioner) Provision(_ context.Context, requests []StackRequest) ([]Stack, error) {
-	f.requests = requests
-	var stacks []Stack
-	for _, req := range requests {
-		stacks = append(stacks, Stack{
-			ID:            req.ID,
-			Version:       req.Version,
-			Elasticsearch: "http://localhost:9200",
-			Kibana:        "http://localhost:5601",
-			Username:      "elastic",
-			Password:      "changeme",
-			Internal:      nil,
-		})
-	}
-	return stacks, nil
+func (f *fakeStackProvisioner) Create(_ context.Context, request StackRequest) (Stack, error) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+	f.requests = append(f.requests, request)
+	return Stack{
+		ID:            request.ID,
+		Version:       request.Version,
+		Elasticsearch: "http://localhost:9200",
+		Kibana:        "http://localhost:5601",
+		Username:      "elastic",
+		Password:      "changeme",
+		Internal:      nil,
+		Ready:         false,
+	}, nil
 }
 
-func (f *fakeStackProvisioner) Clean(_ context.Context, stacks []Stack) error {
-	f.stacks = stacks
+func (f *fakeStackProvisioner) WaitForReady(_ context.Context, stack Stack) (Stack, error) {
+	stack.Ready = true
+	return stack, nil
+}
+
+func (f *fakeStackProvisioner) Delete(_ context.Context, stack Stack) error {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+	f.stacks = append(f.stacks, stack)
 	return nil
 }
