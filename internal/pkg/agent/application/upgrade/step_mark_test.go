@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,7 +28,12 @@ func TestWatchMarker(t *testing.T) {
 	testLogger, _ := logger.NewTesting("watch_marker")
 
 	var testDetails *details.Details
+	var testDetailsMu sync.Mutex
+
 	testDetailsObs := func(upgradeDetails *details.Details) {
+		testDetailsMu.Lock()
+		defer testDetailsMu.Unlock()
+
 		testDetails = upgradeDetails
 	}
 	testErrChan := make(chan error)
@@ -67,6 +73,9 @@ func TestWatchMarker(t *testing.T) {
 	// marker file will be noticed and read by the watchMarker function, and the
 	// testDetailsObs function will be called with them.
 	require.Eventually(t, func() bool {
+		testDetailsMu.Lock()
+		defer testDetailsMu.Unlock()
+
 		return assert.NotNil(t, testDetails) &&
 			assert.Equal(t, expectedDetails, testDetails)
 	}, 1*time.Second, 10*time.Millisecond)
