@@ -322,14 +322,14 @@ func TestFleetGateway(t *testing.T) {
 
 		stateStore := newStateStore(t, log)
 
-		upgradeDetails := details.Details{
+		upgradeDetails := &details.Details{
 			TargetVersion: "8.12.0",
 			State:         "UPG_WATCHING",
 			ActionID:      "foobarbaz",
 		}
 		stateFetcher := func() coordinator.State {
 			return coordinator.State{
-				UpgradeDetails: &upgradeDetails,
+				UpgradeDetails: upgradeDetails,
 			}
 		}
 
@@ -355,7 +355,7 @@ func TestFleetGateway(t *testing.T) {
 				require.NoError(t, err)
 
 				require.NotNil(t, checkinRequest.UpgradeDetails)
-				require.Equal(t, upgradeDetails, *checkinRequest.UpgradeDetails)
+				require.Equal(t, upgradeDetails, checkinRequest.UpgradeDetails)
 
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
