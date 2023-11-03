@@ -21,6 +21,22 @@ steps:
     retry:
       manual:
         allowed: true
+  - label: "Unit tests - Windows 11"
+    key: "unit-tests-win11"
+    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+    artifact_paths:
+      - "build/TEST-**"
+      - "build/diagnostics/*"
+      - "coverage.out"
+    agents:
+      provider: "gcp"
+      image: "family/endpoint-windows-11-tester-rel"
+      machine_type: "n2-standard-8"
+      disk_type: "pd-ssd"
+    retry:
+      manual:
+        allowed: true
+
   # - label: "Unit tests - Ubuntu 22.04"
   #   key: "unit-tests-2204"
   #   command: ".buildkite/scripts/steps/unit-tests.sh"
