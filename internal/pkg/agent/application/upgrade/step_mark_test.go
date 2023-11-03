@@ -47,11 +47,7 @@ func TestWatchMarker(t *testing.T) {
 	}()
 
 	errCh := make(chan error)
-	startedCh := make(chan struct{}, 1)
-	go watchMarker(testCtx, testDetailsObs, testLogger, errCh, startedCh, testMarkerFile)
-
-	// Wait until watch marker is actually started
-	<-startedCh
+	go watchMarker(testCtx, testDetailsObs, testLogger, errCh, testMarkerFile)
 
 	// Write out the expected upgrade details to the test upgrade marker
 	// file.

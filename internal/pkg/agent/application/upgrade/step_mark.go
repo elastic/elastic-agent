@@ -213,12 +213,11 @@ func markerFilePath() string {
 // updates the c.State.UpgradeDetails accordingly.
 func WatchMarker(ctx context.Context, detailsObserver details.Observer, logger *logger.Logger, errCh chan error) {
 	upgradeMarkerFilePath := markerFilePath()
-	startedCh := make(chan struct{}, 1)
-	watchMarker(ctx, detailsObserver, logger, errCh, startedCh, upgradeMarkerFilePath)
+	watchMarker(ctx, detailsObserver, logger, errCh, upgradeMarkerFilePath)
 }
 
 // startedCh is used only for unit testing watchMarker
-func watchMarker(ctx context.Context, detailsObserver details.Observer, logger *logger.Logger, errCh chan error, startedCh chan struct{}, upgradeMarkerFilePath string) {
+func watchMarker(ctx context.Context, detailsObserver details.Observer, logger *logger.Logger, errCh chan error, upgradeMarkerFilePath string) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		errCh <- fmt.Errorf("failed to create watch for upgrade marker: %w", err)
@@ -226,16 +225,8 @@ func watchMarker(ctx context.Context, detailsObserver details.Observer, logger *
 	}
 	defer w.Close()
 
-	// Watch the upgrade marker file's directory, not the file itself, so we
-	// notice the file even if it's deleted and recreated.
-	err = w.Add(filepath.Dir(upgradeMarkerFilePath))
-	if err != nil {
-		errCh <- fmt.Errorf("failed to set watch on upgrade marker's directory: %w", err)
-		return
-	}
-
+	// Handle watching
 	go func() {
-		startedCh <- struct{}{}
 		for {
 			select {
 			case <-ctx.Done():
@@ -275,6 +266,25 @@ func watchMarker(ctx context.Context, detailsObserver details.Observer, logger *
 			}
 		}
 	}()
+
+	// Watch the upgrade marker file's directory, not the file itself, so we
+	// notice the file even if it's deleted and recreated.
+	err = w.Add(filepath.Dir(upgradeMarkerFilePath))
+	if err != nil {
+		errCh <- fmt.Errorf("failed to set watch on upgrade marker's directory: %w", err)
+		return
+	}
+
+	// Do an initial read from the upgrade marker file, in case the file
+	// is already present before the watching starts.
+	marker, err := loadMarker(upgradeMarkerFilePath)
+	if err != nil {
+		errCh <- fmt.Errorf("unable to load upgrade marker from watch: %w", err)
+		return
+	}
+	if marker != nil && marker.Details != nil {
+		detailsObserver(marker.Details)
+	}
 
 	<-ctx.Done()
 }
