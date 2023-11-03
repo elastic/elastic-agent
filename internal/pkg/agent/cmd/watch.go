@@ -15,18 +15,19 @@ import (
 
 	"github.com/elastic/elastic-agent/version"
 
-	"github.com/elastic/elastic-agent/internal/pkg/config"
-
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/configure"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -108,11 +109,22 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	ctx := context.Background()
 	if err := watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
 		log.Error("Error detected proceeding to rollback: %v", err)
-		// TODO: deserialize upgrade details to marker file, update state, and
-		// serialize back to marker file.
+
+		marker.Details.SetState(details.StateRollback)
+		err = upgrade.SaveMarker(marker)
+		if err != nil {
+			log.Errorf("unable to save upgrade marker before attempting to rollback: %s", err.Error())
+		}
+
 		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
 			log.Error("rollback failed", err)
+
+			marker.Details.Fail(err)
+			err = upgrade.SaveMarker(marker)
+			if err != nil {
+				log.Errorf("unable to save upgrade marker after rollback failed: %s", err.Error())
+			}
 		}
 		return err
 	}
