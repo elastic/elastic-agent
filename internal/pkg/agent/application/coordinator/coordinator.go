@@ -791,12 +791,13 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					State runtime.ComponentState `yaml:"state"`
 				}
 				type StateHookOutput struct {
-					State        agentclient.State      `yaml:"state"`
-					Message      string                 `yaml:"message"`
-					FleetState   agentclient.State      `yaml:"fleet_state"`
-					FleetMessage string                 `yaml:"fleet_message"`
-					LogLevel     logp.Level             `yaml:"log_level"`
-					Components   []StateComponentOutput `yaml:"components"`
+					State          agentclient.State      `yaml:"state"`
+					Message        string                 `yaml:"message"`
+					FleetState     agentclient.State      `yaml:"fleet_state"`
+					FleetMessage   string                 `yaml:"fleet_message"`
+					LogLevel       logp.Level             `yaml:"log_level"`
+					Components     []StateComponentOutput `yaml:"components"`
+					UpgradeDetails *details.Details       `yaml:"upgrade_details,omitempty"`
 				}
 
 				s := c.State()
@@ -809,12 +810,13 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					}
 				}
 				output := StateHookOutput{
-					State:        s.State,
-					Message:      s.Message,
-					FleetState:   s.FleetState,
-					FleetMessage: s.FleetMessage,
-					LogLevel:     s.LogLevel,
-					Components:   compStates,
+					State:          s.State,
+					Message:        s.Message,
+					FleetState:     s.FleetState,
+					FleetMessage:   s.FleetMessage,
+					LogLevel:       s.LogLevel,
+					Components:     compStates,
+					UpgradeDetails: s.UpgradeDetails,
 				}
 				o, err := yaml.Marshal(output)
 				if err != nil {
