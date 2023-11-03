@@ -22,6 +22,7 @@ require (
 	github.com/elastic/go-sysinfo v1.11.1
 	github.com/elastic/go-ucfg v0.8.6
 	github.com/fatih/color v1.15.0
+	github.com/fsnotify/fsnotify v1.6.0
 	github.com/gofrs/flock v0.8.1
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.5.9
@@ -92,7 +93,6 @@ require (
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
-	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
