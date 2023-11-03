@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -118,6 +119,12 @@ inputs:
 		}
 	}
 	require.NoError(t, err)
+
+	// ensure that upgrade details now show the state as UPG_ROLLBACK
+	state, err := startFixture.Client().State(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, state.UpgradeDetails)
+	require.Equal(t, details.StateRollback, state.UpgradeDetails.State)
 
 	// rollback should stop the watcher
 	// killTimeout is greater than timeout as the watcher should have been
