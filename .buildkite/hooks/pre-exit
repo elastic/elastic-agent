@@ -10,7 +10,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == 
 
   # Perform cleanup of integration tests resources
   echo "--- Cleaning up integration test resources"
-  TEST_INTEG_AUTH_ESS_REGION=us-east-1 SNAPSHOT=true mage integration:clean
+  SNAPSHOT=true mage integration:clean
 fi
 
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
