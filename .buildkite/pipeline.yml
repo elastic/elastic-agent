@@ -170,21 +170,29 @@ steps:
           artifacts: build/TEST-go-integration*.xml
 
   # Branch steps
-
-  - label: "K8s tests"
+  - group: "K8s tests"
     key: "k8s-tests"
-    branches: "main 7.* 8.* v7.* v8.*"
-    env:
-      K8S_VERSION: "v1.28.0"
-      KIND_VERSION: "v0.20.0"
-    command: ".buildkite/scripts/steps/k8s-tests.sh"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-      - "coverage.out"
-    agents:
-      provider: "gcp"
-      image: "family/core-ubuntu-2204"
-    retry:
-      manual:
-        allowed: true
+    steps:
+      - label: "K8s tests: {{matrix.k8s_version}}"
+        key: "k8s-tests-{{matrix.k8s_version}}"
+        branches: "main 7.* 8.* v7.* v8.*"
+        env:
+          K8S_VERSION: "v{{matrix.k8s_version}}"
+          KIND_VERSION: "v0.20.0"
+        command: ".buildkite/scripts/steps/k8s-tests.sh"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "gcp"
+          image: "family/core-ubuntu-2204"
+        matrix:
+          setup:
+            k8s_version:
+              - "1.28.0"
+              - "1.27.3"
+              - "1.26.6"
+        retry:
+          manual:
+            allowed: true
