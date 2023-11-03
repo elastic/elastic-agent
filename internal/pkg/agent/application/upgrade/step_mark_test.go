@@ -9,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"gopkg.in/yaml.v2"
@@ -44,8 +46,12 @@ func TestWatchMarker(t *testing.T) {
 		}
 	}()
 
-	go watchMarker(testCtx, testDetailsObs, testLogger, testErrChan, testMarkerFile)
-
+	errCh := make(chan error)
+	startedCh := make(chan struct{}, 1)
+	go watchMarker(testCtx, testDetailsObs, testLogger, errCh, startedCh, testMarkerFile)
+	<-startedCh
+	// Write out the expected upgrade details to the test upgrade marker
+	// file.
 	expectedDetails := details.Details{
 		TargetVersion: "8.12.0",
 		State:         details.StateWatching,
@@ -58,7 +64,13 @@ func TestWatchMarker(t *testing.T) {
 	err = os.WriteFile(testMarkerFile, data, 0644)
 	require.NoError(t, err)
 
+	// We expect that the details that were just written out to the test upgrade
+	// marker file will be noticed and read by the watchMarker function, and the
+	// testDetailsObs function will be called with them.
+	require.Eventually(t, func() bool {
+		return assert.NotNil(t, testDetails) &&
+			assert.Equal(t, expectedDetails, *testDetails)
+	}, 1*time.Second, 10*time.Millisecond)
+
 	require.NoError(t, testErr)
-	require.NotNil(t, testDetails)
-	require.Equal(t, expectedDetails, *testDetails)
 }

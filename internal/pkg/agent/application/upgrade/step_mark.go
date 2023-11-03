@@ -213,10 +213,11 @@ func markerFilePath() string {
 // updates the c.State.UpgradeDetails accordingly.
 func WatchMarker(ctx context.Context, detailsObserver details.Observer, logger *logger.Logger, errCh chan error) {
 	upgradeMarkerFilePath := markerFilePath()
-	watchMarker(ctx, detailsObserver, logger, errCh, upgradeMarkerFilePath)
+	startedCh := make(chan struct{}, 1)
+	watchMarker(ctx, detailsObserver, logger, errCh, startedCh, upgradeMarkerFilePath)
 }
 
-func watchMarker(ctx context.Context, detailsObserver details.Observer, logger *logger.Logger, errCh chan error, upgradeMarkerFilePath string) {
+func watchMarker(ctx context.Context, detailsObserver details.Observer, logger *logger.Logger, errCh chan error, startedCh chan struct{}, upgradeMarkerFilePath string) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		errCh <- fmt.Errorf("failed to create watch for upgrade marker: %w", err)
@@ -232,39 +233,47 @@ func watchMarker(ctx context.Context, detailsObserver details.Observer, logger *
 		return
 	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case err, ok := <-w.Errors:
-			if !ok { // Channel was closed (i.e. Watcher.Close() was called).
-				logger.Debug("upgrade marker watch's error channel was closed")
+	go func() {
+		startedCh <- struct{}{}
+		for {
+			select {
+			case <-ctx.Done():
 				return
-			}
-			errCh <- fmt.Errorf("upgrade marker watch returned error: %w", err)
-		case e, ok := <-w.Events:
-			if !ok { // Channel was closed (i.e. Watcher.Close() was called).
-				logger.Debug("upgrade marker watch's events channel was closed")
-				return
-			}
-
-			if e.Name != filepath.Base(upgradeMarkerFilePath) {
-				// Event is for a file other than the upgrade marker; ignore it.
+			case err, ok := <-w.Errors:
+				logger.Debug("after there are watch errors")
+				if !ok { // Channel was closed (i.e. Watcher.Close() was called).
+					logger.Debug("upgrade marker watch's error channel was closed")
+					return
+				}
+				errCh <- fmt.Errorf("upgrade marker watch returned error: %w", err)
 				continue
-			}
+			case e, ok := <-w.Events:
+				logger.Debugf("after there is a watch event: [%s]", e.String())
+				if !ok { // Channel was closed (i.e. Watcher.Close() was called).
+					logger.Debug("upgrade marker watch's events channel was closed")
+					return
+				}
 
-			switch e.Op {
-			case fsnotify.Create, fsnotify.Write:
-				// Upgrade marker file was created or updated; read upgrade details
-				// from it and set them in the coordinator's state.
-				marker, err := LoadMarker()
-				if err != nil {
-					errCh <- fmt.Errorf("unable to load upgrade marker from watch: %w", err)
+				if e.Name != upgradeMarkerFilePath {
+					// Event is for a file other than the upgrade marker; ignore it.
 					continue
 				}
 
-				detailsObserver(marker.Details)
+				switch e.Op {
+				case fsnotify.Create, fsnotify.Write:
+					// Upgrade marker file was created or updated; read upgrade details
+					// from it and set them in the coordinator's state.
+					marker, err := loadMarker(upgradeMarkerFilePath)
+					if err != nil {
+						errCh <- fmt.Errorf("unable to load upgrade marker from watch: %w", err)
+						continue
+					}
+
+					detailsObserver(marker.Details)
+				}
 			}
 		}
-	}
+	}()
+
+	<-ctx.Done()
 }
