@@ -15,15 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-
 	"github.com/stretchr/testify/require"
+
 	"go.elastic.co/apm/apmtest"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -31,6 +27,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -39,6 +37,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -651,6 +651,14 @@ func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, source
 }
 
 func (f *fakeUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+	return nil
+}
+
+func (f *fakeUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
+	return nil
+}
+
+func (f *fakeUpgradeManager) Close() error {
 	return nil
 }
 

@@ -55,6 +55,7 @@ type Upgrader struct {
 	agentInfo      *info.AgentInfo
 	upgradeable    bool
 	fleetServerURI string
+	markerWatcher  MarkerWatcher
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -65,13 +66,19 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) *Upgrader {
-	return &Upgrader{
-		log:         log,
-		settings:    settings,
-		agentInfo:   agentInfo,
-		upgradeable: IsUpgradeable(),
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) (*Upgrader, error) {
+	markerFileWatcher, err := newMarkerFileWatcher(markerFilePath(), log)
+	if err != nil {
+		return nil, err
 	}
+
+	return &Upgrader{
+		log:           log,
+		settings:      settings,
+		agentInfo:     agentInfo,
+		upgradeable:   IsUpgradeable(),
+		markerWatcher: markerFileWatcher,
+	}, nil
 }
 
 // SetClient reloads URI based on up to date fleet client
@@ -237,6 +244,14 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	marker.Acked = true
 
 	return SaveMarker(marker)
+}
+
+func (u *Upgrader) MarkerWatcher() MarkerWatcher {
+	return u.markerWatcher
+}
+
+func (u *Upgrader) Close() error {
+	return u.markerWatcher.Close()
 }
 
 func (u *Upgrader) sourceURI(retrievedURI string) string {

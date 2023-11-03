@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"gopkg.in/yaml.v2"
@@ -21,24 +20,20 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func TestWatchMarker(t *testing.T) {
+func TestMarkerWatcher(t *testing.T) {
 	testMarkerDir := t.TempDir()
 	testMarkerFile := filepath.Join(testMarkerDir, markerFilename)
-
 	testLogger, _ := logger.NewTesting("watch_marker")
+
+	markerWatcher, err := newMarkerFileWatcher(testMarkerFile, testLogger)
+	require.NoError(t, err)
+	defer markerWatcher.Close()
+
+	testCtx, testCancel := context.WithCancel(context.Background())
+	defer testCancel()
 
 	var testDetails *details.Details
 	var testDetailsMu sync.Mutex
-
-	testDetailsObs := func(upgradeDetails *details.Details) {
-		testDetailsMu.Lock()
-		defer testDetailsMu.Unlock()
-
-		testDetails = upgradeDetails
-	}
-	testErrChan := make(chan error)
-	testCtx, testCancel := context.WithCancel(context.Background())
-	defer testCancel()
 
 	var testErr error
 	go func() {
@@ -46,14 +41,20 @@ func TestWatchMarker(t *testing.T) {
 			select {
 			case <-testCtx.Done():
 				return
-			case err := <-testErrChan:
+			case err := <-markerWatcher.Errors():
 				testErr = err
+			case marker := <-markerWatcher.Watch():
+				testDetailsMu.Lock()
+				testDetails = marker.Details
+				testDetailsMu.Unlock()
 			}
 		}
 	}()
 
-	errCh := make(chan error)
-	go watchMarker(testCtx, testDetailsObs, testLogger, errCh, testMarkerFile)
+	go func() {
+		err := markerWatcher.Run(testCtx)
+		require.NoError(t, err)
+	}()
 
 	// Write out the expected upgrade details to the test upgrade marker
 	// file.
@@ -76,8 +77,7 @@ func TestWatchMarker(t *testing.T) {
 		testDetailsMu.Lock()
 		defer testDetailsMu.Unlock()
 
-		return assert.NotNil(t, testDetails) &&
-			assert.Equal(t, expectedDetails, testDetails)
+		return testDetails != nil && testDetails.Equals(expectedDetails)
 	}, 1*time.Second, 10*time.Millisecond)
 
 	require.NoError(t, testErr)

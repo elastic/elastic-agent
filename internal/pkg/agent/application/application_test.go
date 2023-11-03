@@ -52,7 +52,7 @@ func TestLimitsLog(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	_, _, _, err := New(
+	_, _, _, _, err := New(
 		ctx,
 		log,
 		log,

@@ -98,3 +98,18 @@ func TestDetailsDownloadRateJSON(t *testing.T) {
 		require.Equal(t, 0.99, unmarshalledDetails.Metadata.DownloadPercent)
 	})
 }
+
+func TestEquals(t *testing.T) {
+	details1 := NewDetails("8.12.0", StateDownloading, "foobar")
+	details1.SetDownloadProgress(0.1234, 34.56)
+	details1.Fail(errors.New("download failed"))
+
+	details2 := NewDetails("8.12.0", StateDownloading, "foobar")
+	details2.SetDownloadProgress(0.1234, 34.56)
+	details2.Fail(errors.New("download failed"))
+
+	details3 := NewDetails("8.12.0", StateDownloading, "foobar")
+
+	require.True(t, details1.Equals(details2))
+	require.False(t, details1.Equals(details3))
+}

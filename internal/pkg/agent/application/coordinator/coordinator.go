@@ -67,6 +67,12 @@ type UpgradeManager interface {
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
+
+	// MarkerWatcher returns a watcher for the upgrade marker.
+	MarkerWatcher() upgrade.MarkerWatcher
+
+	// Close releases any resources in use by the UpgradeManager
+	Close() error
 }
 
 // MonitorManager provides an interface to perform the monitoring action for the agent.
@@ -292,6 +298,9 @@ type managerChans struct {
 
 	varsManagerUpdate <-chan []*transpiler.Vars
 	varsManagerError  <-chan error
+
+	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
+	upgradeMarkerErr    <-chan error
 }
 
 // New creates a new coordinator.
@@ -372,6 +381,10 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 	if varsMgr != nil {
 		c.managerChans.varsManagerUpdate = varsMgr.Watch()
 		c.managerChans.varsManagerError = varsMgr.Errors()
+	}
+	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
+		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
+		c.managerChans.upgradeMarkerErr = upgradeMgr.MarkerWatcher().Errors()
 	}
 	return c
 }
@@ -881,10 +894,16 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		varsErrCh <- nil
 	}
 
-	// Start watching the upgrade marker so any changes to upgrade details
-	// within it can be set on the coordinator state.
-	watchMarkerErrCh := make(chan error)
-	go upgrade.WatchMarker(ctx, c.setUpgradeDetails, c.logger, watchMarkerErrCh)
+	upgradeMarkerWatcherErrCh := make(chan error, 1)
+	if c.upgradeMgr != nil && c.upgradeMgr.MarkerWatcher() != nil {
+		go func() {
+			err := c.upgradeMgr.MarkerWatcher().Run(ctx)
+			cancel()
+			upgradeMarkerWatcherErrCh <- err
+		}()
+	} else {
+		upgradeMarkerWatcherErrCh <- nil
+	}
 
 	// Keep looping until the context ends.
 	for ctx.Err() == nil {
@@ -893,7 +912,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	// If we got fatal errors from any of the managers, return them.
 	// Otherwise, just return the context's closing error.
-	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh, watchMarkerErrCh)
+	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerWatcherErrCh)
 	if err != nil {
 		c.logger.Debugf("Manager errors on Coordinator shutdown: %v", err.Error())
 		return err
@@ -977,6 +996,11 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 	case ll := <-c.logLevelCh:
 		if ctx.Err() == nil {
 			c.processLogLevel(ctx, ll)
+		}
+
+	case upgradeMarker := <-c.managerChans.upgradeMarkerUpdate:
+		if ctx.Err() != nil {
+			c.setUpgradeDetails(upgradeMarker.Details)
 		}
 	}
 
@@ -1234,7 +1258,7 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 // It returns any resulting errors as a multierror, or nil if no errors
 // were reported.
 // Called on the main Coordinator goroutine.
-func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerErrCh chan error) error {
+func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerWatchErrCh chan error) error {
 	var runtimeErr error
 	var configErr error
 	var varsErr error
@@ -1267,7 +1291,7 @@ waitLoop:
 			returnedConfig = true
 		case varsErr = <-varsErrCh:
 			returnedVars = true
-		case upgradeMarkerErr = <-upgradeMarkerErrCh:
+		case upgradeMarkerErr = <-upgradeMarkerWatchErrCh:
 			returnedUpgradeMarker = true
 		case <-timeoutWait.C:
 			var timeouts []string
