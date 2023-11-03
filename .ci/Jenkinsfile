@@ -240,67 +240,7 @@ pipeline {
             }
           }
       }
-    }
-    stage('extended windows') {
-      when {
-        // Always when running builds on branches/tags
-        // Enable if extended windows support related changes.
-        beforeAgent true
-        anyOf {
-          not { changeRequest() }
-          expression { return isExtendedWindowsEnabled() && env.ONLY_DOCS == "false"}
-        }
-      }
-      failFast false
-      matrix {
-        agent {label "${PLATFORM} && windows-immutable"}
-        options { skipDefaultCheckout() }
-        axes {
-          axis {
-            name 'PLATFORM'
-            values 'windows-8', 'windows-10', 'windows-11'
-          }
-        }
-        stages {
-          stage('build'){
-            options { skipDefaultCheckout() }
-            steps {
-              withGithubNotify(context: "Build-${PLATFORM}") {
-                deleteDir()
-                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-                withMageEnv(){
-                  dir("${BASE_DIR}"){
-                    cmd(label: 'Go build', script: 'mage build')
-                  }
-                }
-              }
-            }
-          }
-          stage('Test') {
-            options { skipDefaultCheckout() }
-            steps {
-              withGithubNotify(context: "Test-${PLATFORM}") {
-                withMageEnv(){
-                  dir("${BASE_DIR}"){
-                    withEnv(["RACE_DETECTOR=true", "TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
-                      cmd(label: 'Go unitTest', script: 'mage unitTest')
-                    }
-                  }
-                }
-              }
-            }
-            post {
-              always {
-                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
-                whenTrue(isCodeCoverageEnabled()) {
-                  coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
-                }
-              }
-            }
-          }
-        }
-      }
-    }        
+    }            
   }
   post {
     cleanup {
