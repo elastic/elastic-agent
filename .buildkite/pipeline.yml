@@ -169,12 +169,10 @@ steps:
       - junit-annotate#v2.4.1:
           artifacts: build/TEST-go-integration*.xml
 
-  # Branch steps
   - group: "K8s tests"
     key: "k8s-tests"
     steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
-        branches: "main 7.* 8.* v7.* v8.* buildkite_k8s_tests"
         env:
           K8S_VERSION: "v{{matrix.k8s_version}}"
           KIND_VERSION: "v0.20.0"
