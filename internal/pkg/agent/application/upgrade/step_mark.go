@@ -159,7 +159,10 @@ func CleanMarker(log *logger.Logger) error {
 // LoadMarker loads the update marker. If the file does not exist it returns nil
 // and no error.
 func LoadMarker() (*UpdateMarker, error) {
-	markerFile := markerFilePath()
+	return loadMarker(markerFilePath())
+}
+
+func loadMarker(markerFile string) (*UpdateMarker, error) {
 	markerBytes, err := ioutil.ReadFile(markerFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
