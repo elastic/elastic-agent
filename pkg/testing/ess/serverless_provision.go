@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -19,10 +18,8 @@ import (
 
 // ServerlessProvision contains
 type ServerlessProvision struct {
-	stacksMut sync.RWMutex
-	stacks    map[string]stackhandlerData
-	cfg       ProvisionerConfig
-	log       runner.Logger
+	cfg ProvisionerConfig
+	log runner.Logger
 }
 
 type defaultLogger struct {
@@ -39,12 +36,6 @@ func (log *defaultLogger) Logf(format string, args ...any) {
 
 }
 
-// tracks the data that maps to a single serverless deployment
-type stackhandlerData struct {
-	client    *ServerlessClient
-	stackData runner.Stack
-}
-
 // ServerlessRegions is the JSON response from the serverless regions API endpoint
 type ServerlessRegions struct {
 	CSP       string `json:"csp"`
@@ -56,9 +47,8 @@ type ServerlessRegions struct {
 // NewServerlessProvisioner creates a new StackProvisioner instance for serverless
 func NewServerlessProvisioner(cfg ProvisionerConfig) (runner.StackProvisioner, error) {
 	prov := &ServerlessProvision{
-		cfg:    cfg,
-		stacks: map[string]stackhandlerData{},
-		log:    &defaultLogger{wrapped: logp.L()},
+		cfg: cfg,
+		log: &defaultLogger{wrapped: logp.L()},
 	}
 	err := prov.CheckCloudRegion()
 	if err != nil {
@@ -139,9 +129,6 @@ func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack)
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info from the stack: %w", err)
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-	defer cancel()
 
 	client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
 	client.proj.ID = deploymentID
