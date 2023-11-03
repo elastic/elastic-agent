@@ -349,6 +349,7 @@ func TestFleetGateway(t *testing.T) {
 		waitFn := ackSeq(
 			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
 				data, err := io.ReadAll(body)
+				require.NoError(t, err)
 
 				var checkinRequest fleetapi.CheckinRequest
 				err = json.Unmarshal(data, &checkinRequest)
