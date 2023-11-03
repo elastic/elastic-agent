@@ -187,7 +187,7 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 	}, nil
 }
 
-func saveMarker(marker *UpdateMarker) error {
+func SaveMarker(marker *UpdateMarker) error {
 	makerSerializer := &updateMarkerSerializer{
 		Hash:        marker.Hash,
 		UpdatedOn:   marker.UpdatedOn,

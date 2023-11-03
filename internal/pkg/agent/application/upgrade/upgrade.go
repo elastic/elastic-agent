@@ -236,7 +236,7 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 
 	marker.Acked = true
 
-	return saveMarker(marker)
+	return SaveMarker(marker)
 }
 
 func (u *Upgrader) sourceURI(retrievedURI string) string {
