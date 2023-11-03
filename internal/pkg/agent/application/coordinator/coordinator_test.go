@@ -321,7 +321,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 }
 
 func TestCollectManagerErrorsTimeout(t *testing.T) {
-	handlerChan, _, _, _ := setupManagerShutdownChannels(time.Millisecond)
+	handlerChan, _, _, _, _ := setupManagerShutdownChannels(time.Millisecond)
 	// Don't send anything to the shutdown channels, causing a timeout
 	// in collectManagerErrors
 	waitAndTestError(t, func(err error) bool {
@@ -332,7 +332,7 @@ func TestCollectManagerErrorsTimeout(t *testing.T) {
 }
 
 func TestCollectManagerErrorsOneResponse(t *testing.T) {
-	handlerChan, _, _, config := setupManagerShutdownChannels(10 * time.Millisecond)
+	handlerChan, _, _, config, _ := setupManagerShutdownChannels(10 * time.Millisecond)
 
 	// Send an error for the config manager -- we should also get a
 	// timeout error since we don't send anything on the other two channels.
@@ -348,26 +348,30 @@ func TestCollectManagerErrorsOneResponse(t *testing.T) {
 }
 
 func TestCollectManagerErrorsAllResponses(t *testing.T) {
-	handlerChan, runtime, varWatcher, config := setupManagerShutdownChannels(5 * time.Second)
+	handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher := setupManagerShutdownChannels(5 * time.Second)
 	runtimeErrStr := "runtime error"
 	varsErrStr := "vars error"
+	upgradeMarkerErrStr := "upgrade marker error"
 	runtime <- errors.New(runtimeErrStr)
 	varWatcher <- errors.New(varsErrStr)
 	config <- nil
+	upgradeMarkerWatcher <- errors.New(upgradeMarkerErrStr)
 
 	waitAndTestError(t, func(err error) bool {
 		return err != nil &&
-			strings.Contains(err.Error(), "2 errors occurred") &&
+			strings.Contains(err.Error(), "3 errors occurred") &&
 			strings.Contains(err.Error(), runtimeErrStr) &&
-			strings.Contains(err.Error(), varsErrStr)
+			strings.Contains(err.Error(), varsErrStr) &&
+			strings.Contains(err.Error(), upgradeMarkerErrStr)
 	}, handlerChan)
 }
 
 func TestCollectManagerErrorsAllResponsesNoErrors(t *testing.T) {
-	handlerChan, runtime, varWatcher, config := setupManagerShutdownChannels(5 * time.Second)
+	handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher := setupManagerShutdownChannels(5 * time.Second)
 	runtime <- nil
 	varWatcher <- nil
 	config <- context.Canceled
+	upgradeMarkerWatcher <- nil
 
 	// All errors are nil or context.Canceled, so collectManagerErrors
 	// should also return nil.
@@ -397,18 +401,19 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 	}
 }
 
-func setupManagerShutdownChannels(timeout time.Duration) (chan error, chan error, chan error, chan error) {
+func setupManagerShutdownChannels(timeout time.Duration) (chan error, chan error, chan error, chan error, chan error) {
 	runtime := make(chan error)
 	varWatcher := make(chan error)
 	config := make(chan error)
+	upgradeMarkerWatcher := make(chan error)
 
 	handlerChan := make(chan error)
 	go func() {
-		handlerErr := collectManagerErrors(timeout, varWatcher, runtime, config)
+		handlerErr := collectManagerErrors(timeout, varWatcher, runtime, config, upgradeMarkerWatcher)
 		handlerChan <- handlerErr
 	}()
 
-	return handlerChan, runtime, varWatcher, config
+	return handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher
 }
 
 func TestCoordinator_ReExec(t *testing.T) {

@@ -217,6 +217,7 @@ func WatchMarker(ctx context.Context, detailsObserver details.Observer, logger *
 	watchMarker(ctx, detailsObserver, logger, errCh, startedCh, upgradeMarkerFilePath)
 }
 
+// startedCh is used only for unit testing watchMarker
 func watchMarker(ctx context.Context, detailsObserver details.Observer, logger *logger.Logger, errCh chan error, startedCh chan struct{}, upgradeMarkerFilePath string) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {

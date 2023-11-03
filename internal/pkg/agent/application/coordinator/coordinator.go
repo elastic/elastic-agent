@@ -881,6 +881,11 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		varsErrCh <- nil
 	}
 
+	// Start watching the upgrade marker so any changes to upgrade details
+	// within it can be set on the coordinator state.
+	watchMarkerErrCh := make(chan error)
+	go upgrade.WatchMarker(ctx, c.setUpgradeDetails, c.logger, watchMarkerErrCh)
+
 	// Keep looping until the context ends.
 	for ctx.Err() == nil {
 		c.runLoopIteration(ctx)
@@ -888,7 +893,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	// If we got fatal errors from any of the managers, return them.
 	// Otherwise, just return the context's closing error.
-	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh)
+	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh, watchMarkerErrCh)
 	if err != nil {
 		c.logger.Debugf("Manager errors on Coordinator shutdown: %v", err.Error())
 		return err
@@ -1229,14 +1234,15 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 // It returns any resulting errors as a multierror, or nil if no errors
 // were reported.
 // Called on the main Coordinator goroutine.
-func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh chan error) error {
+func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerErrCh chan error) error {
 	var runtimeErr error
 	var configErr error
 	var varsErr error
+	var upgradeMarkerErr error
 	// in case other components are locked up, let us time out
 	timeoutWait := time.NewTimer(timeout)
 	defer timeoutWait.Stop()
-	var returnedRuntime, returnedConfig, returnedVars bool
+	var returnedRuntime, returnedConfig, returnedVars, returnedUpgradeMarker bool
 	/*
 		Wait for all managers to gently shut down. All managers send
 		an error status on their termination channel after their Run method
@@ -1253,7 +1259,7 @@ func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, config
 	var combinedErr error
 
 waitLoop:
-	for !returnedRuntime || !returnedConfig || !returnedVars {
+	for !returnedRuntime || !returnedConfig || !returnedVars || !returnedUpgradeMarker {
 		select {
 		case runtimeErr = <-runtimeErrCh:
 			returnedRuntime = true
@@ -1261,6 +1267,8 @@ waitLoop:
 			returnedConfig = true
 		case varsErr = <-varsErrCh:
 			returnedVars = true
+		case upgradeMarkerErr = <-upgradeMarkerErrCh:
+			returnedUpgradeMarker = true
 		case <-timeoutWait.C:
 			var timeouts []string
 			if !returnedRuntime {
@@ -1271,6 +1279,9 @@ waitLoop:
 			}
 			if !returnedVars {
 				timeouts = append(timeouts, "no response from vars manager")
+			}
+			if !returnedUpgradeMarker {
+				timeouts = append(timeouts, "no response from upgradeMarkerWatcher component")
 			}
 			timeoutStr := strings.Join(timeouts, ", ")
 			combinedErr = multierror.Append(combinedErr, fmt.Errorf("timeout while waiting for managers to shut down: %v", timeoutStr))
@@ -1285,6 +1296,9 @@ waitLoop:
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars manager: %w", varsErr))
+	}
+	if upgradeMarkerErr != nil && !errors.Is(varsErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("upgrade marker watcher: %w", upgradeMarkerErr))
 	}
 	return combinedErr
 }
