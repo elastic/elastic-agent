@@ -51,12 +51,12 @@ func TestWatchMarker(t *testing.T) {
 
 	// Write out the expected upgrade details to the test upgrade marker
 	// file.
-	expectedDetails := details.Details{
+	expectedDetails := &details.Details{
 		TargetVersion: "8.12.0",
 		State:         details.StateWatching,
 	}
 	marker := updateMarkerSerializer{
-		Details: &expectedDetails,
+		Details: expectedDetails,
 	}
 	data, err := yaml.Marshal(marker)
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestWatchMarker(t *testing.T) {
 	// testDetailsObs function will be called with them.
 	require.Eventually(t, func() bool {
 		return assert.NotNil(t, testDetails) &&
-			assert.Equal(t, expectedDetails, *testDetails)
+			assert.Equal(t, expectedDetails, testDetails)
 	}, 1*time.Second, 10*time.Millisecond)
 
 	require.NoError(t, testErr)
