@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 )
 
@@ -62,89 +60,77 @@ func (p *provisioner) SetLogger(l runner.Logger) {
 	p.logger = l
 }
 
-func (p *provisioner) Provision(ctx context.Context, requests []runner.StackRequest) ([]runner.Stack, error) {
-	results := make(map[runner.StackRequest]*CreateDeploymentResponse)
-	for _, r := range requests {
-		// allow up to 2 minutes for each create request
-		createCtx, createCancel := context.WithTimeout(ctx, 2*time.Minute)
-		resp, err := p.createDeployment(createCtx, r,
-			map[string]string{
-				"division":          "engineering",
-				"org":               "ingest",
-				"team":              "elastic-agent",
-				"project":           "elastic-agent",
-				"integration-tests": "true",
-			})
-		createCancel()
-		if err != nil {
-			return nil, err
-		}
-		results[r] = resp
-	}
-
-	// set a long timeout
-	// this context travels up to the magefile, clients that want a shorter timeout can set
-	// it via mage's -t flag
-	readyCtx, readyCancel := context.WithTimeout(ctx, 25*time.Minute)
-	defer readyCancel()
-
-	g, gCtx := errgroup.WithContext(readyCtx)
-	for req, resp := range results {
-		g.Go(func(req runner.StackRequest, resp *CreateDeploymentResponse) func() error {
-			return func() error {
-				ready, err := p.client.DeploymentIsReady(gCtx, resp.ID, 30*time.Second)
-				if err != nil {
-					return fmt.Errorf("failed to check for cloud %s to be ready: %w", req.Version, err)
-				}
-				if !ready {
-					return fmt.Errorf("cloud %s never became ready: %w", req.Version, err)
-				}
-				return nil
-			}
-		}(req, resp))
-	}
-	err := g.Wait()
-	if err != nil {
-		return nil, err
-	}
-
-	var stacks []runner.Stack
-	for req, resp := range results {
-		stacks = append(stacks, runner.Stack{
-			ID:            req.ID,
-			Version:       req.Version,
-			Elasticsearch: resp.ElasticsearchEndpoint,
-			Kibana:        resp.KibanaEndpoint,
-			Username:      resp.Username,
-			Password:      resp.Password,
-			Internal: map[string]interface{}{
-				"deployment_id": resp.ID,
-			},
+// Create creates a stack.
+func (p *provisioner) Create(ctx context.Context, request runner.StackRequest) (runner.Stack, error) {
+	// allow up to 2 minutes for request
+	createCtx, createCancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer createCancel()
+	resp, err := p.createDeployment(createCtx, request,
+		map[string]string{
+			"division":          "engineering",
+			"org":               "ingest",
+			"team":              "elastic-agent",
+			"project":           "elastic-agent",
+			"integration-tests": "true",
 		})
+	if err != nil {
+		return runner.Stack{}, err
 	}
-	return stacks, nil
+	return runner.Stack{
+		ID:            request.ID,
+		Version:       request.Version,
+		Elasticsearch: resp.ElasticsearchEndpoint,
+		Kibana:        resp.KibanaEndpoint,
+		Username:      resp.Username,
+		Password:      resp.Password,
+		Internal: map[string]interface{}{
+			"deployment_id": resp.ID,
+		},
+		Ready: false,
+	}, nil
 }
 
-// Clean cleans up all provisioned resources.
-func (p *provisioner) Clean(ctx context.Context, stacks []runner.Stack) error {
-	var errs []error
-	for _, s := range stacks {
-		err := p.destroyDeployment(ctx, s)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to destroy stack %s (%s): %w", s.Version, s.ID, err))
-		}
+// WaitForReady should block until the stack is ready or the context is cancelled.
+func (p *provisioner) WaitForReady(ctx context.Context, stack runner.Stack) (runner.Stack, error) {
+	deploymentID, err := p.getDeploymentID(stack)
+	if err != nil {
+		return stack, fmt.Errorf("failed to get deployment ID from the stack: %w", err)
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
+	// allow up to 10 minutes for it to become ready
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	p.logger.Logf("Waiting for cloud %s to be ready (%s) [id: %s]", stack.Version, stack.ID, deploymentID)
+	ready, err := p.client.DeploymentIsReady(ctx, deploymentID, 30*time.Second)
+	if err != nil {
+		return stack, fmt.Errorf("failed to check for cloud %s to be ready: %w", stack.Version, err)
 	}
-	return nil
+	if !ready {
+		return stack, fmt.Errorf("cloud %s never became ready: %w", stack.Version, err)
+	}
+	stack.Ready = true
+	return stack, nil
+}
+
+// Delete deletes a stack.
+func (p *provisioner) Delete(ctx context.Context, stack runner.Stack) error {
+	deploymentID, err := p.getDeploymentID(stack)
+	if err != nil {
+		return err
+	}
+
+	// allow up to 1 minute for request
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer cancel()
+
+	p.logger.Logf("Destroying cloud %s (%s) [id: %s]", stack.Version, stack.ID, deploymentID)
+	return p.client.ShutdownDeployment(ctx, deploymentID)
 }
 
 func (p *provisioner) createDeployment(ctx context.Context, r runner.StackRequest, tags map[string]string) (*CreateDeploymentResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
-	p.logger.Logf("Creating stack %s (%s)", r.Version, r.ID)
+	p.logger.Logf("Creating cloud %s (%s)", r.Version, r.ID)
 	name := fmt.Sprintf("%s-%s", strings.Replace(p.cfg.Identifier, ".", "-", -1), r.ID)
 
 	// prepare tags
@@ -168,26 +154,21 @@ func (p *provisioner) createDeployment(ctx context.Context, r runner.StackReques
 		p.logger.Logf("Failed to create ESS cloud %s: %s", r.Version, err)
 		return nil, fmt.Errorf("failed to create ESS cloud for version %s: %w", r.Version, err)
 	}
-	p.logger.Logf("Created stack %s (%s) [id: %s]", r.Version, r.ID, resp.ID)
+	p.logger.Logf("Created cloud %s (%s) [id: %s]", r.Version, r.ID, resp.ID)
 	return resp, nil
 }
 
-func (p *provisioner) destroyDeployment(ctx context.Context, s runner.Stack) error {
-	if s.Internal == nil {
-		return fmt.Errorf("missing internal information")
+func (p *provisioner) getDeploymentID(stack runner.Stack) (string, error) {
+	if stack.Internal == nil {
+		return "", fmt.Errorf("missing internal information")
 	}
-	deploymentIDRaw, ok := s.Internal["deployment_id"]
+	deploymentIDRaw, ok := stack.Internal["deployment_id"]
 	if !ok {
-		return fmt.Errorf("missing internal deployment_id")
+		return "", fmt.Errorf("missing internal deployment_id")
 	}
 	deploymentID, ok := deploymentIDRaw.(string)
 	if !ok {
-		return fmt.Errorf("internal deployment_id not a string")
+		return "", fmt.Errorf("internal deployment_id not a string")
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-	defer cancel()
-
-	p.logger.Logf("Destroying stack %s (%s)", s.Version, s.ID)
-	return p.client.ShutdownDeployment(ctx, deploymentID)
+	return deploymentID, nil
 }

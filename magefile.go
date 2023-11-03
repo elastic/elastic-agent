@@ -1752,15 +1752,18 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 	datacenter := os.Getenv("TEST_INTEG_AUTH_GCP_DATACENTER")
 	if datacenter == "" {
+		// us-central1-a is used because T2A instances required for ARM64 testing are only
+		// available in the central regions
 		datacenter = "us-central1-a"
 	}
 
-	// Valid values are gcp-us-central1 (default), azure-eastus2,
+	// Valid values are gcp-us-west2 (default), azure-eastus2,
 	// aws-eu-central-1, us-east-1 (which is an AWS region but the
 	// "aws" CSP prefix is not used by ESS for some reason!)
 	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
 	if essRegion == "" {
-		essRegion = "gcp-us-central1"
+		// CFT testing requires the usage of gcp-us-west2
+		essRegion = "gcp-us-west2"
 	}
 
 	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
