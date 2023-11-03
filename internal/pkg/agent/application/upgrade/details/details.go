@@ -68,6 +68,7 @@ func NewDetails(targetVersion string, initialState State, actionID string) *Deta
 
 // SetState is a convenience method to set the state of the upgrade and
 // notify all observers.
+// Do NOT call SetState with StateFailed; call the Fail method instead.
 func (d *Details) SetState(s State) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
