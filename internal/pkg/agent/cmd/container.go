@@ -269,7 +269,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(logToStderr, false, initTimeout, isContainer)
+		return run(logToStderr, false, initTimeout, "", isContainer)
 	}
 
 	if cfg.FleetServer.Enable {
@@ -322,7 +322,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(logToStderr, false, initTimeout, isContainer)
+	return run(logToStderr, false, initTimeout, "", isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token

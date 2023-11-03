@@ -46,6 +46,7 @@ import (
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/otel/collector"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -73,7 +74,8 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			}
 			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
-			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
+			otelConfig, _ := cmd.Flags().GetString("config")
+			if err := run(nil, testingMode, fleetInitTimeout, otelConfig); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 
 				return err
@@ -81,6 +83,8 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().String("config", "", "Run in OTel Collector mode with given configuration file (EXPERIMENTAL)")
 
 	// --disable-encrypted-store only has meaning on Mac OS, and it disables the encrypted disk store
 	// feature of the Elastic Agent. On Mac OS root privileges are required to perform the disk
@@ -99,7 +103,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
+func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration, otelConfig string, modifiers ...component.PlatformModifier) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -240,6 +244,15 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		l.Info("APM instrumentation disabled")
 	}
 
+	var otelcol *collector.Collector
+	if otelConfig != "" {
+		// Load the otel collector configuration
+		l.Infof("Running in OTel Collector mode with config %s", otelConfig)
+		configPaths := []string{otelConfig}
+		oc, _ := collector.New(configPaths, "8.11.0", nil)
+		otelcol = &oc
+	}
+
 	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
@@ -277,12 +290,26 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 
 	appDone := make(chan bool)
 	appErr := make(chan error)
-	// Spawn the main Coordinator goroutine
-	go func() {
-		err := coord.Run(ctx)
-		close(appDone)
-		appErr <- err
-	}()
+	otelcolDone := make(chan bool)
+	otelcolErr := make(chan error)
+
+	// Start OTel or coordinator, not both
+	if otelcol != nil {
+		// Spawn the OTel Collector
+		go func() {
+			l.Info("Starting OTel Collector")
+			err := (*otelcol).Run(ctx)
+			close(otelcolDone)
+			otelcolErr <- err
+		}()
+	} else {
+		// Spawn the main Coordinator goroutine
+		go func() {
+			err := coord.Run(ctx)
+			close(appDone)
+			appErr <- err
+		}()
+	}
 
 	// listen for signals
 	signals := make(chan os.Signal, 1)
@@ -297,6 +324,10 @@ LOOP:
 			break LOOP
 		case <-appDone:
 			l.Info("application done, coordinator exited")
+			logShutdown = false
+			break LOOP
+		case <-otelcolDone:
+			l.Info("otelcol done, otelcol exited")
 			logShutdown = false
 			break LOOP
 		case <-rex.ShutdownChan():
@@ -320,7 +351,11 @@ LOOP:
 		l.Info("Shutting down Elastic Agent and sending last events...")
 	}
 	cancel()
-	err = <-appErr
+	if otelcol != nil {
+		err = <-otelcolErr
+	} else {
+		err = <-appErr
+	}
 
 	if logShutdown {
 		l.Info("Shutting down completed.")
