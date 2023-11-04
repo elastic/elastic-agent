@@ -123,7 +123,7 @@ inputs:
 	// ensure that upgrade details now show the state as UPG_ROLLBACK
 	state, err := startFixture.Client().State(ctx)
 	require.NoError(t, err)
-	require.NotNil(t, state.UpgradeDetails) // FIXME: there is no UpgradeDetails on State (yet!)
+	require.NotNil(t, state.UpgradeDetails)
 	require.Equal(t, details.StateRollback, state.UpgradeDetails.State)
 
 	// rollback should stop the watcher
