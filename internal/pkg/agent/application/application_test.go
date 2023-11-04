@@ -15,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -51,6 +52,8 @@ func TestLimitsLog(t *testing.T) {
 	log, obs := logger.NewTesting("TestLimitsLog")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+
+	upgrade.CreateMarkerTestDir(t)
 
 	_, _, _, _, err := New(
 		ctx,

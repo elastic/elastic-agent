@@ -83,6 +83,8 @@ func TestDownloadWithRetries(t *testing.T) {
 		},
 	}
 
+	CreateMarkerTestDir(t)
+
 	// Successful immediately (no retries)
 	t.Run("successful_immediately", func(t *testing.T) {
 		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
