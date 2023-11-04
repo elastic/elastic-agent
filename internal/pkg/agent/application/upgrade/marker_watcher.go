@@ -38,9 +38,10 @@ func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) (
 	} // Watch the upgrade marker file's directory, not the file itself, so we
 
 	// notice the file even if it's deleted and recreated.
-	err = watcher.Add(filepath.Dir(upgradeMarkerFilePath))
+	upgradeMarkerDirPath := filepath.Dir(upgradeMarkerFilePath)
+	err = watcher.Add(upgradeMarkerDirPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set watch on upgrade marker's directory: %w", err)
+		return nil, fmt.Errorf("failed to set watch on upgrade marker's directory [%s]: %w", upgradeMarkerDirPath, err)
 	}
 
 	return &MarkerFileWatcher{
