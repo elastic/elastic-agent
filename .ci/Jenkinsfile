@@ -95,7 +95,7 @@ pipeline {
             values 'ubuntu-22 && immutable', 'aws && aarch64 && gobld/diskSizeGb:200', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable' //, 'macos12 && x86_64'
           }
         }
-        stages {        
+        stages {
           stage('K8s') {
             when {
               beforeAgent true
@@ -112,7 +112,7 @@ pipeline {
             steps {
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-              runK8s(k8sVersion: 'v1.27.3', kindVersion: 'v0.20.0', context: "K8s-${PLATFORM}")
+              runK8s(k8sVersion: 'v1.28.0', kindVersion: 'v0.20.0', context: "K8s-${PLATFORM}")
             }
           }
           stage('Package') {
@@ -184,7 +184,7 @@ pipeline {
         axes {
           axis {
             name 'K8S_VERSION'
-            values "v1.27.3","v1.26.6","v1.25.11"
+            values "v1.28.0","v1.27.3","v1.26.6"
           }
         }
         stages {

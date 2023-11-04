@@ -6,13 +6,20 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/jedib0t/go-pretty/v6/list"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
 func TestHumanOutput(t *testing.T) {
@@ -146,5 +153,81 @@ func TestHumanOutput(t *testing.T) {
 		err = outputFunc(&b, test.state)
 		require.NoErrorf(t, err, "error applying output function: %s with state: %s", test.output, test.state_name)
 		require.Equalf(t, string(expected), b.String(), "unexpected input with output: %s, state: %s", test.output, test.state_name)
+	}
+}
+
+func TestListUpgradeDetails(t *testing.T) {
+	now := time.Now().UTC()
+	cases := map[string]struct {
+		upgradeDetails *cproto.UpgradeDetails
+		expectedOutput string
+	}{
+		"no_details": {
+			upgradeDetails: nil,
+			expectedOutput: "",
+		},
+		"no_metadata": {
+			upgradeDetails: &cproto.UpgradeDetails{
+				TargetVersion: "8.12.0",
+				State:         "UPG_REQUESTED",
+				ActionId:      "foobar",
+			},
+			expectedOutput: `── upgrade_details
+   ├─ target_version: 8.12.0
+   ├─ state: UPG_REQUESTED
+   └─ action_id: foobar`,
+		},
+		"no_action_id": {
+			upgradeDetails: &cproto.UpgradeDetails{
+				TargetVersion: "8.12.0",
+				State:         "UPG_REQUESTED",
+			},
+			expectedOutput: `── upgrade_details
+   ├─ target_version: 8.12.0
+   └─ state: UPG_REQUESTED`,
+		},
+		"no_scheduled_at": {
+			upgradeDetails: &cproto.UpgradeDetails{
+				TargetVersion: "8.12.0",
+				State:         "UPG_FAILED",
+				Metadata: &cproto.UpgradeDetailsMetadata{
+					FailedState:     "UPG_DOWNLOADING",
+					ErrorMsg:        "error downloading",
+					DownloadPercent: 0.104,
+				},
+			},
+			expectedOutput: `── upgrade_details
+   ├─ target_version: 8.12.0
+   ├─ state: UPG_FAILED
+   └─ metadata
+      ├─ failed_state: UPG_DOWNLOADING
+      └─ error_msg: error downloading`,
+		},
+		"no_failed_state": {
+			upgradeDetails: &cproto.UpgradeDetails{
+				TargetVersion: "8.12.0",
+				State:         "UPG_DOWNLOADING",
+				Metadata: &cproto.UpgradeDetailsMetadata{
+					ScheduledAt:     timestamppb.New(now),
+					DownloadPercent: 0.17679,
+				},
+			},
+			expectedOutput: fmt.Sprintf(`── upgrade_details
+   ├─ target_version: 8.12.0
+   ├─ state: UPG_DOWNLOADING
+   └─ metadata
+      ├─ scheduled_at: %s
+      └─ download_percent: 17.68%%`, now.Format(time.RFC3339)),
+		}}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			l := list.NewWriter()
+			l.SetStyle(list.StyleConnectedLight)
+
+			listUpgradeDetails(l, test.upgradeDetails)
+			actualOutput := l.Render()
+			require.Equal(t, test.expectedOutput, actualOutput)
+		})
 	}
 }
