@@ -26,9 +26,8 @@ func TestProvisionGetRegions(t *testing.T) {
 
 	cfg := ProvisionerConfig{Region: "bad-region-ID", APIKey: key}
 	prov := &ServerlessProvision{
-		cfg:    cfg,
-		stacks: map[string]stackhandlerData{},
-		log:    &defaultLogger{wrapped: logp.L()},
+		cfg: cfg,
+		log: &defaultLogger{wrapped: logp.L()},
 	}
 	err = prov.CheckCloudRegion()
 	require.NoError(t, err)
