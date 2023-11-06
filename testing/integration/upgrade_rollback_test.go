@@ -125,7 +125,7 @@ inputs:
 	startVersion, err := version.ParseVersion(startVersionInfo.Binary.Version)
 	require.NoError(t, err)
 
-	if !startVersion.Less(version.NewParsedSemVer(8, 12, 0, "", "")) {
+	if !startVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) {
 		client := startFixture.Client()
 		err = client.Connect(ctx)
 		require.NoError(t, err)
@@ -256,7 +256,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	startVersion, err := version.ParseVersion(startVersionInfo.Binary.Version)
 	require.NoError(t, err)
 
-	if !startVersion.Less(version.NewParsedSemVer(8, 12, 0, "", "")) {
+	if !startVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) {
 		client := startFixture.Client()
 		err = client.Connect(ctx)
 		require.NoError(t, err)
