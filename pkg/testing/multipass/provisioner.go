@@ -7,6 +7,7 @@ package multipass
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -122,6 +123,12 @@ func (p *provisioner) Clean(ctx context.Context, _ runner.Config, instances []ru
 
 // launch creates an instance.
 func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runner.OSBatch) error {
+	// check if instance already exists
+	err := p.ensureInstanceNotExist(ctx, batch)
+	if err != nil {
+		p.logger.Logf(
+			"could not check multipass instance %q does not exists, moving on anyway. Err: %v", err)
+	}
 	args := []string{
 		"launch",
 		"-c", "2",
@@ -145,9 +152,14 @@ func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runne
 		return fmt.Errorf("failed to marshal cloud-init configuration: %w", err)
 	}
 
+	p.logger.Logf("Launching multipass instance %s", batch.ID)
 	var output bytes.Buffer
-	p.logger.Logf("Launching multipass image %s", batch.ID)
-	proc, err := process.Start("multipass", process.WithContext(ctx), process.WithArgs(args), process.WithCmdOptions(runner.AttachOut(&output), runner.AttachErr(&output)))
+	proc, err := process.Start("multipass",
+		process.WithContext(ctx),
+		process.WithArgs(args),
+		process.WithCmdOptions(
+			runner.AttachOut(&output),
+			runner.AttachErr(&output)))
 	if err != nil {
 		return fmt.Errorf("failed to run multipass launch: %w", err)
 	}
@@ -167,6 +179,56 @@ func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runne
 		fmt.Fprintf(os.Stdout, "%s\n", output.Bytes())
 		return fmt.Errorf("failed to run multipass launch: exited with code: %d", ps.ExitCode())
 	}
+	return nil
+}
+
+func (p *provisioner) ensureInstanceNotExist(ctx context.Context, batch runner.OSBatch) error {
+	var output bytes.Buffer
+	proc, err := process.Start("multipass",
+		process.WithContext(ctx),
+		process.WithArgs([]string{"list", "--format", "json"}),
+		process.WithCmdOptions(
+			runner.AttachOut(&output),
+			runner.AttachErr(&output)))
+	if err != nil {
+		return fmt.Errorf("multipass list failed: %w", err)
+	}
+
+	<-proc.Wait()
+	list := struct {
+		List []struct {
+			Ipv4    []string `json:"ipv4"`
+			Name    string   `json:"name"`
+			Release string   `json:"release"`
+			State   string   `json:"state"`
+		} `json:"list"`
+	}{}
+	err = json.NewDecoder(&output).Decode(&list)
+	if err != nil {
+		return fmt.Errorf("could not decode mutipass list output: %w", err)
+	}
+
+	for _, i := range list.List {
+		if i.Name == batch.ID {
+			p.logger.Logf("multipass trying to delete instance %s", batch.ID)
+
+			output.Reset()
+			proc, err = process.Start("multipass",
+				process.WithContext(ctx),
+				process.WithArgs([]string{"delete", "--purge", batch.ID}),
+				process.WithCmdOptions(
+					runner.AttachOut(&output),
+					runner.AttachErr(&output)))
+			if err != nil {
+				return fmt.Errorf("multipass instance %q already exist, state %q. Could not delete it: %w",
+					batch.ID, i.State, err)
+			}
+			<-proc.Wait()
+
+			break
+		}
+	}
+
 	return nil
 }
 
