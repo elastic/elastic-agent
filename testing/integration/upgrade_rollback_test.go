@@ -154,8 +154,8 @@ inputs:
 // rolled back to the previous version.
 func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local: true, // requires Agent installation
-		Sudo:  true, // requires Agent installation
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

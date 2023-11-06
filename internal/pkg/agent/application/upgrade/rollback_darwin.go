@@ -18,7 +18,7 @@ import (
 const (
 	// delay after agent restart is performed to allow agent to tear down all the processes
 	// important mainly for windows, as it prevents removing files which are in use
-	afterRestartDelay = 20 * time.Second // FIXME: increased for debugging
+	afterRestartDelay = 2 * time.Second
 )
 
 func invokeCmd() *exec.Cmd {

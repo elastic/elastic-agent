@@ -383,7 +383,6 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		c.managerChans.varsManagerError = varsMgr.Errors()
 	}
 	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
-		logger.Info("Setting up upgrade marker update and error channels")
 		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
 		c.managerChans.upgradeMarkerErr = upgradeMgr.MarkerWatcher().Errors()
 	}
@@ -1000,9 +999,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		}
 
 	case upgradeMarker := <-c.managerChans.upgradeMarkerUpdate:
-		c.logger.Infof("Received upgrade marker on update channel; details = %#+v\n", upgradeMarker.Details)
 		if ctx.Err() == nil {
-			c.logger.Infof("Setting upgrade details: %#+v\n", upgradeMarker.Details)
 			c.setUpgradeDetails(upgradeMarker.Details)
 		}
 	}
