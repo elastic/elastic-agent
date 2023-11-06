@@ -222,20 +222,16 @@ func testUpgradeFleetManagedElasticAgent(
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
-	t.Cleanup(func() {
-		t.Log("Un-enrolling Elastic Agent through Fleet Server...")
-		assert.NoError(t, fleettools.UnEnrollAgent(info.KibanaClient, policy.ID))
-	})
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policy.ID, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policyResp.ID, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	t.Logf("Upgrading from version %q to version %q...", startParsedVersion, endVersionInfo.Binary.String())
-	err = fleettools.UpgradeAgent(kibClient, policy.ID, endVersionInfo.Binary.String(), true)
+	err = fleettools.UpgradeAgent(kibClient, policyResp.ID, endVersionInfo.Binary.String(), true)
 	require.NoError(t, err)
 
 	t.Log("Waiting from upgrade details to show up in Fleet")
@@ -258,12 +254,12 @@ func testUpgradeFleetManagedElasticAgent(
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policy.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policyResp.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
 
 	// wait for version
 	require.Eventually(t, func() bool {
 		t.Log("Getting Agent version...")
-		newVersion, err := fleettools.GetAgentVersion(kibClient, policy.ID)
+		newVersion, err := fleettools.GetAgentVersion(kibClient, policyResp.ID)
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
 			return false
