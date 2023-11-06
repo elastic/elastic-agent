@@ -108,7 +108,19 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	errorCheckInterval := cfg.Settings.Upgrade.Watcher.ErrorCheck.Interval
 	ctx := context.Background()
 	if err := watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
-		log.Error("Error detected proceeding to rollback: %v", err)
+		log.Error("Error detected, proceeding to rollback: %v", err)
+
+		// If we are upgrading from version >= 8.12.0, marker.Details should be non-nil
+		// because the Agent we upgraded FROM would've written upgrade details in the upgrade
+		// marker. However, if we're upgrading from version < 8.12.0, the marker won't
+		// contain upgrade details, so we populate them now.
+		if marker.Details == nil {
+			actionID := ""
+			if marker.Action != nil {
+				actionID = marker.Action.ActionID
+			}
+			marker.Details = details.NewDetails(version.GetAgentPackageVersion(), details.StateRollback, actionID)
+		}
 
 		marker.Details.SetState(details.StateRollback)
 		err = upgrade.SaveMarker(marker)
