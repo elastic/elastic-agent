@@ -1000,8 +1000,8 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		}
 
 	case upgradeMarker := <-c.managerChans.upgradeMarkerUpdate:
-		c.logger.Infof("Received upgrade marker on update channel: %#+v\n", upgradeMarker)
-		if ctx.Err() != nil {
+		c.logger.Infof("Received upgrade marker on update channel; details = %#+v\n", upgradeMarker.Details)
+		if ctx.Err() == nil {
 			c.logger.Infof("Setting upgrade details: %#+v\n", upgradeMarker.Details)
 			c.setUpgradeDetails(upgradeMarker.Details)
 		}
