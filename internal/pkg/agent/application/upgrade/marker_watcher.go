@@ -107,6 +107,8 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 						return
 					}
 
+					// TODO: remove debug logging
+					mfw.logger.Infof("marker: %#+v\n", marker)
 					mfw.updateCh <- *marker
 				}
 			}
