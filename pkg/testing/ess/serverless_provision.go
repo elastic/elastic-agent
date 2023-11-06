@@ -207,13 +207,13 @@ func (prov *ServerlessProvision) getDeploymentInfo(stack runner.Stack) (string, 
 	if !ok {
 		return "", "", fmt.Errorf("internal deployment_id not a string")
 	}
-	depploymentTypeRaw, ok := stack.Internal["deployment_type"]
+	deploymentTypeRaw, ok := stack.Internal["deployment_type"]
 	if !ok {
 		return "", "", fmt.Errorf("missing internal deployment_type")
 	}
-	depploymentType, ok := depploymentTypeRaw.(string)
+	deploymentType, ok := deploymentTypeRaw.(string)
 	if !ok {
 		return "", "", fmt.Errorf("internal deployment_type is not a string")
 	}
-	return deploymentID, depploymentType, nil
+	return deploymentID, deploymentType, nil
 }

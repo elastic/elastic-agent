@@ -1757,12 +1757,10 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		datacenter = "us-central1-a"
 	}
 
-	// Valid values are gcp-us-west2 (default), azure-eastus2,
-	// aws-eu-central-1, us-east-1 (which is an AWS region but the
-	// "aws" CSP prefix is not used by ESS for some reason!)
+	// Possible to change the region for deployment, default is gcp-us-west2 which is
+	// the CFT region.
 	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
 	if essRegion == "" {
-		// CFT testing requires the usage of gcp-us-west2
 		essRegion = "gcp-us-west2"
 	}
 
