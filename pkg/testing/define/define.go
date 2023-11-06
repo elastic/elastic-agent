@@ -229,9 +229,9 @@ func getESClient() (*elasticsearch.Client, error) {
 	esHost := os.Getenv("ELASTICSEARCH_HOST")
 	esUser := os.Getenv("ELASTICSEARCH_USERNAME")
 	esPass := os.Getenv("ELASTICSEARCH_PASSWORD")
-	// if esHost == "" || esUser == "" || esPass == "" {
-	// 	return nil, errors.New("ELASTICSEARCH_* must be defined by the test runner")
-	// }
+	if esHost == "" || esUser == "" || esPass == "" {
+		return nil, errors.New("ELASTICSEARCH_* must be defined by the test runner")
+	}
 	c, err := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{esHost},
 		Username:  esUser,
@@ -248,9 +248,9 @@ func getKibanaClient() (*kibana.Client, error) {
 	kibanaHost := os.Getenv("KIBANA_HOST")
 	kibanaUser := os.Getenv("KIBANA_USERNAME")
 	kibanaPass := os.Getenv("KIBANA_PASSWORD")
-	// if kibanaHost == "" || kibanaUser == "" || kibanaPass == "" {
-	// 	return nil, errors.New("KIBANA_* must be defined by the test runner")
-	// }
+	if kibanaHost == "" || kibanaUser == "" || kibanaPass == "" {
+		return nil, errors.New("KIBANA_* must be defined by the test runner")
+	}
 	c, err := kibana.NewClientWithConfigDefault(&kibana.ClientConfig{
 		Host:          kibanaHost,
 		Username:      kibanaUser,

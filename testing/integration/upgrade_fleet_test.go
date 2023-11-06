@@ -91,10 +91,10 @@ func TestFleetManagedUpgrade(t *testing.T) {
 //		[x] setup the Go httptest.Server to serve the agent artefacts
 //		[x] block the connections to artefacts.elastic.co using iptables
 //		[x] check the connection is indeed blocked
-//		[x] double check the stack is still reachable
-//		[ ] configure the policy to use the custom artifactsAPI server
-//	   [x] create new download source
-//	   [ ] create policy
+//		[x] double-check the stack is still reachable
+//		[x] configure the policy to use the custom artifactsAPI server
+//	   		[x] create new download source
+//	   		[x] create policy
 //		[ ] install / upgrade the agent
 func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
@@ -129,9 +129,10 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	s := newArtifactsServer(ctx, t, latest.String())
 	_ = s
 	host := "artifacts.elastic.co"
-	AirGap(t, host)
+	simulateAirGapedEnvironment(t, host)
 
-	rctx, _ := context.WithTimeout(ctx, time.Second)
+	rctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
 	req, err := http.NewRequestWithContext(rctx, http.MethodGet, "https://"+host, nil)
 	_, err = http.DefaultClient.Do(req)
 	require.ErrorIs(t, err, context.DeadlineExceeded,
@@ -293,11 +294,11 @@ func defaultPolicy() kibana.AgentPolicy {
 	return createPolicyReq
 }
 
-func AirGap(t *testing.T, host string) {
+// simulateAirGapedEnvironment uses iptables to block outgoing packages to the
+// IPs (v4 and v6) associated with host.
+func simulateAirGapedEnvironment(t *testing.T, host string) {
 	ips, err := net.LookupIP(host)
-	if err != nil {
-		panic(err)
-	}
+	require.NoErrorf(t, err, "could not get IPs for host %q", host)
 
 	// iptables -A OUTPUT -j DROP -d IP
 	t.Logf("found %v IPs for %q, blockingn them...", ips, host)
@@ -323,7 +324,7 @@ func AirGap(t *testing.T, host string) {
 		toCleanUp = append(toCleanUp, append([]string{cmd, "-D"}, args[1:]...))
 
 		// Just in case someone executes the test locally.
-		t.Logf("use \"%s -D %s\" to remove it", cmd, args[1:])
+		t.Logf("use \"%s -D %s\" to remove it", cmd, strings.Join(args[1:], " "))
 	}
 	t.Cleanup(func() {
 		for _, c := range toCleanUp {
@@ -340,31 +341,6 @@ func AirGap(t *testing.T, host string) {
 		}
 	})
 }
-
-//	func TestManual(t *testing.T) {
-//		ctx, _ := testcontext.WithDeadline(
-//			t, context.Background(), time.Now().Add(10*time.Minute))
-//
-//		artifactAPI := tools.NewArtifactAPIClient()
-//		latest, err := artifactAPI.GetLatestSnapshotVersion(ctx, t)
-//		require.NoError(t, err, "could not fetch latest version from artifacts API")
-//
-//		s := newArtifactsServer(ctx, t, latest.String())
-//		fmt.Println(s.URL)
-//		host := "artifacts.elastic.co"
-//		AirGap(nil, host)
-//
-//		rctx, _ := context.WithTimeout(ctx, 5*time.Second)
-//		req, err := http.NewRequestWithContext(rctx, http.MethodGet, "https://"+host, nil)
-//		_, err = http.DefaultClient.Do(req)
-//		fmt.Println("req err:", err)
-//		require.ErrorIs(t, err, context.DeadlineExceeded,
-//			"request to %q should have failed, iptables rules should block it")
-//
-//		wg := sync.WaitGroup{}
-//		wg.Add(1)
-//		wg.Wait()
-//	}
 
 func newArtifactsServer(ctx context.Context, t *testing.T, version string) *httptest.Server {
 	fileServerDir := t.TempDir()
@@ -387,7 +363,7 @@ func newArtifactsServer(ctx context.Context, t *testing.T, version string) *http
 	// }
 
 	fs := http.FileServer(http.Dir(fileServerDir))
-	fmt.Println("fileServerDir:", fileServerDir)
+	// fmt.Println("fileServerDir:", fileServerDir)
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-8.10.2-linux-x86_64.tar.gz
