@@ -650,10 +650,6 @@ func (c *Coordinator) Run(ctx context.Context) error {
 
 	err := c.runner(ctx)
 
-	errChan := make(chan error)
-	go upgrade.WatchMarker(watchCtx, c.setUpgradeDetails, c.logger, errChan)
-	// TODO: consume from errChan
-
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		c.setCoordinatorState(agentclient.Stopped, "Requested to be stopped")
 		c.setFleetState(agentclient.Stopped, "Requested to be stopped")
