@@ -40,7 +40,11 @@ type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.
 
 type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details) (string, error)
 
+<<<<<<< HEAD
 func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+=======
+func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+>>>>>>> dba216671d (Use only fs.NewDownloader for file://. (#3682))
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -48,6 +52,11 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 	}()
 
 	pgpBytes = u.appendFallbackPGP(parsedVersion, pgpBytes)
+
+	parsedVersion, err := agtversion.ParseVersion(version)
+	if err != nil {
+		return "", fmt.Errorf("error parsing version %q: %w", version, err)
+	}
 
 	// do not update source config
 	settings := *u.settings
@@ -77,7 +86,11 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 			}
 
 			// log that a local upgrade artifact is being used
+<<<<<<< HEAD
 			u.log.Infow("Using local upgrade artifact", "version", parsedVersion,
+=======
+			u.log.Infow("Using local upgrade artifact", "version", version,
+>>>>>>> dba216671d (Use only fs.NewDownloader for file://. (#3682))
 				"drop_path", settings.DropPath,
 				"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 		} else {
@@ -88,7 +101,11 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 	if factory == nil {
 		// set the factory to the newDownloader factory
 		factory = newDownloader
+<<<<<<< HEAD
 		u.log.Infow("Downloading upgrade artifact", "version", parsedVersion,
+=======
+		u.log.Infow("Downloading upgrade artifact", "version", version,
+>>>>>>> dba216671d (Use only fs.NewDownloader for file://. (#3682))
 			"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 			"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 	}
@@ -195,6 +212,32 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 }
 
 func (u *Upgrader) downloadOnce(
+<<<<<<< HEAD
+=======
+	ctx context.Context,
+	factory downloaderFactory,
+	version *agtversion.ParsedSemVer,
+	settings *artifact.Config,
+	upgradeDetails *details.Details,
+) (string, error) {
+	downloader, err := factory(version, u.log, settings, upgradeDetails)
+	if err != nil {
+		return "", fmt.Errorf("unable to create fetcher: %w", err)
+	}
+	// All download artifacts expect a name that includes <major>.<minor.<patch>[-SNAPSHOT] so we have to
+	// make sure not to include build metadata we might have in the parsed version (for snapshots we already
+	// used that to configure the URL we download the files from)
+	path, err := downloader.Download(ctx, agentArtifact, version.VersionWithPrerelease())
+	if err != nil {
+		return "", fmt.Errorf("unable to download package: %w", err)
+	}
+
+	// Download successful
+	return path, nil
+}
+
+func (u *Upgrader) downloadWithRetries(
+>>>>>>> dba216671d (Use only fs.NewDownloader for file://. (#3682))
 	ctx context.Context,
 	factory downloaderFactory,
 	version *agtversion.ParsedSemVer,
