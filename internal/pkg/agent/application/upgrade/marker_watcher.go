@@ -44,6 +44,8 @@ func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) (
 		return nil, fmt.Errorf("failed to set watch on upgrade marker's directory [%s]: %w", upgradeMarkerDirPath, err)
 	}
 
+	// TODO: remove debug logging
+	logger.Info("Creating new marker file watcher")
 	return &MarkerFileWatcher{
 		watcher:        watcher,
 		markerFilePath: upgradeMarkerFilePath,
@@ -69,6 +71,8 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case err, ok := <-mfw.watcher.Errors:
+				// TODO: remove debug logging
+				mfw.logger.Info("after there are watch errors")
 				mfw.logger.Debug("after there are watch errors")
 				if !ok { // Channel was closed (i.e. Watcher.Close() was called).
 					mfw.logger.Debug("upgrade marker watch's error channel was closed")
@@ -77,6 +81,8 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 				mfw.errCh <- fmt.Errorf("upgrade marker watch returned error: %w", err)
 				continue
 			case e, ok := <-mfw.watcher.Events:
+				// TODO: remove debug logging
+				mfw.logger.Infof("after there is a watch event: [%s]", e.String())
 				mfw.logger.Debugf("after there is a watch event: [%s]", e.String())
 				if !ok { // Channel was closed (i.e. Watcher.Close() was called).
 					mfw.logger.Debug("upgrade marker watch's events channel was closed")
@@ -92,6 +98,9 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 				case fsnotify.Create, fsnotify.Write:
 					// Upgrade marker file was created or updated; read its contents
 					// and send them over the update channel.
+					// TODO: remove debug logging
+					mfw.logger.Info("upgrade marker file created or updated")
+
 					marker, err := loadMarker(mfw.markerFilePath)
 					if err != nil {
 						mfw.errCh <- fmt.Errorf("unable to load upgrade marker from watch: %w", err)
@@ -106,10 +115,14 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 
 	// Do an initial read from the upgrade marker file, in case the file
 	// is already present before the watching starts.
+	// TODO: remove debug logging
+	mfw.logger.Info("initial read of marker file")
 	marker, err := loadMarker(mfw.markerFilePath)
 	if err != nil {
 		return fmt.Errorf("unable to load upgrade marker from watch: %w", err)
 	}
+	// TODO: remove debug logging
+	mfw.logger.Infof("marker: %#+v\n", marker)
 	if marker != nil && marker.Details != nil {
 		mfw.updateCh <- *marker
 	}
