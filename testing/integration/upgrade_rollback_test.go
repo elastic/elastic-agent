@@ -120,11 +120,22 @@ inputs:
 	}
 	require.NoError(t, err)
 
-	// ensure that upgrade details now show the state as UPG_ROLLBACK
-	state, err := startFixture.Client().State(ctx)
+	// ensure that upgrade details now show the state as UPG_ROLLBACK. This is only possible with Elastic
+	// Agent versions >= 8.12.0.
+	startVersion, err := version.ParseVersion(startVersionInfo.Binary.Version)
 	require.NoError(t, err)
-	require.NotNil(t, state.UpgradeDetails)
-	require.Equal(t, details.StateRollback, state.UpgradeDetails.State)
+
+	if !startVersion.Less(version.NewParsedSemVer(8, 12, 0, "", "")) {
+		client := startFixture.Client()
+		err = client.Connect(ctx)
+		require.NoError(t, err)
+
+		state, err := client.State(ctx)
+		require.NoError(t, err)
+
+		require.NotNil(t, state.UpgradeDetails)
+		require.Equal(t, details.StateRollback, state.UpgradeDetails.State)
+	}
 
 	// rollback should stop the watcher
 	// killTimeout is greater than timeout as the watcher should have been
@@ -143,8 +154,8 @@ inputs:
 // rolled back to the previous version.
 func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
+		Local: true, // requires Agent installation
+		Sudo:  true, // requires Agent installation
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -239,6 +250,23 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		}
 	}
 	require.NoError(t, err)
+
+	// ensure that upgrade details now show the state as UPG_ROLLBACK. This is only possible with Elastic
+	// Agent versions >= 8.12.0.
+	startVersion, err := version.ParseVersion(startVersionInfo.Binary.Version)
+	require.NoError(t, err)
+
+	if !startVersion.Less(version.NewParsedSemVer(8, 12, 0, "", "")) {
+		client := startFixture.Client()
+		err = client.Connect(ctx)
+		require.NoError(t, err)
+
+		state, err := client.State(ctx)
+		require.NoError(t, err)
+
+		require.NotNil(t, state.UpgradeDetails)
+		require.Equal(t, details.StateRollback, state.UpgradeDetails.State)
+	}
 
 	// rollback should stop the watcher
 	// killTimeout is greater than timeout as the watcher should have been
