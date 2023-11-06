@@ -87,13 +87,15 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 // The test:
 //
-//	[x] download the "downgradeTo" from artefacts api
-//	[x] setup the Go httptest.Server to serve the agent artefacts
-//	[x] block the connections to artefacts.elastic.co using iptables
-//	[x] check the connection is indeed blocked
-//	[x] double check the stack is still reachable
-//	[ ] configure the policy to use the custom artifactsAPI server
-//	[ ] install / upgrade the agent
+//		[x] download the "downgradeTo" from artefacts api
+//		[x] setup the Go httptest.Server to serve the agent artefacts
+//		[x] block the connections to artefacts.elastic.co using iptables
+//		[x] check the connection is indeed blocked
+//		[x] double check the stack is still reachable
+//		[ ] configure the policy to use the custom artifactsAPI server
+//	   [x] create new download source
+//	   [ ] create policy
+//		[ ] install / upgrade the agent
 func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
@@ -154,16 +156,19 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), latest)
 
+	downloadSrcName := "local-airgaped-" + uuid.NewString()
 	downloadSource := kibana.DownloadSource{
-		Name:      "local",
+		Name:      downloadSrcName,
 		Host:      s.URL + "/downloads/beats/elastic-agent/",
 		IsDefault: true,
 	}
+	t.Logf("creating download source %q", downloadSrcName)
 	err = stack.KibanaClient.CreateDownloadSource(ctx, downloadSource)
 	require.NoError(t, err, "could not create download source")
 
 	policy := defaultPolicy()
-	policy.DownloadSourceID = downloadSource.Name
+	// no need to set DownloadSourceID as the one we created is already the default one
+	// policy.DownloadSourceID = downloadSource.Name
 
 	// it's failing when creating the policy, on:
 	// 	policyResp, err := kibClient.CreatePolicy(ctx, policy)
