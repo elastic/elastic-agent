@@ -138,11 +138,12 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	_, err = stack.ESClient.Info()
 	require.NoErrorf(t, err,
 		"failed to interact with ES after blocking %q through iptables", host)
-	_, _, err = stack.KibanaClient.Request(http.MethodGet, "/api/status",
+	_, body, err := stack.KibanaClient.Request(http.MethodGet, "/api/features",
 		nil, nil, nil)
 	require.NoErrorf(t, err,
 		"failed to interact with Kibana after blocking %q through iptables. "+
-			"It should not affect the connection to the stack", host)
+			"It should not affect the connection to the stack. Host: %s, response body: %s",
+		stack.KibanaClient.URL, host, body)
 
 	// =========================================================================
 	fixture, err := define.NewFixture(t, define.Version())
@@ -153,8 +154,19 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), latest)
 
+	downloadSource := kibana.DownloadSource{
+		Name:      "local",
+		Host:      s.URL + "/downloads/beats/elastic-agent/",
+		IsDefault: true,
+	}
+	err = stack.KibanaClient.CreateDownloadSource(ctx, downloadSource)
+	require.NoError(t, err, "could not create download source")
+
 	policy := defaultPolicy()
-	policy.DownloadSourceID = s.URL + "/downloads/beats/elastic-agent/"
+	policy.DownloadSourceID = downloadSource.Name
+
+	// it's failing when creating the policy, on:
+	// 	policyResp, err := kibClient.CreatePolicy(ctx, policy)
 	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy)
 }
 
