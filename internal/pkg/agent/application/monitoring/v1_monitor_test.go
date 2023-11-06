@@ -6,7 +6,9 @@ package monitoring
 
 import (
 	"context"
+	"encoding/json"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,8 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	monitoringcfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 func TestMonitoringConfigMetricsInterval(t *testing.T) {
@@ -93,4 +97,115 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 		}
 
 	}
+}
+
+func TestMonitoringConfigComponentFields(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	cfg := &monitoringConfig{
+		C: &monitoringcfg.MonitoringConfig{
+			Enabled:        true,
+			MonitorMetrics: true,
+			Namespace:      "tiaog",
+			HTTP: &monitoringcfg.MonitoringHTTPConfig{
+				Enabled: false,
+			},
+		},
+	}
+
+	policy := map[string]any{
+		"agent": map[string]any{
+			"monitoring": map[string]any{
+				"metrics": true,
+				"logs":    false,
+			},
+		},
+		"outputs": map[string]any{
+			"default": map[string]any{},
+		},
+	}
+
+	b := &BeatsMonitor{
+		enabled:   true,
+		config:    cfg,
+		agentInfo: agentInfo,
+	}
+
+	components := []component.Component{
+		{
+			ID: "filestream-default",
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Service: &component.ServiceSpec{
+						Log: &component.ServiceLogSpec{
+							Path: "/tmp/foo",
+						},
+					},
+				},
+			},
+		},
+	}
+	monitoringConfig, err := b.MonitoringConfig(policy, components, map[string]string{"filestream-default": "filebeat"})
+	if err != nil {
+		t.Fatalf("cannot render monitoring configuration: %s", err)
+	}
+
+	// This is a test and the structure of `monitoringConfig` is well know,
+	// so we coerce everything to the correct type. If something does not match
+	// the test will panic.
+	inputsSlice := monitoringConfig["inputs"].([]any)
+	for _, input := range inputsSlice {
+		inpMap := input.(map[string]any)
+		for _, rawStream := range inpMap["streams"].([]any) {
+			streamID := rawStream.(map[string]any)["id"].(string)
+			processors := rawStream.(map[string]any)["processors"].([]any)
+			for _, rawProcessor := range processors {
+				processor := rawProcessor.(map[string]any)
+				if _, exists := processor["add_fields"]; !exists {
+					continue
+				}
+				p := Processor{}
+				if err := json.Unmarshal([]byte(mapstr.M(processor).String()), &p); err != nil {
+					t.Errorf("could not decode processor config: %q, err: %s", "foo", err)
+				}
+				if p.AddFields.Target != "component" {
+					continue
+				}
+
+				binary := p.AddFields.Fields.Binary
+				componentID := p.AddFields.Fields.ID
+
+				// The elastic-Agent is a special case, handle it first
+				if strings.Contains(streamID, "monitoring-agent") {
+					if binary != "elastic-agent" {
+						t.Errorf("expecting fields['binary'] = 'elastic-agent', got %q", binary)
+					}
+					if componentID != "elastic-agent" {
+						t.Errorf("expecting fields['id'] = 'elastic-agent', got %q", componentID)
+					}
+					continue
+				}
+				if binary != "filebeat" {
+					t.Errorf("expecting fields['binary'] = 'filebeat', got %q", binary)
+				}
+				if componentID != "filestream-default" {
+					t.Errorf("expecting fields['id'] = 'filestream-default', got %q", componentID)
+				}
+
+			}
+		}
+	}
+}
+
+type Processor struct {
+	AddFields AddFields `json:"add_fields"`
+}
+type Fields struct {
+	Binary string `json:"binary"`
+	ID     string `json:"id"`
+}
+type AddFields struct {
+	Fields Fields `json:"fields"`
+	Target string `json:"target"`
 }

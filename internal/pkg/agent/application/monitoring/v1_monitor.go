@@ -594,6 +594,15 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 						"ignore_missing": true,
 					},
 				},
+				map[string]interface{}{
+					"add_fields": map[string]interface{}{
+						"target": "component",
+						"fields": map[string]interface{}{
+							"id":     "elastic-agent",
+							"binary": "elastic-agent",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -655,6 +664,15 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 							},
 						},
 					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "component",
+							"fields": map[string]interface{}{
+								"id":     unit,
+								"binary": binaryName,
+							},
+						},
+					},
 				},
 			})
 		}
@@ -713,6 +731,15 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 							"http",
 						},
 						"ignore_missing": true,
+					},
+				},
+				map[string]interface{}{
+					"add_fields": map[string]interface{}{
+						"target": "component",
+						"fields": map[string]interface{}{
+							"id":     unit,
+							"binary": binaryName,
+						},
 					},
 				},
 			},
@@ -777,6 +804,15 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 							"ignore_missing": true,
 						},
 					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "component",
+							"fields": map[string]interface{}{
+								"id":     unit,
+								"binary": binaryName,
+							},
+						},
+					},
 				},
 			})
 		}
@@ -807,7 +843,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				"hosts":      endpoints,
 				"namespace":  "application",
 				"period":     metricsCollectionIntervalString,
-				"processors": createProcessorsForJSONInput(name, monitoringNamespace, b.agentInfo),
+				"processors": createProcessorsForJSONInput(name, comp.ID, monitoringNamespace, b.agentInfo),
 			},
 				map[string]interface{}{
 					idKey: "metrics-monitoring-shipper-stats",
@@ -821,7 +857,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 					"hosts":      endpoints,
 					"namespace":  "agent",
 					"period":     metricsCollectionIntervalString,
-					"processors": createProcessorsForJSONInput(name, monitoringNamespace, b.agentInfo),
+					"processors": createProcessorsForJSONInput(name, comp.ID, monitoringNamespace, b.agentInfo),
 				})
 		}
 	}
@@ -878,7 +914,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 	return nil
 }
 
-func createProcessorsForJSONInput(name string, monitoringNamespace string, agentInfo *info.AgentInfo) []interface{} {
+func createProcessorsForJSONInput(name string, compID, monitoringNamespace string, agentInfo *info.AgentInfo) []interface{} {
 	return []interface{}{
 		map[string]interface{}{
 			"add_fields": map[string]interface{}{
@@ -930,6 +966,15 @@ func createProcessorsForJSONInput(name string, monitoringNamespace string, agent
 					"http",
 				},
 				"ignore_missing": true,
+			},
+		},
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "component",
+				"fields": map[string]interface{}{
+					"id":     compID,
+					"binary": name,
+				},
 			},
 		},
 	}
