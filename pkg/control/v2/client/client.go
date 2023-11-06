@@ -111,12 +111,13 @@ type AgentStateInfo struct {
 
 // AgentState is the current state of the Elastic Agent.
 type AgentState struct {
-	Info         AgentStateInfo   `json:"info" yaml:"info"`
-	State        State            `json:"state" yaml:"state"`
-	Message      string           `json:"message" yaml:"message"`
-	Components   []ComponentState `json:"components" yaml:"components"`
-	FleetState   State            `yaml:"fleet_state"`
-	FleetMessage string           `yaml:"fleet_message"`
+	Info           AgentStateInfo         `json:"info" yaml:"info"`
+	State          State                  `json:"state" yaml:"state"`
+	Message        string                 `json:"message" yaml:"message"`
+	Components     []ComponentState       `json:"components" yaml:"components"`
+	FleetState     State                  `yaml:"fleet_state"`
+	FleetMessage   string                 `yaml:"fleet_message"`
+	UpgradeDetails *cproto.UpgradeDetails `json:"upgrade_details,omitempty" yaml:"upgrade_details,omitempty"`
 }
 
 // DiagnosticFileResult is a diagnostic file result.
@@ -475,10 +476,11 @@ func toState(res *cproto.StateResponse) (*AgentState, error) {
 			Snapshot:  res.Info.Snapshot,
 			PID:       res.Info.Pid,
 		},
-		State:        res.State,
-		Message:      res.Message,
-		FleetState:   res.FleetState,
-		FleetMessage: res.FleetMessage,
+		State:          res.State,
+		Message:        res.Message,
+		FleetState:     res.FleetState,
+		FleetMessage:   res.FleetMessage,
+		UpgradeDetails: res.UpgradeDetails,
 
 		Components: make([]ComponentState, 0, len(res.Components)),
 	}

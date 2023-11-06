@@ -320,25 +320,35 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCoordinatorShutdownTimeout(t *testing.T) {
-	CoordinatorShutdownTimeout = time.Millisecond
-	handlerChan, _, _, _ := setupAndWaitCoordinatorDone()
-	waitAndTestError(t, func(err error) bool { return errors.Is(err, context.Canceled) }, handlerChan)
+func TestCollectManagerErrorsTimeout(t *testing.T) {
+	handlerChan, _, _, _ := setupManagerShutdownChannels(time.Millisecond)
+	// Don't send anything to the shutdown channels, causing a timeout
+	// in collectManagerErrors
+	waitAndTestError(t, func(err error) bool {
+		return err != nil &&
+			strings.Contains(err.Error(), "1 error occurred") &&
+			strings.Contains(err.Error(), "timeout while waiting for managers")
+	}, handlerChan)
 }
 
-func TestCoordinatorShutdownErrorOneResponse(t *testing.T) {
-	CoordinatorShutdownTimeout = 10 * time.Millisecond
-	handlerChan, _, _, config := setupAndWaitCoordinatorDone()
+func TestCollectManagerErrorsOneResponse(t *testing.T) {
+	handlerChan, _, _, config := setupManagerShutdownChannels(10 * time.Millisecond)
 
+	// Send an error for the config manager -- we should also get a
+	// timeout error since we don't send anything on the other two channels.
 	cfgErrStr := "config watcher error"
 	config <- errors.New(cfgErrStr)
 
-	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
+	waitAndTestError(t, func(err error) bool {
+		return err != nil &&
+			strings.Contains(err.Error(), "2 errors occurred") &&
+			strings.Contains(err.Error(), cfgErrStr) &&
+			strings.Contains(err.Error(), "timeout while waiting for managers")
+	}, handlerChan)
 }
 
-func TestCoordinatorShutdownErrorAllResponses(t *testing.T) {
-	CoordinatorShutdownTimeout = 5 * time.Second
-	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
+func TestCollectManagerErrorsAllResponses(t *testing.T) {
+	handlerChan, runtime, varWatcher, config := setupManagerShutdownChannels(5 * time.Second)
 	runtimeErrStr := "runtime error"
 	varsErrStr := "vars error"
 	runtime <- errors.New(runtimeErrStr)
@@ -346,20 +356,24 @@ func TestCoordinatorShutdownErrorAllResponses(t *testing.T) {
 	config <- nil
 
 	waitAndTestError(t, func(err error) bool {
-		return strings.Contains(err.Error(), runtimeErrStr) &&
+		return err != nil &&
+			strings.Contains(err.Error(), "2 errors occurred") &&
+			strings.Contains(err.Error(), runtimeErrStr) &&
 			strings.Contains(err.Error(), varsErrStr)
 	}, handlerChan)
 }
 
-func TestCoordinatorShutdownAllResponsesNoErrors(t *testing.T) {
-	CoordinatorShutdownTimeout = 5 * time.Second
-	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
+func TestCollectManagerErrorsAllResponsesNoErrors(t *testing.T) {
+	handlerChan, runtime, varWatcher, config := setupManagerShutdownChannels(5 * time.Second)
 	runtime <- nil
 	varWatcher <- nil
-	config <- nil
+	config <- context.Canceled
+
+	// All errors are nil or context.Canceled, so collectManagerErrors
+	// should also return nil.
 
 	waitAndTestError(t, func(err error) bool {
-		return errors.Is(err, context.Canceled)
+		return err == nil
 	}, handlerChan)
 }
 
@@ -369,7 +383,7 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 	for {
 		select {
 		case <-waitCtx.Done():
-			t.Fatalf("handleCoordinatorDone timed out while waiting for shutdown")
+			t.Fatalf("timed out while waiting for response from collectManagerErrors")
 		case gotErr := <-handlerErr:
 			if handlerErr != nil {
 				if check(gotErr) {
@@ -383,20 +397,14 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 	}
 }
 
-func setupAndWaitCoordinatorDone() (chan error, chan error, chan error, chan error) {
+func setupManagerShutdownChannels(timeout time.Duration) (chan error, chan error, chan error, chan error) {
 	runtime := make(chan error)
 	varWatcher := make(chan error)
 	config := make(chan error)
 
-	testCord := Coordinator{logger: logp.L()}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	// emulate shutdown
-	cancel()
-
 	handlerChan := make(chan error)
 	go func() {
-		handlerErr := testCord.handleCoordinatorDone(ctx, varWatcher, runtime, config)
+		handlerErr := collectManagerErrors(timeout, varWatcher, runtime, config)
 		handlerChan <- handlerErr
 	}()
 
