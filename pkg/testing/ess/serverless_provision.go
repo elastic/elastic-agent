@@ -110,6 +110,11 @@ func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.
 	client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
 	client.proj.ID = deploymentID
 	client.proj.Type = deploymentType
+	client.proj.Region = prov.cfg.Region
+	client.proj.Endpoints.Elasticsearch = stack.Elasticsearch
+	client.proj.Endpoints.Kibana = stack.Kibana
+	client.proj.Credentials.Username = stack.Username
+	client.proj.Credentials.Password = stack.Password
 
 	prov.log.Logf("Waiting for serverless stack %s to be ready (%s) [id: %s]", stack.Version, stack.ID, deploymentID)
 	ready, err := client.DeploymentIsReady(ctx)
@@ -133,6 +138,11 @@ func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack)
 	client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
 	client.proj.ID = deploymentID
 	client.proj.Type = deploymentType
+	client.proj.Region = prov.cfg.Region
+	client.proj.Endpoints.Elasticsearch = stack.Elasticsearch
+	client.proj.Endpoints.Kibana = stack.Kibana
+	client.proj.Credentials.Username = stack.Username
+	client.proj.Credentials.Password = stack.Password
 
 	prov.log.Logf("Destroying serverless stack %s (%s) [id: %s]", stack.Version, stack.ID, deploymentID)
 	err = client.DeleteDeployment()
