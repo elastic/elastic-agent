@@ -147,7 +147,7 @@ func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.
 		case err := <-errCh:
 			if err == nil {
 				stack.Ready = true
-				return stack, err
+				return stack, nil
 			}
 			lastErr = err
 		}
