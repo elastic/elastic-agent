@@ -169,18 +169,6 @@ entries:
       file:
         name: 1697662109-upgrade-elastic-agent-libs-to-v0.6.0.yaml
         checksum: 70d3e8469fce838d73781c409d9dd7592adbddc8
-    - kind: feature
-      summary: Add component {id, binary} to monitoring metrics from Elastic-Agent and Beats.
-      description: ""
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/3626
-      issue:
-        - https://github.com/elastic/integrations/issues/7977
-      timestamp: 1697735373
-      file:
-        name: 1697735373-Add-component-fields-to-metrics.yaml
-        checksum: e78d27aa33269834757dceee23e195ae6ea8ecd5
     - kind: bug-fix
       summary: Increase wait period between service restarts on failure to 15s on Windows.
       description: This is the same value used by other Elastic windows services like endpoint-security.

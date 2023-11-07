@@ -64,7 +64,6 @@ elastic-agent::
 
 * Add Support For Processors In Hints-Based Kubernetes Autodiscover. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3107[#https://github.com/elastic/elastic-agent/pull/3107] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2959[#https://github.com/elastic/elastic-agent/issues/2959]
 * Print Out Elastic Agent Installation Steps To Show Progress. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3338[#https://github.com/elastic/elastic-agent/pull/3338] 
-* Add Component {Id, Binary} To Monitoring Metrics From Elastic-Agent And Beats. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3626[#https://github.com/elastic/elastic-agent/pull/3626] {elastic-agent-issue}https://github.com/elastic/integrations/issues/7977[#https://github.com/elastic/integrations/issues/7977]
 
 
 [discrete]
