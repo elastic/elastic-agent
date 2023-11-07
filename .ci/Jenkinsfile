@@ -110,13 +110,9 @@ pipeline {
               }
             }
             steps {
-<<<<<<< HEAD
-              runK8s(k8sVersion: 'v1.26.0', kindVersion: 'v0.17.0', context: "K8s-${PLATFORM}")
-=======
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
               runK8s(k8sVersion: 'v1.27.3', kindVersion: 'v0.20.0', context: "K8s-${PLATFORM}")
->>>>>>> bf78cc1e14 ([CI] Pull requests migration to buildkite (#3573))
             }
           }
           stage('Package') {
