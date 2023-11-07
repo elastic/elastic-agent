@@ -194,7 +194,7 @@ pipeline {
         beforeAgent true
         anyOf {
           not { changeRequest() }
-          // expression { return isExtendedWindowsEnabled() && env.ONLY_DOCS == "false"}
+          expression { return isExtendedWindowsEnabled() && env.ONLY_DOCS == "false"}
         }
       }
       failFast false
