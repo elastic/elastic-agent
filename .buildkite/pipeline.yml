@@ -32,7 +32,7 @@ steps:
           provider: "aws"
           imagePrefix: "core-ubuntu-2204-aarch64"
           diskSizeGb: 200
-          instanceType: "m6g.4xlarge"
+          instanceType: "m6g.xlarge"
         retry:
           manual:
             allowed: true
