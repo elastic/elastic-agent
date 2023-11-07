@@ -119,12 +119,18 @@ func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.
 	prov.log.Logf("Waiting for serverless stack %s to be ready (%s) [id: %s]", stack.Version, stack.ID, deploymentID)
 
 	errCh := make(chan error)
+	var lastErr error
+
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
-			return stack, fmt.Errorf("serverless %s never became ready: %w", stack.Version, ctx.Err())
+			if lastErr == nil {
+				lastErr = ctx.Err()
+			}
+			return stack, fmt.Errorf("serverless %s never became ready: %w", stack.Version, lastErr)
 		case <-ticker.C:
 			go func() {
 				statusCtx, statusCancel := context.WithTimeout(ctx, 30*time.Second)
@@ -141,8 +147,9 @@ func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.
 		case err := <-errCh:
 			if err == nil {
 				stack.Ready = true
+				return stack, err
 			}
-			return stack, err
+			lastErr = err
 		}
 	}
 }
