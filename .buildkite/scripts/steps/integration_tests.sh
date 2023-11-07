@@ -4,7 +4,6 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 
 STACK_PROVISIONER="${1:-"stateful"}"
-export STACK_PROVISIONER
 MAGE_TARGET="${2:-"integration:test"}"
 MAGE_SUBTARGET="${3:-""}"
 

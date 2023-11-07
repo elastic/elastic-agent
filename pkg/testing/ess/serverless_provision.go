@@ -117,15 +117,34 @@ func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.
 	client.proj.Credentials.Password = stack.Password
 
 	prov.log.Logf("Waiting for serverless stack %s to be ready (%s) [id: %s]", stack.Version, stack.ID, deploymentID)
-	ready, err := client.DeploymentIsReady(ctx)
-	if err != nil {
-		return stack, fmt.Errorf("failed to check for serverless %s to be ready: %w", stack.Version, err)
+
+	errCh := make(chan error)
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return stack, fmt.Errorf("serverless %s never became ready: %w", stack.Version, ctx.Err())
+		case <-ticker.C:
+			go func() {
+				statusCtx, statusCancel := context.WithTimeout(ctx, 30*time.Second)
+				defer statusCancel()
+				ready, err := client.DeploymentIsReady(statusCtx)
+				if err != nil {
+					errCh <- err
+				} else if !ready {
+					errCh <- fmt.Errorf("serverless %s never became ready", stack.Version)
+				} else {
+					errCh <- nil
+				}
+			}()
+		case err := <-errCh:
+			if err == nil {
+				stack.Ready = true
+			}
+			return stack, err
+		}
 	}
-	if !ready {
-		return stack, fmt.Errorf("serverless %s never became ready: %w", stack.Version, err)
-	}
-	stack.Ready = true
-	return stack, nil
 }
 
 // Delete deletes a stack.
