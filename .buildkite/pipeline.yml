@@ -4,8 +4,6 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
-<<<<<<< HEAD
-=======
   - label: "Unit tests - Ubuntu 22.04"
     key: "unit-tests-2204"
     command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -148,7 +146,6 @@ steps:
       provider: "gcp"
       machineType: "n1-standard-8"
 
->>>>>>> bf78cc1e14 ([CI] Pull requests migration to buildkite (#3573))
   - label: "Integration tests"
     key: "integration-tests"
     command: ".buildkite/scripts/integration_tests.sh"
@@ -158,8 +155,6 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n1-standard-8"
-<<<<<<< HEAD
-=======
 
   - wait: ~
     continue_on_failure: true
@@ -169,4 +164,3 @@ steps:
     plugins:
       - junit-annotate#v2.4.1:
           artifacts: build/TEST-go-integration*.xml
->>>>>>> bf78cc1e14 ([CI] Pull requests migration to buildkite (#3573))
