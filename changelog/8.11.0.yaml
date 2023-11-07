@@ -1,0 +1,194 @@
+version: 8.11.0
+entries:
+    - kind: feature
+      summary: Add support for processors in hints-based Kubernetes autodiscover.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3107
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2959
+      timestamp: 1691060806
+      file:
+        name: 1691060806-Processor-support-for-hints-autodiscover.yaml
+        checksum: c55b54ba6747d5ac659649fd4e4a16e941364f8e
+    - kind: feature
+      summary: Print out Elastic Agent installation steps to show progress.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3338
+      issue: []
+      timestamp: 1693427183
+      file:
+        name: 1693427183-install-progress.yaml
+        checksum: fb4c231a3a23abd6be758a4342484d10ce73aa6c
+    - kind: feature
+      summary: Add colors to Agent messages printed by the elastic-agent logs command based on their level.
+      description: ""
+      component: CLI
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3345
+      issue: []
+      timestamp: 1693813219
+      file:
+        name: 1693813219-log-command-colors.yaml
+        checksum: 53b5a44c3799fa9888ad7beba34c2858bca7b3e2
+    - kind: enhancement
+      summary: Support the NETINFO variable in Elastic Kubernetes manifests. Setting a new environmental variable `ELASTIC_NETINFO=false` globally disables the `netinfo.enabled` parameter of the `add_host_metadata` processor. This disables the indexing of `host.ip` and `host.mac` fields.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3354
+      issue: []
+      timestamp: 1693920861
+      file:
+        name: 1693920861-netinfo-manifests.yaml
+        checksum: e9e5a459e64a189b7b74f5689c57d41d4fbf442c
+    - kind: bug-fix
+      summary: The Elastic Agent uninstall process now finds and kills any running upgrade Watcher process. Uninstalls initiated within 10 minutes of a previous upgrade now work as expected.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3384
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3371
+      timestamp: 1694187216
+      file:
+        name: 1694187216-Uninstall-finds-and-kills-any-running-watcher-process.yaml
+        checksum: 31df28d9490d0c844b88d48f1aa3504cce2365ee
+    - kind: enhancement
+      summary: Fix the Kubernetes `deploy/kubernetes/creator_k8.sh` script to correcly exclude configmaps.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3396
+      issue: []
+      timestamp: 1694439479
+      file:
+        name: 1694439479-fix_creatork8sscript.yaml
+        checksum: c65f7e65ebac64f9332a407f2449c88e30bd4239
+    - kind: bug-fix
+      summary: Prevent a standalone Elastic Agent from being upgraded if an upgrade is already in progress.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3473
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2706
+      timestamp: 1695685534
+      file:
+        name: 1695685534-standalone-prevent-quick-upgrades.yaml
+        checksum: 9df813abbdf5ae1558b16b1052a5bbc238cf7ae1
+    - kind: feature
+      summary: Enable tamper protection feature flag by default for Elastic Agent version 8.11.0.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3478
+      issue: []
+      timestamp: 1695780865
+      file:
+        name: 1695780865-Enable-tamper-protection-feature-flag-by-default-for-Agent-8.11.0.yaml
+        checksum: 46eac90f4af827db837fc7d19c1131328b011952
+    - kind: bug-fix
+      summary: Prevent multiple attempts to stop an already stopped service.
+      description: ""
+      component: runtime
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3482
+      issue: []
+      timestamp: 1695920792
+      file:
+        name: 1695920792-Prevent-multiple-stops-of-services.yaml
+        checksum: 8a0b54855b27c98e6af3d60df1c9cb04f935efee
+    - kind: breaking-change
+      summary: Enable compression by default for Elasticsearch outputs
+      description: 'The default compression level for Elasticsearch outputs is changing from 0 to 1. On typical workloads this is expected to decrease network data volume by 70-80%, while increasing cpu use by 20-25% and ingestion time by 10%. The previous behavior can be restored by adding ''compression_level: 0'' to the output configuration.'
+      component: all
+      pr:
+        - https://github.com/elastic/beats/pull/36681
+      issue:
+        - https://github.com/elastic/ingest-dev/issues/2458
+      timestamp: 1696361138
+      file:
+        name: 1696361138-es-default-compression.yaml
+        checksum: f3bee390b1af6bc5049315e25e5c14d0ff23240e
+    - kind: bug-fix
+      summary: Fix a bug that affected reporting progress of the Agent artifact download during an upgrade.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3548
+      issue: []
+      timestamp: 1696530758
+      file:
+        name: 1696530758-bugfix-upgrade-progress-reporter.yaml
+        checksum: a168f2ab2a26e7813bb230b5f663ecbeca9d624c
+    - kind: enhancement
+      summary: Increase Agent monitoring metrics interval from 10s to 60s to reduce the default ingestion load and long term storage requirements.
+      description: ""
+      component: monitoring
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3578
+      issue: []
+      timestamp: 1696955150
+      file:
+        name: 1696955150-Slow-down-agent-monitoring-metrics-interval-to-60s.yaml
+        checksum: ead85ab471d5a6f609c367d57817d1c2299d93f2
+    - kind: breaking-change
+      summary: Elastic-agent-autodiscover to v0.6.4. Disables metadata for deployment and cronjob
+      description: Elastic-agent-autodiscover library by default comes with add_resource_metadata.deployment=false and add_resource_metadata.cronjob=false. Pods that will be created from deployments or cronjobs will not have the extra metadata field for kubernetes.deployment or kubernetes.cronjob respectively.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3593
+      issue: []
+      timestamp: 1697103197
+      file:
+        name: 1697103197-updating_agentautodiscovery_811.yaml
+        checksum: b937c2a635860c3497502b018b8b997143ba5fc3
+    - kind: security
+      summary: Upgrade to Go 1.20.10.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3601
+      issue: []
+      timestamp: 1697229987
+      file:
+        name: 1697229987-Upgrade-to-Go-1.20.10.yaml
+        checksum: e31fa72a840bb0616000830d86a3b18f1a22aae6
+    - kind: bug-fix
+      summary:  Upgrade `elastic-agent-libs` to v0.6.0 to fix the Agent Windows service becoming unresponsive. Fixes Windows service timeouts during WMI queries and during service shutdown.
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3632
+      issue: []
+      timestamp: 1697662109
+      file:
+        name: 1697662109-upgrade-elastic-agent-libs-to-v0.6.0.yaml
+        checksum: 70d3e8469fce838d73781c409d9dd7592adbddc8
+    - kind: feature
+      summary: Add component {id, binary} to monitoring metrics from Elastic-Agent and Beats.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3626
+      issue:
+        - https://github.com/elastic/integrations/issues/7977
+      timestamp: 1697735373
+      file:
+        name: 1697735373-Add-component-fields-to-metrics.yaml
+        checksum: e78d27aa33269834757dceee23e195ae6ea8ecd5
+    - kind: bug-fix
+      summary: Increase wait period between service restarts on failure to 15s on Windows.
+      description: This is the same value used by other Elastic windows services like endpoint-security.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3657
+      issue: []
+      timestamp: 1698259940
+      file:
+        name: 1698259940-Increase-wait-period-between-service-restarts-on-failure-to-15s-on-Windows.yaml
+        checksum: 12985bc12758581d4f236ebf0928fde307ffceca
