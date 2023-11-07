@@ -174,7 +174,7 @@ func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runne
 	}
 	_ = proc.Stdin.Close()
 	ps := <-proc.Wait()
-	if ps.ExitCode() != 0 {
+	if !ps.Success() {
 		// print the output so its clear what went wrong
 		fmt.Fprintf(os.Stdout, "%s\n", output.Bytes())
 		return fmt.Errorf("failed to run multipass launch: exited with code: %d", ps.ExitCode())
@@ -184,17 +184,26 @@ func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runne
 
 func (p *provisioner) ensureInstanceNotExist(ctx context.Context, batch runner.OSBatch) error {
 	var output bytes.Buffer
+	var stdErr bytes.Buffer
 	proc, err := process.Start("multipass",
 		process.WithContext(ctx),
 		process.WithArgs([]string{"list", "--format", "json"}),
 		process.WithCmdOptions(
 			runner.AttachOut(&output),
-			runner.AttachErr(&output)))
+			runner.AttachErr(&stdErr)))
 	if err != nil {
-		return fmt.Errorf("multipass list failed: %w", err)
+		return fmt.Errorf("multipass list failed to run: %w", err)
 	}
 
-	<-proc.Wait()
+	state := <-proc.Wait()
+	if !state.Success() {
+		msg := fmt.Sprintf("multipass list exited with non-zero status: %s",
+			state.String())
+		p.logger.Logf(msg)
+		p.logger.Logf("output: %s", output.String())
+		p.logger.Logf("stderr: %s", stdErr.String())
+		return fmt.Errorf(msg)
+	}
 	list := struct {
 		List []struct {
 			Ipv4    []string `json:"ipv4"`
@@ -213,17 +222,28 @@ func (p *provisioner) ensureInstanceNotExist(ctx context.Context, batch runner.O
 			p.logger.Logf("multipass trying to delete instance %s", batch.ID)
 
 			output.Reset()
+			stdErr.Reset()
 			proc, err = process.Start("multipass",
 				process.WithContext(ctx),
 				process.WithArgs([]string{"delete", "--purge", batch.ID}),
 				process.WithCmdOptions(
 					runner.AttachOut(&output),
-					runner.AttachErr(&output)))
+					runner.AttachErr(&stdErr)))
 			if err != nil {
-				return fmt.Errorf("multipass instance %q already exist, state %q. Could not delete it: %w",
+				return fmt.Errorf(
+					"multipass instance %q already exist, state %q. Could not delete it: %w",
 					batch.ID, i.State, err)
 			}
-			<-proc.Wait()
+			state = <-proc.Wait()
+			if !state.Success() {
+				msg := fmt.Sprintf("failed to delete and purge multipass instance %s: %s",
+					batch.ID,
+					state.String())
+				p.logger.Logf(msg)
+				p.logger.Logf("output: %s", output.String())
+				p.logger.Logf("stderr: %s", stdErr.String())
+				return fmt.Errorf(msg)
+			}
 
 			break
 		}
