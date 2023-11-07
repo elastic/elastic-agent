@@ -8,7 +8,6 @@ DEFAULT_HOME="/usr/local"
 KIND_VERSION=${KIND_VERSION:?$MSG}
 HOME=${HOME:?$DEFAULT_HOME}
 KIND_CMD="${HOME}/bin/kind"
-export PATH=$HOME/bin:${PATH}
 
 if command -v kind
 then

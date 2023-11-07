@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+export PATH=$HOME/bin:${PATH}
 source .buildkite/scripts/install-kubectl.sh
 source .buildkite/scripts/install-kind.sh
 
