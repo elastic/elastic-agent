@@ -46,8 +46,7 @@ inputs:
 #       # Stream ID for this data stream allowing Filebeat to track the state of the ingested files. Must be unique.
 #       # Each filestream data stream creates a separate instance of the Filebeat filestream input.
 #       - id: your-filestream-stream-id
-#         data_stream:
-#           dataset: generic
+#         data_stream.dataset: generic
 #         paths:
 #           - /var/log/*.log
 
