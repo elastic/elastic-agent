@@ -105,7 +105,7 @@ type fakeHttpClient struct {
 	responses []*http.Response
 }
 
-func (c *fakeHttpClient) Do(_ *http.Request) (resp *http.Response, err error) {
-	resp, c.responses = c.responses[0], c.responses[1:]
-	return
+func (c *fakeHttpClient) Do(_ *http.Request) (*http.Response, error) {
+	c.responses = c.responses[1:]
+	return c.responses[0], nil
 }

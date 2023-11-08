@@ -338,7 +338,7 @@ func CheckHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInf
 			}
 
 			if versionOut.Binary.Version != versionInfo.Version {
-				return fmt.Errorf("versions don't match: got %s, wnat %s",
+				return fmt.Errorf("versions don't match: got %s, want %s",
 					versionOut.Binary.Version, versionInfo.Version)
 			}
 			if versionOut.Binary.Snapshot != versionInfo.Snapshot {

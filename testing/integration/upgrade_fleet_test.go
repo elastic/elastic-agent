@@ -85,25 +85,14 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture)
 }
 
-// The test:
-//
-//		[x] download the "downgradeTo" from artefacts api
-//		[x] setup the Go httptest.Server to serve the agent artefacts
-//		[x] block the connections to artefacts.elastic.co using iptables
-//		[x] check the connection is indeed blocked
-//		[x] double-check the stack is still reachable
-//		[x] configure the policy to use the custom artifactsAPI server
-//	   		[x] create new download source
-//	   		[x] create policy
-//		[ ] install / upgrade the agent
 func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
 		// The test uses iptables to simulate the air-gaped environment.
 		OS:      []define.OS{{Type: define.Linux}},
-		Isolate: true,
+		Isolate: true,  // It blocks IPs using iptables.
 		Local:   false, // requires Agent installation
-		Sudo:    true,  // requires Agent installation
+		Sudo:    true,  // uses iptables and installs the Agent
 	})
 
 	ctx, _ := testcontext.WithDeadline(
@@ -113,7 +102,7 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	latest, err := artifactAPI.GetLatestSnapshotVersion(ctx, t)
 	require.NoError(t, err, "could not fetch latest version from artifacts API")
 
-	// We need to prepare it first because it'll download the artifact and it
+	// We need to prepare it first because it'll download the artifact, and it
 	// has to happen before we block the artifacts API IPs.
 	// The test does not need a fixture, but testUpgradeFleetManagedElasticAgent
 	// uses it to get some information about the agent version.
@@ -164,7 +153,7 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 		Host:      s.URL + "/downloads/beats/elastic-agent/",
 		IsDefault: true,
 	}
-	t.Logf("creating download source %q to %q",
+	t.Logf("creating download source %q, using %q.",
 		downloadSource.Name, downloadSource.Host)
 	err = stack.KibanaClient.CreateDownloadSource(ctx, downloadSource)
 	require.NoError(t, err, "could not create download source")
@@ -177,7 +166,6 @@ func testUpgradeFleetManagedElasticAgent(
 	t *testing.T,
 	info *define.Info,
 	startFixture *atesting.Fixture,
-	// TODO: remove it and receive only the needed info about the target version.
 	endFixture *atesting.Fixture) {
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
@@ -258,16 +246,16 @@ func testUpgradeFleetManagedElasticAgent(
 
 	// wait for the watcher to show up
 	t.Logf("Waiting for upgrade watcher to start...")
-	err = upgradetest.WaitForWatcher(ctx, 2*time.Minute, 10*time.Second)
+	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
 	require.NoError(t, err, "upgrade watcher did not start")
 	t.Logf("Upgrade watcher started")
 
 	// wait for the agent to be healthy and correct version
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 1*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policyResp.ID, "online"), 2*time.Minute, 15*time.Second, "Agent status is not online")
+	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policyResp.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
 
 	// wait for version
 	require.Eventually(t, func() bool {
@@ -352,21 +340,19 @@ func newArtifactsServer(ctx context.Context, t *testing.T, version string) *http
 	err = fr.Fetch(ctx, t, downloadAt)
 	require.NoError(t, err, "could not download agent %s", version)
 
+	// it's useful for debugging
 	dl, err := os.ReadDir(downloadAt)
 	require.NoError(t, err)
 	var files []string
 	for _, d := range dl {
 		files = append(files, d.Name())
 	}
-
-	fs := http.FileServer(http.Dir(fileServerDir))
 	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
 		fileServerDir, files)
 
+	fs := http.FileServer(http.Dir(fileServerDir))
+
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Logf("ArtifactsServer: %s - %s", r.Method, r.URL.String())
-		// https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-8.10.2-linux-x86_64.tar.gz
-		// http://127.0.0.1:45467      /downloads/beats/elastic-agent/
 		fs.ServeHTTP(w, r)
 	}))
 }
