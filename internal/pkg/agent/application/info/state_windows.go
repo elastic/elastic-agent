@@ -4,15 +4,13 @@
 
 //go:build windows
 
-package cmd
+package info
 
 import (
-	"os/exec"
-
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-func enrollCmdExtras(cmd *exec.Cmd, ownership utils.FileOwner) error {
-	// TODO: Add ability to call enroll as non-Administrator on Windows.
+func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
+	// TODO(blakerouse): Fix the market permissions on Windows.
 	return nil
 }

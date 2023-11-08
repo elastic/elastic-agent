@@ -8,41 +8,20 @@ package install
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strconv"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-// fixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
-func fixPermissions(topPath string, uidStr string, gidStr string) error {
-	var err error
-
-	uid := os.Getuid()
-	gid := os.Getgid()
-	if uidStr != "" {
-		uid, err = strconv.Atoi(uidStr)
-		if err != nil {
-			return fmt.Errorf("failed to convert uid(%s) to int: %w", uidStr, err)
-		}
-	}
-	if gidStr != "" {
-		gid, err = strconv.Atoi(gidStr)
-		if err != nil {
-			return fmt.Errorf("failed to convert gid(%s) to int: %w", gidStr, err)
-		}
-	}
-
-	return recursiveRootPermissions(topPath, uid, gid)
-}
-
-func recursiveRootPermissions(path string, uid int, gid int) error {
-	return filepath.Walk(path, func(name string, info fs.FileInfo, err error) error {
+// FixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
+func FixPermissions(topPath string, ownership utils.FileOwner) error {
+	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
 		if err == nil {
 			// all files should be owned by uid:gid
 			// uses `os.Lchown` so the symlink is updated to have the permissions
-			err = os.Lchown(name, uid, gid)
+			err = os.Lchown(name, ownership.UID, ownership.GID)
 			if err != nil {
 				return err
 			}

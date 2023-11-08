@@ -4,21 +4,19 @@
 
 //go:build !windows
 
-package cmd
+package info
 
 import (
-	"os/exec"
-	"syscall"
+	"fmt"
+	"os"
 
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-func enrollCmdExtras(cmd *exec.Cmd, ownership utils.FileOwner) error {
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Credential: &syscall.Credential{
-			Uid: uint32(ownership.UID),
-			Gid: uint32(ownership.GID),
-		},
+func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
+	err := os.Chown(markerFilePath, ownership.UID, ownership.GID)
+	if err != nil {
+		return fmt.Errorf("failed to chown %d:%d %s: %w", ownership.UID, ownership.GID, markerFilePath, err)
 	}
 	return nil
 }

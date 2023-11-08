@@ -57,7 +57,7 @@ type InstallOpts struct {
 	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
-	NonRoot        bool   // --non-root
+	Unprivileged   bool   // --unprivileged
 
 	EnrollOpts
 }
@@ -79,8 +79,8 @@ func (i InstallOpts) toCmdArgs() []string {
 	if i.ProxyURL != "" {
 		args = append(args, "--proxy-url="+i.ProxyURL)
 	}
-	if i.NonRoot {
-		args = append(args, "--non-root")
+	if i.Unprivileged {
+		args = append(args, "--unprivileged")
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
@@ -117,8 +117,8 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 
 	// we just installed agent, the control socket is at a well-known location
 	socketPath := paths.ControlSocketPath
-	if installOpts.NonRoot {
-		socketPath = paths.ControlSocketNonRootPath
+	if installOpts.Unprivileged {
+		socketPath = paths.ControlSocketUnprivilegedPath
 	}
 	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)

@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+//go:build integration && !windows
 
 package integration
 
@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -26,7 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
-func TestInstallNonRootWithoutBasePath(t *testing.T) {
+func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
 		// We require sudo for this test to run
 		// `elastic-agent install` (even though it will
@@ -70,16 +69,16 @@ func TestInstallNonRootWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{Force: true, NonRoot: true})
+	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{Force: true, Unprivileged: true})
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
 	}
 
-	checkInstallNonRootSuccess(t, topPath)
+	checkInstallUnprivilegedSuccess(t, topPath)
 }
 
-func TestInstallNonRootWithBasePath(t *testing.T) {
+func TestInstallUnprivilegedWithBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
 		// We require sudo for this test to run
 		// `elastic-agent install` (even though it will
@@ -125,9 +124,9 @@ func TestInstallNonRootWithBasePath(t *testing.T) {
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{
-		BasePath: basePath,
-		Force:    true,
-		NonRoot:  true,
+		BasePath:     basePath,
+		Force:        true,
+		Unprivileged: true,
 	})
 	if err != nil {
 		t.Logf("install output: %s", out)
@@ -136,22 +135,16 @@ func TestInstallNonRootWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	checkInstallNonRootSuccess(t, topPath)
+	checkInstallUnprivilegedSuccess(t, topPath)
 }
 
-func checkInstallNonRootSuccess(t *testing.T, topPath string) {
+func checkInstallUnprivilegedSuccess(t *testing.T, topPath string) {
 	t.Helper()
 
 	// Check that the elastic-agent user/group exist.
-	uidStr, err := install.FindUID("elastic-agent")
+	uid, err := install.FindUID("elastic-agent")
 	require.NoError(t, err)
-	gidStr, err := install.FindGID("elastic-agent")
-	require.NoError(t, err)
-
-	// Linux only at the moment, so just force uid/gid to int.
-	uid, err := strconv.Atoi(uidStr)
-	require.NoError(t, err)
-	gid, err := strconv.Atoi(gidStr)
+	gid, err := install.FindGID("elastic-agent")
 	require.NoError(t, err)
 
 	// Path should now exist as well as be owned by the correct user/group.
@@ -174,7 +167,7 @@ func checkInstallNonRootSuccess(t *testing.T, topPath string) {
 	require.NoError(t, err)
 
 	// Check that the socket is created with the correct permissions.
-	socketPath := strings.TrimPrefix(paths.ControlSocketNonRootPath, "unix://")
+	socketPath := strings.TrimPrefix(paths.ControlSocketUnprivilegedPath, "unix://")
 	require.Eventuallyf(t, func() bool {
 		_, err = os.Stat(socketPath)
 		return err == nil

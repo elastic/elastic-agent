@@ -13,19 +13,17 @@ import (
 
 	"github.com/hectane/go-acl"
 	"golang.org/x/sys/windows"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-// fixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
-func fixPermissions(topPath string, uid string, gid string) error {
-	return recursiveSystemAdminPermissions(topPath)
-}
-
-func recursiveSystemAdminPermissions(path string) error {
-	return filepath.Walk(path, func(name string, info fs.FileInfo, err error) error {
+// FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
+func FixPermissions(topPath string, ownership utils.FileOwner) error {
+	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
 		if err == nil {
 			// first level doesn't inherit
 			inherit := true
-			if path == name {
+			if topPath == name {
 				inherit = false
 			}
 			err = systemAdministratorsOnly(name, inherit)

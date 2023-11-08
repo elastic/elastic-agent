@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/utils"
+
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"go.elastic.co/apm"
@@ -260,7 +262,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	}
 
 	if c.options.FixPermissions {
-		err = install.FixPermissions(paths.Top(), "", "")
+		err = install.FixPermissions(paths.Top(), utils.CurrentFileOwner())
 		if err != nil {
 			return errors.New(err, "failed to fix permissions")
 		}

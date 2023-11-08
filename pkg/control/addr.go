@@ -24,7 +24,7 @@ func Address() string {
 		if root {
 			return paths.ControlSocketPath
 		}
-		return paths.ControlSocketNonRootPath
+		return paths.ControlSocketUnprivilegedPath
 	}
 
 	// unix socket path must be less than 104 characters

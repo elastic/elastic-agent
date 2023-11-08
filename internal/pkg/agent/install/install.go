@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/jaypipes/ghw"
@@ -20,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -30,10 +30,10 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar, streams *cli.IOStreams) (string, string, error) {
+func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.ProgressBar, streams *cli.IOStreams) (utils.FileOwner, error) {
 	dir, err := findDirectory()
 	if err != nil {
-		return "", "", errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
+		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
 	}
 
 	// We only uninstall Agent if it is currently installed.
@@ -48,7 +48,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 		err = Uninstall(cfgFile, topPath, "", pt)
 		if err != nil {
 			pt.Describe("Failed to uninstall current Elastic Agent")
-			return "", "", errors.New(
+			return utils.FileOwner{}, errors.New(
 				err,
 				fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
 				errors.M("directory", filepath.Dir(topPath)))
@@ -56,45 +56,44 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 		pt.Describe("Successfully uninstalled current Elastic Agent")
 	}
 
-	uid := "0"
-	gid := "0"
+	var ownership utils.FileOwner
 	username := ""
 	groupName := ""
-	if nonRoot {
+	if unprivileged {
 		username = elasticUsername
 		groupName = elasticGroupName
 
 		// ensure required group
-		gid, err = FindGID(groupName)
+		ownership.GID, err = FindGID(groupName)
 		if err != nil && !errors.Is(err, ErrGroupNotFound) {
-			return "", "", fmt.Errorf("failed finding group %s: %w", groupName, err)
+			return utils.FileOwner{}, fmt.Errorf("failed finding group %s: %w", groupName, err)
 		}
 		if errors.Is(err, ErrGroupNotFound) {
 			pt.Describe(fmt.Sprintf("Creating group %s", groupName))
-			gid, err = CreateGroup(groupName)
+			ownership.GID, err = CreateGroup(groupName)
 			if err != nil {
 				pt.Describe(fmt.Sprintf("Failed to create group %s", groupName))
-				return "", "", fmt.Errorf("failed to create group %s: %w", groupName, err)
+				return utils.FileOwner{}, fmt.Errorf("failed to create group %s: %w", groupName, err)
 			}
 			pt.Describe(fmt.Sprintf("Successfully created group %s", groupName))
 		}
 
 		// ensure required user
-		uid, err = FindUID(username)
+		ownership.UID, err = FindUID(username)
 		if err != nil && !errors.Is(err, ErrUserNotFound) {
-			return "", "", fmt.Errorf("failed finding username %s: %w", username, err)
+			return utils.FileOwner{}, fmt.Errorf("failed finding username %s: %w", username, err)
 		}
 		if errors.Is(err, ErrUserNotFound) {
 			pt.Describe(fmt.Sprintf("Creating user %s", username))
-			uid, err = CreateUser(username, gid)
+			ownership.UID, err = CreateUser(username, ownership.GID)
 			if err != nil {
 				pt.Describe(fmt.Sprintf("Failed to create user %s", username))
-				return "", "", fmt.Errorf("failed to create user %s: %w", username, err)
+				return utils.FileOwner{}, fmt.Errorf("failed to create user %s: %w", username, err)
 			}
 			err = AddUserToGroup(username, groupName)
 			if err != nil {
 				pt.Describe(fmt.Sprintf("Failed to add user %s to group %s", username, groupName))
-				return "", "", fmt.Errorf("failed to add user %s to group %s: %w", username, groupName, err)
+				return utils.FileOwner{}, fmt.Errorf("failed to add user %s to group %s: %w", username, groupName, err)
 			}
 			pt.Describe(fmt.Sprintf("Successfully created user %s", username))
 		}
@@ -103,7 +102,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 	// ensure parent directory exists
 	err = os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
-		return "", "", errors.New(
+		return utils.FileOwner{}, errors.New(
 			err,
 			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)),
 			errors.M("directory", filepath.Dir(topPath)))
@@ -132,7 +131,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 	})
 	if err != nil {
 		pt.Describe("Error copying files")
-		return "", "", errors.New(
+		return utils.FileOwner{}, errors.New(
 			err,
 			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
 			errors.M("source", dir), errors.M("destination", topPath),
@@ -145,7 +144,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 		pathDir := filepath.Dir(paths.ShellWrapperPath)
 		err = os.MkdirAll(pathDir, 0755)
 		if err != nil {
-			return "", "", errors.New(
+			return utils.FileOwner{}, errors.New(
 				err,
 				fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, paths.ShellWrapperPath),
 				errors.M("directory", pathDir))
@@ -158,7 +157,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 			// Check if previous shell wrapper or symlink exists and remove it so it can be overwritten
 			if _, err := os.Lstat(paths.ShellWrapperPath); err == nil {
 				if err := os.Remove(paths.ShellWrapperPath); err != nil {
-					return "", "", errors.New(
+					return utils.FileOwner{}, errors.New(
 						err,
 						fmt.Sprintf("failed to remove (%s)", paths.ShellWrapperPath),
 						errors.M("destination", paths.ShellWrapperPath))
@@ -166,7 +165,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 			}
 			err = os.Symlink(filepath.Join(topPath, paths.BinaryName), paths.ShellWrapperPath)
 			if err != nil {
-				return "", "", errors.New(
+				return utils.FileOwner{}, errors.New(
 					err,
 					fmt.Sprintf("failed to create elastic-agent symlink (%s)", paths.ShellWrapperPath),
 					errors.M("destination", paths.ShellWrapperPath))
@@ -178,7 +177,7 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 			shellWrapper := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
 			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
 			if err != nil {
-				return "", "", errors.New(
+				return utils.FileOwner{}, errors.New(
 					err,
 					fmt.Sprintf("failed to write shell wrapper (%s)", paths.ShellWrapperPath),
 					errors.M("destination", paths.ShellWrapperPath))
@@ -189,18 +188,18 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 	// post install (per platform)
 	err = postInstall(topPath)
 	if err != nil {
-		return "", "", fmt.Errorf("error running post-install steps: %w", err)
+		return ownership, fmt.Errorf("error running post-install steps: %w", err)
 	}
 
 	// fix permissions
-	err = FixPermissions(topPath, uid, gid)
+	err = FixPermissions(topPath, ownership)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
+		return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 	}
 	if paths.ShellWrapperPath != "" {
-		err = FixPermissions(paths.ShellWrapperPath, uid, gid)
+		err = FixPermissions(paths.ShellWrapperPath, ownership)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath, err)
+			return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath, err)
 		}
 	}
 
@@ -208,18 +207,10 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 	// now is the only time to do it while root is available (without doing this it will not be possible
 	// for the service to create the control socket)
 	// windows: uses npipe and doesn't need a directory created
-	if nonRoot && runtime.GOOS != "windows" {
-		uidInt, err := strconv.Atoi(uid)
+	if unprivileged {
+		err = createSocketDir(ownership)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to convert uid(%s) to int: %w", uid, err)
-		}
-		gidInt, err := strconv.Atoi(gid)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to convert gid(%s) to int: %w", gid, err)
-		}
-		err = createSocketDir(uidInt, gidInt)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to create socket directory: %w", err)
+			return ownership, fmt.Errorf("failed to create socket directory: %w", err)
 		}
 	}
 
@@ -228,19 +219,19 @@ func Install(cfgFile, topPath string, nonRoot bool, pt *progressbar.ProgressBar,
 	svc, err := newService(topPath, username, groupName)
 	if err != nil {
 		pt.Describe("Failed to install service")
-		return "", "", fmt.Errorf("error installing new service: %w", err)
+		return ownership, fmt.Errorf("error installing new service: %w", err)
 	}
 	err = svc.Install()
 	if err != nil {
 		pt.Describe("Failed to install service")
-		return "", "", errors.New(
+		return ownership, errors.New(
 			err,
 			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
 			errors.M("service", paths.ServiceName))
 	}
 	pt.Describe("Installed service")
 
-	return uid, gid, nil
+	return ownership, nil
 }
 
 // StartService starts the installed service.
@@ -368,23 +359,4 @@ func hasAllSSDs(block ghw.BlockInfo) bool {
 	}
 
 	return true
-}
-
-func createSocketDir(uid int, gid int) error {
-	path := filepath.Dir(strings.TrimPrefix(paths.ControlSocketNonRootPath, "unix://"))
-	err := os.MkdirAll(path, 0770)
-	if err != nil {
-		return fmt.Errorf("failed to create path %s: %w", path, err)
-	}
-	err = os.Chown(path, uid, gid)
-	if err != nil {
-		return fmt.Errorf("failed to chown path %s: %w", path, err)
-	}
-	// possible that the directory existed, still set the
-	// permission again to ensure that they are correct
-	err = os.Chmod(path, 0770)
-	if err != nil {
-		return fmt.Errorf("failed to chmod path %s: %w", path, err)
-	}
-	return nil
 }

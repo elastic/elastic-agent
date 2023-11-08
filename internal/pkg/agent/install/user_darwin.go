@@ -16,93 +16,104 @@ import (
 	"strings"
 )
 
-func findGID(name string) (string, error) {
+// FindGID returns the group's GID on the machine.
+func FindGID(name string) (int, error) {
 	records, err := dsclList("/Groups", "PrimaryGroupID")
 	if err != nil {
-		return "", fmt.Errorf("failed listing: %w", err)
+		return -1, fmt.Errorf("failed listing: %w", err)
 	}
 	for _, record := range records {
 		if record[0] == name {
-			return record[1], nil
+			val, err := strconv.Atoi(record[1])
+			if err != nil {
+				return -1, fmt.Errorf("failed to convert %s to int: %w", record[1], err)
+			}
+			return val, nil
 		}
 	}
-	return "", ErrGroupNotFound
+	return -1, ErrGroupNotFound
 }
 
-func createGroup(name string) (string, error) {
+// CreateGroup creates a group on the machine.
+func CreateGroup(name string) (int, error) {
 	// find the next available ID
 	nextId, err := dsclNextID("/Groups", "PrimaryGroupID")
 	if err != nil {
-		return "", fmt.Errorf("failed getting next gid: %w", err)
+		return -1, fmt.Errorf("failed getting next gid: %w", err)
 	}
-	gid := strconv.Itoa(nextId)
 	path := fmt.Sprintf("/Groups/%s", name)
 
 	// create the group entry
-	err = dsclExec("-create", path, "PrimaryGroupID", gid)
+	err = dsclExec("-create", path, "PrimaryGroupID", strconv.Itoa(nextId))
 	if err != nil {
-		return "", err
+		return -1, err
 	}
 
-	return gid, nil
+	return nextId, nil
 }
 
-func findUID(name string) (string, error) {
+// FindUID returns the user's UID on the machine.
+func FindUID(name string) (int, error) {
 	records, err := dsclList("/Users", "UniqueID")
 	if err != nil {
-		return "", fmt.Errorf("failed listing: %w", err)
+		return -1, fmt.Errorf("failed listing: %w", err)
 	}
 	for _, record := range records {
 		if record[0] == name {
-			return record[1], nil
+			val, err := strconv.Atoi(record[1])
+			if err != nil {
+				return -1, fmt.Errorf("failed to convert %s to int: %w", record[1], err)
+			}
+			return val, nil
 		}
 	}
-	return "", ErrUserNotFound
+	return -1, ErrUserNotFound
 }
 
-func createUser(name string, gid string) (string, error) {
+// CreateUser creates a user on the machine.
+func CreateUser(name string, gid int) (int, error) {
 	// find the next available ID
 	nextId, err := dsclNextID("/Users", "UniqueID")
 	if err != nil {
-		return "", fmt.Errorf("failed getting next uid: %w", err)
+		return -1, fmt.Errorf("failed getting next uid: %w", err)
 	}
-	uid := strconv.Itoa(nextId)
 	path := fmt.Sprintf("/Users/%s", name)
 
 	// create the user entry
-	err = dsclExec("-create", path, "UniqueID", uid)
+	err = dsclExec("-create", path, "UniqueID", strconv.Itoa(nextId))
 	if err != nil {
-		return "", err
+		return -1, err
 	}
 
 	// set primary group to gid
-	err = dsclExec("-create", path, "PrimaryGroupID", gid)
+	err = dsclExec("-create", path, "PrimaryGroupID", strconv.Itoa(gid))
 	if err != nil {
-		return "", err
+		return -1, err
 	}
 
 	// set home directory to empty
 	err = dsclExec("-create", path, "NFSHomeDirectory", "/var/empty")
 	if err != nil {
-		return "", err
+		return -1, err
 	}
 
 	// set to no shell
 	err = dsclExec("-create", path, "UserShell", "/usr/bin/false")
 	if err != nil {
-		return "", err
+		return -1, err
 	}
 
 	// set to no password (aka. cannot authenticate)
 	err = dsclExec("-create", path, "Password", "*")
 	if err != nil {
-		return "", err
+		return -1, err
 	}
 
-	return uid, nil
+	return nextId, nil
 }
 
-func addUserToGroup(username string, groupName string) error {
+// AddUserToGroup adds a user to  a group.
+func AddUserToGroup(username string, groupName string) error {
 	// #nosec G204 -- user cannot set the groupName or username (hard coded in caller)
 	cmd := exec.Command("dscl", ".", "-append", fmt.Sprintf("/Groups/%s", groupName), "GroupMembership", username)
 	output, err := cmd.CombinedOutput()

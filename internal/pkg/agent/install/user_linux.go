@@ -10,43 +10,48 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
-func findGID(name string) (string, error) {
+// FindGID returns the group's GID on the machine.
+func FindGID(name string) (int, error) {
 	id, err := getentGetID("group", name)
 	if e := (&exec.ExitError{}); errors.As(err, &e) {
 		if e.ExitCode() == 2 {
 			// exit code 2 is the key doesn't exist in the database
-			return "", ErrGroupNotFound
+			return -1, ErrGroupNotFound
 		}
 	}
 	return id, err
 }
 
-func createGroup(name string) (string, error) {
+// CreateGroup creates a group on the machine.
+func CreateGroup(name string) (int, error) {
 	cmd := exec.Command("groupadd", "-f", name)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("groupadd -f %s failed: %w (output: %s)", name, err, output)
+		return -1, fmt.Errorf("groupadd -f %s failed: %w (output: %s)", name, err, output)
 	}
-	return findGID(name)
+	return FindGID(name)
 }
 
-func findUID(name string) (string, error) {
+// FindUID returns the user's UID on the machine.
+func FindUID(name string) (int, error) {
 	id, err := getentGetID("passwd", name)
 	if e := (&exec.ExitError{}); errors.As(err, &e) {
 		if e.ExitCode() == 2 {
 			// exit code 2 is the key doesn't exist in the database
-			return "", ErrUserNotFound
+			return -1, ErrUserNotFound
 		}
 	}
 	return id, err
 }
 
-func createUser(name string, gid string) (string, error) {
+// CreateUser creates a user on the machine.
+func CreateUser(name string, gid int) (int, error) {
 	args := []string{
-		"--gid", gid,
+		"--gid", strconv.Itoa(gid),
 		"--system",
 		"--no-user-group",
 		"--shell", "/usr/bin/false",
@@ -56,12 +61,13 @@ func createUser(name string, gid string) (string, error) {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		command := fmt.Sprintf("useradd %s", strings.Join(args, " "))
-		return "", fmt.Errorf("%s failed: %w (output: %s)", command, err, output)
+		return -1, fmt.Errorf("%s failed: %w (output: %s)", command, err, output)
 	}
-	return findUID(name)
+	return FindUID(name)
 }
 
-func addUserToGroup(username string, groupName string) error {
+// AddUserToGroup adds a user to  a group.
+func AddUserToGroup(username string, groupName string) error {
 	cmd := exec.Command("usermod", "-a", "-G", groupName, username)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -70,15 +76,19 @@ func addUserToGroup(username string, groupName string) error {
 	return nil
 }
 
-func getentGetID(database string, key string) (string, error) {
+func getentGetID(database string, key string) (int, error) {
 	cmd := exec.Command("getent", database, key)
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("getent %s %s failed: %w (output: %s)", database, key, err, output)
+		return -1, fmt.Errorf("getent %s %s failed: %w (output: %s)", database, key, err, output)
 	}
 	split := strings.Split(string(output), ":")
 	if len(split) < 3 {
-		return "", fmt.Errorf("unexpected format: %s", output)
+		return -1, fmt.Errorf("unexpected format: %s", output)
 	}
-	return split[2], nil
+	val, err := strconv.Atoi(split[2])
+	if err != nil {
+		return -1, fmt.Errorf("failed to convert %s to int: %w", split[2], err)
+	}
+	return val, nil
 }

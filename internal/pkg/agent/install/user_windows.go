@@ -8,22 +8,27 @@ package install
 
 import "errors"
 
-func findGID(name string) (string, error) {
+// FindGID returns the group's GID on the machine.
+func FindGID(name string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
-func createGroup(name string) (string, error) {
+// CreateGroup creates a group on the machine.
+func CreateGroup(name string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
-func findUID(name string) (string, error) {
+// FindUID returns the user's UID on the machine.
+func FindUID(name string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
-func createUser(name string, gid string) (string, error) {
+// CreateUser creates a user on the machine.
+func CreateUser(name string, gid string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
-func addUserToGroup(username string, groupName string) error {
+// AddUserToGroup adds a user to  a group.
+func AddUserToGroup(username string, groupName string) error {
 	return errors.New("not implemented")
 }
