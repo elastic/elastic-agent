@@ -184,9 +184,6 @@ steps:
         agents:
           provider: "gcp"
           image: "family/core-ubuntu-2204"
-        plugins:
-          - junit-annotate#v2.4.1:
-              artifacts: build/TEST-*.xml
         matrix:
           setup:
             k8s_version:
