@@ -8,8 +8,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -197,7 +199,12 @@ func TestExpectedConfig(t *testing.T) {
 				assert.Equal(t, err.Error(), scenario.Err.Error())
 			} else {
 				require.NoError(t, err)
-				assert.EqualValues(t, scenario.Expected, observed)
+				// protocmp.Transform ensures we do not compare any internal
+				// protobuf fields
+				if !cmp.Equal(scenario.Expected, observed, protocmp.Transform()) {
+					t.Errorf("mismatch (-want +got) \n%s",
+						cmp.Diff(scenario.Expected, observed, protocmp.Transform()))
+				}
 			}
 		})
 	}
