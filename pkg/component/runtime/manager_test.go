@@ -544,8 +544,6 @@ func TestManager_FakeInput_APM(t *testing.T) {
 
 	subscriptionCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
-	subscriptionErrCh := make(chan error)
-	doneCh := make(chan struct{})
 
 	initialAPMConfig := &proto.APMConfig{
 		Elastic: &proto.ElasticAPM{
@@ -575,217 +573,149 @@ func TestManager_FakeInput_APM(t *testing.T) {
 		},
 	}
 
-	go func() {
-		sub := m.Subscribe(subscriptionCtx, compID)
-		var healthIteration int
-		var retrievedApmConfig *proto.APMConfig
-		for {
-			select {
-			case <-subscriptionCtx.Done():
-				return
-			case componentState := <-sub.Ch():
-				t.Logf("component state changed: %+v", componentState)
-
-				if componentState.State == client.UnitStateFailed {
-					subscriptionErrCh <- fmt.Errorf("component failed: %s", componentState.Message)
-					return
-				}
-
-				unit, ok := componentState.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
-				if !ok {
-					subscriptionErrCh <- errors.New("unit missing: fake-input")
-					return
-				}
-
-				switch unit.State {
-				case client.UnitStateFailed:
-					subscriptionErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-
-				case client.UnitStateHealthy:
-					healthIteration++
-					t.Logf("Healthy iteration %d starting at %s", healthIteration, time.Now())
-					switch healthIteration {
-					case 1: // yes, it's starting on 1
-						comp.Component = &proto.Component{
-							ApmConfig: initialAPMConfig,
-						}
-						err := m.Update(component.Model{Components: []component.Component{comp}})
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
-								healthIteration, err)
-							return
-						}
-
-					// check if config sent on iteration 1 was set
-					case 2:
-						// In the previous iteration, the (fake) component has received a CheckinExpected
-						// message to propagate the APM configuration. In this iteration we are about to
-						// retrieve the APM configuration from the same component via the retrieve_apm_config
-						// action. Within the component, which is running as a separate process, actions
-						// and CheckinExpected messages are processed concurrently. We need some way to wait
-						// a reasonably short amount of time for the CheckinExpected message to be applied by the
-						// component (thus setting the APM config) before we query the same component
-						// for apm config information. We accomplish this via assert.Eventually.
-						// We also send a modified APM config to see that the component updates correctly and
-						// reports the new config in the next iteration.
-						assert.Eventuallyf(t, func() bool {
-							// check the component
-							res, err := m.PerformAction(
-								context.Background(),
-								comp,
-								comp.Units[0],
-								fakecmp.ActionRetrieveAPMConfig,
-								nil)
-							if err != nil {
-								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to PerformAction %s: %w",
-									healthIteration, fakecmp.ActionRetrieveAPMConfig, err)
-								return false
-							}
-							retrievedApmConfig, err = extractAPMConfigFromActionResult(t, res)
-							if err != nil {
-								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to retrieve APM Config from ActionResult %s: %w",
-									healthIteration, fakecmp.ActionRetrieveAPMConfig, err)
-								return false
-							}
-							return gproto.Equal(initialAPMConfig, retrievedApmConfig)
-						}, 1*time.Second, 100*time.Millisecond, "APM config was not received by component. expected: %s actual: %s", initialAPMConfig, retrievedApmConfig)
-
-						comp.Component = &proto.Component{
-							ApmConfig: modifiedAPMConfig,
-						}
-						err := m.Update(component.Model{Components: []component.Component{comp}})
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
-								healthIteration, err)
-							return
-						}
-					// Set a new APM config to check that we update correctly
-					case 3:
-						// In the previous iteration, the (fake) component has received another CheckinExpected
-						// message to propagate a modified APM configuration. In this iteration we are about to
-						// retrieve the APM configuration from the same component via the retrieve_apm_config
-						// action.
-						assert.Eventuallyf(t, func() bool {
-							// check the component
-							res, err := m.PerformAction(
-								context.Background(),
-								comp,
-								comp.Units[0],
-								fakecmp.ActionRetrieveAPMConfig,
-								nil)
-							if err != nil {
-								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to PerformAction %s: %w",
-									healthIteration, fakecmp.ActionRetrieveAPMConfig, err)
-								return false
-							}
-
-							retrievedApmConfig, err = extractAPMConfigFromActionResult(t, res)
-							if err != nil {
-								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to retrieve APM Config from ActionResult %s: %w",
-									healthIteration, fakecmp.ActionRetrieveAPMConfig, err)
-								return false
-							}
-
-							return gproto.Equal(modifiedAPMConfig, retrievedApmConfig)
-						}, 1*time.Second, 100*time.Millisecond, "APM config was not received by component. expected: %s actual: %s", modifiedAPMConfig, retrievedApmConfig)
-
-						comp.Component = &proto.Component{
-							ApmConfig: nil,
-						}
-						err := m.Update(component.Model{Components: []component.Component{comp}})
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
-								healthIteration, err)
-							return
-						}
-
-					case 4:
-						// In the previous iteration, the (fake) component has received another CheckinExpected
-						// message to propagate a nil APM configuration.  In this iteration we are about to
-						// retrieve the APM configuration from the same component via the retrieve_apm_config
-						// action.
-						assert.Eventuallyf(t, func() bool {
-							// check the component
-							res, err := m.PerformAction(
-								context.Background(),
-								comp,
-								comp.Units[0],
-								fakecmp.ActionRetrieveAPMConfig,
-								nil)
-							if err != nil {
-								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to PerformAction %s: %w",
-									healthIteration, fakecmp.ActionRetrieveAPMConfig, err)
-								return false
-							}
-
-							retrievedApmConfig, err = extractAPMConfigFromActionResult(t, res)
-							if err != nil {
-								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to retrieve APM Config from ActionResult %s: %w",
-									healthIteration, fakecmp.ActionRetrieveAPMConfig, err)
-								return false
-							}
-							return retrievedApmConfig == nil
-						}, 1*time.Second, 100*time.Millisecond, "APM config was not received by component. expected: nil actual: %s", retrievedApmConfig)
-
-						doneCh <- struct{}{}
-					}
-
-				case client.UnitStateStarting:
-					// acceptable
-
-				case client.UnitStateConfiguring:
-					// set unit back to healthy, so other cases will run.
-					comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
-						"type":    "fake",
-						"state":   int(client.UnitStateHealthy),
-						"message": "Fake Healthy",
-					})
-
-					err := m.Update(component.Model{Components: []component.Component{comp}})
-					if err != nil {
-						t.Logf("error updating component state to health: %v", err)
-
-						subscriptionErrCh <- fmt.Errorf("failed to update component: %w", err)
-					}
-
-				default:
-					// unexpected state that should not have occurred
-					subscriptionErrCh <- fmt.Errorf("unit reported unexpected state: %v",
-						unit.State)
-				}
-
-			}
-		}
-	}()
-
-	defer drainErrChan(managerErrCh)
-	defer drainErrChan(subscriptionErrCh)
+	sub := m.Subscribe(subscriptionCtx, compID)
 
 	err = m.Update(component.Model{Components: []component.Component{comp}})
-	require.NoError(t, err)
+	require.NoError(t, err, "manager Update call must succeed")
 
 	timeout := 30 * time.Second
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
 
-	// Wait for a success, an error or time out
+	// testStep tracks how far into the test sequence we've progressed.
+	// 0: When unit is healthy, set initialAPMConfig
+	// 1: When initialAPMConfig is active, set modifiedAPMConfig
+	// 2: When modifiedAPMConfig is active, clear all APMConfig
+	// 3: When APM config is empty again, succeed
+	var testStep int
+STATELOOP:
 	for {
 		select {
 		case <-timeoutTimer.C:
-			t.Fatalf("timed out after %s", timeout)
-		case err := <-managerErrCh:
-			require.NoError(t, err)
-		case err := <-subscriptionErrCh:
-			require.NoError(t, err)
-		case <-doneCh:
-			subCancel()
-			cancel()
+			require.Fail(t, "timed out waiting for state update")
+		case componentState := <-sub.Ch():
+			t.Logf("component state changed: %+v", componentState)
 
-			err = <-managerErrCh
-			require.NoError(t, err)
-			return
+			require.NotEqual(t, client.UnitStateFailed, componentState.State, "component failed: %v", componentState.Message)
+
+			unit, ok := componentState.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
+			require.True(t, ok, "input unit missing: fake-input")
+
+			if unit.State == client.UnitStateStarting || unit.State == client.UnitStateConfiguring {
+				// Unit is still starting or reconfiguring, skip to next update
+				continue STATELOOP
+			}
+
+			require.Equal(t, client.UnitStateHealthy, unit.State, "unit isn't healthy: %v", unit.Message)
+
+			t.Logf("Healthy iteration %d starting at %s", testStep, time.Now())
+			switch testStep {
+			case 0:
+				// Add an APM config to the component config and send an update.
+				comp.Component = &proto.Component{
+					ApmConfig: initialAPMConfig,
+				}
+				err := m.Update(component.Model{Components: []component.Component{comp}})
+				require.NoError(t, err, "manager Update call must succeed")
+
+			case 1:
+				// First, check that the APM config set in the previous step is
+				// visible, if not then we need to wait for a future update
+				if componentState.Component == nil {
+					continue STATELOOP
+				}
+
+				// The APM config has propagated to the component state, now make sure
+				// it's visible when retrieving via action
+				res, err := m.PerformAction(
+					context.Background(),
+					comp,
+					comp.Units[0],
+					fakecmp.ActionRetrieveAPMConfig,
+					nil)
+				require.NoError(t, err, "failed to retrieve APM config")
+
+				retrievedAPMConfig, err := extractAPMConfigFromActionResult(t, res)
+				require.NoError(t, err, "couldn't read APM config from ActionResult")
+
+				if !gproto.Equal(initialAPMConfig, retrievedAPMConfig) {
+					require.Fail(t, "retrieved APM config should match what was sent", initialAPMConfig.String(), retrievedAPMConfig.String())
+				}
+
+				// If all went well, we now try updating to a new APM config
+				comp.Component = &proto.Component{
+					ApmConfig: modifiedAPMConfig,
+				}
+				err = m.Update(component.Model{Components: []component.Component{comp}})
+				require.NoError(t, err, "manager Update call must succeed")
+
+			case 2:
+				require.NotNil(t, componentState.Component, "ApmConfig must not be nil")
+
+				if gproto.Equal(initialAPMConfig, componentState.Component.GetApmConfig()) {
+					// Reported config is still the old one, wait for the next update
+					continue STATELOOP
+				}
+
+				// The new APM config has propagated, make sure it's visible when
+				// retrieving via action
+				res, err := m.PerformAction(
+					context.Background(),
+					comp,
+					comp.Units[0],
+					fakecmp.ActionRetrieveAPMConfig,
+					nil)
+				require.NoError(t, err, "failed to retrieve APM config")
+
+				retrievedAPMConfig, err := extractAPMConfigFromActionResult(t, res)
+				require.NoError(t, err, "couldn't read APM config from ActionResult")
+
+				if !gproto.Equal(modifiedAPMConfig, retrievedAPMConfig) {
+					require.Fail(t, "retrieved APM config should match what was sent", modifiedAPMConfig.String(), retrievedAPMConfig.String())
+				}
+
+				// Both configs were reported correctly, now clear the APM config
+				comp.Component = &proto.Component{
+					ApmConfig: nil,
+				}
+				err = m.Update(component.Model{Components: []component.Component{comp}})
+				require.NoError(t, err, "manager Update call must succeed")
+
+			case 3:
+				if componentState.Component != nil && componentState.Component.ApmConfig != nil {
+					// APM config is still present, wait for next update
+					continue STATELOOP
+				}
+
+				// Component config has propagated, make sure it's reported via actions
+
+				// The new APM config has propagated, make sure it's visible when
+				// retrieving via action
+				res, err := m.PerformAction(
+					context.Background(),
+					comp,
+					comp.Units[0],
+					fakecmp.ActionRetrieveAPMConfig,
+					nil)
+				require.NoError(t, err, "failed to retrieve APM config")
+
+				retrievedAPMConfig, err := extractAPMConfigFromActionResult(t, res)
+				require.NoError(t, err, "couldn't read APM config from ActionResult")
+
+				require.Nil(t, retrievedAPMConfig, "APM config should be nil", retrievedAPMConfig.String())
+
+				// Success, end the loop
+				break STATELOOP
+			}
+			testStep++
 		}
 	}
+
+	subCancel()
+	cancel()
+
+	err = <-managerErrCh
+	require.NoError(t, err)
 }
 
 func extractAPMConfigFromActionResult(t *testing.T, res map[string]interface{}) (*proto.APMConfig, error) {
