@@ -95,6 +95,7 @@ pipeline {
             values 'ubuntu-22 && immutable', 'aws && aarch64 && gobld/diskSizeGb:200', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable' //, 'macos12 && x86_64'
           }
         }
+<<<<<<< HEAD
         stages {        
           stage('K8s') {
             when {
@@ -115,6 +116,9 @@ pipeline {
               runK8s(k8sVersion: 'v1.27.3', kindVersion: 'v0.20.0', context: "K8s-${PLATFORM}")
             }
           }
+=======
+        stages {                  
+>>>>>>> 72653ac2b0 ([CI]Buildkite k8s tests migration (#3680))
           stage('Package') {
             when {
               beforeAgent true
@@ -167,6 +171,7 @@ pipeline {
           }
         }
       }
+<<<<<<< HEAD
     }
     stage('Full K8s') {
       when {
@@ -203,6 +208,9 @@ pipeline {
         }
       }
     }
+=======
+    }    
+>>>>>>> 72653ac2b0 ([CI]Buildkite k8s tests migration (#3680))
     stage('Sync K8s') { //This stage opens a PR to kibana Repository in order to sync k8s manifests
       when {
         // Only on main branch
