@@ -8,6 +8,7 @@ package integration
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -139,6 +140,15 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 	t.Logf("Upgrading from version %q to version %q...", startParsedVersion, endVersionInfo.Binary.String())
 	err = fleettools.UpgradeAgent(kibClient, policy.ID, endVersionInfo.Binary.String(), true)
 	require.NoError(t, err)
+
+	// wait for upgrade details to show up in `.fleet-agents` indices.
+	hostname, err := os.Hostname()
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		agent, err := fleettools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policy.ID, hostname)
+		return err != nil && agent.UpgradeDetails != nil
+
+	}, 5*time.Minute, time.Second)
 
 	// wait for the watcher to show up
 	t.Logf("Waiting for upgrade watcher to start...")

@@ -180,5 +180,8 @@ replace (
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
 
+// FIXME: remove once https://github.com/elastic/elastic-agent-libs/pull/158 has been merged
+replace github.com/elastic/elastic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20231108093453-10b9f48ba4a2
+
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
