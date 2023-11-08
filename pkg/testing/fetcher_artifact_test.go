@@ -55,7 +55,7 @@ func TestArtifactFetcher_Default(t *testing.T) {
 	require.NoError(t, err)
 	_, err = os.Stat(filepath.Join(tmp, res.Name()))
 	require.NoError(t, err)
-	_, err = os.Stat(filepath.Join(tmp, res.Name()+hashExt))
+	_, err = os.Stat(filepath.Join(tmp, res.Name()+extHash))
 	require.NoError(t, err)
 }
 
@@ -96,7 +96,7 @@ func TestArtifactFetcher_SnapshotOnly(t *testing.T) {
 	require.NoError(t, err)
 	_, err = os.Stat(filepath.Join(tmp, res.Name()))
 	require.NoError(t, err)
-	_, err = os.Stat(filepath.Join(tmp, res.Name()+hashExt))
+	_, err = os.Stat(filepath.Join(tmp, res.Name()+extHash))
 	require.NoError(t, err)
 	assert.Contains(t, res.Name(), "-SNAPSHOT")
 }

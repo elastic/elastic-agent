@@ -8,7 +8,7 @@ package integration
 
 import (
 	"context"
-	"os"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -82,7 +82,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...", define.Version(), endVersionInfo.Binary.String())
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy())
+	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture)
 }
 
 // The test:
@@ -127,7 +127,6 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	require.NoError(t, err)
 
 	s := newArtifactsServer(ctx, t, latest.String())
-	_ = s
 	host := "artifacts.elastic.co"
 	simulateAirGapedEnvironment(t, host)
 
@@ -135,8 +134,12 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	defer cancel()
 	req, err := http.NewRequestWithContext(rctx, http.MethodGet, "https://"+host, nil)
 	_, err = http.DefaultClient.Do(req)
-	require.ErrorIs(t, err, context.DeadlineExceeded,
-		"request to %q should have failed, iptables rules should have blocked it")
+	if !(errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, os.ErrDeadlineExceeded)) {
+		t.Fatalf(
+			"request to %q should have failed, iptables rules should have blocked it",
+			host)
+	}
 
 	_, err = stack.ESClient.Info()
 	require.NoErrorf(t, err,
@@ -148,7 +151,6 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 			"It should not affect the connection to the stack. Host: %s, response body: %s",
 		stack.KibanaClient.URL, host, body)
 
-	// =========================================================================
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 	err = fixture.Prepare(ctx)
@@ -157,23 +159,17 @@ func TestFleetManagedAirGapedUpgrade(t *testing.T) {
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), latest)
 
-	downloadSrcName := "local-airgaped-" + uuid.NewString()
 	downloadSource := kibana.DownloadSource{
-		Name:      downloadSrcName,
+		Name:      "local-airgaped-" + uuid.NewString(),
 		Host:      s.URL + "/downloads/beats/elastic-agent/",
 		IsDefault: true,
 	}
-	t.Logf("creating download source %q", downloadSrcName)
+	t.Logf("creating download source %q to %q",
+		downloadSource.Name, downloadSource.Host)
 	err = stack.KibanaClient.CreateDownloadSource(ctx, downloadSource)
 	require.NoError(t, err, "could not create download source")
 
-	policy := defaultPolicy()
-	// no need to set DownloadSourceID as the one we created is already the default one
-	// policy.DownloadSourceID = downloadSource.Name
-
-	// it's failing when creating the policy, on:
-	// 	policyResp, err := kibClient.CreatePolicy(ctx, policy)
-	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy)
+	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo)
 }
 
 func testUpgradeFleetManagedElasticAgent(
@@ -182,8 +178,7 @@ func testUpgradeFleetManagedElasticAgent(
 	info *define.Info,
 	startFixture *atesting.Fixture,
 	// TODO: remove it and receive only the needed info about the target version.
-	endFixture *atesting.Fixture,
-	policy kibana.AgentPolicy) {
+	endFixture *atesting.Fixture) {
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err)
@@ -192,9 +187,19 @@ func testUpgradeFleetManagedElasticAgent(
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err)
 
+	policyUUID := uuid.New().String()
+
 	kibClient := info.KibanaClient
 	t.Log("Creating Agent policy...")
-	policyResp, err := kibClient.CreatePolicy(ctx, policy)
+	policyResp, err := kibClient.CreatePolicy(ctx, kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	})
 	require.NoError(t, err, "failed creating policy")
 
 	t.Log("Creating Agent enrollment API key...")
@@ -229,9 +234,16 @@ func testUpgradeFleetManagedElasticAgent(
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policyResp.ID, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	require.Eventually(t,
+		check.FleetAgentStatus(
+			t, kibClient, policyResp.ID, "online"),
+		2*time.Minute,
+		10*time.Second,
+		"Agent status is not online")
 
-	t.Logf("Upgrading from version %q to version %q...", startParsedVersion, endVersionInfo.Binary.String())
+	t.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"...",
+		startParsedVersion, startVersionInfo.Binary.Commit,
+		endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
 	err = fleettools.UpgradeAgent(kibClient, policyResp.ID, endVersionInfo.Binary.String(), true)
 	require.NoError(t, err)
 
@@ -246,16 +258,16 @@ func testUpgradeFleetManagedElasticAgent(
 
 	// wait for the watcher to show up
 	t.Logf("Waiting for upgrade watcher to start...")
-	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
-	require.NoError(t, err)
+	err = upgradetest.WaitForWatcher(ctx, 2*time.Minute, 10*time.Second)
+	require.NoError(t, err, "upgrade watcher did not start")
 	t.Logf("Upgrade watcher started")
 
 	// wait for the agent to be healthy and correct version
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 1*time.Minute, 10*time.Second, t)
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policyResp.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policyResp.ID, "online"), 2*time.Minute, 15*time.Second, "Agent status is not online")
 
 	// wait for version
 	require.Eventually(t, func() bool {
@@ -277,21 +289,6 @@ func testUpgradeFleetManagedElasticAgent(
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
 	assert.NoError(t, err)
-}
-
-func defaultPolicy() kibana.AgentPolicy {
-	policyUUID := uuid.New().String()
-
-	createPolicyReq := kibana.AgentPolicy{
-		Name:        "test-policy-" + policyUUID,
-		Namespace:   "default",
-		Description: "Test policy " + policyUUID,
-		MonitoringEnabled: []kibana.MonitoringEnabledOption{
-			kibana.MonitoringEnabledLogs,
-			kibana.MonitoringEnabledMetrics,
-		},
-	}
-	return createPolicyReq
 }
 
 // simulateAirGapedEnvironment uses iptables to block outgoing packages to the
@@ -344,7 +341,7 @@ func simulateAirGapedEnvironment(t *testing.T, host string) {
 
 func newArtifactsServer(ctx context.Context, t *testing.T, version string) *httptest.Server {
 	fileServerDir := t.TempDir()
-	downloadAt := filepath.Join(fileServerDir, "downloads", "beats", "elastic-agent")
+	downloadAt := filepath.Join(fileServerDir, "downloads", "beats", "elastic-agent", "beats", "elastic-agent")
 	err := os.MkdirAll(downloadAt, 0700)
 	require.NoError(t, err, "could not create directory structure for file server")
 
@@ -355,19 +352,21 @@ func newArtifactsServer(ctx context.Context, t *testing.T, version string) *http
 	err = fr.Fetch(ctx, t, downloadAt)
 	require.NoError(t, err, "could not download agent %s", version)
 
-	// dl, err := os.ReadDir(downloadAt)
-	// require.NoError(t, err)
-	// fmt.Println("files in ", downloadAt)
-	// for _, d := range dl {
-	// 	fmt.Println("\t", d.Name())
-	// }
+	dl, err := os.ReadDir(downloadAt)
+	require.NoError(t, err)
+	var files []string
+	for _, d := range dl {
+		files = append(files, d.Name())
+	}
 
 	fs := http.FileServer(http.Dir(fileServerDir))
-	// fmt.Println("fileServerDir:", fileServerDir)
+	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
+		fileServerDir, files)
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("ArtifactsServer: %s - %s", r.Method, r.URL.String())
 		// https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-8.10.2-linux-x86_64.tar.gz
+		// http://127.0.0.1:45467      /downloads/beats/elastic-agent/
 		fs.ServeHTTP(w, r)
 	}))
-
 }

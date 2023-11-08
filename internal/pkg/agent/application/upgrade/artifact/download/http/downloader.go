@@ -172,7 +172,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		return "", err
 	}
 
-	req, err := http.NewRequest("GET", sourceURI, nil)
+	req, err := http.NewRequest(http.MethodGet, sourceURI, nil)
 	if err != nil {
 		return "", errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
@@ -220,5 +220,6 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	}
 	dp.ReportComplete()
 
+	e.log.Infof("downloader %T downloaded %s", e, sourceURI)
 	return fullPath, nil
 }
