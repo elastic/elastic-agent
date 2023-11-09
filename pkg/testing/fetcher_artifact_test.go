@@ -7,6 +7,7 @@ package testing
 import (
 	"bytes"
 	"context"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -31,15 +32,15 @@ func TestArtifactFetcher_Default(t *testing.T) {
 	fakeClient := &fakeHttpClient{responses: []*http.Response{
 		{
 			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte(artifactsResponse))),
+			Body:       io.NopCloser(bytes.NewReader([]byte(artifactsResponse))),
 		},
 		{
 			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte(binaryResponse))),
+			Body:       io.NopCloser(bytes.NewReader([]byte(binaryResponse))),
 		},
 		{
 			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte(hashResponse))),
+			Body:       io.NopCloser(bytes.NewReader([]byte(hashResponse))),
 		},
 	}}
 
@@ -106,6 +107,7 @@ type fakeHttpClient struct {
 }
 
 func (c *fakeHttpClient) Do(_ *http.Request) (*http.Response, error) {
+	resp := c.responses[0]
 	c.responses = c.responses[1:]
-	return c.responses[0], nil
+	return resp, nil
 }
