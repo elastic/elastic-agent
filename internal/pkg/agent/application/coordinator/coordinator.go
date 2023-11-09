@@ -1255,14 +1255,13 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 // were reported.
 // Called on the main Coordinator goroutine.
 func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerWatchErrCh chan error) error {
-	var runtimeErr error
-	var configErr error
-	var varsErr error
-	var upgradeMarkerErr error
+	var runtimeErr, configErr, varsErr, upgradeMarkerErr error
+	var returnedRuntime, returnedConfig, returnedVars, returnedUpgradeMarker bool
+
 	// in case other components are locked up, let us time out
 	timeoutWait := time.NewTimer(timeout)
 	defer timeoutWait.Stop()
-	var returnedRuntime, returnedConfig, returnedVars, returnedUpgradeMarker bool
+
 	/*
 		Wait for all managers to gently shut down. All managers send
 		an error status on their termination channel after their Run method
