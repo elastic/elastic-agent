@@ -216,7 +216,7 @@ func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.Progres
 
 	// install service
 	pt.Describe("Installing service")
-	svc, err := newService(topPath, username, groupName)
+	svc, err := newService(topPath, withUserGroup(username, groupName))
 	if err != nil {
 		pt.Describe("Failed to install service")
 		return ownership, fmt.Errorf("error installing new service: %w", err)
@@ -239,7 +239,7 @@ func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.Progres
 // This should only be called after Install is successful.
 func StartService(topPath string) error {
 	// only starting the service, so no need to set the username and group to any value
-	svc, err := newService(topPath, "", "")
+	svc, err := newService(topPath)
 	if err != nil {
 		return fmt.Errorf("error creating new service handler: %w", err)
 	}
@@ -256,7 +256,7 @@ func StartService(topPath string) error {
 // StopService stops the installed service.
 func StopService(topPath string) error {
 	// only stopping the service, so no need to set the username and group to any value
-	svc, err := newService(topPath, "", "")
+	svc, err := newService(topPath)
 	if err != nil {
 		return fmt.Errorf("error creating new service handler: %w", err)
 	}
@@ -273,7 +273,7 @@ func StopService(topPath string) error {
 // RestartService restarts the installed service.
 func RestartService(topPath string) error {
 	// only restarting the service, so no need to set the username and group to any value
-	svc, err := newService(topPath, "", "")
+	svc, err := newService(topPath)
 	if err != nil {
 		return fmt.Errorf("error creating new service handler: %w", err)
 	}
@@ -289,7 +289,7 @@ func RestartService(topPath string) error {
 
 // StatusService returns the status of the service.
 func StatusService(topPath string) (service.Status, error) {
-	svc, err := newService(topPath, "", "")
+	svc, err := newService(topPath)
 	if err != nil {
 		return service.StatusUnknown, err
 	}

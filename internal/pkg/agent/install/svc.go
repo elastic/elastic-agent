@@ -37,17 +37,36 @@ func ExecutablePath(topPath string) string {
 	return exec
 }
 
-func newService(topPath string, username string, group string) (service.Service, error) {
+type serviceOpts struct {
+	Username string
+	Group    string
+}
+
+type serviceOpt func(opts *serviceOpts)
+
+func withUserGroup(username string, group string) serviceOpt {
+	return func(opts *serviceOpts) {
+		opts.Username = username
+		opts.Group = group
+	}
+}
+
+func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
+	var opts serviceOpts
+	for _, o := range opt {
+		o(&opts)
+	}
+
 	cfg := &service.Config{
 		Name:             paths.ServiceName,
 		DisplayName:      ServiceDisplayName,
 		Description:      ServiceDescription,
 		Executable:       ExecutablePath(topPath),
 		WorkingDirectory: topPath,
-		UserName:         username,
+		UserName:         opts.Username,
 		Option: map[string]interface{}{
 			// GroupName
-			"GroupName": group,
+			"GroupName": opts.Group,
 
 			// Linux (systemd) always restart on failure
 			"Restart": "always",

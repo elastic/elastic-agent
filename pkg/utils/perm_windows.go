@@ -6,6 +6,13 @@
 
 package utils
 
+const (
+	// AdministratorSID is the SID for the Administrator user.
+	AdministratorSID = "S-1-5-32-544"
+	// SystemSID is the SID for the SYSTEM user.
+	SystemSID = "S-1-5-32-544"
+)
+
 // FileOwner is the ownership a file should have.
 type FileOwner struct {
 	UID string
@@ -16,8 +23,8 @@ type FileOwner struct {
 func CurrentFileOwner() FileOwner {
 	// TODO(blakerouse): Make this return the current user and group on Windows.
 	return FileOwner{
-		UID: "S-1-5-32-544", // Administrator
-		GID: "S-1-5-18",     // SYSTEM
+		UID: AdministratorSID,
+		GID: SystemSID,
 	}
 }
 
