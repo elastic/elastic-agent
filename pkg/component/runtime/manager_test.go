@@ -638,13 +638,15 @@ STATELOOP:
 				retrievedAPMConfig, err := extractAPMConfigFromActionResult(t, res)
 				require.NoError(t, err, "couldn't read APM config from ActionResult")
 
-				if !gproto.Equal(initialAPMConfig, retrievedAPMConfig) {
+				if retrievedAPMConfig == nil {
+					t.Logf("retrieved APM config is still nil, trying again")
+				} else if !gproto.Equal(initialAPMConfig, retrievedAPMConfig) {
 					require.Fail(t, "retrieved APM config should match what was sent", initialAPMConfig.String(), retrievedAPMConfig.String())
-				}
-
-				// If all went well, we now try updating to a new APM config
-				comp.Component = &proto.Component{
-					ApmConfig: modifiedAPMConfig,
+				} else {
+					// Config matches, we now try updating to a new APM config
+					comp.Component = &proto.Component{
+						ApmConfig: modifiedAPMConfig,
+					}
 				}
 				err = m.Update(component.Model{Components: []component.Component{comp}})
 				require.NoError(t, err, "manager Update call must succeed")
@@ -670,13 +672,16 @@ STATELOOP:
 				retrievedAPMConfig, err := extractAPMConfigFromActionResult(t, res)
 				require.NoError(t, err, "couldn't read APM config from ActionResult")
 
-				if !gproto.Equal(modifiedAPMConfig, retrievedAPMConfig) {
-					require.Fail(t, "retrieved APM config should match what was sent", modifiedAPMConfig.String(), retrievedAPMConfig.String())
-				}
+				if gproto.Equal(initialAPMConfig, retrievedAPMConfig) {
+					t.Logf("Action returned previous APM config, trying again")
 
-				// Both configs were reported correctly, now clear the APM config
-				comp.Component = &proto.Component{
-					ApmConfig: nil,
+				} else if !gproto.Equal(modifiedAPMConfig, retrievedAPMConfig) {
+					require.Fail(t, "retrieved APM config should match what was sent", modifiedAPMConfig.String(), retrievedAPMConfig.String())
+				} else {
+					// Both configs were reported correctly, now clear the APM config
+					comp.Component = &proto.Component{
+						ApmConfig: nil,
+					}
 				}
 				err = m.Update(component.Model{Components: []component.Component{comp}})
 				require.NoError(t, err, "manager Update call must succeed")
