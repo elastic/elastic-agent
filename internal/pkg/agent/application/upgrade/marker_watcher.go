@@ -83,7 +83,10 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) {
 				}
 
 				if e.Name != mfw.markerFilePath {
-					// Event is for a file other than the upgrade marker; ignore it.
+					// Since we are watching the directory that will contain the upgrade
+					// marker file, we could receive events here for changes to files other
+					// than the upgrade marker. We ignore such events as we're only concerned
+					// with changes to the upgrade marker.
 					continue
 				}
 
