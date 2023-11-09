@@ -99,6 +99,42 @@ steps:
           manual:
             allowed: true
 
+  - group: "Desktop Windows tests"
+    key: "extended-windows"
+    steps:
+      - label: "Unit tests - Windows 10"
+        key: "unit-tests-win10"
+        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "gcp"
+          # TODO create own image
+          image: "family/endpoint-windows-10-tester-rel"
+          machine_type: "n2-standard-8"
+          disk_type: "pd-ssd"
+        retry:
+          manual:
+            allowed: true
+      - label: "Unit tests - Windows 11"
+        key: "unit-tests-win11"
+        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "gcp"
+          # TODO create own image
+          image: "family/endpoint-windows-11-tester-rel"
+          machine_type: "n2-standard-8"
+          disk_type: "pd-ssd"
+        retry:
+          manual:
+            allowed: true
+
   - label: "Merge coverage reports"
     key: "merge-coverage"
     env:
@@ -111,6 +147,7 @@ steps:
       unit-tests-win2022
       unit-tests-macos-13
       unit-tests-macos-13-arm
+      extended-windows
       "
     artifact_paths:
       - "build/TEST-**"
@@ -166,41 +203,3 @@ steps:
     plugins:
       - junit-annotate#v2.4.1:
           artifacts: build/TEST-go-integration*.xml
-
-  - group: "Desktop Windows tests"
-    key: "extended-windows"
-    steps:
-      - label: "Unit tests - Windows 10"
-        key: "unit-tests-win10"
-        branches: "main v7.* 7.* 8.* v8.*"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-        artifact_paths:
-          - "build/TEST-**"
-          - "build/diagnostics/*"
-          - "coverage.out"
-        agents:
-          provider: "gcp"
-          # TODO create own image
-          image: "family/endpoint-windows-10-tester-rel"
-          machine_type: "n2-standard-8"
-          disk_type: "pd-ssd"
-        retry:
-          manual:
-            allowed: true
-      - label: "Unit tests - Windows 11"
-        key: "unit-tests-win11"
-        branches: "main v7.* 7.* 8.* v8.*"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-        artifact_paths:
-          - "build/TEST-**"
-          - "build/diagnostics/*"
-          - "coverage.out"
-        agents:
-          provider: "gcp"
-          # TODO create own image
-          image: "family/endpoint-windows-11-tester-rel"
-          machine_type: "n2-standard-8"
-          disk_type: "pd-ssd"
-        retry:
-          manual:
-            allowed: true
