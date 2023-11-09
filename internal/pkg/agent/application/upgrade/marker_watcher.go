@@ -16,8 +16,7 @@ import (
 
 type MarkerWatcher interface {
 	Watch() <-chan UpdateMarker
-	Errors() <-chan error
-	Run(ctx context.Context) error
+	Run(ctx context.Context)
 	Close() error
 }
 
@@ -28,15 +27,14 @@ type MarkerFileWatcher struct {
 	logger *logger.Logger
 
 	updateCh chan UpdateMarker
-	errCh    chan error
 }
 
 func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) (MarkerWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create upgrade marker watcher: %w", err)
-	} 
-	
+	}
+
 	// Watch the upgrade marker file's directory, not the file itself, so we
 	// notice the file even if it's deleted and recreated.
 	upgradeMarkerDirPath := filepath.Dir(upgradeMarkerFilePath)
@@ -45,12 +43,13 @@ func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) (
 		return nil, fmt.Errorf("failed to set watch on upgrade marker's directory [%s]: %w", upgradeMarkerDirPath, err)
 	}
 
+	logger = logger.Named("marker_file_watcher")
+
 	return &MarkerFileWatcher{
 		watcher:        watcher,
 		markerFilePath: upgradeMarkerFilePath,
 		logger:         logger,
 		updateCh:       make(chan UpdateMarker),
-		errCh:          make(chan error),
 	}, nil
 }
 
@@ -58,11 +57,12 @@ func (mfw *MarkerFileWatcher) Watch() <-chan UpdateMarker {
 	return mfw.updateCh
 }
 
-func (mfw *MarkerFileWatcher) Errors() <-chan error {
-	return mfw.errCh
-}
+func (mfw *MarkerFileWatcher) Run(ctx context.Context) {
+	// Do an initial read from the upgrade marker file, in case the file
+	// is already present before the watching starts.
+	doInitialRead := make(chan struct{}, 1)
+	doInitialRead <- struct{}{}
 
-func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 	// Handle watching
 	go func() {
 		for {
@@ -70,17 +70,15 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case err, ok := <-mfw.watcher.Errors:
-				mfw.logger.Debug("after there are watch errors")
 				if !ok { // Channel was closed (i.e. Watcher.Close() was called).
-					mfw.logger.Debug("upgrade marker watch's error channel was closed")
+					mfw.logger.Debug("fsnotify.Watcher's error channel was closed")
 					return
 				}
-				mfw.errCh <- fmt.Errorf("upgrade marker watch returned error: %w", err)
+				mfw.logger.Errorf("upgrade marker watch returned error: %s", err)
 				continue
 			case e, ok := <-mfw.watcher.Events:
-				mfw.logger.Debugf("after there is a watch event: [%s]", e.String())
 				if !ok { // Channel was closed (i.e. Watcher.Close() was called).
-					mfw.logger.Debug("upgrade marker watch's events channel was closed")
+					mfw.logger.Debug("fsnotify.Watcher's events channel was closed")
 					return
 				}
 
@@ -89,35 +87,33 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 					continue
 				}
 
-				switch e.Op {
-				case fsnotify.Create, fsnotify.Write:
+				switch {
+				case e.Op&fsnotify.Create == fsnotify.Create ||
+					e.Op&fsnotify.Write == fsnotify.Write:
 					// Upgrade marker file was created or updated; read its contents
 					// and send them over the update channel.
-
-					marker, err := loadMarker(mfw.markerFilePath)
-					if err != nil {
-						mfw.errCh <- fmt.Errorf("unable to load upgrade marker from watch: %w", err)
-						return
-					}
-
-					mfw.updateCh <- *marker
+					mfw.processMarker()
 				}
+			case <-doInitialRead:
+				mfw.processMarker()
 			}
 		}
 	}()
+}
 
-	// Do an initial read from the upgrade marker file, in case the file
-	// is already present before the watching starts.
+func (mfw *MarkerFileWatcher) processMarker() {
 	marker, err := loadMarker(mfw.markerFilePath)
 	if err != nil {
-		return fmt.Errorf("unable to load upgrade marker from watch: %w", err)
-	}
-	if marker != nil && marker.Details != nil {
-		mfw.updateCh <- *marker
+		mfw.logger.Error(err)
+		return
 	}
 
-	<-ctx.Done()
-	return nil
+	// Nothing to do if marker is not (yet) present
+	if marker == nil {
+		return
+	}
+
+	mfw.updateCh <- *marker
 }
 
 func (mfw *MarkerFileWatcher) Close() error {

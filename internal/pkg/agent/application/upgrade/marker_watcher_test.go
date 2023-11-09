@@ -41,8 +41,6 @@ func TestMarkerWatcher(t *testing.T) {
 			select {
 			case <-testCtx.Done():
 				return
-			case err := <-markerWatcher.Errors():
-				testErr = err
 			case marker := <-markerWatcher.Watch():
 				testDetailsMu.Lock()
 				testDetails = marker.Details
@@ -52,8 +50,7 @@ func TestMarkerWatcher(t *testing.T) {
 	}()
 
 	go func() {
-		err := markerWatcher.Run(testCtx)
-		require.NoError(t, err)
+		markerWatcher.Run(testCtx)
 	}()
 
 	// Write out the expected upgrade details to the test upgrade marker
