@@ -146,7 +146,7 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
 		agent, err := fleettools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policy.ID, hostname)
-		return err != nil && agent.UpgradeDetails != nil
+		return err == nil && agent.UpgradeDetails != nil
 
 	}, 5*time.Minute, time.Second)
 
