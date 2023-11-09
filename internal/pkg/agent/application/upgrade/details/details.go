@@ -130,6 +130,14 @@ func (d *Details) RegisterObserver(observer Observer) {
 
 // Equals compares the non-lock fields of two Details structs.
 func (d *Details) Equals(otherD *Details) bool {
+	if d == nil && otherD == nil {
+		return true
+	}
+
+	if d == nil || otherD == nil {
+		return false
+	}
+
 	return d.State == otherD.State &&
 		d.TargetVersion == otherD.TargetVersion &&
 		d.ActionID == otherD.ActionID &&

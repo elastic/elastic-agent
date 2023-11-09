@@ -112,4 +112,12 @@ func TestEquals(t *testing.T) {
 
 	require.True(t, details1.Equals(details2))
 	require.False(t, details1.Equals(details3))
+
+	// Nil checks
+	var details4 *Details
+	var details5 *Details
+
+	require.True(t, details4.Equals(details5))
+	require.False(t, details1.Equals(details4))
+	require.False(t, details4.Equals(details1))
 }
