@@ -35,8 +35,9 @@ func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) (
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create upgrade marker watcher: %w", err)
-	} // Watch the upgrade marker file's directory, not the file itself, so we
-
+	} 
+	
+	// Watch the upgrade marker file's directory, not the file itself, so we
 	// notice the file even if it's deleted and recreated.
 	upgradeMarkerDirPath := filepath.Dir(upgradeMarkerFilePath)
 	err = watcher.Add(upgradeMarkerDirPath)
