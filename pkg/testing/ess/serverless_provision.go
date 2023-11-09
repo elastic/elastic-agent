@@ -71,7 +71,7 @@ func (prov *ServerlessProvision) Create(ctx context.Context, request runner.Stac
 	client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
 	srvReq := ServerlessRequest{Name: request.ID, RegionID: prov.cfg.Region}
 
-	prov.log.Logf("Creating serverless stack %s (%s)", request.Version, request.ID)
+	prov.log.Logf("Creating serverless stack %s [stack_id: %s]", request.Version, request.ID)
 	proj, err := client.DeployStack(createCtx, srvReq)
 	if err != nil {
 		return runner.Stack{}, fmt.Errorf("error deploying stack for request %s: %w", request.ID, err)
@@ -93,7 +93,7 @@ func (prov *ServerlessProvision) Create(ctx context.Context, request runner.Stac
 		},
 		Ready: false,
 	}
-	prov.log.Logf("Created serverless stack %s (%s) [id: %s]", request.Version, request.ID, proj.ID)
+	prov.log.Logf("Created serverless stack %s [stack_id: %s, deployment_id: %s]", request.Version, request.ID, proj.ID)
 	return stack, nil
 }
 
@@ -116,7 +116,7 @@ func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.
 	client.proj.Credentials.Username = stack.Username
 	client.proj.Credentials.Password = stack.Password
 
-	prov.log.Logf("Waiting for serverless stack %s to be ready (%s) [id: %s]", stack.Version, stack.ID, deploymentID)
+	prov.log.Logf("Waiting for serverless stack %s to be ready [stack_id: %s, deployment_id: %s]", stack.Version, stack.ID, deploymentID)
 
 	errCh := make(chan error)
 	var lastErr error
@@ -130,7 +130,7 @@ func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.
 			if lastErr == nil {
 				lastErr = ctx.Err()
 			}
-			return stack, fmt.Errorf("serverless %s never became ready: %w", stack.Version, lastErr)
+			return stack, fmt.Errorf("serverless stack %s [stack_id: %s, deployment_id: %s] never became ready: %w", stack.Version, stack.ID, deploymentID, lastErr)
 		case <-ticker.C:
 			go func() {
 				statusCtx, statusCancel := context.WithTimeout(ctx, 30*time.Second)
@@ -139,7 +139,7 @@ func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.
 				if err != nil {
 					errCh <- err
 				} else if !ready {
-					errCh <- fmt.Errorf("serverless %s never became ready", stack.Version)
+					errCh <- fmt.Errorf("serverless stack %s [stack_id: %s, deployment_id: %s] never became ready", stack.Version, stack.ID, deploymentID)
 				} else {
 					errCh <- nil
 				}
@@ -170,7 +170,7 @@ func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack)
 	client.proj.Credentials.Username = stack.Username
 	client.proj.Credentials.Password = stack.Password
 
-	prov.log.Logf("Destroying serverless stack %s (%s) [id: %s]", stack.Version, stack.ID, deploymentID)
+	prov.log.Logf("Destroying serverless stack %s [stack_id: %s, deployment_id: %s]", stack.Version, stack.ID, deploymentID)
 	err = client.DeleteDeployment()
 	if err != nil {
 		return fmt.Errorf("error removing deployment after re-creating client: %w", err)

@@ -99,13 +99,13 @@ func (p *provisioner) WaitForReady(ctx context.Context, stack runner.Stack) (run
 	// allow up to 10 minutes for it to become ready
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-	p.logger.Logf("Waiting for cloud %s to be ready (%s) [id: %s]", stack.Version, stack.ID, deploymentID)
+	p.logger.Logf("Waiting for cloud stack %s to be ready [stack_id: %s, deployment_id: %s]", stack.Version, stack.ID, deploymentID)
 	ready, err := p.client.DeploymentIsReady(ctx, deploymentID, 30*time.Second)
 	if err != nil {
-		return stack, fmt.Errorf("failed to check for cloud %s to be ready: %w", stack.Version, err)
+		return stack, fmt.Errorf("failed to check for cloud %s [stack_id: %s, deployment_id: %s] to be ready: %w", stack.Version, stack.ID, deploymentID, err)
 	}
 	if !ready {
-		return stack, fmt.Errorf("cloud %s never became ready: %w", stack.Version, err)
+		return stack, fmt.Errorf("cloud %s [stack_id: %s, deployment_id: %s] never became ready: %w", stack.Version, stack.ID, deploymentID, err)
 	}
 	stack.Ready = true
 	return stack, nil
@@ -122,7 +122,7 @@ func (p *provisioner) Delete(ctx context.Context, stack runner.Stack) error {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
-	p.logger.Logf("Destroying cloud %s (%s) [id: %s]", stack.Version, stack.ID, deploymentID)
+	p.logger.Logf("Destroying cloud stack %s [stack_id: %s, deployment_id: %s]", stack.Version, stack.ID, deploymentID)
 	return p.client.ShutdownDeployment(ctx, deploymentID)
 }
 
@@ -130,7 +130,7 @@ func (p *provisioner) createDeployment(ctx context.Context, r runner.StackReques
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
-	p.logger.Logf("Creating cloud %s (%s)", r.Version, r.ID)
+	p.logger.Logf("Creating cloud stack %s [stack_id: %s]", r.Version, r.ID)
 	name := fmt.Sprintf("%s-%s", strings.Replace(p.cfg.Identifier, ".", "-", -1), r.ID)
 
 	// prepare tags
@@ -154,7 +154,7 @@ func (p *provisioner) createDeployment(ctx context.Context, r runner.StackReques
 		p.logger.Logf("Failed to create ESS cloud %s: %s", r.Version, err)
 		return nil, fmt.Errorf("failed to create ESS cloud for version %s: %w", r.Version, err)
 	}
-	p.logger.Logf("Created cloud %s (%s) [id: %s]", r.Version, r.ID, resp.ID)
+	p.logger.Logf("Created cloud stack %s [stack_id: %s, deployment_id: %s]", r.Version, r.ID, resp.ID)
 	return resp, nil
 }
 

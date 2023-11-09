@@ -87,7 +87,7 @@ func TestNewRunner_Clean(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.ElementsMatch(t, ip.instances, []Instance{i1, i2})
-	assert.ElementsMatch(t, sp.stacks, []Stack{s1, s2})
+	assert.ElementsMatch(t, sp.deletedStacks, []Stack{s1, s2})
 }
 
 type fakeInstanceProvisioner struct {
@@ -124,9 +124,9 @@ func (f *fakeInstanceProvisioner) Clean(_ context.Context, _ Config, instances [
 }
 
 type fakeStackProvisioner struct {
-	mx       sync.Mutex
-	requests []StackRequest
-	stacks   []Stack
+	mx            sync.Mutex
+	requests      []StackRequest
+	deletedStacks []Stack
 }
 
 func (f *fakeStackProvisioner) SetLogger(_ Logger) {
@@ -156,6 +156,6 @@ func (f *fakeStackProvisioner) WaitForReady(_ context.Context, stack Stack) (Sta
 func (f *fakeStackProvisioner) Delete(_ context.Context, stack Stack) error {
 	f.mx.Lock()
 	defer f.mx.Unlock()
-	f.stacks = append(f.stacks, stack)
+	f.deletedStacks = append(f.deletedStacks, stack)
 	return nil
 }

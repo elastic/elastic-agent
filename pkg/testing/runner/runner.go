@@ -631,7 +631,7 @@ func (r *Runner) startStacks(ctx context.Context) error {
 		}
 	}
 
-	// start go routine's to provision the needed stacks
+	// start goroutines to provision the needed stacks
 	for _, request := range requests {
 		go func(ctx context.Context, req stackReq) {
 			var err error
