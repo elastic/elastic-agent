@@ -351,17 +351,15 @@ func TestCollectManagerErrorsAllResponses(t *testing.T) {
 	handlerChan, runtime, varWatcher, config := setupManagerShutdownChannels(5 * time.Second)
 	runtimeErrStr := "runtime error"
 	varsErrStr := "vars error"
-	upgradeMarkerErrStr := "upgrade marker error"
 	runtime <- errors.New(runtimeErrStr)
 	varWatcher <- errors.New(varsErrStr)
 	config <- nil
 
 	waitAndTestError(t, func(err error) bool {
 		return err != nil &&
-			strings.Contains(err.Error(), "3 errors occurred") &&
+			strings.Contains(err.Error(), "2 errors occurred") &&
 			strings.Contains(err.Error(), runtimeErrStr) &&
-			strings.Contains(err.Error(), varsErrStr) &&
-			strings.Contains(err.Error(), upgradeMarkerErrStr)
+			strings.Contains(err.Error(), varsErrStr)
 	}, handlerChan)
 }
 
