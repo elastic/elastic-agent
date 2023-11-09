@@ -141,7 +141,7 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 	err = fleettools.UpgradeAgent(kibClient, policy.ID, endVersionInfo.Binary.String(), true)
 	require.NoError(t, err)
 
-	// wait for upgrade details to show up in `.fleet-agents` indices.
+	t.Log("Waiting from upgrade details to show up in Fleet")
 	hostname, err := os.Hostname()
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
