@@ -122,6 +122,31 @@ steps:
       - unit-tests-macos-13-arm
     allow_dependency_failure: true
 
+  - group: "K8s tests"
+    key: "k8s-tests"
+    steps:
+      - label: "K8s tests: {{matrix.k8s_version}}"
+        env:
+          K8S_VERSION: "v{{matrix.k8s_version}}"
+          KIND_VERSION: "v0.20.0"
+        command: ".buildkite/scripts/steps/k8s-tests.sh"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "gcp"
+          image: "family/core-ubuntu-2204"
+        matrix:
+          setup:
+            k8s_version:
+              - "1.28.0"
+              - "1.27.3"
+              - "1.26.6"
+        retry:
+          manual:
+            allowed: true
+
   - label: ":sonarqube: Continuous Code Inspection"
     env:
       VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
@@ -140,7 +165,7 @@ steps:
     key: "serverless-integration-tests"
     env:
       TEST_INTEG_AUTH_ESS_REGION: us-east-1
-    command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestMonitoringLogsShipped" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+    command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"

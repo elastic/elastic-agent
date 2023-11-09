@@ -12,10 +12,10 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/e2e-testing v1.1.0
-	github.com/elastic/elastic-agent-autodiscover v0.6.4
+	github.com/elastic/elastic-agent-autodiscover v0.6.5
 	github.com/elastic/elastic-agent-client/v7 v7.5.0
 	github.com/elastic/elastic-agent-libs v0.6.2
-	github.com/elastic/elastic-agent-system-metrics v0.7.0
+	github.com/elastic/elastic-agent-system-metrics v0.8.0
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
 	github.com/elastic/go-elasticsearch/v8 v8.10.1
 	github.com/elastic/go-licenser v0.4.1
@@ -85,7 +85,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
-	github.com/docker/docker v23.0.3+incompatible // indirect
+	github.com/docker/docker v24.0.7+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
