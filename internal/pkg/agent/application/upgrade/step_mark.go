@@ -160,7 +160,7 @@ func LoadMarker() (*UpdateMarker, error) {
 }
 
 func loadMarker(markerFile string) (*UpdateMarker, error) {
-	markerBytes, err := ioutil.ReadFile(markerFile)
+	markerBytes, err := readMarkerFile(markerFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
@@ -199,7 +199,7 @@ func SaveMarker(marker *UpdateMarker) error {
 		return err
 	}
 
-	return ioutil.WriteFile(markerFilePath(), markerBytes, 0600)
+	return writeMarkerFile(markerFilePath(), markerBytes)
 }
 
 func markerFilePath() string {
