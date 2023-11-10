@@ -93,15 +93,11 @@ type Manager struct {
 	baseLogger *logger.Logger
 	ca         *authority.CertificateAuthority
 	listenAddr string
+	listenPort int
 	agentInfo  *info.AgentInfo
 	tracer     *apm.Tracer
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
-
-	// netMx synchronizes the access to listener and server only
-	netMx    sync.RWMutex
-	listener net.Listener
-	server   *grpc.Server
 
 	// Set when the RPC server is ready to receive requests, for use by tests.
 	serverReady *atomic.Bool
@@ -109,6 +105,10 @@ type Manager struct {
 	// updateMx protects the call to update to ensure that
 	// only one call to update occurs at a time
 	updateMx sync.Mutex
+
+	// updateChan forwards component model updates from the public Update method
+	// to the internal run loop.
+	updateChan chan component.Model
 
 	// currentMx protects access to the current map only
 	currentMx sync.RWMutex
@@ -123,10 +123,9 @@ type Manager struct {
 
 	errCh chan error
 
-	// upon creation the Manager is neither running not shutting down, thus both
-	// flags are needed.
-	running      atomic.Bool
-	shuttingDown atomic.Bool
+	// doneChan is closed when Manager is shutting down to signal that any
+	// pending requests should be canceled.
+	doneChan chan struct{}
 }
 
 // NewManager creates a new manager.
@@ -153,10 +152,12 @@ func NewManager(
 		current:       make(map[string]*componentRuntimeState),
 		shipperConns:  make(map[string]*shipperConn),
 		subscriptions: make(map[string][]*Subscription),
+		updateChan:    make(chan component.Model),
 		errCh:         make(chan error),
 		monitor:       monitor,
 		grpcConfig:    grpcConfig,
 		serverReady:   atomic.NewBool(false),
+		doneChan:      make(chan struct{}),
 	}
 	return m, nil
 }
@@ -169,16 +170,11 @@ func NewManager(
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
-	m.running.Store(true)
-	m.shuttingDown.Store(false)
-
-	lis, err := net.Listen("tcp", m.listenAddr)
+	listener, err := net.Listen("tcp", m.listenAddr)
 	if err != nil {
 		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
 	}
-	m.netMx.Lock()
-	m.listener = lis
-	m.netMx.Unlock()
+	m.listenPort = listener.Addr().(*net.TCPAddr).Port
 
 	certPool := x509.NewCertPool()
 	if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
@@ -205,41 +201,56 @@ func (m *Manager) Run(ctx context.Context) error {
 			grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
 		)
 	}
-	m.netMx.Lock()
-	m.server = server
-	m.netMx.Unlock()
-	proto.RegisterElasticAgentServer(m.server, m)
+	proto.RegisterElasticAgentServer(server, m)
 
 	// start serving GRPC connections
-	var wg sync.WaitGroup
-	wg.Add(1)
+	var wgServer sync.WaitGroup
+	wgServer.Add(1)
 	go func() {
-		defer wg.Done()
-		m.serverReady.Store(true)
-		for {
-			err := server.Serve(lis)
-			if err != nil {
-				m.logger.Errorf("control protocol failed: %s", err)
-			}
-			if ctx.Err() != nil {
-				// context has an error don't start again
-				return
-			}
-		}
+		defer wgServer.Done()
+		go m.serverLoop(ctx, listener, server)
 	}()
 
-	<-ctx.Done()
-	m.running.Store(false)
-	m.shuttingDown.Store(true)
+RUNLOOP:
+	for ctx.Err() == nil {
+		select {
+		case <-ctx.Done():
+			// Signal that we will not accept any more updates
+			break RUNLOOP
+		case model := <-m.updateChan:
+			// New component model. This is an external update coming from a
+			// policy change, so we set tearDown to true.
+			err := m.update(model, true)
+
+			// When update is done, send its result back to the coordinator, unless we're shutting down.
+			select {
+			case m.errCh <- err:
+			case <-ctx.Done():
+			}
+		}
+	}
+	close(m.doneChan)
+
+	// Notify components to shutdown and wait for their response
 	m.shutdown()
 
+	// Close the rpc listener and wait for serverLoop to return
+	listener.Close()
+	wgServer.Wait()
+
+	// Cancel any remaining connections
 	server.Stop()
-	wg.Wait()
-	m.netMx.Lock()
-	m.listener = nil
-	m.server = nil
-	m.netMx.Unlock()
 	return ctx.Err()
+}
+
+func (m *Manager) serverLoop(ctx context.Context, listener net.Listener, server *grpc.Server) {
+	m.serverReady.Store(true)
+	for ctx.Err() == nil {
+		err := server.Serve(listener)
+		if err != nil {
+			m.logger.Errorf("control protocol listener failed: %s", err)
+		}
+	}
 }
 
 // Errors returns channel that errors are reported on.
@@ -247,45 +258,19 @@ func (m *Manager) Errors() <-chan error {
 	return m.errCh
 }
 
-// Update updates the currComp state of the running components.
+// Update forwards a new component model to Manager's run loop.
+// When it has been processed, a result will be sent on Manager's
+// error channel.
 // Called from the main Coordinator goroutine.
 //
-// This returns as soon as possible, the work is performed in the background.
-func (m *Manager) Update(model component.Model) error {
-	shuttingDown := m.shuttingDown.Load()
-	if shuttingDown {
-		// ignore any updates once shutdown started
-		return nil
+// If calling from a test, you should read from errCh afterwards to avoid
+// blocking Manager's main loop.
+func (m *Manager) Update(model component.Model) {
+	select {
+	case m.updateChan <- model:
+	case <-m.doneChan:
+		// Manager is shutting down, ignore the udpate
 	}
-	// teardown is true because the public `Update` method would be coming directly from
-	// policy so if a component was removed it needs to be torn down.
-	return m.update(model, true)
-}
-
-// State returns the current component states.
-func (m *Manager) State() []ComponentComponentState {
-	m.currentMx.RLock()
-	defer m.currentMx.RUnlock()
-	states := make([]ComponentComponentState, 0, len(m.current))
-	for _, crs := range m.current {
-		var legacyPID string
-		if crs.runtime != nil {
-			if commandRuntime, ok := crs.runtime.(*commandRuntime); ok {
-				if commandRuntime != nil {
-					procInfo := commandRuntime.proc
-					if procInfo != nil {
-						legacyPID = fmt.Sprint(commandRuntime.proc.PID)
-					}
-				}
-			}
-		}
-		states = append(states, ComponentComponentState{
-			Component: crs.getCurrent(),
-			State:     crs.getLatest(),
-			LegacyPID: legacyPID,
-		})
-	}
-	return states
 }
 
 // PerformAction executes an action on a unit.
@@ -891,13 +876,7 @@ func (m *Manager) getRuntimeFromComponent(comp component.Component) *componentRu
 func (m *Manager) getListenAddr() string {
 	addr := strings.SplitN(m.listenAddr, ":", 2)
 	if len(addr) == 2 && addr[1] == "0" {
-		m.netMx.RLock()
-		lis := m.listener
-		m.netMx.RUnlock()
-		if lis != nil {
-			port := lis.Addr().(*net.TCPAddr).Port
-			return fmt.Sprintf("%s:%d", addr[0], port)
-		}
+		return fmt.Sprintf("%s:%d", addr[0], m.listenPort)
 	}
 	return m.listenAddr
 }

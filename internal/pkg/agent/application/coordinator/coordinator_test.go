@@ -778,6 +778,8 @@ func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
 type fakeRuntimeManager struct {
 	state          []runtime.ComponentComponentState
 	updateCallback func([]component.Component) error
+	result         error
+	errChan        chan error
 }
 
 func (r *fakeRuntimeManager) Run(ctx context.Context) error {
@@ -787,11 +789,15 @@ func (r *fakeRuntimeManager) Run(ctx context.Context) error {
 
 func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
 
-func (r *fakeRuntimeManager) Update(model component.Model) error {
+func (r *fakeRuntimeManager) Update(model component.Model) {
+	r.result = nil
 	if r.updateCallback != nil {
-		return r.updateCallback(model.Components)
+		r.result = r.updateCallback(model.Components)
 	}
-	return nil
+	if r.errChan != nil {
+		// If a reporting channel is set, send the result to it
+		r.errChan <- r.result
+	}
 }
 
 // State returns the current components model state.

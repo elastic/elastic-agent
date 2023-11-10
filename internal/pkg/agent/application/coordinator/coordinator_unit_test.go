@@ -751,6 +751,7 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	logger := logp.NewLogger("testing")
 
 	configChan := make(chan ConfigChange, 1)
+	updateErrChan := make(chan error, 1)
 
 	const errorStr = "update failed for testing reasons"
 	// Create a mocked runtime manager that always reports an error
@@ -758,6 +759,7 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 		updateCallback: func(comp []component.Component) error {
 			return fmt.Errorf(errorStr)
 		},
+		errChan: updateErrChan,
 	}
 
 	coord := &Coordinator{
@@ -766,6 +768,9 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 		stateBroadcaster: broadcaster.New(State{}, 0, 0),
 		managerChans: managerChans{
 			configManagerUpdate: configChan,
+			// Give coordinator the same error channel we set on the runtime
+			// manager, so it receives the update result.
+			runtimeManagerError: updateErrChan,
 		},
 		runtimeMgr: runtimeManager,
 		vars:       emptyVars(t),
@@ -778,16 +783,19 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	configChan <- configChange
 	coord.runLoopIteration(ctx)
 
-	// Make sure the failure was reported to the config manager
-	assert.True(t, configChange.failed, "Config change should report failure if the runtime manager returns an error")
-	require.Error(t, configChange.err, "Config change should get an error if runtime manager update fails")
-	assert.Contains(t, configChange.err.Error(), errorStr)
+	// Make sure the config change was acknowledged to the config manager
+	// (the failure is not reported here since it happens asynchronously; it
+	// will appear in the coordinator state afterwards.)
+	assert.True(t, configChange.acked, "Config change should be acknowledged to the config manager")
+	assert.NoError(t, configChange.err, "Config change with async error should succeed")
 
-	// Make sure the error is saved in Coordinator.runtimeUpdateErr
+	// Now do another run loop iteration to let the update error propagate,
+	// and make sure it is reported correctly.
+	coord.runLoopIteration(ctx)
 	require.Error(t, coord.runtimeUpdateErr, "Runtime update failure should be saved in runtimeUpdateErr")
 	assert.Equal(t, errorStr, coord.runtimeUpdateErr.Error(), "runtimeUpdateErr should match the error reported by the runtime manager")
 
-	// Make sure the error is reported in Coordinator state.
+	// Make sure the error appears in the Coordinator state.
 	state := coord.State()
 	assert.Equal(t, agentclient.Failed, state.State, "Failed policy update should cause failed Coordinator")
 	assert.Contains(t, state.Message, errorStr, "Failed policy update should be reported in Coordinator state message")
