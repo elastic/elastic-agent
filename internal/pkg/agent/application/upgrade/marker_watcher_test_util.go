@@ -17,6 +17,8 @@ import (
 // directly or indirectly use the MarkerFileWatcher to succeed. The
 // temporary directory is cleaned up when the test completes.
 func CreateMarkerTestDir(t *testing.T) {
+	t.Helper()
+
 	execPath, err := os.Executable()
 	require.NoError(t, err)
 
