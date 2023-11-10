@@ -24,8 +24,10 @@ const minMarkerAccessRetries = 5
 // which could fail on Windows.
 func readMarkerFile(markerFile string) ([]byte, error) {
 	var markerFileBytes []byte
-	readFn := func() (err error) {
+	readFn := func() error {
+		var err error
 		markerFileBytes, err = os.ReadFile(markerFile)
+		return err
 	}
 
 	if err := accessMarkerFileWithRetries(readFn); err != nil {
@@ -41,7 +43,7 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 // processes (the Upgrade Watcher and the main Agent process) at the same time,
 // which could fail on Windows.
 func writeMarkerFile(markerFile string, markerBytes []byte) error {
-	writeFn := func() (err error) {
+	writeFn := func() error {
 		return os.WriteFile(markerFile, markerBytes, 0600)
 	}
 
