@@ -202,7 +202,7 @@ steps:
     key: "serverless-integration-tests"
     env:
       TEST_INTEG_AUTH_ESS_REGION: us-east-1
-    command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+    command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestMonitoringLogsShipped" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
