@@ -240,12 +240,11 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, configMgr, upgradeMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
 	defer composable.Close()
-	defer upgradeMgr.Close()
 
 	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {

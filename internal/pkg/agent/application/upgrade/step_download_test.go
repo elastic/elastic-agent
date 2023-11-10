@@ -83,7 +83,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		},
 	}
 
-	CreateMarkerTestDir(t)
+	createMarkerTestDir(t)
 
 	// Successful immediately (no retries)
 	t.Run("successful_immediately", func(t *testing.T) {

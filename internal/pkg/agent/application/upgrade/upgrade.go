@@ -250,10 +250,6 @@ func (u *Upgrader) MarkerWatcher() MarkerWatcher {
 	return u.markerWatcher
 }
 
-func (u *Upgrader) Close() error {
-	return u.markerWatcher.Close()
-}
-
 func (u *Upgrader) sourceURI(retrievedURI string) string {
 	if retrievedURI != "" {
 		return retrievedURI

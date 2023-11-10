@@ -16,8 +16,7 @@ import (
 
 type MarkerWatcher interface {
 	Watch() <-chan UpdateMarker
-	Run(ctx context.Context)
-	Close() error
+	Run(ctx context.Context) error
 }
 
 type MarkerFileWatcher struct {
@@ -35,14 +34,6 @@ func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) (
 		return nil, fmt.Errorf("failed to create upgrade marker watcher: %w", err)
 	}
 
-	// Watch the upgrade marker file's directory, not the file itself, so we
-	// notice the file even if it's deleted and recreated.
-	upgradeMarkerDirPath := filepath.Dir(upgradeMarkerFilePath)
-	err = watcher.Add(upgradeMarkerDirPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set watch on upgrade marker's directory [%s]: %w", upgradeMarkerDirPath, err)
-	}
-
 	logger = logger.Named("marker_file_watcher")
 
 	return &MarkerFileWatcher{
@@ -57,7 +48,14 @@ func (mfw *MarkerFileWatcher) Watch() <-chan UpdateMarker {
 	return mfw.updateCh
 }
 
-func (mfw *MarkerFileWatcher) Run(ctx context.Context) {
+func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
+	// Watch the upgrade marker file's directory, not the file itself, so we
+	// notice the file even if it's deleted and recreated.
+	upgradeMarkerDirPath := filepath.Dir(mfw.markerFilePath)
+	if err := mfw.watcher.Add(upgradeMarkerDirPath); err != nil {
+		return fmt.Errorf("failed to set watch on upgrade marker's directory [%s]: %w", upgradeMarkerDirPath, err)
+	}
+
 	// Do an initial read from the upgrade marker file, in case the file
 	// is already present before the watching starts.
 	doInitialRead := make(chan struct{}, 1)
@@ -101,6 +99,8 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) {
 			}
 		}
 	}()
+
+	return nil
 }
 
 func (mfw *MarkerFileWatcher) processMarker() {
@@ -116,8 +116,4 @@ func (mfw *MarkerFileWatcher) processMarker() {
 	}
 
 	mfw.updateCh <- *marker
-}
-
-func (mfw *MarkerFileWatcher) Close() error {
-	return mfw.watcher.Close()
 }

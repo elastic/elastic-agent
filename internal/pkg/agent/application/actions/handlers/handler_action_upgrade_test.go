@@ -56,10 +56,6 @@ func (u *mockUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
 	return nil
 }
 
-func (u *mockUpgradeManager) Close() error {
-	return nil
-}
-
 func TestUpgradeHandler(t *testing.T) {
 	// Create a cancellable context that will shut down the coordinator after
 	// the test.
