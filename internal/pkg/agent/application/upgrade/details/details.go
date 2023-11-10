@@ -130,10 +130,12 @@ func (d *Details) RegisterObserver(observer Observer) {
 
 // Equals compares the non-lock fields of two Details structs.
 func (d *Details) Equals(otherD *Details) bool {
-	if d == nil && otherD == nil {
+	// If both addresses are equal or both are nil
+	if d == otherD {
 		return true
 	}
 
+	// If only one is nil but the other is not
 	if d == nil || otherD == nil {
 		return false
 	}
