@@ -7,7 +7,7 @@
 package upgrade
 
 import (
-	"io/ioutil"
+	"os"
 	"time"
 )
 
@@ -20,7 +20,7 @@ const markerAccessTimeout = 10 * time.Second
 // which could fail on Windows.
 func readMarkerFile(markerFile string) ([]byte, error) {
 	// TODO: use github.com/cenkalti/backoff
-	return ioutil.ReadFile(markerFile)
+	return os.ReadFile(markerFile)
 }
 
 // On Windows, writeMarkerFile tries to write the marker file, retrying with
@@ -30,5 +30,5 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 // which could fail on Windows.
 func writeMarkerFile(markerFile string, markerBytes []byte) error {
 	// TODO: use github.com/cenkalti/backoff
-	return ioutil.WriteFile(markerFilePath(), markerBytes, 0600)
+	return os.WriteFile(markerFilePath(), markerBytes, 0600)
 }
