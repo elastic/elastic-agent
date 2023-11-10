@@ -68,6 +68,7 @@ steps:
       manual:
         allowed: true
 
+<<<<<<< HEAD
   - label: "Unit tests - MacOS 13 ARM"
     key: "unit-tests-macos-13-arm"
     command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -81,6 +82,23 @@ steps:
     retry:
       manual:
         allowed: true
+=======
+      # Runs inly on the main branch
+      - label: "Unit tests - MacOS 13 ARM"
+        key: "unit-tests-macos-13-arm"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        branches: main
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: orka
+          imagePrefix: generic-13-ventura-arm
+        retry:
+          manual:
+            allowed: true
+>>>>>>> 3155ea9db0 ([CI] run MacOS 13 ARM unit tests only on main branch (#3742))
 
   - label: "Unit tests - MacOS 13"
     key: "unit-tests-macos-13"
@@ -107,7 +125,12 @@ steps:
       unit-tests-win2016
       unit-tests-win2022
       unit-tests-macos-13
+<<<<<<< HEAD
       unit-tests-macos-13-arm
+=======
+      unit-tests-win10
+      unit-tests-win11
+>>>>>>> 3155ea9db0 ([CI] run MacOS 13 ARM unit tests only on main branch (#3742))
       "
     artifact_paths:
       - "build/TEST-**"
