@@ -85,7 +85,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture)
 }
 
-func TestFleetManagedAirGapedUpgrade(t *testing.T) {
+func TestFleetAirGapedUpgrade(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
 		// The test uses iptables to simulate the air-gaped environment.
