@@ -47,9 +47,8 @@ func TestMarkerWatcher(t *testing.T) {
 		}
 	}()
 
-	go func() {
-		markerWatcher.Run(testCtx)
-	}()
+	err := markerWatcher.Run(testCtx)
+	require.NoError(t, err)
 
 	// Write out the expected upgrade details to the test upgrade marker
 	// file.
