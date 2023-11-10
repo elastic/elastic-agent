@@ -1066,10 +1066,15 @@ func expBackoffWithContext(ctx context.Context, init, max time.Duration) backoff
 
 func cleanTags(tags []string) []string {
 	var r []string
+	// Create a map to store unique elements
+	seen := make(map[string]bool)
 	for _, str := range tags {
 		tag := strings.TrimSpace(str)
 		if tag != "" {
-			r = append(r, tag)
+			if _, ok := seen[tag]; !ok {
+				seen[tag] = true
+				r = append(r, tag)
+			}
 		}
 	}
 	return r
