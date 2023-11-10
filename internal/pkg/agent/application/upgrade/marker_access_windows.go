@@ -2,16 +2,20 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build windows
-
 package upgrade
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"time"
+
+	"github.com/cenkalti/backoff/v4"
 )
 
 const markerAccessTimeout = 10 * time.Second
+const markerAccessBackoffInitialInterval = 50 * time.Millisecond
+const minMarkerAccessRetries = 5
 
 // On Windows, readMarkerFile tries to read the marker file, retrying with
 // randomized exponential backoff up to markerAccessTimeout duration. This retry
@@ -19,8 +23,16 @@ const markerAccessTimeout = 10 * time.Second
 // processes (the Upgrade Watcher and the main Agent process) at the same time,
 // which could fail on Windows.
 func readMarkerFile(markerFile string) ([]byte, error) {
-	// TODO: use github.com/cenkalti/backoff
-	return os.ReadFile(markerFile)
+	var markerFileBytes []byte
+	readFn := func() (err error) {
+		markerFileBytes, err = os.ReadFile(markerFile)
+	}
+
+	if err := accessMarkerFileWithRetries(readFn); err != nil {
+		return nil, fmt.Errorf("failed to read upgrade marker file [%s] despite retrying: %w", markerFile, err)
+	}
+
+	return markerFileBytes, nil
 }
 
 // On Windows, writeMarkerFile tries to write the marker file, retrying with
@@ -29,6 +41,26 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 // processes (the Upgrade Watcher and the main Agent process) at the same time,
 // which could fail on Windows.
 func writeMarkerFile(markerFile string, markerBytes []byte) error {
-	// TODO: use github.com/cenkalti/backoff
-	return os.WriteFile(markerFilePath(), markerBytes, 0600)
+	writeFn := func() (err error) {
+		return os.WriteFile(markerFile, markerBytes, 0600)
+	}
+
+	if err := accessMarkerFileWithRetries(writeFn); err != nil {
+		return fmt.Errorf("failed to write upgrade marker file [%s] despite retrying: %w", markerFile, err)
+	}
+
+	return nil
+}
+
+func accessMarkerFileWithRetries(accessFn func() error) error {
+	expBackoff := backoff.NewExponentialBackOff()
+	expBackoff.InitialInterval = markerAccessBackoffInitialInterval
+	expBackoff.MaxInterval = markerAccessTimeout / minMarkerAccessRetries
+
+	ctx, cancel := context.WithTimeout(context.Background(), markerAccessTimeout)
+	defer cancel()
+
+	expBackoffWithTimeout := backoff.WithContext(expBackoff, ctx)
+
+	return backoff.Retry(accessFn, expBackoffWithTimeout)
 }
