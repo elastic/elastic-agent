@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const agentName = "elastic-agent"
@@ -136,6 +137,12 @@ func DefaultLoggingConfig() *Config {
 	cfg.Files.Path = paths.Logs()
 	cfg.Files.Name = agentName
 	cfg.Files.MaxSize = 20 * 1024 * 1024
+	cfg.Files.Permissions = 0600 // default user only
+	root, _ := utils.HasRoot()   // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		cfg.Files.Permissions = 0660
+	}
 
 	return &cfg
 }
@@ -150,10 +157,16 @@ func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
 	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
 	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
+	permissions := 0600        // default user only
+	root, _ := utils.HasRoot() // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		permissions = 0660
+	}
 	rotator, err := file.NewFileRotator(filename,
 		file.MaxSizeBytes(defaultCfg.Files.MaxSize),
 		file.MaxBackups(defaultCfg.Files.MaxBackups),
-		file.Permissions(os.FileMode(defaultCfg.Files.Permissions)),
+		file.Permissions(os.FileMode(permissions)),
 		file.Interval(defaultCfg.Files.Interval),
 		file.RotateOnStartup(defaultCfg.Files.RotateOnStartup),
 		file.RedirectStderr(defaultCfg.Files.RedirectStderr),

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -21,7 +22,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-const flagInstallBasePath = "base-path"
+const (
+	flagInstallBasePath     = "base-path"
+	flagInstallUnprivileged = "unprivileged"
+)
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -43,6 +47,7 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current installation and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
+	cmd.Flags().Bool(flagInstallUnprivileged, false, "Installed Elastic Agent will create an 'elastic-agent' user and run as that user.")
 	addEnrollFlags(cmd)
 
 	return cmd
@@ -65,6 +70,12 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
+	}
+
+	// only support Linux at the moment
+	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
+	if unprivileged && runtime.GOOS != "linux" {
+		return fmt.Errorf("unable to perform install command, unprivileged is currently only supported on Linux")
 	}
 
 	topPath := paths.InstallPath(basePath)
@@ -175,9 +186,10 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	progBar := install.CreateAndStartNewSpinner(streams.Out, "Installing Elastic Agent...")
 
+	var ownership utils.FileOwner
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
-		err = install.Install(cfgFile, topPath, progBar, streams)
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, progBar, streams)
 		if err != nil {
 			return fmt.Errorf("error installing package: %w", err)
 		}
@@ -225,6 +237,10 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		enrollCmd.Stdin = os.Stdin
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
+		err = enrollCmdExtras(enrollCmd, ownership)
+		if err != nil {
+			return err
+		}
 
 		progBar.Describe("Enrolling Elastic Agent with Fleet")
 		err = enrollCmd.Start()
@@ -243,7 +259,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		progBar.Describe("Enroll Completed")
 	}
 
-	if err := info.CreateInstallMarker(topPath); err != nil {
+	if err := info.CreateInstallMarker(topPath, ownership); err != nil {
 		return fmt.Errorf("failed to create install marker: %w", err)
 	}
 
