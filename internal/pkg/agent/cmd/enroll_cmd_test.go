@@ -351,9 +351,9 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, cleanedTags, "production")
 	})
 
-	t.Run("comma separated tags are cleaned", func(t *testing.T) {
+	t.Run("comma separated tags and duplicated tags are cleaned", func(t *testing.T) {
 		cmd := newEnrollCommandWithArgs([]string{}, streams)
-		err := cmd.Flags().Set("tag", "windows, production")
+		err := cmd.Flags().Set("tag", "windows, production, windows")
 		require.NoError(t, err)
 		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
 		require.Contains(t, args, "--tag")
@@ -362,6 +362,9 @@ func TestValidateArgs(t *testing.T) {
 		cleanedTags := cleanTags(args)
 		require.Contains(t, cleanedTags, "windows")
 		require.Contains(t, cleanedTags, "production")
+		// Validate that we remove the duplicates
+		require.Equal(t, len(args), 10)
+		require.Equal(t, len(cleanedTags), 7)
 	})
 
 	t.Run("valid tag and empty tag", func(t *testing.T) {
