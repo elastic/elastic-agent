@@ -893,6 +893,8 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		} else {
 			upgradeMarkerWatcherErrCh <- nil
 		}
+	} else {
+		upgradeMarkerWatcherErrCh <- nil
 	}
 
 	// Keep looping until the context ends.
