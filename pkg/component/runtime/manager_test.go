@@ -578,6 +578,7 @@ func TestManager_FakeInput_APM(t *testing.T) {
 	err = m.Update(component.Model{Components: []component.Component{comp}})
 	require.NoError(t, err, "manager Update call must succeed")
 
+	// TODO: replace this timeout with a context so we can use it in action calls
 	timeout := 30 * time.Second
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
@@ -627,6 +628,10 @@ STATELOOP:
 
 				// The APM config has propagated to the component state, now make sure
 				// it's visible when retrieving via action
+				assert.Eventually(t, func() bool {
+					retrievedAPMConfig := fetchAPMConfigWithAction(t)
+				})
+				fetchAPMConfigWithAction
 				res, err := m.PerformAction(
 					context.Background(),
 					comp,
@@ -669,6 +674,10 @@ STATELOOP:
 					nil)
 				require.NoError(t, err, "failed to retrieve APM config")
 
+				require.Eventually(t, func() bool {
+
+				},
+				)
 				retrievedAPMConfig, err := extractAPMConfigFromActionResult(t, res)
 				require.NoError(t, err, "couldn't read APM config from ActionResult")
 
@@ -723,27 +732,29 @@ STATELOOP:
 	require.NoError(t, err)
 }
 
-func extractAPMConfigFromActionResult(t *testing.T, res map[string]interface{}) (*proto.APMConfig, error) {
+func fetchAPMConfigWithAction(t *testing.T, ctx context.Context, m *Manager, comp component.Component) *proto.APMConfig {
+	res, err := m.PerformAction(
+		context.Background(),
+		comp,
+		comp.Units[0],
+		fakecmp.ActionRetrieveAPMConfig,
+		nil)
+	require.NoError(t, err, "failed to retrieve APM config")
+
 	apmCfg, ok := res["apm"]
-	if !ok {
-		return nil, fmt.Errorf("ActionResult for %s does not contain top level key %s", fakecmp.ActionRetrieveAPMConfig, "apm")
-	}
+	require.True(t, ok, "ActionResult must contain top-level 'apm' key")
 	if apmCfg == nil {
 		// the APM config is not set on the component
-		return nil, nil
+		return nil
 	}
 
 	jsonApmConfig, ok := apmCfg.(string)
-	if !ok {
-		return nil, fmt.Errorf("ActionResult for %s does not contain a string value: %T", fakecmp.ActionRetrieveAPMConfig, apmCfg)
-	}
+	require.True(t, ok, "'apm' key must contain a string")
 
 	retrievedApmConfig := new(proto.APMConfig)
-	err := protojson.Unmarshal([]byte(jsonApmConfig), retrievedApmConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling apmconfig %s: %w", jsonApmConfig, err)
-	}
-	return retrievedApmConfig, nil
+	err = protojson.Unmarshal([]byte(jsonApmConfig), retrievedApmConfig)
+	require.NoError(t, err, "'apm' key must contain valid json", jsonApmConfig)
+	return retrievedApmConfig
 }
 
 func TestManager_FakeInput_Limits(t *testing.T) {
