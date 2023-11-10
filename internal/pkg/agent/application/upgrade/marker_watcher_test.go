@@ -77,22 +77,3 @@ func TestMarkerWatcher(t *testing.T) {
 
 	require.NoError(t, testErr)
 }
-
-// createMarkerTestDir creates a temporary directory that's needed
-// for the MarkerFileWatcher to function correctly. This allows tests that
-// directly or indirectly use the MarkerFileWatcher to succeed. The
-// temporary directory is cleaned up when the test completes.
-func createMarkerTestDir(t *testing.T) {
-	t.Helper()
-
-	execPath, err := os.Executable()
-	require.NoError(t, err)
-
-	testDataDir := filepath.Join(filepath.Dir(execPath), "data")
-	err = os.Mkdir(testDataDir, 0755)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		os.RemoveAll(testDataDir)
-	})
-}
