@@ -25,8 +25,7 @@ func TestMarkerWatcher(t *testing.T) {
 	testMarkerFile := filepath.Join(testMarkerDir, markerFilename)
 	testLogger, _ := logger.NewTesting("watch_marker")
 
-	markerWatcher, err := newMarkerFileWatcher(testMarkerFile, testLogger)
-	require.NoError(t, err)
+	markerWatcher := newMarkerFileWatcher(testMarkerFile, testLogger)
 
 	testCtx, testCancel := context.WithCancel(context.Background())
 	defer testCancel()

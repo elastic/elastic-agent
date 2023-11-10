@@ -20,28 +20,19 @@ type MarkerWatcher interface {
 }
 
 type MarkerFileWatcher struct {
-	watcher        *fsnotify.Watcher
 	markerFilePath string
-
-	logger *logger.Logger
-
-	updateCh chan UpdateMarker
+	logger         *logger.Logger
+	updateCh       chan UpdateMarker
 }
 
-func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) (MarkerWatcher, error) {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create upgrade marker watcher: %w", err)
-	}
-
+func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) MarkerWatcher {
 	logger = logger.Named("marker_file_watcher")
 
 	return &MarkerFileWatcher{
-		watcher:        watcher,
 		markerFilePath: upgradeMarkerFilePath,
 		logger:         logger,
 		updateCh:       make(chan UpdateMarker),
-	}, nil
+	}
 }
 
 func (mfw *MarkerFileWatcher) Watch() <-chan UpdateMarker {
@@ -49,10 +40,15 @@ func (mfw *MarkerFileWatcher) Watch() <-chan UpdateMarker {
 }
 
 func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("failed to create upgrade marker watcher: %w", err)
+	}
+
 	// Watch the upgrade marker file's directory, not the file itself, so we
 	// notice the file even if it's deleted and recreated.
 	upgradeMarkerDirPath := filepath.Dir(mfw.markerFilePath)
-	if err := mfw.watcher.Add(upgradeMarkerDirPath); err != nil {
+	if err := watcher.Add(upgradeMarkerDirPath); err != nil {
 		return fmt.Errorf("failed to set watch on upgrade marker's directory [%s]: %w", upgradeMarkerDirPath, err)
 	}
 
@@ -63,18 +59,19 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 
 	// Handle watching
 	go func() {
+		defer watcher.Close()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case err, ok := <-mfw.watcher.Errors:
+			case err, ok := <-watcher.Errors:
 				if !ok { // Channel was closed (i.e. Watcher.Close() was called).
 					mfw.logger.Debug("fsnotify.Watcher's error channel was closed")
 					return
 				}
 				mfw.logger.Errorf("upgrade marker watch returned error: %s", err)
 				continue
-			case e, ok := <-mfw.watcher.Events:
+			case e, ok := <-watcher.Events:
 				if !ok { // Channel was closed (i.e. Watcher.Close() was called).
 					mfw.logger.Debug("fsnotify.Watcher's events channel was closed")
 					return

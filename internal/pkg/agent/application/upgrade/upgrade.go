@@ -67,17 +67,12 @@ func IsUpgradeable() bool {
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
 func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) (*Upgrader, error) {
-	markerFileWatcher, err := newMarkerFileWatcher(markerFilePath(), log)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Upgrader{
 		log:           log,
 		settings:      settings,
 		agentInfo:     agentInfo,
 		upgradeable:   IsUpgradeable(),
-		markerWatcher: markerFileWatcher,
+		markerWatcher: newMarkerFileWatcher(markerFilePath(), log),
 	}, nil
 }
 
