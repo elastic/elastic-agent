@@ -91,8 +91,7 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) {
 				}
 
 				switch {
-				case e.Op&fsnotify.Create == fsnotify.Create ||
-					e.Op&fsnotify.Write == fsnotify.Write:
+				case e.Op&(fsnotify.Create|fsnotify.Write) != 0:
 					// Upgrade marker file was created or updated; read its contents
 					// and send them over the update channel.
 					mfw.processMarker()
