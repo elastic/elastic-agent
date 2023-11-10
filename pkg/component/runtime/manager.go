@@ -102,10 +102,6 @@ type Manager struct {
 	// Set when the RPC server is ready to receive requests, for use by tests.
 	serverReady *atomic.Bool
 
-	// updateMx protects the call to update to ensure that
-	// only one call to update occurs at a time
-	updateMx sync.Mutex
-
 	// updateChan forwards component model updates from the public Update method
 	// to the internal run loop.
 	updateChan chan component.Model
@@ -247,7 +243,10 @@ func (m *Manager) serverLoop(ctx context.Context, listener net.Listener, server 
 	m.serverReady.Store(true)
 	for ctx.Err() == nil {
 		err := server.Serve(listener)
-		if err != nil {
+		if err != nil && ctx.Err() == nil {
+			// Only log an error if we aren't shutting down, otherwise we'll spam
+			// the logs with "use of closed network connection" for a connection that
+			// was closed on purpose.
 			m.logger.Errorf("control protocol listener failed: %s", err)
 		}
 	}
@@ -643,13 +642,10 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 }
 
 // update updates the current state of the running components.
+// It is only called by the main runtime manager goroutine in Manager.Run.
 //
 // This returns as soon as possible, work is performed in the background.
 func (m *Manager) update(model component.Model, teardown bool) error {
-	// ensure that only one `update` can occur at the same time
-	m.updateMx.Lock()
-	defer m.updateMx.Unlock()
-
 	// prepare the components to add consistent shipper connection information between
 	// the connected components in the model
 	err := m.connectShippers(model.Components)
