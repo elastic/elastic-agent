@@ -13,8 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elastic/elastic-agent/version"
-
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -30,6 +28,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -115,6 +115,13 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		// marker. However, if we're upgrading from version < 8.12.0, the marker won't
 		// contain upgrade details, so we populate them now.
 		if marker.Details == nil {
+			fromVersion, err := agtversion.ParseVersion(marker.PrevVersion)
+			if err != nil {
+				log.Warnf("upgrade details are nil, but unable to parse version being upgraded from [%s]: %s", marker.PrevVersion, err.Error())
+			} else if fromVersion.Less(*agtversion.NewParsedSemVer(8, 12, 0, "", "")) {
+				log.Warnf("upgrade details are unexpectedly nil, upgrading from version [%s]", marker.PrevVersion)
+			}
+
 			actionID := ""
 			if marker.Action != nil {
 				actionID = marker.Action.ActionID
