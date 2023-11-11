@@ -122,11 +122,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 				log.Warnf("upgrade details are unexpectedly nil, upgrading from version [%s]", marker.PrevVersion)
 			}
 
-			actionID := ""
-			if marker.Action != nil {
-				actionID = marker.Action.ActionID
-			}
-			marker.Details = details.NewDetails(version.GetAgentPackageVersion(), details.StateRollback, actionID)
+			marker.Details = details.NewDetails(version.GetAgentPackageVersion(), details.StateRollback, marker.GetActionID())
 		}
 
 		marker.Details.SetState(details.StateRollback)

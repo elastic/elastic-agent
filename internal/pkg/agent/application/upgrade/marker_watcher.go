@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/version"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -110,6 +112,19 @@ func (mfw *MarkerFileWatcher) processMarker() {
 	// Nothing to do if marker is not (yet) present
 	if marker == nil {
 		return
+	}
+
+	// If we are able to load (read) the upgrade marker here, but there are no
+	// upgrade details in it, it's possible (particularly on Windows, due to
+	// multiple processes reading and writing from the same file), that
+	// the Upgrade Watcher failed to update the upgrade marker file with
+	// upgrade details in it. In such a scenario, if we detect that the
+	// version of Agent we're running right now is the same as the prevVersion
+	// recorded in the upgrade marker we just read here, it would mean the
+	// upgrade was rolled back. So we explicitly create upgrade details in the
+	// upgrade marker with the UPG_ROLLBACK state.
+	if marker.Details == nil && marker.PrevVersion == version.GetAgentPackageVersion() {
+		marker.Details = details.NewDetails("unknown", details.StateRollback, marker.GetActionID())
 	}
 
 	mfw.updateCh <- *marker

@@ -42,6 +42,15 @@ type UpdateMarker struct {
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
 }
 
+// GetActionID returns the Fleet Action ID associated with the
+// upgrade action, if it's recorded in the UpdateMarker.
+func (um UpdateMarker) GetActionID() string {
+	if um.Action != nil {
+		return um.Action.ActionID
+	}
+	return ""
+}
+
 // MarkerActionUpgrade adapter struct compatible with pre 8.3 version of the marker file format
 type MarkerActionUpgrade struct {
 	ActionID   string `yaml:"id"`
