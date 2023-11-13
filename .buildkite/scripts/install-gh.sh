@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+# Required environment variables:
+# - GH_VERSION - the version of gh to install
 set -euo pipefail
 
 echo "--- Install gh cli"
@@ -13,7 +16,7 @@ if command -v gh
 then
     set +e
     echo "Found GH. Checking version.."
-    FOUND_GH_VERSION=$(kind --version 2>&1 >/dev/null | awk '{print $3}')
+    FOUND_GH_VERSION=$(gh --version 2>&1 >/dev/null | awk '{print $3}')
     if [ "$FOUND_GH_VERSION" == "$GH_VERSION" ]
     then
         echo "Versions match. No need to install gh. Exiting."
@@ -21,7 +24,6 @@ then
     fi
     set -e
 fi
-
 
 OS=$(uname -s| tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m| tr '[:upper:]' '[:lower:]')
@@ -33,7 +35,7 @@ fi
 
 echo "Downloading gh : ${GH_VERSION}..."
 TMP_DIR=$(mktemp -d)
-if curl -sL  "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_${OS}_${ARCH}.tar.gz" ; then
+if curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_${OS}_${ARCH}.tar.gz" | tar xz -C $TMP_DIR ; then
   mkdir -p "${HOME}/bin"
   mv "${TMP_DIR}/gh_${GH_VERSION}_${OS}_${ARCH}/bin/gh" "${GH_CMD}"
   rm -rf ${TMP_DIR}
