@@ -294,7 +294,7 @@ func reportNextScheduledUpgrade(input []fleetapi.Action, detailsSetter details.O
 		}
 
 		start, err := uAction.StartTime()
-		if err == fleetapi.ErrNoStartTime {
+		if errors.Is(err, fleetapi.ErrNoStartTime) {
 			log.Warnf("scheduled upgrade action [id = %s] has no start time!", uAction.ID())
 			continue
 		}
