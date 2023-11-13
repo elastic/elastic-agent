@@ -1468,12 +1468,10 @@ LOOP:
 }
 
 func TestManager_FakeInput_NoDeadlock(t *testing.T) {
-	/*
-		NOTE: This is a long-running test that spams the runtime managers `Update` function to try and
-		trigger a deadlock. This test takes 2 minutes to run trying to re-produce issue:
+	// NOTE: This is a long-running test that spams the runtime managers `Update` function to try and
+	// trigger a deadlock. This test takes 2 minutes to run trying to re-produce issue:
+	// https://github.com/elastic/elastic-agent/issues/2691
 
-		https://github.com/elastic/elastic-agent/issues/2691
-	*/
 	testPaths(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1589,7 +1587,7 @@ LOOP:
 			// no deadlock after timeout (all good stop the component)
 			updatedCancel()
 			m.Update(component.Model{Components: []component.Component{}})
-			<-errCh // Don't care about the result of Update, just that it runs
+			<-m.errCh // Don't care about the result of Update, just that it runs
 			break LOOP
 		case err := <-errCh:
 			require.NoError(t, err)
