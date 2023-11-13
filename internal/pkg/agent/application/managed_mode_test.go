@@ -98,7 +98,7 @@ func Test_runDispatcher(t *testing.T) {
 		},
 		mockDispatcher: func() *mockDispatcher {
 			dispatcher := &mockDispatcher{}
-			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything).Once()
+			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once()
 			return dispatcher
 		},
 		interval: time.Second,
@@ -111,8 +111,8 @@ func Test_runDispatcher(t *testing.T) {
 		},
 		mockDispatcher: func() *mockDispatcher {
 			dispatcher := &mockDispatcher{}
-			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything).Once()
-			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything).Maybe() // allow a second call in case there are timing issues in the CI pipeline
+			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once()
+			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe() // allow a second call in case there are timing issues in the CI pipeline
 			return dispatcher
 		},
 		interval: time.Millisecond * 60,
