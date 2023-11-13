@@ -12,16 +12,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/control"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-
 	"github.com/hashicorp/go-multierror"
+	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -137,7 +138,9 @@ func InvokeWatcher(log *logger.Logger) error {
 func restartAgent(ctx context.Context, log *logger.Logger) error {
 	restartViaDaemonFn := func(ctx context.Context) error {
 		c := client.New()
-		err := c.Connect(ctx)
+		connectCtx, connectCancel := context.WithTimeout(ctx, 3*time.Second)
+		defer connectCancel()
+		err := c.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry())
 		if err != nil {
 			return errors.New(err, "failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 		}
@@ -163,6 +166,7 @@ func restartAgent(ctx context.Context, log *logger.Logger) error {
 
 	signal := make(chan struct{})
 	backExp := backoff.NewExpBackoff(signal, restartBackoffInit, restartBackoffMax)
+	root, _ := utils.HasRoot() // error ignored
 
 	for restartAttempt := 1; restartAttempt <= maxRestartCount; restartAttempt++ {
 		backExp.Wait()
@@ -175,19 +179,21 @@ func restartAgent(ctx context.Context, log *logger.Logger) error {
 		}
 		log.Warnf("Failed to restart agent via control protocol: %s", err.Error())
 
-		// Next, try to restart Agent via the service.
-		log.Infof("Restarting Agent via service; attempt %d of %d", restartAttempt, maxRestartCount)
-		err = restartViaServiceFn(ctx)
-		if err == nil {
-			break
+		// Next, try to restart Agent via the service. (only if root)
+		if root {
+			log.Infof("Restarting Agent via service; attempt %d of %d", restartAttempt, maxRestartCount)
+			err = restartViaServiceFn(ctx)
+			if err == nil {
+				break
+			}
+			log.Warnf("Failed to restart agent via service: %s", err.Error())
 		}
 
 		if restartAttempt == maxRestartCount {
 			log.Error("Failed to restart agent after final attempt")
 			return err
 		}
-
-		log.Warnf("Failed to restart agent via service: %s; will try again in %v", err.Error(), backExp.NextWait())
+		log.Warnf("Failed to restart agent; will try again in %v", backExp.NextWait())
 	}
 
 	close(signal)
