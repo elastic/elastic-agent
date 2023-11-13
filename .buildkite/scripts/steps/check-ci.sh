@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-source .buildkite/scripts/common.sh
 echo "--- Check CI"
 
 BEAT_VERSION=$(make get-version)
