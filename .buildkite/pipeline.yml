@@ -4,6 +4,15 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
+  - label: "check-ci"
+    key: "check-ci"
+    command: ".buildkite/scripts/steps/check-ci.sh"
+    agents:
+      provider: "gcp"
+      image: "family/core-ubuntu-2204"
+    retry:
+      manual:
+        allowed: true
   - group: "Unit tests"
     key: "unit-tests"
     steps:
