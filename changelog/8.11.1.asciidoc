@@ -1,0 +1,33 @@
+// begin 8.11.1 relnotes
+
+[[release-notes-8.11.1]]
+==  8.11.1
+
+Review important information about the  8.11.1 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.11.1]]
+=== New features
+
+The 8.11.1 release adds the following new and notable features.
+
+
+elastic-agent::
+
+* Add component {id, binary} to monitoring metrics from Elastic Agent and Beats. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3626[#https://github.com/elastic/elastic-agent/pull/3626] {elastic-agent-issue}https://github.com/elastic/integrations/issues/7977[#https://github.com/elastic/integrations/issues/7977]
+
+
+
+
+
+
+
+// end 8.11.1 relnotes
