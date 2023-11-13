@@ -4,7 +4,6 @@ set -euo pipefail
 export PATH=$HOME/bin:${PATH}
 source .buildkite/scripts/install-gh.sh
 
-
 cd deploy/kubernetes
 
 echo "--- [File Creation] Create-Needed-Manifest"
@@ -15,4 +14,5 @@ echo "--- [Clone] Kibana-Repository"
 make ci-clone-kibana-repository
 cp Makefile ./kibana
 cd kibana
+echo "--- Create Kibana PR"
 make ci-create-kubernetes-templates-pull-request

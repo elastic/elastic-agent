@@ -5,6 +5,8 @@ env:
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
   - label: "Sync K8s: Create Kibana PR"
+    env:
+      GH_VERSION: "2.4.0"
     key: "sync-k8s"
     command: ".buildkite/scripts/steps/sync-k8s.sh"
     agents:
