@@ -2,7 +2,7 @@
 
 # Required environment variables:
 # - GH_VERSION - the version of gh to install
-set -euo pipefail
+set -exuo pipefail
 
 echo "--- Install gh cli"
 
@@ -19,8 +19,10 @@ then
     FOUND_GH_VERSION=$(gh --version 2>&1 >/dev/null | awk '{print $3}')
     if [ "$FOUND_GH_VERSION" == "$GH_VERSION" ]
     then
-        echo "Versions match. No need to install gh. Exiting."
+        echo "GH Versions match: $GH_VERSION. No need to install gh. Exiting."
         exit 0
+    else 
+        echo "GH VErsion mismatch. Desired version: $GH_VERSION, found version: $FOUND_GH_VERSION. Installing new version."    
     fi
     set -e
 fi
