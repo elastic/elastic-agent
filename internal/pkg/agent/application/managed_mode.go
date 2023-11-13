@@ -163,7 +163,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
 		m.log.Info("restoring current policy from disk")
-		m.dispatcher.Dispatch(ctx, actionAcker, actions...)
+		m.dispatcher.Dispatch(ctx, m.coord, actionAcker, actions...)
 		stateRestored = true
 	}
 

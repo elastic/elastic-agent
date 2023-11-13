@@ -14,6 +14,8 @@ import (
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -101,7 +103,7 @@ func (ad *ActionDispatcher) key(a fleetapi.Action) string {
 // Dispatch will handle action queue operations, and retries.
 // Any action that implements the ScheduledAction interface may be added/removed from the queue based on StartTime.
 // Any action that implements the RetryableAction interface will be rescheduled if the handler returns an error.
-func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, actions ...fleetapi.Action) {
+func (ad *ActionDispatcher) Dispatch(ctx context.Context, coord *coordinator.Coordinator, acker acker.Acker, actions ...fleetapi.Action) {
 	var err error
 	span, ctx := apm.StartSpan(ctx, "dispatch", "app.internal")
 	defer func() {
@@ -110,6 +112,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 	}()
 
 	ad.removeQueuedUpgrades(actions)
+	reportNextScheduledUpgrade(actions, coord, ad.log)
 	actions = ad.queueScheduledActions(actions)
 	actions = ad.dispatchCancelActions(ctx, actions, acker)
 	queued, expired := ad.gatherQueuedActions(time.Now().UTC())
@@ -276,4 +279,46 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	if err := acker.Commit(ctx); err != nil {
 		ad.log.Errorf("Unable to commit action retry (id %s) to fleet-server: %v", action.ID(), err)
 	}
+}
+
+func reportNextScheduledUpgrade(input []fleetapi.Action, coord *coordinator.Coordinator, log *logger.Logger) {
+	var nextUpgrade *fleetapi.ActionUpgrade
+	for _, action := range input {
+		sAction, ok := action.(fleetapi.ScheduledAction)
+		if !ok {
+			continue
+		}
+
+		uAction, ok := sAction.(*fleetapi.ActionUpgrade)
+		if !ok {
+			continue
+		}
+
+		start, err := uAction.StartTime()
+		if err == fleetapi.ErrNoStartTime {
+			log.Warnf("scheduled upgrade action [id = %s] has no start time!", uAction.ID())
+			continue
+		}
+
+		if nextUpgrade == nil {
+			nextUpgrade = uAction
+			continue
+		}
+
+		nextUpgradeStartTime, _ := nextUpgrade.StartTime()
+		if start.Before(nextUpgradeStartTime) {
+			nextUpgrade = uAction
+		}
+	}
+
+	// If there no scheduled upgrade, there are no upgrade details to report.
+	if nextUpgrade == nil {
+		return
+	}
+
+	upgradeDetails := details.NewDetails(nextUpgrade.Version, details.StateScheduled, nextUpgrade.ID())
+	startTime, _ := nextUpgrade.StartTime()
+	upgradeDetails.Metadata.ScheduledAt = startTime
+
+	coord.SetUpgradeDetails(upgradeDetails)
 }
