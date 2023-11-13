@@ -78,7 +78,7 @@ func (prov *ServerlessProvision) Create(ctx context.Context, request runner.Stac
 	}
 	err = client.WaitForEndpoints(createCtx)
 	if err != nil {
-		return runner.Stack{}, fmt.Errorf("error waiting for endpoints to become available for request: %w", err)
+		return runner.Stack{}, fmt.Errorf("error waiting for endpoints to become available for serverless stack %s [stack_id: %s, deployment_id: %s]: %w", request.Version, request.ID, proj.ID, err)
 	}
 	stack := runner.Stack{
 		ID:            request.ID,
@@ -173,7 +173,7 @@ func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack)
 	prov.log.Logf("Destroying serverless stack %s [stack_id: %s, deployment_id: %s]", stack.Version, stack.ID, deploymentID)
 	err = client.DeleteDeployment()
 	if err != nil {
-		return fmt.Errorf("error removing deployment after re-creating client: %w", err)
+		return fmt.Errorf("error removing serverless stack %s [stack_id: %s, deployment_id: %s]: %w", stack.Version, stack.ID, deploymentID, err)
 	}
 	return nil
 }
