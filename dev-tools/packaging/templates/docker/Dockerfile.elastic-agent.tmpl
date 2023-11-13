@@ -6,9 +6,19 @@
 # the final image because of permission changes.
 FROM {{ .buildFrom }} AS home
 
-COPY beat {{ $beatHome }}
+{{- if ne .user "root" }}
+RUN groupadd --gid 1000 {{ .BeatName }} && \
+    useradd -M --uid 1000 --gid 1000 --groups 0 {{ .user }} && \
+    true
+{{- end }}
 
-RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/logs && \
+COPY --chown={{ .user }}:{{ .user }} beat {{ $beatHome }}
+
+RUN true && \
+{{- if ne .user "root" }}
+    usermod -d {{ $beatHome}} {{ .user }} && \
+{{- end}}
+    mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/logs && \
     find {{ $beatHome }} -type d -exec chmod 0755 {} \; && \
     find {{ $beatHome }} -type f -exec chmod 0644 {} \; && \
     find {{ $beatHome }}/data -type d -exec chmod 0770 {} \; && \
@@ -26,7 +36,7 @@ RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_s
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-collector || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-symbolizer || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-host-agent || true) && \
-    find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chown root:root {} \; && \
+    find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chown {{ .user }}:{{ .user }} {} \; && \
     find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \
 {{- range $i, $modulesd := .ModulesDirs }}
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
@@ -112,11 +122,22 @@ RUN set -e ; \
 COPY docker-entrypoint /usr/local/bin/docker-entrypoint
 RUN chmod 755 /usr/local/bin/docker-entrypoint
 
-COPY --from=home {{ $beatHome }} {{ $beatHome }}
+
+{{- if ne .user "root" }}
+RUN groupadd --gid 1000 {{ .BeatName }} && \
+    useradd -M --uid 1000 --gid 1000 --groups 0 {{ .user }} && \
+    true
+{{- end }}
+
+COPY --chown={{ .user }}:{{ .user }} --from=home {{ $beatHome }} {{ $beatHome }}
 
 # Elastic Agent needs group permissions in the home itself to be able to
 # create fleet.yml when running as non-root.
-RUN chmod 0770 {{ $beatHome }}
+RUN chmod 0770 {{ $beatHome }} && \
+{{- if ne .user "root" }}
+    usermod -d {{ $beatHome}} {{ .user }} && \
+{{- end}}
+    true
 
 RUN mkdir /licenses
 COPY --from=home {{ $beatHome }}/LICENSE.txt /licenses
@@ -132,15 +153,10 @@ COPY --from=home /opt /opt
 RUN mkdir /app
 {{- end }}
 {{- else }}
-RUN groupadd --gid 1000 {{ .BeatName }} && \
-    useradd -M --uid 1000 --gid 1000 --groups 0 --home {{ $beatHome }} {{ .user }} && \
-    chown -R {{ .user }}:{{ .user }} {{ $beatHome }} && \
-    true
-
 {{- if contains .image_name "-cloud" }}
 # Generate folder for a stub command that will be overwritten at runtime
-RUN mkdir /app
-RUN chown {{ .user }} /app
+RUN mkdir /app && \
+    chown {{ .user }} /app
 {{- end }}
 {{- end }}
 
