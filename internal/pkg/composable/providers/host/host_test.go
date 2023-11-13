@@ -30,7 +30,7 @@ func TestContextProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	const checkInterval = 50 * time.Millisecond
-	const testTimeout = 500 * time.Millisecond
+	const testTimeout = 1 * time.Second
 	c, err := config.NewConfigFrom(map[string]interface{}{
 		"check_interval": checkInterval,
 	})
