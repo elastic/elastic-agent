@@ -37,12 +37,12 @@ fi
 
 echo "Downloading gh : ${GH_VERSION}..."
 TMP_DIR=$(mktemp -d)
-if curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_${OS}_${ARCH}.tar.gz" | tar xz -C $TMP_DIR ; then
+if curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" | tar xz -C $TMP_DIR ; then
   mkdir -p "${HOME}/bin"
-  mv "${TMP_DIR}/gh_${GH_VERSION}_${OS}_${ARCH}/bin/gh" "${GH_CMD}"
+  mv "${TMP_DIR}/gh_${GH_VERSION}_linux_amd64/bin/gh" "${GH_CMD}"
   rm -rf ${TMP_DIR}
-else
-    echo "Something bad with the download, let's delete the corrupted binary"
+else    
+    echo "Something bad with the download, deleting the binary"
     if [ -e "${GH_CMD}" ] ; then
         rm "${GH_CMD}"
     fi
