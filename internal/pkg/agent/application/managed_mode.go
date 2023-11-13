@@ -17,6 +17,7 @@ import (
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -163,7 +164,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
 		m.log.Info("restoring current policy from disk")
-		m.dispatcher.Dispatch(ctx, m.coord, actionAcker, actions...)
+		m.dispatcher.Dispatch(ctx, m.coord.SetUpgradeDetails, actionAcker, actions...)
 		stateRestored = true
 	}
 
@@ -229,24 +230,24 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		return gateway.Run(ctx)
 	})
 
-	go runDispatcher(ctx, m.dispatcher, gateway, actionAcker, dispatchFlushInterval)
+	go runDispatcher(ctx, m.dispatcher, gateway, m.coord.SetUpgradeDetails, actionAcker, dispatchFlushInterval)
 
 	<-ctx.Done()
 	return gatewayRunner.Err()
 }
 
 // runDispatcher passes actions collected from gateway to dispatcher or calls Dispatch with no actions every flushInterval.
-func runDispatcher(ctx context.Context, actionDispatcher dispatcher.Dispatcher, fleetGateway coordinator.FleetGateway, actionAcker acker.Acker, flushInterval time.Duration) {
+func runDispatcher(ctx context.Context, actionDispatcher dispatcher.Dispatcher, fleetGateway coordinator.FleetGateway, detailsSetter details.Observer, actionAcker acker.Acker, flushInterval time.Duration) {
 	t := time.NewTimer(flushInterval)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C: // periodically call the dispatcher to handle scheduled actions.
-			actionDispatcher.Dispatch(ctx, actionAcker)
+			actionDispatcher.Dispatch(ctx, detailsSetter, actionAcker)
 			t.Reset(flushInterval)
 		case actions := <-fleetGateway.Actions():
-			actionDispatcher.Dispatch(ctx, actionAcker, actions...)
+			actionDispatcher.Dispatch(ctx, detailsSetter, actionAcker, actions...)
 			t.Reset(flushInterval)
 		}
 	}

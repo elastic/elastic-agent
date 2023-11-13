@@ -14,7 +14,6 @@ import (
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -33,7 +32,7 @@ type priorityQueue interface {
 
 // Dispatcher processes actions coming from fleet api.
 type Dispatcher interface {
-	Dispatch(context.Context, acker.Acker, ...fleetapi.Action)
+	Dispatch(context.Context, details.Observer, acker.Acker, ...fleetapi.Action)
 	Errors() <-chan error
 }
 
@@ -103,7 +102,7 @@ func (ad *ActionDispatcher) key(a fleetapi.Action) string {
 // Dispatch will handle action queue operations, and retries.
 // Any action that implements the ScheduledAction interface may be added/removed from the queue based on StartTime.
 // Any action that implements the RetryableAction interface will be rescheduled if the handler returns an error.
-func (ad *ActionDispatcher) Dispatch(ctx context.Context, coord *coordinator.Coordinator, acker acker.Acker, actions ...fleetapi.Action) {
+func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.Observer, acker acker.Acker, actions ...fleetapi.Action) {
 	var err error
 	span, ctx := apm.StartSpan(ctx, "dispatch", "app.internal")
 	defer func() {
@@ -112,7 +111,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, coord *coordinator.Coo
 	}()
 
 	ad.removeQueuedUpgrades(actions)
-	reportNextScheduledUpgrade(actions, coord, ad.log)
+	reportNextScheduledUpgrade(actions, detailsSetter, ad.log)
 	actions = ad.queueScheduledActions(actions)
 	actions = ad.dispatchCancelActions(ctx, actions, acker)
 	queued, expired := ad.gatherQueuedActions(time.Now().UTC())
@@ -281,7 +280,7 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	}
 }
 
-func reportNextScheduledUpgrade(input []fleetapi.Action, coord *coordinator.Coordinator, log *logger.Logger) {
+func reportNextScheduledUpgrade(input []fleetapi.Action, detailsSetter details.Observer, log *logger.Logger) {
 	var nextUpgrade *fleetapi.ActionUpgrade
 	for _, action := range input {
 		sAction, ok := action.(fleetapi.ScheduledAction)
@@ -297,6 +296,10 @@ func reportNextScheduledUpgrade(input []fleetapi.Action, coord *coordinator.Coor
 		start, err := uAction.StartTime()
 		if err == fleetapi.ErrNoStartTime {
 			log.Warnf("scheduled upgrade action [id = %s] has no start time!", uAction.ID())
+			continue
+		}
+
+		if !start.After(time.Now()) {
 			continue
 		}
 
@@ -320,5 +323,5 @@ func reportNextScheduledUpgrade(input []fleetapi.Action, coord *coordinator.Coor
 	startTime, _ := nextUpgrade.StartTime()
 	upgradeDetails.Metadata.ScheduledAt = startTime
 
-	coord.SetUpgradeDetails(upgradeDetails)
+	detailsSetter(upgradeDetails)
 }

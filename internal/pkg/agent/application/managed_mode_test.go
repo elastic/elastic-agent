@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
@@ -22,8 +23,8 @@ type mockDispatcher struct {
 	mock.Mock
 }
 
-func (m *mockDispatcher) Dispatch(ctx context.Context, ack acker.Acker, actions ...fleetapi.Action) {
-	m.Called(ctx, ack, actions)
+func (m *mockDispatcher) Dispatch(ctx context.Context, detailsSetter details.Observer, ack acker.Acker, actions ...fleetapi.Action) {
+	m.Called(ctx, detailsSetter, ack, actions)
 }
 
 func (m *mockDispatcher) Errors() <-chan error {
@@ -126,11 +127,12 @@ func Test_runDispatcher(t *testing.T) {
 			ch := make(chan []fleetapi.Action, 1)
 			gateway := tc.mockGateway(ch)
 			dispatcher := tc.mockDispatcher()
+			detailsSetter := func(upgradeDetails *details.Details) {}
 			acker := &mockAcker{}
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 			defer cancel()
-			runDispatcher(ctx, dispatcher, gateway, acker, tc.interval)
+			runDispatcher(ctx, dispatcher, gateway, detailsSetter, acker, tc.interval)
 			assert.Empty(t, ch)
 
 			gateway.AssertExpectations(t)

@@ -9,13 +9,17 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type mockHandler struct {
@@ -107,6 +111,7 @@ func (m *mockQueue) Save() error {
 }
 
 func TestActionDispatcher(t *testing.T) {
+	detailsSetter := func(upgradeDetails *details.Details) {}
 	ack := noop.New()
 
 	t.Run("Success to dispatch multiples events", func(t *testing.T) {
@@ -139,7 +144,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(ctx)
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action1, action2)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action1, action2)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -166,7 +171,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(ctx)
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -216,7 +221,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action1, action2)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action1, action2)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -247,7 +252,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action)
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
@@ -287,7 +292,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action2)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action2)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -310,7 +315,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack)
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
@@ -345,7 +350,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -379,7 +384,7 @@ func TestActionDispatcher(t *testing.T) {
 		// launch in another routing and sleep to check if an error is generated
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action1, action2)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action1, action2)
 		time.Sleep(time.Millisecond * 200)
 		select {
 		case <-d.Errors():
@@ -422,7 +427,7 @@ func TestActionDispatcher(t *testing.T) {
 		// launch in another routing and sleep to check if an error is generated
 		dispatchCtx1, cancelFn1 := context.WithCancel(context.Background())
 		defer cancelFn1()
-		go d.Dispatch(dispatchCtx1, ack, action1)
+		go d.Dispatch(dispatchCtx1, detailsSetter, ack, action1)
 		select {
 		case err := <-d.Errors():
 			if err == nil {
@@ -433,7 +438,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx2, cancelFn2 := context.WithCancel(context.Background())
 		defer cancelFn2()
-		go d.Dispatch(dispatchCtx2, ack, action2)
+		go d.Dispatch(dispatchCtx2, detailsSetter, ack, action2)
 		select {
 		case err := <-d.Errors():
 			if err != nil {
@@ -483,4 +488,87 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 		queue.AssertExpectations(t)
 		action.AssertExpectations(t)
 	})
+}
+
+func TestReportNextScheduledUpgrade(t *testing.T) {
+	now := time.Now().UTC()
+	later := now.Add(3 * time.Hour)
+	muchLater := later.Add(3 * time.Hour)
+
+	cases := map[string]struct {
+		actions               []fleetapi.Action
+		expectedDetails       *details.Details
+		expectedWarningLogMsg string
+	}{
+		"no_scheduled_upgrades": {
+			actions: []fleetapi.Action{
+				&fleetapi.ActionUpgrade{
+					ActionID: "action1",
+					Version:  "8.12.3",
+				},
+			},
+			expectedWarningLogMsg: "scheduled upgrade action [id = action1] has no start time!",
+		},
+		"one_scheduled_upgrade": {
+			actions: []fleetapi.Action{
+				&fleetapi.ActionUpgrade{
+					ActionID:        "action2",
+					ActionStartTime: later.Format(time.RFC3339),
+					Version:         "8.13.0",
+				},
+			},
+			expectedDetails: &details.Details{
+				TargetVersion: "8.13.0",
+				State:         details.StateScheduled,
+				ActionID:      "action2",
+				Metadata: details.Metadata{
+					ScheduledAt: later.Truncate(time.Second),
+				},
+			},
+		},
+		"many_scheduled_upgrades": {
+			actions: []fleetapi.Action{
+				&fleetapi.ActionUpgrade{
+					ActionID:        "action3",
+					ActionStartTime: muchLater.Format(time.RFC3339),
+					Version:         "8.14.1",
+				},
+				&fleetapi.ActionUpgrade{
+					ActionID:        "action4",
+					ActionStartTime: later.Format(time.RFC3339),
+					Version:         "8.13.5",
+				},
+			},
+			expectedDetails: &details.Details{
+				TargetVersion: "8.13.5",
+				State:         details.StateScheduled,
+				ActionID:      "action4",
+				Metadata: details.Metadata{
+					ScheduledAt: later.Truncate(time.Second),
+				},
+			},
+		},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			var actualDetails *details.Details
+			detailsSetter := func(upgradeDetails *details.Details) {
+				actualDetails = upgradeDetails
+			}
+			log, obs := logger.NewTesting("report_next_upgrade_details")
+
+			reportNextScheduledUpgrade(test.actions, detailsSetter, log)
+
+			//require.True(t, test.expectedDetails.Equals(actualDetails))
+			require.Equal(t, test.expectedDetails, actualDetails) // FIXME replace with above assertion once https://github.com/elastic/elastic-agent/pull/3694 is merged
+			if test.expectedWarningLogMsg != "" {
+				logs := obs.TakeAll()
+				require.Len(t, logs, 1)
+				require.Equal(t, zapcore.WarnLevel, logs[0].Level)
+				require.Equal(t, test.expectedWarningLogMsg, logs[0].Message)
+			}
+
+		})
+	}
 }
