@@ -13,19 +13,17 @@ import (
 
 	"github.com/hectane/go-acl"
 	"golang.org/x/sys/windows"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-// fixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
-func fixPermissions(topPath string) error {
-	return recursiveSystemAdminPermissions(topPath)
-}
-
-func recursiveSystemAdminPermissions(path string) error {
-	return filepath.Walk(path, func(name string, info fs.FileInfo, err error) error {
+// FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
+func FixPermissions(topPath string, ownership utils.FileOwner) error {
+	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
 		if err == nil {
 			// first level doesn't inherit
 			inherit := true
-			if path == name {
+			if topPath == name {
 				inherit = false
 			}
 			err = systemAdministratorsOnly(name, inherit)
@@ -38,11 +36,11 @@ func recursiveSystemAdminPermissions(path string) error {
 
 func systemAdministratorsOnly(path string, inherit bool) error {
 	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
-	systemSID, err := windows.StringToSid("S-1-5-18")
+	systemSID, err := windows.StringToSid(utils.SystemSID)
 	if err != nil {
 		return err
 	}
-	administratorsSID, err := windows.StringToSid("S-1-5-32-544")
+	administratorsSID, err := windows.StringToSid(utils.AdministratorSID)
 	if err != nil {
 		return err
 	}

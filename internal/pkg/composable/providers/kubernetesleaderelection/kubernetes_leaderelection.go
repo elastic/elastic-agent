@@ -83,12 +83,13 @@ func (p *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 			},
 		},
 		ReleaseOnCancel: true,
-		LeaseDuration:   15 * time.Second,
-		RenewDeadline:   10 * time.Second,
-		RetryPeriod:     2 * time.Second,
+		LeaseDuration:   time.Duration(p.config.LeaseDuration) * time.Second,
+		RenewDeadline:   time.Duration(p.config.RenewDeadline) * time.Second,
+		RetryPeriod:     time.Duration(p.config.RetryPeriod) * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				p.logger.Debugf("leader election lock GAINED, id %v", id)
+				p.logger.Debugf("leader configuration timings: LeaseDuration: %v , RenewDeadline: %v, RetryPeriod: %v", p.leaderElection.LeaseDuration, p.leaderElection.RenewDeadline, p.leaderElection.RetryPeriod)
 				p.startLeading(comm)
 			},
 			OnStoppedLeading: func() {

@@ -4,97 +4,138 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
-  - label: "Unit tests - Ubuntu 22.04"
-    key: "unit-tests-2204"
-    command: ".buildkite/scripts/steps/unit-tests.sh"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-      - "coverage.out"
-    agents:
-      provider: "gcp"
-      image: "family/core-ubuntu-2204"
-    retry:
-      manual:
-        allowed: true
+  - group: "Unit tests"
+    key: "unit-tests"
+    steps:
+      - label: "Unit tests - Ubuntu 22.04"
+        key: "unit-tests-2204"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "gcp"
+          image: "family/core-ubuntu-2204"
+        retry:
+          manual:
+            allowed: true
 
-  - label: "Unit tests - Ubuntu 22.04 ARM64"
-    key: "unit-tests-2204-arm64"
-    command: ".buildkite/scripts/steps/unit-tests.sh"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-      - "coverage.out"
-    agents:
-      provider: "aws"
-      imagePrefix: "core-ubuntu-2204-aarch64"
-      diskSizeGb: 200
-      instanceType: "m6g.4xlarge"
-    retry:
-      manual:
-        allowed: true
+      - label: "Unit tests - Ubuntu 22.04 ARM64"
+        key: "unit-tests-2204-arm64"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "aws"
+          imagePrefix: "core-ubuntu-2204-aarch64"
+          diskSizeGb: 200
+          instanceType: "m6g.xlarge"
+        retry:
+          manual:
+            allowed: true
 
-  - label: "Unit tests - Windows 2022"
-    key: "unit-tests-win2022"
-    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-      - "coverage.out"
-    agents:
-      provider: "gcp"
-      image: "family/core-windows-2022"
-      machine_type: "n2-standard-8"
-      disk_size: 200
-      disk_type: "pd-ssd"
-    retry:
-      manual:
-        allowed: true
+      - label: "Unit tests - Windows 2022"
+        key: "unit-tests-win2022"
+        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "gcp"
+          image: "family/core-windows-2022"
+          machine_type: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          manual:
+            allowed: true
 
-  - label: "Unit tests - Windows 2016"
-    key: "unit-tests-win2016"
-    command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-      - "coverage.out"
-    agents:
-      provider: "gcp"
-      image: "family/core-windows-2016"
-      machine_type: "n2-standard-8"
-      disk_size: 200
-      disk_type: "pd-ssd"
-    retry:
-      manual:
-        allowed: true
+      - label: "Unit tests - Windows 2016"
+        key: "unit-tests-win2016"
+        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "gcp"
+          image: "family/core-windows-2016"
+          machine_type: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          manual:
+            allowed: true
 
-  - label: "Unit tests - MacOS 13 ARM"
-    key: "unit-tests-macos-13-arm"
-    command: ".buildkite/scripts/steps/unit-tests.sh"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-      - "coverage.out"
-    agents:
-      provider: orka
-      imagePrefix: generic-13-ventura-arm
-    retry:
-      manual:
-        allowed: true
+      # Runs inly on the main branch
+      - label: "Unit tests - MacOS 13 ARM"
+        key: "unit-tests-macos-13-arm"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        branches: main
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: orka
+          imagePrefix: generic-13-ventura-arm
+        retry:
+          manual:
+            allowed: true
 
-  - label: "Unit tests - MacOS 13"
-    key: "unit-tests-macos-13"
-    command: ".buildkite/scripts/steps/unit-tests.sh"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-      - "coverage.out"
-    agents:
-      provider: orka
-      imagePrefix: generic-13-ventura-x64
-    retry:
-      manual:
-        allowed: true
+      - label: "Unit tests - MacOS 13"
+        key: "unit-tests-macos-13"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: orka
+          imagePrefix: generic-13-ventura-x64
+        retry:
+          manual:
+            allowed: true
+
+  - group: "Desktop Windows tests"
+    key: "extended-windows"
+    steps:
+      - label: "Unit tests - Windows 10"
+        key: "unit-tests-win10"
+        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "gcp"
+          # TODO create own image
+          image: "family/endpoint-windows-10-tester-rel"
+          machine_type: "n2-standard-8"
+          disk_type: "pd-ssd"
+        retry:
+          manual:
+            allowed: true
+      - label: "Unit tests - Windows 11"
+        key: "unit-tests-win11"
+        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "gcp"
+          # TODO create own image
+          image: "family/endpoint-windows-11-tester-rel"
+          machine_type: "n2-standard-8"
+          disk_type: "pd-ssd"
+        retry:
+          manual:
+            allowed: true
 
   - label: "Merge coverage reports"
     key: "merge-coverage"
@@ -107,19 +148,16 @@ steps:
       unit-tests-win2016
       unit-tests-win2022
       unit-tests-macos-13
-      unit-tests-macos-13-arm
+      unit-tests-win10
+      unit-tests-win11
       "
     artifact_paths:
       - "build/TEST-**"
     agents:
       image: "golang:1.20.10"
     depends_on:
-      - unit-tests-2204
-      - unit-tests-2204-arm64
-      - unit-tests-win2022
-      - unit-tests-win2016
-      - unit-tests-macos-13
-      - unit-tests-macos-13-arm
+      - unit-tests
+      - extended-windows
     allow_dependency_failure: true
 
   - group: "K8s tests"
