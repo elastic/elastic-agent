@@ -144,6 +144,13 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		return err
 	}
 
+	// watch succeeded - upgrade was successful!
+	marker.Details.SetState(details.StateCompleted)
+	err = upgrade.SaveMarker(marker)
+	if err != nil {
+		log.Errorf("unable to save upgrade marker after successful watch: %s", err.Error())
+	}
+
 	// cleanup older versions,
 	// in windows it might leave self untouched, this will get cleaned up
 	// later at the start, because for windows we leave marker untouched.
