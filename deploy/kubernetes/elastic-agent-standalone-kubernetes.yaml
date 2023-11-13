@@ -133,6 +133,21 @@ data:
             # ssl.certificate_authorities:
             #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
           - data_stream:
+              dataset: kubernetes.state_namespace
+              type: metrics
+            metricsets:
+              - state_namespace
+            add_metadata: true
+            hosts:
+              - 'kube-state-metrics:8080'
+            period: 10s
+            # Openshift:
+            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
+            # and/or tls termination, then configuration below should be considered:
+            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            # ssl.certificate_authorities:
+            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          - data_stream:
               dataset: kubernetes.state_node
               type: metrics
             metricsets:
@@ -712,7 +727,7 @@ spec:
                   fieldPath: metadata.name
             - name: STATE_PATH
               value: "/etc/elastic-agent"
-            # The following ELASTIC_NETINFO:false variable will disable the netinfo.enabled option of add-host-metadata processor. This will remove fields host.ip and host.mac.  
+            # The following ELASTIC_NETINFO:false variable will disable the netinfo.enabled option of add-host-metadata processor. This will remove fields host.ip and host.mac.
             # For more info: https://www.elastic.co/guide/en/beats/metricbeat/current/add-host-metadata.html
             - name: ELASTIC_NETINFO
               value: "false"
