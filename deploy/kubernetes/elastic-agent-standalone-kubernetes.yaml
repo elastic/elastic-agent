@@ -35,7 +35,7 @@ data:
         meta:
           package:
             name: kubernetes
-            version: 1.29.2
+            version: 1.52.0
         data_stream:
           namespace: default
         streams:
@@ -352,7 +352,7 @@ data:
         meta:
           package:
             name: kubernetes
-            version: 1.29.2
+            version: 1.52.0
         data_stream:
           namespace: default
         streams:
@@ -380,7 +380,7 @@ data:
         meta:
           package:
             name: kubernetes
-            version: 1.29.2
+            version: 1.52.0
         data_stream:
           namespace: default
         streams:
@@ -521,7 +521,7 @@ data:
         meta:
           package:
             name: kubernetes
-            version: 1.29.2
+            version: 1.52.0
         data_stream:
           namespace: default
         streams:
