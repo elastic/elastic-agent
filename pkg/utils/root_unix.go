@@ -16,5 +16,5 @@ const (
 // HasRoot returns true if the user has root permissions.
 // Added extra `nil` value to return since the HasRoot for windows will return an error as well
 func HasRoot() (bool, error) {
-	return os.Getegid() == 0, nil
+	return os.Geteuid() == 0, nil
 }

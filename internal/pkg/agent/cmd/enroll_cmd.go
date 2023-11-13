@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/utils"
+
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"go.elastic.co/apm"
@@ -260,7 +262,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	}
 
 	if c.options.FixPermissions {
-		err = install.FixPermissions(paths.Top())
+		err = install.FixPermissions(paths.Top(), utils.CurrentFileOwner())
 		if err != nil {
 			return errors.New(err, "failed to fix permissions")
 		}
@@ -1064,10 +1066,15 @@ func expBackoffWithContext(ctx context.Context, init, max time.Duration) backoff
 
 func cleanTags(tags []string) []string {
 	var r []string
+	// Create a map to store unique elements
+	seen := make(map[string]bool)
 	for _, str := range tags {
 		tag := strings.TrimSpace(str)
 		if tag != "" {
-			r = append(r, tag)
+			if _, ok := seen[tag]; !ok {
+				seen[tag] = true
+				r = append(r, tag)
+			}
 		}
 	}
 	return r
