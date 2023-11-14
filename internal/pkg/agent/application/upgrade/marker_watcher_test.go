@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+
 	"github.com/stretchr/testify/require"
 
 	"gopkg.in/yaml.v2"
@@ -57,7 +59,8 @@ func TestMarkerWatcher(t *testing.T) {
 		State:         details.StateWatching,
 	}
 	marker := updateMarkerSerializer{
-		Details: expectedDetails,
+		PrevVersion: "8.6.0",
+		Details:     expectedDetails,
 	}
 	data, err := yaml.Marshal(marker)
 	require.NoError(t, err)
@@ -75,4 +78,132 @@ func TestMarkerWatcher(t *testing.T) {
 	}, 1*time.Second, 10*time.Millisecond)
 
 	require.NoError(t, testErr)
+}
+
+func TestProcessMarker(t *testing.T) {
+	cases := map[string]struct {
+		markerFileContents string
+
+		expectedErrLogMsg bool
+		expectedDetails   *details.Details
+	}{
+		"failed_loading": {
+			markerFileContents: `
+invalid
+`,
+			expectedErrLogMsg: true,
+			expectedDetails:   nil,
+		},
+		"no_marker": {
+			markerFileContents: "",
+			expectedErrLogMsg:  false,
+			expectedDetails:    nil,
+		},
+		"same_version_no_details": {
+			markerFileContents: `
+prev_version: 8.9.2
+`,
+			expectedDetails: &details.Details{
+				TargetVersion: "unknown",
+				State:         details.StateRollback,
+			},
+		},
+		"same_version_with_details_no_state": {
+			markerFileContents: `
+prev_version: 8.9.2
+details:
+  target_version: 8.9.2
+`,
+			expectedErrLogMsg: false,
+			expectedDetails: &details.Details{
+				TargetVersion: "8.9.2",
+				State:         details.StateRollback,
+			},
+		},
+		"same_version_with_details_wrong_state": {
+			markerFileContents: `
+prev_version: 8.9.2
+details:
+  target_version: 8.9.2
+  state: UPG_WATCHING
+`,
+			expectedErrLogMsg: false,
+			expectedDetails: &details.Details{
+				TargetVersion: "8.9.2",
+				State:         details.StateRollback,
+			},
+		},
+		"different_version": {
+			markerFileContents: `
+prev_version: 8.8.2
+details:
+  target_version: 8.9.2
+  state: UPG_WATCHING
+`,
+			expectedErrLogMsg: false,
+			expectedDetails: &details.Details{
+				TargetVersion: "8.9.2",
+				State:         details.StateWatching,
+			},
+		},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			testMarkerFilePath := filepath.Join(tmpDir, markerFilename)
+			if test.markerFileContents != "" {
+				err := os.WriteFile(testMarkerFilePath, []byte(test.markerFileContents), 0644)
+				require.NoError(t, err)
+			}
+			log, obs := logger.NewTesting("marker_watcher")
+			updateCh := make(chan UpdateMarker)
+			mfw := MarkerFileWatcher{
+				markerFilePath: testMarkerFilePath,
+				logger:         log,
+				updateCh:       updateCh,
+			}
+
+			done := make(chan struct{})
+			var markerRead bool
+			var actualMarker UpdateMarker
+			go func() {
+				for {
+					select {
+					case <-done:
+						return
+					case m := <-updateCh:
+						markerRead = true
+						actualMarker = m
+					}
+				}
+			}()
+
+			mfw.processMarker("8.9.2")
+
+			// error loading marker
+			if test.expectedErrLogMsg {
+				done <- struct{}{}
+				logs := obs.FilterLevelExact(zapcore.ErrorLevel).TakeAll()
+				require.NotEmpty(t, logs)
+				require.False(t, markerRead)
+				return
+			}
+
+			// no marker
+			if test.markerFileContents == "" {
+				done <- struct{}{}
+				require.False(t, markerRead)
+				return
+			}
+
+			// marker exists and can be read
+			require.Eventually(t, func() bool {
+				return markerRead
+			}, 5*time.Second, 100*time.Millisecond)
+
+			require.True(t, actualMarker.Details.Equals(test.expectedDetails))
+		})
+
+	}
 }

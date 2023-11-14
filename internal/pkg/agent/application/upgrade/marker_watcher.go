@@ -12,7 +12,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/version"
-
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -91,10 +90,10 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 				case e.Op&(fsnotify.Create|fsnotify.Write) != 0:
 					// Upgrade marker file was created or updated; read its contents
 					// and send them over the update channel.
-					mfw.processMarker()
+					mfw.processMarker(version.GetAgentPackageVersion())
 				}
 			case <-doInitialRead:
-				mfw.processMarker()
+				mfw.processMarker(version.GetAgentPackageVersion())
 			}
 		}
 	}()
@@ -102,7 +101,7 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 	return nil
 }
 
-func (mfw *MarkerFileWatcher) processMarker() {
+func (mfw *MarkerFileWatcher) processMarker(currentVersion string) {
 	marker, err := loadMarker(mfw.markerFilePath)
 	if err != nil {
 		mfw.logger.Error(err)
@@ -120,7 +119,7 @@ func (mfw *MarkerFileWatcher) processMarker() {
 	// been recorded in the marker's upgrade details field but, in case it
 	// isn't for some reason, we fallback to explicitly setting that state as
 	// part of the upgrade details in the marker.
-	if marker.PrevVersion == version.GetAgentPackageVersion() {
+	if marker.PrevVersion == currentVersion {
 		if marker.Details == nil {
 			marker.Details = details.NewDetails("unknown", details.StateRollback, marker.GetActionID())
 		} else {
