@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
@@ -18,17 +18,15 @@ import (
 
 // ServerlessProvision contains
 type ServerlessProvision struct {
-	stacksMut sync.RWMutex
-	stacks    map[string]stackhandlerData
-	cfg       ProvisionerConfig
-	log       runner.Logger
+	cfg ProvisionerConfig
+	log runner.Logger
 }
 
 type defaultLogger struct {
 	wrapped *logp.Logger
 }
 
-// / implements the runner.Logger interface
+// Logf implements the runner.Logger interface
 func (log *defaultLogger) Logf(format string, args ...any) {
 	if len(args) == 0 {
 
@@ -36,12 +34,6 @@ func (log *defaultLogger) Logf(format string, args ...any) {
 		log.wrapped.Infof(format, args)
 	}
 
-}
-
-// tracks the data that maps to a single serverless deployment
-type stackhandlerData struct {
-	client    *ServerlessClient
-	stackData runner.Stack
 }
 
 // ServerlessRegions is the JSON response from the serverless regions API endpoint
@@ -55,9 +47,8 @@ type ServerlessRegions struct {
 // NewServerlessProvisioner creates a new StackProvisioner instance for serverless
 func NewServerlessProvisioner(cfg ProvisionerConfig) (runner.StackProvisioner, error) {
 	prov := &ServerlessProvision{
-		cfg:    cfg,
-		stacks: map[string]stackhandlerData{},
-		log:    &defaultLogger{wrapped: logp.L()},
+		cfg: cfg,
+		log: &defaultLogger{wrapped: logp.L()},
 	}
 	err := prov.CheckCloudRegion()
 	if err != nil {
@@ -71,114 +62,118 @@ func (prov *ServerlessProvision) SetLogger(l runner.Logger) {
 	prov.log = l
 }
 
-// Provision a new set of serverless instances
-func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runner.StackRequest) ([]runner.Stack, error) {
-	upWaiter := sync.WaitGroup{}
-	depErrs := make(chan error, len(requests))
-	depUp := make(chan bool, len(requests))
-	stacks := []runner.Stack{}
-	for _, req := range requests {
-		client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
-		srvReq := ServerlessRequest{Name: req.ID, RegionID: prov.cfg.Region}
-		proj, err := client.DeployStack(ctx, srvReq)
-		if err != nil {
-			return nil, fmt.Errorf("error deploying stack for request %s: %w", req.ID, err)
-		}
-		err = client.WaitForEndpoints(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("error waiting for endpoints to become available for request: %w", err)
-		}
-		newStack := runner.Stack{
-			ID:            req.ID,
-			Version:       req.Version,
-			Elasticsearch: client.proj.Endpoints.Elasticsearch,
-			Kibana:        client.proj.Endpoints.Kibana,
-			Username:      client.proj.Credentials.Username,
-			Password:      client.proj.Credentials.Password,
-			Internal: map[string]interface{}{
-				"deployment_id":   proj.ID,
-				"deployment_type": proj.Type,
-			},
-		}
-		stacks = append(stacks, newStack)
-		prov.stacksMut.Lock()
-		prov.stacks[req.ID] = stackhandlerData{client: client, stackData: newStack}
-		prov.stacksMut.Unlock()
+// Create creates a stack.
+func (prov *ServerlessProvision) Create(ctx context.Context, request runner.StackRequest) (runner.Stack, error) {
+	// allow up to 4 minutes for requests
+	createCtx, createCancel := context.WithTimeout(ctx, 4*time.Minute)
+	defer createCancel()
 
-		upWaiter.Add(1)
-		go func() {
-			isUp, err := client.DeploymentIsReady(ctx)
-			if err != nil {
-				depErrs <- err
+	client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
+	srvReq := ServerlessRequest{Name: request.ID, RegionID: prov.cfg.Region}
 
-			}
-			depUp <- isUp
-		}()
+	prov.log.Logf("Creating serverless stack %s [stack_id: %s]", request.Version, request.ID)
+	proj, err := client.DeployStack(createCtx, srvReq)
+	if err != nil {
+		return runner.Stack{}, fmt.Errorf("error deploying stack for request %s: %w", request.ID, err)
+	}
+	err = client.WaitForEndpoints(createCtx)
+	if err != nil {
+		return runner.Stack{}, fmt.Errorf("error waiting for endpoints to become available for serverless stack %s [stack_id: %s, deployment_id: %s]: %w", request.Version, request.ID, proj.ID, err)
+	}
+	stack := runner.Stack{
+		ID:            request.ID,
+		Version:       request.Version,
+		Elasticsearch: client.proj.Endpoints.Elasticsearch,
+		Kibana:        client.proj.Endpoints.Kibana,
+		Username:      client.proj.Credentials.Username,
+		Password:      client.proj.Credentials.Password,
+		Internal: map[string]interface{}{
+			"deployment_id":   proj.ID,
+			"deployment_type": proj.Type,
+		},
+		Ready: false,
+	}
+	prov.log.Logf("Created serverless stack %s [stack_id: %s, deployment_id: %s]", request.Version, request.ID, proj.ID)
+	return stack, nil
+}
+
+// WaitForReady should block until the stack is ready or the context is cancelled.
+func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.Stack) (runner.Stack, error) {
+	deploymentID, deploymentType, err := prov.getDeploymentInfo(stack)
+	if err != nil {
+		return stack, fmt.Errorf("failed to get deployment info from the stack: %w", err)
 	}
 
-	gotUp := 0
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
+	client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
+	client.proj.ID = deploymentID
+	client.proj.Type = deploymentType
+	client.proj.Region = prov.cfg.Region
+	client.proj.Endpoints.Elasticsearch = stack.Elasticsearch
+	client.proj.Endpoints.Kibana = stack.Kibana
+	client.proj.Credentials.Username = stack.Username
+	client.proj.Credentials.Password = stack.Password
+
+	prov.log.Logf("Waiting for serverless stack %s to be ready [stack_id: %s, deployment_id: %s]", stack.Version, stack.ID, deploymentID)
+
+	errCh := make(chan error)
+	var lastErr error
+
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
-		case err := <-depErrs:
-			return nil, fmt.Errorf("error waiting for stacks to become available: %w", err)
-		case isUp := <-depUp:
-			if isUp {
-				gotUp++
+			if lastErr == nil {
+				lastErr = ctx.Err()
 			}
-			if gotUp >= len(requests) {
-				return stacks, nil
+			return stack, fmt.Errorf("serverless stack %s [stack_id: %s, deployment_id: %s] never became ready: %w", stack.Version, stack.ID, deploymentID, lastErr)
+		case <-ticker.C:
+			go func() {
+				statusCtx, statusCancel := context.WithTimeout(ctx, 30*time.Second)
+				defer statusCancel()
+				ready, err := client.DeploymentIsReady(statusCtx)
+				if err != nil {
+					errCh <- err
+				} else if !ready {
+					errCh <- fmt.Errorf("serverless stack %s [stack_id: %s, deployment_id: %s] never became ready", stack.Version, stack.ID, deploymentID)
+				} else {
+					errCh <- nil
+				}
+			}()
+		case err := <-errCh:
+			if err == nil {
+				stack.Ready = true
+				return stack, nil
 			}
+			lastErr = err
 		}
 	}
-
 }
 
-// Clean shuts down and removes the deployments
-func (prov *ServerlessProvision) Clean(ctx context.Context, stacks []runner.Stack) error {
-	for _, stack := range stacks {
-		prov.stacksMut.RLock()
-		// because of the way the provisioner initializes,
-		// we can't guarantee that we have a valid client/stack setup, as we might have just re-initialized from a file.
-		// If that's the case, create a new client
-		stackRef, ok := prov.stacks[stack.ID]
-		prov.stacksMut.RUnlock()
-		// we can't reference the client, it won't be created when we just run mage:clean
-		// instead, grab the project ID from `stacks`, create a new client
-		if ok {
-			err := stackRef.client.DeleteDeployment()
-			if err != nil {
-				prov.log.Logf("error removing deployment: %w", err)
-			}
-		} else {
-			// create a new client
-			client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
-			dep_id, ok := stack.Internal["deployment_id"]
-			if !ok {
-				return fmt.Errorf("could not find deployment_id for serverless")
-			}
-			dep_id_str, ok := dep_id.(string)
-			if !ok {
-				return fmt.Errorf("deployment_id is not a string: %v", dep_id)
-			}
-			client.proj.ID = dep_id_str
+// Delete deletes a stack.
+func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack) error {
+	deploymentID, deploymentType, err := prov.getDeploymentInfo(stack)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment info from the stack: %w", err)
+	}
 
-			dep_type, ok := stack.Internal["deployment_type"]
-			if !ok {
-				return fmt.Errorf("could not find deployment_type in stack for serverless")
-			}
-			dep_type_str, ok := dep_type.(string)
-			if !ok {
-				return fmt.Errorf("deployment_type is not a string: %v", dep_id_str)
-			}
-			client.proj.Type = dep_type_str
-			err := client.DeleteDeployment()
-			if err != nil {
-				return fmt.Errorf("error removing deployment after re-creating client: %w", err)
-			}
+	client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
+	client.proj.ID = deploymentID
+	client.proj.Type = deploymentType
+	client.proj.Region = prov.cfg.Region
+	client.proj.Endpoints.Elasticsearch = stack.Elasticsearch
+	client.proj.Endpoints.Kibana = stack.Kibana
+	client.proj.Credentials.Username = stack.Username
+	client.proj.Credentials.Password = stack.Password
 
-		}
+	prov.log.Logf("Destroying serverless stack %s [stack_id: %s, deployment_id: %s]", stack.Version, stack.ID, deploymentID)
+	err = client.DeleteDeployment()
+	if err != nil {
+		return fmt.Errorf("error removing serverless stack %s [stack_id: %s, deployment_id: %s]: %w", stack.Version, stack.ID, deploymentID, err)
 	}
 	return nil
 }
@@ -234,4 +229,27 @@ func (prov *ServerlessProvision) CheckCloudRegion() error {
 	}
 
 	return nil
+}
+
+func (prov *ServerlessProvision) getDeploymentInfo(stack runner.Stack) (string, string, error) {
+	if stack.Internal == nil {
+		return "", "", fmt.Errorf("missing internal information")
+	}
+	deploymentIDRaw, ok := stack.Internal["deployment_id"]
+	if !ok {
+		return "", "", fmt.Errorf("missing internal deployment_id")
+	}
+	deploymentID, ok := deploymentIDRaw.(string)
+	if !ok {
+		return "", "", fmt.Errorf("internal deployment_id not a string")
+	}
+	deploymentTypeRaw, ok := stack.Internal["deployment_type"]
+	if !ok {
+		return "", "", fmt.Errorf("missing internal deployment_type")
+	}
+	deploymentType, ok := deploymentTypeRaw.(string)
+	if !ok {
+		return "", "", fmt.Errorf("internal deployment_type is not a string")
+	}
+	return deploymentID, deploymentType, nil
 }

@@ -17,7 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 )
 
-var serverlessURL = "https://staging.found.no"
+var serverlessURL = "https://cloud.elastic.co"
 
 // ServerlessClient is the handler the serverless ES instance
 type ServerlessClient struct {
