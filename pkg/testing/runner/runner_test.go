@@ -103,15 +103,15 @@ func (f *fakeInstanceProvisioner) Name() string {
 	return "fake"
 }
 
-func (f *fakeInstanceProvisioner) SetLogger(_ Logger) {
+func (p *fakeInstanceProvisioner) SetLogger(_ Logger) {
 }
 
-func (f *fakeInstanceProvisioner) Supported(_ define.OS) bool {
+func (p *fakeInstanceProvisioner) Supported(_ define.OS) bool {
 	return true
 }
 
-func (f *fakeInstanceProvisioner) Provision(_ context.Context, _ Config, batches []OSBatch) ([]Instance, error) {
-	f.batches = batches
+func (p *fakeInstanceProvisioner) Provision(_ context.Context, _ Config, batches []OSBatch) ([]Instance, error) {
+	p.batches = batches
 	var instances []Instance
 	for _, batch := range batches {
 		instances = append(instances, Instance{
@@ -126,8 +126,8 @@ func (f *fakeInstanceProvisioner) Provision(_ context.Context, _ Config, batches
 	return instances, nil
 }
 
-func (f *fakeInstanceProvisioner) Clean(_ context.Context, _ Config, instances []Instance) error {
-	f.instances = instances
+func (p *fakeInstanceProvisioner) Clean(_ context.Context, _ Config, instances []Instance) error {
+	p.instances = instances
 	return nil
 }
 
