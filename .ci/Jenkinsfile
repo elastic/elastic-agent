@@ -65,77 +65,7 @@ pipeline {
           setEnvVar('GO_VERSION', readFile(file: '.go-version')?.trim())
         }
       }
-    }    
-    stage('Test') {
-      when {
-        beforeAgent true
-        expression { return env.ONLY_DOCS == "false" }
-      }
-      failFast false
-      matrix {
-        agent {label "${PLATFORM}"}
-        options { skipDefaultCheckout() }
-        axes {
-          axis {
-            name 'PLATFORM'
-            // Orka workers are not healthy (memory and connectivity issues)
-            values 'ubuntu-22 && immutable', 'aws && aarch64 && gobld/diskSizeGb:200', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable' //, 'macos12 && x86_64'
-          }
-        }
-        stages {                  
-          stage('Package') {
-            when {
-              beforeAgent true
-              allOf {
-                anyOf {
-                  expression { return isE2eEnabled() }
-                  expression { return isPackageEnabled() }
-                  not { changeRequest() }
-                }
-                // Run packaging only for the linux specific arch
-                expression { return (PLATFORM.contains('ubuntu') || PLATFORM.contains('aarch64')) }
-              }
-            }
-            environment {
-              ARCH = "${PLATFORM.contains('aarch64') ? 'arm64' : 'amd64'}"
-              DEV = true
-              EXTERNAL = true
-            }
-            steps {
-              withGithubNotify(context: "Package ${PLATFORM}") {
-                deleteDir()
-                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-                withMageEnv(){
-                  dir("${BASE_DIR}"){
-                    withPackageEnv("${PLATFORM}") {
-                      cmd(label: 'Go package', script: 'mage package ironbank')
-                      uploadPackagesToGoogleBucket(
-                        credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
-                        repo: env.REPO,
-                        bucket: env.JOB_GCS_EXT_BUCKET,
-                        pattern: "build/distributions/**/*")
-                      pushDockerImages(
-                        registry: env.DOCKER_REGISTRY,
-                        secret: env.DOCKER_ELASTIC_SECRET,
-                        snapshot: env.SNAPSHOT,
-                        version: env.BEAT_VERSION,
-                        images: [
-                          [ source: "beats/elastic-agent", arch: env.ARCH, target: "observability-ci/elastic-agent"],
-                          [ source: "beats/elastic-agent-oss", arch: env.ARCH, target: "observability-ci/elastic-agent-oss"],
-                          [ source: "beats/elastic-agent-ubi9", arch: env.ARCH, target: "observability-ci/elastic-agent-ubi9"],
-                          [ source: "beats/elastic-agent-complete", arch: env.ARCH, target: "observability-ci/elastic-agent-complete"],
-                          [ source: "beats-ci/elastic-agent-cloud", arch: env.ARCH, target: "observability-ci/elastic-agent-cloud"]
-                        ]
-                      )
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }    
+    }        
     stage('Sync K8s') { //This stage opens a PR to kibana Repository in order to sync k8s manifests
       when {
         // Only on main branch
