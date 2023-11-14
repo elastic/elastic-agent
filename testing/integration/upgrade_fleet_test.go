@@ -87,7 +87,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), endVersionInfo.Binary.String())
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture)
+	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy())
 }
 
 func TestFleetAirGapedUpgrade(t *testing.T) {
@@ -154,16 +154,19 @@ func TestFleetAirGapedUpgrade(t *testing.T) {
 		define.Version(), latest)
 
 	downloadSource := kibana.DownloadSource{
-		Name:      "local-airgaped-" + uuid.NewString(),
+		Name:      "local-air-gaped-" + uuid.NewString(),
 		Host:      s.URL + "/downloads/beats/elastic-agent/",
-		IsDefault: true,
+		IsDefault: false, // other tests reuse the stack, let's not mess things up
 	}
 	t.Logf("creating download source %q, using %q.",
 		downloadSource.Name, downloadSource.Host)
-	err = stack.KibanaClient.CreateDownloadSource(ctx, downloadSource)
+	src, err := stack.KibanaClient.CreateDownloadSource(ctx, downloadSource)
 	require.NoError(t, err, "could not create download source")
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo)
+	policy := defaultPolicy()
+	policy.DownloadSourceID = src.Item.ID
+
+	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy)
 }
 
 func testUpgradeFleetManagedElasticAgent(
@@ -171,7 +174,9 @@ func testUpgradeFleetManagedElasticAgent(
 	t *testing.T,
 	info *define.Info,
 	startFixture *atesting.Fixture,
-	endFixture *atesting.Fixture) {
+	endFixture *atesting.Fixture,
+	policy kibana.AgentPolicy) {
+	kibClient := info.KibanaClient
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err)
@@ -180,19 +185,8 @@ func testUpgradeFleetManagedElasticAgent(
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err)
 
-	policyUUID := uuid.New().String()
-
-	kibClient := info.KibanaClient
 	t.Log("Creating Agent policy...")
-	policyResp, err := kibClient.CreatePolicy(ctx, kibana.AgentPolicy{
-		Name:        "test-policy-" + policyUUID,
-		Namespace:   "default",
-		Description: "Test policy " + policyUUID,
-		MonitoringEnabled: []kibana.MonitoringEnabledOption{
-			kibana.MonitoringEnabledLogs,
-			kibana.MonitoringEnabledMetrics,
-		},
-	})
+	policyResp, err := kibClient.CreatePolicy(ctx, policy)
 	require.NoError(t, err, "failed creating policy")
 
 	t.Log("Creating Agent enrollment API key...")
@@ -282,6 +276,21 @@ func testUpgradeFleetManagedElasticAgent(
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
 	assert.NoError(t, err)
+}
+
+func defaultPolicy() kibana.AgentPolicy {
+	policyUUID := uuid.New().String()
+
+	policy := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	return policy
 }
 
 // simulateAirGapedEnvironment uses iptables to block outgoing packages to the
