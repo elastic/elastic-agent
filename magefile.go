@@ -929,7 +929,6 @@ func packageAgent(platforms []string, packagingFn func()) {
 			// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/assetbeat/latest/8.11.0-SNAPSHOT.json
 			externalBinaries := map[string]string{
 				"auditbeat":             "beats",
 				"filebeat":              "beats",
@@ -945,7 +944,6 @@ func packageAgent(platforms []string, packagingFn func()) {
 				"pf-elastic-collector":  "prodfiler",
 				"pf-elastic-symbolizer": "prodfiler",
 				"pf-host-agent":         "prodfiler",
-				"assetbeat":             "assetbeat", // only supporting linux/amd64 or linux/arm64
 			}
 
 			// Only log fatal logs for logs produced using logrus. This is the global logger
