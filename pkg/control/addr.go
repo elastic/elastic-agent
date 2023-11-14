@@ -13,13 +13,18 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // Address returns the address to connect to Elastic Agent daemon.
 func Address() string {
 	// when installed the control address is fixed
 	if info.RunningInstalled() {
-		return paths.ControlSocketPath
+		root, _ := utils.HasRoot() // error is ignored
+		if root {
+			return paths.ControlSocketPath
+		}
+		return paths.ControlSocketUnprivilegedPath
 	}
 
 	// unix socket path must be less than 104 characters

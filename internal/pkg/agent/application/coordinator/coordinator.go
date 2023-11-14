@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -157,8 +158,9 @@ type VarsManager interface {
 // passing it into the components runtime manager.
 type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
 
-// CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
-var CoordinatorShutdownTimeout = time.Second * 5
+// managerShutdownTimeout is how long the coordinator will wait during shutdown
+// to receive termination states from its managers.
+const managerShutdownTimeout = time.Second * 5
 
 type configReloader interface {
 	Reload(*config.Config) error
@@ -290,9 +292,6 @@ type managerChans struct {
 	varsManagerUpdate <-chan []*transpiler.Vars
 	varsManagerError  <-chan error
 }
-
-// ErrFatalCoordinator is returned when a coordinator sub-component returns an error, as opposed to a simple context-cancelled.
-var ErrFatalCoordinator = errors.New("fatal error in coordinator")
 
 // New creates a new coordinator.
 func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
@@ -615,45 +614,47 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 //
 // The RuntimeManager, ConfigManager and VarsManager that is passed into NewCoordinator are also ran and lifecycle controlled by the Run.
 //
-// In the case that either of the above managers fail, they will all be restarted unless the context was explicitly cancelled or timed out.
+// If any of the three managers fail, the Coordinator will shut down and
+// Run will return an error.
 func (c *Coordinator) Run(ctx context.Context) error {
 	// log all changes in the state of the runtime and update the coordinator state
 	watchCtx, watchCanceller := context.WithCancel(ctx)
 	defer watchCanceller()
+	go c.watchRuntimeComponents(watchCtx)
+
 	// Close the state broadcaster on finish, but leave it running in the
 	// background until all subscribers have read the final values or their
 	// context ends, so test listeners and such can collect Coordinator's
 	// shutdown state.
 	defer close(c.stateBroadcaster.InputChan)
 
-	go c.watchRuntimeComponents(watchCtx)
+	// The usual state refresh happens in the main run loop in Coordinator.runner,
+	// so before/after the runner call we need to trigger state change broadcasts
+	// manually with refreshState.
+	c.setCoordinatorState(agentclient.Starting, "Waiting for initial configuration and composable variables")
+	c.refreshState()
 
-	for {
-		c.setCoordinatorState(agentclient.Starting, "Waiting for initial configuration and composable variables")
-		// The usual state refresh happens in the main run loop in Coordinator.runner,
-		// so before/after the runner call we need to trigger state change broadcasts
-		// manually.
-		c.refreshState()
-		err := c.runner(ctx)
+	err := c.runner(ctx)
+
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		c.setCoordinatorState(agentclient.Stopped, "Requested to be stopped")
+		c.setFleetState(agentclient.Stopped, "Requested to be stopped")
+	} else {
+		var message string
 		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				c.setCoordinatorState(agentclient.Stopped, "Requested to be stopped")
-				c.setFleetState(agentclient.Stopped, "Requested to be stopped")
-				c.refreshState()
-				// do not restart
-				return err
-			}
-			if errors.Is(err, ErrFatalCoordinator) {
-				c.setCoordinatorState(agentclient.Failed, "Fatal coordinator error")
-				c.setFleetState(agentclient.Stopped, "Fatal coordinator error")
-				c.refreshState()
-				return err
-			}
+			message = fmt.Sprintf("Fatal coordinator error: %v", err.Error())
+		} else {
+			// runner should always return a non-nil error, but if it doesn't,
+			// report it.
+			message = "Coordinator terminated with unknown error (runner returned nil)"
 		}
-		c.setCoordinatorState(agentclient.Failed, fmt.Sprintf("Coordinator failed and will be restarted: %s", err))
-		c.refreshState()
-		c.logger.Errorf("coordinator failed and will be restarted: %s", err)
+		c.setCoordinatorState(agentclient.Failed, message)
+		c.setFleetState(agentclient.Stopped, message)
 	}
+	// Broadcast the final state in case anyone is still listening
+	c.refreshState()
+
+	return err
 }
 
 // DiagnosticHooks returns diagnostic hooks that can be connected to the control server to provide diagnostic
@@ -791,12 +792,13 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					State runtime.ComponentState `yaml:"state"`
 				}
 				type StateHookOutput struct {
-					State        agentclient.State      `yaml:"state"`
-					Message      string                 `yaml:"message"`
-					FleetState   agentclient.State      `yaml:"fleet_state"`
-					FleetMessage string                 `yaml:"fleet_message"`
-					LogLevel     logp.Level             `yaml:"log_level"`
-					Components   []StateComponentOutput `yaml:"components"`
+					State          agentclient.State      `yaml:"state"`
+					Message        string                 `yaml:"message"`
+					FleetState     agentclient.State      `yaml:"fleet_state"`
+					FleetMessage   string                 `yaml:"fleet_message"`
+					LogLevel       logp.Level             `yaml:"log_level"`
+					Components     []StateComponentOutput `yaml:"components"`
+					UpgradeDetails *details.Details       `yaml:"upgrade_details,omitempty"`
 				}
 
 				s := c.State()
@@ -809,12 +811,13 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					}
 				}
 				output := StateHookOutput{
-					State:        s.State,
-					Message:      s.Message,
-					FleetState:   s.FleetState,
-					FleetMessage: s.FleetMessage,
-					LogLevel:     s.LogLevel,
-					Components:   compStates,
+					State:          s.State,
+					Message:        s.Message,
+					FleetState:     s.FleetState,
+					FleetMessage:   s.FleetMessage,
+					LogLevel:       s.LogLevel,
+					Components:     compStates,
+					UpgradeDetails: s.UpgradeDetails,
 				}
 				o, err := yaml.Marshal(output)
 				if err != nil {
@@ -877,7 +880,15 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	for ctx.Err() == nil {
 		c.runLoopIteration(ctx)
 	}
-	return c.handleCoordinatorDone(ctx, varsErrCh, runtimeErrCh, configErrCh)
+
+	// If we got fatal errors from any of the managers, return them.
+	// Otherwise, just return the context's closing error.
+	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh)
+	if err != nil {
+		c.logger.Debugf("Manager errors on Coordinator shutdown: %v", err.Error())
+		return err
+	}
+	return ctx.Err()
 }
 
 // runLoopIteration runs one iteration of the Coorinator's internal run
@@ -1207,27 +1218,34 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 	return result
 }
 
-// handleCoordinatorDone is called when the Coordinator's context is
-// finished. It waits for the runtime, config, and vars managers to finish,
-// and collects their return values into an error if any of them returned
-// for a reason other than context.Canceled.
+// collectManagerErrors listens on the shutdown channels for the
+// runtime, config, and vars managers, and waits for up to
+// the specified timeout for them to report their final status.
+// It returns any resulting errors as a multierror, or nil if no errors
+// were reported.
 // Called on the main Coordinator goroutine.
-func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runtimeErrCh, configErrCh chan error) error {
+func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh chan error) error {
 	var runtimeErr error
 	var configErr error
 	var varsErr error
 	// in case other components are locked up, let us time out
-	timeoutWait := time.NewTimer(CoordinatorShutdownTimeout)
+	timeoutWait := time.NewTimer(timeout)
 	defer timeoutWait.Stop()
 	var returnedRuntime, returnedConfig, returnedVars bool
 	/*
-		Wait for all subcomponents to gently shut down.
+		Wait for all managers to gently shut down. All managers send
+		an error status on their termination channel after their Run method
+		returns.
 		Logic:
-		If all three subcomponent channels return an error, or close,
-		Assume shutdown is complete.
-		If there's a non-nil error, return it as an ErrFatalCoordinator,
-		If there's no errors from the channels, pass on the underlying context error
+		If all three manager channels return a value, or close, we're done.
+		If any errors are non-nil (and not just context.Canceled), collect and
+		return them with multierror.
+		Otherwise, return nil.
 	*/
+
+	// combinedErr will store any reported errors as well as timeout errors
+	// for unresponsive managers.
+	var combinedErr error
 
 waitLoop:
 	for !returnedRuntime || !returnedConfig || !returnedVars {
@@ -1241,37 +1259,29 @@ waitLoop:
 		case <-timeoutWait.C:
 			var timeouts []string
 			if !returnedRuntime {
-				timeouts = []string{"no response from runtime component"}
+				timeouts = []string{"no response from runtime manager"}
 			}
 			if !returnedConfig {
-				timeouts = append(timeouts, "no response from configWatcher component")
+				timeouts = append(timeouts, "no response from config manager")
 			}
 			if !returnedVars {
-				timeouts = append(timeouts, "no response from varsWatcher component")
+				timeouts = append(timeouts, "no response from vars manager")
 			}
-			c.logger.Debugf("timeout while waiting for other components to shut down: %v", timeouts)
+			timeoutStr := strings.Join(timeouts, ", ")
+			combinedErr = multierror.Append(combinedErr, fmt.Errorf("timeout while waiting for managers to shut down: %v", timeoutStr))
 			break waitLoop
 		}
 	}
-	// try not to lose any errors
-	var combinedErr error
 	if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
-		c.logger.Debugf("runtime component shut down with error: %s", runtimeErr)
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime Manager: %w", runtimeErr))
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime manager: %w", runtimeErr))
 	}
 	if configErr != nil && !errors.Is(configErr, context.Canceled) {
-		c.logger.Debugf("config manager shut down with error: %s", configErr)
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config Manager: %w", configErr))
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config manager: %w", configErr))
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
-		c.logger.Debugf("varsWatcher shut down with error: %s", varsErr)
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars manager: %w", varsErr))
 	}
-	if combinedErr != nil {
-		return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error()) //nolint:errorlint //errors.Is() won't work if we pass through the combined errors with %w
-	}
-	// if there's no component errors, continue to pass along the context error
-	return ctx.Err()
+	return combinedErr
 }
 
 type coordinatorComponentLog struct {

@@ -38,6 +38,12 @@ func TestDetailsFail(t *testing.T) {
 	require.Equal(t, StateFailed, det.State)
 	require.Equal(t, StateRequested, det.Metadata.FailedState)
 	require.Equal(t, err.Error(), det.Metadata.ErrorMsg)
+
+	// Check that resetting state to something other than StateFailed
+	// clears Metadata.FailedState and Metadata.ErrorMsg
+	det.SetState(StateDownloading)
+	require.Equal(t, State(""), det.Metadata.FailedState)
+	require.Equal(t, "", det.Metadata.ErrorMsg)
 }
 
 func TestDetailsObserver(t *testing.T) {
@@ -91,5 +97,4 @@ func TestDetailsDownloadRateJSON(t *testing.T) {
 		require.Equal(t, math.Inf(1), float64(unmarshalledDetails.Metadata.DownloadRate))
 		require.Equal(t, 0.99, unmarshalledDetails.Metadata.DownloadPercent)
 	})
-
 }

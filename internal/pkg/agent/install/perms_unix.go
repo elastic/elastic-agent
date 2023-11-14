@@ -11,18 +11,17 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-// fixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
-func fixPermissions(topPath string) error {
-	return recursiveRootPermissions(topPath)
-}
-
-func recursiveRootPermissions(path string) error {
-	return filepath.Walk(path, func(name string, info fs.FileInfo, err error) error {
+// FixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
+func FixPermissions(topPath string, ownership utils.FileOwner) error {
+	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
 		if err == nil {
-			// all files should be owned by root:root
-			err = os.Chown(name, 0, 0)
+			// all files should be owned by uid:gid
+			// uses `os.Lchown` so the symlink is updated to have the permissions
+			err = os.Lchown(name, ownership.UID, ownership.GID)
 			if err != nil {
 				return err
 			}
