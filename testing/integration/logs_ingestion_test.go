@@ -104,15 +104,11 @@ func testMonitoringLogsAreShipped(
 ) {
 	// Stage 1: Make sure metricbeat logs are populated
 	t.Log("Making sure metricbeat logs are populated")
-	require.Eventually(t,
-		func() bool {
-			docs := findESDocs(t, func() (estools.Documents, error) {
-				return estools.GetLogsForDataset(info.ESClient, "elastic_agent.metricbeat")
-			})
-			return len(docs.Hits.Hits) > 0
-		},
-		1*time.Minute, 500*time.Millisecond,
-		"there should be metricbeats logs by now")
+	docs := findESDocs(t, func() (estools.Documents, error) {
+		return estools.GetLogsForDataset(info.ESClient, "elastic_agent.metricbeat")
+	})
+	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
+	require.NotZero(t, len(docs.Hits.Hits))
 
 	// Stage 2: make sure all components are healthy
 	t.Log("Making sure all components are healthy")
@@ -127,7 +123,7 @@ func testMonitoringLogsAreShipped(
 
 	// Stage 3: Make sure there are no errors in logs
 	t.Log("Making sure there are no error logs")
-	docs := findESDocs(t, func() (estools.Documents, error) {
+	docs = findESDocs(t, func() (estools.Documents, error) {
 		return estools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{
 			// acceptable error messages (include reason)
 			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused", // beat is running default config before its config gets updated
