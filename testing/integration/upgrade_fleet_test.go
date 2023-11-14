@@ -291,7 +291,7 @@ func simulateAirGapedEnvironment(t *testing.T, host string) {
 	require.NoErrorf(t, err, "could not get IPs for host %q", host)
 
 	// iptables -A OUTPUT -j DROP -d IP
-	t.Logf("found %v IPs for %q, blockingn them...", ips, host)
+	t.Logf("found %v IPs for %q, blocking them...", ips, host)
 	var toCleanUp [][]string
 	const iptables = "iptables"
 	const ip6tables = "ip6tables"

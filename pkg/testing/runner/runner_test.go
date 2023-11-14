@@ -144,10 +144,10 @@ func (f *fakeStackProvisioner) Name() string {
 func (f *fakeStackProvisioner) SetLogger(_ Logger) {
 }
 
-func (f *fakeStackProvisioner) Create(_ context.Context, request StackRequest) (Stack, error) {
-	f.mx.Lock()
-	defer f.mx.Unlock()
-	f.requests = append(f.requests, request)
+func (p *fakeStackProvisioner) Create(_ context.Context, request StackRequest) (Stack, error) {
+	p.mx.Lock()
+	defer p.mx.Unlock()
+	p.requests = append(p.requests, request)
 	return Stack{
 		ID:            request.ID,
 		Version:       request.Version,
@@ -160,14 +160,14 @@ func (f *fakeStackProvisioner) Create(_ context.Context, request StackRequest) (
 	}, nil
 }
 
-func (f *fakeStackProvisioner) WaitForReady(_ context.Context, stack Stack) (Stack, error) {
+func (p *fakeStackProvisioner) WaitForReady(_ context.Context, stack Stack) (Stack, error) {
 	stack.Ready = true
 	return stack, nil
 }
 
-func (f *fakeStackProvisioner) Delete(_ context.Context, stack Stack) error {
-	f.mx.Lock()
-	defer f.mx.Unlock()
-	f.deletedStacks = append(f.deletedStacks, stack)
+func (p *fakeStackProvisioner) Delete(_ context.Context, stack Stack) error {
+	p.mx.Lock()
+	defer p.mx.Unlock()
+	p.deletedStacks = append(p.deletedStacks, stack)
 	return nil
 }
