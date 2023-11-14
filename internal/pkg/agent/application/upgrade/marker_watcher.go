@@ -114,17 +114,18 @@ func (mfw *MarkerFileWatcher) processMarker() {
 		return
 	}
 
-	// If we are able to load (read) the upgrade marker here, but there are no
-	// upgrade details in it, it's possible (particularly on Windows, due to
-	// multiple processes reading and writing from the same file), that
-	// the Upgrade Watcher failed to update the upgrade marker file with
-	// upgrade details in it. In such a scenario, if we detect that the
-	// version of Agent we're running right now is the same as the prevVersion
-	// recorded in the upgrade marker we just read here, it would mean the
-	// upgrade was rolled back. So we explicitly create upgrade details in the
-	// upgrade marker with the UPG_ROLLBACK state.
-	if marker.Details == nil && marker.PrevVersion == version.GetAgentPackageVersion() {
-		marker.Details = details.NewDetails("unknown", details.StateRollback, marker.GetActionID())
+	// If the marker exists but the version of Agent we're running right
+	// now is the same as the prevVersion recorded in the marker, it means
+	// the upgrade was rolled back. Ideally, this UPG_ROLLBACK state would've
+	// been recorded in the marker's upgrade details field but, in case it
+	// isn't for some reason, we fallback to explicitly setting that state as
+	// part of the upgrade details in the marker.
+	if marker.PrevVersion == version.GetAgentPackageVersion() {
+		if marker.Details == nil {
+			marker.Details = details.NewDetails("unknown", details.StateRollback, marker.GetActionID())
+		} else {
+			marker.Details.SetState(details.StateRollback)
+		}
 	}
 
 	mfw.updateCh <- *marker
