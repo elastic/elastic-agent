@@ -4,6 +4,8 @@ set -euo pipefail
 export PATH=$HOME/bin:${PATH}
 source .buildkite/scripts/install-gh.sh
 
+export GITHUB_TOKEN=$(retry 5 vault kv get -field token kv/ci-shared/platform-ingest/github_token)
+
 cd deploy/kubernetes
 
 echo "--- [File Creation] Create-Needed-Manifest"
