@@ -1,0 +1,107 @@
+// begin 8.11.0 relnotes
+
+[[release-notes-8.11.0]]
+==  8.11.0
+
+Review important information about the  8.11.0 release.
+
+[discrete]
+[[security-updates-8.11.0]]
+=== Security updates
+
+
+elastic-agent::
+
+* Upgrade To Go 1.20.10. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3601[#https://github.com/elastic/elastic-agent/pull/3601] 
+
+[discrete]
+[[breaking-changes-8.11.0]]
+=== Breaking changes
+
+Breaking changes can prevent your application from optimal operation and
+performance. Before you upgrade, review the breaking changes, then mitigate the
+impact to your application.
+
+// TODO: add details and impact
+
+all::
+
+[discrete]
+[[breaking-https://github.com/elastic/beats/pull/36681]]
+.Enable Compression By Default For Elasticsearch Outputs. {all-pull}https://github.com/elastic/beats/pull/36681[#https://github.com/elastic/beats/pull/36681] {all-issue}https://github.com/elastic/ingest-dev/issues/2458[#https://github.com/elastic/ingest-dev/issues/2458]
+[%collapsible]
+====
+The default compression level for Elasticsearch outputs is changing from 0 to 1. On typical workloads this is expected to decrease network data volume by 70-80%, while increasing cpu use by 20-25% and ingestion time by 10%. The previous behavior can be restored by adding &#39;compression_level: 0&#39; to the output configuration.
+====
+elastic-agent::
+
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/3593]]
+.Elastic-Agent-Autodiscover To V0.6.4. Disables Metadata For Deployment And Cronjob. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3593[#https://github.com/elastic/elastic-agent/pull/3593] 
+[%collapsible]
+====
+Elastic-agent-autodiscover library by default comes with add_resource_metadata.deployment=false and add_resource_metadata.cronjob=false. Pods that will be created from deployments or cronjobs will not have the extra metadata field for kubernetes.deployment or kubernetes.cronjob respectively.
+====
+
+
+
+
+
+[discrete]
+[[new-features-8.11.0]]
+=== New features
+
+The 8.11.0 release adds the following new and notable features.
+
+
+
+
+* Enable Tamper Protection Feature Flag By Default For Elastic Agent Version 8.11.0. {-pull}https://github.com/elastic/elastic-agent/pull/3478[#https://github.com/elastic/elastic-agent/pull/3478] 
+CLI::
+
+* Add Colors To Agent Messages Printed By The Elastic-Agent Logs Command Based On Their Level. {CLI-pull}https://github.com/elastic/elastic-agent/pull/3345[#https://github.com/elastic/elastic-agent/pull/3345] 
+elastic-agent::
+
+* Add Support For Processors In Hints-Based Kubernetes Autodiscover. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3107[#https://github.com/elastic/elastic-agent/pull/3107] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2959[#https://github.com/elastic/elastic-agent/issues/2959]
+* Print Out Elastic Agent Installation Steps To Show Progress. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3338[#https://github.com/elastic/elastic-agent/pull/3338] 
+
+
+[discrete]
+[[enhancements-8.11.0]]
+=== Enhancements
+
+
+
+
+* Fix The Kubernetes `Deploy/Kubernetes/Creator_k8.sh` Script To Correcly Exclude Configmaps. {-pull}https://github.com/elastic/elastic-agent/pull/3396[#https://github.com/elastic/elastic-agent/pull/3396] 
+elastic-agent::
+
+* Support The Netinfo Variable In Elastic Kubernetes Manifests. Setting A New Environmental Variable `Elastic_netinfo=False` Globally Disables The `Netinfo.enabled` Parameter Of The `Add_host_metadata` Processor. This Disables The Indexing Of `Host.ip` And `Host.mac` Fields. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3354[#https://github.com/elastic/elastic-agent/pull/3354] 
+monitoring::
+
+* Increase Agent Monitoring Metrics Interval From 10S To 60S To Reduce The Default Ingestion Load And Long Term Storage Requirements. {monitoring-pull}https://github.com/elastic/elastic-agent/pull/3578[#https://github.com/elastic/elastic-agent/pull/3578] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.11.0]]
+=== Bug fixes
+
+
+
+
+* The Elastic Agent Uninstall Process Now Finds And Kills Any Running Upgrade Watcher Process. Uninstalls Initiated Within 10 Minutes Of A Previous Upgrade Now Work As Expected. {-pull}https://github.com/elastic/elastic-agent/pull/3384[#https://github.com/elastic/elastic-agent/pull/3384] {-issue}https://github.com/elastic/elastic-agent/issues/3371[#https://github.com/elastic/elastic-agent/issues/3371]
+agent::
+
+* Upgrade `Elastic-Agent-Libs` To V0.6.0 To Fix The Agent Windows Service Becoming Unresponsive. Fixes Windows Service Timeouts During Wmi Queries And During Service Shutdown. {agent-pull}https://github.com/elastic/elastic-agent/pull/3632[#https://github.com/elastic/elastic-agent/pull/3632] 
+elastic-agent::
+
+* Prevent A Standalone Elastic Agent From Being Upgraded If An Upgrade Is Already In Progress. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3473[#https://github.com/elastic/elastic-agent/pull/3473] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2706[#https://github.com/elastic/elastic-agent/issues/2706]
+* Fix A Bug That Affected Reporting Progress Of The Agent Artifact Download During An Upgrade. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3548[#https://github.com/elastic/elastic-agent/pull/3548] 
+* Increase Wait Period Between Service Restarts On Failure To 15S On Windows. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3657[#https://github.com/elastic/elastic-agent/pull/3657] 
+runtime::
+
+* Prevent Multiple Attempts To Stop An Already Stopped Service. {runtime-pull}https://github.com/elastic/elastic-agent/pull/3482[#https://github.com/elastic/elastic-agent/pull/3482] 
+
+// end 8.11.0 relnotes

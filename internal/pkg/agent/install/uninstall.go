@@ -35,6 +35,7 @@ import (
 // Uninstall uninstalls persistently Elastic Agent on the system.
 func Uninstall(cfgFile, topPath, uninstallToken string, pt *progressbar.ProgressBar) error {
 	// uninstall the current service
+	// not creating the service, so no need to set the username and group to any value
 	svc, err := newService(topPath)
 	if err != nil {
 		return fmt.Errorf("error creating new service handler: %w", err)

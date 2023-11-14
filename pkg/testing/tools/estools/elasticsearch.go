@@ -438,9 +438,9 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 
 }
 
-// GetLogsForDatastream returns any logs associated with the datastream
-func GetLogsForDatastream(client elastictransport.Interface, index string) (Documents, error) {
-	return GetLogsForDatastreamWithContext(context.Background(), client, index)
+// GetLogsForDataset returns any logs associated with the datastream
+func GetLogsForDataset(client elastictransport.Interface, index string) (Documents, error) {
+	return GetLogsForDatasetWithContext(context.Background(), client, index)
 }
 
 // GetLogsForAgentID returns any logs associated with the agent ID
@@ -478,8 +478,8 @@ func GetLogsForAgentID(client elastictransport.Interface, id string) (Documents,
 	return handleDocsResponse(res)
 }
 
-// GetLogsForDatastreamWithContext returns any logs associated with the datastream
-func GetLogsForDatastreamWithContext(ctx context.Context, client elastictransport.Interface, index string) (Documents, error) {
+// GetLogsForDatasetWithContext returns any logs associated with the datastream
+func GetLogsForDatasetWithContext(ctx context.Context, client elastictransport.Interface, index string) (Documents, error) {
 	indexQuery := map[string]interface{}{
 		"query": map[string]interface{}{
 			"match": map[string]interface{}{
@@ -536,6 +536,60 @@ func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{
 	return handleDocsResponse(res)
 }
 
+// GetLogsForDatastream returns any logs associated with the datastream
+func GetLogsForDatastream(
+	ctx context.Context,
+	client elastictransport.Interface,
+	dsType, dataset, namespace string) (Documents, error) {
+
+	query := map[string]any{
+		"_source": []string{"message"},
+		"query": map[string]any{
+			"bool": map[string]any{
+				"must": []any{
+					map[string]any{
+						"match": map[string]any{
+							"data_stream.dataset": dataset,
+						},
+					},
+					map[string]any{
+						"match": map[string]any{
+							"data_stream.namespace": namespace,
+						},
+					},
+					map[string]any{
+						"match": map[string]any{
+							"data_stream.type": dsType,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(query); err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	es := esapi.New(client)
+	res, err := es.Search(
+		es.Search.WithIndex(fmt.Sprintf(".ds-%s*", dsType)),
+		es.Search.WithExpandWildcards("all"),
+		es.Search.WithBody(&buf),
+		es.Search.WithTrackTotalHits(true),
+		es.Search.WithPretty(),
+		es.Search.WithContext(ctx),
+	)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
+	}
+
+	return handleDocsResponse(res)
+}
+
+// handleDocsResponse converts the esapi.Response into Documents,
+// it closes the response.Body after reading
 func handleDocsResponse(res *esapi.Response) (Documents, error) {
 	resultBuf, err := handleResponseRaw(res)
 	if err != nil {

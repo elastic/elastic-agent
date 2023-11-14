@@ -85,11 +85,13 @@ func unzip(log *logger.Logger, archivePath string) (string, error) {
 
 		if f.FileInfo().IsDir() {
 			log.Debugw("Unpacking directory", "archive", "zip", "file.path", path)
-			_ = os.MkdirAll(path, f.Mode())
+			// remove any world permissions from the directory
+			_ = os.MkdirAll(path, f.Mode()&0770)
 		} else {
 			log.Debugw("Unpacking file", "archive", "zip", "file.path", path)
-			_ = os.MkdirAll(filepath.Dir(path), f.Mode())
-			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			// remove any world permissions from the directory/file
+			_ = os.MkdirAll(filepath.Dir(path), f.Mode()&0770)
+			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()&0770)
 			if err != nil {
 				return err
 			}
@@ -190,11 +192,13 @@ func untar(log *logger.Logger, version string, archivePath string) (string, erro
 		case mode.IsRegular():
 			log.Debugw("Unpacking file", "archive", "tar", "file.path", abs)
 			// just to be sure, it should already be created by Dir type
-			if err := os.MkdirAll(filepath.Dir(abs), 0755); err != nil {
+			// remove any world permissions from the directory
+			if err := os.MkdirAll(filepath.Dir(abs), mode.Perm()&0770); err != nil {
 				return "", errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
-			wf, err := os.OpenFile(abs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm())
+			// remove any world permissions from the file
+			wf, err := os.OpenFile(abs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm()&0770)
 			if err != nil {
 				return "", errors.New(err, "TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
@@ -209,7 +213,8 @@ func untar(log *logger.Logger, version string, archivePath string) (string, erro
 			}
 		case mode.IsDir():
 			log.Debugw("Unpacking directory", "archive", "tar", "file.path", abs)
-			if err := os.MkdirAll(abs, 0755); err != nil {
+			// remove any world permissions from the directory
+			if err := os.MkdirAll(abs, mode.Perm()&0770); err != nil {
 				return "", errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 		default:

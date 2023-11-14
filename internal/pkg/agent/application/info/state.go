@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // MarkerFileName is the name of the file that's created by
@@ -28,11 +29,10 @@ func RunningInstalled() bool {
 	return true
 }
 
-func CreateInstallMarker(topPath string) error {
+func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
 	markerFilePath := filepath.Join(topPath, MarkerFileName)
 	if _, err := os.Create(markerFilePath); err != nil {
 		return err
 	}
-
-	return nil
+	return fixInstallMarkerPermissions(markerFilePath, ownership)
 }
