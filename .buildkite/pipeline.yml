@@ -211,8 +211,6 @@ steps:
 
   - label: "Integration tests"
     key: "integration-tests"
-    env:
-      TEST_INTEG_AUTH_ESS_REGION: us-east-1
     command: ".buildkite/scripts/steps/integration_tests.sh stateful"
     artifact_paths:
       - "build/TEST-**"
@@ -229,19 +227,6 @@ steps:
     plugins:
       - junit-annotate#v2.4.1:
           artifacts: build/TEST-go-integration*.xml
-
-  - label: "Sync K8s: Create Kibana PR"
-    env:
-      GH_VERSION: "2.4.0"
-    key: "sync-k8s"
-    branches: "main"
-    command: ".buildkite/scripts/steps/sync-k8s.sh"
-    agents:
-      provider: "gcp"
-      image: "family/core-ubuntu-2204"
-    retry:
-      manual:
-        allowed: true
 
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
