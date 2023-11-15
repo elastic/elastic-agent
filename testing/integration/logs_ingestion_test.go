@@ -207,6 +207,9 @@ func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.
 			fmt.Println(">>>>>>>>>>>>>>>>>>>> Iteration ", count)
 			var err error
 			docs, err = findFn()
+			if err != nil {
+				fmt.Println(">>>>>>>>>>>>>>>>>>>> error tying to fetch ES docs: ", err)
+			}
 			return err == nil
 		},
 		8*time.Minute,
