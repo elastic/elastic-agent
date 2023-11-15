@@ -106,6 +106,24 @@ type Manager struct {
 	// to the internal run loop.
 	updateChan chan component.Model
 
+	// Component model update is run asynchronously and pings this channel when
+	// finished, so the runtime manager loop knows it's safe to advance to the
+	// next update without ever having to block on the result.
+	updateDoneChan chan struct{}
+
+	// Next component model update that will be applied, in case we get one
+	// while a previous update is still in progress. If we get more than one,
+	// keep only the most recent.
+	// Only access from the main runtime manager goroutine.
+	nextUpdate *component.Model
+
+	// Whether we're already waiting on the results of an update call.
+	// If this is true when the run loop finishes, we need to wait for the
+	// final update result before shutting down, otherwise the shutdown's
+	// update call will conflict.
+	// Only access from the main runtime manager goroutine.
+	updateInProgress bool
+
 	// currentMx protects access to the current map only
 	currentMx sync.RWMutex
 	current   map[string]*componentRuntimeState
@@ -139,21 +157,22 @@ func NewManager(
 		return nil, err
 	}
 	m := &Manager{
-		logger:        logger,
-		baseLogger:    baseLogger,
-		ca:            ca,
-		listenAddr:    listenAddr,
-		agentInfo:     agentInfo,
-		tracer:        tracer,
-		current:       make(map[string]*componentRuntimeState),
-		shipperConns:  make(map[string]*shipperConn),
-		subscriptions: make(map[string][]*Subscription),
-		updateChan:    make(chan component.Model),
-		errCh:         make(chan error),
-		monitor:       monitor,
-		grpcConfig:    grpcConfig,
-		serverReady:   atomic.NewBool(false),
-		doneChan:      make(chan struct{}),
+		logger:         logger,
+		baseLogger:     baseLogger,
+		ca:             ca,
+		listenAddr:     listenAddr,
+		agentInfo:      agentInfo,
+		tracer:         tracer,
+		current:        make(map[string]*componentRuntimeState),
+		shipperConns:   make(map[string]*shipperConn),
+		subscriptions:  make(map[string][]*Subscription),
+		updateChan:     make(chan component.Model),
+		updateDoneChan: make(chan struct{}),
+		errCh:          make(chan error),
+		monitor:        monitor,
+		grpcConfig:     grpcConfig,
+		serverReady:    atomic.NewBool(false),
+		doneChan:       make(chan struct{}),
 	}
 	return m, nil
 }
@@ -207,25 +226,9 @@ func (m *Manager) Run(ctx context.Context) error {
 		go m.serverLoop(ctx, listener, server)
 	}()
 
-RUNLOOP:
-	for ctx.Err() == nil {
-		select {
-		case <-ctx.Done():
-			// Signal that we will not accept any more updates
-			break RUNLOOP
-		case model := <-m.updateChan:
-			// New component model. This is an external update coming from a
-			// policy change, so we set tearDown to true.
-			err := m.update(model, true)
-
-			// When update is done, send its result back to the coordinator, unless we're shutting down.
-			select {
-			case m.errCh <- err:
-			case <-ctx.Done():
-			}
-		}
-	}
-	close(m.doneChan)
+	// Start the run loop, which continues on the main goroutine
+	// until the context is canceled.
+	m.runLoop(ctx)
 
 	// Notify components to shutdown and wait for their response
 	m.shutdown()
@@ -237,6 +240,64 @@ RUNLOOP:
 	// Cancel any remaining connections
 	server.Stop()
 	return ctx.Err()
+}
+
+// The main run loop for the runtime manager, whose responsibilities are:
+//   - Accept component model updates from the Coordinator
+//   - Apply those updates safely without ever blocking, because a block here
+//     propagates to a block in the Coordinator
+//   - Close doneChan when the loop ends, so the Coordinator knows not to send
+//     any more updates
+func (m *Manager) runLoop(ctx context.Context) {
+LOOP:
+	for ctx.Err() == nil {
+		select {
+		case <-ctx.Done():
+			break LOOP
+		case model := <-m.updateChan:
+			// Mark the new model as the next update, overwriting any previously
+			// pending values.
+			m.nextUpdate = &model
+		case <-m.updateDoneChan:
+			// An update call has finished, we can initiate another when available.
+			m.updateInProgress = false
+		}
+
+		// After each select call, check if there's a pending update that
+		// can be applied.
+		if m.nextUpdate != nil && !m.updateInProgress {
+			// There is a component model update available, apply it.
+			go func(model component.Model) {
+				// Run the update with tearDown set to true since this is coming
+				// from a user-initiated policy update
+				result := m.update(model, true)
+
+				// When update is done, send its result back to the coordinator,
+				// unless we're shutting down.
+				select {
+				case m.errCh <- result:
+				case <-ctx.Done():
+				}
+				// Signal the runtime manager that we're finished. Note that
+				// we don't select on ctx.Done() in this case because the runtime
+				// manager always reads the results of an update once initiated,
+				// even if it is shutting down.
+				m.updateDoneChan <- struct{}{}
+			}(*m.nextUpdate)
+			m.updateInProgress = true
+			m.nextUpdate = nil
+		}
+	}
+	// Signal that the run loop is ended to unblock any incoming messages.
+	close(m.doneChan)
+
+	if m.updateInProgress {
+		// Wait for the existing update to finish before shutting down,
+		// otherwise the new update call closing everything will
+		// conflict.
+		<-m.updateDoneChan
+		m.updateInProgress = false
+	}
 }
 
 func (m *Manager) serverLoop(ctx context.Context, listener net.Listener, server *grpc.Server) {
