@@ -19,4 +19,4 @@ make ci-clone-kibana-repository
 cp Makefile ./kibana
 cd kibana
 echo "--- Create Kibana PR"
-GH_TOKEN=$GITHUB_TOKEN make ci-create-kubernetes-templates-pull-request
+make ci-create-kubernetes-templates-pull-request
