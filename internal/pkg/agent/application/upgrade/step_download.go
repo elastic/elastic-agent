@@ -251,7 +251,7 @@ func (u *Upgrader) downloadWithRetries(
 		var err error
 		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails)
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to download artifact: %w", err)
 		}
 		return nil
 	}
