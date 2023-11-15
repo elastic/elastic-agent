@@ -16,8 +16,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 )
 
-// ServerlessProvision contains
-type ServerlessProvision struct {
+const ProvisionerServerless = "serverless"
+
+// ServerlessProvisioner contains
+type ServerlessProvisioner struct {
 	cfg ProvisionerConfig
 	log runner.Logger
 }
@@ -46,7 +48,7 @@ type ServerlessRegions struct {
 
 // NewServerlessProvisioner creates a new StackProvisioner instance for serverless
 func NewServerlessProvisioner(cfg ProvisionerConfig) (runner.StackProvisioner, error) {
-	prov := &ServerlessProvision{
+	prov := &ServerlessProvisioner{
 		cfg: cfg,
 		log: &defaultLogger{wrapped: logp.L()},
 	}
@@ -57,13 +59,17 @@ func NewServerlessProvisioner(cfg ProvisionerConfig) (runner.StackProvisioner, e
 	return prov, nil
 }
 
+func (prov *ServerlessProvisioner) Name() string {
+	return ProvisionerServerless
+}
+
 // SetLogger sets the logger for the
-func (prov *ServerlessProvision) SetLogger(l runner.Logger) {
+func (prov *ServerlessProvisioner) SetLogger(l runner.Logger) {
 	prov.log = l
 }
 
 // Create creates a stack.
-func (prov *ServerlessProvision) Create(ctx context.Context, request runner.StackRequest) (runner.Stack, error) {
+func (prov *ServerlessProvisioner) Create(ctx context.Context, request runner.StackRequest) (runner.Stack, error) {
 	// allow up to 4 minutes for requests
 	createCtx, createCancel := context.WithTimeout(ctx, 4*time.Minute)
 	defer createCancel()
@@ -82,6 +88,7 @@ func (prov *ServerlessProvision) Create(ctx context.Context, request runner.Stac
 	}
 	stack := runner.Stack{
 		ID:            request.ID,
+		Provisioner:   prov.Name(),
 		Version:       request.Version,
 		Elasticsearch: client.proj.Endpoints.Elasticsearch,
 		Kibana:        client.proj.Endpoints.Kibana,
@@ -98,7 +105,7 @@ func (prov *ServerlessProvision) Create(ctx context.Context, request runner.Stac
 }
 
 // WaitForReady should block until the stack is ready or the context is cancelled.
-func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.Stack) (runner.Stack, error) {
+func (prov *ServerlessProvisioner) WaitForReady(ctx context.Context, stack runner.Stack) (runner.Stack, error) {
 	deploymentID, deploymentType, err := prov.getDeploymentInfo(stack)
 	if err != nil {
 		return stack, fmt.Errorf("failed to get deployment info from the stack: %w", err)
@@ -155,7 +162,7 @@ func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.
 }
 
 // Delete deletes a stack.
-func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack) error {
+func (prov *ServerlessProvisioner) Delete(ctx context.Context, stack runner.Stack) error {
 	deploymentID, deploymentType, err := prov.getDeploymentInfo(stack)
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info from the stack: %w", err)
@@ -181,7 +188,7 @@ func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack)
 // CheckCloudRegion checks to see if the provided region is valid for the serverless
 // if we have an invalid region, overwrite with a valid one.
 // The "normal" and serverless ESS APIs have different regions, hence why we need this.
-func (prov *ServerlessProvision) CheckCloudRegion() error {
+func (prov *ServerlessProvisioner) CheckCloudRegion() error {
 	urlPath := fmt.Sprintf("%s/api/v1/serverless/regions", serverlessURL)
 
 	httpHandler, err := http.NewRequestWithContext(context.Background(), "GET", urlPath, nil)
@@ -231,7 +238,7 @@ func (prov *ServerlessProvision) CheckCloudRegion() error {
 	return nil
 }
 
-func (prov *ServerlessProvision) getDeploymentInfo(stack runner.Stack) (string, string, error) {
+func (prov *ServerlessProvisioner) getDeploymentInfo(stack runner.Stack) (string, string, error) {
 	if stack.Internal == nil {
 		return "", "", fmt.Errorf("missing internal information")
 	}
