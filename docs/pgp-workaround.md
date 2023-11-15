@@ -59,4 +59,4 @@ host { 'elastic-artifacts':
 
 ## TLS
 
-Because the connection is `https`, the the certificate that the host that is impersonating `https:\\artifacts.elastic.co` will have to have `artifacts.elastic.co` as one of it's Subject Alternate Names.
+Because the connection is `https`, the certificate that the host that is impersonating `https:\\artifacts.elastic.co` returns will have to have `artifacts.elastic.co` as one of it's Subject Alternate Names.
