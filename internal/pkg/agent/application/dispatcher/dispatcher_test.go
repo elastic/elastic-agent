@@ -496,9 +496,9 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 	muchLater := later.Add(3 * time.Hour)
 
 	cases := map[string]struct {
-		actions               []fleetapi.Action
-		expectedDetails       *details.Details
-		expectedWarningLogMsg string
+		actions           []fleetapi.Action
+		expectedDetails   *details.Details
+		expectedErrLogMsg string
 	}{
 		"no_scheduled_upgrades": {
 			actions: []fleetapi.Action{
@@ -507,7 +507,7 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 					Version:  "8.12.3",
 				},
 			},
-			expectedWarningLogMsg: "scheduled upgrade action [id = action1] has no start time!",
+			expectedErrLogMsg: "failed to get start time for scheduled upgrade action [id = action1]",
 		},
 		"one_scheduled_upgrade": {
 			actions: []fleetapi.Action{
@@ -548,6 +548,16 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 				},
 			},
 		},
+		"invalid_time_scheduled_upgrade": {
+			actions: []fleetapi.Action{
+				&fleetapi.ActionUpgrade{
+					ActionID:        "action1",
+					Version:         "8.13.2",
+					ActionStartTime: "invalid",
+				},
+			},
+			expectedErrLogMsg: "failed to get start time for scheduled upgrade action [id = action1]",
+		},
 	}
 
 	for name, test := range cases {
@@ -561,13 +571,15 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 			reportNextScheduledUpgrade(test.actions, detailsSetter, log)
 
 			require.True(t, test.expectedDetails.Equals(actualDetails))
-			if test.expectedWarningLogMsg != "" {
-				logs := obs.TakeAll()
-				require.Len(t, logs, 1)
-				require.Equal(t, zapcore.WarnLevel, logs[0].Level)
-				require.Equal(t, test.expectedWarningLogMsg, logs[0].Message)
-			}
 
+			logs := obs.TakeAll()
+			if test.expectedErrLogMsg != "" {
+				require.Len(t, logs, 1)
+				require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
+				require.Equal(t, test.expectedErrLogMsg, logs[0].Message)
+			} else {
+				require.Empty(t, logs)
+			}
 		})
 	}
 }
