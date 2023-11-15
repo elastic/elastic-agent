@@ -233,4 +233,4 @@ steps:
                   provider: "gcp"
                   image: "family/core-ubuntu-2204"
                 env:
-                  - GH_VERSION: "2.4.0"
+                  - GH_VERSION=2.4.0
