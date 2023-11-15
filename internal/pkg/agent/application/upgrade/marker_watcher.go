@@ -9,10 +9,11 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/fsnotify/fsnotify"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/version"
-	"github.com/fsnotify/fsnotify"
 )
 
 type MarkerWatcher interface {
