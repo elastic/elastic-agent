@@ -167,14 +167,17 @@ details:
 			done := make(chan struct{})
 			var markerRead bool
 			var actualMarker UpdateMarker
+			var markerMu sync.Mutex
 			go func() {
 				for {
 					select {
 					case <-done:
 						return
 					case m := <-updateCh:
+						markerMu.Lock()
 						markerRead = true
 						actualMarker = m
+						markerMu.Unlock()
 					}
 				}
 			}()
@@ -186,21 +189,34 @@ details:
 				done <- struct{}{}
 				logs := obs.FilterLevelExact(zapcore.ErrorLevel).TakeAll()
 				require.NotEmpty(t, logs)
+
+				markerMu.Lock()
+				defer markerMu.Unlock()
 				require.False(t, markerRead)
+
 				return
 			}
 
 			// no marker
 			if test.markerFileContents == "" {
 				done <- struct{}{}
+
+				markerMu.Lock()
+				defer markerMu.Unlock()
 				require.False(t, markerRead)
+
 				return
 			}
 
 			// marker exists and can be read
 			require.Eventually(t, func() bool {
+				markerMu.Lock()
+				defer markerMu.Unlock()
 				return markerRead
 			}, 5*time.Second, 100*time.Millisecond)
+
+			markerMu.Lock()
+			defer markerMu.Unlock()
 
 			require.True(t, actualMarker.Details.Equals(test.expectedDetails))
 		})
