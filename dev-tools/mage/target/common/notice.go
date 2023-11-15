@@ -6,6 +6,7 @@ package common
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -79,7 +80,9 @@ func Notice() (err error) {
 
 	if err := licDetectCmd.Wait(); err != nil {
 		// copy error to stdout, helpful if tool failed
-		io.Copy(os.Stdout, &buf)
+		if _, cerr := io.Copy(os.Stdout, &buf); cerr != nil {
+			return errors.Join(fmt.Errorf("failed to read stderr: %w", cerr), err)
+		}
 		return err
 	}
 
