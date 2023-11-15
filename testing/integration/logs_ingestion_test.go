@@ -195,21 +195,11 @@ func testMonitoringLogsAreShipped(
 
 func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.Documents {
 	var docs estools.Documents
-	start := time.Now()
-	defer func() {
-		fmt.Println(">>>>>>>>>>>>>>>>>>>> Took", time.Now().Sub(start))
-	}()
-	count := 0
 	require.Eventually(
 		t,
 		func() bool {
-			count++
-			fmt.Println(">>>>>>>>>>>>>>>>>>>> Iteration ", count)
 			var err error
 			docs, err = findFn()
-			if err != nil {
-				fmt.Println(">>>>>>>>>>>>>>>>>>>> error tying to fetch ES docs: ", err)
-			}
 			return err == nil
 		},
 		8*time.Minute,
