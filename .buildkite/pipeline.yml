@@ -4,17 +4,6 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
-  - label: "Sync K8s: Create Kibana PR"
-    env:
-      GH_VERSION: "2.4.0"
-    key: "sync-k8s"
-    command: ".buildkite/scripts/steps/sync-k8s.sh"
-    agents:
-      provider: "gcp"
-      image: "family/core-ubuntu-2204"
-    retry:
-      manual:
-        allowed: true
   # - group: "Unit tests"
   #   key: "unit-tests"
   #   steps:
@@ -217,3 +206,31 @@ steps:
   #   plugins:
   #     - junit-annotate#v2.4.1:
   #         artifacts: build/TEST-go-integration*.xml
+
+  # - label: "Sync K8s: Create Kibana PR"
+  #   env:
+  #     GH_VERSION: "2.4.0"
+  #   key: "sync-k8s"
+  #   branches: "main"
+  #   command: ".buildkite/scripts/steps/sync-k8s.sh"
+  #   agents:
+  #     provider: "gcp"
+  #     image: "family/core-ubuntu-2204"
+  #   retry:
+  #     manual:
+  #       allowed: true
+
+  - label: "Trigger k8s sync"
+    plugins:
+      - monebag/monorepo-diff#v2.5.9:
+          diff: "git diff --name-only HEAD~1"
+          watch:
+            - path: deploy/kubernetes/*
+              config:
+                command: ".buildkite/scripts/steps/sync-k8s.sh"
+                branches: main
+                agents:
+                  provider: "gcp"
+                  image: "family/core-ubuntu-2204"
+                env:
+                  - GH_VERSION: "2.4.0"
