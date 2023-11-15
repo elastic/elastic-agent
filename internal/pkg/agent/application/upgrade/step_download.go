@@ -248,6 +248,12 @@ func (u *Upgrader) downloadWithRetries(
 	opFn := func() error {
 		attempt++
 		u.log.Infof("download attempt %d", attempt)
+
+		// Reset upgrade details state to UPG_DOWNLOADING in case this is
+		// a retry attempt and we were in UPG_FAILED after the previous
+		// attempt failed.
+		upgradeDetails.SetState(details.StateDownloading)
+
 		var err error
 		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails)
 		if err != nil {
