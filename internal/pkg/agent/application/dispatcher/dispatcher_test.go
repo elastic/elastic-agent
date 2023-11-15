@@ -560,8 +560,7 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 
 			reportNextScheduledUpgrade(test.actions, detailsSetter, log)
 
-			//require.True(t, test.expectedDetails.Equals(actualDetails))
-			require.Equal(t, test.expectedDetails, actualDetails) // FIXME replace with above assertion once https://github.com/elastic/elastic-agent/pull/3694 is merged
+			require.True(t, test.expectedDetails.Equals(actualDetails))
 			if test.expectedWarningLogMsg != "" {
 				logs := obs.TakeAll()
 				require.Len(t, logs, 1)
