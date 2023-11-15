@@ -489,7 +489,8 @@ func TestManager_FakeInput_Features(t *testing.T) {
 func TestManager_FakeInput_APM(t *testing.T) {
 	testPaths(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	timeout := 30 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	agentInfo, _ := info.NewAgentInfo(ctx, true)
@@ -578,11 +579,6 @@ func TestManager_FakeInput_APM(t *testing.T) {
 	err = m.Update(component.Model{Components: []component.Component{comp}})
 	require.NoError(t, err, "manager Update call must succeed")
 
-	// TODO: replace this timeout with a context so we can use it in action calls
-	timeout := 30 * time.Second
-	timeoutTimer := time.NewTimer(timeout)
-	defer timeoutTimer.Stop()
-
 	// testStep tracks how far into the test sequence we've progressed.
 	// 0: When unit is healthy, set initialAPMConfig
 	// 1: When initialAPMConfig is active, set modifiedAPMConfig
@@ -592,7 +588,7 @@ func TestManager_FakeInput_APM(t *testing.T) {
 STATELOOP:
 	for {
 		select {
-		case <-timeoutTimer.C:
+		case <-ctx.Done():
 			require.Fail(t, "timed out waiting for state update")
 		case componentState := <-sub.Ch():
 			t.Logf("component state changed: %+v", componentState)
@@ -627,31 +623,23 @@ STATELOOP:
 				}
 
 				// The APM config has propagated to the component state, now make sure
-				// it's visible when retrieving via action
-				assert.Eventually(t, func() bool {
-					retrievedAPMConfig := fetchAPMConfigWithAction(t)
-				})
-				fetchAPMConfigWithAction
-				res, err := m.PerformAction(
-					context.Background(),
-					comp,
-					comp.Units[0],
-					fakecmp.ActionRetrieveAPMConfig,
-					nil)
-				require.NoError(t, err, "failed to retrieve APM config")
+				// it's visible when retrieving via action.
+				// We use require.Eventually because the new value isn't guaranteed
+				// to immediately propagate via Action even after it appears in the
+				// component checkin.
 
-				retrievedAPMConfig, err := extractAPMConfigFromActionResult(t, res)
-				require.NoError(t, err, "couldn't read APM config from ActionResult")
+				require.Eventually(t,
+					func() bool {
+						retrievedAPMConfig := fetchAPMConfigWithAction(t, ctx, m, comp)
+						return gproto.Equal(initialAPMConfig, retrievedAPMConfig)
+					},
+					3*time.Second,
+					50*time.Millisecond,
+					"Updated APM config should be reported by Actions")
 
-				if retrievedAPMConfig == nil {
-					t.Logf("retrieved APM config is still nil, trying again")
-				} else if !gproto.Equal(initialAPMConfig, retrievedAPMConfig) {
-					require.Fail(t, "retrieved APM config should match what was sent", initialAPMConfig.String(), retrievedAPMConfig.String())
-				} else {
-					// Config matches, we now try updating to a new APM config
-					comp.Component = &proto.Component{
-						ApmConfig: modifiedAPMConfig,
-					}
+				// Config matches, we now try updating to a new APM config
+				comp.Component = &proto.Component{
+					ApmConfig: modifiedAPMConfig,
 				}
 				err = m.Update(component.Model{Components: []component.Component{comp}})
 				require.NoError(t, err, "manager Update call must succeed")
@@ -659,39 +647,20 @@ STATELOOP:
 			case 2:
 				require.NotNil(t, componentState.Component, "ApmConfig must not be nil")
 
-				if gproto.Equal(initialAPMConfig, componentState.Component.GetApmConfig()) {
-					// Reported config is still the old one, wait for the next update
-					continue STATELOOP
+				require.Eventually(t,
+					func() bool {
+						retrievedAPMConfig := fetchAPMConfigWithAction(t, ctx, m, comp)
+						return gproto.Equal(modifiedAPMConfig, retrievedAPMConfig)
+					},
+					3*time.Second,
+					50*time.Millisecond,
+					"Updated APM config should be reported by Actions")
+
+				// Both configs were reported correctly, now clear the APM config
+				comp.Component = &proto.Component{
+					ApmConfig: nil,
 				}
 
-				// The new APM config has propagated, make sure it's visible when
-				// retrieving via action
-				res, err := m.PerformAction(
-					context.Background(),
-					comp,
-					comp.Units[0],
-					fakecmp.ActionRetrieveAPMConfig,
-					nil)
-				require.NoError(t, err, "failed to retrieve APM config")
-
-				require.Eventually(t, func() bool {
-
-				},
-				)
-				retrievedAPMConfig, err := extractAPMConfigFromActionResult(t, res)
-				require.NoError(t, err, "couldn't read APM config from ActionResult")
-
-				if gproto.Equal(initialAPMConfig, retrievedAPMConfig) {
-					t.Logf("Action returned previous APM config, trying again")
-
-				} else if !gproto.Equal(modifiedAPMConfig, retrievedAPMConfig) {
-					require.Fail(t, "retrieved APM config should match what was sent", modifiedAPMConfig.String(), retrievedAPMConfig.String())
-				} else {
-					// Both configs were reported correctly, now clear the APM config
-					comp.Component = &proto.Component{
-						ApmConfig: nil,
-					}
-				}
 				err = m.Update(component.Model{Components: []component.Component{comp}})
 				require.NoError(t, err, "manager Update call must succeed")
 
@@ -701,22 +670,14 @@ STATELOOP:
 					continue STATELOOP
 				}
 
-				// Component config has propagated, make sure it's reported via actions
-
-				// The new APM config has propagated, make sure it's visible when
-				// retrieving via action
-				res, err := m.PerformAction(
-					context.Background(),
-					comp,
-					comp.Units[0],
-					fakecmp.ActionRetrieveAPMConfig,
-					nil)
-				require.NoError(t, err, "failed to retrieve APM config")
-
-				retrievedAPMConfig, err := extractAPMConfigFromActionResult(t, res)
-				require.NoError(t, err, "couldn't read APM config from ActionResult")
-
-				require.Nil(t, retrievedAPMConfig, "APM config should be nil", retrievedAPMConfig.String())
+				require.Eventually(t,
+					func() bool {
+						retrievedAPMConfig := fetchAPMConfigWithAction(t, ctx, m, comp)
+						return retrievedAPMConfig == nil
+					},
+					3*time.Second,
+					50*time.Millisecond,
+					"Final APM config should be nil")
 
 				// Success, end the loop
 				break STATELOOP
