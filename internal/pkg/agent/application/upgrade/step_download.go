@@ -257,6 +257,9 @@ func (u *Upgrader) downloadWithRetries(
 	}
 
 	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
+		// Set upgrade details state to UPG_FAILED (with error details). The state
+		// will be reset to UPG_DOWNLOADING before we retry the download.
+		upgradeDetails.Fail(err)
 		u.log.Warnf("%s; retrying (will be retry %d) in %s.", err.Error(), attempt, retryAfter)
 	}
 
