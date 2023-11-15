@@ -18,11 +18,13 @@ RUN true && \
 {{- if ne .user "root" }}
     usermod -d {{ $beatHome}} {{ .user }} && \
 {{- end}}
+    # ECE needs to create config here under non-1000 user
+    chmod 0777 {{ $beatHome}} && \
     mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/logs && \
     find {{ $beatHome }} -type d -exec chmod 0755 {} \; && \
     find {{ $beatHome }} -type f -exec chmod 0644 {} \; && \
-    find {{ $beatHome }}/data -type d -exec chmod 0770 {} \; && \
-    find {{ $beatHome }}/data -type f -exec chmod 0660 {} \; && \
+    find {{ $beatHome }}/data -type d -exec chmod 0777 {} \; && \
+    find {{ $beatHome }}/data -type f -exec chmod 0666 {} \; && \
     rm {{ $beatBinary }} && \
     ln -s {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent {{ $beatBinary }} && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-agent && \
@@ -133,7 +135,7 @@ COPY --chown={{ .user }}:{{ .user }} --from=home {{ $beatHome }} {{ $beatHome }}
 
 # Elastic Agent needs group permissions in the home itself to be able to
 # create fleet.yml when running as non-root.
-RUN chmod 0770 {{ $beatHome }} && \
+RUN chmod 0777 {{ $beatHome }} && \
 {{- if ne .user "root" }}
     usermod -d {{ $beatHome}} {{ .user }} && \
 {{- end}}
@@ -156,7 +158,7 @@ RUN mkdir /app
 {{- if contains .image_name "-cloud" }}
 # Generate folder for a stub command that will be overwritten at runtime
 RUN mkdir /app && \
-    chown {{ .user }} /app
+    chown {{ .user }}:{{ .user }} /app
 {{- end }}
 {{- end }}
 
@@ -180,7 +182,7 @@ RUN echo \
     {{ $beatHome }}/.synthetics \
     {{ $beatHome }}/.npm \
     {{ $beatHome }}/.cache \
-    | xargs -IDIR sh -c 'mkdir -p DIR && chmod 0770 DIR'
+    | xargs -IDIR sh -c 'mkdir -p DIR && chmod 0775 DIR'
 
 # Setup synthetics env vars
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
@@ -209,20 +211,22 @@ RUN cd {{$beatHome}}/.node \
      esac \
   && mkdir -p node \
   && curl ${NODE_DOWNLOAD_URL} | tar -xJ --strip 1 -C node \
-  && chmod ug+rwX -R $NODE_PATH
-
+  && chmod ug+rwX -R $NODE_PATH \
 # Install synthetics as a regular user, installing npm deps as root odesn't work
-RUN chown -R {{ .user }} $NODE_PATH
+   && chown -R {{ .user }}:{{ .user }} $NODE_PATH \
+   # fix .node .npm and .synthetics
+   && chown -R {{ .user }}:{{ .user }} {{$beatHome}} 
 USER {{ .user }}
 # If this fails dump the NPM logs
-RUN npm i -g --loglevel verbose --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1'
-RUN chmod ug+rwX -R $NODE_PATH
+RUN (npm i -g --loglevel verbose --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
+    chmod ug+rwX -R $NODE_PATH
 USER root
 
 # Install the deps as needed by the exact version of playwright elastic synthetics uses
 # We don't use npx playwright install-deps because that could pull a newer version
 # Install additional fonts as well
-RUN for iter in {1..10}; do \
+RUN chown -R {{ .user }}:{{ .user }} {{$beatHome}}  && \
+    for iter in {1..10}; do \
     apt-get update -y && \
     $NODE_PATH/node/lib/node_modules/@elastic/synthetics/node_modules/.bin/playwright install-deps chromium && \
     DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes \
@@ -239,6 +243,7 @@ USER {{ .user }}
 {{- range $i, $port := .ExposePorts }}
 EXPOSE {{ $port }}
 {{- end }}
+
 
 # When running under Docker, we must ensure libbeat monitoring pulls cgroup
 # metrics from /sys/fs/cgroup/<subsystem>/, ignoring any paths found in
