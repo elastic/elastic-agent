@@ -7,21 +7,16 @@
 package server
 
 import (
+	"fmt"
 	"net"
 	"os/user"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/control"
-
-	"github.com/pkg/errors"
-
 	"github.com/elastic/elastic-agent-libs/api/npipe"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-)
 
-const (
-	NTAUTHORITY_SYSTEM   = "S-1-5-18"
-	ADMINISTRATORS_GROUP = "S-1-5-32-544"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // createListener creates a named pipe listener on Windows
@@ -40,7 +35,7 @@ func cleanupListener(_ *logger.Logger) {
 func securityDescriptor(log *logger.Logger) (string, error) {
 	u, err := user.Current()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get current user")
+		return "", fmt.Errorf("failed to get current user: %w", err)
 	}
 	// Named pipe security and access rights.
 	// We create the pipe and the specific users should only be able to write to it.
@@ -56,7 +51,7 @@ func securityDescriptor(log *logger.Logger) (string, error) {
 		// running as SYSTEM, include Administrators group so Administrators can talk over
 		// the named pipe to the running Elastic Agent system process
 		// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
-		descriptor += "(A;;GA;;;" + ADMINISTRATORS_GROUP + ")"
+		descriptor += "(A;;GA;;;" + utils.AdministratorSID + ")"
 	}
 	return descriptor, nil
 }
@@ -72,7 +67,7 @@ func isWindowsAdmin(u *user.User) (bool, error) {
 
 	groups, err := u.GroupIds()
 	if err != nil {
-		return false, errors.Wrap(err, "failed to get current user groups")
+		return false, fmt.Errorf("failed to get current user groups: %w", err)
 	}
 
 	for _, groupSid := range groups {
@@ -85,5 +80,5 @@ func isWindowsAdmin(u *user.User) (bool, error) {
 }
 
 func equalsSystemGroup(s string) bool {
-	return strings.EqualFold(s, NTAUTHORITY_SYSTEM) || strings.EqualFold(s, ADMINISTRATORS_GROUP)
+	return strings.EqualFold(s, utils.SystemSID) || strings.EqualFold(s, utils.AdministratorSID)
 }

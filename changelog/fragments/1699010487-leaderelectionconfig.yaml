@@ -8,18 +8,18 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: bug-fix
+kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: upgrade elastic-agent-libs to v0.6.0
+summary: Added Kubernetes leader_election provider configuration parameters
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: 'allows elastic-agent running as a windows service to receive more than one change request.'
+#description:
 
-# Affected component; a word indicating the component this changeset affects.
-component: agent
+# Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
+component: elastic-agent
 
 # PR URL; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.

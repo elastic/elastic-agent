@@ -73,6 +73,15 @@ func (d *Details) SetState(s State) {
 	defer d.mu.Unlock()
 
 	d.State = s
+
+	// If State is something other than StateFailed, make sure to clear
+	// Metadata.FailedState and Metadata.ErrorMsg as those two fields
+	// should be set when State is set to StateFailed. See the Fail method.
+	if s != StateFailed {
+		d.Metadata.ErrorMsg = ""
+		d.Metadata.FailedState = ""
+	}
+
 	d.notifyObservers()
 }
 
