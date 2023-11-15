@@ -255,8 +255,8 @@ LOOP:
 		case <-ctx.Done():
 			break LOOP
 		case model := <-m.updateChan:
-			// Mark the new model as the next update, overwriting any previously
-			// pending values.
+			// We got a new component model from m.Update(), mark it as the
+			// next update to apply, overwriting any previous pending value.
 			m.nextUpdate = &model
 		case <-m.updateDoneChan:
 			// An update call has finished, we can initiate another when available.
@@ -289,6 +289,8 @@ LOOP:
 		}
 	}
 	// Signal that the run loop is ended to unblock any incoming messages.
+	// We need to do this before waiting on the final update result, otherwise
+	// it might be stuck trying to send the result to errCh.
 	close(m.doneChan)
 
 	if m.updateInProgress {
