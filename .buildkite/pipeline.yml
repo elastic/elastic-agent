@@ -236,7 +236,9 @@ steps:
       - monebag/monorepo-diff#v2.5.9:
           diff: "git diff --name-only HEAD~1"
           watch:
-            - path: deploy/kubernetes/*
+            - path:
+                - deploy/kubernetes/*
+                - version/docs/version.asciidoc
               config:
                 label: "Sync K8s"
                 command: ".buildkite/scripts/steps/sync-k8s.sh"
