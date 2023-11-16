@@ -321,7 +321,7 @@ func reportNextScheduledUpgrade(input []fleetapi.Action, detailsSetter details.O
 
 	upgradeDetails := details.NewDetails(nextUpgrade.Version, details.StateScheduled, nextUpgrade.ID())
 	startTime, _ := nextUpgrade.StartTime()
-	upgradeDetails.Metadata.ScheduledAt = startTime
+	upgradeDetails.Metadata.ScheduledAt = &startTime
 
 	detailsSetter(upgradeDetails)
 }
