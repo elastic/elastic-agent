@@ -36,7 +36,7 @@ mage -l
 mkdir -p build
 cd build
 
-git clone git@github.com:elastic/beats.git
+git clone --filter=tree:0 git@github.com:elastic/beats.git
 cd ..
 
 # export WORKSPACE=beats/x-pack/metricbeat
@@ -57,17 +57,14 @@ cd ..
 # exit $TESTS_EXIT_STATUS
 
 echo "testing metricbeat..."
-if ! run_test_for_beat metricbeat; then
-    exit 1
-fi
+run_test_for_beat metricbeat
+
+
 
 echo "testing filebeat..."
-if ! run_test_for_beat filebeat; then
-    exit 1
-fi
+run_test_for_beat filebeat
+
 
 
 echo "testing auditbeat..."
-if ! run_test_for_beat auditbeat; then
-    exit 1
-fi
+run_test_for_beat auditbeat
