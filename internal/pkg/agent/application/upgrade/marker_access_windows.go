@@ -58,6 +58,7 @@ func accessMarkerFileWithRetries(accessFn func() error) error {
 	expBackoff := backoff.NewExponentialBackOff()
 	expBackoff.InitialInterval = markerAccessBackoffInitialInterval
 	expBackoff.MaxInterval = markerAccessTimeout / minMarkerAccessRetries
+	expBackoff.MaxElapsedTime = markerAccessTimeout
 
 	ctx, cancel := context.WithTimeout(context.Background(), markerAccessTimeout)
 	defer cancel()
