@@ -270,12 +270,12 @@ LOOP:
 			go func(model component.Model) {
 				// Run the update with tearDown set to true since this is coming
 				// from a user-initiated policy update
-				result := m.update(model, true)
+				err := m.update(model, true)
 
 				// When update is done, send its result back to the coordinator,
 				// unless we're shutting down.
 				select {
-				case m.errCh <- result:
+				case m.errCh <- err:
 				case <-ctx.Done():
 				}
 				// Signal the runtime manager that we're finished. Note that
