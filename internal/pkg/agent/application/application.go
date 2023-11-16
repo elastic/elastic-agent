@@ -86,7 +86,7 @@ func New(
 		// monitoring is always disabled in testing mode
 		disableMonitoring = true
 	} else {
-		log.Info("Loading baseline config from %v", pathConfigFile)
+		log.Infof("Loading baseline config from %v", pathConfigFile)
 		rawConfig, err = config.LoadFile(pathConfigFile)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
