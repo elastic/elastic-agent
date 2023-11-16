@@ -21,6 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -66,6 +67,9 @@ type UpgradeManager interface {
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
+
+	// MarkerWatcher returns a watcher for the upgrade marker.
+	MarkerWatcher() upgrade.MarkerWatcher
 }
 
 // MonitorManager provides an interface to perform the monitoring action for the agent.
@@ -290,6 +294,8 @@ type managerChans struct {
 
 	varsManagerUpdate <-chan []*transpiler.Vars
 	varsManagerError  <-chan error
+
+	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 }
 
 // New creates a new coordinator.
@@ -370,6 +376,9 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 	if varsMgr != nil {
 		c.managerChans.varsManagerUpdate = varsMgr.Watch()
 		c.managerChans.varsManagerError = varsMgr.Errors()
+	}
+	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
+		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
 	}
 	return c
 }
@@ -875,6 +884,18 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		varsErrCh <- nil
 	}
 
+	upgradeMarkerWatcherErrCh := make(chan error, 1)
+	if c.upgradeMgr != nil && c.upgradeMgr.MarkerWatcher() != nil {
+		err := c.upgradeMgr.MarkerWatcher().Run(ctx)
+		if err != nil {
+			upgradeMarkerWatcherErrCh <- err
+		} else {
+			upgradeMarkerWatcherErrCh <- nil
+		}
+	} else {
+		upgradeMarkerWatcherErrCh <- nil
+	}
+
 	// Keep looping until the context ends.
 	for ctx.Err() == nil {
 		c.runLoopIteration(ctx)
@@ -882,7 +903,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	// If we got fatal errors from any of the managers, return them.
 	// Otherwise, just return the context's closing error.
-	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh)
+	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerWatcherErrCh)
 	if err != nil {
 		c.logger.Debugf("Manager errors on Coordinator shutdown: %v", err.Error())
 		return err
@@ -972,6 +993,11 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 	case ll := <-c.logLevelCh:
 		if ctx.Err() == nil {
 			c.processLogLevel(ctx, ll)
+		}
+
+	case upgradeMarker := <-c.managerChans.upgradeMarkerUpdate:
+		if ctx.Err() == nil {
+			c.setUpgradeDetails(upgradeMarker.Details)
 		}
 	}
 
@@ -1206,11 +1232,11 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 	for _, component := range comps {
 		// If this is an input component (not a shipper), make sure its type is allowed
 		if component.InputSpec != nil && !c.caps.AllowInput(component.InputType) {
-			c.logger.Info("Component '%v' with input type '%v' filtered by capabilities.yml", component.InputType)
+			c.logger.Infof("Component '%v' with input type '%v' filtered by capabilities.yml", component.ID, component.InputType)
 			continue
 		}
 		if !c.caps.AllowOutput(component.OutputType) {
-			c.logger.Info("Component '%v' with output type '%v' filtered by capabilities.yml", component.ID, component.OutputType)
+			c.logger.Infof("Component '%v' with output type '%v' filtered by capabilities.yml", component.ID, component.OutputType)
 			continue
 		}
 		result = append(result, component)
@@ -1219,19 +1245,20 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 }
 
 // collectManagerErrors listens on the shutdown channels for the
-// runtime, config, and vars managers, and waits for up to
-// the specified timeout for them to report their final status.
+// runtime, config, and vars managers as well as the upgrade marker
+// watcher and waits for up to the specified timeout for them to
+// report their final status.
 // It returns any resulting errors as a multierror, or nil if no errors
 // were reported.
 // Called on the main Coordinator goroutine.
-func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh chan error) error {
-	var runtimeErr error
-	var configErr error
-	var varsErr error
+func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerWatcherErrCh chan error) error {
+	var runtimeErr, configErr, varsErr, upgradeMarkerWatcherErr error
+	var returnedRuntime, returnedConfig, returnedVars, returnedUpgradeMarkerWatcher bool
+
 	// in case other components are locked up, let us time out
 	timeoutWait := time.NewTimer(timeout)
 	defer timeoutWait.Stop()
-	var returnedRuntime, returnedConfig, returnedVars bool
+
 	/*
 		Wait for all managers to gently shut down. All managers send
 		an error status on their termination channel after their Run method
@@ -1248,7 +1275,7 @@ func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, config
 	var combinedErr error
 
 waitLoop:
-	for !returnedRuntime || !returnedConfig || !returnedVars {
+	for !returnedRuntime || !returnedConfig || !returnedVars || !returnedUpgradeMarkerWatcher {
 		select {
 		case runtimeErr = <-runtimeErrCh:
 			returnedRuntime = true
@@ -1256,6 +1283,8 @@ waitLoop:
 			returnedConfig = true
 		case varsErr = <-varsErrCh:
 			returnedVars = true
+		case upgradeMarkerWatcherErr = <-upgradeMarkerWatcherErrCh:
+			returnedUpgradeMarkerWatcher = true
 		case <-timeoutWait.C:
 			var timeouts []string
 			if !returnedRuntime {
@@ -1266,6 +1295,9 @@ waitLoop:
 			}
 			if !returnedVars {
 				timeouts = append(timeouts, "no response from vars manager")
+			}
+			if !returnedUpgradeMarkerWatcher {
+				timeouts = append(timeouts, "no response from upgrade marker watcher")
 			}
 			timeoutStr := strings.Join(timeouts, ", ")
 			combinedErr = multierror.Append(combinedErr, fmt.Errorf("timeout while waiting for managers to shut down: %v", timeoutStr))
@@ -1280,6 +1312,9 @@ waitLoop:
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars manager: %w", varsErr))
+	}
+	if upgradeMarkerWatcherErr != nil && !errors.Is(upgradeMarkerWatcherErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("upgrade marker watcher: %w", upgradeMarkerWatcherErr))
 	}
 	return combinedErr
 }

@@ -164,11 +164,16 @@ func TestStateMapping(t *testing.T) {
 
 			if tc.upgradeDetails != nil {
 				expectedMetadata := &cproto.UpgradeDetailsMetadata{
-					ScheduledAt:     timestamppb.New(tc.upgradeDetails.Metadata.ScheduledAt),
 					DownloadPercent: float32(tc.upgradeDetails.Metadata.DownloadPercent),
 					FailedState:     string(tc.upgradeDetails.Metadata.FailedState),
 					ErrorMsg:        tc.upgradeDetails.Metadata.ErrorMsg,
 				}
+
+				if tc.upgradeDetails.Metadata.ScheduledAt != nil &&
+					!tc.upgradeDetails.Metadata.ScheduledAt.IsZero() {
+					expectedMetadata.ScheduledAt = timestamppb.New(*tc.upgradeDetails.Metadata.ScheduledAt)
+				}
+
 				assert.Equal(t, string(tc.upgradeDetails.State), stateResponse.UpgradeDetails.State)
 				assert.Equal(t, tc.upgradeDetails.TargetVersion, stateResponse.UpgradeDetails.TargetVersion)
 				assert.Equal(t, tc.upgradeDetails.ActionID, stateResponse.UpgradeDetails.ActionId)
