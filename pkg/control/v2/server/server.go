@@ -370,11 +370,16 @@ func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.
 			State:         string(state.UpgradeDetails.State),
 			ActionId:      state.UpgradeDetails.ActionID,
 			Metadata: &cproto.UpgradeDetailsMetadata{
-				ScheduledAt:     timestamppb.New(state.UpgradeDetails.Metadata.ScheduledAt),
 				DownloadPercent: float32(state.UpgradeDetails.Metadata.DownloadPercent),
 				FailedState:     string(state.UpgradeDetails.Metadata.FailedState),
 				ErrorMsg:        state.UpgradeDetails.Metadata.ErrorMsg,
 			},
+		}
+
+		if state.UpgradeDetails.Metadata.ScheduledAt != nil &&
+			!state.UpgradeDetails.Metadata.ScheduledAt.IsZero() {
+			upgradeDetails.Metadata.ScheduledAt = timestamppb.New(*state.UpgradeDetails.Metadata.ScheduledAt)
+
 		}
 	}
 

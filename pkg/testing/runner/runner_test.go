@@ -38,12 +38,13 @@ func TestNewRunner_Clean(t *testing.T) {
 	require.NoError(t, err)
 
 	i1 := Instance{
-		ID:         "id-1",
-		Name:       "name-1",
-		IP:         "127.0.0.1",
-		Username:   "ubuntu",
-		RemotePath: "/home/ubuntu/agent",
-		Internal:   map[string]interface{}{}, // ElementsMatch fails without this set
+		ID:          "id-1",
+		Name:        "name-1",
+		Provisioner: ip.Name(),
+		IP:          "127.0.0.1",
+		Username:    "ubuntu",
+		RemotePath:  "/home/ubuntu/agent",
+		Internal:    map[string]interface{}{}, // ElementsMatch fails without this set
 	}
 	err = r.addOrUpdateInstance(StateInstance{
 		Instance: i1,
@@ -51,12 +52,13 @@ func TestNewRunner_Clean(t *testing.T) {
 	})
 	require.NoError(t, err)
 	i2 := Instance{
-		ID:         "id-2",
-		Name:       "name-2",
-		IP:         "127.0.0.2",
-		Username:   "ubuntu",
-		RemotePath: "/home/ubuntu/agent",
-		Internal:   map[string]interface{}{}, // ElementsMatch fails without this set
+		ID:          "id-2",
+		Name:        "name-2",
+		Provisioner: ip.Name(),
+		IP:          "127.0.0.2",
+		Username:    "ubuntu",
+		RemotePath:  "/home/ubuntu/agent",
+		Internal:    map[string]interface{}{}, // ElementsMatch fails without this set
 	}
 	err = r.addOrUpdateInstance(StateInstance{
 		Instance: i2,
@@ -64,16 +66,18 @@ func TestNewRunner_Clean(t *testing.T) {
 	})
 	require.NoError(t, err)
 	s1 := Stack{
-		ID:       "id-1",
-		Version:  "8.10.0",
-		Internal: map[string]interface{}{}, // ElementsMatch fails without this set
+		ID:          "id-1",
+		Provisioner: sp.Name(),
+		Version:     "8.10.0",
+		Internal:    map[string]interface{}{}, // ElementsMatch fails without this set
 	}
 	err = r.addOrUpdateStack(s1)
 	require.NoError(t, err)
 	s2 := Stack{
-		ID:       "id-2",
-		Version:  "8.9.0",
-		Internal: map[string]interface{}{}, // ElementsMatch fails without this set
+		ID:          "id-2",
+		Provisioner: sp.Name(),
+		Version:     "8.9.0",
+		Internal:    map[string]interface{}{}, // ElementsMatch fails without this set
 	}
 	err = r.addOrUpdateStack(s2)
 	require.NoError(t, err)
@@ -93,6 +97,10 @@ func TestNewRunner_Clean(t *testing.T) {
 type fakeInstanceProvisioner struct {
 	batches   []OSBatch
 	instances []Instance
+}
+
+func (f *fakeInstanceProvisioner) Name() string {
+	return "fake"
 }
 
 func (f *fakeInstanceProvisioner) SetLogger(_ Logger) {
@@ -127,6 +135,10 @@ type fakeStackProvisioner struct {
 	mx            sync.Mutex
 	requests      []StackRequest
 	deletedStacks []Stack
+}
+
+func (f *fakeStackProvisioner) Name() string {
+	return "fake"
 }
 
 func (f *fakeStackProvisioner) SetLogger(_ Logger) {
