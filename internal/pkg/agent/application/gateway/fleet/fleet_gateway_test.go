@@ -7,6 +7,7 @@ package fleet
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"io"
@@ -23,9 +24,11 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -308,6 +311,73 @@ func TestFleetGateway(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("Sends upgrade details", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		scheduler := scheduler.NewStepper()
+		client := newTestingClient()
+
+		log, _ := logger.NewTesting("fleet_gateway")
+
+		stateStore := newStateStore(t, log)
+
+		upgradeDetails := &details.Details{
+			TargetVersion: "8.12.0",
+			State:         "UPG_WATCHING",
+			ActionID:      "foobarbaz",
+		}
+		stateFetcher := func() coordinator.State {
+			return coordinator.State{
+				UpgradeDetails: upgradeDetails,
+			}
+		}
+
+		gateway, err := newFleetGatewayWithScheduler(
+			log,
+			settings,
+			agentInfo,
+			client,
+			scheduler,
+			noop.New(),
+			stateFetcher,
+			stateStore,
+		)
+
+		require.NoError(t, err)
+
+		waitFn := ackSeq(
+			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+				data, err := io.ReadAll(body)
+				require.NoError(t, err)
+
+				var checkinRequest fleetapi.CheckinRequest
+				err = json.Unmarshal(data, &checkinRequest)
+				require.NoError(t, err)
+
+				require.NotNil(t, checkinRequest.UpgradeDetails)
+				require.Equal(t, upgradeDetails, checkinRequest.UpgradeDetails)
+
+				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+				return resp, nil
+			}),
+		)
+
+		errCh := runFleetGateway(ctx, gateway)
+
+		// Synchronize scheduler and acking of calls from the worker go routine.
+		scheduler.Next()
+		waitFn()
+
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
+		select {
+		case actions := <-gateway.Actions():
+			t.Errorf("Expected no actions, got %v", actions)
+		default:
+		}
+	})
 }
 
 func TestRetriesOnFailures(t *testing.T) {

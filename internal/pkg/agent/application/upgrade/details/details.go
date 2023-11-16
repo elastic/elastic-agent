@@ -35,7 +35,7 @@ type Details struct {
 
 // Metadata consists of metadata relating to a specific upgrade state
 type Metadata struct {
-	ScheduledAt time.Time `json:"scheduled_at,omitempty" yaml:"scheduled_at,omitempty"`
+	ScheduledAt *time.Time `json:"scheduled_at,omitempty" yaml:"scheduled_at,omitempty"`
 
 	// DownloadPercent is the percentage of the artifact that has been
 	// downloaded. Minimum value is 0 and maximum value is 1.
