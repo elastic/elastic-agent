@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -48,6 +49,10 @@ func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, source
 }
 
 func (u *mockUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+	return nil
+}
+
+func (u *mockUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
 	return nil
 }
 

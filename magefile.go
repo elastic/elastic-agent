@@ -1772,10 +1772,14 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
 	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
 	if stackProvisionerMode == "" {
-		stackProvisionerMode = "stateful"
+		stackProvisionerMode = ess.ProvisionerStateful
 	}
-	if stackProvisionerMode != "stateful" && stackProvisionerMode != "serverless" {
-		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of 'serverless' or 'stateful', not %s", stackProvisionerMode)
+	if stackProvisionerMode != ess.ProvisionerStateful &&
+		stackProvisionerMode != ess.ProvisionerServerless {
+		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
+			ess.ProvisionerStateful,
+			ess.ProvisionerServerless,
+			stackProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
@@ -1831,9 +1835,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	var instanceProvisioner runner.InstanceProvisioner
-	if instanceProvisionerMode == "multipass" {
+	if instanceProvisionerMode == multipass.Name {
 		instanceProvisioner = multipass.NewProvisioner()
-	} else if instanceProvisionerMode == "ogc" {
+	} else if instanceProvisionerMode == ogc.Name {
 		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
 		if err != nil {
 			return nil, err
@@ -1848,12 +1852,13 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Region:     essRegion,
 	}
 	var stackProvisioner runner.StackProvisioner
-	if stackProvisionerMode == "stateful" {
+	if stackProvisionerMode == ess.ProvisionerStateful {
 		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err
 		}
-	} else if stackProvisionerMode == "serverless" {
+
+	} else if stackProvisionerMode == ess.ProvisionerServerless {
 		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err

@@ -594,23 +594,10 @@ func (r *Runner) startStacks(ctx context.Context) error {
 	var requests []stackReq
 	for _, version := range versions {
 		id := strings.Replace(version, ".", "", -1)
-		stack, ok := r.findStack(id)
-		if ok {
-			requests = append(requests, stackReq{
-				request: StackRequest{
-					ID:      id,
-					Version: version,
-				},
-				stack: &stack,
-			})
-		} else {
-			requests = append(requests, stackReq{
-				request: StackRequest{
-					ID:      id,
-					Version: version,
-				},
-			})
-		}
+		requests = append(requests, stackReq{
+			request: StackRequest{ID: id, Version: version},
+			stack:   r.findStack(id),
+		})
 	}
 
 	reportResult := func(version string, stack Stack, err error) {
@@ -706,7 +693,8 @@ func (r *Runner) findInstance(id string) (StateInstance, bool) {
 	r.stateMx.Lock()
 	defer r.stateMx.Unlock()
 	for _, existing := range r.state.Instances {
-		if existing.ID == id {
+		if existing.Same(StateInstance{
+			Instance: Instance{ID: id, Provisioner: r.ip.Name()}}) {
 			return existing, true
 		}
 	}
@@ -718,30 +706,30 @@ func (r *Runner) addOrUpdateInstance(instance StateInstance) error {
 	defer r.stateMx.Unlock()
 
 	state := r.state
-	existed := false
+	found := false
 	for idx, existing := range state.Instances {
-		if existing.ID == instance.ID {
+		if existing.Same(instance) {
 			state.Instances[idx] = instance
-			existed = true
+			found = true
 			break
 		}
 	}
-	if !existed {
+	if !found {
 		state.Instances = append(state.Instances, instance)
 	}
 	r.state = state
 	return r.writeState()
 }
 
-func (r *Runner) findStack(id string) (Stack, bool) {
+func (r *Runner) findStack(id string) *Stack {
 	r.stateMx.Lock()
 	defer r.stateMx.Unlock()
 	for _, existing := range r.state.Stacks {
-		if existing.ID == id {
-			return existing, true
+		if existing.Same(Stack{ID: id, Provisioner: r.sp.Name()}) {
+			return &existing
 		}
 	}
-	return Stack{}, false
+	return nil
 }
 
 func (r *Runner) addOrUpdateStack(stack Stack) error {
@@ -749,15 +737,15 @@ func (r *Runner) addOrUpdateStack(stack Stack) error {
 	defer r.stateMx.Unlock()
 
 	state := r.state
-	existed := false
+	found := false
 	for idx, existing := range state.Stacks {
-		if existing.ID == stack.ID {
+		if existing.Same(stack) {
 			state.Stacks[idx] = stack
-			existed = true
+			found = true
 			break
 		}
 	}
-	if !existed {
+	if !found {
 		state.Stacks = append(state.Stacks, stack)
 	}
 	r.state = state
@@ -827,6 +815,20 @@ func (r *Runner) mergeResults(results map[string]OSRunnerResult) (Result, error)
 	complete.JSONOutput = jsonOutput.Bytes()
 	complete.XMLOutput = junitBytes.Bytes()
 	return complete, nil
+}
+
+// Same returns true if other is the same instance as this one.
+// Two instances are considered the same if their provider and ID are the same.
+func (s StateInstance) Same(other StateInstance) bool {
+	return s.Provisioner == other.Provisioner &&
+		s.ID == other.ID
+}
+
+// Same returns true if other is the same stack as this one.
+// Two stacks are considered the same if their provisioner and ID are the same.
+func (s Stack) Same(other Stack) bool {
+	return s.Provisioner == other.Provisioner &&
+		s.ID == other.ID
 }
 
 func mergePackageResult(pkg OSRunnerPackageResult, batchName string, sudo bool, rawOutput io.Writer, jsonOutput io.Writer, suites *JUnitTestSuites) error {

@@ -334,6 +334,13 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	defer cancel()
 	logger := logp.NewLogger("testing")
 
+	upgradeMgr, err := upgrade.NewUpgrader(
+		logger,
+		&artifact.Config{},
+		&info.AgentInfo{},
+	)
+	require.NoError(t, err)
+
 	// Channels have buffer length 1 so we don't have to run on multiple
 	// goroutines.
 	stateChan := make(chan State, 1)
@@ -353,11 +360,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		// Policy changes are sent to the upgrade manager, which scans it
 		// for updated artifact URIs. We take advantage of this for the
 		// test by sending an invalid artifact URI to trigger an error.
-		upgradeMgr: upgrade.NewUpgrader(
-			logger,
-			&artifact.Config{},
-			&info.AgentInfo{},
-		),
+		upgradeMgr: upgradeMgr,
 		// Add a placeholder runtime manager that will accept any updates
 		runtimeMgr: &fakeRuntimeManager{},
 
