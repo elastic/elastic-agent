@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -27,6 +29,11 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 	readFn := func() error {
 		var err error
 		markerFileBytes, err = os.ReadFile(markerFile)
+		if errors.Is(err, os.ErrNotExist) {
+			// marker doesn't exist, nothing to do
+			return nil
+		}
+
 		return err
 	}
 

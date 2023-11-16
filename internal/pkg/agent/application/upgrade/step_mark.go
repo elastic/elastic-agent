@@ -171,10 +171,11 @@ func LoadMarker() (*UpdateMarker, error) {
 func loadMarker(markerFile string) (*UpdateMarker, error) {
 	markerBytes, err := readMarkerFile(markerFile)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, nil
-		}
 		return nil, err
+	}
+	if markerBytes == nil {
+		// marker doesn't exist
+		return nil, nil
 	}
 
 	marker := &updateMarkerSerializer{}

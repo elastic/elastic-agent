@@ -8,12 +8,19 @@ package upgrade
 
 import (
 	"os"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
 // On non-Windows platforms, readMarkerFile simply reads the marker file.
 // See marker_access_windows.go for behavior on Windows platforms.
 func readMarkerFile(markerFile string) ([]byte, error) {
-	return os.ReadFile(markerFile)
+	markerFileBytes, err := os.ReadFile(markerFile)
+	if errors.Is(err, os.ErrNotExist) {
+		// marker doesn't exist, nothing to do
+		return nil, nil
+	}
+	return markerFileBytes, nil
 }
 
 // On non-Windows platforms, writeMarkerFile simply writes the marker file.
