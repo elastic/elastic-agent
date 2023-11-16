@@ -127,6 +127,24 @@ func (d *Details) RegisterObserver(observer Observer) {
 	d.notifyObserver(observer)
 }
 
+// Equals compares the non-lock fields of two Details structs.
+func (d *Details) Equals(otherD *Details) bool {
+	// If both addresses are equal or both are nil
+	if d == otherD {
+		return true
+	}
+
+	// If only one is nil but the other is not
+	if d == nil || otherD == nil {
+		return false
+	}
+
+	return d.State == otherD.State &&
+		d.TargetVersion == otherD.TargetVersion &&
+		d.ActionID == otherD.ActionID &&
+		d.Metadata.Equals(otherD.Metadata)
+}
+
 func (d *Details) notifyObservers() {
 	for _, observer := range d.observers {
 		d.notifyObserver(observer)
@@ -145,6 +163,14 @@ func (d *Details) notifyObserver(observer Observer) {
 		}
 		observer(&dCopy)
 	}
+}
+
+func (m Metadata) Equals(otherM Metadata) bool {
+	return m.ScheduledAt.Equal(otherM.ScheduledAt) &&
+		m.FailedState == otherM.FailedState &&
+		m.ErrorMsg == otherM.ErrorMsg &&
+		m.DownloadPercent == otherM.DownloadPercent &&
+		m.DownloadRate == otherM.DownloadRate
 }
 
 func (dr *downloadRate) MarshalJSON() ([]byte, error) {
