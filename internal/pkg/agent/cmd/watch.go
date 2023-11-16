@@ -13,22 +13,23 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elastic/elastic-agent/version"
-
-	"github.com/elastic/elastic-agent/internal/pkg/config"
-
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/configure"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -107,12 +108,47 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	errorCheckInterval := cfg.Settings.Upgrade.Watcher.ErrorCheck.Interval
 	ctx := context.Background()
 	if err := watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
-		log.Error("Error detected proceeding to rollback: %v", err)
+		log.Error("Error detected, proceeding to rollback: %v", err)
+
+		// If we are upgrading from version >= 8.12.0, marker.Details should be non-nil
+		// because the Agent we upgraded FROM would've written upgrade details in the upgrade
+		// marker. However, if we're upgrading from version < 8.12.0, the marker won't
+		// contain upgrade details, so we populate them now.
+		if marker.Details == nil {
+			fromVersion, err := agtversion.ParseVersion(marker.PrevVersion)
+			if err != nil {
+				log.Warnf("upgrade details are nil, but unable to parse version being upgraded from [%s]: %s", marker.PrevVersion, err.Error())
+			} else if fromVersion.Less(*agtversion.NewParsedSemVer(8, 12, 0, "", "")) {
+				log.Warnf("upgrade details are unexpectedly nil, upgrading from version [%s]", marker.PrevVersion)
+			}
+
+			marker.Details = details.NewDetails(version.GetAgentPackageVersion(), details.StateRollback, marker.GetActionID())
+		}
+
+		marker.Details.SetState(details.StateRollback)
+		err = upgrade.SaveMarker(marker)
+		if err != nil {
+			log.Errorf("unable to save upgrade marker before attempting to rollback: %s", err.Error())
+		}
+
 		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
 			log.Error("rollback failed", err)
+
+			marker.Details.Fail(err)
+			err = upgrade.SaveMarker(marker)
+			if err != nil {
+				log.Errorf("unable to save upgrade marker after rollback failed: %s", err.Error())
+			}
 		}
 		return err
+	}
+
+	// watch succeeded - upgrade was successful!
+	marker.Details.SetState(details.StateCompleted)
+	err = upgrade.SaveMarker(marker)
+	if err != nil {
+		log.Errorf("unable to save upgrade marker after successful watch: %s", err.Error())
 	}
 
 	// cleanup older versions,

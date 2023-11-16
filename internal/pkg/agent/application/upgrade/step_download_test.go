@@ -89,7 +89,9 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{expectedDownloadPath, nil}, nil
 		}
 
-		u := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		require.NoError(t, err)
+
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
@@ -124,7 +126,9 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		require.NoError(t, err)
+
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
@@ -161,7 +165,9 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		require.NoError(t, err)
+
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
@@ -186,7 +192,9 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
 		}
 
-		u := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		require.NoError(t, err)
+
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")

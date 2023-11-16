@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -118,6 +119,23 @@ inputs:
 		}
 	}
 	require.NoError(t, err)
+
+	// ensure that upgrade details now show the state as UPG_ROLLBACK. This is only possible with Elastic
+	// Agent versions >= 8.12.0.
+	startVersion, err := version.ParseVersion(startVersionInfo.Binary.Version)
+	require.NoError(t, err)
+
+	if !startVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) {
+		client := startFixture.Client()
+		err = client.Connect(ctx)
+		require.NoError(t, err)
+
+		state, err := client.State(ctx)
+		require.NoError(t, err)
+
+		require.NotNil(t, state.UpgradeDetails)
+		require.Equal(t, details.StateRollback, state.UpgradeDetails.State)
+	}
 
 	// rollback should stop the watcher
 	// killTimeout is greater than timeout as the watcher should have been
@@ -232,6 +250,23 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		}
 	}
 	require.NoError(t, err)
+
+	// ensure that upgrade details now show the state as UPG_ROLLBACK. This is only possible with Elastic
+	// Agent versions >= 8.12.0.
+	startVersion, err := version.ParseVersion(startVersionInfo.Binary.Version)
+	require.NoError(t, err)
+
+	if !startVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) {
+		client := startFixture.Client()
+		err = client.Connect(ctx)
+		require.NoError(t, err)
+
+		state, err := client.State(ctx)
+		require.NoError(t, err)
+
+		require.NotNil(t, state.UpgradeDetails)
+		require.Equal(t, details.StateRollback, state.UpgradeDetails.State)
+	}
 
 	// rollback should stop the watcher
 	// killTimeout is greater than timeout as the watcher should have been
