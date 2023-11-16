@@ -76,7 +76,7 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
-		Isolate: false,
+		Isolate: true,
 		Sudo:    true, // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
@@ -102,7 +102,7 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
-		Isolate: false,
+		Isolate: true,
 		Sudo:    true, // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
@@ -130,7 +130,7 @@ func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
-		Isolate: false,
+		Isolate: true,
 		Sudo:    true, // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
@@ -493,7 +493,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
-		Isolate: false,
+		Isolate: true,
 		Sudo:    true, // requires Agent installation
 	})
 
