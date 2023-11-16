@@ -8,8 +8,8 @@ echo "--- Install gh cli"
 
 MSG="environment variable missing."
 DEFAULT_HOME="/usr/local"
-GH_VERSION=${GH_VERSION:?$MSG}
-HOME=${HOME:?$DEFAULT_HOME}
+GH_VERSION=${GH_VERSION:-$MSG}
+HOME=${HOME:-$DEFAULT_HOME}
 GH_CMD="${HOME}/bin/gh"
 
 if command -v gh
@@ -27,6 +27,8 @@ then
     set -e
 fi
 
+source .buildkite/scripts/common.sh
+
 OS=$(uname -s| tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m| tr '[:upper:]' '[:lower:]')
 if [ "${ARCH}" == "aarch64" ] ; then
@@ -37,10 +39,10 @@ fi
 
 echo "Downloading gh : ${GH_VERSION}..."
 TMP_DIR=$(mktemp -d)
-if curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" | tar xz -C $TMP_DIR ; then
+if retry 5 curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" | tar xz -C $TMP_DIR ; then
   mkdir -p "${HOME}/bin"
   mv "${TMP_DIR}/gh_${GH_VERSION}_linux_amd64/bin/gh" "${GH_CMD}"
-  rm -rf ${TMP_DIR}
+  rm -rf "${TMP_DIR}"
 else    
     echo "Something bad with the download, deleting the binary"
     if [ -e "${GH_CMD}" ] ; then
