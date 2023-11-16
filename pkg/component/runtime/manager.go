@@ -331,7 +331,7 @@ func (m *Manager) Update(model component.Model) {
 	select {
 	case m.updateChan <- model:
 	case <-m.doneChan:
-		// Manager is shutting down, ignore the udpate
+		// Manager is shutting down, ignore the update
 	}
 }
 
