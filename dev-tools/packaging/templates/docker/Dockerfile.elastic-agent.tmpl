@@ -211,15 +211,14 @@ RUN cd {{$beatHome}}/.node \
      esac \
   && mkdir -p node \
   && curl ${NODE_DOWNLOAD_URL} | tar -xJ --strip 1 -C node \
-  && chmod ug+rwX -R $NODE_PATH \
+  && chmod ugo+rwX -R $NODE_PATH \
 # Install synthetics as a regular user, installing npm deps as root odesn't work
-   && chown -R {{ .user }}:{{ .user }} $NODE_PATH \
    # fix .node .npm and .synthetics
-   && chown -R {{ .user }}:{{ .user }} {{$beatHome}} 
+   && chown -R {{ .user }}:{{ .user }} $NODE_PATH 
 USER {{ .user }}
 # If this fails dump the NPM logs
 RUN (npm i -g --loglevel verbose --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
-    chmod ug+rwX -R $NODE_PATH
+    chmod ugo+rwX -R $NODE_PATH
 USER root
 
 # Install the deps as needed by the exact version of playwright elastic synthetics uses
