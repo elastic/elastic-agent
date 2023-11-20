@@ -1737,8 +1737,8 @@ github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8/go.mod h1:HUYIGzjTL3rfEspMx
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/xlab/treeprint v1.1.0/go.mod h1:gj5Gd3gPdKtR1ikdDK6fnFLdmIS0X30kTTuNd/WEJu0=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
-github.com/ycombinator/elastic-agent-libs v0.0.0-20231120175530-2423154723d5 h1:tyjcd30tHnApHEdFWD3cvDfG7PS2FI9bufbwUlBbVtg=
-github.com/ycombinator/elastic-agent-libs v0.0.0-20231120175530-2423154723d5/go.mod h1:pVBEElQJUO9mr4WStWNXuQGsJn54lcjAoYAHmsvBLBc=
+github.com/ycombinator/elastic-agent-libs v0.0.0-20231120180527-82a87b8ca926 h1:gLhw5YIjBFkZV/V5662hDSJX9KCDUew8JiSvyq6trkc=
+github.com/ycombinator/elastic-agent-libs v0.0.0-20231120180527-82a87b8ca926/go.mod h1:pVBEElQJUO9mr4WStWNXuQGsJn54lcjAoYAHmsvBLBc=
 github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d/go.mod h1:rHwXgn7JulP+udvsHwJoVG1YGAP6VLg4y9I5dyZdqmA=
 github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a h1:fZHgsYlfvtyqToslyjUt3VOPF4J7aK/3MPcK7xp3PDk=
 github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a/go.mod h1:ul22v+Nro/R083muKhosV54bj5niojjWZvU8xrevuH4=

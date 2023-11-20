@@ -182,7 +182,7 @@ replace (
 )
 
 // FIXME: remove once https://github.com/elastic/elastic-agent-libs/pull/166 is merged and new version is released
-replace github.com/elastic/elastic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20231120175530-2423154723d5
+replace github.com/elastic/elastic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20231120180527-82a87b8ca926
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
