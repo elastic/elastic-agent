@@ -167,11 +167,22 @@ func (d *Details) notifyObserver(observer Observer) {
 }
 
 func (m Metadata) Equals(otherM Metadata) bool {
-	return m.ScheduledAt.Equal(otherM.ScheduledAt) &&
+	return equalTimePointers(m.ScheduledAt, otherM.ScheduledAt) &&
 		m.FailedState == otherM.FailedState &&
 		m.ErrorMsg == otherM.ErrorMsg &&
 		m.DownloadPercent == otherM.DownloadPercent &&
 		m.DownloadRate == otherM.DownloadRate
+}
+
+func equalTimePointers(t, otherT *time.Time) bool {
+	if t == otherT {
+		return true
+	}
+	if t == nil || otherT == nil {
+		return false
+	}
+
+	return t.Equal(*otherT)
 }
 
 func (dr *downloadRate) MarshalJSON() ([]byte, error) {

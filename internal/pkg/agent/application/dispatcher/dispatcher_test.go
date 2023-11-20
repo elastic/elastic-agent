@@ -493,6 +493,7 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 func TestReportNextScheduledUpgrade(t *testing.T) {
 	now := time.Now().UTC()
 	later := now.Add(3 * time.Hour)
+	laterTruncate := later.Truncate(time.Second)
 	muchLater := later.Add(3 * time.Hour)
 
 	cases := map[string]struct {
@@ -522,7 +523,7 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 				State:         details.StateScheduled,
 				ActionID:      "action2",
 				Metadata: details.Metadata{
-					ScheduledAt: later.Truncate(time.Second),
+					ScheduledAt: &laterTruncate,
 				},
 			},
 		},
@@ -544,7 +545,7 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 				State:         details.StateScheduled,
 				ActionID:      "action4",
 				Metadata: details.Metadata{
-					ScheduledAt: later.Truncate(time.Second),
+					ScheduledAt: &laterTruncate,
 				},
 			},
 		},
