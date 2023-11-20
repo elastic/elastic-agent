@@ -14,6 +14,7 @@ require (
 	github.com/elastic/e2e-testing v1.1.0
 	github.com/elastic/elastic-agent-autodiscover v0.6.5
 	github.com/elastic/elastic-agent-client/v7 v7.5.0
+	// FIXME: bump up once https://github.com/elastic/elastic-agent-libs/pull/166 is merged and new version is released
 	github.com/elastic/elastic-agent-libs v0.7.0
 	github.com/elastic/elastic-agent-system-metrics v0.8.0
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
@@ -179,6 +180,9 @@ replace (
 	github.com/fsnotify/fsnotify => github.com/adriansr/fsnotify v1.4.8-0.20211018144411-a81f2b630e7c
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
+
+// FIXME: remove once https://github.com/elastic/elastic-agent-libs/pull/166 is merged and new version is released
+replace github.com/elastic/elastic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20231120175530-2423154723d5
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible

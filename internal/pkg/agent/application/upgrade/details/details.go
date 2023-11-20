@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/upgrade/details"
+
 	"github.com/docker/go-units"
 )
 
@@ -43,7 +45,7 @@ type Metadata struct {
 
 	// DownloadRate is the rate, in bytes per second, at which the download
 	// is progressing.
-	DownloadRate downloadRate `json:"download_rate,omitempty" yaml:"download_rate,omitempty"`
+	DownloadRate details.DownloadRate `json:"download_rate,omitempty" yaml:"download_rate,omitempty"`
 
 	// FailedState is the state an upgrade was in if/when it failed. Use the
 	// Fail() method of UpgradeDetails to correctly record details when
@@ -93,7 +95,7 @@ func (d *Details) SetDownloadProgress(percent, rateBytesPerSecond float64) {
 	defer d.mu.Unlock()
 
 	d.Metadata.DownloadPercent = percent
-	d.Metadata.DownloadRate = downloadRate(rateBytesPerSecond)
+	d.Metadata.DownloadRate = details.DownloadRate(rateBytesPerSecond)
 	d.notifyObservers()
 }
 
