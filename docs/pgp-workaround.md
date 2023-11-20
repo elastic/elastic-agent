@@ -56,3 +56,7 @@ host { 'elastic-artifacts':
         path: '/etc/hosts'
         line: '<YOUR_HOST_IP> artifacts.elastic.co'
 ```
+
+## TLS
+
+Because the connection is `https`, the certificate that the host that is impersonating `https:\\artifacts.elastic.co` returns will have to have `artifacts.elastic.co` as one of it's Subject Alternate Names.

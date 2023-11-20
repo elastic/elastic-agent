@@ -929,7 +929,6 @@ func packageAgent(platforms []string, packagingFn func()) {
 			// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/assetbeat/latest/8.11.0-SNAPSHOT.json
 			externalBinaries := map[string]string{
 				"auditbeat":             "beats",
 				"filebeat":              "beats",
@@ -945,7 +944,6 @@ func packageAgent(platforms []string, packagingFn func()) {
 				"pf-elastic-collector":  "prodfiler",
 				"pf-elastic-symbolizer": "prodfiler",
 				"pf-host-agent":         "prodfiler",
-				"assetbeat":             "assetbeat", // only supporting linux/amd64 or linux/arm64
 			}
 
 			// Only log fatal logs for logs produced using logrus. This is the global logger
@@ -1752,15 +1750,16 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 	datacenter := os.Getenv("TEST_INTEG_AUTH_GCP_DATACENTER")
 	if datacenter == "" {
+		// us-central1-a is used because T2A instances required for ARM64 testing are only
+		// available in the central regions
 		datacenter = "us-central1-a"
 	}
 
-	// Valid values are gcp-us-central1 (default), azure-eastus2,
-	// aws-eu-central-1, us-east-1 (which is an AWS region but the
-	// "aws" CSP prefix is not used by ESS for some reason!)
+	// Possible to change the region for deployment, default is gcp-us-west2 which is
+	// the CFT region.
 	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
 	if essRegion == "" {
-		essRegion = "gcp-us-central1"
+		essRegion = "gcp-us-west2"
 	}
 
 	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
@@ -1773,10 +1772,14 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
 	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
 	if stackProvisionerMode == "" {
-		stackProvisionerMode = "stateful"
+		stackProvisionerMode = ess.ProvisionerStateful
 	}
-	if stackProvisionerMode != "stateful" && stackProvisionerMode != "serverless" {
-		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of 'serverless' or 'stateful', not %s", stackProvisionerMode)
+	if stackProvisionerMode != ess.ProvisionerStateful &&
+		stackProvisionerMode != ess.ProvisionerServerless {
+		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
+			ess.ProvisionerStateful,
+			ess.ProvisionerServerless,
+			stackProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
@@ -1832,9 +1835,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	var instanceProvisioner runner.InstanceProvisioner
-	if instanceProvisionerMode == "multipass" {
+	if instanceProvisionerMode == multipass.Name {
 		instanceProvisioner = multipass.NewProvisioner()
-	} else if instanceProvisionerMode == "ogc" {
+	} else if instanceProvisionerMode == ogc.Name {
 		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
 		if err != nil {
 			return nil, err
@@ -1849,12 +1852,13 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Region:     essRegion,
 	}
 	var stackProvisioner runner.StackProvisioner
-	if stackProvisionerMode == "stateful" {
+	if stackProvisionerMode == ess.ProvisionerStateful {
 		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err
 		}
-	} else if stackProvisionerMode == "serverless" {
+
+	} else if stackProvisionerMode == ess.ProvisionerServerless {
 		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err

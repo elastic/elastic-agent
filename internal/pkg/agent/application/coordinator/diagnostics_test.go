@@ -441,7 +441,7 @@ func TestDiagnosticState(t *testing.T) {
 			ActionID:      "foobar",
 			Metadata: details.Metadata{
 				DownloadPercent: 0.17469,
-				ScheduledAt:     now,
+				ScheduledAt:     &now,
 				DownloadRate:    123.56,
 			},
 		},
