@@ -22,7 +22,7 @@ then
         echo "GH Versions match: $GH_VERSION. No need to install gh. Exiting."
         exit 0
     else 
-        echo "GH VErsion mismatch. Desired version: $GH_VERSION, found version: $FOUND_GH_VERSION. Installing new version."    
+        echo "GH Version mismatch. Desired version: $GH_VERSION, found version: $FOUND_GH_VERSION. Installing new version."    
     fi
     set -e
 fi
