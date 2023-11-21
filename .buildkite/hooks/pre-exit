@@ -9,12 +9,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == 
   source "${WORKSPACE}/.buildkite/scripts/common.sh"
 
   # Perform cleanup of integration tests resources
-  echo "--- Cleaning up integration test resources"
-  if [[ "$BUILDKITE_STEP_KEY" == "serverless-integration-tests" ]]; then
-    STACK_PROVISIONER=serverless SNAPSHOT=true mage integration:clean
-  else
-    SNAPSHOT=true mage integration:clean
-  fi
+  SNAPSHOT=true mage integration:clean
 fi
 
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then

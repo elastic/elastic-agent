@@ -136,19 +136,9 @@ steps:
       manual:
         allowed: true
 
-  - label: "Serverless integration test"
-    key: "serverless-integration-tests"
-    command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-    agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
-
   - label: "Integration tests"
     key: "integration-tests"
-    command: ".buildkite/scripts/steps/integration_tests.sh stateful"
+    command: ".buildkite/scripts/steps/integration_tests.sh"
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
