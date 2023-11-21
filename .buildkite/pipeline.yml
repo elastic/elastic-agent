@@ -4,27 +4,15 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
-<<<<<<< HEAD
-  - label: "Unit tests - Ubuntu 22.04"
-    key: "unit-tests-2204"
-    command: ".buildkite/scripts/steps/unit-tests.sh"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-      - "coverage.out"
-=======
   - label: "check-ci"
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
->>>>>>> 08c5150103 (Migrate check-ci step to buildkite (#3759))
     agents:
       provider: "gcp"
       image: "family/core-ubuntu-2204"
     retry:
       manual:
         allowed: true
-<<<<<<< HEAD
-=======
   - group: "Unit tests"
     key: "unit-tests"
     steps:
@@ -41,7 +29,6 @@ steps:
         retry:
           manual:
             allowed: true
->>>>>>> 08c5150103 (Migrate check-ci step to buildkite (#3759))
 
   - label: "Unit tests - Ubuntu 22.04 ARM64"
     key: "unit-tests-2204-arm64"
