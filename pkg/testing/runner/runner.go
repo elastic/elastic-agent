@@ -1024,10 +1024,11 @@ func createBatchID(batch OSBatch) string {
 
 	// The batchID needs to be at most 63 characters long otherwise
 	// OGC will fail to instantiate the VM.
-	if len(id) > 63 {
-		hash := fmt.Sprintf("%X", md5.Sum([]byte(id)))
+	maxIDLen := 63
+	if len(id) > maxIDLen {
+		hash := fmt.Sprintf("%x", md5.Sum([]byte(id)))
 		hashLen := utf8.RuneCountInString(hash)
-		id = id[:63-hashLen-1] + "-" + hash
+		id = id[:maxIDLen-hashLen-1] + "-" + hash
 	}
 
 	return strings.ToLower(id)
