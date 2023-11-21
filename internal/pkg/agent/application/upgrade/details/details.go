@@ -5,21 +5,11 @@
 package details
 
 import (
-	"encoding/json"
-	"fmt"
-	"math"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/upgrade/details"
-
-	"github.com/docker/go-units"
 )
-
-// downloadRate is a float64 that can be safely marshalled to JSON
-// when the value is Infinity. The rate is always in bytes/second units.
-type downloadRate float64
 
 // Observer is a function that will be called with upgrade details
 type Observer func(details *Details)
@@ -185,37 +175,4 @@ func equalTimePointers(t, otherT *time.Time) bool {
 	}
 
 	return t.Equal(*otherT)
-}
-
-func (dr *downloadRate) MarshalJSON() ([]byte, error) {
-	downloadRateBytesPerSecond := float64(*dr)
-	if math.IsInf(downloadRateBytesPerSecond, 0) {
-		return json.Marshal("+Inf bps")
-	}
-
-	return json.Marshal(
-		fmt.Sprintf("%sps", units.HumanSizeWithPrecision(downloadRateBytesPerSecond, 2)),
-	)
-}
-
-func (dr *downloadRate) UnmarshalJSON(data []byte) error {
-	var downloadRateStr string
-	err := json.Unmarshal(data, &downloadRateStr)
-	if err != nil {
-		return err
-	}
-
-	if downloadRateStr == "+Inf bps" {
-		*dr = downloadRate(math.Inf(1))
-		return nil
-	}
-
-	downloadRateStr = strings.TrimSuffix(downloadRateStr, "ps")
-	downloadRateBytesPerSecond, err := units.FromHumanSize(downloadRateStr)
-	if err != nil {
-		return err
-	}
-
-	*dr = downloadRate(downloadRateBytesPerSecond)
-	return nil
 }
