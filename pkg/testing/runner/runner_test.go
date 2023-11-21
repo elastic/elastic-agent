@@ -99,7 +99,7 @@ type fakeInstanceProvisioner struct {
 	instances []Instance
 }
 
-func (f *fakeInstanceProvisioner) Name() string {
+func (p *fakeInstanceProvisioner) Name() string {
 	return "fake"
 }
 
@@ -137,11 +137,11 @@ type fakeStackProvisioner struct {
 	deletedStacks []Stack
 }
 
-func (f *fakeStackProvisioner) Name() string {
+func (p *fakeStackProvisioner) Name() string {
 	return "fake"
 }
 
-func (f *fakeStackProvisioner) SetLogger(_ Logger) {
+func (p *fakeStackProvisioner) SetLogger(_ Logger) {
 }
 
 func (p *fakeStackProvisioner) Create(_ context.Context, request StackRequest) (Stack, error) {

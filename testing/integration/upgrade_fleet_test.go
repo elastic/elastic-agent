@@ -26,13 +26,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
-
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
@@ -95,9 +94,9 @@ func TestFleetAirGapedUpgrade(t *testing.T) {
 		Stack: &define.Stack{},
 		// The test uses iptables to simulate the air-gaped environment.
 		OS:      []define.OS{{Type: define.Linux}},
-		Isolate: true,  // It blocks IPs using iptables.
-		Local:   false, // requires Agent installation
-		Sudo:    true,  // uses iptables and installs the Agent
+		Isolate: true,  // Needed as the test blocks IPs using iptables.
+		Local:   false, // Needed as the test requires Agent installation
+		Sudo:    true,  // Needed as the test uses iptables and installs the Agent
 	})
 
 	ctx, _ := testcontext.WithDeadline(
