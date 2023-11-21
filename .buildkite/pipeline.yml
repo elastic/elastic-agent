@@ -221,6 +221,7 @@ steps:
   - label: "Integration tests"
     key: "integration-tests"
     command: ".buildkite/scripts/steps/integration_tests.sh stateful"
+    timeout_in_minutes: 120
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
@@ -231,6 +232,7 @@ steps:
   - label: "Serverless Beats Tests"
     key: "serverless-beats-integration-tests"
     command: ".buildkite/scripts/steps/beats_tests.sh"
+    timeout_in_minutes: 120
     if: "build.env('CRON') == 'yes'"
     agents:
       provider: "gcp"
@@ -238,7 +240,6 @@ steps:
     retry:
       manual:
         allowed: true
-
 
   - wait: ~
     continue_on_failure: true
