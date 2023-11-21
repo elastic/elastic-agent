@@ -60,64 +60,6 @@ func (p *provisioner) SetLogger(l runner.Logger) {
 	p.logger = l
 }
 
-<<<<<<< HEAD
-func (p *provisioner) Provision(ctx context.Context, requests []runner.StackRequest) ([]runner.Stack, error) {
-	results := make(map[runner.StackRequest]*CreateDeploymentResponse)
-	for _, r := range requests {
-		// allow up to 2 minutes for each create request
-		createCtx, createCancel := context.WithTimeout(ctx, 2*time.Minute)
-		resp, err := p.createDeployment(createCtx, r,
-			map[string]string{
-				"division":          "engineering",
-				"org":               "ingest",
-				"team":              "elastic-agent",
-				"project":           "elastic-agent",
-				"integration-tests": "true",
-			})
-		createCancel()
-		if err != nil {
-			return nil, err
-		}
-		results[r] = resp
-	}
-
-	// wait 15 minutes for all stacks to be ready
-	readyCtx, readyCancel := context.WithTimeout(ctx, 15*time.Minute)
-	defer readyCancel()
-
-	g, gCtx := errgroup.WithContext(readyCtx)
-	for req, resp := range results {
-		g.Go(func(req runner.StackRequest, resp *CreateDeploymentResponse) func() error {
-			return func() error {
-				ready, err := p.client.DeploymentIsReady(gCtx, resp.ID, 30*time.Second)
-				if err != nil {
-					return fmt.Errorf("failed to check for cloud %s to be ready: %w", req.Version, err)
-				}
-				if !ready {
-					return fmt.Errorf("cloud %s never became ready: %w", req.Version, err)
-				}
-				return nil
-			}
-		}(req, resp))
-	}
-	err := g.Wait()
-	if err != nil {
-		return nil, err
-	}
-
-	var stacks []runner.Stack
-	for req, resp := range results {
-		stacks = append(stacks, runner.Stack{
-			ID:            req.ID,
-			Version:       req.Version,
-			Elasticsearch: resp.ElasticsearchEndpoint,
-			Kibana:        resp.KibanaEndpoint,
-			Username:      resp.Username,
-			Password:      resp.Password,
-			Internal: map[string]interface{}{
-				"deployment_id": resp.ID,
-			},
-=======
 // Create creates a stack.
 func (p *provisioner) Create(ctx context.Context, request runner.StackRequest) (runner.Stack, error) {
 	// allow up to 2 minutes for request
@@ -130,7 +72,6 @@ func (p *provisioner) Create(ctx context.Context, request runner.StackRequest) (
 			"team":              "elastic-agent",
 			"project":           "elastic-agent",
 			"integration-tests": "true",
->>>>>>> b272a93bcf (Switch to CFT region and add more robust tracking and cleanup of stacks. (#3701))
 		})
 	if err != nil {
 		return runner.Stack{}, err

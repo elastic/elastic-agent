@@ -136,11 +136,6 @@ steps:
       manual:
         allowed: true
 
-<<<<<<< HEAD
-  - label: "Integration tests"
-    key: "integration-tests"
-    command: ".buildkite/scripts/steps/integration_tests.sh"
-=======
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
     command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
@@ -154,7 +149,6 @@ steps:
   - label: "Integration tests"
     key: "integration-tests"
     command: ".buildkite/scripts/steps/integration_tests.sh stateful"
->>>>>>> b272a93bcf (Switch to CFT region and add more robust tracking and cleanup of stacks. (#3701))
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"

@@ -373,20 +373,10 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	// ensure that we have all the requirements for the stack if required
 	if batch.Batch.Stack != nil {
 		// wait for the stack to be ready before continuing
-<<<<<<< HEAD
-		r.stacksReady.Wait()
-		if r.stacksErr != nil {
-			return OSRunnerResult{}, fmt.Errorf("%s unable to continue because stack never became ready: %w", instance.Name, r.stacksErr)
-		}
-		stack, ok := r.getStackForBatchID(batch.ID)
-		if !ok {
-			return OSRunnerResult{}, fmt.Errorf("failed to find stack for batch %s", batch.ID)
-=======
 		logger.Logf("Waiting for stack to be ready...")
 		stack, err := r.getStackForBatchID(batch.ID)
 		if err != nil {
 			return OSRunnerResult{}, err
->>>>>>> b272a93bcf (Switch to CFT region and add more robust tracking and cleanup of stacks. (#3701))
 		}
 		env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
 		env["ELASTICSEARCH_USERNAME"] = stack.Username

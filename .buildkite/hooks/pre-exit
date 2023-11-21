@@ -10,15 +10,11 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == 
 
   # Perform cleanup of integration tests resources
   echo "--- Cleaning up integration test resources"
-<<<<<<< HEAD
-  TEST_INTEG_AUTH_ESS_REGION=azure-eastus2 SNAPSHOT=true mage integration:clean
-=======
   if [[ "$BUILDKITE_STEP_KEY" == "serverless-integration-tests" ]]; then
     STACK_PROVISIONER=serverless SNAPSHOT=true mage integration:clean
   else
     SNAPSHOT=true mage integration:clean
   fi
->>>>>>> b272a93bcf (Switch to CFT region and add more robust tracking and cleanup of stacks. (#3701))
 fi
 
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then

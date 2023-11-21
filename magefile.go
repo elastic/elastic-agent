@@ -1735,12 +1735,8 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		datacenter = "us-central1-a"
 	}
 
-<<<<<<< HEAD
-	// Valid values are gcp-us-central1 (default), azure-eastus2
-=======
 	// Possible to change the region for deployment, default is gcp-us-west2 which is
 	// the CFT region.
->>>>>>> b272a93bcf (Switch to CFT region and add more robust tracking and cleanup of stacks. (#3701))
 	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
 	if essRegion == "" {
 		essRegion = "gcp-us-west2"

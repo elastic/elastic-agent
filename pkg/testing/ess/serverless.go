@@ -17,11 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 )
 
-<<<<<<< HEAD
-var serverlessURL = "https://global.qa.cld.elstc.co"
-=======
 var serverlessURL = "https://cloud.elastic.co"
->>>>>>> b272a93bcf (Switch to CFT region and add more robust tracking and cleanup of stacks. (#3701))
 
 // ServerlessClient is the handler the serverless ES instance
 type ServerlessClient struct {

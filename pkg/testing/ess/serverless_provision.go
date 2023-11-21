@@ -62,43 +62,11 @@ func (prov *ServerlessProvision) SetLogger(l runner.Logger) {
 	prov.log = l
 }
 
-<<<<<<< HEAD
-// Provision a new set of serverless instances
-func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runner.StackRequest) ([]runner.Stack, error) {
-	upWaiter := sync.WaitGroup{}
-	depErrs := make(chan error, len(requests))
-	depUp := make(chan bool, len(requests))
-	stacks := []runner.Stack{}
-	for _, req := range requests {
-		client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
-		srvReq := ServerlessRequest{Name: req.ID, RegionID: prov.cfg.Region}
-		_, err := client.DeployStack(ctx, srvReq)
-		if err != nil {
-			return nil, fmt.Errorf("error deploying stack for request %s: %w", req.ID, err)
-		}
-		err = client.WaitForEndpoints(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("error waiting for endpoints to become available for request: %w", err)
-		}
-		newStack := runner.Stack{
-			ID:            req.ID,
-			Version:       req.Version,
-			Elasticsearch: client.proj.Endpoints.Elasticsearch,
-			Kibana:        client.proj.Endpoints.Kibana,
-			Username:      client.proj.Credentials.Username,
-			Password:      client.proj.Credentials.Password,
-		}
-		stacks = append(stacks, newStack)
-		prov.stacksMut.Lock()
-		prov.stacks[req.ID] = stackhandlerData{client: client, stackData: newStack}
-		prov.stacksMut.Unlock()
-=======
 // Create creates a stack.
 func (prov *ServerlessProvision) Create(ctx context.Context, request runner.StackRequest) (runner.Stack, error) {
 	// allow up to 4 minutes for requests
 	createCtx, createCancel := context.WithTimeout(ctx, 4*time.Minute)
 	defer createCancel()
->>>>>>> b272a93bcf (Switch to CFT region and add more robust tracking and cleanup of stacks. (#3701))
 
 	client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey, prov.log)
 	srvReq := ServerlessRequest{Name: request.ID, RegionID: prov.cfg.Region}
@@ -186,22 +154,6 @@ func (prov *ServerlessProvision) WaitForReady(ctx context.Context, stack runner.
 	}
 }
 
-<<<<<<< HEAD
-// Clean shuts down and removes the deployments
-func (prov *ServerlessProvision) Clean(ctx context.Context, stacks []runner.Stack) error {
-	for _, stack := range stacks {
-		prov.stacksMut.RLock()
-		stackRef, ok := prov.stacks[stack.ID]
-		prov.stacksMut.RUnlock()
-		if ok {
-			err := stackRef.client.DeleteDeployment()
-			if err != nil {
-				prov.log.Logf("error removing deployment: %w", err)
-			}
-		} else {
-			prov.log.Logf("error: could not find deployment for ID %s", stack.ID)
-		}
-=======
 // Delete deletes a stack.
 func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack) error {
 	deploymentID, deploymentType, err := prov.getDeploymentInfo(stack)
@@ -222,7 +174,6 @@ func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack)
 	err = client.DeleteDeployment()
 	if err != nil {
 		return fmt.Errorf("error removing serverless stack %s [stack_id: %s, deployment_id: %s]: %w", stack.Version, stack.ID, deploymentID, err)
->>>>>>> b272a93bcf (Switch to CFT region and add more robust tracking and cleanup of stacks. (#3701))
 	}
 	return nil
 }
