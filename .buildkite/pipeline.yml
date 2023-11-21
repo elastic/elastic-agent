@@ -166,3 +166,23 @@ steps:
     plugins:
       - junit-annotate#v2.4.1:
           artifacts: build/TEST-go-integration*.xml
+
+  # Triggers a dynamic step: Sync K8s
+  # Runs only on main and if k8s files are changed
+  - label: "Trigger k8s sync"
+    branches: main
+    plugins:
+      - monebag/monorepo-diff#v2.5.9:
+          diff: "git diff --name-only HEAD~1"
+          watch:
+            - path:
+                - deploy/kubernetes/*
+                - version/docs/version.asciidoc
+              config:
+                label: "Sync K8s"
+                command: ".buildkite/scripts/steps/sync-k8s.sh"
+                agents:
+                  provider: "gcp"
+                  image: "family/core-ubuntu-2204"
+                env:
+                  - GH_VERSION=2.4.0
