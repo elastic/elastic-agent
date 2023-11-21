@@ -951,6 +951,7 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 	for _, tag := range params.AdditionalMetrics {
 		if tag == "CPU" {
 			finalDiagnosticTime = diagnosticTimeoutCPU
+			break
 		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, finalDiagnosticTime)

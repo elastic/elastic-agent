@@ -11,7 +11,7 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: dynamic-timeout-for-diags
+summary: Use shorter timeouts for diagnostic requests unless CPU diagnostics are requested
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
