@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -89,35 +90,39 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 
 // Reload reloads the artifact configuration for the upgrader.
 func (u *Upgrader) Reload(rawConfig *config.Config) error {
-	type reloadConfig struct {
-		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
-		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
+	cfg, err := configuration.NewFromConfig(rawConfig)
+	if err != nil {
+		return fmt.Errorf("invalid config: %w", err)
+	}
 
-		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/ coming from fleet which uses
-		// different naming.
+	// the source URI coming from fleet which uses a different naming.
+	type reloadConfig struct {
+		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
 		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
 	}
-	cfg := &reloadConfig{}
-	if err := rawConfig.Unpack(&cfg); err != nil {
+	fleetSourceURI := &reloadConfig{}
+	if err := rawConfig.Unpack(&fleetSourceURI); err != nil {
 		return errors.New(err, "failed to unpack config during reload")
 	}
 
-	var newSourceURI string
-	if cfg.FleetSourceURI != "" {
-		// fleet configuration takes precedence
-		newSourceURI = cfg.FleetSourceURI
-	} else if cfg.SourceURI != "" {
-		newSourceURI = cfg.SourceURI
+	// fleet configuration takes precedence
+	if fleetSourceURI.FleetSourceURI != "" {
+		cfg.Settings.DownloadConfig.SourceURI = fleetSourceURI.FleetSourceURI
 	}
 
-	if newSourceURI != "" {
-		u.log.Infof("Source URI changed from %q to %q", u.settings.SourceURI, newSourceURI)
-		u.settings.SourceURI = newSourceURI
+	if cfg.Settings.DownloadConfig.SourceURI != "" {
+		u.log.Infof("Source URI changed from %q to %q",
+			u.settings.SourceURI,
+			cfg.Settings.DownloadConfig.SourceURI)
 	} else {
 		// source uri unset, reset to default
-		u.log.Infof("Source URI reset from %q to %q", u.settings.SourceURI, artifact.DefaultSourceURI)
-		u.settings.SourceURI = artifact.DefaultSourceURI
+		u.log.Infof("Source URI reset from %q to %q",
+			u.settings.SourceURI,
+			artifact.DefaultSourceURI)
+		cfg.Settings.DownloadConfig.SourceURI = artifact.DefaultSourceURI
 	}
+
+	u.settings = cfg.Settings.DownloadConfig
 	return nil
 }
 
