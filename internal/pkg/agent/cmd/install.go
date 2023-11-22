@@ -48,7 +48,7 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	cmd.Flags().Bool(flagInstallUnprivileged, false, "Installed Elastic Agent will create an 'elastic-agent' user and run as that user. (experimental)")
-	cmd.Flags().MarkHidden(flagInstallUnprivileged) // Hidden until fully supported
+	_ = cmd.Flags().MarkHidden(flagInstallUnprivileged) // Hidden until fully supported
 	addEnrollFlags(cmd)
 
 	return cmd
