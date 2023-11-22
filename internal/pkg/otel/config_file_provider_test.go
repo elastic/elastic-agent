@@ -25,7 +25,7 @@ func TestContentFileProviderOutput(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			cp := NewFileProviderWithDefaults()
-			confMap, err := cp.Retrieve(context.TODO(), "file:"+filepath.Join(".", "testdata", tc.configFile), nil)
+			confMap, err := cp.Retrieve(context.TODO(), "file:"+filepath.Join(".", "testdata", "otel", tc.configFile), nil)
 			require.NoError(t, err)
 
 			conf, err := confMap.AsConf()
