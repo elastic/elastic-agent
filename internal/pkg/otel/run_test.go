@@ -21,15 +21,17 @@ func TestIsOtelConfig(t *testing.T) {
 		expectedErr    error
 	}{
 		// otel name based
-		{"named otel.yml", filepath.Join("testdata", "otel.yml"), true, nil},
-		{"named otel.yaml", filepath.Join("testdata", "otel.yaml"), true, nil},
-		{"named otlp.yml", filepath.Join("testdata", "otlp.yml"), true, nil},
-		{"named otelcol.yml", filepath.Join("testdata", "otelcol.yml"), true, nil},
+		{"named otel.yml", filepath.Join("testdata", "otel", "otel.yml"), true, nil},
+		{"named otel.yaml", filepath.Join("testdata", "otel", "otel.yaml"), true, nil},
+		{"named otlp.yml", filepath.Join("testdata", "otel", "otlp.yml"), true, nil},
+		{"named otelcol.yml", filepath.Join("testdata", "otel", "otelcol.yml"), true, nil},
 
 		// content based
-		{"agent content - agent.yml", filepath.Join("testdata", "agent.yml"), false, nil},
-		{"otel content - config.yml", filepath.Join("testdata", "config.yml"), true, nil},
-		{"agent content - policy.yml", filepath.Join("testdata", "policy.yml"), false, nil},
+		{"otel content - elastic-agent.yml", filepath.Join("testdata", "otel", "elastic-agent.yml"), true, nil},
+		{"otel content - config.yml", filepath.Join("testdata", "otel", "config.yml"), true, nil},
+		{"agent content - agent.yml", filepath.Join("testdata", "agent", "agent.yml"), false, nil},
+		{"agent content - elastic-agent.yml", filepath.Join("testdata", "agent", "elastic-agent.yml"), false, nil},
+		{"agent content - policy.yml", filepath.Join("testdata", "agent", "policy.yml"), false, nil},
 
 		// error handling
 		{"note existing file", filepath.Join("testdata", "invalid.yml"), false, os.ErrNotExist},
