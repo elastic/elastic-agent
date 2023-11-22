@@ -212,49 +212,6 @@ func TestIsInProgress(t *testing.T) {
 	}
 }
 
-func TestUpgrader_Reload(t *testing.T) {
-	log, _ := logger.NewTesting("")
-	wantSourceURL := "https://sourceURI.co/downloads/beats/"
-	wantProxyURL := "http://someBrokenURL/"
-	rawCfg := fmt.Sprintf(`
-agent.download:
-  sourceURI: "%s"
-  proxy_url: %s
-`, wantSourceURL, wantProxyURL)
-
-	u := Upgrader{
-		log:      log,
-		settings: artifact.DefaultConfig()}
-
-	cfg, err := config.NewConfigFrom(rawCfg)
-	require.NoError(t, err, "failed to crete new config")
-
-	err = u.Reload(cfg)
-	require.NotNilf(t, u.settings.Proxy.URL, "ProxyURI should not be nil")
-	assert.Equal(t, wantProxyURL, u.settings.Proxy.URL.String())
-	assert.Equal(t, wantSourceURL, u.settings.SourceURI)
-}
-
-func TestUpgrader_Reload_fleetSourceURL_has_precedence(t *testing.T) {
-	log, _ := logger.NewTesting("")
-	wantSourceURL := "https://this.sourceURI.co/downloads/beats/"
-	rawCfg := fmt.Sprintf(`
-agent.download:
-  sourceURI: "%s"
-  source_uri: "https://NOT.this.sourceURI.co/downloads/beats/"
-`, wantSourceURL)
-
-	u := Upgrader{
-		log:      log,
-		settings: artifact.DefaultConfig()}
-
-	cfg, err := config.NewConfigFrom(rawCfg)
-	require.NoError(t, err, "failed to crete new config")
-
-	err = u.Reload(cfg)
-	assert.Equal(t, wantSourceURL, u.settings.SourceURI)
-}
-
 func TestUpgraderReload(t *testing.T) {
 	defaultCfg := artifact.DefaultConfig()
 	tcs := []struct {
