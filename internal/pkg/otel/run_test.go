@@ -19,29 +19,37 @@ func TestIsOtelConfig(t *testing.T) {
 		path           string
 		expectedResult bool
 		expectedErr    error
+		errString      string
 	}{
 		// otel name based
-		{"named otel.yml", filepath.Join("testdata", "otel", "otel.yml"), true, nil},
-		{"named otel.yaml", filepath.Join("testdata", "otel", "otel.yaml"), true, nil},
-		{"named otlp.yml", filepath.Join("testdata", "otel", "otlp.yml"), true, nil},
-		{"named otelcol.yml", filepath.Join("testdata", "otel", "otelcol.yml"), true, nil},
+		{"named otel.yml", filepath.Join("testdata", "otel", "otel.yml"), true, nil, ""},
+		{"named otel.yaml", filepath.Join("testdata", "otel", "otel.yaml"), true, nil, ""},
+		{"named otlp.yml", filepath.Join("testdata", "otel", "otlp.yml"), true, nil, ""},
+		{"named otelcol.yml", filepath.Join("testdata", "otel", "otelcol.yml"), true, nil, ""},
 
-		// content based
-		{"otel content - elastic-agent.yml", filepath.Join("testdata", "otel", "elastic-agent.yml"), true, nil},
-		{"otel content - config.yml", filepath.Join("testdata", "otel", "config.yml"), true, nil},
-		{"agent content - agent.yml", filepath.Join("testdata", "agent", "agent.yml"), false, nil},
-		{"agent content - elastic-agent.yml", filepath.Join("testdata", "agent", "elastic-agent.yml"), false, nil},
-		{"agent content - policy.yml", filepath.Join("testdata", "agent", "policy.yml"), false, nil},
+		// // content based
+		{"otel content - elastic-agent.yml", filepath.Join("testdata", "otel", "elastic-agent.yml"), true, nil, ""},
+		{"otel content - config.yml", filepath.Join("testdata", "otel", "config.yml"), true, nil, ""},
+		{"agent content - agent.yml", filepath.Join("testdata", "agent", "agent.yml"), false, nil, ""},
+		{"agent content - elastic-agent.yml", filepath.Join("testdata", "agent", "elastic-agent.yml"), false, nil, ""},
+		{"agent content - policy.yml", filepath.Join("testdata", "agent", "policy.yml"), false, nil, ""},
+		{"random yaml content - random.yml", filepath.Join("testdata", "random.yml"), false, nil, ""},
 
-		// error handling
-		{"note existing file", filepath.Join("testdata", "invalid.yml"), false, os.ErrNotExist},
+		// // error handling
+		{"note existing file", filepath.Join("testdata", "invalid.yml"), false, os.ErrNotExist, ""},
+		{"broken file", filepath.Join("testdata", "broken.yml"), false, nil, "line 1: cannot unmarshal !!str `this is...` into map[string]interface {}"},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := IsOtelConfig(context.TODO(), tc.path)
 			require.Equal(t, tc.expectedResult, res)
-			require.ErrorIs(t, err, tc.expectedErr)
+			if len(tc.errString) > 0 {
+				require.Contains(t, err.Error(), tc.errString)
+			} else {
+				require.ErrorIs(t, err, tc.expectedErr)
+			}
+
 		})
 	}
 }
