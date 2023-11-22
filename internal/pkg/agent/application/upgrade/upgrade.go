@@ -96,11 +96,11 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	}
 
 	// the source URI coming from fleet which uses a different naming.
-	type reloadConfig struct {
+	type fleetCfg struct {
 		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
 		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
 	}
-	fleetSourceURI := &reloadConfig{}
+	fleetSourceURI := &fleetCfg{}
 	if err := rawConfig.Unpack(&fleetSourceURI); err != nil {
 		return errors.New(err, "failed to unpack config during reload")
 	}
