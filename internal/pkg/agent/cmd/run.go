@@ -141,7 +141,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	}
 
 	if runAsOtel {
-		return otel.Run(ctx, cancel, stop, testingMode, modifiers...)
+		return otel.Run(ctx, cancel, stop, testingMode)
 	}
 
 	// not otel continue as usual

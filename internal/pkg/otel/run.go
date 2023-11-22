@@ -20,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	agentComponent "github.com/elastic/elastic-agent/pkg/component"
 )
 
 const buildDescription = "Elastic opentelemetry-collector distribution"
@@ -70,7 +69,7 @@ func IsOtelConfig(ctx context.Context, pathConfigFile string) (bool, error) {
 	return false, nil
 }
 
-func Run(ctx context.Context, cancel context.CancelFunc, stop chan bool, testingMode bool, modifiers ...agentComponent.PlatformModifier) error {
+func Run(ctx context.Context, cancel context.CancelFunc, stop chan bool, testingMode bool) error {
 	fmt.Println("Starting in otel mode")
 	settings, err := newSettings([]string{paths.ConfigFile()}, release.Version())
 	if err != nil {
