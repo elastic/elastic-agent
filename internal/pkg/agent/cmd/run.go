@@ -45,6 +45,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
@@ -133,6 +134,22 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
 
+	// detect otel
+	runAsOtel, err := otel.IsOtelConfig(ctx, paths.ConfigFile())
+	if err != nil {
+		return err
+	}
+
+	if runAsOtel {
+		return otel.Run(ctx, cancel, stop, testingMode, modifiers...)
+	}
+
+	// not otel continue as usual
+	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, modifiers...)
+
+}
+
+func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		return err
