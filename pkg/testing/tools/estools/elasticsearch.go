@@ -488,7 +488,7 @@ func GetLogsForDatasetWithContext(ctx context.Context, client elastictransport.I
 		},
 	}
 
-	return performQueryForRawQuery(ctx, indexQuery, "logs*", client)
+	return performQueryForRawQuery(ctx, indexQuery, "logs-elastic_agent*", client)
 }
 
 // GetPing performs a basic ping and returns ES config info
