@@ -203,6 +203,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	})
 
 	var server *grpc.Server
+	m.logger.Infof("Starting grpc control protocol listener on port %v with max_message_size %v", m.grpcConfig.Port, m.grpcConfig.MaxMsgSize)
 	if m.tracer != nil {
 		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(m.tracer))
 		server = grpc.NewServer(
