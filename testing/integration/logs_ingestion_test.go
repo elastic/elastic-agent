@@ -202,7 +202,7 @@ func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.
 			docs, err = findFn()
 			return err == nil
 		},
-		8*time.Minute,
+		3*time.Minute,
 		15*time.Second,
 	)
 
