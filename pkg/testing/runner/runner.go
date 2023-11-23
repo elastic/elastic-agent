@@ -7,6 +7,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v2"
 
@@ -957,6 +959,16 @@ func createBatchID(batch OSBatch) string {
 			id += "-" + batch.Batch.SudoTests[0].Tests[0].Name
 		}
 	}
+
+	// The batchID needs to be at most 63 characters long otherwise
+	// OGC will fail to instantiate the VM.
+	maxIDLen := 63
+	if len(id) > maxIDLen {
+		hash := fmt.Sprintf("%x", md5.Sum([]byte(id)))
+		hashLen := utf8.RuneCountInString(hash)
+		id = id[:maxIDLen-hashLen-1] + "-" + hash
+	}
+
 	return strings.ToLower(id)
 }
 
