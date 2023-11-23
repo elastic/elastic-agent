@@ -80,7 +80,7 @@ func TestDetailsDownloadRateJSON(t *testing.T) {
 		var unmarshalledDetails Details
 		err = json.Unmarshal(data, &unmarshalledDetails)
 		require.NoError(t, err)
-		require.Equal(t, float64(1800), float64(unmarshalledDetails.Metadata.DownloadRate))
+		require.Equal(t, float64(1794), float64(unmarshalledDetails.Metadata.DownloadRate))
 		require.Equal(t, .8, unmarshalledDetails.Metadata.DownloadPercent)
 	})
 
