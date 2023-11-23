@@ -238,9 +238,15 @@ func testUpgradeFleetManagedElasticAgent(
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
 		agent, err := fleettools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policy.ID, hostname)
+		if agent.UpgradeDetails != nil {
+			t.Logf("Waiting from upgrade details to show up in Fleet. "+
+				"UpgradeDetails: %#v", agent.UpgradeDetails)
+		} else {
+			t.Logf("Waiting from upgrade details to show up in Fleet. " +
+				"UpgradeDetails: nil")
+		}
 		return err == nil && agent.UpgradeDetails != nil
-
-	}, 5*time.Minute, time.Second)
+	}, 5*time.Minute, 10*time.Second)
 
 	// wait for the watcher to show up
 	t.Logf("Waiting for upgrade watcher to start...")
