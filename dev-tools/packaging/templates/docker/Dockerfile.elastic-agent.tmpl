@@ -9,6 +9,7 @@ FROM {{ .buildFrom }} AS home
 COPY beat {{ $beatHome }}
 
 RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/logs && \
+    chown -R root:root {{ $beatHome }} && \
     find {{ $beatHome }} -type d -exec chmod 0755 {} \; && \
     find {{ $beatHome }} -type f -exec chmod 0644 {} \; && \
     find {{ $beatHome }}/data -type d -exec chmod 0770 {} \; && \
@@ -126,16 +127,25 @@ COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
 COPY --from=home /opt /opt
 {{- end }}
 
+
+RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
+{{- if .linux_capabilities }}
+# Since the beat is stored at the other end of a symlink we must follow the symlink first
+# For security reasons setcap does not support symlinks. This is smart in the general case
+# but in our specific case since we're building a trusted image from trusted binaries this is
+# fine. Thus, we use readlink to follow the link and setcap on the actual binary
+    readlink -f {{ $beatBinary }} | xargs setcap {{ .linux_capabilities }} && \
+{{- end }}
+true
+
 {{- if eq .user "root" }}
 {{- if contains .image_name "-cloud" }}
 # Generate folder for a stub command that will be overwritten at runtime
 RUN mkdir /app
 {{- end }}
 {{- else }}
-RUN groupadd --gid 1000 {{ .BeatName }} && \
-    useradd -M --uid 1000 --gid 1000 --groups 0 --home {{ $beatHome }} {{ .user }} && \
-    chown -R {{ .user }}:{{ .user }} {{ $beatHome }} && \
-    true
+RUN groupadd --gid 1000 {{ .BeatName }}
+RUN useradd -M --uid 1000 --gid 1000 --groups 0 --home {{ $beatHome }} {{ .user }}
 
 {{- if contains .image_name "-cloud" }}
 # Generate folder for a stub command that will be overwritten at runtime
@@ -143,17 +153,6 @@ RUN mkdir /app
 RUN chown {{ .user }} /app
 {{- end }}
 {{- end }}
-
-# Keep this after any chown command, chown resets any applied capabilities
-RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
-{{- if .linux_capabilities }}
-# Since the beat is stored at the other end of a symlink we must follow the symlink first
-# For security reasons setcap does not support symlinks. This is smart in the general case
-# but in our specific case since we're building a trusted image from trusted binaries this is
-# fine. Thus, we use readlink to follow the link and setcap on the actual binary
-   setcap {{ .linux_capabilities }}  $(readlink -f {{ $beatBinary }}) && \
-{{- end }}
-true
 
 {{- if (and (contains .image_name "-complete") (not (contains .from "ubi-minimal")))  }}
 USER root
@@ -170,7 +169,7 @@ RUN echo \
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
 ENV ELASTIC_AGENT_COMPLETE=true
 ENV TZ=UTC
-ENV NODE_VERSION=18.16.0
+ENV NODE_VERSION=18.18.2
 ENV PATH="$NODE_PATH/node/bin:$PATH"
 # Install the latest version of @elastic/synthetics forcefully ignoring the previously
 # cached node_modules, heartbeat then calls the global executable to run test suites
