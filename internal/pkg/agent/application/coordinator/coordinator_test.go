@@ -15,15 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-
 	"github.com/stretchr/testify/require"
+
 	"go.elastic.co/apm/apmtest"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -31,6 +27,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -39,6 +37,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -321,7 +321,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 }
 
 func TestCollectManagerErrorsTimeout(t *testing.T) {
-	handlerChan, _, _, _ := setupManagerShutdownChannels(time.Millisecond)
+	handlerChan, _, _, _, _ := setupManagerShutdownChannels(time.Millisecond)
 	// Don't send anything to the shutdown channels, causing a timeout
 	// in collectManagerErrors
 	waitAndTestError(t, func(err error) bool {
@@ -332,7 +332,7 @@ func TestCollectManagerErrorsTimeout(t *testing.T) {
 }
 
 func TestCollectManagerErrorsOneResponse(t *testing.T) {
-	handlerChan, _, _, config := setupManagerShutdownChannels(10 * time.Millisecond)
+	handlerChan, _, _, config, _ := setupManagerShutdownChannels(10 * time.Millisecond)
 
 	// Send an error for the config manager -- we should also get a
 	// timeout error since we don't send anything on the other two channels.
@@ -348,26 +348,30 @@ func TestCollectManagerErrorsOneResponse(t *testing.T) {
 }
 
 func TestCollectManagerErrorsAllResponses(t *testing.T) {
-	handlerChan, runtime, varWatcher, config := setupManagerShutdownChannels(5 * time.Second)
+	handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher := setupManagerShutdownChannels(5 * time.Second)
 	runtimeErrStr := "runtime error"
 	varsErrStr := "vars error"
+	upgradeMarkerWatcherErrStr := "upgrade marker watcher error"
 	runtime <- errors.New(runtimeErrStr)
 	varWatcher <- errors.New(varsErrStr)
 	config <- nil
+	upgradeMarkerWatcher <- errors.New(upgradeMarkerWatcherErrStr)
 
 	waitAndTestError(t, func(err error) bool {
 		return err != nil &&
-			strings.Contains(err.Error(), "2 errors occurred") &&
+			strings.Contains(err.Error(), "3 errors occurred") &&
 			strings.Contains(err.Error(), runtimeErrStr) &&
-			strings.Contains(err.Error(), varsErrStr)
+			strings.Contains(err.Error(), varsErrStr) &&
+			strings.Contains(err.Error(), upgradeMarkerWatcherErrStr)
 	}, handlerChan)
 }
 
 func TestCollectManagerErrorsAllResponsesNoErrors(t *testing.T) {
-	handlerChan, runtime, varWatcher, config := setupManagerShutdownChannels(5 * time.Second)
+	handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher := setupManagerShutdownChannels(5 * time.Second)
 	runtime <- nil
 	varWatcher <- nil
 	config <- context.Canceled
+	upgradeMarkerWatcher <- nil
 
 	// All errors are nil or context.Canceled, so collectManagerErrors
 	// should also return nil.
@@ -397,18 +401,19 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 	}
 }
 
-func setupManagerShutdownChannels(timeout time.Duration) (chan error, chan error, chan error, chan error) {
+func setupManagerShutdownChannels(timeout time.Duration) (chan error, chan error, chan error, chan error, chan error) {
 	runtime := make(chan error)
 	varWatcher := make(chan error)
 	config := make(chan error)
+	upgradeMarkerWatcher := make(chan error)
 
 	handlerChan := make(chan error)
 	go func() {
-		handlerErr := collectManagerErrors(timeout, varWatcher, runtime, config)
+		handlerErr := collectManagerErrors(timeout, varWatcher, runtime, config, upgradeMarkerWatcher)
 		handlerChan <- handlerErr
 	}()
 
-	return handlerChan, runtime, varWatcher, config
+	return handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher
 }
 
 func TestCoordinator_ReExec(t *testing.T) {
@@ -649,6 +654,10 @@ func (f *fakeUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
 	return nil
 }
 
+func (f *fakeUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
+	return nil
+}
+
 type testMonitoringManager struct{}
 
 func newTestMonitoringMgr() *testMonitoringManager { return &testMonitoringManager{} }
@@ -778,6 +787,8 @@ func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
 type fakeRuntimeManager struct {
 	state          []runtime.ComponentComponentState
 	updateCallback func([]component.Component) error
+	result         error
+	errChan        chan error
 }
 
 func (r *fakeRuntimeManager) Run(ctx context.Context) error {
@@ -787,11 +798,15 @@ func (r *fakeRuntimeManager) Run(ctx context.Context) error {
 
 func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
 
-func (r *fakeRuntimeManager) Update(model component.Model) error {
+func (r *fakeRuntimeManager) Update(model component.Model) {
+	r.result = nil
 	if r.updateCallback != nil {
-		return r.updateCallback(model.Components)
+		r.result = r.updateCallback(model.Components)
 	}
-	return nil
+	if r.errChan != nil {
+		// If a reporting channel is set, send the result to it
+		r.errChan <- r.result
+	}
 }
 
 // State returns the current components model state.

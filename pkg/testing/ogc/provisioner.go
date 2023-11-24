@@ -24,6 +24,7 @@ import (
 const (
 	// LayoutIntegrationTag is the tag added to all layouts for the integration testing framework.
 	LayoutIntegrationTag = "agent-integration"
+	Name                 = "ogc"
 )
 
 type provisioner struct {
@@ -40,6 +41,10 @@ func NewProvisioner(cfg Config) (runner.InstanceProvisioner, error) {
 	return &provisioner{
 		cfg: cfg,
 	}, nil
+}
+
+func (p *provisioner) Name() string {
+	return Name
 }
 
 func (p *provisioner) SetLogger(l runner.Logger) {
@@ -83,8 +88,8 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 		return nil, err
 	}
 	if len(machines) == 0 {
-		// print the output so its clear what went wrong
-		// without this it's unclear where OGC went wrong it
+		// Print the output so its clear what went wrong.
+		// Without this it's unclear where OGC went wrong, it
 		// doesn't do a great job of reporting a clean error
 		fmt.Fprintf(os.Stdout, "%s\n", upOutput)
 		return nil, fmt.Errorf("ogc didn't create any machines")
@@ -99,14 +104,15 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 			// without this it's unclear where OGC went wrong it
 			// doesn't do a great job of reporting a clean error
 			fmt.Fprintf(os.Stdout, "%s\n", upOutput)
-			return nil, fmt.Errorf("failed to find machine for layout ID: %s", b.ID)
+			return nil, fmt.Errorf("failed to find machine for batch ID: %s", b.ID)
 		}
 		instances = append(instances, runner.Instance{
-			ID:         b.ID,
-			Name:       machine.InstanceName,
-			IP:         machine.PublicIP,
-			Username:   machine.Layout.Username,
-			RemotePath: machine.Layout.RemotePath,
+			ID:          b.ID,
+			Provisioner: Name,
+			Name:        machine.InstanceName,
+			IP:          machine.PublicIP,
+			Username:    machine.Layout.Username,
+			RemotePath:  machine.Layout.RemotePath,
 			Internal: map[string]interface{}{
 				"instance_id": machine.InstanceID,
 			},

@@ -24,6 +24,7 @@ import (
 
 const (
 	Ubuntu = "ubuntu"
+	Name   = "multipass"
 )
 
 type provisioner struct {
@@ -33,6 +34,10 @@ type provisioner struct {
 // NewProvisioner creates the multipass provisioner
 func NewProvisioner() runner.InstanceProvisioner {
 	return &provisioner{}
+}
+
+func (p *provisioner) Name() string {
+	return Name
 }
 
 func (p *provisioner) SetLogger(l runner.Logger) {
@@ -92,12 +97,13 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 			return nil, fmt.Errorf("instance %s is not marked as running", batch.ID)
 		}
 		results = append(results, runner.Instance{
-			ID:         batch.ID,
-			Name:       batch.ID,
-			IP:         mi.IPv4[0],
-			Username:   "ubuntu",
-			RemotePath: "/home/ubuntu/agent",
-			Internal:   nil,
+			ID:          batch.ID,
+			Provisioner: Name,
+			Name:        batch.ID,
+			IP:          mi.IPv4[0],
+			Username:    "ubuntu",
+			RemotePath:  "/home/ubuntu/agent",
+			Internal:    nil,
 		})
 	}
 	return results, nil

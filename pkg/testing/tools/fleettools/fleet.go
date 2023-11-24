@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 )
@@ -25,7 +26,7 @@ func GetAgentByPolicyIDAndHostnameFromList(client *kibana.Client, policyID, host
 		agentHostname := item.LocalMetadata.Host.Hostname
 		agentPolicyID := item.PolicyID
 
-		if agentHostname == hostname && agentPolicyID == policyID {
+		if strings.EqualFold(agentHostname, hostname) && agentPolicyID == policyID {
 			hostnameAgents = append(hostnameAgents, &listAgentsResp.Items[i])
 		}
 	}

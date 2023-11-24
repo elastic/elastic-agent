@@ -25,7 +25,7 @@ func TestProvisionGetRegions(t *testing.T) {
 	require.True(t, found)
 
 	cfg := ProvisionerConfig{Region: "bad-region-ID", APIKey: key}
-	prov := &ServerlessProvision{
+	prov := &ServerlessProvisioner{
 		cfg: cfg,
 		log: &defaultLogger{wrapped: logp.L()},
 	}
