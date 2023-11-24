@@ -34,7 +34,7 @@ func FixPermissions(topPath string, ownership utils.FileOwner) error {
 
 		// remove any world permissions from the file
 		if err := os.Chmod(name, info.Mode().Perm()&0770); err != nil {
-			return fmt.Errorf("could not update permissions of %q: %w:", topPath, err)
+			return fmt.Errorf("could not update permissions of %q: %w", topPath, err)
 		}
 
 		return nil

@@ -115,6 +115,7 @@ type enrollCmdOption struct {
 	DelayEnroll          bool                       `yaml:"-"`
 	FleetServer          enrollCmdFleetServerOption `yaml:"-"`
 	SkipCreateSecret     bool                       `yaml:"-"`
+	SkipDaemonRestart    bool                       `yaml:"-"`
 	Tags                 []string                   `yaml:"omitempty"`
 }
 
@@ -277,7 +278,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		}
 	}()
 
-	if c.agentProc == nil {
+	if c.agentProc == nil && !c.options.SkipDaemonRestart {
 		if err = c.daemonReloadWithBackoff(ctx); err != nil {
 			c.log.Errorf("Elastic Agent might not be running; unable to trigger restart: %v", err)
 			return fmt.Errorf("could not reload agent daemon, unable to trigger restart: %w", err)
