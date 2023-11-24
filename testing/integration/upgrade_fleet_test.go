@@ -187,6 +187,7 @@ func testUpgradeFleetManagedElasticAgent(
 	t.Log("Creating Agent policy...")
 	policyResp, err := kibClient.CreatePolicy(ctx, policy)
 	require.NoError(t, err, "failed creating policy")
+	policy = policyResp.AgentPolicy
 
 	t.Log("Creating Agent enrollment API key...")
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
@@ -236,11 +237,14 @@ func testUpgradeFleetManagedElasticAgent(
 	t.Log("Waiting from upgrade details to show up in Fleet")
 	hostname, err := os.Hostname()
 	require.NoError(t, err)
-	require.Eventually(t, func() bool {
-		agent, err := fleettools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policy.ID, hostname)
+	var agent *kibana.AgentExisting
+	require.Eventuallyf(t, func() bool {
+		agent, err = fleettools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policy.ID, hostname)
 		return err == nil && agent.UpgradeDetails != nil
-
-	}, 5*time.Minute, time.Second)
+	},
+		5*time.Minute, time.Second,
+		"last error: %v. agent.UpgradeDetails: %s",
+		err, agentUpgradeDetailsString(agent))
 
 	// wait for the watcher to show up
 	t.Logf("Waiting for upgrade watcher to start...")
@@ -368,4 +372,15 @@ func newArtifactsServer(ctx context.Context, t *testing.T, version string) *http
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fs.ServeHTTP(w, r)
 	}))
+}
+
+func agentUpgradeDetailsString(a *kibana.AgentExisting) string {
+	if a == nil {
+		return "agent is NIL"
+	}
+	if a.UpgradeDetails == nil {
+		return "upgrade details is NIL"
+	}
+
+	return fmt.Sprintf("%#v", *a.UpgradeDetails)
 }
