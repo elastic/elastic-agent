@@ -61,6 +61,7 @@ func (c *Coordinator) ClearOverrideState() {
 // SetUpgradeDetails sets upgrade details. This is used during upgrades.
 func (c *Coordinator) SetUpgradeDetails(upgradeDetails *details.Details) {
 	c.upgradeDetailsChan <- upgradeDetails
+	c.logUpgradeDetails(upgradeDetails)
 }
 
 // setRuntimeUpdateError reports a failed policy update in the runtime manager.
