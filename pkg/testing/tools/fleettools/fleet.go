@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 )
@@ -20,18 +21,20 @@ func GetAgentByPolicyIDAndHostnameFromList(client *kibana.Client, policyID, host
 		return nil, err
 	}
 
+	var agentHostnames []string
 	hostnameAgents := make([]*kibana.AgentExisting, 0)
 	for i, item := range listAgentsResp.Items {
 		agentHostname := item.LocalMetadata.Host.Hostname
 		agentPolicyID := item.PolicyID
 
-		if agentHostname == hostname && agentPolicyID == policyID {
+		if strings.EqualFold(agentHostname, hostname) && agentPolicyID == policyID {
 			hostnameAgents = append(hostnameAgents, &listAgentsResp.Items[i])
 		}
 	}
 
 	if len(hostnameAgents) == 0 {
-		return nil, fmt.Errorf("unable to find agent with hostname [%s]", hostname)
+		return nil, fmt.Errorf("unable to find agent with hostname [%s] for policy [%s]. Found: %v",
+			hostname, policyID, agentHostnames)
 	}
 
 	if len(hostnameAgents) > 1 {

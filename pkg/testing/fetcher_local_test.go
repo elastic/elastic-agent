@@ -35,11 +35,11 @@ func TestLocalFetcher(t *testing.T) {
 
 	snapshotPath := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s", baseVersion, suffix)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, snapshotPath), snapshotContent, 0644))
-	snapshotPathHash := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s%s", baseVersion, suffix, hashExt)
+	snapshotPathHash := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s%s", baseVersion, suffix, extHash)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, snapshotPathHash), snapshotContentHash, 0644))
 	notSnapshotPath := fmt.Sprintf("elastic-agent-%s-%s", baseVersion, suffix)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPath), noSnapshotContent, 0644))
-	notSnapshotPathHash := fmt.Sprintf("elastic-agent-%s-%s%s", baseVersion, suffix, hashExt)
+	notSnapshotPathHash := fmt.Sprintf("elastic-agent-%s-%s%s", baseVersion, suffix, extHash)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPathHash), noSnapshotContentHash, 0644))
 
 	tcs := []struct {
@@ -88,7 +88,7 @@ func TestLocalFetcher(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, string(tc.want), string(content))
-		contentHash, err := os.ReadFile(filepath.Join(tmp, got.Name()+hashExt))
+		contentHash, err := os.ReadFile(filepath.Join(tmp, got.Name()+extHash))
 		require.NoError(t, err)
 
 		assert.Equal(t, string(tc.wantHash), string(contentHash))

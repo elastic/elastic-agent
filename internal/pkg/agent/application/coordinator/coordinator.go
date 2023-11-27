@@ -21,6 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -66,6 +67,9 @@ type UpgradeManager interface {
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
+
+	// MarkerWatcher returns a watcher for the upgrade marker.
+	MarkerWatcher() upgrade.MarkerWatcher
 }
 
 // MonitorManager provides an interface to perform the monitoring action for the agent.
@@ -96,10 +100,7 @@ type RuntimeManager interface {
 	Runner
 
 	// Update updates the current components model.
-	Update(model component.Model) error
-
-	// State returns the current components model state.
-	State() []runtime.ComponentComponentState
+	Update(model component.Model)
 
 	// PerformAction executes an action on a unit.
 	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
@@ -237,17 +238,19 @@ type Coordinator struct {
 	// into the reported state before broadcasting -- State() will report
 	// agentclient.Failed if one of these is set, even if the underlying
 	// coordinator state is agentclient.Healthy.
-	runtimeMgrErr error // Currently unused
-	configMgrErr  error
-	actionsErr    error
-	varsMgrErr    error
+	// Errors from the runtime manager report policy update failures and are
+	// stored in runtimeUpdateErr below.
+	configMgrErr error
+	actionsErr   error
+	varsMgrErr   error
 
 	// Errors resulting from different possible failure modes when setting a
 	// new policy. Right now there are three different stages where a policy
 	// update can fail:
 	// - in generateAST, converting the policy to an AST
 	// - in process, converting the AST and vars into a full component model
-	// - while sending the final component model to the runtime manager
+	// - while applying the final component model in the runtime manager
+	//   (reported asynchronously via the runtime manager error channel)
 	//
 	// The plan is to improve our preprocessing so we can always detect
 	// failures immediately https://github.com/elastic/elastic-agent/issues/2887.
@@ -291,6 +294,8 @@ type managerChans struct {
 
 	varsManagerUpdate <-chan []*transpiler.Vars
 	varsManagerError  <-chan error
+
+	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 }
 
 // New creates a new coordinator.
@@ -371,6 +376,9 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 	if varsMgr != nil {
 		c.managerChans.varsManagerUpdate = varsMgr.Watch()
 		c.managerChans.varsManagerError = varsMgr.Errors()
+	}
+	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
+		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
 	}
 	return c
 }
@@ -876,6 +884,18 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		varsErrCh <- nil
 	}
 
+	upgradeMarkerWatcherErrCh := make(chan error, 1)
+	if c.upgradeMgr != nil && c.upgradeMgr.MarkerWatcher() != nil {
+		err := c.upgradeMgr.MarkerWatcher().Run(ctx)
+		if err != nil {
+			upgradeMarkerWatcherErrCh <- err
+		} else {
+			upgradeMarkerWatcherErrCh <- nil
+		}
+	} else {
+		upgradeMarkerWatcherErrCh <- nil
+	}
+
 	// Keep looping until the context ends.
 	for ctx.Err() == nil {
 		c.runLoopIteration(ctx)
@@ -883,7 +903,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	// If we got fatal errors from any of the managers, return them.
 	// Otherwise, just return the context's closing error.
-	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh)
+	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerWatcherErrCh)
 	if err != nil {
 		c.logger.Debugf("Manager errors on Coordinator shutdown: %v", err.Error())
 		return err
@@ -899,7 +919,13 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		return
 
 	case runtimeErr := <-c.managerChans.runtimeManagerError:
-		c.setRuntimeManagerError(runtimeErr)
+		// runtime manager errors report the result of a policy update.
+		// Coordinator transitions from starting to healthy when a policy update
+		// is successful.
+		c.setRuntimeUpdateError(runtimeErr)
+		if runtimeErr == nil {
+			c.setCoordinatorState(agentclient.Healthy, "Running")
+		}
 
 	case configErr := <-c.managerChans.configManagerError:
 		if c.isManaged {
@@ -967,6 +993,11 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 	case ll := <-c.logLevelCh:
 		if ctx.Err() == nil {
 			c.processLogLevel(ctx, ll)
+		}
+
+	case upgradeMarker := <-c.managerChans.upgradeMarkerUpdate:
+		if ctx.Err() == nil {
+			c.setUpgradeDetails(upgradeMarker.Details)
 		}
 	}
 
@@ -1127,12 +1158,7 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 
 	c.logger.Info("Updating running component model")
 	c.logger.With("components", model.Components).Debug("Updating running component model")
-	err = c.runtimeMgr.Update(model)
-	c.setRuntimeUpdateError(err)
-	if err != nil {
-		return fmt.Errorf("updating runtime: %w", err)
-	}
-	c.setCoordinatorState(agentclient.Healthy, "Running")
+	c.runtimeMgr.Update(model)
 	return nil
 }
 
@@ -1206,11 +1232,11 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 	for _, component := range comps {
 		// If this is an input component (not a shipper), make sure its type is allowed
 		if component.InputSpec != nil && !c.caps.AllowInput(component.InputType) {
-			c.logger.Info("Component '%v' with input type '%v' filtered by capabilities.yml", component.InputType)
+			c.logger.Infof("Component '%v' with input type '%v' filtered by capabilities.yml", component.ID, component.InputType)
 			continue
 		}
 		if !c.caps.AllowOutput(component.OutputType) {
-			c.logger.Info("Component '%v' with output type '%v' filtered by capabilities.yml", component.ID, component.OutputType)
+			c.logger.Infof("Component '%v' with output type '%v' filtered by capabilities.yml", component.ID, component.OutputType)
 			continue
 		}
 		result = append(result, component)
@@ -1219,19 +1245,20 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 }
 
 // collectManagerErrors listens on the shutdown channels for the
-// runtime, config, and vars managers, and waits for up to
-// the specified timeout for them to report their final status.
+// runtime, config, and vars managers as well as the upgrade marker
+// watcher and waits for up to the specified timeout for them to
+// report their final status.
 // It returns any resulting errors as a multierror, or nil if no errors
 // were reported.
 // Called on the main Coordinator goroutine.
-func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh chan error) error {
-	var runtimeErr error
-	var configErr error
-	var varsErr error
+func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerWatcherErrCh chan error) error {
+	var runtimeErr, configErr, varsErr, upgradeMarkerWatcherErr error
+	var returnedRuntime, returnedConfig, returnedVars, returnedUpgradeMarkerWatcher bool
+
 	// in case other components are locked up, let us time out
 	timeoutWait := time.NewTimer(timeout)
 	defer timeoutWait.Stop()
-	var returnedRuntime, returnedConfig, returnedVars bool
+
 	/*
 		Wait for all managers to gently shut down. All managers send
 		an error status on their termination channel after their Run method
@@ -1248,7 +1275,7 @@ func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, config
 	var combinedErr error
 
 waitLoop:
-	for !returnedRuntime || !returnedConfig || !returnedVars {
+	for !returnedRuntime || !returnedConfig || !returnedVars || !returnedUpgradeMarkerWatcher {
 		select {
 		case runtimeErr = <-runtimeErrCh:
 			returnedRuntime = true
@@ -1256,6 +1283,8 @@ waitLoop:
 			returnedConfig = true
 		case varsErr = <-varsErrCh:
 			returnedVars = true
+		case upgradeMarkerWatcherErr = <-upgradeMarkerWatcherErrCh:
+			returnedUpgradeMarkerWatcher = true
 		case <-timeoutWait.C:
 			var timeouts []string
 			if !returnedRuntime {
@@ -1266,6 +1295,9 @@ waitLoop:
 			}
 			if !returnedVars {
 				timeouts = append(timeouts, "no response from vars manager")
+			}
+			if !returnedUpgradeMarkerWatcher {
+				timeouts = append(timeouts, "no response from upgrade marker watcher")
 			}
 			timeoutStr := strings.Join(timeouts, ", ")
 			combinedErr = multierror.Append(combinedErr, fmt.Errorf("timeout while waiting for managers to shut down: %v", timeoutStr))
@@ -1280,6 +1312,9 @@ waitLoop:
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars manager: %w", varsErr))
+	}
+	if upgradeMarkerWatcherErr != nil && !errors.Is(upgradeMarkerWatcherErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("upgrade marker watcher: %w", upgradeMarkerWatcherErr))
 	}
 	return combinedErr
 }

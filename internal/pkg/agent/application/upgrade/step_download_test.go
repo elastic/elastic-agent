@@ -89,7 +89,9 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{expectedDownloadPath, nil}, nil
 		}
 
-		u := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		require.NoError(t, err)
+
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
@@ -124,7 +126,9 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		require.NoError(t, err)
+
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
@@ -135,7 +139,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		logs := obs.TakeAll()
 		require.Len(t, logs, 3)
 		require.Equal(t, "download attempt 1", logs[0].Message)
-		require.Contains(t, logs[1].Message, "unable to create fetcher: failed to construct downloader; retrying (will be retry 1)")
+		require.Contains(t, logs[1].Message, "unable to create fetcher: failed to construct downloader")
 		require.Equal(t, "download attempt 2", logs[2].Message)
 	})
 
@@ -161,7 +165,9 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		require.NoError(t, err)
+
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
@@ -172,7 +178,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		logs := obs.TakeAll()
 		require.Len(t, logs, 3)
 		require.Equal(t, "download attempt 1", logs[0].Message)
-		require.Contains(t, logs[1].Message, "unable to download package: download failed; retrying (will be retry 1)")
+		require.Contains(t, logs[1].Message, "unable to download package: download failed; retrying")
 		require.Equal(t, "download attempt 2", logs[2].Message)
 	})
 
@@ -186,7 +192,9 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
 		}
 
-		u := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		require.NoError(t, err)
+
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
@@ -199,7 +207,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.GreaterOrEqual(t, len(logs), minNmExpectedAttempts*2)
 		for i := 0; i < minNmExpectedAttempts; i++ {
 			require.Equal(t, fmt.Sprintf("download attempt %d", i+1), logs[(2*i)].Message)
-			require.Contains(t, logs[(2*i+1)].Message, fmt.Sprintf("unable to download package: download failed; retrying (will be retry %d)", i+1))
+			require.Contains(t, logs[(2*i+1)].Message, "unable to download package: download failed; retrying")
 		}
 	})
 }

@@ -87,7 +87,6 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 		"beats":                 {"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat"},
 		"cloud-defend":          {"cloud-defend"},
 		"cloudbeat":             {"cloudbeat"},
-		"assetbeat":             {"assetbeat"},
 		"elastic-agent-shipper": {"elastic-agent-shipper"},
 		"endpoint-dev":          {"endpoint-security"},
 		"fleet-server":          {"fleet-server"},

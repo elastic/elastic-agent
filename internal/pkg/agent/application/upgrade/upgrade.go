@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -55,6 +56,7 @@ type Upgrader struct {
 	agentInfo      *info.AgentInfo
 	upgradeable    bool
 	fleetServerURI string
+	markerWatcher  MarkerWatcher
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -65,13 +67,14 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) *Upgrader {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) (*Upgrader, error) {
 	return &Upgrader{
-		log:         log,
-		settings:    settings,
-		agentInfo:   agentInfo,
-		upgradeable: IsUpgradeable(),
-	}
+		log:           log,
+		settings:      settings,
+		agentInfo:     agentInfo,
+		upgradeable:   IsUpgradeable(),
+		markerWatcher: newMarkerFileWatcher(markerFilePath(), log),
+	}, nil
 }
 
 // SetClient reloads URI based on up to date fleet client
@@ -87,35 +90,39 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 
 // Reload reloads the artifact configuration for the upgrader.
 func (u *Upgrader) Reload(rawConfig *config.Config) error {
-	type reloadConfig struct {
-		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
-		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
+	cfg, err := configuration.NewFromConfig(rawConfig)
+	if err != nil {
+		return fmt.Errorf("invalid config: %w", err)
+	}
 
-		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/ coming from fleet which uses
-		// different naming.
+	// the source URI coming from fleet which uses a different naming.
+	type fleetCfg struct {
+		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
 		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
 	}
-	cfg := &reloadConfig{}
-	if err := rawConfig.Unpack(&cfg); err != nil {
+	fleetSourceURI := &fleetCfg{}
+	if err := rawConfig.Unpack(&fleetSourceURI); err != nil {
 		return errors.New(err, "failed to unpack config during reload")
 	}
 
-	var newSourceURI string
-	if cfg.FleetSourceURI != "" {
-		// fleet configuration takes precedence
-		newSourceURI = cfg.FleetSourceURI
-	} else if cfg.SourceURI != "" {
-		newSourceURI = cfg.SourceURI
+	// fleet configuration takes precedence
+	if fleetSourceURI.FleetSourceURI != "" {
+		cfg.Settings.DownloadConfig.SourceURI = fleetSourceURI.FleetSourceURI
 	}
 
-	if newSourceURI != "" {
-		u.log.Infof("Source URI changed from %q to %q", u.settings.SourceURI, newSourceURI)
-		u.settings.SourceURI = newSourceURI
+	if cfg.Settings.DownloadConfig.SourceURI != "" {
+		u.log.Infof("Source URI changed from %q to %q",
+			u.settings.SourceURI,
+			cfg.Settings.DownloadConfig.SourceURI)
 	} else {
 		// source uri unset, reset to default
-		u.log.Infof("Source URI reset from %q to %q", u.settings.SourceURI, artifact.DefaultSourceURI)
-		u.settings.SourceURI = artifact.DefaultSourceURI
+		u.log.Infof("Source URI reset from %q to %q",
+			u.settings.SourceURI,
+			artifact.DefaultSourceURI)
+		cfg.Settings.DownloadConfig.SourceURI = artifact.DefaultSourceURI
 	}
+
+	u.settings = cfg.Settings.DownloadConfig
 	return nil
 }
 
@@ -181,13 +188,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, u.log, newHash, action); err != nil {
+	det.SetState(details.StateWatching)
+	if err := u.markUpgrade(ctx, u.log, newHash, action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
-
-	det.SetState(details.StateWatching)
 
 	if err := InvokeWatcher(u.log); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
@@ -237,7 +243,11 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 
 	marker.Acked = true
 
-	return saveMarker(marker)
+	return SaveMarker(marker)
+}
+
+func (u *Upgrader) MarkerWatcher() MarkerWatcher {
+	return u.markerWatcher
 }
 
 func (u *Upgrader) sourceURI(retrievedURI string) string {

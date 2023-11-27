@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,12 +38,13 @@ func TestNewRunner_Clean(t *testing.T) {
 	require.NoError(t, err)
 
 	i1 := Instance{
-		ID:         "id-1",
-		Name:       "name-1",
-		IP:         "127.0.0.1",
-		Username:   "ubuntu",
-		RemotePath: "/home/ubuntu/agent",
-		Internal:   map[string]interface{}{}, // ElementsMatch fails without this set
+		ID:          "id-1",
+		Name:        "name-1",
+		Provisioner: ip.Name(),
+		IP:          "127.0.0.1",
+		Username:    "ubuntu",
+		RemotePath:  "/home/ubuntu/agent",
+		Internal:    map[string]interface{}{}, // ElementsMatch fails without this set
 	}
 	err = r.addOrUpdateInstance(StateInstance{
 		Instance: i1,
@@ -50,12 +52,13 @@ func TestNewRunner_Clean(t *testing.T) {
 	})
 	require.NoError(t, err)
 	i2 := Instance{
-		ID:         "id-2",
-		Name:       "name-2",
-		IP:         "127.0.0.2",
-		Username:   "ubuntu",
-		RemotePath: "/home/ubuntu/agent",
-		Internal:   map[string]interface{}{}, // ElementsMatch fails without this set
+		ID:          "id-2",
+		Name:        "name-2",
+		Provisioner: ip.Name(),
+		IP:          "127.0.0.2",
+		Username:    "ubuntu",
+		RemotePath:  "/home/ubuntu/agent",
+		Internal:    map[string]interface{}{}, // ElementsMatch fails without this set
 	}
 	err = r.addOrUpdateInstance(StateInstance{
 		Instance: i2,
@@ -63,16 +66,18 @@ func TestNewRunner_Clean(t *testing.T) {
 	})
 	require.NoError(t, err)
 	s1 := Stack{
-		ID:       "id-1",
-		Version:  "8.10.0",
-		Internal: map[string]interface{}{}, // ElementsMatch fails without this set
+		ID:          "id-1",
+		Provisioner: sp.Name(),
+		Version:     "8.10.0",
+		Internal:    map[string]interface{}{}, // ElementsMatch fails without this set
 	}
 	err = r.addOrUpdateStack(s1)
 	require.NoError(t, err)
 	s2 := Stack{
-		ID:       "id-2",
-		Version:  "8.9.0",
-		Internal: map[string]interface{}{}, // ElementsMatch fails without this set
+		ID:          "id-2",
+		Provisioner: sp.Name(),
+		Version:     "8.9.0",
+		Internal:    map[string]interface{}{}, // ElementsMatch fails without this set
 	}
 	err = r.addOrUpdateStack(s2)
 	require.NoError(t, err)
@@ -86,7 +91,7 @@ func TestNewRunner_Clean(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.ElementsMatch(t, ip.instances, []Instance{i1, i2})
-	assert.ElementsMatch(t, sp.stacks, []Stack{s1, s2})
+	assert.ElementsMatch(t, sp.deletedStacks, []Stack{s1, s2})
 }
 
 type fakeInstanceProvisioner struct {
@@ -94,15 +99,19 @@ type fakeInstanceProvisioner struct {
 	instances []Instance
 }
 
-func (f *fakeInstanceProvisioner) SetLogger(_ Logger) {
+func (p *fakeInstanceProvisioner) Name() string {
+	return "fake"
 }
 
-func (f *fakeInstanceProvisioner) Supported(_ define.OS) bool {
+func (p *fakeInstanceProvisioner) SetLogger(_ Logger) {
+}
+
+func (p *fakeInstanceProvisioner) Supported(_ define.OS) bool {
 	return true
 }
 
-func (f *fakeInstanceProvisioner) Provision(_ context.Context, _ Config, batches []OSBatch) ([]Instance, error) {
-	f.batches = batches
+func (p *fakeInstanceProvisioner) Provision(_ context.Context, _ Config, batches []OSBatch) ([]Instance, error) {
+	p.batches = batches
 	var instances []Instance
 	for _, batch := range batches {
 		instances = append(instances, Instance{
@@ -117,37 +126,48 @@ func (f *fakeInstanceProvisioner) Provision(_ context.Context, _ Config, batches
 	return instances, nil
 }
 
-func (f *fakeInstanceProvisioner) Clean(_ context.Context, _ Config, instances []Instance) error {
-	f.instances = instances
+func (p *fakeInstanceProvisioner) Clean(_ context.Context, _ Config, instances []Instance) error {
+	p.instances = instances
 	return nil
 }
 
 type fakeStackProvisioner struct {
-	requests []StackRequest
-	stacks   []Stack
+	mx            sync.Mutex
+	requests      []StackRequest
+	deletedStacks []Stack
 }
 
-func (f *fakeStackProvisioner) SetLogger(_ Logger) {
+func (p *fakeStackProvisioner) Name() string {
+	return "fake"
 }
 
-func (f *fakeStackProvisioner) Provision(_ context.Context, requests []StackRequest) ([]Stack, error) {
-	f.requests = requests
-	var stacks []Stack
-	for _, req := range requests {
-		stacks = append(stacks, Stack{
-			ID:            req.ID,
-			Version:       req.Version,
-			Elasticsearch: "http://localhost:9200",
-			Kibana:        "http://localhost:5601",
-			Username:      "elastic",
-			Password:      "changeme",
-			Internal:      nil,
-		})
-	}
-	return stacks, nil
+func (p *fakeStackProvisioner) SetLogger(_ Logger) {
 }
 
-func (f *fakeStackProvisioner) Clean(_ context.Context, stacks []Stack) error {
-	f.stacks = stacks
+func (p *fakeStackProvisioner) Create(_ context.Context, request StackRequest) (Stack, error) {
+	p.mx.Lock()
+	defer p.mx.Unlock()
+	p.requests = append(p.requests, request)
+	return Stack{
+		ID:            request.ID,
+		Version:       request.Version,
+		Elasticsearch: "http://localhost:9200",
+		Kibana:        "http://localhost:5601",
+		Username:      "elastic",
+		Password:      "changeme",
+		Internal:      nil,
+		Ready:         false,
+	}, nil
+}
+
+func (p *fakeStackProvisioner) WaitForReady(_ context.Context, stack Stack) (Stack, error) {
+	stack.Ready = true
+	return stack, nil
+}
+
+func (p *fakeStackProvisioner) Delete(_ context.Context, stack Stack) error {
+	p.mx.Lock()
+	defer p.mx.Unlock()
+	p.deletedStacks = append(p.deletedStacks, stack)
 	return nil
 }

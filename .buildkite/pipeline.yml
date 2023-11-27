@@ -4,6 +4,15 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
+  - label: "check-ci"
+    key: "check-ci"
+    command: ".buildkite/scripts/steps/check-ci.sh"
+    agents:
+      provider: "gcp"
+      image: "family/core-ubuntu-2204"
+    retry:
+      manual:
+        allowed: true
   - group: "Unit tests"
     key: "unit-tests"
     steps:
@@ -11,7 +20,8 @@ steps:
         key: "unit-tests-2204"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
-          - "build/TEST-**"
+          - "build/TEST-go-unit.html"
+          - "build/TEST-go-unit.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -25,7 +35,8 @@ steps:
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
-          - "build/TEST-**"
+          - "build/TEST-go-unit.html"
+          - "build/TEST-go-unit.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -41,7 +52,8 @@ steps:
         key: "unit-tests-win2022"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-**"
+          - "build/TEST-go-unit.html"
+          - "build/TEST-go-unit.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -58,7 +70,8 @@ steps:
         key: "unit-tests-win2016"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-**"
+          - "build/TEST-go-unit.html"
+          - "build/TEST-go-unit.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -77,7 +90,8 @@ steps:
         command: ".buildkite/scripts/steps/unit-tests.sh"
         branches: main
         artifact_paths:
-          - "build/TEST-**"
+          - "build/TEST-go-unit.html"
+          - "build/TEST-go-unit.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -91,7 +105,8 @@ steps:
         key: "unit-tests-macos-13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
-          - "build/TEST-**"
+          - "build/TEST-go-unit.html"
+          - "build/TEST-go-unit.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -108,7 +123,8 @@ steps:
         key: "unit-tests-win10"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-**"
+          - "build/TEST-go-unit.html"
+          - "build/TEST-go-unit.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -124,7 +140,8 @@ steps:
         key: "unit-tests-win11"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-**"
+          - "build/TEST-go-unit.html"
+          - "build/TEST-go-unit.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -152,7 +169,7 @@ steps:
       unit-tests-win11
       "
     artifact_paths:
-      - "build/TEST-**"
+      - "build/TEST-go-unit.cov"
     agents:
       image: "golang:1.20.10"
     depends_on:
@@ -168,10 +185,6 @@ steps:
           K8S_VERSION: "v{{matrix.k8s_version}}"
           KIND_VERSION: "v0.20.0"
         command: ".buildkite/scripts/steps/k8s-tests.sh"
-        artifact_paths:
-          - "build/TEST-**"
-          - "build/diagnostics/*"
-          - "coverage.out"
         agents:
           provider: "gcp"
           image: "family/core-ubuntu-2204"
@@ -201,8 +214,6 @@ steps:
 
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
-    env:
-      TEST_INTEG_AUTH_ESS_REGION: us-east-1
     command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
     artifact_paths:
       - "build/TEST-**"
@@ -213,8 +224,6 @@ steps:
 
   - label: "Integration tests"
     key: "integration-tests"
-    env:
-      TEST_INTEG_AUTH_ESS_REGION: us-east-1
     command: ".buildkite/scripts/steps/integration_tests.sh stateful"
     artifact_paths:
       - "build/TEST-**"
@@ -222,6 +231,18 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n1-standard-8"
+
+  - label: "Serverless Beats Tests"
+    key: "serverless-beats-integration-tests"
+    command: ".buildkite/scripts/steps/beats_tests.sh"
+    if: "build.env('CRON') == 'yes'"
+    agents:
+      provider: "gcp"
+      machineType: "n1-standard-8"
+    retry:
+      manual:
+        allowed: true
+
 
   - wait: ~
     continue_on_failure: true
@@ -231,3 +252,23 @@ steps:
     plugins:
       - junit-annotate#v2.4.1:
           artifacts: build/TEST-go-integration*.xml
+
+  # Triggers a dynamic step: Sync K8s
+  # Runs only on main and if k8s files are changed
+  - label: "Trigger k8s sync"
+    branches: main
+    plugins:
+      - monebag/monorepo-diff#v2.5.9:
+          diff: "git diff --name-only HEAD~1"
+          watch:
+            - path:
+                - deploy/kubernetes/*
+                - version/docs/version.asciidoc
+              config:
+                label: "Sync K8s"
+                command: ".buildkite/scripts/steps/sync-k8s.sh"
+                agents:
+                  provider: "gcp"
+                  image: "family/core-ubuntu-2204"
+                env:
+                  - GH_VERSION=2.4.0

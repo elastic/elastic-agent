@@ -14,6 +14,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -37,6 +38,17 @@ type UpdateMarker struct {
 	// Acked is a flag marking whether or not action was acked
 	Acked  bool                    `json:"acked" yaml:"acked"`
 	Action *fleetapi.ActionUpgrade `json:"action" yaml:"action"`
+
+	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
+}
+
+// GetActionID returns the Fleet Action ID associated with the
+// upgrade action, if it's recorded in the UpdateMarker.
+func (um UpdateMarker) GetActionID() string {
+	if um.Action != nil {
+		return um.Action.ActionID
+	}
+	return ""
 }
 
 // MarkerActionUpgrade adapter struct compatible with pre 8.3 version of the marker file format
@@ -78,6 +90,7 @@ type updateMarkerSerializer struct {
 	PrevHash    string               `yaml:"prev_hash"`
 	Acked       bool                 `yaml:"acked"`
 	Action      *MarkerActionUpgrade `yaml:"action"`
+	Details     *details.Details     `yaml:"details"`
 }
 
 func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
@@ -88,11 +101,12 @@ func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 		PrevHash:    m.PrevHash,
 		Acked:       m.Acked,
 		Action:      convertToMarkerAction(m.Action),
+		Details:     m.Details,
 	}
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash string, action *fleetapi.ActionUpgrade) error {
+func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash string, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
 	prevVersion := release.Version()
 	prevHash := release.Commit()
 	if len(prevHash) > hashLen {
@@ -105,6 +119,7 @@ func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash strin
 		PrevVersion: prevVersion,
 		PrevHash:    prevHash,
 		Action:      action,
+		Details:     upgradeDetails,
 	}
 
 	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
@@ -150,13 +165,17 @@ func CleanMarker(log *logger.Logger) error {
 // LoadMarker loads the update marker. If the file does not exist it returns nil
 // and no error.
 func LoadMarker() (*UpdateMarker, error) {
-	markerFile := markerFilePath()
-	markerBytes, err := ioutil.ReadFile(markerFile)
+	return loadMarker(markerFilePath())
+}
+
+func loadMarker(markerFile string) (*UpdateMarker, error) {
+	markerBytes, err := readMarkerFile(markerFile)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, nil
-		}
 		return nil, err
+	}
+	if markerBytes == nil {
+		// marker doesn't exist
+		return nil, nil
 	}
 
 	marker := &updateMarkerSerializer{}
@@ -171,10 +190,11 @@ func LoadMarker() (*UpdateMarker, error) {
 		PrevHash:    marker.PrevHash,
 		Acked:       marker.Acked,
 		Action:      convertToActionUpgrade(marker.Action),
+		Details:     marker.Details,
 	}, nil
 }
 
-func saveMarker(marker *UpdateMarker) error {
+func SaveMarker(marker *UpdateMarker) error {
 	makerSerializer := &updateMarkerSerializer{
 		Hash:        marker.Hash,
 		UpdatedOn:   marker.UpdatedOn,
@@ -182,13 +202,14 @@ func saveMarker(marker *UpdateMarker) error {
 		PrevHash:    marker.PrevHash,
 		Acked:       marker.Acked,
 		Action:      convertToMarkerAction(marker.Action),
+		Details:     marker.Details,
 	}
 	markerBytes, err := yaml.Marshal(makerSerializer)
 	if err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(markerFilePath(), markerBytes, 0600)
+	return writeMarkerFile(markerFilePath(), markerBytes)
 }
 
 func markerFilePath() string {
