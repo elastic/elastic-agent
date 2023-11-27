@@ -25,10 +25,9 @@ func TestProvisionGetRegions(t *testing.T) {
 	require.True(t, found)
 
 	cfg := ProvisionerConfig{Region: "bad-region-ID", APIKey: key}
-	prov := &ServerlessProvision{
-		cfg:    cfg,
-		stacks: map[string]stackhandlerData{},
-		log:    &defaultLogger{wrapped: logp.L()},
+	prov := &ServerlessProvisioner{
+		cfg: cfg,
+		log: &defaultLogger{wrapped: logp.L()},
 	}
 	err = prov.CheckCloudRegion()
 	require.NoError(t, err)
@@ -48,27 +47,23 @@ func TestStackProvisioner(t *testing.T) {
 	cfg := ProvisionerConfig{Region: "aws-eu-west-1", APIKey: key}
 	provClient, err := NewServerlessProvisioner(cfg)
 	require.NoError(t, err)
-	stacks := []runner.StackRequest{
-		{ID: "stack-test-one", Version: "8.9.0"},
-		{ID: "stack-test-two", Version: "8.9.0"},
-	}
+	request := runner.StackRequest{ID: "stack-test-one", Version: "8.9.0"}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
-	res, err := provClient.Provision(ctx, stacks)
+	stack, err := provClient.Create(ctx, request)
 	require.NoError(t, err)
 	t.Logf("got results:")
-	for _, stack := range res {
-		t.Logf("stack: %#v", stack)
-		require.NotEmpty(t, stack.Elasticsearch)
-		require.NotEmpty(t, stack.Kibana)
-		require.NotEmpty(t, stack.Password)
-		require.NotEmpty(t, stack.Username)
-	}
-	t.Logf("tearing down...")
-	err = provClient.Clean(ctx, res)
+	t.Logf("stack: %#v", stack)
+	require.NotEmpty(t, stack.Elasticsearch)
+	require.NotEmpty(t, stack.Kibana)
+	require.NotEmpty(t, stack.Password)
+	require.NotEmpty(t, stack.Username)
+	stack, err = provClient.WaitForReady(ctx, stack)
 	require.NoError(t, err)
-
+	t.Logf("tearing down...")
+	err = provClient.Delete(ctx, stack)
+	require.NoError(t, err)
 }
 
 func TestStartServerless(t *testing.T) {

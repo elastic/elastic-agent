@@ -14,6 +14,7 @@ import (
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -31,7 +32,7 @@ type priorityQueue interface {
 
 // Dispatcher processes actions coming from fleet api.
 type Dispatcher interface {
-	Dispatch(context.Context, acker.Acker, ...fleetapi.Action)
+	Dispatch(context.Context, details.Observer, acker.Acker, ...fleetapi.Action)
 	Errors() <-chan error
 }
 
@@ -101,7 +102,7 @@ func (ad *ActionDispatcher) key(a fleetapi.Action) string {
 // Dispatch will handle action queue operations, and retries.
 // Any action that implements the ScheduledAction interface may be added/removed from the queue based on StartTime.
 // Any action that implements the RetryableAction interface will be rescheduled if the handler returns an error.
-func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, actions ...fleetapi.Action) {
+func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.Observer, acker acker.Acker, actions ...fleetapi.Action) {
 	var err error
 	span, ctx := apm.StartSpan(ctx, "dispatch", "app.internal")
 	defer func() {
@@ -110,6 +111,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 	}()
 
 	ad.removeQueuedUpgrades(actions)
+	reportNextScheduledUpgrade(actions, detailsSetter, ad.log)
 	actions = ad.queueScheduledActions(actions)
 	actions = ad.dispatchCancelActions(ctx, actions, acker)
 	queued, expired := ad.gatherQueuedActions(time.Now().UTC())
@@ -248,7 +250,7 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	attempt := action.RetryAttempt()
 	d, err := ad.rt.GetWait(attempt)
 	if err != nil {
-		ad.log.Errorf("No more reties for action id %s: %v", action.ID(), err)
+		ad.log.Errorf("No more retries for action id %s: %v", action.ID(), err)
 		action.SetRetryAttempt(-1)
 		if err := acker.Ack(ctx, action); err != nil {
 			ad.log.Errorf("Unable to ack action failure (id %s) to fleet-server: %v", action.ID(), err)
@@ -276,4 +278,50 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	if err := acker.Commit(ctx); err != nil {
 		ad.log.Errorf("Unable to commit action retry (id %s) to fleet-server: %v", action.ID(), err)
 	}
+}
+
+func reportNextScheduledUpgrade(input []fleetapi.Action, detailsSetter details.Observer, log *logger.Logger) {
+	var nextUpgrade *fleetapi.ActionUpgrade
+	for _, action := range input {
+		sAction, ok := action.(fleetapi.ScheduledAction)
+		if !ok {
+			continue
+		}
+
+		uAction, ok := sAction.(*fleetapi.ActionUpgrade)
+		if !ok {
+			continue
+		}
+
+		start, err := uAction.StartTime()
+		if err != nil {
+			log.Errorf("failed to get start time for scheduled upgrade action [id = %s]", uAction.ID())
+			continue
+		}
+
+		if !start.After(time.Now()) {
+			continue
+		}
+
+		if nextUpgrade == nil {
+			nextUpgrade = uAction
+			continue
+		}
+
+		nextUpgradeStartTime, _ := nextUpgrade.StartTime()
+		if start.Before(nextUpgradeStartTime) {
+			nextUpgrade = uAction
+		}
+	}
+
+	// If there no scheduled upgrade, there are no upgrade details to report.
+	if nextUpgrade == nil {
+		return
+	}
+
+	upgradeDetails := details.NewDetails(nextUpgrade.Version, details.StateScheduled, nextUpgrade.ID())
+	startTime, _ := nextUpgrade.StartTime()
+	upgradeDetails.Metadata.ScheduledAt = &startTime
+
+	detailsSetter(upgradeDetails)
 }

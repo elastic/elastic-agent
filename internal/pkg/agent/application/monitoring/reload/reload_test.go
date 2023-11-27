@@ -59,18 +59,18 @@ agent.monitoring.enabled: false
 			false, false, true,
 		},
 		{
-			"stop when running, monitoring.metrics disabled",
+			"do not stop when running, monitoring.metrics disabled",
 			true, true, true,
 			`
 agent.monitoring.metrics: false
 `,
-			false, false, true,
+			true, false, false,
 		},
 		{
 			"stop stopped server",
 			false, false, false,
 			`
-agent.monitoring.metrics: false
+agent.monitoring.enabled: false
 `,
 			false, false, false,
 		},
@@ -99,7 +99,7 @@ agent.monitoring.enabled: true
 				log,
 				cfg,
 			)
-			r.isServerRunning = tc.currRunning
+			r.isServerRunning.Store(tc.currRunning)
 			if tc.currRunning {
 				r.s = fsc
 			}
@@ -107,7 +107,7 @@ agent.monitoring.enabled: true
 			newCfg := aConfig.MustNewConfigFrom(tc.newConfig)
 			require.NoError(t, r.Reload(newCfg))
 
-			require.Equal(t, tc.expectedRunning, r.isServerRunning)
+			require.Equal(t, tc.expectedRunning, r.isServerRunning.Load())
 			require.Equal(t, tc.expectedStart, fsc.startTriggered)
 			require.Equal(t, tc.expectedStop, fsc.stopTriggered)
 		})

@@ -1,0 +1,55 @@
+// begin 8.10.4 relnotes
+
+[[release-notes-8.10.4]]
+==  8.10.4
+
+Review important information about the  8.10.4 release.
+
+
+
+[discrete]
+[[breaking-changes-8.10.4]]
+=== Breaking changes
+
+Breaking changes can prevent your application from optimal operation and
+performance. Before you upgrade, review the breaking changes, then mitigate the
+impact to your application.
+
+elastic-agent::
+
+[discrete]
+[[breaking-3591]]
+.`elastic-agent-autodiscover` library has been updated to version 0.6.4, disabling metadata For `kubernetes.deployment` and `kubernetes.cronjob` fields.
+[%collapsible]
+====
+*Details* +
+The `elastic-agent-autodiscover` Kubernetes library by default comes with `add_resource_metadata.deployment=false` and `add_resource_metadata.cronjob=false`.
+*Impact* +
+Pods that will be created from deployments or cronjobs will not have the extra metadata field for `kubernetes.deployment` or `kubernetes.cronjob`, respectively. This change was made to avoid the memory impact of keeping the feature enabled in big Kubernetes clusters.
+For more information, refer to {agent-pull}3591[#3591].
+====
+
+
+
+
+
+[discrete]
+[[new-features-8.10.4]]
+=== New features
+
+The 8.10.4 release adds the following new and notable features.
+
+
+elastic-agent::
+
+* Secondary Fallback For Package Signature Verification. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3453[#https://github.com/elastic/elastic-agent/pull/3453] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3264[#https://github.com/elastic/elastic-agent/issues/3264]
++
+Ability to upgrade securely in air-gapped environment where fleet server is the only reachable URI.
+
+
+
+
+
+
+
+// end 8.10.4 relnotes

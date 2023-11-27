@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -107,7 +108,13 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 	}
 
 	// fetch package hash
-	err = DownloadPackage(ctx, l, r.doer, r.src+hashExt, filepath.Join(dir, r.path+hashExt))
+	err = DownloadPackage(ctx, l, r.doer, r.src+extHash, filepath.Join(dir, r.path+extHash))
+	if err != nil {
+		return fmt.Errorf("failed to download %s: %w", r.src, err)
+	}
+
+	// fetch package asc
+	err = DownloadPackage(ctx, l, r.doer, r.src+extAsc, filepath.Join(dir, r.path+extAsc))
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
@@ -256,7 +263,7 @@ func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath 
 type writeProgress struct {
 	logger    Logger
 	total     uint64
-	completed uint64
+	completed atomic.Uint64
 }
 
 func newWriteProgress(ctx context.Context, l Logger, total uint64) *writeProgress {
@@ -270,7 +277,7 @@ func newWriteProgress(ctx context.Context, l Logger, total uint64) *writeProgres
 
 func (wp *writeProgress) Write(p []byte) (int, error) {
 	n := len(p)
-	wp.completed += uint64(n)
+	wp.completed.Add(uint64(n))
 	return n, nil
 }
 
@@ -282,7 +289,7 @@ func (wp *writeProgress) printProgress(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			wp.logger.Logf("Downloading artifact progress %.2f%%", float64(wp.completed)/float64(wp.total)*100.0)
+			wp.logger.Logf("Downloading artifact progress %.2f%%", float64(wp.completed.Load())/float64(wp.total)*100.0)
 		}
 	}
 }

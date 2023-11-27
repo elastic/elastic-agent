@@ -20,7 +20,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
-const hashExt = ".sha512"
+const extAsc = ".asc"
+const extHash = ".sha512"
 
 var (
 	// ErrUnsupportedPlatform returned when the operating system and architecture combination is not supported.
@@ -133,7 +134,7 @@ func untar(archivePath string, extractDir string) error {
 
 		fi := f.FileInfo()
 		mode := fi.Mode()
-		abs := filepath.Join(extractDir, f.Name)
+		abs := filepath.Join(extractDir, f.Name) //nolint:gosec // used only in tests
 		switch {
 		case mode.IsRegular():
 			// just to be sure, it should already be created by Dir type
@@ -146,7 +147,7 @@ func untar(archivePath string, extractDir string) error {
 				return fmt.Errorf("failed creating file %s: %w", abs, err)
 			}
 
-			_, err = io.Copy(wf, tr)
+			_, err = io.Copy(wf, tr) //nolint:gosec // used only in tests
 			if closeErr := wf.Close(); closeErr != nil && err == nil {
 				err = closeErr
 			}
@@ -193,7 +194,7 @@ func unzip(archivePath string, extractDir string) error {
 
 		fi := f.FileInfo()
 		mode := fi.Mode()
-		abs := filepath.Join(extractDir, f.Name)
+		abs := filepath.Join(extractDir, f.Name) //nolint:gosec // used only in tests
 		switch {
 		case mode.IsRegular():
 			// just to be sure, it should already be created by Dir type
@@ -211,6 +212,7 @@ func unzip(archivePath string, extractDir string) error {
 				}
 			}()
 
+			//nolint:gosec // used only in tests
 			if _, err = io.Copy(f, rc); err != nil {
 				return fmt.Errorf("error writing file %s: %w", abs, err)
 			}

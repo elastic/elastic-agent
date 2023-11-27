@@ -15,13 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.elastic.co/apm/apmtest"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -29,6 +27,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -37,6 +37,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -318,46 +320,64 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCoordinatorShutdownTimeout(t *testing.T) {
-	CoordinatorShutdownTimeout = time.Millisecond
-	handlerChan, _, _, _ := setupAndWaitCoordinatorDone()
-	waitAndTestError(t, func(err error) bool { return errors.Is(err, context.Canceled) }, handlerChan)
-}
-
-func TestCoordinatorShutdownErrorOneResponse(t *testing.T) {
-	CoordinatorShutdownTimeout = 10 * time.Millisecond
-	handlerChan, _, _, config := setupAndWaitCoordinatorDone()
-
-	cfgErrStr := "config watcher error"
-	config <- errors.New(cfgErrStr)
-
-	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
-}
-
-func TestCoordinatorShutdownErrorAllResponses(t *testing.T) {
-	CoordinatorShutdownTimeout = 5 * time.Second
-	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
-	runtimeErrStr := "runtime error"
-	varsErrStr := "vars error"
-	runtime <- errors.New(runtimeErrStr)
-	varWatcher <- errors.New(varsErrStr)
-	config <- nil
-
+func TestCollectManagerErrorsTimeout(t *testing.T) {
+	handlerChan, _, _, _, _ := setupManagerShutdownChannels(time.Millisecond)
+	// Don't send anything to the shutdown channels, causing a timeout
+	// in collectManagerErrors
 	waitAndTestError(t, func(err error) bool {
-		return strings.Contains(err.Error(), runtimeErrStr) &&
-			strings.Contains(err.Error(), varsErrStr)
+		return err != nil &&
+			strings.Contains(err.Error(), "1 error occurred") &&
+			strings.Contains(err.Error(), "timeout while waiting for managers")
 	}, handlerChan)
 }
 
-func TestCoordinatorShutdownAllResponsesNoErrors(t *testing.T) {
-	CoordinatorShutdownTimeout = 5 * time.Second
-	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
-	runtime <- nil
-	varWatcher <- nil
-	config <- nil
+func TestCollectManagerErrorsOneResponse(t *testing.T) {
+	handlerChan, _, _, config, _ := setupManagerShutdownChannels(10 * time.Millisecond)
+
+	// Send an error for the config manager -- we should also get a
+	// timeout error since we don't send anything on the other two channels.
+	cfgErrStr := "config watcher error"
+	config <- errors.New(cfgErrStr)
 
 	waitAndTestError(t, func(err error) bool {
-		return errors.Is(err, context.Canceled)
+		return err != nil &&
+			strings.Contains(err.Error(), "2 errors occurred") &&
+			strings.Contains(err.Error(), cfgErrStr) &&
+			strings.Contains(err.Error(), "timeout while waiting for managers")
+	}, handlerChan)
+}
+
+func TestCollectManagerErrorsAllResponses(t *testing.T) {
+	handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher := setupManagerShutdownChannels(5 * time.Second)
+	runtimeErrStr := "runtime error"
+	varsErrStr := "vars error"
+	upgradeMarkerWatcherErrStr := "upgrade marker watcher error"
+	runtime <- errors.New(runtimeErrStr)
+	varWatcher <- errors.New(varsErrStr)
+	config <- nil
+	upgradeMarkerWatcher <- errors.New(upgradeMarkerWatcherErrStr)
+
+	waitAndTestError(t, func(err error) bool {
+		return err != nil &&
+			strings.Contains(err.Error(), "3 errors occurred") &&
+			strings.Contains(err.Error(), runtimeErrStr) &&
+			strings.Contains(err.Error(), varsErrStr) &&
+			strings.Contains(err.Error(), upgradeMarkerWatcherErrStr)
+	}, handlerChan)
+}
+
+func TestCollectManagerErrorsAllResponsesNoErrors(t *testing.T) {
+	handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher := setupManagerShutdownChannels(5 * time.Second)
+	runtime <- nil
+	varWatcher <- nil
+	config <- context.Canceled
+	upgradeMarkerWatcher <- nil
+
+	// All errors are nil or context.Canceled, so collectManagerErrors
+	// should also return nil.
+
+	waitAndTestError(t, func(err error) bool {
+		return err == nil
 	}, handlerChan)
 }
 
@@ -367,7 +387,7 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 	for {
 		select {
 		case <-waitCtx.Done():
-			t.Fatalf("handleCoordinatorDone timed out while waiting for shutdown")
+			t.Fatalf("timed out while waiting for response from collectManagerErrors")
 		case gotErr := <-handlerErr:
 			if handlerErr != nil {
 				if check(gotErr) {
@@ -381,24 +401,19 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 	}
 }
 
-func setupAndWaitCoordinatorDone() (chan error, chan error, chan error, chan error) {
+func setupManagerShutdownChannels(timeout time.Duration) (chan error, chan error, chan error, chan error, chan error) {
 	runtime := make(chan error)
 	varWatcher := make(chan error)
 	config := make(chan error)
-
-	testCord := Coordinator{logger: logp.L()}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	// emulate shutdown
-	cancel()
+	upgradeMarkerWatcher := make(chan error)
 
 	handlerChan := make(chan error)
 	go func() {
-		handlerErr := testCord.handleCoordinatorDone(ctx, varWatcher, runtime, config)
+		handlerErr := collectManagerErrors(timeout, varWatcher, runtime, config, upgradeMarkerWatcher)
 		handlerChan <- handlerErr
 	}()
 
-	return handlerChan, runtime, varWatcher, config
+	return handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher
 }
 
 func TestCoordinator_ReExec(t *testing.T) {
@@ -471,8 +486,50 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCoordinator_UpgradeDetails(t *testing.T) {
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	expectedErr := errors.New("some upgrade error")
+	upgradeManager := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  expectedErr,
+	}
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, WithUpgradeManager(upgradeManager))
+	require.Nil(t, coord.state.UpgradeDetails)
+	go func() {
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	// no vars used by the config
+	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
+
+	// no need for anything to really run
+	cfg, err := config.NewConfigFrom(nil)
+	require.NoError(t, err)
+	cfgMgr.Config(ctx, cfg)
+
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	require.ErrorIs(t, expectedErr, err)
+	cancel()
+
+	err = <-coordCh
+	require.NoError(t, err)
+
+	require.Equal(t, details.StateFailed, coord.state.UpgradeDetails.State)
+	require.Equal(t, details.StateRequested, coord.state.UpgradeDetails.Metadata.FailedState)
+	require.Equal(t, expectedErr.Error(), coord.state.UpgradeDetails.Metadata.ErrorMsg)
+}
+
 type createCoordinatorOpts struct {
-	managed bool
+	managed        bool
+	upgradeManager UpgradeManager
 }
 
 type CoordinatorOpt func(o *createCoordinatorOpts)
@@ -480,6 +537,12 @@ type CoordinatorOpt func(o *createCoordinatorOpts)
 func ManagedCoordinator(managed bool) CoordinatorOpt {
 	return func(o *createCoordinatorOpts) {
 		o.managed = managed
+	}
+}
+
+func WithUpgradeManager(upgradeManager UpgradeManager) CoordinatorOpt {
+	return func(o *createCoordinatorOpts) {
+		o.upgradeManager = upgradeManager
 	}
 }
 
@@ -527,7 +590,12 @@ func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt
 	cfgMgr := newFakeConfigManager()
 	varsMgr := newFakeVarsManager()
 
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, &fakeUpgradeManager{}, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed)
+	upgradeManager := o.upgradeManager
+	if upgradeManager == nil {
+		upgradeManager = &fakeUpgradeManager{}
+	}
+
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed)
 	return coord, cfgMgr, varsMgr
 }
 
@@ -574,7 +642,7 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
 	if f.upgradeErr != nil {
 		return nil, f.upgradeErr
@@ -583,6 +651,10 @@ func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, source
 }
 
 func (f *fakeUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+	return nil
+}
+
+func (f *fakeUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
 	return nil
 }
 
@@ -715,6 +787,8 @@ func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
 type fakeRuntimeManager struct {
 	state          []runtime.ComponentComponentState
 	updateCallback func([]component.Component) error
+	result         error
+	errChan        chan error
 }
 
 func (r *fakeRuntimeManager) Run(ctx context.Context) error {
@@ -724,11 +798,15 @@ func (r *fakeRuntimeManager) Run(ctx context.Context) error {
 
 func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
 
-func (r *fakeRuntimeManager) Update(model component.Model) error {
+func (r *fakeRuntimeManager) Update(model component.Model) {
+	r.result = nil
 	if r.updateCallback != nil {
-		return r.updateCallback(model.Components)
+		r.result = r.updateCallback(model.Components)
 	}
-	return nil
+	if r.errChan != nil {
+		// If a reporting channel is set, send the result to it
+		r.errChan <- r.result
+	}
 }
 
 // State returns the current components model state.

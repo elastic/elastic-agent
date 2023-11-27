@@ -12,21 +12,28 @@ import (
 	"strings"
 
 	"github.com/jaypipes/ghw"
+	"github.com/kardianos/service"
 	"github.com/otiai10/copy"
+	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
 	darwin = "darwin"
+
+	elasticUsername  = "elastic-agent"
+	elasticGroupName = "elastic-agent"
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
+func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.ProgressBar, streams *cli.IOStreams) (utils.FileOwner, error) {
 	dir, err := findDirectory()
 	if err != nil {
-		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
+		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
 	}
 
 	// We only uninstall Agent if it is currently installed.
@@ -37,38 +44,84 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 		// There is no uninstall token for "install" command.
 		// Uninstall will fail on protected agent.
 		// The protected Agent will need to be uninstalled first before it can be installed.
-		s := pt.StepStart("Uninstalling current Elastic Agent")
-		err = Uninstall(cfgFile, topPath, "", s)
+		pt.Describe("Uninstalling current Elastic Agent")
+		err = Uninstall(cfgFile, topPath, "", pt)
 		if err != nil {
-			s.Failed()
-			return errors.New(
+			pt.Describe("Failed to uninstall current Elastic Agent")
+			return utils.FileOwner{}, errors.New(
 				err,
 				fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
 				errors.M("directory", filepath.Dir(topPath)))
 		}
-		s.Succeeded()
+		pt.Describe("Successfully uninstalled current Elastic Agent")
+	}
+
+	var ownership utils.FileOwner
+	username := ""
+	groupName := ""
+	if unprivileged {
+		username = elasticUsername
+		groupName = elasticGroupName
+
+		// ensure required group
+		ownership.GID, err = FindGID(groupName)
+		if err != nil && !errors.Is(err, ErrGroupNotFound) {
+			return utils.FileOwner{}, fmt.Errorf("failed finding group %s: %w", groupName, err)
+		}
+		if errors.Is(err, ErrGroupNotFound) {
+			pt.Describe(fmt.Sprintf("Creating group %s", groupName))
+			ownership.GID, err = CreateGroup(groupName)
+			if err != nil {
+				pt.Describe(fmt.Sprintf("Failed to create group %s", groupName))
+				return utils.FileOwner{}, fmt.Errorf("failed to create group %s: %w", groupName, err)
+			}
+			pt.Describe(fmt.Sprintf("Successfully created group %s", groupName))
+		}
+
+		// ensure required user
+		ownership.UID, err = FindUID(username)
+		if err != nil && !errors.Is(err, ErrUserNotFound) {
+			return utils.FileOwner{}, fmt.Errorf("failed finding username %s: %w", username, err)
+		}
+		if errors.Is(err, ErrUserNotFound) {
+			pt.Describe(fmt.Sprintf("Creating user %s", username))
+			ownership.UID, err = CreateUser(username, ownership.GID)
+			if err != nil {
+				pt.Describe(fmt.Sprintf("Failed to create user %s", username))
+				return utils.FileOwner{}, fmt.Errorf("failed to create user %s: %w", username, err)
+			}
+			err = AddUserToGroup(username, groupName)
+			if err != nil {
+				pt.Describe(fmt.Sprintf("Failed to add user %s to group %s", username, groupName))
+				return utils.FileOwner{}, fmt.Errorf("failed to add user %s to group %s: %w", username, groupName, err)
+			}
+			pt.Describe(fmt.Sprintf("Successfully created user %s", username))
+		}
 	}
 
 	// ensure parent directory exists
 	err = os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
-		return errors.New(
+		return utils.FileOwner{}, errors.New(
 			err,
 			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)),
 			errors.M("directory", filepath.Dir(topPath)))
 	}
 
 	// copy source into install path
-	block, err := ghw.Block()
-	if err != nil {
-		return fmt.Errorf("ghw.Block() returned error: %w", err)
-	}
-
+	//
+	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
+	// otherwise fall back to the default.
 	copyConcurrency := 1
-	if HasAllSSDs(*block) {
+	hasSSDs, detectHWErr := HasAllSSDs()
+	if detectHWErr != nil {
+		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling copy concurrency: %s\n", detectHWErr)
+	}
+	if hasSSDs {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
-	s := pt.StepStart("Copying files")
+
+	pt.Describe("Copying install files")
 	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
@@ -77,20 +130,21 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 		NumOfWorkers: int64(copyConcurrency),
 	})
 	if err != nil {
-		s.Failed()
-		return errors.New(
+		pt.Describe("Error copying files")
+		return utils.FileOwner{}, errors.New(
 			err,
 			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
-			errors.M("source", dir), errors.M("destination", topPath))
+			errors.M("source", dir), errors.M("destination", topPath),
+		)
 	}
-	s.Succeeded()
+	pt.Describe("Successfully copied files")
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
 		pathDir := filepath.Dir(paths.ShellWrapperPath)
 		err = os.MkdirAll(pathDir, 0755)
 		if err != nil {
-			return errors.New(
+			return utils.FileOwner{}, errors.New(
 				err,
 				fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, paths.ShellWrapperPath),
 				errors.M("directory", pathDir))
@@ -103,7 +157,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 			// Check if previous shell wrapper or symlink exists and remove it so it can be overwritten
 			if _, err := os.Lstat(paths.ShellWrapperPath); err == nil {
 				if err := os.Remove(paths.ShellWrapperPath); err != nil {
-					return errors.New(
+					return utils.FileOwner{}, errors.New(
 						err,
 						fmt.Sprintf("failed to remove (%s)", paths.ShellWrapperPath),
 						errors.M("destination", paths.ShellWrapperPath))
@@ -111,7 +165,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 			}
 			err = os.Symlink(filepath.Join(topPath, paths.BinaryName), paths.ShellWrapperPath)
 			if err != nil {
-				return errors.New(
+				return utils.FileOwner{}, errors.New(
 					err,
 					fmt.Sprintf("failed to create elastic-agent symlink (%s)", paths.ShellWrapperPath),
 					errors.M("destination", paths.ShellWrapperPath))
@@ -123,7 +177,7 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 			shellWrapper := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
 			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
 			if err != nil {
-				return errors.New(
+				return utils.FileOwner{}, errors.New(
 					err,
 					fmt.Sprintf("failed to write shell wrapper (%s)", paths.ShellWrapperPath),
 					errors.M("destination", paths.ShellWrapperPath))
@@ -134,45 +188,60 @@ func Install(cfgFile, topPath string, pt ProgressTrackerStep) error {
 	// post install (per platform)
 	err = postInstall(topPath)
 	if err != nil {
-		return err
+		return ownership, fmt.Errorf("error running post-install steps: %w", err)
 	}
 
 	// fix permissions
-	err = FixPermissions(topPath)
+	err = FixPermissions(topPath, ownership)
 	if err != nil {
-		return errors.New(
-			err,
-			"failed to perform permission changes",
-			errors.M("destination", topPath))
+		return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
+	}
+	if paths.ShellWrapperPath != "" {
+		err = FixPermissions(paths.ShellWrapperPath, ownership)
+		if err != nil {
+			return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath, err)
+		}
+	}
+
+	// create socket path when installing as non-root
+	// now is the only time to do it while root is available (without doing this it will not be possible
+	// for the service to create the control socket)
+	// windows: uses npipe and doesn't need a directory created
+	if unprivileged {
+		err = createSocketDir(ownership)
+		if err != nil {
+			return ownership, fmt.Errorf("failed to create socket directory: %w", err)
+		}
 	}
 
 	// install service
-	s = pt.StepStart("Installing service")
-	svc, err := newService(topPath)
+	pt.Describe("Installing service")
+	svc, err := newService(topPath, withUserGroup(username, groupName))
 	if err != nil {
-		s.Failed()
-		return err
+		pt.Describe("Failed to install service")
+		return ownership, fmt.Errorf("error installing new service: %w", err)
 	}
 	err = svc.Install()
 	if err != nil {
-		s.Failed()
-		return errors.New(
+		pt.Describe("Failed to install service")
+		return ownership, errors.New(
 			err,
 			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
 			errors.M("service", paths.ServiceName))
 	}
-	s.Succeeded()
+	pt.Describe("Installed service")
 
-	return nil
+	return ownership, nil
 }
 
 // StartService starts the installed service.
 //
 // This should only be called after Install is successful.
 func StartService(topPath string) error {
+	// only starting the service, so no need to set the username and group to any value
 	svc, err := newService(topPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating new service handler: %w", err)
 	}
 	err = svc.Start()
 	if err != nil {
@@ -186,9 +255,10 @@ func StartService(topPath string) error {
 
 // StopService stops the installed service.
 func StopService(topPath string) error {
+	// only stopping the service, so no need to set the username and group to any value
 	svc, err := newService(topPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating new service handler: %w", err)
 	}
 	err = svc.Stop()
 	if err != nil {
@@ -202,9 +272,10 @@ func StopService(topPath string) error {
 
 // RestartService restarts the installed service.
 func RestartService(topPath string) error {
+	// only restarting the service, so no need to set the username and group to any value
 	svc, err := newService(topPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating new service handler: %w", err)
 	}
 	err = svc.Restart()
 	if err != nil {
@@ -216,9 +287,13 @@ func RestartService(topPath string) error {
 	return nil
 }
 
-// FixPermissions fixes the permissions on the installed system.
-func FixPermissions(topPath string) error {
-	return fixPermissions(topPath)
+// StatusService returns the status of the service.
+func StatusService(topPath string) (service.Status, error) {
+	svc, err := newService(topPath)
+	if err != nil {
+		return service.StatusUnknown, err
+	}
+	return svc.Status()
 }
 
 // findDirectory returns the directory to copy into the installation location.
@@ -227,16 +302,16 @@ func FixPermissions(topPath string) error {
 func findDirectory() (string, error) {
 	execPath, err := os.Executable()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error fetching executable of current process: %w", err)
 	}
 	execPath, err = filepath.Abs(execPath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error fetching absolute file path: %w", err)
 	}
 	sourceDir := paths.ExecDir(filepath.Dir(execPath))
 	err = verifyDirectory(sourceDir)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error verifying directory: %w", err)
 	}
 	return sourceDir, nil
 }
@@ -251,8 +326,22 @@ func verifyDirectory(dir string) error {
 }
 
 // HasAllSSDs returns true if the host we are on uses SSDs for
-// all its persistent storage; false otherwise or on error
-func HasAllSSDs(block ghw.BlockInfo) bool {
+// all its persistent storage; false otherwise. Returns any error
+// encountered detecting the hardware type for informational purposes.
+// Errors from this function are not fatal. Note that errors may be
+// returned on some Mac hardware configurations as the ghw package
+// does not fully support MacOS.
+func HasAllSSDs() (bool, error) {
+	block, err := ghw.Block()
+	if err != nil {
+		return false, err
+	}
+
+	return hasAllSSDs(*block), nil
+}
+
+// Internal version of HasAllSSDs for testing.
+func hasAllSSDs(block ghw.BlockInfo) bool {
 	for _, disk := range block.Disks {
 		switch disk.DriveType {
 		case ghw.DRIVE_TYPE_FDD, ghw.DRIVE_TYPE_ODD:

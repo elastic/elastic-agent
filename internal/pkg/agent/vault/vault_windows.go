@@ -12,6 +12,8 @@ import (
 	"github.com/billgraziano/dpapi"
 	"github.com/hectane/go-acl"
 	"golang.org/x/sys/windows"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func (v *Vault) encrypt(data []byte) ([]byte, error) {
@@ -28,11 +30,11 @@ func tightenPermissions(path string) error {
 
 func systemAdministratorsOnly(path string, inherit bool) error {
 	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
-	systemSID, err := windows.StringToSid("S-1-5-18")
+	systemSID, err := windows.StringToSid(utils.SystemSID)
 	if err != nil {
 		return err
 	}
-	administratorsSID, err := windows.StringToSid("S-1-5-32-544")
+	administratorsSID, err := windows.StringToSid(utils.AdministratorSID)
 	if err != nil {
 		return err
 	}

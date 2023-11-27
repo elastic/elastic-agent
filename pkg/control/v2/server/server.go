@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/control"
@@ -361,6 +362,27 @@ func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.
 			},
 		})
 	}
+
+	var upgradeDetails *cproto.UpgradeDetails
+	if state.UpgradeDetails != nil {
+		upgradeDetails = &cproto.UpgradeDetails{
+			TargetVersion: state.UpgradeDetails.TargetVersion,
+			State:         string(state.UpgradeDetails.State),
+			ActionId:      state.UpgradeDetails.ActionID,
+			Metadata: &cproto.UpgradeDetailsMetadata{
+				DownloadPercent: float32(state.UpgradeDetails.Metadata.DownloadPercent),
+				FailedState:     string(state.UpgradeDetails.Metadata.FailedState),
+				ErrorMsg:        state.UpgradeDetails.Metadata.ErrorMsg,
+			},
+		}
+
+		if state.UpgradeDetails.Metadata.ScheduledAt != nil &&
+			!state.UpgradeDetails.Metadata.ScheduledAt.IsZero() {
+			upgradeDetails.Metadata.ScheduledAt = timestamppb.New(*state.UpgradeDetails.Metadata.ScheduledAt)
+
+		}
+	}
+
 	return &cproto.StateResponse{
 		Info: &cproto.StateAgentInfo{
 			Id:        agentInfo.AgentID(),
@@ -368,11 +390,13 @@ func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.
 			Commit:    release.Commit(),
 			BuildTime: release.BuildTime().Format(control.TimeFormat()),
 			Snapshot:  release.Snapshot(),
+			Pid:       int32(os.Getpid()),
 		},
-		State:        state.State,
-		Message:      state.Message,
-		FleetState:   state.FleetState,
-		FleetMessage: state.FleetMessage,
-		Components:   components,
+		State:          state.State,
+		Message:        state.Message,
+		FleetState:     state.FleetState,
+		FleetMessage:   state.FleetMessage,
+		Components:     components,
+		UpgradeDetails: upgradeDetails,
 	}, nil
 }

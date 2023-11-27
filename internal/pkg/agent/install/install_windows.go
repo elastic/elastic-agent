@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -42,5 +43,11 @@ func postInstall(topPath string) error {
 		return err
 	}
 
+	return nil
+}
+
+// createSocketDir creates the socket directory.
+func createSocketDir(ownership utils.FileOwner) error {
+	// doesn't do anything on windows, no directory is needed.
 	return nil
 }

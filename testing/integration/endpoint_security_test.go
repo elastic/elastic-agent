@@ -36,7 +36,7 @@ import (
 
 const (
 	// TODO: Setup a GitHub Action to update this for each release of https://github.com/elastic/endpoint-package
-	endpointPackageVersion       = "8.9.0"
+	endpointPackageVersion       = "8.11.0"
 	endpointHealthPollingTimeout = 2 * time.Minute
 )
 
@@ -248,7 +248,8 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
-	installElasticDefendPackage(t, info, policy.ID)
+	_, err = installElasticDefendPackage(t, info, policy.ID)
+	require.NoError(t, err)
 
 	t.Log("Polling for endpoint-security to become Healthy")
 	ctx, cancel := context.WithTimeout(context.Background(), endpointHealthPollingTimeout)
@@ -599,7 +600,7 @@ func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient c
 
 	// Ensure both the endpoint input and output units were found and healthy.
 	if !foundEndpointInputUnit || !foundEndpointOutputUnit {
-		t.Logf("State did not contain endpoint units. state: %+v", state)
+		t.Logf("State did not contain endpoint units (input: %v/output: %v) state: %+v. ", foundEndpointInputUnit, foundEndpointOutputUnit, state)
 		return false
 	}
 

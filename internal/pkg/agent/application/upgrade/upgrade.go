@@ -12,8 +12,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jaypipes/ghw"
-
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 
@@ -21,6 +19,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -28,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -57,6 +56,7 @@ type Upgrader struct {
 	agentInfo      *info.AgentInfo
 	upgradeable    bool
 	fleetServerURI string
+	markerWatcher  MarkerWatcher
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -67,13 +67,14 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) *Upgrader {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) (*Upgrader, error) {
 	return &Upgrader{
-		log:         log,
-		settings:    settings,
-		agentInfo:   agentInfo,
-		upgradeable: IsUpgradeable(),
-	}
+		log:           log,
+		settings:      settings,
+		agentInfo:     agentInfo,
+		upgradeable:   IsUpgradeable(),
+		markerWatcher: newMarkerFileWatcher(markerFilePath(), log),
+	}, nil
 }
 
 // SetClient reloads URI based on up to date fleet client
@@ -89,35 +90,39 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 
 // Reload reloads the artifact configuration for the upgrader.
 func (u *Upgrader) Reload(rawConfig *config.Config) error {
-	type reloadConfig struct {
-		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
-		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
+	cfg, err := configuration.NewFromConfig(rawConfig)
+	if err != nil {
+		return fmt.Errorf("invalid config: %w", err)
+	}
 
-		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/ coming from fleet which uses
-		// different naming.
+	// the source URI coming from fleet which uses a different naming.
+	type fleetCfg struct {
+		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
 		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
 	}
-	cfg := &reloadConfig{}
-	if err := rawConfig.Unpack(&cfg); err != nil {
+	fleetSourceURI := &fleetCfg{}
+	if err := rawConfig.Unpack(&fleetSourceURI); err != nil {
 		return errors.New(err, "failed to unpack config during reload")
 	}
 
-	var newSourceURI string
-	if cfg.FleetSourceURI != "" {
-		// fleet configuration takes precedence
-		newSourceURI = cfg.FleetSourceURI
-	} else if cfg.SourceURI != "" {
-		newSourceURI = cfg.SourceURI
+	// fleet configuration takes precedence
+	if fleetSourceURI.FleetSourceURI != "" {
+		cfg.Settings.DownloadConfig.SourceURI = fleetSourceURI.FleetSourceURI
 	}
 
-	if newSourceURI != "" {
-		u.log.Infof("Source URI changed from %q to %q", u.settings.SourceURI, newSourceURI)
-		u.settings.SourceURI = newSourceURI
+	if cfg.Settings.DownloadConfig.SourceURI != "" {
+		u.log.Infof("Source URI changed from %q to %q",
+			u.settings.SourceURI,
+			cfg.Settings.DownloadConfig.SourceURI)
 	} else {
 		// source uri unset, reset to default
-		u.log.Infof("Source URI reset from %q to %q", u.settings.SourceURI, artifact.DefaultSourceURI)
-		u.settings.SourceURI = artifact.DefaultSourceURI
+		u.log.Infof("Source URI reset from %q to %q",
+			u.settings.SourceURI,
+			artifact.DefaultSourceURI)
+		cfg.Settings.DownloadConfig.SourceURI = artifact.DefaultSourceURI
 	}
+
+	u.settings = cfg.Settings.DownloadConfig
 	return nil
 }
 
@@ -127,7 +132,7 @@ func (u *Upgrader) Upgradeable() bool {
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
@@ -137,16 +142,21 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
 	}
 
+	det.SetState(details.StateDownloading)
+
 	sourceURI = u.sourceURI(sourceURI)
-	archivePath, err := u.downloadArtifact(ctx, version, sourceURI, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	archivePath, err := u.downloadArtifact(ctx, version, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
 		if dErr := cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version()); dErr != nil {
 			u.log.Errorw("Unable to remove file after verification failure", "error.message", dErr)
 		}
+
 		return nil, err
 	}
+
+	det.SetState(details.StateExtracting)
 
 	newHash, err := u.unpack(version, archivePath)
 	if err != nil {
@@ -170,13 +180,16 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, errors.New(err, "failed to copy run directory")
 	}
 
+	det.SetState(details.StateReplacing)
+
 	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, u.log, newHash, action); err != nil {
+	det.SetState(details.StateWatching)
+	if err := u.markUpgrade(ctx, u.log, newHash, action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
@@ -230,7 +243,11 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 
 	marker.Acked = true
 
-	return saveMarker(marker)
+	return SaveMarker(marker)
+}
+
+func (u *Upgrader) MarkerWatcher() MarkerWatcher {
+	return u.markerWatcher
 }
 
 func (u *Upgrader) sourceURI(retrievedURI string) string {
@@ -377,13 +394,14 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		}
 	}
 
-	block, err := ghw.Block()
-	if err != nil {
-		return fmt.Errorf("ghw.Block() returned error: %w", err)
-	}
-
+	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
+	// otherwise fall back to the default.
 	copyConcurrency := 1
-	if install.HasAllSSDs(*block) {
+	hasSSDs, detectHWErr := install.HasAllSSDs()
+	if detectHWErr != nil {
+		l.Infow("Could not determine block storage type, disabling copy concurrency", "error.message", detectHWErr)
+	}
+	if hasSSDs {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 

@@ -1,7 +1,9 @@
-ALL=elastic-agent-standalone elastic-agent-managed
+SHELL := /bin/bash
 
-BEAT_VERSION=$(shell grep '^:stack-version:' ../../version/docs/version.asciidoc | cut -c 17- )
-BRANCH_VERSION=$(shell grep '^:doc-branch:' ../../version/docs/version.asciidoc | cut -c 14- )
+ALL=elastic-agent-standalone elastic-agent-managed
+WORKSPACE=$(shell git rev-parse --show-toplevel)
+BEAT_VERSION=$(shell grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
+BRANCH_VERSION=$(shell cut -d. -f1-2 <<< '${BEAT_VERSION}')
 
 #variables needed for ci-create-kubernetes-templates-pull-request
 ELASTIC_AGENT_REPO=kibana
@@ -79,7 +81,7 @@ else
 	echo "INFO: create pull request"
 	@gh pr create \
 		--title "Update kubernetes templates for elastic-agent" \
-		--body "Automated by ${BUILD_URL}" \
+		--body "Automated by ${BUILDKITE_BUILD_URL}" \
 		--label automation \
 		--label release_note:skip \
 		--base main \

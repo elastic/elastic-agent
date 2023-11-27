@@ -5,7 +5,7 @@
 package reload
 
 import (
-	"sync"
+	"sync/atomic"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -26,9 +26,8 @@ type ServerReloader struct {
 	log         *logger.Logger
 	newServerFn serverConstructor
 
-	config              *monitoringCfg.MonitoringConfig
-	isServerRunning     bool
-	isServerRunningLock sync.Mutex
+	config          *monitoringCfg.MonitoringConfig
+	isServerRunning atomic.Bool
 }
 
 func NewServerReloader(newServerFn serverConstructor, log *logger.Logger, mcfg *monitoringCfg.MonitoringConfig) *ServerReloader {
@@ -42,14 +41,7 @@ func NewServerReloader(newServerFn serverConstructor, log *logger.Logger, mcfg *
 }
 
 func (sr *ServerReloader) Start() {
-	sr.isServerRunningLock.Lock()
-	defer sr.isServerRunningLock.Unlock()
-
-	sr.start()
-}
-
-func (sr *ServerReloader) start() {
-	if sr.s != nil && sr.isServerRunning {
+	if sr.s != nil && sr.isServerRunning.Load() {
 		// server is already running
 		return
 	}
@@ -64,25 +56,18 @@ func (sr *ServerReloader) start() {
 
 	sr.s.Start()
 	sr.log.Debugf("Server started")
-	sr.isServerRunning = true
+	sr.isServerRunning.Store(true)
 }
 
 func (sr *ServerReloader) Stop() error {
-	sr.isServerRunningLock.Lock()
-	defer sr.isServerRunningLock.Unlock()
-
-	return sr.stop()
-}
-
-func (sr *ServerReloader) stop() error {
 	if sr.s == nil {
 		// stopping not started server
-		sr.isServerRunning = false
+		sr.isServerRunning.Store(false)
 		return nil
 	}
 	sr.log.Info("Stopping server")
 
-	sr.isServerRunning = false
+	sr.isServerRunning.Store(false)
 	if err := sr.s.Stop(); err != nil {
 		return err
 	}
@@ -93,9 +78,6 @@ func (sr *ServerReloader) stop() error {
 }
 
 func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
-	sr.isServerRunningLock.Lock()
-	defer sr.isServerRunningLock.Unlock()
-
 	newConfig := configuration.DefaultConfiguration()
 	if err := rawConfig.Unpack(&newConfig); err != nil {
 		return errors.New(err, "failed to unpack monitoring config during reload")
@@ -103,17 +85,17 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 
 	sr.config = newConfig.Settings.MonitoringConfig
 
-	shouldRunMetrics := sr.config.Enabled && sr.config.MonitorMetrics
-	if shouldRunMetrics && !sr.isServerRunning {
-		sr.start()
+	shouldRunMetrics := sr.config.Enabled
+	if shouldRunMetrics && !sr.isServerRunning.Load() {
+		sr.Start()
 
-		sr.isServerRunning = true
+		sr.isServerRunning.Store(true)
 		return nil
 	}
 
-	if !shouldRunMetrics && sr.isServerRunning {
-		sr.isServerRunning = false
-		return sr.stop()
+	if !shouldRunMetrics && sr.isServerRunning.Load() {
+		sr.isServerRunning.Store(false)
+		return sr.Stop()
 	}
 
 	return nil

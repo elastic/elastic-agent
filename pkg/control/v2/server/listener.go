@@ -13,10 +13,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/control"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func createListener(log *logger.Logger) (net.Listener, error) {
@@ -26,7 +26,7 @@ func createListener(log *logger.Logger) (net.Listener, error) {
 	}
 	dir := filepath.Dir(path)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err = os.MkdirAll(dir, 0755)
+		err = os.MkdirAll(dir, 0775)
 		if err != nil {
 			return nil, err
 		}
@@ -35,7 +35,13 @@ func createListener(log *logger.Logger) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = os.Chmod(path, 0700)
+	mode := os.FileMode(0700)
+	root, _ := utils.HasRoot() // error ignored
+	if !root {
+		// allow group access when not running as root
+		mode = os.FileMode(0770)
+	}
+	err = os.Chmod(path, mode)
 	if err != nil {
 		// failed to set permissions (close listener)
 		lis.Close()

@@ -43,8 +43,11 @@ const (
 	// maxCheckinMisses is the maximum number of check-in misses a component can miss before it is killed
 	// and restarted.
 	maxCheckinMisses = 3
-	// diagnosticTimeout is the maximum amount of time to wait for a diagnostic response from a unit.
-	diagnosticTimeout = time.Minute
+	// diagnosticTimeoutCPU is the maximum amount of time to wait for a diagnostic response from a unit while collecting CPU profiles
+	diagnosticTimeoutCPU = time.Minute
+
+	// diagnosticTimeout is the maximum amount of time to wait for a diagnostic response from a unit
+	diagnosticTimeout = time.Second * 20
 
 	// stopCheckRetryPeriod is a idle time between checks for component stopped state
 	stopCheckRetryPeriod = 200 * time.Millisecond
@@ -93,22 +96,36 @@ type Manager struct {
 	baseLogger *logger.Logger
 	ca         *authority.CertificateAuthority
 	listenAddr string
+	listenPort int
 	agentInfo  *info.AgentInfo
 	tracer     *apm.Tracer
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
 
-	// netMx synchronizes the access to listener and server only
-	netMx    sync.RWMutex
-	listener net.Listener
-	server   *grpc.Server
-
 	// Set when the RPC server is ready to receive requests, for use by tests.
 	serverReady *atomic.Bool
 
-	// updateMx protects the call to update to ensure that
-	// only one call to update occurs at a time
-	updateMx sync.Mutex
+	// updateChan forwards component model updates from the public Update method
+	// to the internal run loop.
+	updateChan chan component.Model
+
+	// Component model update is run asynchronously and pings this channel when
+	// finished, so the runtime manager loop knows it's safe to advance to the
+	// next update without ever having to block on the result.
+	updateDoneChan chan struct{}
+
+	// Next component model update that will be applied, in case we get one
+	// while a previous update is still in progress. If we get more than one,
+	// keep only the most recent.
+	// Only access from the main runtime manager goroutine.
+	nextUpdate *component.Model
+
+	// Whether we're already waiting on the results of an update call.
+	// If this is true when the run loop finishes, we need to wait for the
+	// final update result before shutting down, otherwise the shutdown's
+	// update call will conflict.
+	// Only access from the main runtime manager goroutine.
+	updateInProgress bool
 
 	// currentMx protects access to the current map only
 	currentMx sync.RWMutex
@@ -123,10 +140,9 @@ type Manager struct {
 
 	errCh chan error
 
-	// upon creation the Manager is neither running not shutting down, thus both
-	// flags are needed.
-	running      atomic.Bool
-	shuttingDown atomic.Bool
+	// doneChan is closed when Manager is shutting down to signal that any
+	// pending requests should be canceled.
+	doneChan chan struct{}
 }
 
 // NewManager creates a new manager.
@@ -144,19 +160,22 @@ func NewManager(
 		return nil, err
 	}
 	m := &Manager{
-		logger:        logger,
-		baseLogger:    baseLogger,
-		ca:            ca,
-		listenAddr:    listenAddr,
-		agentInfo:     agentInfo,
-		tracer:        tracer,
-		current:       make(map[string]*componentRuntimeState),
-		shipperConns:  make(map[string]*shipperConn),
-		subscriptions: make(map[string][]*Subscription),
-		errCh:         make(chan error),
-		monitor:       monitor,
-		grpcConfig:    grpcConfig,
-		serverReady:   atomic.NewBool(false),
+		logger:         logger,
+		baseLogger:     baseLogger,
+		ca:             ca,
+		listenAddr:     listenAddr,
+		agentInfo:      agentInfo,
+		tracer:         tracer,
+		current:        make(map[string]*componentRuntimeState),
+		shipperConns:   make(map[string]*shipperConn),
+		subscriptions:  make(map[string][]*Subscription),
+		updateChan:     make(chan component.Model),
+		updateDoneChan: make(chan struct{}),
+		errCh:          make(chan error),
+		monitor:        monitor,
+		grpcConfig:     grpcConfig,
+		serverReady:    atomic.NewBool(false),
+		doneChan:       make(chan struct{}),
 	}
 	return m, nil
 }
@@ -169,16 +188,11 @@ func NewManager(
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
-	m.running.Store(true)
-	m.shuttingDown.Store(false)
-
-	lis, err := net.Listen("tcp", m.listenAddr)
+	listener, err := net.Listen("tcp", m.listenAddr)
 	if err != nil {
 		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
 	}
-	m.netMx.Lock()
-	m.listener = lis
-	m.netMx.Unlock()
+	m.listenPort = listener.Addr().(*net.TCPAddr).Port
 
 	certPool := x509.NewCertPool()
 	if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
@@ -192,6 +206,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	})
 
 	var server *grpc.Server
+	m.logger.Infof("Starting grpc control protocol listener on port %v with max_message_size %v", m.grpcConfig.Port, m.grpcConfig.MaxMsgSize)
 	if m.tracer != nil {
 		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(m.tracer))
 		server = grpc.NewServer(
@@ -205,41 +220,103 @@ func (m *Manager) Run(ctx context.Context) error {
 			grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
 		)
 	}
-	m.netMx.Lock()
-	m.server = server
-	m.netMx.Unlock()
-	proto.RegisterElasticAgentServer(m.server, m)
+	proto.RegisterElasticAgentServer(server, m)
 
 	// start serving GRPC connections
-	var wg sync.WaitGroup
-	wg.Add(1)
+	var wgServer sync.WaitGroup
+	wgServer.Add(1)
 	go func() {
-		defer wg.Done()
-		m.serverReady.Store(true)
-		for {
-			err := server.Serve(lis)
-			if err != nil {
-				m.logger.Errorf("control protocol failed: %s", err)
-			}
-			if ctx.Err() != nil {
-				// context has an error don't start again
-				return
-			}
-		}
+		defer wgServer.Done()
+		go m.serverLoop(ctx, listener, server)
 	}()
 
-	<-ctx.Done()
-	m.running.Store(false)
-	m.shuttingDown.Store(true)
+	// Start the run loop, which continues on the main goroutine
+	// until the context is canceled.
+	m.runLoop(ctx)
+
+	// Notify components to shutdown and wait for their response
 	m.shutdown()
 
+	// Close the rpc listener and wait for serverLoop to return
+	listener.Close()
+	wgServer.Wait()
+
+	// Cancel any remaining connections
 	server.Stop()
-	wg.Wait()
-	m.netMx.Lock()
-	m.listener = nil
-	m.server = nil
-	m.netMx.Unlock()
 	return ctx.Err()
+}
+
+// The main run loop for the runtime manager, whose responsibilities are:
+//   - Accept component model updates from the Coordinator
+//   - Apply those updates safely without ever blocking, because a block here
+//     propagates to a block in the Coordinator
+//   - Close doneChan when the loop ends, so the Coordinator knows not to send
+//     any more updates
+func (m *Manager) runLoop(ctx context.Context) {
+LOOP:
+	for ctx.Err() == nil {
+		select {
+		case <-ctx.Done():
+			break LOOP
+		case model := <-m.updateChan:
+			// We got a new component model from m.Update(), mark it as the
+			// next update to apply, overwriting any previous pending value.
+			m.nextUpdate = &model
+		case <-m.updateDoneChan:
+			// An update call has finished, we can initiate another when available.
+			m.updateInProgress = false
+		}
+
+		// After each select call, check if there's a pending update that
+		// can be applied.
+		if m.nextUpdate != nil && !m.updateInProgress {
+			// There is a component model update available, apply it.
+			go func(model component.Model) {
+				// Run the update with tearDown set to true since this is coming
+				// from a user-initiated policy update
+				err := m.update(model, true)
+
+				// When update is done, send its result back to the coordinator,
+				// unless we're shutting down.
+				select {
+				case m.errCh <- err:
+				case <-ctx.Done():
+				}
+				// Signal the runtime manager that we're finished. Note that
+				// we don't select on ctx.Done() in this case because the runtime
+				// manager always reads the results of an update once initiated,
+				// even if it is shutting down.
+				m.updateDoneChan <- struct{}{}
+			}(*m.nextUpdate)
+			m.updateInProgress = true
+			m.nextUpdate = nil
+		}
+	}
+	// Signal that the run loop is ended to unblock any incoming messages.
+	// We need to do this before waiting on the final update result, otherwise
+	// it might be stuck trying to send the result to errCh.
+	close(m.doneChan)
+
+	if m.updateInProgress {
+		// Wait for the existing update to finish before shutting down,
+		// otherwise the new update call closing everything will
+		// conflict.
+		<-m.updateDoneChan
+		m.updateInProgress = false
+	}
+}
+
+func (m *Manager) serverLoop(ctx context.Context, listener net.Listener, server *grpc.Server) {
+	m.serverReady.Store(true)
+	for ctx.Err() == nil {
+		err := server.Serve(listener)
+		if err != nil && ctx.Err() == nil {
+			// Only log an error if we aren't shutting down, otherwise we'll spam
+			// the logs with "use of closed network connection" for a connection that
+			// was closed on purpose.
+			m.logger.Errorf("control protocol listener failed: %s", err)
+		}
+	}
 }
 
 // Errors returns channel that errors are reported on.
@@ -247,45 +324,19 @@ func (m *Manager) Errors() <-chan error {
 	return m.errCh
 }
 
-// Update updates the currComp state of the running components.
+// Update forwards a new component model to Manager's run loop.
+// When it has been processed, a result will be sent on Manager's
+// error channel.
 // Called from the main Coordinator goroutine.
 //
-// This returns as soon as possible, the work is performed in the background.
-func (m *Manager) Update(model component.Model) error {
-	shuttingDown := m.shuttingDown.Load()
-	if shuttingDown {
-		// ignore any updates once shutdown started
-		return nil
+// If calling from a test, you should read from errCh afterwards to avoid
+// blocking Manager's main loop.
+func (m *Manager) Update(model component.Model) {
+	select {
+	case m.updateChan <- model:
+	case <-m.doneChan:
+		// Manager is shutting down, ignore the update
 	}
-	// teardown is true because the public `Update` method would be coming directly from
-	// policy so if a component was removed it needs to be torn down.
-	return m.update(model, true)
-}
-
-// State returns the current component states.
-func (m *Manager) State() []ComponentComponentState {
-	m.currentMx.RLock()
-	defer m.currentMx.RUnlock()
-	states := make([]ComponentComponentState, 0, len(m.current))
-	for _, crs := range m.current {
-		var legacyPID string
-		if crs.runtime != nil {
-			if commandRuntime, ok := crs.runtime.(*commandRuntime); ok {
-				if commandRuntime != nil {
-					procInfo := commandRuntime.proc
-					if procInfo != nil {
-						legacyPID = fmt.Sprint(commandRuntime.proc.PID)
-					}
-				}
-			}
-		}
-		states = append(states, ComponentComponentState{
-			Component: crs.getCurrent(),
-			State:     crs.getLatest(),
-			LegacyPID: legacyPID,
-		})
-	}
-	return states
 }
 
 // PerformAction executes an action on a unit.
@@ -658,13 +709,10 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 }
 
 // update updates the current state of the running components.
+// It is only called by the main runtime manager goroutine in Manager.Run.
 //
 // This returns as soon as possible, work is performed in the background.
 func (m *Manager) update(model component.Model, teardown bool) error {
-	// ensure that only one `update` can occur at the same time
-	m.updateMx.Lock()
-	defer m.updateMx.Unlock()
-
 	// prepare the components to add consistent shipper connection information between
 	// the connected components in the model
 	err := m.connectShippers(model.Components)
@@ -705,6 +753,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 		var stoppedWg sync.WaitGroup
 		stoppedWg.Add(len(stop))
 		for _, existing := range stop {
+			m.logger.Debugf("Stopping component %q", existing.id)
 			_ = existing.stop(teardown, model.Signed)
 			// stop is async, wait for operation to finish,
 			// otherwise new instance may be started and components
@@ -755,6 +804,7 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 	for {
 		latestState := comp.getLatest()
 		if latestState.State == client.UnitStateStopped {
+			m.logger.Debugf("component %q stopped.", compID)
 			return
 		}
 
@@ -767,6 +817,7 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 
 		select {
 		case <-timeoutCh:
+			m.logger.Errorf("timeout exceeded waiting for component %q to stop", compID)
 			return
 		case <-time.After(stopCheckRetryPeriod):
 		}
@@ -888,13 +939,7 @@ func (m *Manager) getRuntimeFromComponent(comp component.Component) *componentRu
 func (m *Manager) getListenAddr() string {
 	addr := strings.SplitN(m.listenAddr, ":", 2)
 	if len(addr) == 2 && addr[1] == "0" {
-		m.netMx.RLock()
-		lis := m.listener
-		m.netMx.RUnlock()
-		if lis != nil {
-			port := lis.Addr().(*net.TCPAddr).Port
-			return fmt.Sprintf("%s:%d", addr[0], port)
-		}
+		return fmt.Sprintf("%s:%d", addr[0], m.listenPort)
 	}
 	return m.listenAddr
 }
@@ -902,7 +947,15 @@ func (m *Manager) getListenAddr() string {
 // performDiagAction creates a diagnostic ActionRequest and executes it against the runtime that's mapped to the specified component.
 // if the specified actionLevel is ActionRequest_COMPONENT, the unit field is ignored.
 func (m *Manager) performDiagAction(ctx context.Context, comp component.Component, unit component.Unit, actionLevel proto.ActionRequest_Level, params client.DiagnosticParams) ([]*proto.ActionDiagnosticUnitResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, diagnosticTimeout)
+	// if we're gathering CPU diagnostics, request a longer timeout; CPU diag collection requires the diagnostic hook to sit and gather a CPU profile.
+	finalDiagnosticTime := diagnosticTimeout
+	for _, tag := range params.AdditionalMetrics {
+		if tag == "CPU" {
+			finalDiagnosticTime = diagnosticTimeoutCPU
+			break
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, finalDiagnosticTime)
 	defer cancel()
 
 	id, err := uuid.NewV4()
@@ -924,7 +977,7 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 	}
 
 	if len(params.AdditionalMetrics) > 0 {
-		m.logger.Debugf("Performing diagnostic action with params: %v", params.AdditionalMetrics)
+		m.logger.Debugf("Performing diagnostic action with params: %v; will wait %s", params.AdditionalMetrics, finalDiagnosticTime)
 	}
 	marshalParams, err := json.Marshal(params)
 	if err != nil {
@@ -947,7 +1000,7 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 	// the only way this can return an error is a context Done(), be sure to make that explicit.
 	if err != nil {
 		if errors.Is(context.DeadlineExceeded, err) {
-			return nil, fmt.Errorf("diagnostic action timed out, deadline is %s: %w", diagnosticTimeout, err)
+			return nil, fmt.Errorf("diagnostic action timed out, deadline is %s: %w", finalDiagnosticTime, err)
 		}
 		return nil, fmt.Errorf("error running performAction: %w", err)
 	}

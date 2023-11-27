@@ -145,7 +145,8 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
@@ -237,7 +238,8 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 						} else if unit.State == client.UnitStateHealthy {
 							// remove the component which will stop it
-							err := m.Update(component.Model{Components: []component.Component{}})
+							m.Update(component.Model{Components: []component.Component{}})
+							err := <-m.errCh
 							if err != nil {
 								subErrCh <- err
 							}
@@ -260,7 +262,8 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
@@ -384,7 +387,8 @@ func TestManager_FakeInput_Features(t *testing.T) {
 							Fqdn: &proto.FQDNFeature{Enabled: true},
 						}
 
-						err := m.Update(component.Model{Components: []component.Component{comp}})
+						m.Update(component.Model{Components: []component.Component{comp}})
+						err := <-m.errCh
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
 								healthIteration, err)
@@ -439,7 +443,8 @@ func TestManager_FakeInput_Features(t *testing.T) {
 						"message": "Fake Healthy",
 					})
 
-					err := m.Update(component.Model{Components: []component.Component{comp}})
+					m.Update(component.Model{Components: []component.Component{comp}})
+					err := <-m.errCh
 					if err != nil {
 						t.Logf("error updating component state to health: %v", err)
 
@@ -459,7 +464,8 @@ func TestManager_FakeInput_Features(t *testing.T) {
 	defer drainErrChan(managerErrCh)
 	defer drainErrChan(subscriptionErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	timeout := 30 * time.Second
@@ -609,7 +615,8 @@ func TestManager_FakeInput_APM(t *testing.T) {
 						comp.Component = &proto.Component{
 							ApmConfig: initialAPMConfig,
 						}
-						err := m.Update(component.Model{Components: []component.Component{comp}})
+						m.Update(component.Model{Components: []component.Component{comp}})
+						err := <-m.errCh
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
 								healthIteration, err)
@@ -653,7 +660,8 @@ func TestManager_FakeInput_APM(t *testing.T) {
 						comp.Component = &proto.Component{
 							ApmConfig: modifiedAPMConfig,
 						}
-						err := m.Update(component.Model{Components: []component.Component{comp}})
+						m.Update(component.Model{Components: []component.Component{comp}})
+						err := <-m.errCh
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
 								healthIteration, err)
@@ -692,7 +700,8 @@ func TestManager_FakeInput_APM(t *testing.T) {
 						comp.Component = &proto.Component{
 							ApmConfig: nil,
 						}
-						err := m.Update(component.Model{Components: []component.Component{comp}})
+						m.Update(component.Model{Components: []component.Component{comp}})
+						err := <-m.errCh
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
 								healthIteration, err)
@@ -741,7 +750,8 @@ func TestManager_FakeInput_APM(t *testing.T) {
 						"message": "Fake Healthy",
 					})
 
-					err := m.Update(component.Model{Components: []component.Component{comp}})
+					m.Update(component.Model{Components: []component.Component{comp}})
+					err := <-m.errCh
 					if err != nil {
 						t.Logf("error updating component state to health: %v", err)
 
@@ -761,7 +771,8 @@ func TestManager_FakeInput_APM(t *testing.T) {
 	defer drainErrChan(managerErrCh)
 	defer drainErrChan(subscriptionErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	timeout := 30 * time.Second
@@ -902,9 +913,10 @@ func TestManager_FakeInput_Limits(t *testing.T) {
 								GoMaxProcs: 101,
 							},
 						}
-						err := m.Update(component.Model{
+						m.Update(component.Model{
 							Components: []component.Component{comp},
 						})
+						err := <-m.errCh
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
 								healthyIteration, err)
@@ -917,9 +929,10 @@ func TestManager_FakeInput_Limits(t *testing.T) {
 						assert.Equal(t, uint64(101), componentState.Component.Limits.GoMaxProcs)
 
 						comp.Component = nil
-						err := m.Update(component.Model{
+						m.Update(component.Model{
 							Components: []component.Component{comp},
 						})
+						err := <-m.errCh
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
 								healthyIteration, err)
@@ -945,7 +958,8 @@ func TestManager_FakeInput_Limits(t *testing.T) {
 	defer drainErrChan(managerErrCh)
 	defer drainErrChan(subscriptionErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	timeout := 30 * time.Second
@@ -1063,9 +1077,10 @@ func TestManager_FakeShipper_Limits(t *testing.T) {
 								GoMaxProcs: 101,
 							},
 						}
-						err := m.Update(component.Model{
+						m.Update(component.Model{
 							Components: []component.Component{comp},
 						})
+						err := <-m.errCh
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
 								healthyIteration, err)
@@ -1078,9 +1093,10 @@ func TestManager_FakeShipper_Limits(t *testing.T) {
 						assert.Equal(t, uint64(101), componentState.Component.Limits.GoMaxProcs)
 
 						comp.Component = nil
-						err := m.Update(component.Model{
+						m.Update(component.Model{
 							Components: []component.Component{comp},
 						})
+						err := <-m.errCh
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
 								healthyIteration, err)
@@ -1106,7 +1122,8 @@ func TestManager_FakeShipper_Limits(t *testing.T) {
 	defer drainErrChan(managerErrCh)
 	defer drainErrChan(subscriptionErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	timeout := 30 * time.Second
@@ -1222,7 +1239,8 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 							}
 
 							unitBad = false
-							err := m.Update(component.Model{Components: []component.Component{updatedComp}})
+							m.Update(component.Model{Components: []component.Component{updatedComp}})
+							err := <-m.errCh
 							if err != nil {
 								subErrCh <- err
 							}
@@ -1250,7 +1268,8 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 								}
 							} else if unit.State == client.UnitStateHealthy {
 								// bad unit is now healthy; stop the component
-								err := m.Update(component.Model{Components: []component.Component{}})
+								m.Update(component.Model{Components: []component.Component{}})
+								err := <-m.errCh
 								if err != nil {
 									subErrCh <- err
 								}
@@ -1274,7 +1293,8 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
@@ -1308,23 +1328,13 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 	ai, _ := info.NewAgentInfo(ctx, true)
 	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
-	errCh := make(chan error)
+	runResultChan := make(chan error, 1)
 	go func() {
-		err := m.Run(ctx)
-		if errors.Is(err, context.Canceled) {
-			err = nil
-		}
-		errCh <- err
+		runResultChan <- m.Run(ctx)
 	}()
 
-	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
-	defer waitCancel()
-	if err := waitForReady(waitCtx, m); err != nil {
-		require.NoError(t, err)
-	}
-
 	binaryPath := testBinary(t, "component")
-	comp := component.Component{
+	healthyComp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
@@ -1355,114 +1365,113 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 			},
 		},
 	}
+	// unhealthyComp is a copy of healthyComp with an error inserted in the
+	// second unit
+	unhealthyComp := healthyComp
+	unhealthyComp.Units = make([]component.Unit, len(healthyComp.Units))
+	copy(unhealthyComp.Units, healthyComp.Units)
+	unhealthyComp.Units[1] = component.Unit{
+		ID:   "good-input",
+		Type: client.UnitTypeInput,
+		Err:  errors.New("hard-error for config"),
+	}
+	goodUnitKey := ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "good-input"}
 
-	subCtx, subCancel := context.WithCancel(context.Background())
-	defer subCancel()
-	subErrCh := make(chan error)
-	go func() {
-		unitGood := true
+	// Wait for Manager to start up
+	timedWaitForReady(t, m, 1*time.Second)
 
-		sub := m.Subscribe(subCtx, "fake-default")
-		for {
-			select {
-			case <-subCtx.Done():
-				return
-			case state := <-sub.Ch():
-				t.Logf("component state changed: %+v", state)
-				if state.State == client.UnitStateFailed {
-					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
-					return
-				}
-
-				unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "good-input"}]
-				if !ok {
-					subErrCh <- errors.New("unit missing: good-input")
-					return
-				}
-				if unitGood {
-					switch unit.State {
-					case client.UnitStateFailed:
-						subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						return
-					case client.UnitStateHealthy:
-						// good unit it; now make it bad
-						t.Logf("marking good-input as having a hard-error for config")
-						updatedComp := comp
-						updatedComp.Units = make([]component.Unit, len(comp.Units))
-						copy(updatedComp.Units, comp.Units)
-						updatedComp.Units[1] = component.Unit{
-							ID:   "good-input",
-							Type: client.UnitTypeInput,
-							Err:  errors.New("hard-error for config"),
-						}
-						unitGood = false
-						err := m.Update(component.Model{Components: []component.Component{updatedComp}})
-						if err != nil {
-							subErrCh <- err
-						}
-					case client.UnitStateStarting:
-						// acceptable
-					default:
-						// unknown state that should not have occurred
-						subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
-					}
-				} else {
-					switch unit.State {
-					case client.UnitStateFailed:
-						// went to failed; stop whole component
-						err := m.Update(component.Model{Components: []component.Component{}})
-						if err != nil {
-							subErrCh <- err
-						}
-					case client.UnitStateStopped:
-						// unit was stopped
-						subErrCh <- nil
-					default:
-						subErrCh <- fmt.Errorf(
-							"good-input unit should be either failed or stopped, but it's '%s'",
-							unit.State)
-					}
-				}
-
-			}
-		}
-	}()
-
-	defer drainErrChan(errCh)
-	defer drainErrChan(subErrCh)
-
-	err = m.Update(component.Model{Components: []component.Component{comp}})
-	require.NoError(t, err)
+	sub := m.Subscribe(ctx, "fake-default")
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
+
+	m.Update(component.Model{Components: []component.Component{healthyComp}})
+	err = <-m.errCh
+	require.NoError(t, err)
+
+	// nextState tracks the stage of the test. We expect the sequence
+	// Starting -> Healthy -> Failed -> Stopped.
+	nextState := client.UnitStateHealthy
+
 LOOP:
 	for {
+		var state ComponentState
 		select {
 		case <-endTimer.C:
-			t.Fatalf("timed out after 30 seconds")
-		case err := <-errCh:
-			require.NoError(t, err)
-		case err := <-subErrCh:
-			require.NoError(t, err)
-			break LOOP
+			require.Fail(t, "timed out waiting for component state update")
+		case state = <-sub.Ch():
+			t.Logf("component state changed: %+v", state)
+		}
+
+		require.NotEqual(t, client.UnitStateFailed, state.State, "component should not fail")
+		unit, ok := state.Units[goodUnitKey]
+		require.True(t, ok, "unit good-input must be present")
+
+		if nextState == client.UnitStateHealthy {
+			// Waiting for unit to become healthy, if it's still starting skip
+			// to the next update
+			if unit.State == client.UnitStateStarting {
+				continue LOOP
+			}
+			if unit.State == client.UnitStateHealthy {
+				// good unit is healthy; now make it bad
+				t.Logf("marking good-input as having a hard-error for config")
+				m.Update(component.Model{Components: []component.Component{unhealthyComp}})
+				err := <-m.errCh
+				require.NoError(t, err, "Component model update should succeed")
+
+				// We next expect to transition to Failed
+				nextState = client.UnitStateFailed
+			} else {
+				// Unit should only be starting or healthy in this stage,
+				// anything else is an error.
+				require.FailNowf(t, "Incorrect state", "Expected STARTING or HEALTHY, got %v", unit.State)
+			}
+		} else if nextState == client.UnitStateFailed {
+			// Waiting for unit to fail, if it's still healthy skip to the next
+			// update
+			if unit.State == client.UnitStateHealthy {
+				continue LOOP
+			}
+			if unit.State == client.UnitStateFailed {
+				// Reached the expected state, now send an empty component model
+				// to stop everything.
+				m.Update(component.Model{Components: []component.Component{}})
+				err := <-m.errCh
+				require.NoError(t, err, "Component model update should succeed")
+				nextState = client.UnitStateStopped
+			} else {
+				// Unit should only be healthy or failed in this stage, anything
+				// else is an error.
+				require.FailNow(t, "Incorrect state", "Expected HEALTHY or FAILED, got %v", unit.State)
+			}
+		} else if nextState == client.UnitStateStopped {
+			// Waiting for component to stop, if it's still Failed skip to
+			// the next update
+			if unit.State == client.UnitStateFailed {
+				continue LOOP
+			}
+			if unit.State == client.UnitStateStopped {
+				// Success, we've finished the whole sequence
+				break LOOP
+			} else {
+				// Unit should only be failed or stopped in this stage, anything
+				// else is an error.
+				require.FailNowf(t, "Incorrect state", "Expected FAILED or STOPPED, got %v", unit.State)
+			}
 		}
 	}
 
-	subCancel()
 	cancel()
-
-	err = <-errCh
-	require.NoError(t, err)
+	err = <-runResultChan
+	require.Equal(t, context.Canceled, err, "Run should return with context canceled, got %v", err.Error())
 }
 
 func TestManager_FakeInput_NoDeadlock(t *testing.T) {
-	/*
-		NOTE: This is a long-running test that spams the runtime managers `Update` function to try and
-		trigger a deadlock. This test takes 2 minutes to run trying to re-produce issue:
+	// NOTE: This is a long-running test that spams the runtime managers `Update` function to try and
+	// trigger a deadlock. This test takes 2 minutes to run trying to re-produce issue:
+	// https://github.com/elastic/elastic-agent/issues/2691
 
-		https://github.com/elastic/elastic-agent/issues/2691
-	*/
 	testPaths(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1535,7 +1544,8 @@ func TestManager_FakeInput_NoDeadlock(t *testing.T) {
 			}
 			i += 1
 			comp = updatedComp
-			err := m.Update(component.Model{Components: []component.Component{updatedComp}})
+			m.Update(component.Model{Components: []component.Component{updatedComp}})
+			err := <-m.errCh
 			if err != nil {
 				updatedErr <- err
 				return
@@ -1576,7 +1586,8 @@ LOOP:
 		case <-endTimer.C:
 			// no deadlock after timeout (all good stop the component)
 			updatedCancel()
-			_ = m.Update(component.Model{Components: []component.Component{}})
+			m.Update(component.Model{Components: []component.Component{}})
+			<-m.errCh // Don't care about the result of Update, just that it runs
 			break LOOP
 		case err := <-errCh:
 			require.NoError(t, err)
@@ -1668,7 +1679,8 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 								"state":   int(client.UnitStateDegraded),
 								"message": "Fake Degraded",
 							})
-							err := m.Update(component.Model{Components: []component.Component{comp}})
+							m.Update(component.Model{Components: []component.Component{comp}})
+							err := <-m.errCh
 							if err != nil {
 								subErrCh <- err
 							}
@@ -1691,7 +1703,8 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
@@ -1809,7 +1822,8 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 						} else if unit1.State == client.UnitStateHealthy {
 							// unit1 is healthy lets remove it from the component
 							comp.Units = comp.Units[0:1]
-							err := m.Update(component.Model{Components: []component.Component{comp}})
+							m.Update(component.Model{Components: []component.Component{comp}})
+							err = <-m.errCh
 							if err != nil {
 								subErrCh <- err
 							}
@@ -1844,7 +1858,8 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
@@ -1968,7 +1983,8 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
@@ -2103,7 +2119,8 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
@@ -2220,7 +2237,8 @@ func TestManager_FakeInput_Restarts_ConfigKill(t *testing.T) {
 									"message": "Fake Healthy",
 									"kill":    rp[1],
 								})
-								err := m.Update(component.Model{Components: []component.Component{comp}})
+								m.Update(component.Model{Components: []component.Component{comp}})
+								err := <-m.errCh
 								if err != nil {
 									subErrCh <- err
 								}
@@ -2245,7 +2263,8 @@ func TestManager_FakeInput_Restarts_ConfigKill(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(1 * time.Minute)
@@ -2359,7 +2378,8 @@ func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
 									"message":          fmt.Sprintf("Fake Healthy %d", lastStoppedCount),
 									"kill_on_interval": true,
 								})
-								err := m.Update(component.Model{Components: []component.Component{comp}})
+								m.Update(component.Model{Components: []component.Component{comp}})
+								err := <-m.errCh
 								if err != nil {
 									subErrCh <- err
 								}
@@ -2387,7 +2407,8 @@ func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(1 * time.Minute)
@@ -2505,7 +2526,8 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
@@ -2622,7 +2644,8 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
@@ -2819,7 +2842,8 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 	defer drainErrChan(subErrCh1)
 	defer drainErrChan(subErrCh2)
 
-	err = m.Update(component.Model{Components: components})
+	m.Update(component.Model{Components: components})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	count := 0
@@ -2975,7 +2999,8 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: []component.Component{comp}})
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
@@ -3189,7 +3214,8 @@ func TestManager_FakeShipper(t *testing.T) {
 									subErrCh <- err
 								} else {
 									// successful; turn it all off
-									err := m.Update(component.Model{Components: []component.Component{}})
+									m.Update(component.Model{Components: []component.Component{}})
+									err = <-m.errCh
 									if err != nil {
 										subErrCh <- err
 									}
@@ -3218,7 +3244,8 @@ func TestManager_FakeShipper(t *testing.T) {
 									subErrCh <- err
 								} else {
 									// successful; turn it all off
-									err := m.Update(component.Model{Components: []component.Component{}})
+									m.Update(component.Model{Components: []component.Component{}})
+									err := <-m.errCh
 									if err != nil {
 										subErrCh <- err
 									}
@@ -3253,7 +3280,8 @@ func TestManager_FakeShipper(t *testing.T) {
 									subErrCh <- err
 								} else {
 									// successful; turn it all off
-									err := m.Update(component.Model{Components: []component.Component{}})
+									m.Update(component.Model{Components: []component.Component{}})
+									err := <-m.errCh
 									if err != nil {
 										subErrCh <- err
 									}
@@ -3278,7 +3306,8 @@ func TestManager_FakeShipper(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	err = m.Update(component.Model{Components: comps})
+	m.Update(component.Model{Components: comps})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	timeout := 2 * time.Minute
@@ -3470,11 +3499,8 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 		stateProgressionWG.Done()
 	}()
 
-	// Wait manager start running, then check if any error happened
-	assert.Eventually(t,
-		func() bool { return m.running.Load() },
-		500*time.Millisecond,
-		10*time.Millisecond)
+	err = waitForReady(waitCtx, m)
+	require.NoError(t, err, "Manager must finish initializing")
 
 	select {
 	case err := <-errCh:
@@ -3483,7 +3509,8 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	err = m.Update(component.Model{Components: components})
+	m.Update(component.Model{Components: components})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	updateSleep := 300 * time.Millisecond
@@ -3492,7 +3519,8 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 		updateSleep = time.Second
 	}
 	time.Sleep(updateSleep)
-	err = m.Update(component.Model{Components: components2})
+	m.Update(component.Model{Components: components2})
+	err = <-m.errCh
 	require.NoError(t, err)
 
 	count := 0
@@ -3670,4 +3698,13 @@ func waitForReady(ctx context.Context, m *Manager) error {
 		}
 	}
 	return nil
+}
+
+func timedWaitForReady(t *testing.T, m *Manager, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	err := waitForReady(ctx, m)
+	if err != nil {
+		require.FailNow(t, "timed out waiting for Manager to start")
+	}
 }

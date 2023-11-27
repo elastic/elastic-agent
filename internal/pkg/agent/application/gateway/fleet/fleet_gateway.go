@@ -217,7 +217,7 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 
 		if f.checkinFailCounter > 0 {
 			// Log at same level as error logs above so subsequent successes are visible when log level is set to 'error'.
-			f.log.Errorf("Checkin request to fleet-server succeeded after %d failures", f.checkinFailCounter)
+			f.log.Warnf("Checkin request to fleet-server succeeded after %d failures", f.checkinFailCounter)
 		}
 
 		f.checkinFailCounter = 0
@@ -332,11 +332,12 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
-		AckToken:   ackToken,
-		Metadata:   ecsMeta,
-		Status:     agentStateToString(state.State),
-		Message:    state.Message,
-		Components: components,
+		AckToken:       ackToken,
+		Metadata:       ecsMeta,
+		Status:         agentStateToString(state.State),
+		Message:        state.Message,
+		Components:     components,
+		UpgradeDetails: state.UpgradeDetails,
 	}
 
 	resp, took, err := cmd.Execute(ctx, req)

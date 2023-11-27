@@ -7,19 +7,29 @@ package ess
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
-	"html/template"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"text/template"
 	"time"
+
+	"gopkg.in/yaml.v2"
 )
+
+type Tag struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
 
 type CreateDeploymentRequest struct {
 	Name    string `json:"name"`
 	Region  string `json:"region"`
 	Version string `json:"version"`
+	Tags    []Tag  `json:"tags"`
 }
 
 type CreateDeploymentResponse struct {
@@ -85,21 +95,16 @@ type DeploymentStatusResponse struct {
 
 // CreateDeployment creates the deployment with the specified configuration.
 func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentRequest) (*CreateDeploymentResponse, error) {
-	tpl, err := deploymentTemplateFactory(req)
+	reqBodyBytes, err := generateCreateDeploymentRequestBody(req)
 	if err != nil {
 		return nil, err
-	}
-
-	var buf bytes.Buffer
-	if err := tpl.Execute(&buf, req); err != nil {
-		return nil, fmt.Errorf("unable to create deployment creation request body: %w", err)
 	}
 
 	createResp, err := c.doPost(
 		ctx,
 		"deployments",
 		"application/json",
-		&buf,
+		bytes.NewReader(reqBodyBytes),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error calling deployment creation API: %w", err)
@@ -191,7 +196,8 @@ func (c *Client) ShutdownDeployment(ctx context.Context, deploymentID string) er
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return fmt.Errorf("got unexpected response code [%d] from deployment shutdown API", res.StatusCode)
+		resBytes, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("got unexpected response code [%d] from deployment shutdown API: %s", res.StatusCode, string(resBytes))
 	}
 
 	return nil
@@ -308,233 +314,77 @@ func overallStatus(statuses ...DeploymentStatus) DeploymentStatus {
 	return overallStatus
 }
 
-func deploymentTemplateFactory(req CreateDeploymentRequest) (*template.Template, error) {
-	regionParts := strings.Split(req.Region, "-")
-	if len(regionParts) < 2 {
-		return nil, fmt.Errorf("unable to parse CSP out of region [%s]", req.Region)
+//go:embed create_deployment_request.tmpl.json
+var createDeploymentRequestTemplate string
+
+//go:embed create_deployment_csp_configuration.yaml
+var cloudProviderSpecificValues []byte
+
+func generateCreateDeploymentRequestBody(req CreateDeploymentRequest) ([]byte, error) {
+	var csp string
+	// Special case: AWS us-east-1 region is just called
+	// us-east-1 (instead of aws-us-east-1)!
+	if req.Region == "us-east-1" {
+		csp = "aws"
+	} else {
+		regionParts := strings.Split(req.Region, "-")
+		if len(regionParts) < 2 {
+			return nil, fmt.Errorf("unable to parse CSP out of region [%s]", req.Region)
+		}
+
+		csp = regionParts[0]
+	}
+	templateContext, err := createDeploymentTemplateContext(csp, req)
+	if err != nil {
+		return nil, fmt.Errorf("creating request template context: %w", err)
 	}
 
-	csp := regionParts[0]
-	var tplStr string
-	switch csp {
-	case "gcp":
-		tplStr = createDeploymentRequestTemplateGCP
-	case "azure":
-		tplStr = createDeploymentRequestTemplateAzure
-	default:
-		return nil, fmt.Errorf("unsupported CSP [%s]", csp)
-	}
-
-	tpl, err := template.New("create_deployment_request").Parse(tplStr)
+	tpl, err := template.New("create_deployment_request").
+		Funcs(template.FuncMap{"json": jsonMarshal}).
+		Parse(createDeploymentRequestTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse deployment creation template: %w", err)
 	}
 
-	return tpl, nil
+	var bBuf bytes.Buffer
+	err = tpl.Execute(&bBuf, templateContext)
+	if err != nil {
+		return nil, fmt.Errorf("rendering create deployment request template with context %v : %w", templateContext, err)
+	}
+	return bBuf.Bytes(), nil
 }
 
-const createDeploymentRequestTemplateGCP = `
-{
-  "resources": {
-    "integrations_server": [
-      {
-        "elasticsearch_cluster_ref_id": "main-elasticsearch",
-        "region": "{{ .Region }}",
-        "plan": {
-          "cluster_topology": [
-            {
-              "instance_configuration_id": "gcp.integrationsserver.n2.68x32x45.2",
-              "zone_count": 1,
-              "size": {
-                "resource": "memory",
-                "value": 1024
-              }
-            }
-          ],
-          "integrations_server": {
-            "version": "{{ .Version }}"
-          }
-        },
-        "ref_id": "main-integrations_server"
-      }
-    ],
-    "elasticsearch": [
-      {
-        "region": "{{ .Region }}",
-        "settings": {
-          "dedicated_masters_threshold": 6
-        },
-        "plan": {
-          "cluster_topology": [
-            {
-              "zone_count": 1,
-              "elasticsearch": {
-                "node_attributes": {
-                  "data": "hot"
-                }
-              },
-              "instance_configuration_id": "gcp.es.datahot.n2.68x10x45",
-              "node_roles": [
-                "master",
-                "ingest",
-                "transform",
-                "data_hot",
-                "remote_cluster_client",
-                "data_content"
-              ],
-              "id": "hot_content",
-              "size": {
-                "resource": "memory",
-                "value": 8192
-              }
-            }
-          ],
-          "elasticsearch": {
-            "version": "{{ .Version }}",
-            "enabled_built_in_plugins": []
-          },
-          "deployment_template": {
-            "id": "gcp-storage-optimized-v5"
-          }
-        },
-        "ref_id": "main-elasticsearch"
-      }
-    ],
-    "enterprise_search": [],
-    "kibana": [
-      {
-        "elasticsearch_cluster_ref_id": "main-elasticsearch",
-        "region": "{{ .Region }}",
-        "plan": {
-          "cluster_topology": [
-            {
-              "instance_configuration_id": "gcp.kibana.n2.68x32x45",
-              "zone_count": 1,
-              "size": {
-                "resource": "memory",
-                "value": 1024
-              }
-            }
-          ],
-          "kibana": {
-            "version": "{{ .Version }}",
-			"user_settings_json": {
-				"xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"]
-			}
-          }
-        },
-        "ref_id": "main-kibana"
-      }
-    ]
-  },
-  "settings": {
-    "autoscaling_enabled": false
-  },
-  "name": "{{ .Name }}",
-  "metadata": {
-    "system_owned": false
-  }
-}`
+func jsonMarshal(in any) (string, error) {
+	jsonBytes, err := json.Marshal(in)
+	if err != nil {
+		return "", err
+	}
 
-const createDeploymentRequestTemplateAzure = `
-{
-  "resources": {
-    "integrations_server": [
-      {
-        "elasticsearch_cluster_ref_id": "main-elasticsearch",
-        "region": "{{ .Region }}",
-        "plan": {
-          "cluster_topology": [
-            {
-              "instance_configuration_id": "azure.integrationsserver.fsv2.2",
-              "zone_count": 1,
-              "size": {
-                "resource": "memory",
-                "value": 1024
-              }
-            }
-          ],
-          "integrations_server": {
-            "version": "{{ .Version }}"
-          }
-        },
-        "ref_id": "main-integrations_server"
-      }
-    ],
-    "elasticsearch": [
-      {
-        "region": "{{ .Region }}",
-        "settings": {
-          "dedicated_masters_threshold": 6
-        },
-        "plan": {
-          "cluster_topology": [
-            {
-              "zone_count": 1,
-              "elasticsearch": {
-                "node_attributes": {
-                  "data": "hot"
-                }
-              },
-              "instance_configuration_id": "azure.es.datahot.edsv4",
-              "node_roles": [
-                "master",
-                "ingest",
-                "transform",
-                "data_hot",
-                "remote_cluster_client",
-                "data_content"
-              ],
-              "id": "hot_content",
-              "size": {
-                "resource": "memory",
-                "value": 8192
-              }
-            }
-          ],
-          "elasticsearch": {
-            "version": "{{ .Version }}",
-            "enabled_built_in_plugins": []
-          },
-          "deployment_template": {
-            "id": "azure-storage-optimized-v2"
-          }
-        },
-        "ref_id": "main-elasticsearch"
-      }
-    ],
-    "enterprise_search": [],
-    "kibana": [
-      {
-        "elasticsearch_cluster_ref_id": "main-elasticsearch",
-        "region": "{{ .Region }}",
-        "plan": {
-          "cluster_topology": [
-            {
-              "instance_configuration_id": "azure.kibana.fsv2",
-              "zone_count": 1,
-              "size": {
-                "resource": "memory",
-                "value": 1024
-              }
-            }
-          ],
-          "kibana": {
-            "version": "{{ .Version }}",
-			"user_settings_json": {
-				"xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"]
-			}
-          }
-        },
-        "ref_id": "main-kibana"
-      }
-    ]
-  },
-  "settings": {
-    "autoscaling_enabled": false
-  },
-  "name": "{{ .Name }}",
-  "metadata": {
-    "system_owned": false
-  }
-}`
+	return string(jsonBytes), nil
+}
+
+func createDeploymentTemplateContext(csp string, req CreateDeploymentRequest) (map[string]any, error) {
+	cspSpecificContext, err := loadCspValues(csp)
+	if err != nil {
+		return nil, fmt.Errorf("loading csp-specific values for %q: %w", csp, err)
+	}
+
+	cspSpecificContext["request"] = req
+
+	return cspSpecificContext, nil
+}
+
+func loadCspValues(csp string) (map[string]any, error) {
+	var cspValues map[string]map[string]any
+
+	err := yaml.Unmarshal(cloudProviderSpecificValues, &cspValues)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling error: %w", err)
+	}
+	values, supportedCSP := cspValues[csp]
+	if !supportedCSP {
+		return nil, fmt.Errorf("csp %s not supported", csp)
+	}
+
+	return values, nil
+}

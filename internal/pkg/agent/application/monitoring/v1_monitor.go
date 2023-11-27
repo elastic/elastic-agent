@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -51,6 +52,10 @@ const (
 	agentName                  = "elastic-agent"
 
 	windowsOS = "windows"
+
+	// metricset execution period used for the monitoring metrics inputs
+	// we set this to 60s to reduce the load/data volume on the monitoring cluster
+	metricsCollectionInterval = 60 * time.Second
 )
 
 var (
@@ -517,6 +522,8 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 }
 
 func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component) error {
+
+	metricsCollectionIntervalString := metricsCollectionInterval.String()
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 	beatsStreams := make([]interface{}, 0, len(componentIDToBinary))
@@ -532,7 +539,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			"path":       "/stats",
 			"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.operatingSystem, b.config.C)},
 			"namespace":  "agent",
-			"period":     "10s",
+			"period":     metricsCollectionIntervalString,
 			"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
 			"processors": []interface{}{
 				map[string]interface{}{
@@ -587,6 +594,15 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 						"ignore_missing": true,
 					},
 				},
+				map[string]interface{}{
+					"add_fields": map[string]interface{}{
+						"target": "component",
+						"fields": map[string]interface{}{
+							"id":     "elastic-agent",
+							"binary": "elastic-agent",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -608,7 +624,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				},
 				"metricsets": []interface{}{"stats", "state"},
 				"hosts":      endpoints,
-				"period":     "10s",
+				"period":     metricsCollectionIntervalString,
 				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
 				"processors": []interface{}{
 					map[string]interface{}{
@@ -648,6 +664,15 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 							},
 						},
 					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "component",
+							"fields": map[string]interface{}{
+								"id":     unit,
+								"binary": binaryName,
+							},
+						},
+					},
 				},
 			})
 		}
@@ -663,7 +688,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			"hosts":      endpoints,
 			"path":       "/stats",
 			"namespace":  "agent",
-			"period":     "10s",
+			"period":     metricsCollectionIntervalString,
 			"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
 			"processors": []interface{}{
 				map[string]interface{}{
@@ -708,6 +733,15 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 						"ignore_missing": true,
 					},
 				},
+				map[string]interface{}{
+					"add_fields": map[string]interface{}{
+						"target": "component",
+						"fields": map[string]interface{}{
+							"id":     unit,
+							"binary": binaryName,
+						},
+					},
+				},
 			},
 		})
 
@@ -725,7 +759,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				"path":          "/inputs/",
 				"namespace":     fbDataStreamName,
 				"json.is_array": true,
-				"period":        "10s",
+				"period":        metricsCollectionIntervalString,
 				"index":         fmt.Sprintf("metrics-elastic_agent.%s-%s", fbDataStreamName, monitoringNamespace),
 				"processors": []interface{}{
 					map[string]interface{}{
@@ -770,6 +804,15 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 							"ignore_missing": true,
 						},
 					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "component",
+							"fields": map[string]interface{}{
+								"id":     unit,
+								"binary": binaryName,
+							},
+						},
+					},
 				},
 			})
 		}
@@ -799,8 +842,8 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				"path":       "/shipper",
 				"hosts":      endpoints,
 				"namespace":  "application",
-				"period":     "10s",
-				"processors": createProcessorsForJSONInput(name, monitoringNamespace, b.agentInfo),
+				"period":     metricsCollectionIntervalString,
+				"processors": createProcessorsForJSONInput(name, comp.ID, monitoringNamespace, b.agentInfo),
 			},
 				map[string]interface{}{
 					idKey: "metrics-monitoring-shipper-stats",
@@ -813,8 +856,8 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 					"path":       "/stats",
 					"hosts":      endpoints,
 					"namespace":  "agent",
-					"period":     "10s",
-					"processors": createProcessorsForJSONInput(name, monitoringNamespace, b.agentInfo),
+					"period":     metricsCollectionIntervalString,
+					"processors": createProcessorsForJSONInput(name, comp.ID, monitoringNamespace, b.agentInfo),
 				})
 		}
 	}
@@ -871,7 +914,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 	return nil
 }
 
-func createProcessorsForJSONInput(name string, monitoringNamespace string, agentInfo *info.AgentInfo) []interface{} {
+func createProcessorsForJSONInput(name string, compID, monitoringNamespace string, agentInfo *info.AgentInfo) []interface{} {
 	return []interface{}{
 		map[string]interface{}{
 			"add_fields": map[string]interface{}{
@@ -923,6 +966,15 @@ func createProcessorsForJSONInput(name string, monitoringNamespace string, agent
 					"http",
 				},
 				"ignore_missing": true,
+			},
+		},
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "component",
+				"fields": map[string]interface{}{
+					"id":     compID,
+					"binary": name,
+				},
 			},
 		},
 	}

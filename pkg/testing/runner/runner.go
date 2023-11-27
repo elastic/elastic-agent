@@ -7,6 +7,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v2"
 
@@ -128,10 +130,11 @@ type Runner struct {
 	ip     InstanceProvisioner
 	sp     StackProvisioner
 
-	batches      []OSBatch
-	batchToStack map[string]Stack
-	stacksReady  sync.WaitGroup
-	stacksErr    error
+	batches []OSBatch
+
+	batchToStack   map[string]stackRes
+	batchToStackCh map[string]chan stackRes
+	batchToStackMx sync.Mutex
 
 	stateMx sync.Mutex
 	state   State
@@ -174,12 +177,13 @@ func NewRunner(cfg Config, ip InstanceProvisioner, sp StackProvisioner, batches 
 	osBatches = filterSupportedOS(osBatches, ip)
 
 	r := &Runner{
-		cfg:          cfg,
-		logger:       logger,
-		ip:           ip,
-		sp:           sp,
-		batches:      osBatches,
-		batchToStack: make(map[string]Stack),
+		cfg:            cfg,
+		logger:         logger,
+		ip:             ip,
+		sp:             sp,
+		batches:        osBatches,
+		batchToStack:   make(map[string]stackRes),
+		batchToStackCh: make(map[string]chan stackRes),
 	}
 
 	err = r.loadState()
@@ -276,11 +280,15 @@ func (r *Runner) Clean() error {
 		defer cancel()
 		return r.ip.Clean(ctx, r.cfg, instances)
 	})
-	g.Go(func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		defer cancel()
-		return r.sp.Clean(ctx, stacks)
-	})
+	for _, stack := range stacks {
+		g.Go(func(stack Stack) func() error {
+			return func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+				defer cancel()
+				return r.sp.Delete(ctx, stack)
+			}
+		}(stack))
+	}
 	return g.Wait()
 }
 
@@ -358,7 +366,6 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		logger.Logf("Failed to copy files instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to copy files to instance %s: %w", instance.Name, err)
 	}
-
 	// start with the ExtraEnv first preventing the other environment flags below
 	// from being overwritten
 	env := map[string]string{}
@@ -369,13 +376,10 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	// ensure that we have all the requirements for the stack if required
 	if batch.Batch.Stack != nil {
 		// wait for the stack to be ready before continuing
-		r.stacksReady.Wait()
-		if r.stacksErr != nil {
-			return OSRunnerResult{}, fmt.Errorf("%s unable to continue because stack never became ready: %w", instance.Name, r.stacksErr)
-		}
-		stack, ok := r.getStackForBatchID(batch.ID)
-		if !ok {
-			return OSRunnerResult{}, fmt.Errorf("failed to find stack for batch %s", batch.ID)
+		logger.Logf("Waiting for stack to be ready...")
+		stack, err := r.getStackForBatchID(batch.ID)
+		if err != nil {
+			return OSRunnerResult{}, err
 		}
 		env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
 		env["ELASTICSEARCH_USERNAME"] = stack.Username
@@ -383,11 +387,12 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		env["KIBANA_HOST"] = stack.Kibana
 		env["KIBANA_USERNAME"] = stack.Username
 		env["KIBANA_PASSWORD"] = stack.Password
-		logger.Logf("Using Stack with Kibana host %s, %s/%s", stack.Kibana, stack.Username, stack.Password)
+		logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
 	}
 
 	// set the go test flags
 	env["GOTEST_FLAGS"] = r.cfg.TestFlags
+	env["TEST_BINARY_NAME"] = r.cfg.BinaryName
 
 	// run the actual tests on the host
 	result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, client, logger, r.cfg.AgentVersion, batch.ID, batch.Batch, env)
@@ -449,9 +454,13 @@ func (r *Runner) getBuild(b OSBatch) Build {
 		ext = "zip"
 	}
 	hashExt := ".sha512"
-	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.OS.Type, arch, ext))
+	name := "elastic-agent"
+	if r.cfg.BinaryName != "" {
+		name = r.cfg.BinaryName
+	}
+	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("%s-%s-%s-%s.%s", name, r.cfg.AgentVersion, b.OS.Type, arch, ext))
 	return Build{
-		Version:    r.cfg.AgentVersion,
+		Version:    r.cfg.ReleaseVersion,
 		Type:       b.OS.Type,
 		Arch:       arch,
 		Path:       packageName,
@@ -571,16 +580,13 @@ func (r *Runner) createRepoArchive(ctx context.Context, repoDir string, dir stri
 
 // startStacks starts the stacks required for the tests to run
 func (r *Runner) startStacks(ctx context.Context) error {
-	// stacks never start ready
-	r.stacksReady.Add(1)
-
 	var versions []string
 	batchToVersion := make(map[string]string)
 	for _, lb := range r.batches {
 		if !lb.Skip && lb.Batch.Stack != nil {
 			if lb.Batch.Stack.Version == "" {
 				// no version defined on the stack; set it to the defined stack version
-				lb.Batch.Stack.Version = r.cfg.AgentStackVersion
+				lb.Batch.Stack.Version = r.cfg.StackVersion
 			}
 			if !slices.Contains(versions, lb.Batch.Stack.Version) {
 				versions = append(versions, lb.Batch.Stack.Version)
@@ -589,66 +595,110 @@ func (r *Runner) startStacks(ctx context.Context) error {
 		}
 	}
 
-	var requests []StackRequest
+	var requests []stackReq
 	for _, version := range versions {
 		id := strings.Replace(version, ".", "", -1)
-		stack, ok := r.findStack(id)
-		if ok {
-			r.logger.Logf("Reusing stack %s (%s)", version, id)
-			for batchID, batchVersion := range batchToVersion {
-				if batchVersion == version {
-					r.batchToStack[batchID] = stack
+		requests = append(requests, stackReq{
+			request: StackRequest{ID: id, Version: version},
+			stack:   r.findStack(id),
+		})
+	}
+
+	reportResult := func(version string, stack Stack, err error) {
+		r.batchToStackMx.Lock()
+		defer r.batchToStackMx.Unlock()
+		res := stackRes{
+			stack: stack,
+			err:   err,
+		}
+		for batchID, batchVersion := range batchToVersion {
+			if batchVersion == version {
+				r.batchToStack[batchID] = res
+				ch, ok := r.batchToStackCh[batchID]
+				if ok {
+					ch <- res
 				}
 			}
-		} else {
-			requests = append(requests, StackRequest{
-				ID:      id,
-				Version: version,
-			})
 		}
 	}
-	if len(requests) == 0 {
-		// no need to request any other stacks
-		r.stacksReady.Done()
-		return nil
-	}
 
-	// start go routine to provision the needed stacks
-	go func(ctx context.Context) {
-		defer r.stacksReady.Done()
+	// start goroutines to provision the needed stacks
+	for _, request := range requests {
+		go func(ctx context.Context, req stackReq) {
+			var err error
+			var stack Stack
+			if req.stack != nil {
+				stack = *req.stack
+			} else {
+				stack, err = r.sp.Create(ctx, req.request)
+				if err != nil {
+					reportResult(req.request.Version, stack, err)
+					return
+				}
+				err = r.addOrUpdateStack(stack)
+				if err != nil {
+					reportResult(stack.Version, stack, err)
+					return
+				}
+			}
 
-		stacks, err := r.sp.Provision(ctx, requests)
-		if err != nil {
-			r.stacksErr = err
-			return
-		}
-		for _, stack := range stacks {
-			err := r.addOrUpdateStack(stack)
-			if err != nil {
-				r.stacksErr = err
+			if stack.Ready {
+				reportResult(stack.Version, stack, nil)
 				return
 			}
-			for batchID, batchVersion := range batchToVersion {
-				if batchVersion == stack.Version {
-					r.batchToStack[batchID] = stack
-				}
+
+			stack, err = r.sp.WaitForReady(ctx, stack)
+			if err != nil {
+				reportResult(stack.Version, stack, err)
+				return
 			}
-		}
-	}(ctx)
+
+			err = r.addOrUpdateStack(stack)
+			if err != nil {
+				reportResult(stack.Version, stack, err)
+				return
+			}
+
+			reportResult(stack.Version, stack, nil)
+		}(ctx, request)
+	}
 
 	return nil
 }
 
-func (r *Runner) getStackForBatchID(id string) (Stack, bool) {
-	stack, ok := r.batchToStack[id]
-	return stack, ok
+func (r *Runner) getStackForBatchID(id string) (Stack, error) {
+	r.batchToStackMx.Lock()
+	res, ok := r.batchToStack[id]
+	if ok {
+		r.batchToStackMx.Unlock()
+		return res.stack, res.err
+	}
+	_, ok = r.batchToStackCh[id]
+	if ok {
+		return Stack{}, fmt.Errorf("getStackForBatchID called twice; this is not allowed")
+	}
+	ch := make(chan stackRes, 1)
+	r.batchToStackCh[id] = ch
+	r.batchToStackMx.Unlock()
+
+	// 12 minutes is because the stack should have been ready after 10 minutes or returned an error
+	// this only exists to ensure that if that code is not blocking that this doesn't block forever
+	t := time.NewTimer(12 * time.Minute)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return Stack{}, fmt.Errorf("failed waiting for a response after 12 minutes")
+	case res = <-ch:
+		return res.stack, res.err
+	}
 }
 
 func (r *Runner) findInstance(id string) (StateInstance, bool) {
 	r.stateMx.Lock()
 	defer r.stateMx.Unlock()
 	for _, existing := range r.state.Instances {
-		if existing.ID == id {
+		if existing.Same(StateInstance{
+			Instance: Instance{ID: id, Provisioner: r.ip.Name()}}) {
 			return existing, true
 		}
 	}
@@ -660,30 +710,30 @@ func (r *Runner) addOrUpdateInstance(instance StateInstance) error {
 	defer r.stateMx.Unlock()
 
 	state := r.state
-	existed := false
+	found := false
 	for idx, existing := range state.Instances {
-		if existing.ID == instance.ID {
+		if existing.Same(instance) {
 			state.Instances[idx] = instance
-			existed = true
+			found = true
 			break
 		}
 	}
-	if !existed {
+	if !found {
 		state.Instances = append(state.Instances, instance)
 	}
 	r.state = state
 	return r.writeState()
 }
 
-func (r *Runner) findStack(id string) (Stack, bool) {
+func (r *Runner) findStack(id string) *Stack {
 	r.stateMx.Lock()
 	defer r.stateMx.Unlock()
 	for _, existing := range r.state.Stacks {
-		if existing.ID == id {
-			return existing, true
+		if existing.Same(Stack{ID: id, Provisioner: r.sp.Name()}) {
+			return &existing
 		}
 	}
-	return Stack{}, false
+	return nil
 }
 
 func (r *Runner) addOrUpdateStack(stack Stack) error {
@@ -691,15 +741,15 @@ func (r *Runner) addOrUpdateStack(stack Stack) error {
 	defer r.stateMx.Unlock()
 
 	state := r.state
-	existed := false
+	found := false
 	for idx, existing := range state.Stacks {
-		if existing.ID == stack.ID {
+		if existing.Same(stack) {
 			state.Stacks[idx] = stack
-			existed = true
+			found = true
 			break
 		}
 	}
-	if !existed {
+	if !found {
 		state.Stacks = append(state.Stacks, stack)
 	}
 	r.state = state
@@ -769,6 +819,20 @@ func (r *Runner) mergeResults(results map[string]OSRunnerResult) (Result, error)
 	complete.JSONOutput = jsonOutput.Bytes()
 	complete.XMLOutput = junitBytes.Bytes()
 	return complete, nil
+}
+
+// Same returns true if other is the same instance as this one.
+// Two instances are considered the same if their provider and ID are the same.
+func (s StateInstance) Same(other StateInstance) bool {
+	return s.Provisioner == other.Provisioner &&
+		s.ID == other.ID
+}
+
+// Same returns true if other is the same stack as this one.
+// Two stacks are considered the same if their provisioner and ID are the same.
+func (s Stack) Same(other Stack) bool {
+	return s.Provisioner == other.Provisioner &&
+		s.ID == other.ID
 }
 
 func mergePackageResult(pkg OSRunnerPackageResult, batchName string, sudo bool, rawOutput io.Writer, jsonOutput io.Writer, suites *JUnitTestSuites) error {
@@ -962,6 +1026,16 @@ func createBatchID(batch OSBatch) string {
 	}
 	id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
 	id += "-" + strings.Replace(batch.Batch.Group, ".", "", -1)
+
+	// The batchID needs to be at most 63 characters long otherwise
+	// OGC will fail to instantiate the VM.
+	maxIDLen := 63
+	if len(id) > maxIDLen {
+		hash := fmt.Sprintf("%x", md5.Sum([]byte(id)))
+		hashLen := utf8.RuneCountInString(hash)
+		id = id[:maxIDLen-hashLen-1] + "-" + hash
+	}
+
 	return strings.ToLower(id)
 }
 
@@ -985,4 +1059,14 @@ type batchLogger struct {
 
 func (b *batchLogger) Logf(format string, args ...any) {
 	b.wrapped.Logf("(%s) %s", b.prefix, fmt.Sprintf(format, args...))
+}
+
+type stackRes struct {
+	stack Stack
+	err   error
+}
+
+type stackReq struct {
+	request StackRequest
+	stack   *Stack
 }

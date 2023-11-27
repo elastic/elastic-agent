@@ -7,6 +7,8 @@ package server
 import (
 	"testing"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -22,11 +25,12 @@ import (
 func TestStateMapping(t *testing.T) {
 
 	testcases := []struct {
-		name         string
-		agentState   cproto.State
-		agentMessage string
-		fleetState   cproto.State
-		fleetMessage string
+		name           string
+		agentState     cproto.State
+		agentMessage   string
+		fleetState     cproto.State
+		fleetMessage   string
+		upgradeDetails *details.Details
 	}{
 		{
 			name:         "waiting first checkin response",
@@ -48,6 +52,21 @@ func TestStateMapping(t *testing.T) {
 			agentMessage: "Healthy",
 			fleetState:   cproto.State_FAILED,
 			fleetMessage: "<error value coming from fleet gateway>",
+		},
+		{
+			name:         "with upgrade details",
+			agentState:   cproto.State_UPGRADING,
+			agentMessage: "Upgrading to version 8.13.0",
+			fleetState:   cproto.State_STOPPED,
+			fleetMessage: "Not enrolled into Fleet",
+			upgradeDetails: &details.Details{
+				TargetVersion: "8.13.0",
+				State:         details.StateDownloading,
+				ActionID:      "",
+				Metadata: details.Metadata{
+					DownloadPercent: 1.7,
+				},
+			},
 		},
 	}
 
@@ -101,6 +120,15 @@ func TestStateMapping(t *testing.T) {
 				},
 			}
 
+			if tc.upgradeDetails != nil {
+				inputState.UpgradeDetails = &details.Details{
+					TargetVersion: tc.upgradeDetails.TargetVersion,
+					State:         tc.upgradeDetails.State,
+					ActionID:      tc.upgradeDetails.ActionID,
+					Metadata:      tc.upgradeDetails.Metadata,
+				}
+			}
+
 			agentInfo := new(info.AgentInfo)
 
 			stateResponse, err := stateToProto(inputState, agentInfo)
@@ -134,7 +162,23 @@ func TestStateMapping(t *testing.T) {
 				assert.Equal(t, expectedCompState, stateResponse.Components[0])
 			}
 
+			if tc.upgradeDetails != nil {
+				expectedMetadata := &cproto.UpgradeDetailsMetadata{
+					DownloadPercent: float32(tc.upgradeDetails.Metadata.DownloadPercent),
+					FailedState:     string(tc.upgradeDetails.Metadata.FailedState),
+					ErrorMsg:        tc.upgradeDetails.Metadata.ErrorMsg,
+				}
+
+				if tc.upgradeDetails.Metadata.ScheduledAt != nil &&
+					!tc.upgradeDetails.Metadata.ScheduledAt.IsZero() {
+					expectedMetadata.ScheduledAt = timestamppb.New(*tc.upgradeDetails.Metadata.ScheduledAt)
+				}
+
+				assert.Equal(t, string(tc.upgradeDetails.State), stateResponse.UpgradeDetails.State)
+				assert.Equal(t, tc.upgradeDetails.TargetVersion, stateResponse.UpgradeDetails.TargetVersion)
+				assert.Equal(t, tc.upgradeDetails.ActionID, stateResponse.UpgradeDetails.ActionId)
+				assert.Equal(t, expectedMetadata, stateResponse.UpgradeDetails.Metadata)
+			}
 		})
 	}
-
 }

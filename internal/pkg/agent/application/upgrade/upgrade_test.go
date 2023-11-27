@@ -14,15 +14,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gofrs/flock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/mocks"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-
-	"github.com/gofrs/flock"
-	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -99,7 +101,7 @@ func Test_CopyFile(t *testing.T) {
 			}
 
 			err := copyDir(l, tc.From, tc.To, tc.IgnoreErr)
-			require.Equal(t, tc.ExpectedErr, err != nil)
+			require.Equal(t, tc.ExpectedErr, err != nil, err)
 		})
 	}
 }
@@ -205,6 +207,70 @@ func TestIsInProgress(t *testing.T) {
 				require.Equal(t, test.expectedErr, err.Error())
 			} else {
 				require.Equal(t, test.expected, inProgress)
+			}
+		})
+	}
+}
+
+func TestUpgraderReload(t *testing.T) {
+	defaultCfg := artifact.DefaultConfig()
+	tcs := []struct {
+		name      string
+		sourceURL string
+		proxyURL  string
+		cfg       string
+	}{
+		{
+			name:      "proxy_url is applied",
+			sourceURL: defaultCfg.SourceURI,
+			proxyURL:  "http://someBrokenURL/",
+			cfg: `
+agent.download:
+  proxy_url: http://someBrokenURL/
+`,
+		},
+		{
+			name:      "source_uri has precedence over sourceURI",
+			sourceURL: "https://this.sourceURI.co/downloads/beats/",
+			cfg: `
+agent.download:
+  source_uri: "https://this.sourceURI.co/downloads/beats/"
+  sourceURI: "https://NOT.sourceURI.co/downloads/beats/"
+`}, {
+			name:      "only sourceURI",
+			sourceURL: "https://this.sourceURI.co/downloads/beats/",
+			cfg: `
+agent.download:
+  sourceURI: "https://this.sourceURI.co/downloads/beats/"
+`}, {
+			name:      "only source_uri",
+			sourceURL: "https://this.sourceURI.co/downloads/beats/",
+			cfg: `
+agent.download:
+  source_uri: "https://this.sourceURI.co/downloads/beats/"
+`},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			log, _ := logger.NewTesting("")
+
+			u := Upgrader{
+				log:      log,
+				settings: artifact.DefaultConfig(),
+			}
+
+			cfg, err := config.NewConfigFrom(tc.cfg)
+			require.NoError(t, err, "failed to create new config")
+
+			err = u.Reload(cfg)
+			require.NoError(t, err, "error reloading config")
+
+			assert.Equal(t, tc.sourceURL, u.settings.SourceURI)
+			if tc.proxyURL != "" {
+				require.NotNilf(t, u.settings.Proxy.URL,
+					"ProxyURI should not be nil, want %s", tc.proxyURL)
+				assert.Equal(t, tc.proxyURL, u.settings.Proxy.URL.String())
 			}
 		})
 	}

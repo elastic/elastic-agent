@@ -7,11 +7,13 @@ package coordinator
 import (
 	"fmt"
 
-	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+
 	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
 // State provides the current state of the coordinator along with all the current states of components and units.
@@ -30,6 +32,8 @@ type State struct {
 
 	Components []runtime.ComponentComponentState `yaml:"components"`
 	LogLevel   logp.Level                        `yaml:"log_level"`
+
+	UpgradeDetails *details.Details `yaml:"upgrade_details,omitempty"`
 }
 
 type coordinatorOverrideState struct {
@@ -54,10 +58,15 @@ func (c *Coordinator) ClearOverrideState() {
 	c.overrideStateChan <- nil
 }
 
-// setRuntimeManagerError updates the error state for the runtime manager.
+// SetUpgradeDetails sets upgrade details. This is used during upgrades.
+func (c *Coordinator) SetUpgradeDetails(upgradeDetails *details.Details) {
+	c.upgradeDetailsChan <- upgradeDetails
+}
+
+// setRuntimeUpdateError reports a failed policy update in the runtime manager.
 // Called on the main Coordinator goroutine.
-func (c *Coordinator) setRuntimeManagerError(err error) {
-	c.runtimeMgrErr = err
+func (c *Coordinator) setRuntimeUpdateError(err error) {
+	c.runtimeUpdateErr = err
 	c.stateNeedsRefresh = true
 }
 
@@ -98,19 +107,18 @@ func (c *Coordinator) setComponentGenError(err error) {
 	c.stateNeedsRefresh = true
 }
 
-// setRuntimeUpdateError updates the error state for sending a component model
-// update to the runtime manager.
-// Called on the main Coordinator goroutine.
-func (c *Coordinator) setRuntimeUpdateError(err error) {
-	c.runtimeUpdateErr = err
-	c.stateNeedsRefresh = true
-}
-
 // setOverrideState is the internal helper to set the override state and
 // set stateNeedsRefresh.
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) setOverrideState(overrideState *coordinatorOverrideState) {
 	c.overrideState = overrideState
+	c.stateNeedsRefresh = true
+}
+
+// setUpgradeDetails is the internal helper to set upgrade details and set stateNeedsRefresh.
+// Must be called on the main Coordinator goroutine.
+func (c *Coordinator) setUpgradeDetails(upgradeDetails *details.Details) {
+	c.state.UpgradeDetails = upgradeDetails
 	c.stateNeedsRefresh = true
 }
 
@@ -163,6 +171,7 @@ func (c *Coordinator) generateReportableState() (s State) {
 	s.FleetState = c.state.FleetState
 	s.FleetMessage = c.state.FleetMessage
 	s.LogLevel = c.state.LogLevel
+	s.UpgradeDetails = c.state.UpgradeDetails
 	s.Components = make([]runtime.ComponentComponentState, len(c.state.Components))
 	copy(s.Components, c.state.Components)
 
@@ -184,9 +193,6 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.runtimeUpdateErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Runtime update failed: %s", c.runtimeUpdateErr.Error())
-	} else if c.runtimeMgrErr != nil {
-		s.State = agentclient.Failed
-		s.Message = fmt.Sprintf("Runtime manager: %s", c.runtimeMgrErr.Error())
 	} else if c.configMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Config manager: %s", c.configMgrErr.Error())

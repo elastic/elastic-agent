@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
@@ -493,7 +494,7 @@ func FixDRADockerArtifacts() error {
 }
 
 func getPackageName(beat, version, pkg string) (string, string) {
-	if _, ok := os.LookupEnv(snapshotEnv); ok {
+	if hasSnapshotEnv() {
 		version += "-SNAPSHOT"
 	}
 	return version, fmt.Sprintf("%s-%s-%s", beat, version, pkg)
@@ -956,19 +957,23 @@ func packageAgent(platforms []string, packagingFn func()) {
 			logrus.SetLevel(logrus.FatalLevel)
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
+			completedDownloads := &atomic.Int32{}
 			for binary, project := range externalBinaries {
 				for _, platform := range platforms {
 					reqPackage := platformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
-					errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath))
+					errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath, completedDownloads))
 				}
 			}
 
 			err := errGroup.Wait()
 			if err != nil {
 				panic(err)
+			}
+			if completedDownloads.Load() == 0 {
+				panic(fmt.Sprintf("No packages were successfully downloaded. You may be building against an invalid or unreleased version. version=%s. If this is an unreleased version, try SNAPSHOT=true or EXTERNAL=false", packageVersion))
 			}
 		} else {
 			packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
@@ -979,10 +984,10 @@ func packageAgent(platforms []string, packagingFn func()) {
 					panic(err)
 				}
 
-				packagesMissing := false
 				packagesCopied := 0
 
 				if !requiredPackagesPresent(pwd, b, packageVersion, requiredPackages) {
+					fmt.Printf("--- Package %s\n", pwd)
 					cmd := exec.Command("mage", "package")
 					cmd.Dir = pwd
 					cmd.Stdout = os.Stdout
@@ -1008,6 +1013,15 @@ func packageAgent(platforms []string, packagingFn func()) {
 					targetPath := filepath.Join(archivePath, rp)
 					os.MkdirAll(targetPath, 0755)
 					for _, f := range files {
+						// safety check; if the user has an older version of the beats repo,
+						// for example right after a release where you've `git pulled` from on repo and not the other,
+						// they might end up with a mishmash of packages from different versions.
+						// check to see if we have mismatched versions.
+						if !strings.Contains(f, packageVersion) {
+							// if this panic hits weird edge cases where we don't want actual failures, revert to a printf statement.
+							panic(fmt.Sprintf("the file %s doesn't match agent version %s, beats repo might be out of date", f, packageVersion))
+						}
+
 						targetFile := filepath.Join(targetPath, filepath.Base(f))
 						packagesCopied += 1
 						if err := sh.Copy(targetFile, f); err != nil {
@@ -1017,8 +1031,8 @@ func packageAgent(platforms []string, packagingFn func()) {
 				}
 				// a very basic footcannon protector; if packages are missing and we need to rebuild them, check to see if those files were copied
 				// if we needed to repackage beats but still somehow copied nothing, could indicate an issue. Usually due to beats and agent being at different versions.
-				if packagesMissing && packagesCopied == 0 {
-					fmt.Printf(">>> WARNING: no packages were copied, but we repackaged beats anyway. Check binary to see if intended beats are there.")
+				if packagesCopied == 0 {
+					fmt.Println(">>> WARNING: no packages were copied, but we repackaged beats anyway. Check binary to see if intended beats are there.")
 				}
 			}
 		}
@@ -1132,15 +1146,17 @@ func packageAgent(platforms []string, packagingFn func()) {
 
 // Helper that wraps the fetchBinaryFromArtifactsApi in a way that is compatible with the errgroup.Go() function.
 // Ensures the arguments are captured by value before starting the goroutine.
-func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string) func() error {
+func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string, compl *atomic.Int32) func() error {
 	return func() error {
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
-				fmt.Printf("Done downloading %s: unsupported on %s, skipping\n", binary, platform)
+				fmt.Printf("Could not download %s: %s\n", binary, err)
 			} else {
 				return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
 			}
+		} else {
+			compl.Add(1)
 		}
 
 		fmt.Printf("Done downloading %s\n", packageName)
@@ -1153,6 +1169,7 @@ func copyComponentSpecs(componentName, versionedDropPath string) (string, error)
 	targetPath := filepath.Join(versionedDropPath, specFileName)
 
 	if _, err := os.Stat(targetPath); err != nil {
+		fmt.Printf(">> File %s does not exist, reverting to local specfile\n", targetPath)
 		// spec not present copy from local
 		sourceSpecFile := filepath.Join("specs", specFileName)
 		if mg.Verbose() {
@@ -1449,6 +1466,7 @@ func majorMinor() string {
 
 // Clean cleans up the integration testing leftovers
 func (Integration) Clean() error {
+	fmt.Println("--- Clean mage artifacts")
 	_ = os.RemoveAll(".agent-testing")
 
 	// Clean out .integration-cache/.ogc-cache always
@@ -1547,6 +1565,33 @@ func (Integration) Single(ctx context.Context, testName string) error {
 // PrepareOnRemote shouldn't be called locally (called on remote host to prepare it for testing)
 func (Integration) PrepareOnRemote() {
 	mg.Deps(mage.InstallGoTestTools)
+}
+
+// Run beat serverless tests
+func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
+	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
+	if os.Getenv("AGENT_BUILD_DIR") == "" {
+		err := os.Setenv("AGENT_BUILD_DIR", beatBuildPath)
+		if err != nil {
+			return fmt.Errorf("error setting build dir: %s", err)
+		}
+	}
+
+	// a bit of bypass logic; run as serverless by default
+	if os.Getenv("STACK_PROVISIONER") == "" {
+		err := os.Setenv("STACK_PROVISIONER", "serverless")
+		if err != nil {
+			return fmt.Errorf("error setting serverless stack var: %w", err)
+		}
+	} else if os.Getenv("STACK_PROVISIONER") == "stateful" {
+		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
+	}
+
+	err := os.Setenv("TEST_BINARY_NAME", beatname)
+	if err != nil {
+		return fmt.Errorf("error setting binary name: %w", err)
+	}
+	return integRunner(ctx, false, "TestBeatsServerless")
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
@@ -1690,6 +1735,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if err != nil {
 		return nil, err
 	}
+
 	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
 	agentVersion := os.Getenv("AGENT_VERSION")
 	if agentVersion == "" {
@@ -1707,6 +1753,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 			agentVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
 		}
 	}
+
 	if agentStackVersion == "" {
 		agentStackVersion = agentVersion
 	}
@@ -1730,13 +1777,16 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 	datacenter := os.Getenv("TEST_INTEG_AUTH_GCP_DATACENTER")
 	if datacenter == "" {
+		// us-central1-a is used because T2A instances required for ARM64 testing are only
+		// available in the central regions
 		datacenter = "us-central1-a"
 	}
 
-	// Valid values are gcp-us-central1 (default), azure-eastus2
+	// Possible to change the region for deployment, default is gcp-us-west2 which is
+	// the CFT region.
 	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
 	if essRegion == "" {
-		essRegion = "gcp-us-central1"
+		essRegion = "gcp-us-west2"
 	}
 
 	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
@@ -1744,15 +1794,19 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		instanceProvisionerMode = "ogc"
 	}
 	if instanceProvisionerMode != "ogc" && instanceProvisionerMode != "multipass" {
-		return nil, errors.New("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass'")
+		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
 	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
 	if stackProvisionerMode == "" {
-		stackProvisionerMode = "ess"
+		stackProvisionerMode = ess.ProvisionerStateful
 	}
-	if stackProvisionerMode != "ess" && stackProvisionerMode != "serverless" {
-		return nil, errors.New("STACK_PROVISIONER environment variable must be one of 'serverless' or 'ess'")
+	if stackProvisionerMode != ess.ProvisionerStateful &&
+		stackProvisionerMode != ess.ProvisionerServerless {
+		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
+			ess.ProvisionerStateful,
+			ess.ProvisionerServerless,
+			stackProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
@@ -1766,25 +1820,38 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
 	}
 
+	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
+	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
+	binaryName := os.Getenv("TEST_BINARY_NAME")
+	if binaryName == "" {
+		binaryName = "elastic-agent"
+	}
+
+	repoDir := os.Getenv("TEST_INTEG_REPO_PATH")
+	if repoDir == "" {
+		repoDir = "."
+	}
+
 	diagDir := filepath.Join("build", "diagnostics")
 	_ = os.MkdirAll(diagDir, 0755)
 
 	cfg := runner.Config{
-		AgentVersion:      agentVersion,
-		AgentStackVersion: agentStackVersion,
-		BuildDir:          agentBuildDir,
-		GOVersion:         goVersion,
-		RepoDir:           ".",
-		StateDir:          ".integration-cache",
-		DiagnosticsDir:    diagDir,
-		Platforms:         testPlatforms(),
-		Groups:            testGroups(),
-		Matrix:            matrix,
-		SingleTest:        singleTest,
-		VerboseMode:       mg.Verbose(),
-		Timestamp:         timestamp,
-		TestFlags:         goTestFlags,
-		ExtraEnv:          extraEnv,
+		AgentVersion:   agentVersion,
+		StackVersion:   agentStackVersion,
+		BuildDir:       agentBuildDir,
+		GOVersion:      goVersion,
+		RepoDir:        repoDir,
+		DiagnosticsDir: diagDir,
+		StateDir:       ".integration-cache",
+		Platforms:      testPlatforms(),
+		Groups:         testGroups(),
+		Matrix:         matrix,
+		SingleTest:     singleTest,
+		VerboseMode:    mg.Verbose(),
+		Timestamp:      timestamp,
+		TestFlags:      goTestFlags,
+		ExtraEnv:       extraEnv,
+		BinaryName:     binaryName,
 	}
 	ogcCfg := ogc.Config{
 		ServiceTokenPath: serviceTokenPath,
@@ -1796,9 +1863,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	var instanceProvisioner runner.InstanceProvisioner
-	if instanceProvisionerMode == "multipass" {
+	if instanceProvisionerMode == multipass.Name {
 		instanceProvisioner = multipass.NewProvisioner()
-	} else if instanceProvisionerMode == "ogc" {
+	} else if instanceProvisionerMode == ogc.Name {
 		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
 		if err != nil {
 			return nil, err
@@ -1813,12 +1880,13 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Region:     essRegion,
 	}
 	var stackProvisioner runner.StackProvisioner
-	if stackProvisionerMode == "ess" {
+	if stackProvisionerMode == ess.ProvisionerStateful {
 		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err
 		}
-	} else if stackProvisionerMode == "serverless" {
+
+	} else if stackProvisionerMode == ess.ProvisionerServerless {
 		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err
@@ -2158,6 +2226,7 @@ func hasSnapshotEnv() bool {
 		return false
 	}
 	b, _ := strconv.ParseBool(snapshot)
+
 	return b
 }
 

@@ -13,10 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/control"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
 // UnitType is the type of the unit
@@ -105,16 +106,18 @@ type AgentStateInfo struct {
 	Commit    string `json:"commit" yaml:"commit"`
 	BuildTime string `json:"build_time" yaml:"build_time"`
 	Snapshot  bool   `json:"snapshot" yaml:"snapshot"`
+	PID       int32  `json:"pid" yaml:"pid"`
 }
 
 // AgentState is the current state of the Elastic Agent.
 type AgentState struct {
-	Info         AgentStateInfo   `json:"info" yaml:"info"`
-	State        State            `json:"state" yaml:"state"`
-	Message      string           `json:"message" yaml:"message"`
-	Components   []ComponentState `json:"components" yaml:"components"`
-	FleetState   State            `yaml:"fleet_state"`
-	FleetMessage string           `yaml:"fleet_message"`
+	Info           AgentStateInfo         `json:"info" yaml:"info"`
+	State          State                  `json:"state" yaml:"state"`
+	Message        string                 `json:"message" yaml:"message"`
+	Components     []ComponentState       `json:"components" yaml:"components"`
+	FleetState     State                  `yaml:"fleet_state"`
+	FleetMessage   string                 `yaml:"fleet_message"`
+	UpgradeDetails *cproto.UpgradeDetails `json:"upgrade_details,omitempty" yaml:"upgrade_details,omitempty"`
 }
 
 // DiagnosticFileResult is a diagnostic file result.
@@ -156,10 +159,11 @@ type DiagnosticComponentResult struct {
 }
 
 // Client communicates to Elastic Agent through the control protocol.
-// go:generate mockery --name Client
+//
+//go:generate mockery --name Client
 type Client interface {
 	// Connect connects to the running Elastic Agent.
-	Connect(ctx context.Context) error
+	Connect(ctx context.Context, opts ...grpc.DialOption) error
 	// Disconnect disconnects from the running Elastic Agent.
 	Disconnect()
 	// Version returns the current version of the running agent.
@@ -231,9 +235,9 @@ func New(opts ...Option) Client {
 }
 
 // Connect connects to the running Elastic Agent.
-func (c *client) Connect(ctx context.Context) error {
+func (c *client) Connect(ctx context.Context, opts ...grpc.DialOption) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	conn, err := dialContext(ctx, c.address, c.maxMsgSize)
+	conn, err := dialContext(ctx, c.address, c.maxMsgSize, opts...)
 	if err != nil {
 		return err
 	}
@@ -470,11 +474,13 @@ func toState(res *cproto.StateResponse) (*AgentState, error) {
 			Commit:    res.Info.Commit,
 			BuildTime: res.Info.BuildTime,
 			Snapshot:  res.Info.Snapshot,
+			PID:       res.Info.Pid,
 		},
-		State:        res.State,
-		Message:      res.Message,
-		FleetState:   res.FleetState,
-		FleetMessage: res.FleetMessage,
+		State:          res.State,
+		Message:        res.Message,
+		FleetState:     res.FleetState,
+		FleetMessage:   res.FleetMessage,
+		UpgradeDetails: res.UpgradeDetails,
 
 		Components: make([]ComponentState, 0, len(res.Components)),
 	}

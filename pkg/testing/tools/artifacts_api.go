@@ -34,21 +34,20 @@ var (
 	ErrBadHTTPStatusCode = errors.New("bad http status code")
 )
 
+type Manifests struct {
+	LastUpdateTime         string `json:"last-update-time"`
+	SecondsSinceLastUpdate int    `json:"seconds-since-last-update"`
+}
+
 type VersionList struct {
-	Versions  []string `json:"versions"`
-	Aliases   []string `json:"aliases"`
-	Manifests struct {
-		LastUpdateTime         string `json:"last-update-time"`
-		SecondsSinceLastUpdate int    `json:"seconds-since-last-update"`
-	} `json:"manifests"`
+	Versions  []string  `json:"versions"`
+	Aliases   []string  `json:"aliases"`
+	Manifests Manifests `json:"manifests"`
 }
 
 type VersionBuilds struct {
-	Builds    []string `json:"builds"`
-	Manifests struct {
-		LastUpdateTime         string `json:"last-update-time"`
-		SecondsSinceLastUpdate int    `json:"seconds-since-last-update"`
-	} `json:"manifests"`
+	Builds    []string  `json:"builds"`
+	Manifests Manifests `json:"manifests"`
 }
 
 type Package struct {
@@ -99,18 +98,12 @@ type Build struct {
 
 type BuildDetails struct {
 	Build     Build
-	Manifests struct {
-		LastUpdateTime         string `json:"last-update-time"`
-		SecondsSinceLastUpdate int    `json:"seconds-since-last-update"`
-	} `json:"manifests"`
+	Manifests Manifests `json:"manifests"`
 }
 
 type SearchPackageResult struct {
 	Packages  map[string]Package `json:"packages"`
-	Manifests struct {
-		LastUpdateTime         string `json:"last-update-time"`
-		SecondsSinceLastUpdate int    `json:"seconds-since-last-update"`
-	} `json:"manifests"`
+	Manifests Manifests          `json:"manifests"`
 }
 
 type httpDoer interface {
@@ -251,7 +244,7 @@ type logger interface {
 	Logf(format string, args ...any)
 }
 
-func GetLatestSnapshotVersion(ctx context.Context, log logger, aac *ArtifactAPIClient) (*version.ParsedSemVer, error) {
+func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context, log logger) (*version.ParsedSemVer, error) {
 	vList, err := aac.GetVersions(ctx)
 	if err != nil {
 		return nil, err

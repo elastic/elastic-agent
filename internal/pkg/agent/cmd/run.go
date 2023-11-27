@@ -49,6 +49,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -216,10 +217,6 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	if err := upgrade.InvokeWatcher(l); err != nil {
 		// we should not fail because watcher is not working
 		l.Error(errors.New(err, "failed to invoke rollback watcher"))
-	}
-
-	if allowEmptyPgp, _ := release.PGP(); allowEmptyPgp {
-		l.Info("Elastic Agent has been built with security disabled. Elastic Agent will not verify signatures of upgrade artifact.")
 	}
 
 	execPath, err := reexecPath()
@@ -616,7 +613,7 @@ func ensureInstallMarkerPresent() error {
 	// Otherwise, we're being upgraded from a version of an installed Agent
 	// that didn't use an installation marker file (that is, before v8.8.0).
 	// So create the file now.
-	if err := info.CreateInstallMarker(paths.Top()); err != nil {
+	if err := info.CreateInstallMarker(paths.Top(), utils.CurrentFileOwner()); err != nil {
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
 

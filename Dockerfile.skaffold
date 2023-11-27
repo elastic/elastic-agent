@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.20.8
+ARG GO_VERSION=1.20.11
 ARG crossbuild_image="docker.elastic.co/beats-dev/golang-crossbuild"
 ARG AGENT_VERSION=8.9.0-SNAPSHOT
 ARG AGENT_IMAGE="docker.elastic.co/beats/elastic-agent"

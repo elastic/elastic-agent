@@ -7,16 +7,18 @@ package coordinator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -413,6 +415,7 @@ func TestDiagnosticState(t *testing.T) {
 	// Create a coordinator with a test state and verify that the state
 	// diagnostic reports it
 
+	now := time.Now().UTC()
 	state := State{
 		State:        agentclient.Starting,
 		Message:      "starting up",
@@ -432,9 +435,19 @@ func TestDiagnosticState(t *testing.T) {
 				},
 			},
 		},
+		UpgradeDetails: &details.Details{
+			TargetVersion: "8.12.0",
+			State:         "UPG_DOWNLOADING",
+			ActionID:      "foobar",
+			Metadata: details.Metadata{
+				DownloadPercent: 0.17469,
+				ScheduledAt:     &now,
+				DownloadRate:    123.56,
+			},
+		},
 	}
 
-	expected := `
+	expected := fmt.Sprintf(`
 state: 0
 message: "starting up"
 fleet_state: 1
@@ -451,7 +464,15 @@ components:
       version_info:
         name: "version name"
         version: "version value"
-`
+upgrade_details:
+  target_version: 8.12.0
+  state: UPG_DOWNLOADING
+  action_id: foobar
+  metadata:
+    download_percent: 0.17469
+    scheduled_at: %s
+    download_rate: 123.56
+`, now.Format(time.RFC3339Nano))
 
 	coord := &Coordinator{
 		// This test needs a broadcaster since the components-actual diagnostic

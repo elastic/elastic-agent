@@ -14,18 +14,23 @@ import (
 
 // Config provides the configuration for running the runner.
 type Config struct {
-	AgentVersion      string
-	AgentStackVersion string
-	BuildDir          string
-	GOVersion         string
-	RepoDir           string
-	StateDir          string
-	DiagnosticsDir    string
+	AgentVersion   string
+	StateDir       string
+	ReleaseVersion string
+	StackVersion   string
+	BuildDir       string
+	GOVersion      string
+	RepoDir        string
+	DiagnosticsDir string
 
 	// Platforms filters the tests to only run on the provided list
 	// of platforms even if the tests supports more than what is
 	// defined in this list.
 	Platforms []string
+
+	// BinaryName is the name of the binary package under test, i.e, elastic-agent, metricbeat, etc
+	// this is used to copy the .tar.gz to the remote host
+	BinaryName string
 
 	// Groups filters the tests to only run tests that are part of
 	// the groups defined in this list.
@@ -56,8 +61,8 @@ func (c *Config) Validate() error {
 	if c.AgentVersion == "" {
 		return errors.New("field AgentVersion must be set")
 	}
-	if c.AgentStackVersion == "" {
-		return errors.New("field AgentStackVersion must be set")
+	if c.StackVersion == "" {
+		return errors.New("field StackVersion must be set")
 	}
 	if c.BuildDir == "" {
 		return errors.New("field BuildDir must be set")

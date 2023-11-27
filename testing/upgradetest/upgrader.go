@@ -27,9 +27,10 @@ type CustomPGP struct {
 type upgradeOpts struct {
 	sourceURI *string
 
-	skipVerify     bool
-	skipDefaultPgp bool
-	customPgp      *CustomPGP
+	skipVerify       bool
+	skipDefaultPgp   bool
+	customPgp        *CustomPGP
+	customWatcherCfg string
 
 	preInstallHook  func() error
 	postInstallHook func() error
@@ -98,6 +99,13 @@ func WithPostUpgradeHook(hook func() error) upgradeOpt {
 	}
 }
 
+// WithCustomWatcherConfig sets a custom watcher configuration to use.
+func WithCustomWatcherConfig(cfg string) upgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.customWatcherCfg = cfg
+	}
+}
+
 // PerformUpgrade performs the upgrading of the Elastic Agent.
 func PerformUpgrade(
 	ctx context.Context,
@@ -126,7 +134,11 @@ func PerformUpgrade(
 	}
 
 	// start fixture gets the agent configured to use a faster watcher
-	err = ConfigureFastWatcher(ctx, startFixture)
+	if upgradeOpts.customWatcherCfg != "" {
+		err = startFixture.Configure(ctx, []byte(upgradeOpts.customWatcherCfg))
+	} else {
+		err = ConfigureFastWatcher(ctx, startFixture)
+	}
 	if err != nil {
 		return fmt.Errorf("failed configuring the start agent with faster watcher configuration: %w", err)
 	}
@@ -199,7 +211,7 @@ func PerformUpgrade(
 		sourceURI := "file://" + filepath.Dir(srcPkg)
 		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
 	} else if *upgradeOpts.sourceURI != "" {
-		// specific ---source-uri
+		// specific --source-uri
 		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", *upgradeOpts.sourceURI)
 	}
 
@@ -286,16 +298,20 @@ func CheckHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInf
 			return err
 		}
 		if status.Info.Version != versionInfo.Version {
-			return fmt.Errorf("versions don't match: %s != %s", status.Info.Version, versionInfo.Version)
+			return fmt.Errorf("versions don't match: got %s, want %s",
+				status.Info.Version, versionInfo.Version)
 		}
 		if status.Info.Snapshot != versionInfo.Snapshot {
-			return fmt.Errorf("snapshots don't match: %t != %t", status.Info.Snapshot, versionInfo.Snapshot)
+			return fmt.Errorf("snapshots don't match: got %t, want %t",
+				status.Info.Snapshot, versionInfo.Snapshot)
 		}
 		if status.Info.Commit != versionInfo.Commit {
-			return fmt.Errorf("commits don't match: %s != %s", status.Info.Commit, versionInfo.Commit)
+			return fmt.Errorf("commits don't match: got %s, want %s",
+				status.Info.Commit, versionInfo.Commit)
 		}
 		if status.State != int(v2proto.State_HEALTHY) {
-			return fmt.Errorf("agent state is not healthy: got %d", status.State)
+			return fmt.Errorf("agent state is not healthy: got %d",
+				status.State)
 		}
 		return nil
 	}
@@ -322,16 +338,20 @@ func CheckHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInf
 			}
 
 			if versionOut.Binary.Version != versionInfo.Version {
-				return fmt.Errorf("versions don't match: %s != %s", versionOut.Binary.Version, versionInfo.Version)
+				return fmt.Errorf("versions don't match: got %s, want %s",
+					versionOut.Binary.Version, versionInfo.Version)
 			}
 			if versionOut.Binary.Snapshot != versionInfo.Snapshot {
-				return fmt.Errorf("snapshots don't match: %t != %t", versionOut.Binary.Snapshot, versionInfo.Snapshot)
+				return fmt.Errorf("snapshots don't match: got %t, want %t",
+					versionOut.Binary.Snapshot, versionInfo.Snapshot)
 			}
 			if versionOut.Binary.Commit != versionInfo.Commit {
-				return fmt.Errorf("commits don't match: %s != %s", versionOut.Binary.Commit, versionInfo.Commit)
+				return fmt.Errorf("commits don't match: got %s, want %s",
+					versionOut.Binary.Commit, versionInfo.Commit)
 			}
 			if state.Status != v1client.Healthy {
-				return fmt.Errorf("agent state is not healthy: got %d", state.Status)
+				return fmt.Errorf("agent state is not healthy: got %d",
+					state.Status)
 			}
 			return nil
 		}

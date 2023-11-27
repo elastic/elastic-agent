@@ -13,7 +13,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"gopkg.in/yaml.v2"
 
@@ -145,6 +147,43 @@ func listAgentState(l list.Writer, state *client.AgentState, all bool) {
 	}
 	l.UnIndent()
 	listComponentState(l, state.Components, all)
+
+	// Upgrade details
+	listUpgradeDetails(l, state.UpgradeDetails)
+}
+
+func listUpgradeDetails(l list.Writer, upgradeDetails *cproto.UpgradeDetails) {
+	if upgradeDetails == nil {
+		return
+	}
+
+	l.AppendItem("upgrade_details")
+	l.Indent()
+	l.AppendItem("target_version: " + upgradeDetails.TargetVersion)
+	l.AppendItem("state: " + upgradeDetails.State)
+	if upgradeDetails.ActionId != "" {
+		l.AppendItem("action_id: " + upgradeDetails.ActionId)
+	}
+
+	if upgradeDetails.Metadata != nil {
+		l.AppendItem("metadata")
+		l.Indent()
+		if upgradeDetails.Metadata.ScheduledAt != nil && !upgradeDetails.Metadata.ScheduledAt.AsTime().IsZero() {
+			l.AppendItem("scheduled_at: " + upgradeDetails.Metadata.ScheduledAt.AsTime().UTC().Format(time.RFC3339))
+		}
+		if upgradeDetails.Metadata.FailedState != "" {
+			l.AppendItem("failed_state: " + upgradeDetails.Metadata.FailedState)
+		}
+		if upgradeDetails.Metadata.ErrorMsg != "" {
+			l.AppendItem("error_msg: " + upgradeDetails.Metadata.ErrorMsg)
+		}
+		if upgradeDetails.State == string(details.StateDownloading) {
+			l.AppendItem(fmt.Sprintf("download_percent: %.2f%%", upgradeDetails.Metadata.DownloadPercent*100))
+		}
+		l.UnIndent()
+	}
+
+	l.UnIndent()
 }
 
 func listFleetState(l list.Writer, state *client.AgentState, all bool) {
