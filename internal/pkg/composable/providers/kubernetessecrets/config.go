@@ -11,9 +11,11 @@ type Config struct {
 	KubeConfig        string                       `config:"kube_config"`
 	KubeClientOptions kubernetes.KubeClientOptions `config:"kube_client_options"`
 
-	TTL int `config:"ttl"`
+	TTL string `config:"ttl"`
 }
 
+var defaultTTL = "60s"
+
 func (c *Config) InitDefaults() {
-	c.TTL = 1
+	c.TTL = defaultTTL
 }

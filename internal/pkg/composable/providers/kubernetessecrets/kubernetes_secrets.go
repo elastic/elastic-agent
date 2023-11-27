@@ -36,7 +36,12 @@ type contextProviderK8sSecrets struct {
 	client   k8sclient.Interface
 
 	secretsCacheMx sync.Mutex
-	secretsCache   map[string]string
+	secretsCache   map[string]secretsData
+}
+
+type secretsData struct {
+	value      string
+	lastAccess time.Time
 }
 
 // ContextProviderBuilder builds the context provider.
@@ -52,7 +57,7 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 	return &contextProviderK8sSecrets{
 		logger:       logger,
 		config:       &cfg,
-		secretsCache: make(map[string]string),
+		secretsCache: make(map[string]secretsData),
 	}, nil
 }
 
@@ -86,7 +91,16 @@ func getK8sClient(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclien
 
 // Update the secrets in the cache every TTL minutes
 func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
-	d := time.Duration(p.config.TTL) * time.Minute
+	d, err := time.ParseDuration(p.config.TTL)
+	if err != nil {
+		p.logger.Debugf(
+			"TTL %v is not valid: %v. Default of %v will be used.",
+			p.config.TTL,
+			err,
+			defaultTTL,
+		)
+		d, _ = time.ParseDuration(defaultTTL)
+	}
 	timer := time.NewTimer(d)
 
 	for {
@@ -102,14 +116,21 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
 
 func (p *contextProviderK8sSecrets) updateCache() {
 	p.secretsCacheMx.Lock()
-	for name := range p.secretsCache {
+	for name, data := range p.secretsCache {
 		newValue, ok := p.fetchSecret(name)
 
 		// remove the secret from the cache
 		if !ok {
 			delete(p.secretsCache, name)
 		} else {
-			p.secretsCache[name] = newValue
+			// if the secret has not been accessed in over 1h, delete it
+			// to avoid keeping secrets in cache that are no longer in use
+			diff := time.Now().Sub(data.lastAccess).Hours()
+			if diff > 1 {
+				delete(p.secretsCache, name)
+			} else {
+				data.value = newValue
+			}
 		}
 	}
 	p.secretsCacheMx.Unlock()
@@ -117,24 +138,37 @@ func (p *contextProviderK8sSecrets) updateCache() {
 
 func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
 	p.secretsCacheMx.Lock()
-	value, ok := p.secretsCache[key]
+	_, ok := p.secretsCache[key]
 	p.secretsCacheMx.Unlock()
 
 	// if value is still not present in cache, it is possible we haven't tried to fetch it yet
 	if !ok {
-		value, ok = p.addToCache(key)
+		data, ok := p.addToCache(key)
+		// if it was not possible to fetch the secret, return
+		if !ok {
+			return data.value, ok
+		}
 	}
-	return value, ok
+
+	p.secretsCacheMx.Lock()
+	data, ok := p.secretsCache[key]
+	data.lastAccess = time.Now()
+	p.secretsCacheMx.Unlock()
+
+	return data.value, ok
 }
 
-func (p *contextProviderK8sSecrets) addToCache(key string) (string, bool) {
+func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
 	value, ok := p.fetchSecret(key)
+	data := secretsData{
+		value: value,
+	}
 	if ok {
 		p.secretsCacheMx.Lock()
-		p.secretsCache[key] = value
+		p.secretsCache[key] = data
 		p.secretsCacheMx.Unlock()
 	}
-	return value, ok
+	return data, ok
 }
 
 func (p *contextProviderK8sSecrets) fetchSecret(key string) (string, bool) {
