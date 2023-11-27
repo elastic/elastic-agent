@@ -28,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -105,25 +104,18 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		return nil
 	}
 
+	// About to start watching the upgrade. Initialize upgrade details and save them in the
+	// upgrade marker.
+	marker.Details = details.NewDetails(version.GetAgentPackageVersion(), details.StateWatching, marker.GetActionID())
+	err = upgrade.SaveMarker(marker)
+	if err != nil {
+		log.Errorf("unable to save upgrade marker before watching: %s", err.Error())
+	}
+
 	errorCheckInterval := cfg.Settings.Upgrade.Watcher.ErrorCheck.Interval
 	ctx := context.Background()
 	if err := watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
 		log.Error("Error detected, proceeding to rollback: %v", err)
-
-		// If we are upgrading from version >= 8.12.0, marker.Details should be non-nil
-		// because the Agent we upgraded FROM would've written upgrade details in the upgrade
-		// marker. However, if we're upgrading from version < 8.12.0, the marker won't
-		// contain upgrade details, so we populate them now.
-		if marker.Details == nil {
-			fromVersion, err := agtversion.ParseVersion(marker.PrevVersion)
-			if err != nil {
-				log.Warnf("upgrade details are nil, but unable to parse version being upgraded from [%s]: %s", marker.PrevVersion, err.Error())
-			} else if fromVersion.Less(*agtversion.NewParsedSemVer(8, 12, 0, "", "")) {
-				log.Warnf("upgrade details are unexpectedly nil, upgrading from version [%s]", marker.PrevVersion)
-			}
-
-			marker.Details = details.NewDetails(version.GetAgentPackageVersion(), details.StateRollback, marker.GetActionID())
-		}
 
 		marker.Details.SetState(details.StateRollback)
 		err = upgrade.SaveMarker(marker, true)
