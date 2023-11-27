@@ -453,13 +453,12 @@ func (c *enrollCmd) prepareFleetTLS() error {
 
 func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 	err := c.daemonReload(ctx)
-	if err != nil &&
-		(errors.Is(err, context.DeadlineExceeded) ||
-			errors.Is(err, context.Canceled)) {
-		return fmt.Errorf("could not reload daemon: %w", err)
-	}
 	if err == nil {
 		return nil
+	}
+	if errors.Is(err, context.DeadlineExceeded) ||
+			errors.Is(err, context.Canceled) {
+		return fmt.Errorf("could not reload daemon: %w", err)
 	}
 
 	signal := make(chan struct{})
