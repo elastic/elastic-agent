@@ -92,12 +92,12 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 func TestFleetAirGappedUpgrade(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
+		Group: "upgrade-fleet-airgapped",
 		Stack: &define.Stack{},
 		// The test uses iptables to simulate the air-gaped environment.
-		OS:      []define.OS{{Type: define.Linux}},
-		Isolate: true,  // Needed as the test blocks IPs using iptables.
-		Local:   false, // Needed as the test requires Agent installation
-		Sudo:    true,  // Needed as the test uses iptables and installs the Agent
+		OS:    []define.OS{{Type: define.Linux}},
+		Local: false, // Needed as the test requires Agent installation
+		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
 	})
 
 	ctx, _ := testcontext.WithDeadline(

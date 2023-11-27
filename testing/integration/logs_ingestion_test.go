@@ -38,6 +38,7 @@ import (
 
 func TestLogIngestionFleetManaged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: "fleet",
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
