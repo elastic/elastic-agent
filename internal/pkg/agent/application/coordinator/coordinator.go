@@ -1149,11 +1149,11 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 	for _, component := range comps {
 		// If this is an input component (not a shipper), make sure its type is allowed
 		if component.InputSpec != nil && !c.caps.AllowInput(component.InputType) {
-			c.logger.Info("Component '%v' with input type '%v' filtered by capabilities.yml", component.InputType)
+			c.logger.Infof("Component '%v' with input type '%v' filtered by capabilities.yml", component.ID, component.InputType)
 			continue
 		}
 		if !c.caps.AllowOutput(component.OutputType) {
-			c.logger.Info("Component '%v' with output type '%v' filtered by capabilities.yml", component.ID, component.OutputType)
+			c.logger.Infof("Component '%v' with output type '%v' filtered by capabilities.yml", component.ID, component.OutputType)
 			continue
 		}
 		result = append(result, component)
