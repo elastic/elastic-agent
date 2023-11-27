@@ -26,7 +26,7 @@ import (
 
 func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "upgrade-standalone",
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})

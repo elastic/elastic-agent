@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build integration
+
 package integration
 
 import (
@@ -24,7 +26,7 @@ import (
 // the second upgrade.
 func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: "upgrade-standalone",
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})

@@ -24,7 +24,7 @@ import (
 
 func TestInstallWithoutBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: define.Default,
+		Group: Default,
 		// We require sudo for this test to run
 		// `elastic-agent install`.
 		Sudo: true,
@@ -72,7 +72,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 func TestInstallWithBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: define.Default,
+		Group: Default,
 		// We require sudo for this test to run
 		// `elastic-agent install`.
 		Sudo: true,
