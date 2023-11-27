@@ -203,7 +203,7 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 
 	// Secret cache should be empty at start
 	fp.secretsCacheMx.Lock()
-	assert.Equal(t, len(fp.secretsCache), 0)
+	assert.Equal(t, 0, len(fp.secretsCache))
 	fp.secretsCacheMx.Unlock()
 
 	// Secret should be in the cache after this call
