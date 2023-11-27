@@ -159,6 +159,8 @@ shared:
       content: >
         {{ commit }}
       mode: 0644
+    'manifest.yaml':
+      mode: 0644
 
   - &agent_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
