@@ -158,14 +158,9 @@ func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runne
 		return fmt.Errorf("failed to marshal cloud-init configuration: %w", err)
 	}
 
-	p.logger.Logf("Launching multipass instance %s", batch.ID)
 	var output bytes.Buffer
-	proc, err := process.Start("multipass",
-		process.WithContext(ctx),
-		process.WithArgs(args),
-		process.WithCmdOptions(
-			runner.AttachOut(&output),
-			runner.AttachErr(&output)))
+	p.logger.Logf("Launching multipass image %s", batch.ID)
+	proc, err := process.Start("multipass", process.WithContext(ctx), process.WithArgs(args), process.WithCmdOptions(runner.AttachOut(&output), runner.AttachErr(&output)))
 	if err != nil {
 		return fmt.Errorf("failed to run multipass launch: %w", err)
 	}
