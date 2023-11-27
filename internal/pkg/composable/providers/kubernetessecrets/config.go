@@ -15,5 +15,5 @@ type Config struct {
 }
 
 func (c *Config) InitDefaults() {
-	c.TTL = 10
+	c.TTL = 1
 }
