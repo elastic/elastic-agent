@@ -54,16 +54,7 @@ func (c *Coordinator) ClearOverrideState() {
 	c.overrideStateChan <- nil
 }
 
-<<<<<<< HEAD
-// setRuntimeManagerError updates the error state for the runtime manager.
-=======
-// SetUpgradeDetails sets upgrade details. This is used during upgrades.
-func (c *Coordinator) SetUpgradeDetails(upgradeDetails *details.Details) {
-	c.upgradeDetailsChan <- upgradeDetails
-}
-
 // setRuntimeUpdateError reports a failed policy update in the runtime manager.
->>>>>>> 112f618969 (Rework runtime manager updates to block the coordinator less (#3747))
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) setRuntimeUpdateError(err error) {
 	c.runtimeUpdateErr = err
