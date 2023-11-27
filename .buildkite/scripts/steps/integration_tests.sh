@@ -3,6 +3,10 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
+# To figure-out what is happening on with running the Windows add my credentails.
+ssh-import-id gh:blakerouse
+whoami
+
 STACK_PROVISIONER="${1:-"stateful"}"
 MAGE_TARGET="${2:-"integration:test"}"
 MAGE_SUBTARGET="${3:-""}"

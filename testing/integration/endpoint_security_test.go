@@ -74,7 +74,7 @@ var protectionTests = []struct {
 // test automatically.
 func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Endpoint,
+		Group: Fleet,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -100,7 +100,7 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 // but at this point endpoint is already uninstalled.
 func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Endpoint,
+		Group: Fleet,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -128,7 +128,7 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 
 func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Endpoint,
+		Group: Fleet,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -491,7 +491,7 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 // path other than default
 func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Endpoint,
+		Group: Fleet,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation

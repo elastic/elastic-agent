@@ -12,9 +12,6 @@ const (
 	// Default group.
 	Default = define.Default
 
-	// Endpoint group of tests. Used for testing endpoint inside of Elastic Agent.
-	Endpoint = "endpoint"
-
 	// Fleet group of tests. Used for testing Elastic Agent with Fleet.
 	Fleet = "fleet"
 
