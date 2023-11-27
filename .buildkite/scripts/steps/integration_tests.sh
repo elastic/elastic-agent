@@ -3,10 +3,6 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-# To figure-out what is happening on with running the Windows add my credentails.
-ssh-import-id gh:blakerouse
-whoami
-
 STACK_PROVISIONER="${1:-"stateful"}"
 MAGE_TARGET="${2:-"integration:test"}"
 MAGE_SUBTARGET="${3:-""}"
@@ -27,7 +23,7 @@ AGENT_PACKAGE_VERSION="${OVERRIDE_AGENT_PACKAGE_VERSION}" DEV=true EXTERNAL=true
 
 # Run integration tests
 set +e
-AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}" TEST_INTEG_CLEAN_ON_EXIT=true  STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage $MAGE_TARGET $MAGE_SUBTARGET
+MAGE_VERBOSE="1" TEST_PLATFORMS="windows/amd64" TEST_GROUPS="default" AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}" TEST_INTEG_CLEAN_ON_EXIT=true  STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage $MAGE_TARGET $MAGE_SUBTARGET
 TESTS_EXIT_STATUS=$?
 set -e
 
