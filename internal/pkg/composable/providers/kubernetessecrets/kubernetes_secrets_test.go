@@ -138,3 +138,110 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 	assert.False(t, found)
 	assert.EqualValues(t, val, "")
 }
+
+func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
+	client := k8sfake.NewSimpleClientset()
+
+	ttlDelete, err := time.ParseDuration("1s")
+	require.NoError(t, err)
+
+	ttlUpdate, err := time.ParseDuration("100ms")
+	require.NoError(t, err)
+
+	secret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "apps/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testing_secret",
+			Namespace: ns,
+		},
+		Data: map[string][]byte{
+			"secret_value": []byte(pass),
+		},
+	}
+	_, err = client.CoreV1().Secrets(ns).Create(context.Background(), secret, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	logger := logp.NewLogger("test_k8s_secrets")
+
+	c := map[string]interface{}{
+		"ttl_update": ttlUpdate,
+		"ttl_delete": ttlDelete,
+	}
+	cfg, err := config.NewConfigFrom(c)
+	require.NoError(t, err)
+
+	p, err := ContextProviderBuilder(logger, cfg, true)
+	require.NoError(t, err)
+
+	fp, _ := p.(*contextProviderK8sSecrets)
+
+	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
+		return client, nil
+	}
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := ctesting.NewContextComm(ctx)
+
+	go func() {
+		_ = fp.Run(ctx, comm)
+	}()
+
+	for {
+		fp.clientMx.Lock()
+		client := fp.client
+		fp.clientMx.Unlock()
+		if client != nil {
+			break
+		}
+		<-time.After(10 * time.Millisecond)
+	}
+
+	// Secret cache should be empty at start
+	fp.secretsCacheMx.Lock()
+	assert.Equal(t, len(fp.secretsCache), 0)
+	fp.secretsCacheMx.Unlock()
+
+	// Secret should be in the cache after this call
+	val, found := fp.Fetch("kubernetes_secrets.test_namespace.testing_secret.secret_value")
+	assert.True(t, found)
+	assert.Equal(t, val, pass)
+	fp.secretsCacheMx.Lock()
+	assert.Equal(t, len(fp.secretsCache), 1)
+	fp.secretsCacheMx.Unlock()
+
+	// Update the secret and check after TTL time, the secret value is correct
+	newPass := "new-pass"
+	secret = &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "apps/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testing_secret",
+			Namespace: ns,
+		},
+		Data: map[string][]byte{
+			"secret_value": []byte(newPass),
+		},
+	}
+	_, err = client.CoreV1().Secrets(ns).Update(context.Background(), secret, metav1.UpdateOptions{})
+	require.NoError(t, err)
+
+	// wait for ttl update
+	<-time.After(ttlUpdate)
+	val, found = fp.Fetch("kubernetes_secrets.test_namespace.testing_secret.secret_value")
+	assert.True(t, found)
+	assert.Equal(t, val, newPass)
+
+	// After TTL delete, secret should no longer be found in cache since it was never
+	// fetched during that time
+	<-time.After(ttlDelete)
+	fp.secretsCacheMx.Lock()
+	assert.Equal(t, 0, len(fp.secretsCache))
+	fp.secretsCacheMx.Unlock()
+}

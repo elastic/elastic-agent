@@ -106,16 +106,12 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
 func (p *contextProviderK8sSecrets) updateCache() {
 	p.secretsCacheMx.Lock()
 	for name, data := range p.secretsCache {
-		newValue, ok := p.fetchSecret(name)
-
-		// remove the secret from the cache
-		if !ok {
+		diff := time.Since(data.lastAccess)
+		if diff > p.config.TTLDelete {
 			delete(p.secretsCache, name)
 		} else {
-			// if the secret has not been accessed in over 1h, delete it
-			// to avoid keeping secrets in cache that are no longer in use
-			diff := time.Since(data.lastAccess)
-			if diff > p.config.TTLDelete {
+			newValue, ok := p.fetchSecret(name)
+			if !ok {
 				delete(p.secretsCache, name)
 			} else {
 				data.value = newValue
