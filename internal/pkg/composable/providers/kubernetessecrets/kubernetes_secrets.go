@@ -125,7 +125,7 @@ func (p *contextProviderK8sSecrets) updateCache() {
 		} else {
 			// if the secret has not been accessed in over 1h, delete it
 			// to avoid keeping secrets in cache that are no longer in use
-			diff := time.Now().Sub(data.lastAccess).Hours()
+			diff := time.Since(data.lastAccess).Hours()
 			if diff > 1 {
 				delete(p.secretsCache, name)
 			} else {
