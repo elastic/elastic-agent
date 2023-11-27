@@ -108,7 +108,8 @@ func testMonitoringLogsAreShipped(
 		return estools.GetLogsForDataset(info.ESClient, "elastic_agent.metricbeat")
 	})
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
-	require.NotZero(t, len(docs.Hits.Hits))
+	require.NotZero(t, len(docs.Hits.Hits),
+		"Looking for logs in dataset 'elastic_agent.metricbeat'")
 
 	// Stage 2: make sure all components are healthy
 	t.Log("Making sure all components are healthy")
