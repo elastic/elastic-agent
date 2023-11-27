@@ -102,7 +102,7 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
 
 func (p *contextProviderK8sSecrets) updateCache() {
 	p.secretsCacheMx.Lock()
-	for name, _ := range p.secretsCache {
+	for name := range p.secretsCache {
 		newValue, ok := p.fetchSecret(name)
 
 		// remove the secret from the cache
