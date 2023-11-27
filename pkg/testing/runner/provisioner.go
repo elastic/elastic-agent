@@ -12,12 +12,18 @@ import (
 
 // Instance represents a provisioned instance.
 type Instance struct {
+	// Provider is the instance provider for the instance.
+	// See INSTANCE_PROVISIONER environment variable for the supported providers.
+	Provider string `yaml:"provider"`
 	// ID is the identifier of the instance.
 	//
 	// This must be the same ID of the OSBatch.
 	ID string `yaml:"id"`
 	// Name is the nice-name of the instance.
 	Name string `yaml:"name"`
+	// Provisioner is the instance provider for the instance.
+	// See INSTANCE_PROVISIONER environment variable for the supported Provisioner.
+	Provisioner string `yaml:"provisioner"`
 	// IP is the IP address of the instance.
 	IP string `yaml:"ip"`
 	// Username is the username used to SSH to the instance.
@@ -32,6 +38,9 @@ type Instance struct {
 
 // InstanceProvisioner performs the provisioning of instances.
 type InstanceProvisioner interface {
+	// Name returns the name of the instance provisioner.
+	Name() string
+
 	// SetLogger sets the logger for it to use.
 	SetLogger(l Logger)
 
@@ -53,6 +62,10 @@ type Stack struct {
 	//
 	// This must be the same ID used for requesting a stack.
 	ID string `yaml:"id"`
+
+	// Provisioner is the stack provisioner. See STACK_PROVISIONER environment
+	// variable for the supported provisioners.
+	Provisioner string `yaml:"provisioner"`
 
 	// Version is the version of the stack.
 	Version string `yaml:"version"`
@@ -89,6 +102,9 @@ type StackRequest struct {
 
 // StackProvisioner performs the provisioning of stacks.
 type StackProvisioner interface {
+	// Name returns the name of the stack provisioner.
+	Name() string
+
 	// SetLogger sets the logger for it to use.
 	SetLogger(l Logger)
 

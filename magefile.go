@@ -1567,6 +1567,33 @@ func (Integration) PrepareOnRemote() {
 	mg.Deps(mage.InstallGoTestTools)
 }
 
+// Run beat serverless tests
+func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
+	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
+	if os.Getenv("AGENT_BUILD_DIR") == "" {
+		err := os.Setenv("AGENT_BUILD_DIR", beatBuildPath)
+		if err != nil {
+			return fmt.Errorf("error setting build dir: %s", err)
+		}
+	}
+
+	// a bit of bypass logic; run as serverless by default
+	if os.Getenv("STACK_PROVISIONER") == "" {
+		err := os.Setenv("STACK_PROVISIONER", "serverless")
+		if err != nil {
+			return fmt.Errorf("error setting serverless stack var: %w", err)
+		}
+	} else if os.Getenv("STACK_PROVISIONER") == "stateful" {
+		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
+	}
+
+	err := os.Setenv("TEST_BINARY_NAME", beatname)
+	if err != nil {
+		return fmt.Errorf("error setting binary name: %w", err)
+	}
+	return integRunner(ctx, false, "TestBeatsServerless")
+}
+
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	mg.Deps(Build.TestBinaries)
@@ -1772,10 +1799,14 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
 	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
 	if stackProvisionerMode == "" {
-		stackProvisionerMode = "stateful"
+		stackProvisionerMode = ess.ProvisionerStateful
 	}
-	if stackProvisionerMode != "stateful" && stackProvisionerMode != "serverless" {
-		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of 'serverless' or 'stateful', not %s", stackProvisionerMode)
+	if stackProvisionerMode != ess.ProvisionerStateful &&
+		stackProvisionerMode != ess.ProvisionerServerless {
+		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
+			ess.ProvisionerStateful,
+			ess.ProvisionerServerless,
+			stackProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
@@ -1831,9 +1862,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	var instanceProvisioner runner.InstanceProvisioner
-	if instanceProvisionerMode == "multipass" {
+	if instanceProvisionerMode == multipass.Name {
 		instanceProvisioner = multipass.NewProvisioner()
-	} else if instanceProvisionerMode == "ogc" {
+	} else if instanceProvisionerMode == ogc.Name {
 		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
 		if err != nil {
 			return nil, err
@@ -1848,12 +1879,13 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Region:     essRegion,
 	}
 	var stackProvisioner runner.StackProvisioner
-	if stackProvisionerMode == "stateful" {
+	if stackProvisionerMode == ess.ProvisionerStateful {
 		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err
 		}
-	} else if stackProvisionerMode == "serverless" {
+
+	} else if stackProvisionerMode == ess.ProvisionerServerless {
 		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err
