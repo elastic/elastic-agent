@@ -111,6 +111,9 @@ func TestMonitoringLogsShipped(t *testing.T) {
 			"Failed to initialize artifact",
 			"Failed to apply initial policy from on disk configuration",
 			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
+			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/instance-id\\\": dial tcp 169.254.169.254:443: connect: connection refused", // okay for the openstack metadata to not work
+			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/hostname\\\": dial tcp 169.254.169.254:443: connect: connection refused",    // okay for the cloud metadata to not work
+			"add_cloud_metadata: received error failed with http status code 404", // okay for the cloud metadata to not work
 		})
 	})
 	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))

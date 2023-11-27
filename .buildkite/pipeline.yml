@@ -4,19 +4,31 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
-  - label: "Unit tests - Ubuntu 22.04"
-    key: "unit-tests-2204"
-    command: ".buildkite/scripts/steps/unit-tests.sh"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-      - "coverage.out"
+  - label: "check-ci"
+    key: "check-ci"
+    command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
       image: "family/core-ubuntu-2204"
     retry:
       manual:
         allowed: true
+  - group: "Unit tests"
+    key: "unit-tests"
+    steps:
+      - label: "Unit tests - Ubuntu 22.04"
+        key: "unit-tests-2204"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        artifact_paths:
+          - "build/TEST-**"
+          - "build/diagnostics/*"
+          - "coverage.out"
+        agents:
+          provider: "gcp"
+          image: "family/core-ubuntu-2204"
+        retry:
+          manual:
+            allowed: true
 
   - label: "Unit tests - Ubuntu 22.04 ARM64"
     key: "unit-tests-2204-arm64"
@@ -177,3 +189,23 @@ steps:
     plugins:
       - junit-annotate#v2.4.1:
           artifacts: build/TEST-go-integration*.xml
+
+  # Triggers a dynamic step: Sync K8s
+  # Runs only on main and if k8s files are changed
+  - label: "Trigger k8s sync"
+    branches: main
+    plugins:
+      - monebag/monorepo-diff#v2.5.9:
+          diff: "git diff --name-only HEAD~1"
+          watch:
+            - path:
+                - deploy/kubernetes/*
+                - version/docs/version.asciidoc
+              config:
+                label: "Sync K8s"
+                command: ".buildkite/scripts/steps/sync-k8s.sh"
+                agents:
+                  provider: "gcp"
+                  image: "family/core-ubuntu-2204"
+                env:
+                  - GH_VERSION=2.4.0
