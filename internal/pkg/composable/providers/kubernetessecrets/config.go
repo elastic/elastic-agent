@@ -4,18 +4,22 @@
 
 package kubernetessecrets
 
-import "github.com/elastic/elastic-agent-autodiscover/kubernetes"
+import (
+	"time"
+
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+)
 
 // Config for kubernetes provider
 type Config struct {
 	KubeConfig        string                       `config:"kube_config"`
 	KubeClientOptions kubernetes.KubeClientOptions `config:"kube_client_options"`
 
-	TTL string `config:"ttl"`
+	TTLUpdate time.Duration `config:"ttl_update"`
+	TTLDelete time.Duration `config:"ttl_delete"`
 }
 
-var defaultTTL = "60s"
-
 func (c *Config) InitDefaults() {
-	c.TTL = defaultTTL
+	c.TTLUpdate = 60 * time.Second
+	c.TTLDelete = 1 * time.Hour
 }

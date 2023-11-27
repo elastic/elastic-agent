@@ -91,25 +91,14 @@ func getK8sClient(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclien
 
 // Update the secrets in the cache every TTL minutes
 func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
-	d, err := time.ParseDuration(p.config.TTL)
-	if err != nil {
-		p.logger.Debugf(
-			"TTL %v is not valid: %v. Default of %v will be used.",
-			p.config.TTL,
-			err,
-			defaultTTL,
-		)
-		d, _ = time.ParseDuration(defaultTTL)
-	}
-	timer := time.NewTimer(d)
-
+	timer := time.NewTimer(p.config.TTLUpdate)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
 			p.updateCache()
-			timer.Reset(d)
+			timer.Reset(p.config.TTLUpdate)
 		}
 	}
 }
@@ -125,8 +114,8 @@ func (p *contextProviderK8sSecrets) updateCache() {
 		} else {
 			// if the secret has not been accessed in over 1h, delete it
 			// to avoid keeping secrets in cache that are no longer in use
-			diff := time.Since(data.lastAccess).Hours()
-			if diff > 1 {
+			diff := time.Since(data.lastAccess)
+			if diff > p.config.TTLDelete {
 				delete(p.secretsCache, name)
 			} else {
 				data.value = newValue
