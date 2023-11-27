@@ -10,4 +10,10 @@ import "github.com/elastic/elastic-agent-autodiscover/kubernetes"
 type Config struct {
 	KubeConfig        string                       `config:"kube_config"`
 	KubeClientOptions kubernetes.KubeClientOptions `config:"kube_client_options"`
+
+	TTL int `config:"ttl"`
+}
+
+func (c *Config) InitDefaults() {
+	c.TTL = 10
 }

@@ -8,6 +8,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
@@ -33,6 +34,9 @@ type contextProviderK8sSecrets struct {
 
 	clientMx sync.Mutex
 	client   k8sclient.Interface
+
+	secretsCacheMx sync.Mutex
+	secretsCache   map[string]string
 }
 
 // ContextProviderBuilder builds the context provider.
@@ -46,19 +50,102 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
 	return &contextProviderK8sSecrets{
-		logger: logger,
-		config: &cfg,
+		logger:       logger,
+		config:       &cfg,
+		secretsCache: make(map[string]string),
 	}, nil
 }
 
 func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
-	// key = "kubernetes_secrets.somenamespace.somesecret.value"
+	return p.getFromCache(key)
+}
+
+// Run initializes the k8s secrets context provider.
+func (p *contextProviderK8sSecrets) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
+	client, err := getK8sClientFunc(p.config.KubeConfig, p.config.KubeClientOptions)
+	if err != nil {
+		p.logger.Debugf("Kubernetes_secrets provider skipped, unable to connect: %s", err)
+		return nil
+	}
+	p.clientMx.Lock()
+	p.client = client
+	p.clientMx.Unlock()
+	go p.updateSecrets(ctx)
+
+	<-comm.Done()
+
+	p.clientMx.Lock()
+	p.client = nil
+	p.clientMx.Unlock()
+	return comm.Err()
+}
+
+func getK8sClient(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
+	return kubernetes.GetKubernetesClient(kubeconfig, opt)
+}
+
+// Update the secrets in the cache every TTL minutes
+func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
+	d := time.Duration(p.config.TTL) * time.Minute
+	timer := time.NewTimer(d)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+			p.updateCache()
+			timer.Reset(d)
+		}
+	}
+}
+
+func (p *contextProviderK8sSecrets) updateCache() {
+	p.secretsCacheMx.Lock()
+	for name, _ := range p.secretsCache {
+		newValue, ok := p.fetchSecret(name)
+
+		// remove the secret from the cache
+		if !ok {
+			delete(p.secretsCache, name)
+		} else {
+			p.secretsCache[name] = newValue
+		}
+	}
+	p.secretsCacheMx.Unlock()
+}
+
+func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
+	p.secretsCacheMx.Lock()
+	value, ok := p.secretsCache[key]
+	p.secretsCacheMx.Unlock()
+
+	// if value is still not present in cache, it is possible we haven't tried to fetch it yet
+	if !ok {
+		value, ok = p.addToCache(key)
+	}
+	return value, ok
+}
+
+func (p *contextProviderK8sSecrets) addToCache(key string) (string, bool) {
+	value, ok := p.fetchSecret(key)
+	if ok {
+		p.secretsCacheMx.Lock()
+		p.secretsCache[key] = value
+		p.secretsCacheMx.Unlock()
+	}
+	return value, ok
+}
+
+func (p *contextProviderK8sSecrets) fetchSecret(key string) (string, bool) {
 	p.clientMx.Lock()
 	client := p.client
 	p.clientMx.Unlock()
 	if client == nil {
 		return "", false
 	}
+
+	// key = "kubernetes_secrets.somenamespace.somesecret.value"
 	tokens := strings.Split(key, ".")
 	if len(tokens) > 0 && tokens[0] != "kubernetes_secrets" {
 		return "", false
@@ -87,26 +174,6 @@ func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
 		return "", false
 	}
 	secretString := secret.Data[secretVar]
+
 	return string(secretString), true
-}
-
-// Run initializes the k8s secrets context provider.
-func (p *contextProviderK8sSecrets) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
-	client, err := getK8sClientFunc(p.config.KubeConfig, p.config.KubeClientOptions)
-	if err != nil {
-		p.logger.Debugf("Kubernetes_secrets provider skipped, unable to connect: %s", err)
-		return nil
-	}
-	p.clientMx.Lock()
-	p.client = client
-	p.clientMx.Unlock()
-	<-comm.Done()
-	p.clientMx.Lock()
-	p.client = nil
-	p.clientMx.Unlock()
-	return comm.Err()
-}
-
-func getK8sClient(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
-	return kubernetes.GetKubernetesClient(kubeconfig, opt)
 }
