@@ -560,7 +560,7 @@ type ExecErr struct {
 }
 
 func (e *ExecErr) Error() string {
-	return e.err.Error()
+	return e.String()
 }
 
 func (e *ExecErr) String() string {

@@ -79,7 +79,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 	defer upCancel()
 	upOutput, err := p.ogcUp(upCtx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ogc up failed: %w", err)
 	}
 
 	// fetch the machines and run the batches on the machine
@@ -100,8 +100,8 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 	for _, b := range batches {
 		machine, ok := findMachine(machines, b.ID)
 		if !ok {
-			// print the output so its clear what went wrong
-			// without this it's unclear where OGC went wrong it
+			// print the output so its clear what went wrong.
+			// Without this it's unclear where OGC went wrong, it
 			// doesn't do a great job of reporting a clean error
 			fmt.Fprintf(os.Stdout, "%s\n", upOutput)
 			return nil, fmt.Errorf("failed to find machine for batch ID: %s", b.ID)
