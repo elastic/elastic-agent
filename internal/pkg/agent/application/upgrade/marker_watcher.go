@@ -129,9 +129,12 @@ func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string
 	// isn't for some reason, we fallback to explicitly setting that state as
 	// part of the upgrade details in the marker.
 	if marker.PrevVersion == currentVersion && marker.PrevHash == commit && !mfw.upgradeStarted.Load() {
+		// If there are no upgrade details in the marker or the state in the
+		// details is not set for some reason, we assume the worst and
+		// explicitly set the state to UPG_ROLLBACK
 		if marker.Details == nil {
 			marker.Details = details.NewDetails("unknown", details.StateRollback, marker.GetActionID())
-		} else {
+		} else if marker.Details.State == "" {
 			marker.Details.SetState(details.StateRollback)
 		}
 	}

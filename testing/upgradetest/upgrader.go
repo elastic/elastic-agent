@@ -7,10 +7,12 @@ package upgradetest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -250,6 +252,13 @@ func PerformUpgrade(
 	}
 	logger.Logf("upgrade watcher started")
 
+	// Check that, while the Upgrade Watcher is running, the upgrade details in Agent status
+	// show the state as UPG_WATCHING.
+	if err := waitUpgradeDetailsState(ctx, startFixture, details.StateWatching, 2*time.Minute, 10*time.Second); err != nil {
+		// error context added by waitUpgradeDetailsState
+		return err
+	}
+
 	if upgradeOpts.postUpgradeHook != nil {
 		if err := upgradeOpts.postUpgradeHook(); err != nil {
 			return fmt.Errorf("post upgrade hook failed: %w", err)
@@ -288,6 +297,14 @@ func PerformUpgrade(
 		// error context added by CheckHealthyAndVersion
 		return err
 	}
+
+	// Check that, upon successful upgrade, the upgrade details have been cleared out
+	// from Agent status.
+	if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, 10*time.Second); err != nil {
+		// error context added by waitUpgradeDetailsState
+		return err
+	}
+
 	return nil
 }
 
@@ -382,6 +399,54 @@ func WaitHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo
 			}
 			lastErr = err
 			logger.Logf("waiting for healthy agent and proper version: %s", err)
+		}
+	}
+}
+
+func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedState details.State, timeout time.Duration, interval time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	t := time.NewTicker(interval)
+	defer t.Stop()
+
+	var lastErr error
+	for {
+		select {
+		case <-ctx.Done():
+			if lastErr != nil {
+				return fmt.Errorf("failed waiting for healthy agent and version (%w): %w", ctx.Err(), lastErr)
+			}
+			return ctx.Err()
+		case <-t.C:
+			status, err := f.ExecStatus(ctx)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+
+			if expectedState == "" {
+				if status.UpgradeDetails == nil {
+					// Expected and actual match, so we're good
+					return nil
+				}
+
+				lastErr = errors.New("upgrade details found in status but they were expected to be absent")
+				continue
+			}
+
+			if status.UpgradeDetails == nil {
+				lastErr = fmt.Errorf("upgrade details not found in status but expected upgrade details state was [%s]", expectedState)
+				continue
+			}
+
+			// Neither expected nor actual are nil, so compare the two
+			if status.UpgradeDetails.State == expectedState {
+				return nil
+			}
+
+			lastErr = fmt.Errorf("upgrade details state in status [%s] is not the same as expected upgrade details state  [%s]", status.UpgradeDetails.State, expectedState)
+			continue
 		}
 	}
 }
