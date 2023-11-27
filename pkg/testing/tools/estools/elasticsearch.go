@@ -533,7 +533,22 @@ func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{
 		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
 	}
 
-	return handleDocsResponse(res)
+	docs, err := handleDocsResponse(res)
+
+	fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+	fmt.Println("Query:")
+	query, debugErr := json.MarshalIndent(queryRaw, "|", "  ")
+	if debugErr != nil {
+		fmt.Println("Error marshalling 'queryRaw':", debugErr)
+		return docs, err
+	}
+	fmt.Println("Raw Query")
+	fmt.Println(string(query))
+	fmt.Println("Documents docs.Hits.Total.Value: ", docs.Hits.Total.Value)
+	fmt.Println("Documents len(docs.Hits.Hits): ", len(docs.Hits.Hits))
+	fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+
+	return docs, err
 }
 
 // GetLogsForDatastream returns any logs associated with the datastream
