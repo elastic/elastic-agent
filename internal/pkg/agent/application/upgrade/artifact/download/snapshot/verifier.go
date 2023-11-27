@@ -41,8 +41,9 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte, versio
 }
 
 // Verify checks the package from configured source.
-func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
-	return v.verifier.Verify(a, version, skipDefaultPgp, pgpBytes...)
+func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+	strippedVersion := agtversion.NewParsedSemVer(version.Major(), version.Minor(), version.Patch(), version.Prerelease(), "")
+	return v.verifier.Verify(a, *strippedVersion, skipDefaultPgp, pgpBytes...)
 }
 
 func (v *Verifier) Reload(c *artifact.Config) error {

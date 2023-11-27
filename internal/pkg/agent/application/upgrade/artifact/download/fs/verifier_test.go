@@ -22,12 +22,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/pgptest"
 )
 
-const (
-	version = "7.5.1"
-)
+var testVersion = version.NewParsedSemVer(7, 5, 1, "", "")
 
 var (
 	beatSpec = artifact.Artifact{
@@ -48,7 +47,7 @@ func TestFetchVerify(t *testing.T) {
 	ctx := context.Background()
 	a := artifact.Artifact{
 		Name: "elastic-agent", Cmd: "elastic-agent", Artifact: "beats/elastic-agent"}
-	version := "8.0.0"
+	aVersion := version.NewParsedSemVer(8, 0, 0, "", "")
 
 	filename := "elastic-agent-8.0.0-darwin-x86_64.tar.gz"
 	targetFilePath := filepath.Join(targetPath, filename)
@@ -80,7 +79,7 @@ func TestFetchVerify(t *testing.T) {
 	// first download verify should fail:
 	// download skipped, as invalid package is prepared upfront
 	// verify fails and cleans download
-	err = verifier.Verify(a, version, false)
+	err = verifier.Verify(a, *aVersion, false)
 	var checksumErr *download.ChecksumMismatchError
 	require.ErrorAs(t, err, &checksumErr)
 
@@ -93,7 +92,7 @@ func TestFetchVerify(t *testing.T) {
 	// second one should pass
 	// download not skipped: package missing
 	// verify passes because hash is not correct
-	_, err = NewDownloader(config).Download(ctx, a, version)
+	_, err = NewDownloader(config).Download(ctx, a, aVersion)
 	require.NoError(t, err)
 	asc, err := os.ReadFile(filepath.Join(dropPath, filename+".asc"))
 	require.NoErrorf(t, err, "could not open .asc for copy")
@@ -109,7 +108,7 @@ func TestFetchVerify(t *testing.T) {
 	_, err = os.Stat(ascTargetFilePath)
 	require.NoError(t, err)
 
-	err = verifier.Verify(a, version, false)
+	err = verifier.Verify(a, *aVersion, false)
 	require.NoError(t, err)
 
 	// Bad GPG public key.
@@ -126,7 +125,7 @@ func TestFetchVerify(t *testing.T) {
 
 	// Missing .asc file.
 	{
-		err = verifier.Verify(a, version, false)
+		err = verifier.Verify(a, *aVersion, false)
 		require.Error(t, err)
 
 		// Don't delete these files when GPG validation failure.
@@ -139,7 +138,7 @@ func TestFetchVerify(t *testing.T) {
 		err = os.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
 		require.NoError(t, err)
 
-		err = verifier.Verify(a, version, false)
+		err = verifier.Verify(a, *aVersion, false)
 		var invalidSigErr *download.InvalidSignatureError
 		assert.ErrorAs(t, err, &invalidSigErr)
 
@@ -217,12 +216,12 @@ func TestVerify(t *testing.T) {
 				},
 			}
 
-			pgpKey := prepareTestCase(t, beatSpec, version, config)
+			pgpKey := prepareTestCase(t, beatSpec, testVersion, config)
 
 			testClient := NewDownloader(config)
-			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+			artifactPath, err := testClient.Download(context.Background(), beatSpec, testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts")
-			_, err = testClient.DownloadAsc(context.Background(), beatSpec, version)
+			_, err = testClient.DownloadAsc(context.Background(), beatSpec, *testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts .asc file")
 
 			_, err = os.Stat(artifactPath)
@@ -231,7 +230,7 @@ func TestVerify(t *testing.T) {
 			testVerifier, err := NewVerifier(log, config, pgpKey)
 			require.NoError(t, err)
 
-			err = testVerifier.Verify(beatSpec, version, false, tc.RemotePGPUris...)
+			err = testVerifier.Verify(beatSpec, *testVersion, false, tc.RemotePGPUris...)
 			require.NoError(t, err)
 
 			// log message informing remote PGP was skipped
@@ -241,17 +240,13 @@ func TestVerify(t *testing.T) {
 	}
 }
 
-// prepareTestCase creates an artifact file, defined by 'a' and 'version',
+// prepareTestCase creates an artifact file, defined by 'a' and 'testVersion',
 // its corresponding checksum (.sha512) and signature (.asc) files.
 // It creates the necessary key to sing the artifact and returns the public key
 // to verify the signature.
-func prepareTestCase(
-	t *testing.T,
-	a artifact.Artifact,
-	version string,
-	cfg *artifact.Config) []byte {
+func prepareTestCase(t *testing.T, a artifact.Artifact, aVersion *version.ParsedSemVer, cfg *artifact.Config) []byte {
 
-	filename, err := artifact.GetArtifactName(a, version, cfg.OperatingSystem, cfg.Architecture)
+	filename, err := artifact.GetArtifactName(a, *aVersion, cfg.OperatingSystem, cfg.Architecture)
 	require.NoErrorf(t, err, "could not get artifact name")
 
 	err = os.MkdirAll(cfg.DropPath, 0777)

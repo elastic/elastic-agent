@@ -121,7 +121,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		}
 	}
 
-	if err := verifier.Verify(agentArtifact, parsedVersion.VersionWithPrerelease(), skipDefaultPgp, pgpBytes...); err != nil {
+	if err := verifier.Verify(agentArtifact, *parsedVersion, skipDefaultPgp, pgpBytes...); err != nil {
 		return "", errors.New(err, "failed verification of agent binary")
 	}
 	return path, nil
@@ -219,7 +219,7 @@ func (u *Upgrader) downloadOnce(
 	// All download artifacts expect a name that includes <major>.<minor.<patch>[-SNAPSHOT] so we have to
 	// make sure not to include build metadata we might have in the parsed version (for snapshots we already
 	// used that to configure the URL we download the files from)
-	path, err := downloader.Download(ctx, agentArtifact, version.VersionWithPrerelease())
+	path, err := downloader.Download(ctx, agentArtifact, version)
 	if err != nil {
 		return "", fmt.Errorf("unable to download package: %w", err)
 	}

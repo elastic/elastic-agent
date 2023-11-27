@@ -28,7 +28,7 @@ type mockDownloader struct {
 	downloadErr  error
 }
 
-func (md *mockDownloader) Download(ctx context.Context, agentArtifact artifact.Artifact, version string) (string, error) {
+func (md *mockDownloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
 	return md.downloadPath, md.downloadErr
 }
 

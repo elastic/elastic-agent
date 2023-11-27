@@ -59,7 +59,7 @@ func TestDownload(t *testing.T) {
 
 			upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
-			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+			artifactPath, err := testClient.Download(context.Background(), beatSpec, aVersion)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -109,7 +109,7 @@ func TestDownloadBodyError(t *testing.T) {
 	log, obs := logger.NewTesting("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
-	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+	artifactPath, err := testClient.Download(context.Background(), beatSpec, aVersion)
 	os.Remove(artifactPath)
 	if err == nil {
 		t.Fatal("expected Download to return an error")
@@ -118,7 +118,7 @@ func TestDownloadBodyError(t *testing.T) {
 	infoLogs := obs.FilterLevelExact(zapcore.InfoLevel).TakeAll()
 	warnLogs := obs.FilterLevelExact(zapcore.WarnLevel).TakeAll()
 
-	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/filebeat/filebeat", version, "linux-x86_64.tar.gz")
+	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/filebeat/filebeat", aVersion, "linux-x86_64.tar.gz")
 	expectedMsg := fmt.Sprintf("download from %s failed at 0B @ NaNBps: unexpected EOF", expectedURL)
 	require.GreaterOrEqual(t, len(infoLogs), 1, "download error not logged at info level")
 	assert.True(t, containsMessage(infoLogs, expectedMsg))
@@ -166,11 +166,11 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	log, obs := logger.NewTesting("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
-	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+	artifactPath, err := testClient.Download(context.Background(), beatSpec, aVersion)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
 
-	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/filebeat/filebeat", version, "linux-x86_64.tar.gz")
+	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/filebeat/filebeat", aVersion, "linux-x86_64.tar.gz")
 	expectedProgressRegexp := regexp.MustCompile(
 		`^download progress from ` + expectedURL + `(.sha512)? is \S+/\S+ \(\d+\.\d{2}% complete\) @ \S+$`,
 	)
@@ -249,11 +249,11 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	log, obs := logger.NewTesting("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
-	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+	artifactPath, err := testClient.Download(context.Background(), beatSpec, aVersion)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
 
-	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/filebeat/filebeat", version, "linux-x86_64.tar.gz")
+	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/filebeat/filebeat", aVersion, "linux-x86_64.tar.gz")
 	expectedProgressRegexp := regexp.MustCompile(
 		`^download progress from ` + expectedURL + `(.sha512)? has fetched \S+ @ \S+$`,
 	)

@@ -11,6 +11,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -23,7 +24,7 @@ func (d *ErrorVerifier) Name() string {
 	return "error"
 }
 
-func (d *ErrorVerifier) Verify(a artifact.Artifact, version string, _ bool, _ ...string) error {
+func (d *ErrorVerifier) Verify(a artifact.Artifact, version version.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	d.called = true
 	return errors.New("failing")
 }
@@ -38,7 +39,7 @@ func (d *FailVerifier) Name() string {
 	return "fail"
 }
 
-func (d *FailVerifier) Verify(a artifact.Artifact, version string, _ bool, _ ...string) error {
+func (d *FailVerifier) Verify(a artifact.Artifact, version version.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	d.called = true
 	return &download.InvalidSignatureError{File: "", Err: errors.New("invalid signature")}
 }
@@ -53,7 +54,7 @@ func (d *SuccVerifier) Name() string {
 	return "succ"
 }
 
-func (d *SuccVerifier) Verify(a artifact.Artifact, version string, _ bool, _ ...string) error {
+func (d *SuccVerifier) Verify(a artifact.Artifact, version version.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	d.called = true
 	return nil
 }
@@ -86,9 +87,10 @@ func TestVerifier(t *testing.T) {
 		},
 	}
 
+	testVersion := version.NewParsedSemVer(1, 2, 3, "", "")
 	for _, tc := range testCases {
 		d := NewVerifier(log, tc.verifiers[0], tc.verifiers[1], tc.verifiers[2])
-		err := d.Verify(artifact.Artifact{Name: "a", Cmd: "a", Artifact: "a/a"}, "b", false)
+		err := d.Verify(artifact.Artifact{Name: "a", Cmd: "a", Artifact: "a/a"}, *testVersion, false)
 
 		assert.Equal(t, tc.expectedResult, err == nil)
 
