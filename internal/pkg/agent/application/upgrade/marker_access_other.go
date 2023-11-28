@@ -26,5 +26,5 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 // On non-Windows platforms, writeMarkerFile simply writes the marker file.
 // See marker_access_windows.go for behavior on Windows platforms.
 func writeMarkerFile(markerFile string, markerBytes []byte) error {
-	return os.WriteFile(markerFilePath(), markerBytes, 0600)
+	return os.WriteFile(markerFile, markerBytes, 0600)
 }
