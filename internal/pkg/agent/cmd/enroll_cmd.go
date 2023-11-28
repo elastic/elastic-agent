@@ -457,7 +457,7 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 		return nil
 	}
 	if errors.Is(err, context.DeadlineExceeded) ||
-			errors.Is(err, context.Canceled) {
+		errors.Is(err, context.Canceled) {
 		return fmt.Errorf("could not reload daemon: %w", err)
 	}
 
@@ -468,15 +468,15 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 	for i := 0; i < 5; i++ {
 		backExp.Wait()
 		c.log.Info("Retrying to restart...")
+
 		err = c.daemonReload(ctx)
-		if err != nil &&
-			(errors.Is(err, context.DeadlineExceeded) ||
-				errors.Is(err, context.Canceled)) {
-			return fmt.Errorf("could not reload daemon after %d retries: %w",
-				i+1, err)
-		}
 		if err == nil {
 			return nil
+		}
+		if errors.Is(err, context.DeadlineExceeded) ||
+			errors.Is(err, context.Canceled) {
+			return fmt.Errorf("could not reload daemon after %d retries: %w",
+				i+1, err)
 		}
 	}
 

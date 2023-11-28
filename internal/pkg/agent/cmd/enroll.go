@@ -77,6 +77,8 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().DurationP("fleet-server-timeout", "", 0, "Timeout waiting for Fleet Server to be ready to start enrollment")
 	cmd.Flags().Bool("skip-daemon-reload", false, "Skip daemon reload after enrolling")
 	cmd.Flags().StringSliceP("tag", "", []string{}, "User set tags")
+
+	cmd.Flags().MarkHidden("skip-daemon-reload")
 }
 
 func validateEnrollFlags(cmd *cobra.Command) error {
