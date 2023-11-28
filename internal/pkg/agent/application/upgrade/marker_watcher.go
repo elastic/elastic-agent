@@ -139,5 +139,7 @@ func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string
 		}
 	}
 
+	// FIXME: Special case for UPG_COMPLETED -> nil details
+
 	mfw.updateCh <- *marker
 }
