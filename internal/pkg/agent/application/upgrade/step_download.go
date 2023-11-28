@@ -257,7 +257,8 @@ func (u *Upgrader) downloadWithRetries(
 	}
 
 	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
-		u.log.Warnf("%s; retrying (will be retry %d) in %s.", err.Error(), attempt, retryAfter)
+		u.log.Warnf("download attempt %d failed: %s; retrying in %s.",
+			attempt, err.Error(), retryAfter)
 	}
 
 	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
