@@ -19,11 +19,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -1007,8 +1007,9 @@ type AgentStatusOutput struct {
 			} `json:"meta"`
 		} `json:"version_info,omitempty"`
 	} `json:"components"`
-	FleetState   int    `json:"FleetState"`
-	FleetMessage string `json:"FleetMessage"`
+	FleetState     int              `json:"FleetState"`
+	FleetMessage   string           `json:"FleetMessage"`
+	UpgradeDetails *details.Details `json:"upgrade_details"`
 }
 
 type AgentInspectOutput struct {
