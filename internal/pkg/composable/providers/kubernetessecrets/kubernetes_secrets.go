@@ -149,6 +149,24 @@ func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
 }
 
 func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
+	// Make sure the key has the expected format "kubernetes_secrets.somenamespace.somesecret.value"
+	tokens := strings.Split(key, ".")
+	if len(tokens) > 0 && tokens[0] != "kubernetes_secrets" {
+		return secretsData{
+			value: "",
+		}, false
+	}
+	if len(tokens) != 4 {
+		p.logger.Debugf(
+			"not valid secret key: %v. Secrets should be of the following format %v",
+			key,
+			"kubernetes_secrets.somenamespace.somesecret.value",
+		)
+		return secretsData{
+			value: "",
+		}, false
+	}
+
 	value, ok := p.fetchSecret(key)
 	data := secretsData{
 		value: value,
@@ -169,19 +187,12 @@ func (p *contextProviderK8sSecrets) fetchSecret(key string) (string, bool) {
 		return "", false
 	}
 
-	// key = "kubernetes_secrets.somenamespace.somesecret.value"
 	tokens := strings.Split(key, ".")
-	if len(tokens) > 0 && tokens[0] != "kubernetes_secrets" {
-		return "", false
-	}
-	if len(tokens) != 4 {
-		p.logger.Debugf(
-			"not valid secret key: %v. Secrets should be of the following format %v",
-			key,
-			"kubernetes_secrets.somenamespace.somesecret.value",
-		)
-		return "", false
-	}
+	// key has the format "kubernetes_secrets.somenamespace.somesecret.value"
+	// This function is only called from:
+	// - addToCache, where we already validated that the key has the right format.
+	// - updateCache, where the results are only added to the cache through addToCache
+	// Because of this we no longer need to validate the key
 	ns := tokens[1]
 	secretName := tokens[2]
 	secretVar := tokens[3]
