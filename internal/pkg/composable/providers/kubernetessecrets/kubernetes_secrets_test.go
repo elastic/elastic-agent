@@ -238,7 +238,7 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 
 	// wait for ttl update
 	<-time.After(ttlUpdate * 2)
-	val, found = fp.Fetch("kubernetes_secrets.test_namespace.testing_secret.secret_value")
+	val, found = fp.Fetch(key)
 	assert.True(t, found)
 	assert.Equal(t, newPass, val)
 
