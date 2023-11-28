@@ -140,12 +140,13 @@ func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
 		}
 	}
 
+	var pass string
 	p.secretsCacheMx.Lock()
 	data, ok := p.secretsCache[key]
 	data.lastAccess = time.Now()
+	pass = data.value
 	p.secretsCacheMx.Unlock()
-
-	return data.value, ok
+	return pass, ok
 }
 
 func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {

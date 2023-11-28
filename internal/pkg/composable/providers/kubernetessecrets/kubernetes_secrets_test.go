@@ -237,17 +237,20 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 	require.NoError(t, err)
 
 	// wait for ttl update
-	<-time.After(ttlUpdate * 2)
-	val, found = fp.Fetch(key)
-	assert.True(t, found)
-	assert.Equal(t, newPass, val)
+	<-time.After(ttlUpdate)
+	assert.Eventuallyf(t, func() bool {
+		val, found = fp.Fetch(key)
+		return found && val == newPass
+	}, ttlUpdate*3, ttlUpdate, "Failed to update the secret value after TTL update has passed.")
 
 	// After TTL delete, secret should no longer be found in cache since it was never
 	// fetched during that time
-	<-time.After(ttlDelete * 2)
-	fp.secretsCacheMx.Lock()
-	size := len(fp.secretsCache)
-	fp.secretsCacheMx.Unlock()
-	assert.Equal(t, 0, size)
+	<-time.After(ttlDelete)
+	assert.Eventuallyf(t, func() bool {
+		fp.secretsCacheMx.RLock()
+		size := len(fp.secretsCache)
+		fp.secretsCacheMx.RUnlock()
+		return size == 0
+	}, ttlDelete*3, ttlDelete, "Failed to delete the secret after TTL delete has passed.")
 
 }
