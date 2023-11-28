@@ -54,10 +54,10 @@ func (c *Coordinator) ClearOverrideState() {
 	c.overrideStateChan <- nil
 }
 
-// setRuntimeManagerError updates the error state for the runtime manager.
+// setRuntimeUpdateError reports a failed policy update in the runtime manager.
 // Called on the main Coordinator goroutine.
-func (c *Coordinator) setRuntimeManagerError(err error) {
-	c.runtimeMgrErr = err
+func (c *Coordinator) setRuntimeUpdateError(err error) {
+	c.runtimeUpdateErr = err
 	c.stateNeedsRefresh = true
 }
 
@@ -95,14 +95,6 @@ func (c *Coordinator) setConfigError(err error) {
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) setComponentGenError(err error) {
 	c.componentGenErr = err
-	c.stateNeedsRefresh = true
-}
-
-// setRuntimeUpdateError updates the error state for sending a component model
-// update to the runtime manager.
-// Called on the main Coordinator goroutine.
-func (c *Coordinator) setRuntimeUpdateError(err error) {
-	c.runtimeUpdateErr = err
 	c.stateNeedsRefresh = true
 }
 
@@ -184,9 +176,6 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.runtimeUpdateErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Runtime update failed: %s", c.runtimeUpdateErr.Error())
-	} else if c.runtimeMgrErr != nil {
-		s.State = agentclient.Failed
-		s.Message = fmt.Sprintf("Runtime manager: %s", c.runtimeMgrErr.Error())
 	} else if c.configMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Config manager: %s", c.configMgrErr.Error())
