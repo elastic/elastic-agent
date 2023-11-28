@@ -106,7 +106,7 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
 func (p *contextProviderK8sSecrets) updateCache() {
 	p.secretsCacheMx.Lock()
 	// deleting entries does not free the memory, so we need to create a new map
-	// to place the ones the secrets we want to keep
+	// to place the secrets we want to keep
 	cacheTmp := make(map[string]*secretsData)
 	for name, data := range p.secretsCache {
 		diff := time.Since(data.lastAccess)
@@ -186,9 +186,9 @@ func (p *contextProviderK8sSecrets) fetchSecret(key string) (string, bool) {
 	secretName := tokens[2]
 	secretVar := tokens[3]
 
-	secretIntefrace := client.CoreV1().Secrets(ns)
+	secretInterface := client.CoreV1().Secrets(ns)
 	ctx := context.TODO()
-	secret, err := secretIntefrace.Get(ctx, secretName, metav1.GetOptions{})
+	secret, err := secretInterface.Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		p.logger.Errorf("Could not retrieve secret from k8s API: %v", err)
 		return "", false
