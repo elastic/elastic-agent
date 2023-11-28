@@ -192,7 +192,9 @@ type Component struct {
 }
 
 func (c Component) MarshalYAML() (interface{}, error) {
-	c.ErrMsg = c.Err.Error()
+	if c.Err != nil {
+		c.ErrMsg = c.Err.Error()
+	}
 	return c, nil
 }
 
