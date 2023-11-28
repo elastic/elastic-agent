@@ -253,7 +253,7 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 
 	marker.Acked = true
 
-	return SaveMarker(marker)
+	return SaveMarker(marker, false)
 }
 
 func (u *Upgrader) MarkerWatcher() MarkerWatcher {
