@@ -104,15 +104,12 @@ func testMonitoringLogsAreShipped(
 ) {
 	// Stage 1: Make sure metricbeat logs are populated
 	t.Log("Making sure metricbeat logs are populated")
-	require.Eventually(t,
-		func() bool {
-			docs := findESDocs(t, func() (estools.Documents, error) {
-				return estools.GetLogsForDataset(info.ESClient, "elastic_agent.metricbeat")
-			})
-			return len(docs.Hits.Hits) > 0
-		},
-		1*time.Minute, 500*time.Millisecond,
-		"there should be metricbeats logs by now")
+	docs := findESDocs(t, func() (estools.Documents, error) {
+		return estools.GetLogsForDataset(info.ESClient, "elastic_agent.metricbeat")
+	})
+	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
+	require.NotZero(t, len(docs.Hits.Hits),
+		"Looking for logs in dataset 'elastic_agent.metricbeat'")
 
 	// Stage 2: make sure all components are healthy
 	t.Log("Making sure all components are healthy")
@@ -127,7 +124,7 @@ func testMonitoringLogsAreShipped(
 
 	// Stage 3: Make sure there are no errors in logs
 	t.Log("Making sure there are no error logs")
-	docs := findESDocs(t, func() (estools.Documents, error) {
+	docs = queryESDocs(t, func() (estools.Documents, error) {
 		return estools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{
 			// acceptable error messages (include reason)
 			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused", // beat is running default config before its config gets updated
@@ -167,7 +164,6 @@ func testMonitoringLogsAreShipped(
 	// this field is not mapped. There is an issue for that:
 	// https://github.com/elastic/integrations/issues/6545
 	// TODO: use runtime fields while the above issue is not resolved.
-
 	docs = findESDocs(t, func() (estools.Documents, error) {
 		return estools.GetLogsForAgentID(info.ESClient, agentID)
 	})
@@ -197,6 +193,28 @@ func testMonitoringLogsAreShipped(
 	}
 }
 
+// queryESDocs runs `findFn` until it returns no error. Zero documents returned
+// is considered a success.
+func queryESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.Documents {
+	var docs estools.Documents
+	require.Eventually(
+		t,
+		func() bool {
+			var err error
+			docs, err = findFn()
+			if err != nil {
+				t.Logf("got an error querying ES, retrying. Error: %s", err)
+			}
+			return err == nil
+		},
+		3*time.Minute,
+		15*time.Second,
+	)
+
+	return docs
+}
+
+// findESDocs runs `findFn` until at least one document is returned and there is no error
 func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.Documents {
 	var docs estools.Documents
 	require.Eventually(
@@ -204,7 +222,12 @@ func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.
 		func() bool {
 			var err error
 			docs, err = findFn()
-			return err == nil
+			if err != nil {
+				t.Logf("got an error querying ES, retrying. Error: %s", err)
+				return false
+			}
+
+			return docs.Hits.Total.Value != 0
 		},
 		3*time.Minute,
 		15*time.Second,
