@@ -237,6 +237,7 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 	require.NoError(t, err)
 
 	// wait for ttl update
+	<-time.After(ttlUpdate)
 	assert.Eventuallyf(t, func() bool {
 		val, found = fp.Fetch("kubernetes_secrets.test_namespace.testing_secret.secret_value")
 		return found && val == newPass
@@ -244,6 +245,7 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 
 	// After TTL delete, secret should no longer be found in cache since it was never
 	// fetched during that time
+	<-time.After(ttlDelete)
 	assert.Eventuallyf(t, func() bool {
 		fp.secretsCacheMx.Lock()
 		size := len(fp.secretsCache)
