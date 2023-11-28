@@ -244,6 +244,11 @@ func PerformUpgrade(
 		return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
 	}
 
+	if err := waitUpgradeDetailsState(ctx, startFixture, details.StateReplacing, 2*time.Minute, 10*time.Second); err != nil {
+		// error context added by checkUpgradeDetailsState
+		return err
+	}
+
 	// wait for the watcher to show up
 	logger.Logf("waiting for upgrade watcher to start")
 	err = WaitForWatcher(ctx, 2*time.Minute, 10*time.Second)
