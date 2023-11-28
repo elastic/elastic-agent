@@ -35,8 +35,8 @@ type contextProviderK8sSecrets struct {
 	clientMx sync.Mutex
 	client   k8sclient.Interface
 
-	secretsCacheMx sync.Mutex
-	secretsCache   map[string]secretsData
+	secretsCacheMx sync.RWMutex
+	secretsCache   map[string]*secretsData
 }
 
 type secretsData struct {
@@ -57,7 +57,7 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 	return &contextProviderK8sSecrets{
 		logger:       logger,
 		config:       &cfg,
-		secretsCache: make(map[string]secretsData),
+		secretsCache: make(map[string]*secretsData),
 	}, nil
 }
 
@@ -105,6 +105,9 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
 
 func (p *contextProviderK8sSecrets) updateCache() {
 	p.secretsCacheMx.Lock()
+	// deleting entries does not free the memory, so we need to create a new map
+	// to place the ones the secrets we want to keep
+	cacheTmp := make(map[string]*secretsData)
 	for name, data := range p.secretsCache {
 		diff := time.Since(data.lastAccess)
 		if diff > p.config.TTLDelete {
@@ -115,16 +118,18 @@ func (p *contextProviderK8sSecrets) updateCache() {
 				delete(p.secretsCache, name)
 			} else {
 				data.value = newValue
+				cacheTmp[name] = data
 			}
 		}
 	}
+	p.secretsCache = cacheTmp
 	p.secretsCacheMx.Unlock()
 }
 
 func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
-	p.secretsCacheMx.Lock()
+	p.secretsCacheMx.RLock()
 	_, ok := p.secretsCache[key]
-	p.secretsCacheMx.Unlock()
+	p.secretsCacheMx.RUnlock()
 
 	// if value is still not present in cache, it is possible we haven't tried to fetch it yet
 	if !ok {
@@ -150,7 +155,7 @@ func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
 	}
 	if ok {
 		p.secretsCacheMx.Lock()
-		p.secretsCache[key] = data
+		p.secretsCache[key] = &data
 		p.secretsCacheMx.Unlock()
 	}
 	return data, ok
