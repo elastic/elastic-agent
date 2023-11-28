@@ -237,20 +237,17 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 	require.NoError(t, err)
 
 	// wait for ttl update
-	<-time.After(ttlUpdate)
-	assert.Eventuallyf(t, func() bool {
-		val, found = fp.Fetch("kubernetes_secrets.test_namespace.testing_secret.secret_value")
-		return found && val == newPass
-	}, 3*ttlUpdate, ttlUpdate, "Failed to update secret in time.")
+	<-time.After(ttlUpdate * 2)
+	val, found = fp.Fetch("kubernetes_secrets.test_namespace.testing_secret.secret_value")
+	assert.True(t, found)
+	assert.Equal(t, newPass, val)
 
 	// After TTL delete, secret should no longer be found in cache since it was never
 	// fetched during that time
-	<-time.After(ttlDelete)
-	assert.Eventuallyf(t, func() bool {
-		fp.secretsCacheMx.Lock()
-		size := len(fp.secretsCache)
-		fp.secretsCacheMx.Unlock()
-		return size == 0
-	}, 3*ttlDelete, ttlDelete, "Failed to remove secret from the cache after TTL Delete has passed.")
+	<-time.After(ttlDelete * 2)
+	fp.secretsCacheMx.Lock()
+	size := len(fp.secretsCache)
+	fp.secretsCacheMx.Unlock()
+	assert.Equal(t, 0, size)
 
 }
