@@ -137,6 +137,7 @@ func FindMatchingLogLinesWithContext(ctx context.Context, client elastictranspor
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
+<<<<<<< HEAD
 	es := esapi.New(client)
 	res, err := es.Search(
 		es.Search.WithIndex("*.ds-logs*"),
@@ -149,6 +150,9 @@ func FindMatchingLogLinesWithContext(ctx context.Context, client elastictranspor
 	if err != nil {
 		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
 	}
+=======
+	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
+>>>>>>> a03aa9cf19 (Fix index pattern when querying ES and condition when searching logs (#3765))
 
 	return handleDocsResponse(res)
 }
@@ -221,6 +225,7 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
+<<<<<<< HEAD
 	es := esapi.New(client)
 	res, err := es.Search(
 		es.Search.WithIndex("*.ds-logs*"),
@@ -235,6 +240,9 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 	}
 
 	return handleDocsResponse(res)
+=======
+	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
+>>>>>>> a03aa9cf19 (Fix index pattern when querying ES and condition when searching logs (#3765))
 }
 
 // GetLogsForDatastream returns any logs associated with the datastream
@@ -260,7 +268,7 @@ func GetLogsForAgentID(client elastictransport.Interface, id string) (Documents,
 
 	es := esapi.New(client)
 	res, err := es.Search(
-		es.Search.WithIndex("*.ds-logs*"),
+		es.Search.WithIndex("logs-elastic_agent*"),
 		es.Search.WithExpandWildcards("all"),
 		es.Search.WithBody(&buf),
 		es.Search.WithTrackTotalHits(true),
@@ -287,6 +295,35 @@ func GetLogsForDatastreamWithContext(ctx context.Context, client elastictranspor
 		},
 	}
 
+<<<<<<< HEAD
+=======
+	return performQueryForRawQuery(ctx, indexQuery, "logs-elastic_agent*", client)
+}
+
+// GetPing performs a basic ping and returns ES config info
+func GetPing(ctx context.Context, client elastictransport.Interface) (Ping, error) {
+	req := esapi.InfoRequest{}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return Ping{}, fmt.Errorf("error in ping request")
+	}
+	defer resp.Body.Close()
+
+	respData, err := handleResponseRaw(resp)
+	if err != nil {
+		return Ping{}, fmt.Errorf("error in HTTP response: %w", err)
+	}
+	pingData := Ping{}
+	err = json.Unmarshal(respData, &pingData)
+	if err != nil {
+		return pingData, fmt.Errorf("error unmarshalling JSON: %w", err)
+	}
+	return pingData, nil
+
+}
+
+func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{}, index string, client elastictransport.Interface) (Documents, error) {
+>>>>>>> a03aa9cf19 (Fix index pattern when querying ES and condition when searching logs (#3765))
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(indexQuery)
 	if err != nil {
