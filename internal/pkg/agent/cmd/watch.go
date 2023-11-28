@@ -106,11 +106,17 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 
 	// About to start watching the upgrade. Initialize upgrade details and save them in the
 	// upgrade marker.
-	marker.Details = details.NewDetails(version.GetAgentPackageVersion(), details.StateWatching, marker.GetActionID())
-	err = upgrade.SaveMarker(marker)
-	if err != nil {
-		log.Errorf("unable to save upgrade marker before watching: %s", err.Error())
-	}
+	upgradeDetails := details.NewDetails(version.GetAgentPackageVersion(), details.StateWatching, marker.GetActionID())
+	upgradeDetails.RegisterObserver(func(details *details.Details) {
+		marker.Details = details
+		if err := upgrade.SaveMarker(marker, true); err != nil {
+			if details != nil {
+				log.Errorf("unable to save upgrade marker after setting upgrade details (state = %s): %s", details.State, err.Error())
+			} else {
+				log.Errorf("unable to save upgrade marker after clearing upgrade details: %s", err.Error())
+			}
+		}
+	})
 
 	errorCheckInterval := cfg.Settings.Upgrade.Watcher.ErrorCheck.Interval
 	ctx := context.Background()
@@ -118,30 +124,16 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		marker.Details.SetState(details.StateRollback)
-		err = upgrade.SaveMarker(marker, true)
-		if err != nil {
-			log.Errorf("unable to save upgrade marker before attempting to rollback: %s", err.Error())
-		}
-
 		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
 			log.Error("rollback failed", err)
-
 			marker.Details.Fail(err)
-			err = upgrade.SaveMarker(marker, true)
-			if err != nil {
-				log.Errorf("unable to save upgrade marker after rollback failed: %s", err.Error())
-			}
 		}
 		return err
 	}
 
 	// watch succeeded - upgrade was successful!
 	marker.Details.SetState(details.StateCompleted)
-	err = upgrade.SaveMarker(marker, false)
-	if err != nil {
-		log.Errorf("unable to save upgrade marker after successful watch: %s", err.Error())
-	}
 
 	// cleanup older versions,
 	// in windows it might leave self untouched, this will get cleaned up
