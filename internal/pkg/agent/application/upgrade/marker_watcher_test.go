@@ -84,6 +84,9 @@ func TestProcessMarker(t *testing.T) {
 	cases := map[string]struct {
 		markerFileContents string
 
+		watcherAgentVersion string
+		watcherAgentHash    string
+
 		expectedErrLogMsg bool
 		expectedDetails   *details.Details
 	}{
@@ -146,6 +149,51 @@ details:
 				State:         details.StateWatching,
 			},
 		},
+		"same_version_different_hash": {
+			markerFileContents: `
+prev_version: 8.9.2
+prev_hash: aaaaaa
+details:
+  target_version: 8.9.2
+  state: UPG_WATCHING
+`,
+			watcherAgentVersion: "8.9.2",
+			watcherAgentHash:    "bbbbbb",
+			expectedErrLogMsg:   false,
+			expectedDetails: &details.Details{
+				TargetVersion: "8.9.2",
+				State:         details.StateWatching,
+			},
+		},
+		"same_version_same_hash": {
+			markerFileContents: `
+prev_version: 8.9.2
+prev_hash: aaaaaa
+details:
+  target_version: 8.9.2
+  state: UPG_WATCHING
+`,
+			watcherAgentVersion: "8.9.2",
+			watcherAgentHash:    "aaaaaa",
+			expectedErrLogMsg:   false,
+			expectedDetails: &details.Details{
+				TargetVersion: "8.9.2",
+				State:         details.StateRollback,
+			},
+		},
+		"same_version_same_hash_no_details": {
+			markerFileContents: `
+prev_version: 8.9.2
+prev_hash: aaaaaa
+`,
+			watcherAgentVersion: "8.9.2",
+			watcherAgentHash:    "aaaaaa",
+			expectedErrLogMsg:   false,
+			expectedDetails: &details.Details{
+				TargetVersion: "unknown",
+				State:         details.StateRollback,
+			},
+		},
 	}
 
 	for name, test := range cases {
@@ -182,7 +230,19 @@ details:
 				}
 			}()
 
-			mfw.processMarker("8.9.2")
+			// default values for version and hash
+			currentVersion := "8.9.2"
+			currentCommit := ""
+
+			// apply overrides from testcase
+			if test.watcherAgentVersion != "" {
+				currentVersion = test.watcherAgentVersion
+			}
+			if test.watcherAgentHash != "" {
+				currentCommit = test.watcherAgentHash
+			}
+
+			mfw.processMarker(currentVersion, currentCommit)
 
 			// error loading marker
 			if test.expectedErrLogMsg {
