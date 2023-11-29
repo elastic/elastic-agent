@@ -213,7 +213,7 @@ message UpgradeDetails {
 message UpgradeDetailsMetadata {
   // If the upgrade is a scheduled upgrade, the timestamp of when the
   // upgrade is expected to start.
-  google.protobuf.Timestamp scheduled_at = 1;
+  string scheduled_at = 1;
 
   // If the upgrade is in the UPG_DOWNLOADING state, the percentage of
   // the Elastic Agent artifact that has already been downloaded, to
@@ -225,6 +225,14 @@ message UpgradeDetailsMetadata {
 
   // Any error encountered during the upgrade process.
   string error_msg = 4;
+
+  // Any error message that is a result of a retryable upgrade
+  // step, e.g. the download step, being (re)tried.
+  string retryable_error_msg = 5;
+
+  // The deadline until when a retryable upgrade step, e.g. the download
+  // step, will be (re)tried.
+  string retry_until = 6;
 }
 
 // DiagnosticFileResult is a file result from a diagnostic result.

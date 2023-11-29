@@ -370,15 +370,22 @@ func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.
 			State:         string(state.UpgradeDetails.State),
 			ActionId:      state.UpgradeDetails.ActionID,
 			Metadata: &cproto.UpgradeDetailsMetadata{
-				DownloadPercent: float32(state.UpgradeDetails.Metadata.DownloadPercent),
-				FailedState:     string(state.UpgradeDetails.Metadata.FailedState),
-				ErrorMsg:        state.UpgradeDetails.Metadata.ErrorMsg,
+				DownloadPercent:   float32(state.UpgradeDetails.Metadata.DownloadPercent),
+				FailedState:       string(state.UpgradeDetails.Metadata.FailedState),
+				ErrorMsg:          state.UpgradeDetails.Metadata.ErrorMsg,
+				RetryableErrorMsg: state.UpgradeDetails.Metadata.RetryableErrorMsg,
 			},
 		}
 
 		if state.UpgradeDetails.Metadata.ScheduledAt != nil &&
 			!state.UpgradeDetails.Metadata.ScheduledAt.IsZero() {
-			upgradeDetails.Metadata.ScheduledAt = timestamppb.New(*state.UpgradeDetails.Metadata.ScheduledAt)
+			upgradeDetails.Metadata.ScheduledAt = state.UpgradeDetails.Metadata.ScheduledAt.Format(control.TimeFormat())
+
+		}
+
+		if state.UpgradeDetails.Metadata.RetryUntil != nil &&
+			!state.UpgradeDetails.Metadata.RetryUntil.IsZero() {
+			upgradeDetails.Metadata.RetryUntil = state.UpgradeDetails.Metadata.RetryUntil.Format(control.TimeFormat())
 
 		}
 	}

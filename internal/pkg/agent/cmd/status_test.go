@@ -9,10 +9,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 	"time"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/elastic/elastic-agent/pkg/control"
 
 	"github.com/jedib0t/go-pretty/v6/list"
 
@@ -208,7 +209,7 @@ func TestListUpgradeDetails(t *testing.T) {
 				TargetVersion: "8.12.0",
 				State:         "UPG_DOWNLOADING",
 				Metadata: &cproto.UpgradeDetailsMetadata{
-					ScheduledAt:     timestamppb.New(now),
+					ScheduledAt:     now.Format(control.TimeFormat()),
 					DownloadPercent: 0.17679,
 				},
 			},
@@ -228,6 +229,33 @@ func TestListUpgradeDetails(t *testing.T) {
 			listUpgradeDetails(l, test.upgradeDetails)
 			actualOutput := l.Render()
 			require.Equal(t, test.expectedOutput, actualOutput)
+		})
+	}
+}
+
+func TestHumanDurationUntil(t *testing.T) {
+	now := time.Now()
+	cases := map[string]struct {
+		targetTimeStr string
+
+		// For some reason the calculated duration is never precise
+		// so we use a regexp instead.
+		expectedDurationRegexp string
+	}{
+		"valid_time": {
+			targetTimeStr:          now.Add(3 * time.Hour).Format(control.TimeFormat()),
+			expectedDurationRegexp: `^2h59m59\.\d+s$`,
+		},
+		"invalid_time": {
+			targetTimeStr:          "foobar",
+			expectedDurationRegexp: "^foobar$",
+		},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			actualTimeStr := humanDurationUntil(test.targetTimeStr, now)
+			require.Regexp(t, regexp.MustCompile(test.expectedDurationRegexp), actualTimeStr)
 		})
 	}
 }
