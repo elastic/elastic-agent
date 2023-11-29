@@ -107,7 +107,7 @@ func (r *localFetcherResult) Fetch(_ context.Context, _ Logger, dir string) erro
 	}
 
 	// fetch artifact hash
-	err = copyFile(fullPath+hashExt, path+hashExt)
+	err = copyFile(fullPath+extHash, path+extHash)
 	if err != nil {
 		return fmt.Errorf("error copying file: %w", err)
 	}

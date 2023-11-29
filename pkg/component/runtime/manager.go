@@ -43,8 +43,11 @@ const (
 	// maxCheckinMisses is the maximum number of check-in misses a component can miss before it is killed
 	// and restarted.
 	maxCheckinMisses = 3
-	// diagnosticTimeout is the maximum amount of time to wait for a diagnostic response from a unit.
-	diagnosticTimeout = time.Minute
+	// diagnosticTimeoutCPU is the maximum amount of time to wait for a diagnostic response from a unit while collecting CPU profiles
+	diagnosticTimeoutCPU = time.Minute
+
+	// diagnosticTimeout is the maximum amount of time to wait for a diagnostic response from a unit
+	diagnosticTimeout = time.Second * 20
 
 	// stopCheckRetryPeriod is a idle time between checks for component stopped state
 	stopCheckRetryPeriod = 200 * time.Millisecond
@@ -203,6 +206,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	})
 
 	var server *grpc.Server
+	m.logger.Infof("Starting grpc control protocol listener on port %v with max_message_size %v", m.grpcConfig.Port, m.grpcConfig.MaxMsgSize)
 	if m.tracer != nil {
 		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(m.tracer))
 		server = grpc.NewServer(
@@ -943,7 +947,15 @@ func (m *Manager) getListenAddr() string {
 // performDiagAction creates a diagnostic ActionRequest and executes it against the runtime that's mapped to the specified component.
 // if the specified actionLevel is ActionRequest_COMPONENT, the unit field is ignored.
 func (m *Manager) performDiagAction(ctx context.Context, comp component.Component, unit component.Unit, actionLevel proto.ActionRequest_Level, params client.DiagnosticParams) ([]*proto.ActionDiagnosticUnitResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, diagnosticTimeout)
+	// if we're gathering CPU diagnostics, request a longer timeout; CPU diag collection requires the diagnostic hook to sit and gather a CPU profile.
+	finalDiagnosticTime := diagnosticTimeout
+	for _, tag := range params.AdditionalMetrics {
+		if tag == "CPU" {
+			finalDiagnosticTime = diagnosticTimeoutCPU
+			break
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, finalDiagnosticTime)
 	defer cancel()
 
 	id, err := uuid.NewV4()
@@ -965,7 +977,7 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 	}
 
 	if len(params.AdditionalMetrics) > 0 {
-		m.logger.Debugf("Performing diagnostic action with params: %v", params.AdditionalMetrics)
+		m.logger.Debugf("Performing diagnostic action with params: %v; will wait %s", params.AdditionalMetrics, finalDiagnosticTime)
 	}
 	marshalParams, err := json.Marshal(params)
 	if err != nil {
@@ -988,7 +1000,7 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 	// the only way this can return an error is a context Done(), be sure to make that explicit.
 	if err != nil {
 		if errors.Is(context.DeadlineExceeded, err) {
-			return nil, fmt.Errorf("diagnostic action timed out, deadline is %s: %w", diagnosticTimeout, err)
+			return nil, fmt.Errorf("diagnostic action timed out, deadline is %s: %w", finalDiagnosticTime, err)
 		}
 		return nil, fmt.Errorf("error running performAction: %w", err)
 	}
