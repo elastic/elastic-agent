@@ -24,6 +24,7 @@ import (
 
 func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
