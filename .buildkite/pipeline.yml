@@ -220,7 +220,7 @@ steps:
       - "build/TEST-**"
       - "build/diagnostics/*"
     agents:
-      image: "ubuntu:22.04"
+      image: "golang:1.20.11"
       ephemeralStorage: "30G"
       memory: "4G"
       cpu: 8
