@@ -30,7 +30,6 @@ steps:
   #     retry:
   #       manual:
   #         allowed: true
-
   #   - label: "Unit tests - Ubuntu 22.04 ARM64"
   #     key: "unit-tests-2204-arm64"
   #     command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -47,7 +46,6 @@ steps:
   #     retry:
   #       manual:
   #         allowed: true
-
   #   - label: "Unit tests - Windows 2022"
   #     key: "unit-tests-win2022"
   #     command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
@@ -65,7 +63,6 @@ steps:
   #     retry:
   #       manual:
   #         allowed: true
-
   #   - label: "Unit tests - Windows 2016"
   #     key: "unit-tests-win2016"
   #     command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
@@ -83,7 +80,6 @@ steps:
   #     retry:
   #       manual:
   #         allowed: true
-
   #   # Runs inly on the main branch
   #   - label: "Unit tests - MacOS 13 ARM"
   #     key: "unit-tests-macos-13-arm"
@@ -100,7 +96,6 @@ steps:
   #     retry:
   #       manual:
   #         allowed: true
-
   #   - label: "Unit tests - MacOS 13"
   #     key: "unit-tests-macos-13"
   #     command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -115,7 +110,6 @@ steps:
   #     retry:
   #       manual:
   #         allowed: true
-
   # - group: "Desktop Windows tests"
   # key: "extended-windows"
   # steps:
@@ -153,7 +147,6 @@ steps:
   #     retry:
   #       manual:
   #         allowed: true
-
   # - label: "Merge coverage reports"
   # key: "merge-coverage"
   # env:
@@ -176,7 +169,6 @@ steps:
   #   - unit-tests
   #   - extended-windows
   # allow_dependency_failure: true
-
   # - group: "K8s tests"
   # key: "k8s-tests"
   # steps:
@@ -197,7 +189,6 @@ steps:
   #     retry:
   #       manual:
   #         allowed: true
-
   # - label: ":sonarqube: Continuous Code Inspection"
   # env:
   #   VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
@@ -211,7 +202,6 @@ steps:
   # retry:
   #   manual:
   #     allowed: true
-
   # - label: "Serverless integration test"
   # key: "serverless-integration-tests"
   # command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
@@ -221,7 +211,6 @@ steps:
   # agents:
   #   provider: "gcp"
   #   machineType: "n1-standard-8"
-
   - label: "Integration tests"
     key: "integration-tests"
     env:
@@ -231,8 +220,13 @@ steps:
       - "build/TEST-**"
       - "build/diagnostics/*"
     agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
+      image: "ubuntu:22.04"
+      ephemeralStorage: "30G"
+      memory: "4G"
+      cpu: 8
+    # agents:
+    #   provider: "gcp"
+    #   machineType: "n1-standard-8"
 
   # - label: "Integration tests1"
   #   key: "integration-tests1"
