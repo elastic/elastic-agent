@@ -244,6 +244,8 @@ func PerformUpgrade(
 		return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
 	}
 
+	// Check that, right before the Upgrade Watcher is started, the upgrade details in Agent status
+	// show the state as UPG_REPLACING.
 	if err := waitUpgradeDetailsState(ctx, startFixture, details.StateReplacing, 2*time.Minute, 10*time.Second); err != nil {
 		// error context added by checkUpgradeDetailsState
 		return err
@@ -281,6 +283,13 @@ func PerformUpgrade(
 		}
 
 		// error context added by WaitHealthyAndVersion
+		return err
+	}
+
+	// Check that, upon successful upgrade, the upgrade details have been cleared out
+	// from Agent status.
+	if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, 10*time.Second); err != nil {
+		// error context added by checkUpgradeDetailsState
 		return err
 	}
 
