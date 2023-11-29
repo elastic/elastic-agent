@@ -17,12 +17,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid"
+	"github.com/stretchr/testify/require"
+
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/gofrs/uuid"
-	"github.com/stretchr/testify/require"
 )
 
 const fileProcessingFilename = `/tmp/testfileprocessing.json`
