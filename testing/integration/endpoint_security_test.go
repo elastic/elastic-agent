@@ -74,10 +74,10 @@ var protectionTests = []struct {
 // test automatically.
 func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
@@ -100,10 +100,10 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 // but at this point endpoint is already uninstalled.
 func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
@@ -128,10 +128,10 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 
 func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
@@ -490,10 +490,10 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 // path other than default
 func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 	})
 
 	ctx, cn := context.WithCancel(context.Background())

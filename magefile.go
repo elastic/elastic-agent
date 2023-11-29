@@ -1773,6 +1773,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	_ = os.MkdirAll(diagDir, 0755)
 
 	cfg := runner.Config{
+<<<<<<< HEAD
 		AgentVersion:      agentVersion,
 		AgentStackVersion: agentStackVersion,
 		BuildDir:          agentBuildDir,
@@ -1787,6 +1788,24 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Timestamp:         timestamp,
 		TestFlags:         goTestFlags,
 		ExtraEnv:          extraEnv,
+=======
+		AgentVersion:   agentVersion,
+		StackVersion:   agentStackVersion,
+		BuildDir:       agentBuildDir,
+		GOVersion:      goVersion,
+		RepoDir:        repoDir,
+		DiagnosticsDir: diagDir,
+		StateDir:       ".integration-cache",
+		Platforms:      testPlatforms(),
+		Groups:         testGroups(),
+		Matrix:         matrix,
+		SingleTest:     singleTest,
+		VerboseMode:    mg.Verbose(),
+		Timestamp:      timestamp,
+		TestFlags:      goTestFlags,
+		ExtraEnv:       extraEnv,
+		BinaryName:     binaryName,
+>>>>>>> 8a8abd046a (Add ability to split integration tests into different groups (#3544))
 	}
 	ogcCfg := ogc.Config{
 		ServiceTokenPath: serviceTokenPath,
@@ -1869,6 +1888,20 @@ func testPlatforms() []string {
 		}
 	}
 	return platforms
+}
+
+func testGroups() []string {
+	groupsStr := os.Getenv("TEST_GROUPS")
+	if groupsStr == "" {
+		return nil
+	}
+	var groups []string
+	for _, g := range strings.Split(groupsStr, " ") {
+		if g != "" {
+			groups = append(groups, g)
+		}
+	}
+	return groups
 }
 
 // Pre-requisite: user must have the gcloud CLI installed
