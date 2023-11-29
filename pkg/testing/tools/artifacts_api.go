@@ -244,7 +244,7 @@ type logger interface {
 	Logf(format string, args ...any)
 }
 
-func GetLatestSnapshotVersion(ctx context.Context, log logger, aac *ArtifactAPIClient) (*version.ParsedSemVer, error) {
+func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context, log logger) (*version.ParsedSemVer, error) {
 	vList, err := aac.GetVersions(ctx)
 	if err != nil {
 		return nil, err

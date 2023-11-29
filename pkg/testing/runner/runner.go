@@ -7,6 +7,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v2"
 
@@ -158,11 +160,13 @@ func NewRunner(cfg Config, ip InstanceProvisioner, sp StackProvisioner, batches 
 
 	var osBatches []OSBatch
 	for _, b := range batches {
-		lbs, err := createBatches(b, platforms, cfg.Matrix)
+		lbs, err := createBatches(b, platforms, cfg.Groups, cfg.Matrix)
 		if err != nil {
 			return nil, err
 		}
-		osBatches = append(osBatches, lbs...)
+		if lbs != nil {
+			osBatches = append(osBatches, lbs...)
+		}
 	}
 	if cfg.SingleTest != "" {
 		osBatches, err = filterSingleTest(osBatches, cfg.SingleTest)
@@ -886,8 +890,20 @@ func findBatchByID(id string, batches []OSBatch) (OSBatch, bool) {
 	return OSBatch{}, false
 }
 
-func createBatches(batch define.Batch, platforms []define.OS, matrix bool) ([]OSBatch, error) {
+func batchInGroups(batch define.Batch, groups []string) bool {
+	for _, g := range groups {
+		if batch.Group == g {
+			return true
+		}
+	}
+	return false
+}
+
+func createBatches(batch define.Batch, platforms []define.OS, groups []string, matrix bool) ([]OSBatch, error) {
 	var batches []OSBatch
+	if len(groups) > 0 && !batchInGroups(batch, groups) {
+		return nil, nil
+	}
 	specifics, err := getSupported(batch.OS, platforms)
 	if errors.Is(err, ErrOSNotSupported) {
 		var s SupportedOS
@@ -1009,16 +1025,17 @@ func createBatchID(batch OSBatch) string {
 		id += "-" + batch.OS.Distro
 	}
 	id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
-	if batch.Batch.Isolate {
-		if len(batch.Batch.Tests) > 0 {
-			// only ever has one test in an isolated batch
-			id += "-" + batch.Batch.Tests[0].Tests[0].Name
-		}
-		if len(batch.Batch.SudoTests) > 0 {
-			// only ever has one test in an isolated batch
-			id += "-" + batch.Batch.SudoTests[0].Tests[0].Name
-		}
+	id += "-" + strings.Replace(batch.Batch.Group, ".", "", -1)
+
+	// The batchID needs to be at most 63 characters long otherwise
+	// OGC will fail to instantiate the VM.
+	maxIDLen := 63
+	if len(id) > maxIDLen {
+		hash := fmt.Sprintf("%x", md5.Sum([]byte(id)))
+		hashLen := utf8.RuneCountInString(hash)
+		id = id[:maxIDLen-hashLen-1] + "-" + hash
 	}
+
 	return strings.ToLower(id)
 }
 

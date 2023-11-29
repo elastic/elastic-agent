@@ -21,6 +21,7 @@ func GetAgentByPolicyIDAndHostnameFromList(client *kibana.Client, policyID, host
 		return nil, err
 	}
 
+	var agentHostnames []string
 	hostnameAgents := make([]*kibana.AgentExisting, 0)
 	for i, item := range listAgentsResp.Items {
 		agentHostname := item.LocalMetadata.Host.Hostname
@@ -32,7 +33,8 @@ func GetAgentByPolicyIDAndHostnameFromList(client *kibana.Client, policyID, host
 	}
 
 	if len(hostnameAgents) == 0 {
-		return nil, fmt.Errorf("unable to find agent with hostname [%s]", hostname)
+		return nil, fmt.Errorf("unable to find agent with hostname [%s] for policy [%s]. Found: %v",
+			hostname, policyID, agentHostnames)
 	}
 
 	if len(hostnameAgents) > 1 {

@@ -40,6 +40,7 @@ agent.upgrade.watcher:
 // that the Agent is rolled back to the previous version.
 func TestStandaloneUpgradeRollback(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -154,6 +155,7 @@ inputs:
 // rolled back to the previous version.
 func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
