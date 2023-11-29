@@ -92,6 +92,7 @@ service:
 
 func TestFileProcessing(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Default,
 		Local: true,
 		OS: []define.OS{
 			// input path missing on windows
@@ -140,6 +141,7 @@ func TestFileProcessing(t *testing.T) {
 
 func TestAPMIngestion(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: Default,
 		Stack: &define.Stack{},
 		Local: true,
 		OS: []define.OS{
