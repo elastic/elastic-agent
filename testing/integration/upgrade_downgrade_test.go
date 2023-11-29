@@ -23,6 +23,7 @@ import (
 
 func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -40,7 +41,7 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 
 	// retrieve all the versions of agent from the artifact API
 	aac := tools.NewArtifactAPIClient()
-	latestSnapshotVersion, err := tools.GetLatestSnapshotVersion(ctx, t, aac)
+	latestSnapshotVersion, err := aac.GetLatestSnapshotVersion(ctx, t)
 	require.NoError(t, err)
 
 	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)

@@ -12,6 +12,9 @@ import (
 
 // Instance represents a provisioned instance.
 type Instance struct {
+	// Provider is the instance provider for the instance.
+	// See INSTANCE_PROVISIONER environment variable for the supported providers.
+	Provider string `yaml:"provider"`
 	// ID is the identifier of the instance.
 	//
 	// This must be the same ID of the OSBatch.
