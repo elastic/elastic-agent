@@ -27,17 +27,10 @@ type Config struct {
 	// defined in this list.
 	Platforms []string
 
-<<<<<<< HEAD
-=======
-	// BinaryName is the name of the binary package under test, i.e, elastic-agent, metricbeat, etc
-	// this is used to copy the .tar.gz to the remote host
-	BinaryName string
-
 	// Groups filters the tests to only run tests that are part of
 	// the groups defined in this list.
 	Groups []string
 
->>>>>>> 8a8abd046a (Add ability to split integration tests into different groups (#3544))
 	// Matrix enables matrix testing. This explodes each test to
 	// run on all supported platforms the runner supports.
 	Matrix bool

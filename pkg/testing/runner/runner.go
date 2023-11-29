@@ -7,6 +7,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v2"
 
@@ -1017,18 +1019,6 @@ func createBatchID(batch OSBatch) string {
 		id += "-" + batch.OS.Distro
 	}
 	id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
-<<<<<<< HEAD
-	if batch.Batch.Isolate {
-		if len(batch.Batch.Tests) > 0 {
-			// only ever has one test in an isolated batch
-			id += "-" + batch.Batch.Tests[0].Tests[0].Name
-		}
-		if len(batch.Batch.SudoTests) > 0 {
-			// only ever has one test in an isolated batch
-			id += "-" + batch.Batch.SudoTests[0].Tests[0].Name
-		}
-	}
-=======
 	id += "-" + strings.Replace(batch.Batch.Group, ".", "", -1)
 
 	// The batchID needs to be at most 63 characters long otherwise
@@ -1040,7 +1030,6 @@ func createBatchID(batch OSBatch) string {
 		id = id[:maxIDLen-hashLen-1] + "-" + hash
 	}
 
->>>>>>> 8a8abd046a (Add ability to split integration tests into different groups (#3544))
 	return strings.ToLower(id)
 }
 
