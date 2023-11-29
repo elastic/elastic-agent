@@ -351,6 +351,73 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 	}
 }
 
+// RunProcess runs the given given process
+// the process will run until an error, or the given timeout is reached
+func RunProcess(t *testing.T,
+	ctx context.Context, runLength time.Duration,
+	logOutput, allowErrs bool,
+	processPath string, args ...string) error {
+	var err error
+	var logProxy Logger
+	if logOutput {
+		logProxy = t
+	}
+	stdOut := newLogWatcher(logProxy)
+	stdErr := newLogWatcher(logProxy)
+
+	proc, err := process.Start(
+		processPath,
+		process.WithContext(ctx),
+		process.WithArgs(args),
+		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+
+	if err != nil {
+		return fmt.Errorf("failed to spawn %q: %w", processPath, err)
+	}
+
+	killProc := func() {
+		_ = proc.Kill()
+		<-proc.Wait()
+	}
+
+	var doneChan <-chan time.Time
+	if runLength != 0 {
+		doneChan = time.After(runLength)
+	}
+
+	stopping := false
+	for {
+		select {
+		case <-ctx.Done():
+			killProc()
+			return ctx.Err()
+		case ps := <-proc.Wait():
+			if stopping {
+				return nil
+			}
+			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
+		case err := <-stdOut.Watch():
+			if !allowErrs {
+				// no errors allowed
+				killProc()
+				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
+			}
+		case err := <-stdErr.Watch():
+			if !allowErrs {
+				// no errors allowed
+				killProc()
+				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
+			}
+		case <-doneChan:
+			if !stopping {
+				// trigger the stop
+				stopping = true
+				_ = proc.Stop()
+			}
+		}
+	}
+}
+
 // RunWithClient runs the provided binary.
 //
 // If `states` are provided, agent runs until each state has been reached. Once reached the
@@ -743,7 +810,7 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 
 	// now remove all that should not be kept; removal is only
 	// done by removing the spec file, no need to delete the binary
-	componentsDir, err := findComponentsDir(workDir)
+	componentsDir, err := FindComponentsDir(workDir)
 	if err != nil {
 		return err
 	}
@@ -884,8 +951,8 @@ func getCacheDir(caller string, name string) (string, error) {
 	return cacheDir, nil
 }
 
-// findComponentsDir identifies the directory that holds the components.
-func findComponentsDir(dir string) (string, error) {
+// FindComponentsDir identifies the directory that holds the components.
+func FindComponentsDir(dir string) (string, error) {
 	dataDir := filepath.Join(dir, "data")
 	agentVersions, err := ioutil.ReadDir(dataDir)
 	if err != nil {
