@@ -14,24 +14,21 @@ import (
 
 func TestAnyLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: define.Default,
 		Local: true,
 	})
 }
 
 func TestAnySudo(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Sudo: true,
-	})
-}
-
-func TestAnyIsolate(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Isolate: true,
+		Group: define.Default,
+		Sudo:  true,
 	})
 }
 
 func TestDarwinLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Darwin,
@@ -43,6 +40,7 @@ func TestDarwinLocal(t *testing.T) {
 
 func TestDarwinSudo(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Darwin,
@@ -52,19 +50,9 @@ func TestDarwinSudo(t *testing.T) {
 	})
 }
 
-func TestDarwinIsolate(t *testing.T) {
-	define.Require(t, define.Requirements{
-		OS: []define.OS{
-			{
-				Type: define.Darwin,
-			},
-		},
-		Isolate: true,
-	})
-}
-
 func TestLinuxLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Linux,
@@ -76,6 +64,7 @@ func TestLinuxLocal(t *testing.T) {
 
 func TestLinuxSudo(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Linux,
@@ -85,19 +74,9 @@ func TestLinuxSudo(t *testing.T) {
 	})
 }
 
-func TestLinuxIsolate(t *testing.T) {
-	define.Require(t, define.Requirements{
-		OS: []define.OS{
-			{
-				Type: define.Linux,
-			},
-		},
-		Isolate: true,
-	})
-}
-
 func TestWindowsLocal(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Windows,
@@ -109,6 +88,7 @@ func TestWindowsLocal(t *testing.T) {
 
 func TestWindowsSudo(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type: define.Windows,
@@ -118,19 +98,9 @@ func TestWindowsSudo(t *testing.T) {
 	})
 }
 
-func TestWindowsIsolate(t *testing.T) {
-	define.Require(t, define.Requirements{
-		OS: []define.OS{
-			{
-				Type: define.Windows,
-			},
-		},
-		Isolate: true,
-	})
-}
-
 func TestSpecificCombinationOne(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
@@ -144,6 +114,7 @@ func TestSpecificCombinationOne(t *testing.T) {
 
 func TestSpecificCombinationTwo(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
@@ -157,6 +128,7 @@ func TestSpecificCombinationTwo(t *testing.T) {
 
 func TestSpecificCombinationWithCloud(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: define.Default,
 		OS: []define.OS{
 			{
 				Type:    define.Linux,
@@ -167,6 +139,64 @@ func TestSpecificCombinationWithCloud(t *testing.T) {
 		},
 		Stack: &define.Stack{
 			Version: "8.8.0",
+		},
+	})
+}
+
+func TestGroup_One_One(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: "one",
+		OS: []define.OS{
+			{
+				Type:    define.Linux,
+				Arch:    define.ARM64,
+				Distro:  "ubuntu",
+				Version: "20.04",
+			},
+		},
+		Stack: &define.Stack{
+			Version: "8.8.0",
+		},
+	})
+}
+
+func TestGroup_One_Two(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: "one",
+		OS: []define.OS{
+			{
+				Type:    define.Linux,
+				Arch:    define.ARM64,
+				Distro:  "ubuntu",
+				Version: "20.04",
+			},
+		},
+		Stack: &define.Stack{
+			Version: "8.8.0",
+		},
+	})
+}
+
+func TestGroup_Two_One(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: "two",
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+				Arch: define.ARM64,
+			},
+		},
+	})
+}
+
+func TestGroup_Two_Two(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: "two",
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+				Arch: define.ARM64,
+			},
 		},
 	})
 }
