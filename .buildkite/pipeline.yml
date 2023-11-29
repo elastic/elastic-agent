@@ -234,41 +234,41 @@ steps:
       provider: "gcp"
       machineType: "n1-standard-8"
 
-  - label: "Integration tests1"
-    key: "integration-tests1"
-    env:
-      TEST_PLATFORMS: "windows/amd64/2022"
-    command: ".buildkite/scripts/steps/integration_tests.sh stateful"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-    agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
+  # - label: "Integration tests1"
+  #   key: "integration-tests1"
+  #   env:
+  #     TEST_PLATFORMS: "windows/amd64/2022"
+  #   command: ".buildkite/scripts/steps/integration_tests.sh stateful"
+  #   artifact_paths:
+  #     - "build/TEST-**"
+  #     - "build/diagnostics/*"
+  #   agents:
+  #     provider: "gcp"
+  #     machineType: "n1-standard-8"
 
-  - label: "Integration tests2"
-    key: "integration-tests2"
-    env:
-      TEST_PLATFORMS: "windows/amd64/2022"
-    command: ".buildkite/scripts/steps/integration_tests.sh stateful"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-    agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
+  # - label: "Integration tests2"
+  #   key: "integration-tests2"
+  #   env:
+  #     TEST_PLATFORMS: "windows/amd64/2022"
+  #   command: ".buildkite/scripts/steps/integration_tests.sh stateful"
+  #   artifact_paths:
+  #     - "build/TEST-**"
+  #     - "build/diagnostics/*"
+  #   agents:
+  #     provider: "gcp"
+  #     machineType: "n1-standard-8"
 
-  - label: "Integration tests3"
-    key: "integration-tests3"
-    env:
-      TEST_PLATFORMS: "windows/amd64/2022"
-    command: ".buildkite/scripts/steps/integration_tests.sh stateful"
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-    agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
+  # - label: "Integration tests3"
+  #   key: "integration-tests3"
+  #   env:
+  #     TEST_PLATFORMS: "windows/amd64/2022"
+  #   command: ".buildkite/scripts/steps/integration_tests.sh stateful"
+  #   artifact_paths:
+  #     - "build/TEST-**"
+  #     - "build/diagnostics/*"
+  #   agents:
+  #     provider: "gcp"
+  #     machineType: "n1-standard-8"
 
   # - label: "Serverless Beats Tests"
   # key: "serverless-beats-integration-tests"
