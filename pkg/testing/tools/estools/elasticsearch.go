@@ -362,7 +362,7 @@ func FindMatchingLogLinesWithContext(ctx context.Context, client elastictranspor
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	return performQueryForRawQuery(ctx, queryRaw, "*ds-logs*", client)
+	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
 
 }
 
@@ -434,8 +434,7 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	return performQueryForRawQuery(ctx, queryRaw, "*ds-logs*", client)
-
+	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
 }
 
 // GetLogsForDataset returns any logs associated with the datastream
@@ -461,7 +460,7 @@ func GetLogsForAgentID(client elastictransport.Interface, id string) (Documents,
 
 	es := esapi.New(client)
 	res, err := es.Search(
-		es.Search.WithIndex("*.ds-logs*"),
+		es.Search.WithIndex("logs-elastic_agent*"),
 		es.Search.WithExpandWildcards("all"),
 		es.Search.WithBody(&buf),
 		es.Search.WithTrackTotalHits(true),
@@ -488,7 +487,7 @@ func GetLogsForDatasetWithContext(ctx context.Context, client elastictransport.I
 		},
 	}
 
-	return performQueryForRawQuery(ctx, indexQuery, "*ds-logs*", client)
+	return performQueryForRawQuery(ctx, indexQuery, "logs-elastic_agent*", client)
 }
 
 // GetLogsForIndexWithContext returns any logs associated with the datastream
