@@ -134,6 +134,14 @@ func (u *Upgrader) Upgradeable() bool {
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+
+	// Inform the Upgrade Marker Watcher that we've started upgrading. Note that this
+	// is only possible to do in-memory since, today, the  process that's initiating
+	// the upgrade is the same as the Agent process in which the Upgrade Marker Watcher is
+	// running. If/when, in the future, the process initiating the upgrade is separated
+	// from the Agent process in which the Upgrade Marker Watcher is running, such in-memory
+	// communication will need to be replaced with inter-process communication (e.g. via
+	// a file, e.g. the Upgrade Marker file or something else).
 	u.markerWatcher.SetUpgradeStarted()
 
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
