@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-
-ssh-import-id gh:pazone
-
 source .buildkite/scripts/common.sh
 
 STACK_PROVISIONER="${1:-"stateful"}"
