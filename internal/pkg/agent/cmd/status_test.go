@@ -218,8 +218,29 @@ func TestListUpgradeDetails(t *testing.T) {
    ├─ state: UPG_DOWNLOADING
    └─ metadata
       ├─ scheduled_at: %s
-      └─ download_percent: 17.68%%`, now.Format(time.RFC3339)),
-		}}
+      └─ download_percent: 17.68%%`, now.Format(control.TimeFormat())),
+		},
+		"retrying_downloading": {
+			upgradeDetails: &cproto.UpgradeDetails{
+				TargetVersion: "8.12.0",
+				State:         "UPG_DOWNLOADING",
+				Metadata: &cproto.UpgradeDetailsMetadata{
+					ScheduledAt:       now.Format(control.TimeFormat()),
+					DownloadPercent:   0,
+					RetryableErrorMsg: "unable to download, will retry",
+					RetryUntil:        "1h59m32s",
+				},
+			},
+			expectedOutput: fmt.Sprintf(`── upgrade_details
+   ├─ target_version: 8.12.0
+   ├─ state: UPG_DOWNLOADING
+   └─ metadata
+      ├─ scheduled_at: %s
+      ├─ download_percent: 0.00%%
+      ├─ retry_until: 1h59m32s
+      └─ retryable_error_msg: unable to download, will retry`, now.Format(control.TimeFormat())),
+		},
+	}
 
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
