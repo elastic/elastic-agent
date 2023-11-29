@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/fsnotify/fsnotify"
 
@@ -27,7 +28,7 @@ type MarkerFileWatcher struct {
 	logger         *logger.Logger
 	updateCh       chan UpdateMarker
 
-	upgradeStarted bool
+	upgradeStarted atomic.Bool
 }
 
 func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) MarkerWatcher {
@@ -37,7 +38,6 @@ func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) M
 		markerFilePath: upgradeMarkerFilePath,
 		logger:         logger,
 		updateCh:       make(chan UpdateMarker),
-		upgradeStarted: false,
 	}
 }
 
@@ -46,7 +46,7 @@ func (mfw *MarkerFileWatcher) Watch() <-chan UpdateMarker {
 }
 
 func (mfw *MarkerFileWatcher) SetUpgradeStarted() {
-	mfw.upgradeStarted = true
+	mfw.upgradeStarted.Store(true)
 }
 
 func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
@@ -128,7 +128,7 @@ func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string
 	// been recorded in the marker's upgrade details field but, in case it
 	// isn't for some reason, we fallback to explicitly setting that state as
 	// part of the upgrade details in the marker.
-	if marker.PrevVersion == currentVersion && marker.PrevHash == commit && !mfw.upgradeStarted {
+	if marker.PrevVersion == currentVersion && marker.PrevHash == commit && !mfw.upgradeStarted.Load() {
 		if marker.Details == nil {
 			marker.Details = details.NewDetails("unknown", details.StateRollback, marker.GetActionID())
 		} else {
