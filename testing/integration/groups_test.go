@@ -15,9 +15,6 @@ const (
 	// Fleet group of tests. Used for testing Elastic Agent with Fleet.
 	Fleet = "fleet"
 
-	// FleetAirgapped group of tests. Used for testing Elastic Agent with Fleet and airgapped.
-	FleetAirgapped = "fleet-airgapped"
-
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
 )
