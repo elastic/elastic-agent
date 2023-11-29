@@ -375,7 +375,43 @@ func CheckForErrorsInLogs(client elastictransport.Interface, namespace string, e
 // CheckForErrorsInLogsWithContext checks to see if any error-level lines exist
 // excludeStrings can be used to remove any particular error strings from logs
 func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictransport.Interface, namespace string, excludeStrings []string) (Documents, error) {
+	excludeStatements := []map[string]interface{}{}
+
+	// Some if not all of those processors are likely to always log some error
+	// just because they cannot fetch the information, like if docker is not running
+	// or the Beat is not running on Kubernetes, so we already exclude all errors from them.
+	processors := []string{
+		"add_host_metadata",
+		"add_cloud_metadata",
+		"add_docker_metadata",
+		"add_kubernetes_metadata",
+	}
+	for _, p := range processors {
+		excludeStatements = append(excludeStatements, map[string]interface{}{
+			"match": map[string]interface{}{
+				"log.logger": p,
+			},
+		})
+	}
+
+	if len(excludeStrings) > 0 {
+		for _, ex := range excludeStrings {
+			excludeStatements = append(excludeStatements, map[string]interface{}{
+				"match_phrase": map[string]interface{}{
+					"message": ex,
+				},
+			})
+		}
+	}
 	queryRaw := map[string]interface{}{
+		// We need runtime mappings until we have all log.* fields mapped.
+		// https://github.com/elastic/integrations/issues/6545
+		"runtime_mappings": map[string]interface{}{
+			"log.logger": map[string]interface{}{
+				"type": "keyword",
+			},
+		},
+
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
 				"must": []map[string]interface{}{
@@ -392,40 +428,9 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 						},
 					},
 				},
+				"must_not": excludeStatements,
 			},
 		},
-	}
-
-	if len(excludeStrings) > 0 {
-		excludeStatements := []map[string]interface{}{}
-		for _, ex := range excludeStrings {
-			excludeStatements = append(excludeStatements, map[string]interface{}{
-				"match_phrase": map[string]interface{}{
-					"message": ex,
-				},
-			})
-		}
-		queryRaw = map[string]interface{}{
-			"query": map[string]interface{}{
-				"bool": map[string]interface{}{
-					"must": []map[string]interface{}{
-						{
-							"match": map[string]interface{}{
-								"log.level": "error",
-							},
-						},
-						{
-							"term": map[string]interface{}{
-								"data_stream.namespace": map[string]interface{}{
-									"value": namespace,
-								},
-							},
-						},
-					},
-					"must_not": excludeStatements,
-				},
-			},
-		}
 	}
 
 	var buf bytes.Buffer
