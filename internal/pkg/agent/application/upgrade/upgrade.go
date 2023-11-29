@@ -134,6 +134,8 @@ func (u *Upgrader) Upgradeable() bool {
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+	u.markerWatcher.SetUpgradeStarted()
+
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
 
