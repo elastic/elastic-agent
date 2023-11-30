@@ -85,7 +85,7 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 
 	// call uninstall now, do not wait for the watcher to finish running
 	// 8.11+ should always kill the running watcher (if it doesn't uninstall will fail)
-	uninstallCtx, uninstallCancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer uninstallCancel()
 	output, err := startFixture.Uninstall(uninstallCtx, &atesting.UninstallOpts{Force: true})
 	assert.NoError(t, err, "uninstall failed with output:\n%s", string(output))
