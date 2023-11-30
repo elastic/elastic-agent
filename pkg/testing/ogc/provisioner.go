@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -79,7 +78,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 	defer upCancel()
 	upOutput, err := p.ogcUp(upCtx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ogc up failed: %w", err)
 	}
 
 	// fetch the machines and run the batches on the machine
@@ -100,8 +99,8 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 	for _, b := range batches {
 		machine, ok := findMachine(machines, b.ID)
 		if !ok {
-			// print the output so its clear what went wrong
-			// without this it's unclear where OGC went wrong it
+			// print the output so its clear what went wrong.
+			// Without this it's unclear where OGC went wrong, it
 			// doesn't do a great job of reporting a clean error
 			fmt.Fprintf(os.Stdout, "%s\n", upOutput)
 			return nil, fmt.Errorf("failed to find machine for batch ID: %s", b.ID)
@@ -295,16 +294,6 @@ func osBatchToOGC(cacheDir string, batch runner.OSBatch) Layout {
 		tags = append(tags, strings.ToLower(fmt.Sprintf("%s-%s", batch.OS.Distro, strings.Replace(batch.OS.Version, ".", "-", -1))))
 	} else {
 		tags = append(tags, strings.ToLower(fmt.Sprintf("%s-%s", batch.OS.Type, strings.Replace(batch.OS.Version, ".", "-", -1))))
-	}
-	if batch.Batch.Isolate {
-		tags = append(tags, "isolate")
-		var test define.BatchPackageTests
-		if len(batch.Batch.SudoTests) > 0 {
-			test = batch.Batch.SudoTests[0]
-		} else if len(batch.Batch.Tests) > 0 {
-			test = batch.Batch.Tests[0]
-		}
-		tags = append(tags, fmt.Sprintf("%s-%s", path.Base(test.Name), strings.ToLower(test.Tests[0].Name)))
 	}
 	los, _ := findOSLayout(batch.OS.OS)
 	return Layout{
