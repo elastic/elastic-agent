@@ -84,8 +84,8 @@ func TestProcessMarker(t *testing.T) {
 	cases := map[string]struct {
 		markerFileContents string
 
-		watcherAgentVersion string
-		watcherAgentHash    string
+		currentAgentVersion string
+		currentAgentHash    string
 
 		expectedErrLogMsg bool
 		expectedDetails   *details.Details
@@ -157,8 +157,8 @@ details:
   target_version: 8.9.2
   state: UPG_WATCHING
 `,
-			watcherAgentVersion: "8.9.2",
-			watcherAgentHash:    "bbbbbb",
+			currentAgentVersion: "8.9.2",
+			currentAgentHash:    "bbbbbb",
 			expectedErrLogMsg:   false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
@@ -173,8 +173,8 @@ details:
   target_version: 8.9.2
   state: UPG_WATCHING
 `,
-			watcherAgentVersion: "8.9.2",
-			watcherAgentHash:    "aaaaaa",
+			currentAgentVersion: "8.9.2",
+			currentAgentHash:    "aaaaaa",
 			expectedErrLogMsg:   false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
@@ -186,8 +186,8 @@ details:
 prev_version: 8.9.2
 prev_hash: aaaaaa
 `,
-			watcherAgentVersion: "8.9.2",
-			watcherAgentHash:    "aaaaaa",
+			currentAgentVersion: "8.9.2",
+			currentAgentHash:    "aaaaaa",
 			expectedErrLogMsg:   false,
 			expectedDetails: &details.Details{
 				TargetVersion: "unknown",
@@ -235,11 +235,11 @@ prev_hash: aaaaaa
 			currentCommit := ""
 
 			// apply overrides from testcase
-			if test.watcherAgentVersion != "" {
-				currentVersion = test.watcherAgentVersion
+			if test.currentAgentVersion != "" {
+				currentVersion = test.currentAgentVersion
 			}
-			if test.watcherAgentHash != "" {
-				currentCommit = test.watcherAgentHash
+			if test.currentAgentHash != "" {
+				currentCommit = test.currentAgentHash
 			}
 
 			mfw.processMarker(currentVersion, currentCommit)
