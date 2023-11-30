@@ -184,8 +184,8 @@ func listUpgradeDetails(l list.Writer, upgradeDetails *cproto.UpgradeDetails) {
 		if upgradeDetails.Metadata.RetryUntil != "" {
 			l.AppendItem("retry_until: " + humanDurationUntil(upgradeDetails.Metadata.RetryUntil, time.Now()))
 		}
-		if upgradeDetails.Metadata.RetryableErrorMsg != "" {
-			l.AppendItem("retryable_error_msg: " + upgradeDetails.Metadata.RetryableErrorMsg)
+		if upgradeDetails.Metadata.RetryErrorMsg != "" {
+			l.AppendItem("retry_error_msg: " + upgradeDetails.Metadata.RetryErrorMsg)
 		}
 		l.UnIndent()
 	}

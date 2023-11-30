@@ -64,12 +64,12 @@ func TestStateMapping(t *testing.T) {
 				State:         details.StateDownloading,
 				ActionID:      "some-action-id",
 				Metadata: details.Metadata{
-					ScheduledAt:       &now,
-					DownloadPercent:   1.7,
-					ErrorMsg:          "some error",
-					RetryUntil:        &now,
-					RetryableErrorMsg: "some retryable error",
-					FailedState:       details.StateWatching,
+					ScheduledAt:     &now,
+					DownloadPercent: 1.7,
+					ErrorMsg:        "some error",
+					RetryUntil:      &now,
+					RetryErrorMsg:   "some retryable error",
+					FailedState:     details.StateWatching,
 				},
 			},
 		},
@@ -169,10 +169,10 @@ func TestStateMapping(t *testing.T) {
 
 			if tc.upgradeDetails != nil {
 				expectedMetadata := &cproto.UpgradeDetailsMetadata{
-					DownloadPercent:   float32(tc.upgradeDetails.Metadata.DownloadPercent),
-					FailedState:       string(tc.upgradeDetails.Metadata.FailedState),
-					ErrorMsg:          tc.upgradeDetails.Metadata.ErrorMsg,
-					RetryableErrorMsg: tc.upgradeDetails.Metadata.RetryableErrorMsg,
+					DownloadPercent: float32(tc.upgradeDetails.Metadata.DownloadPercent),
+					FailedState:     string(tc.upgradeDetails.Metadata.FailedState),
+					ErrorMsg:        tc.upgradeDetails.Metadata.ErrorMsg,
+					RetryErrorMsg:   tc.upgradeDetails.Metadata.RetryErrorMsg,
 				}
 
 				if tc.upgradeDetails.Metadata.ScheduledAt != nil &&

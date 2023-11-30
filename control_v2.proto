@@ -228,7 +228,7 @@ message UpgradeDetailsMetadata {
 
   // Any error message that is a result of a retryable upgrade
   // step, e.g. the download step, being retried.
-  string retryable_error_msg = 5;
+  string retry_error_msg = 5;
 
   // The deadline until when a retryable upgrade step, e.g. the download
   // step, will be retried.

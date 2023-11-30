@@ -225,10 +225,10 @@ func TestListUpgradeDetails(t *testing.T) {
 				TargetVersion: "8.12.0",
 				State:         "UPG_DOWNLOADING",
 				Metadata: &cproto.UpgradeDetailsMetadata{
-					ScheduledAt:       now.Format(control.TimeFormat()),
-					DownloadPercent:   0,
-					RetryableErrorMsg: "unable to download, will retry",
-					RetryUntil:        "1h59m32s",
+					ScheduledAt:     now.Format(control.TimeFormat()),
+					DownloadPercent: 0,
+					RetryErrorMsg:   "unable to download, will retry",
+					RetryUntil:      "1h59m32s",
 				},
 			},
 			expectedOutput: fmt.Sprintf(`── upgrade_details
@@ -238,7 +238,7 @@ func TestListUpgradeDetails(t *testing.T) {
       ├─ scheduled_at: %s
       ├─ download_percent: 0.00%%
       ├─ retry_until: 1h59m32s
-      └─ retryable_error_msg: unable to download, will retry`, now.Format(control.TimeFormat())),
+      └─ retry_error_msg: unable to download, will retry`, now.Format(control.TimeFormat())),
 		},
 	}
 

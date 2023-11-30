@@ -37,9 +37,9 @@ type Metadata struct {
 	// is progressing.
 	DownloadRate details.DownloadRate `json:"download_rate,omitempty" yaml:"download_rate,omitempty"`
 
-	// RetryableErrorMsg is any error message that is a result of a retryable upgrade
+	// RetryErrorMsg is any error message that is a result of a retryable upgrade
 	// step, e.g. the download step, being retried.
-	RetryableErrorMsg string `json:"retryable_error_msg,omitempty" yaml:"retryable_error_msg,omitempty"`
+	RetryErrorMsg string `json:"retry_error_msg,omitempty" yaml:"retry_error_msg,omitempty"`
 
 	// RetryUntil is the deadline until when a retryable upgrade step, e.g. the download
 	// step, will be retried.
@@ -97,15 +97,15 @@ func (d *Details) SetDownloadProgress(percent, rateBytesPerSecond float64) {
 	d.notifyObservers()
 }
 
-// SetRetryableError sets the RetryableErrorMsg metadata field.
+// SetRetryableError sets the RetryErrorMsg metadata field.
 func (d *Details) SetRetryableError(retryableError error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	if retryableError == nil {
-		d.Metadata.RetryableErrorMsg = ""
+		d.Metadata.RetryErrorMsg = ""
 	} else {
-		d.Metadata.RetryableErrorMsg = retryableError.Error()
+		d.Metadata.RetryErrorMsg = retryableError.Error()
 	}
 	d.notifyObservers()
 }
@@ -195,7 +195,7 @@ func (m Metadata) Equals(otherM Metadata) bool {
 		m.DownloadPercent == otherM.DownloadPercent &&
 		m.DownloadRate == otherM.DownloadRate &&
 		equalTimePointers(m.RetryUntil, otherM.RetryUntil) &&
-		m.RetryableErrorMsg == otherM.RetryableErrorMsg
+		m.RetryErrorMsg == otherM.RetryErrorMsg
 }
 
 func equalTimePointers(t, otherT *time.Time) bool {

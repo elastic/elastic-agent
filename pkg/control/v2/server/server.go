@@ -370,10 +370,10 @@ func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.
 			State:         string(state.UpgradeDetails.State),
 			ActionId:      state.UpgradeDetails.ActionID,
 			Metadata: &cproto.UpgradeDetailsMetadata{
-				DownloadPercent:   float32(state.UpgradeDetails.Metadata.DownloadPercent),
-				FailedState:       string(state.UpgradeDetails.Metadata.FailedState),
-				ErrorMsg:          state.UpgradeDetails.Metadata.ErrorMsg,
-				RetryableErrorMsg: state.UpgradeDetails.Metadata.RetryableErrorMsg,
+				DownloadPercent: float32(state.UpgradeDetails.Metadata.DownloadPercent),
+				FailedState:     string(state.UpgradeDetails.Metadata.FailedState),
+				ErrorMsg:        state.UpgradeDetails.Metadata.ErrorMsg,
+				RetryErrorMsg:   state.UpgradeDetails.Metadata.RetryErrorMsg,
 			},
 		}
 
