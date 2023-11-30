@@ -91,10 +91,10 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 				case e.Op&(fsnotify.Create|fsnotify.Write) != 0:
 					// Upgrade marker file was created or updated; read its contents
 					// and send them over the update channel.
-					mfw.processMarker(version.GetAgentPackageVersion())
+					mfw.processMarker(version.GetAgentPackageVersion(), version.Commit())
 				}
 			case <-doInitialRead:
-				mfw.processMarker(version.GetAgentPackageVersion())
+				mfw.processMarker(version.GetAgentPackageVersion(), version.Commit())
 			}
 		}
 	}()
@@ -102,7 +102,7 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 	return nil
 }
 
-func (mfw *MarkerFileWatcher) processMarker(currentVersion string) {
+func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string) {
 	marker, err := loadMarker(mfw.markerFilePath)
 	if err != nil {
 		mfw.logger.Error(err)
@@ -120,7 +120,7 @@ func (mfw *MarkerFileWatcher) processMarker(currentVersion string) {
 	// been recorded in the marker's upgrade details field but, in case it
 	// isn't for some reason, we fallback to explicitly setting that state as
 	// part of the upgrade details in the marker.
-	if marker.PrevVersion == currentVersion {
+	if marker.PrevVersion == currentVersion && marker.PrevHash == commit {
 		if marker.Details == nil {
 			marker.Details = details.NewDetails("unknown", details.StateRollback, marker.GetActionID())
 		} else {
