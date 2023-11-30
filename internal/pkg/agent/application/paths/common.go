@@ -57,10 +57,10 @@ func init() {
 	fs.StringVar(&topPath, "path.home", topPath, "Agent root path")
 	fs.BoolVar(&unversionedHome, "path.home.unversioned", unversionedHome, "Agent root path is not versioned based on build")
 	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
+	fs.StringVar(&configFilePath, "config", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
 	fs.StringVar(&installPath, "path.install", installPath, "Install path contains binaries Agent extracts")
-
 	// enable user to download update artifacts to alternative place
 	// TODO: remove path.downloads support on next major (this can be configured using `agent.download.targetDirectory`)
 	// `path.download` serves just as init value for `agent.download.targetDirectory`
