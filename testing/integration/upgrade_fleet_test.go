@@ -79,13 +79,9 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool)
 	// Upgrade to a different build but of the same version (always a snapshot).
 	// In the case there is not a different build then the test is skipped.
 	// Fleet doesn't allow a downgrade to occur, so we cannot go to a lower version.
-	sameVersion := define.Version()
-	if !strings.HasSuffix(sameVersion, "-SNAPSHOT") {
-		sameVersion += "-SNAPSHOT"
-	}
 	endFixture, err := atesting.NewFixture(
 		t,
-		sameVersion,
+		upgradetest.EnsureSnapshot(define.Version()),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
@@ -99,6 +95,17 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool)
 		startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
 		t.Skipf("Build under test is the same as the build from the artifacts repository (version: %s) [commit: %s]",
 			startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
+	}
+
+	if unprivileged {
+		currentVersion, err := version.ParseVersion(define.Version())
+		require.NoError(t, err)
+		if currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) {
+			t.Skipf("Version is %s is less than 8.12 and doesn't suppoert unprivileged mode.")
+		}
+		if runtime.GOOS != define.Linux {
+			t.Skipf("Unprivileged mode is currently only supported on linux")
+		}
 	}
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",

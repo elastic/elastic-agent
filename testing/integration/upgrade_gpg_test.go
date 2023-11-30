@@ -8,6 +8,7 @@ package integration
 
 import (
 	"context"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -28,10 +29,10 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	})
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
-	fromVersion, err := version.ParseVersion(define.Version())
+	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	if fromVersion.Less(*minVersion) {
+	if currentVersion.Less(*minVersion) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
@@ -42,18 +43,26 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	// logic that is in the build.
 	startFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
+	startVersionInfo, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err)
 
 	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
-	require.NoError(t, err)
 	endFixture, err := atesting.NewFixture(
 		t,
-		upgradeToVersion,
+		upgradetest.EnsureSnapshot(define.Version()),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
 
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	if startVersionInfo.Binary.String() == endVersionInfo.Binary.String() &&
+		startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("Build under test is the same as the build from the artifacts repository (version: %s) [commit: %s]",
+			startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
+	}
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), endVersionInfo.Binary.String())
 
 	defaultPGP := release.PGP()
 	firstSeven := string(defaultPGP[:7])
@@ -68,12 +77,18 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 		PGP: newPgp,
 	}
 
-	err = upgradetest.PerformUpgrade(
-		ctx, startFixture, endFixture, t,
-		upgradetest.WithUnprivileged(true),
+	upgradeOpts := []upgradetest.UpgradeOpt{
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
-		upgradetest.WithSkipVerify(false))
+		upgradetest.WithSkipVerify(false),
+	}
+	if !currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) && runtime.GOOS == define.Linux {
+		// on Linux and 8.12+ we run this test as unprivileged
+		upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(true))
+	}
+
+	err = upgradetest.PerformUpgrade(
+		ctx, startFixture, endFixture, t, upgradeOpts...)
 	require.NoError(t, err, "perform upgrade failed")
 }
 
@@ -85,10 +100,10 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	})
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
-	fromVersion, err := version.ParseVersion(define.Version())
+	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	if fromVersion.Less(*minVersion) {
+	if currentVersion.Less(*minVersion) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
@@ -126,9 +141,18 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 		PGPUri: "https://127.0.0.1:3456/non/existing/path",
 	}
 
+	upgradeOpts := []upgradetest.UpgradeOpt{
+		upgradetest.WithSourceURI(""),
+		upgradetest.WithCustomPGP(customPGP),
+		upgradetest.WithSkipVerify(false),
+	}
+	if !currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) && runtime.GOOS == define.Linux {
+		// on Linux and 8.12+ we run this test as unprivileged
+		upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(true))
+	}
+
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
-		upgradetest.WithUnprivileged(true),
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
 		upgradetest.WithSkipVerify(false))

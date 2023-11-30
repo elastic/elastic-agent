@@ -9,6 +9,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -63,7 +64,8 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	upgradeOpts := []upgradetest.UpgradeOpt{
 		upgradetest.WithPostUpgradeHook(postUpgradeHook),
 	}
-	if !currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) {
+	if !currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) && runtime.GOOS == define.Linux {
+		// on Linux and 8.12+ we run this test as unprivileged
 		upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(true))
 	}
 

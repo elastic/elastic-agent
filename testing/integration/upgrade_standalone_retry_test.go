@@ -9,10 +9,12 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"net"
 	"net/http"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -33,6 +35,9 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
@@ -87,10 +92,16 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	}()
 
 	sourceURI := fmt.Sprintf("http://localhost:%d", port)
+	upgradeOpts := []upgradetest.UpgradeOpt{
+		upgradetest.WithSourceURI(sourceURI),
+	}
+	if !currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) && runtime.GOOS == define.Linux {
+		// on Linux and 8.12+ we run this test as unprivileged
+		upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(true))
+	}
+
 	err = upgradetest.PerformUpgrade(
-		ctx, startFixture, endFixture, t,
-		upgradetest.WithUnprivileged(true),
-		upgradetest.WithSourceURI(sourceURI))
+		ctx, startFixture, endFixture, t, upgradeOpts...)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, count, "retry request didn't occur")
 }

@@ -71,7 +71,7 @@ func TestStandaloneUpgradeUnprivileged(t *testing.T) {
 	// this can only currently test upgrading from snapshot 8.12 to build of 8.12.
 	startFixture, err := atesting.NewFixture(
 		t,
-		define.Version(),
+		upgradetest.EnsureSnapshot(define.Version()),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err, "error creating previous agent fixture")

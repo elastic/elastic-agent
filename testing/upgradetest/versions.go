@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
@@ -136,4 +137,12 @@ func PreviousMinor(ctx context.Context, version string) (string, error) {
 		return "", fmt.Errorf("no previous minor")
 	}
 	return versions[0].String(), nil
+}
+
+// EnsureSnapshot ensures that the version string is a snapshot version.
+func EnsureSnapshot(version string) string {
+	if !strings.HasSuffix(version, "-SNAPSHOT") {
+		version += "-SNAPSHOT"
+	}
+	return version
 }
