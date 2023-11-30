@@ -39,17 +39,13 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	startFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
-	require.NoError(t, err)
+	// Upgrade to an older snapshot build of same version.
 	endFixture, err := atesting.NewFixture(
 		t,
-		upgradeToVersion,
+		define.Version(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
-
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
 
 	// uses an internal http server that returns bad requests
 	// until it returns a successful request
@@ -91,7 +87,10 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	}()
 
 	sourceURI := fmt.Sprintf("http://localhost:%d", port)
-	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithSourceURI(sourceURI))
+	err = upgradetest.PerformUpgrade(
+		ctx, startFixture, endFixture, t,
+		upgradetest.WithUnprivileged(true),
+		upgradetest.WithSourceURI(sourceURI))
 	assert.NoError(t, err)
 	assert.Equal(t, 2, count, "retry request didn't occur")
 }

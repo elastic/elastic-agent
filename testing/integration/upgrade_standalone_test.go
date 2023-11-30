@@ -9,6 +9,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,4 +50,35 @@ func TestStandaloneUpgrade(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestStandaloneUpgradeUnprivileged(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: UpgradeUnprivileged,
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+	if currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) {
+		t.Skipf("Version %s is lower than min version %s; test cannot be performed", define.Version(), upgradetest.Version_8_12_0_SNAPSHOT)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// this can only currently test upgrading from snapshot 8.12 to build of 8.12.
+	startFixture, err := atesting.NewFixture(
+		t,
+		define.Version(),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
+	require.NoError(t, err, "error creating previous agent fixture")
+
+	endFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithUnprivileged(true))
+	assert.NoError(t, err)
 }

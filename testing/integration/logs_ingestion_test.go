@@ -72,6 +72,7 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
+		Unprivileged:   true,
 	}
 
 	// 2. Install the Elastic-Agent with the policy that

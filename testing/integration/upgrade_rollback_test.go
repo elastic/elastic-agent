@@ -100,6 +100,7 @@ inputs:
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
+		upgradetest.WithUnprivileged(true),
 		upgradetest.WithPreInstallHook(preInstallHook),
 		upgradetest.WithPostUpgradeHook(postUpgradeHook))
 	if !errors.Is(err, ErrPostExit) {
@@ -191,6 +192,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
+		upgradetest.WithUnprivileged(true),
 		upgradetest.WithPostUpgradeHook(postUpgradeHook),
 		upgradetest.WithCustomWatcherConfig(reallyFastWatcherCfg))
 	if !errors.Is(err, ErrPostExit) {

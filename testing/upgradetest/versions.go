@@ -29,6 +29,8 @@ var (
 	Version_8_10_0_SNAPSHOT = version.NewParsedSemVer(8, 10, 0, "SNAPSHOT", "")
 	// Version_8_11_0_SNAPSHOT is the minimum version for uninstall command to kill the watcher upon uninstall
 	Version_8_11_0_SNAPSHOT = version.NewParsedSemVer(8, 11, 0, "SNAPSHOT", "")
+	// Version_8_12_0_SNAPSHOT is the minimum version for uninstall command to kill the watcher upon uninstall
+	Version_8_12_0_SNAPSHOT = version.NewParsedSemVer(8, 12, 0, "SNAPSHOT", "")
 )
 
 // GetUpgradableVersions returns the version that the upgradeToVersion can upgrade from.

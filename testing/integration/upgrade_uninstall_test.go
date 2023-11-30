@@ -38,13 +38,11 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start at old version, we want this test to upgrade to our
+	// Start on a snapshot build, we want this test to upgrade to our
 	// build to ensure that the uninstall will kill the watcher.
-	startVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
-	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,
-		startVersion,
+		define.Version(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
@@ -62,9 +60,15 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 		return ErrPostExit
 	}
 
+	upgradeOpts := []upgradetest.UpgradeOpt{
+		upgradetest.WithPostUpgradeHook(postUpgradeHook),
+	}
+	if !currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) {
+		upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(true))
+	}
+
 	err = upgradetest.PerformUpgrade(
-		ctx, startFixture, endFixture, t,
-		upgradetest.WithPostUpgradeHook(postUpgradeHook))
+		ctx, startFixture, endFixture, t, upgradeOpts...)
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}

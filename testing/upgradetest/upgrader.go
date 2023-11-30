@@ -27,6 +27,7 @@ type CustomPGP struct {
 type upgradeOpts struct {
 	sourceURI *string
 
+	unprivileged     bool
 	skipVerify       bool
 	skipDefaultPgp   bool
 	customPgp        *CustomPGP
@@ -38,69 +39,76 @@ type upgradeOpts struct {
 	postUpgradeHook func() error
 }
 
-type upgradeOpt func(opts *upgradeOpts)
+type UpgradeOpt func(opts *upgradeOpts)
 
 // WithSourceURI sets a specific --source-uri for the upgrade
 // command. This doesn't change the verification of the upgrade
 // the resulting upgrade must still be the same agent provided
 // in the endFixture variable.
-func WithSourceURI(sourceURI string) upgradeOpt {
+func WithSourceURI(sourceURI string) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.sourceURI = &sourceURI
 	}
 }
 
+// WithUnprivileged sets the install to be unprivileged
+func WithUnprivileged(unprivileged bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.unprivileged = unprivileged
+	}
+}
+
 // WithSkipVerify sets the skip verify option for upgrade.
-func WithSkipVerify(skipVerify bool) upgradeOpt {
+func WithSkipVerify(skipVerify bool) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.skipVerify = skipVerify
 	}
 }
 
 // WithSkipDefaultPgp sets the skip default pgp option for upgrade.
-func WithSkipDefaultPgp(skipDefaultPgp bool) upgradeOpt {
+func WithSkipDefaultPgp(skipDefaultPgp bool) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.skipDefaultPgp = skipDefaultPgp
 	}
 }
 
 // WithCustomPGP sets a custom pgp configuration for upgrade.
-func WithCustomPGP(customPgp CustomPGP) upgradeOpt {
+func WithCustomPGP(customPgp CustomPGP) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.customPgp = &customPgp
 	}
 }
 
 // WithPreInstallHook sets a hook to be called before install.
-func WithPreInstallHook(hook func() error) upgradeOpt {
+func WithPreInstallHook(hook func() error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.preInstallHook = hook
 	}
 }
 
 // WithPostInstallHook sets a hook to be called before install.
-func WithPostInstallHook(hook func() error) upgradeOpt {
+func WithPostInstallHook(hook func() error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.postInstallHook = hook
 	}
 }
 
 // WithPreUpgradeHook sets a hook to be called before install.
-func WithPreUpgradeHook(hook func() error) upgradeOpt {
+func WithPreUpgradeHook(hook func() error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.preUpgradeHook = hook
 	}
 }
 
 // WithPostUpgradeHook sets a hook to be called before install.
-func WithPostUpgradeHook(hook func() error) upgradeOpt {
+func WithPostUpgradeHook(hook func() error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.postUpgradeHook = hook
 	}
 }
 
 // WithCustomWatcherConfig sets a custom watcher configuration to use.
-func WithCustomWatcherConfig(cfg string) upgradeOpt {
+func WithCustomWatcherConfig(cfg string) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.customWatcherCfg = cfg
 	}
@@ -112,7 +120,7 @@ func PerformUpgrade(
 	startFixture *atesting.Fixture,
 	endFixture *atesting.Fixture,
 	logger Logger,
-	opts ...upgradeOpt,
+	opts ...UpgradeOpt,
 ) error {
 	// use the passed in options to perform the upgrade
 	// `skipVerify` is by default enabled, because default is to perform a local
@@ -174,6 +182,7 @@ func PerformUpgrade(
 	installOpts := atesting.InstallOpts{
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
+		Unprivileged:   upgradeOpts.unprivileged,
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	if err != nil {

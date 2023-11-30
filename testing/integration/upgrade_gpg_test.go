@@ -70,6 +70,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
+		upgradetest.WithUnprivileged(true),
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
 		upgradetest.WithSkipVerify(false))
@@ -127,6 +128,7 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
+		upgradetest.WithUnprivileged(true),
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
 		upgradetest.WithSkipVerify(false))

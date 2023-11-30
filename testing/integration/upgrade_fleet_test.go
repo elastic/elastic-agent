@@ -46,7 +46,24 @@ func TestFleetManagedUpgrade(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+	testFleetManagedUpgrade(t, info, false)
+}
 
+// TestFleetManagedUpgrade tests that the build under test can retrieve an action from
+// Fleet and perform the upgrade install as unprivileged. It does not need to test all
+// the combinations of  versions as the standalone tests already perform those tests
+// and would be redundant.
+func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: FleetUnprivileged,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+	testFleetManagedUpgrade(t, info, true)
+}
+
+func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
@@ -87,7 +104,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), endVersionInfo.Binary.String())
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy())
+	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged)
 }
 
 func TestFleetAirGappedUpgrade(t *testing.T) {
@@ -99,7 +116,22 @@ func TestFleetAirGappedUpgrade(t *testing.T) {
 		Local: false, // Needed as the test requires Agent installation
 		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
 	})
+	testFleetAirGappedUpgrade(t, stack, false)
+}
 
+func TestFleetAirGappedUpgradeUnprivileged(t *testing.T) {
+	stack := define.Require(t, define.Requirements{
+		Group: FleetAirgappedUnprivileged,
+		Stack: &define.Stack{},
+		// The test uses iptables to simulate the air-gaped environment.
+		OS:    []define.OS{{Type: define.Linux}},
+		Local: false, // Needed as the test requires Agent installation
+		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
+	})
+	testFleetAirGappedUpgrade(t, stack, true)
+}
+
+func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bool) {
 	ctx, _ := testcontext.WithDeadline(
 		t, context.Background(), time.Now().Add(10*time.Minute))
 
@@ -166,7 +198,7 @@ func TestFleetAirGappedUpgrade(t *testing.T) {
 	policy := defaultPolicy()
 	policy.DownloadSourceID = src.Item.ID
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy)
+	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy, unprivileged)
 }
 
 func testUpgradeFleetManagedElasticAgent(
@@ -175,7 +207,8 @@ func testUpgradeFleetManagedElasticAgent(
 	info *define.Info,
 	startFixture *atesting.Fixture,
 	endFixture *atesting.Fixture,
-	policy kibana.AgentPolicy) {
+	policy kibana.AgentPolicy,
+	unprivileged bool) {
 	kibClient := info.KibanaClient
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
@@ -213,6 +246,7 @@ func testUpgradeFleetManagedElasticAgent(
 			URL:             fleetServerURL,
 			EnrollmentToken: enrollmentToken.APIKey,
 		},
+		Unprivileged: unprivileged,
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
