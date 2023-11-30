@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
@@ -45,7 +46,7 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Upgrade from an old build because the new watcher from the new build will
@@ -160,7 +161,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Upgrade from an old build because the new watcher from the new build will

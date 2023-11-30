@@ -95,7 +95,7 @@ func testAfterRemovingPkgVersionFiles(ctx context.Context, f *atesting.Fixture) 
 		}
 		testf := func() error {
 			// check the version returned by the running agent
-			stdout, stderr, processState := getAgentVersionOutput(t, f, context.Background(), false)
+			stdout, stderr, processState := getAgentVersionOutput(t, f, ctx, false)
 
 			binaryActualVersion := unmarshalVersionOutput(t, stdout, "binary")
 			assert.Equal(t, version.GetDefaultVersion(), binaryActualVersion, "binary version does not return default beat version when the package version file is missing")
