@@ -273,6 +273,11 @@ func TestDownloadWithRetries(t *testing.T) {
 	})
 }
 
+// mockUpgradeDetails returns a *details.Details value that has an observer registered on it for inspecting
+// certain properties of the object being set and unset.  It also returns:
+// - a *time.Time value, which will be not nil if Metadata.RetryUntil is set on the mock value,
+// - a *bool value, which will be true if Metadata.RetryUntil is set and then unset on the mock value,
+// - a *string value, which will be non-empty if Metadata.RetryErrorMsg is set on the mock value.
 func mockUpgradeDetails(parsedVersion *agtversion.ParsedSemVer) (*details.Details, *time.Time, *bool, *string) {
 	var upgradeDetailsRetryUntil time.Time
 	var upgradeDetailsRetryUntilWasUnset bool
