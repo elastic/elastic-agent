@@ -383,12 +383,10 @@ func TestDiagnosticComponentsActual(t *testing.T) {
 		},
 	}
 
-	// The error values here shouldn't really be empty, this is a known bug, see
-	// https://github.com/elastic/elastic-agent/issues/2940
 	expected := `
 components:
   - id: component-1
-    error: {}
+    error: "component error"
     input_type: "test-input"
     output_type: "test-output"
     units:
