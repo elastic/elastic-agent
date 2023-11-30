@@ -38,11 +38,11 @@ type Metadata struct {
 	DownloadRate details.DownloadRate `json:"download_rate,omitempty" yaml:"download_rate,omitempty"`
 
 	// RetryableErrorMsg is any error message that is a result of a retryable upgrade
-	// step, e.g. the download step, being (re)tried.
+	// step, e.g. the download step, being retried.
 	RetryableErrorMsg string `json:"retryable_error_msg,omitempty" yaml:"retryable_error_msg,omitempty"`
 
 	// RetryUntil is the deadline until when a retryable upgrade step, e.g. the download
-	// step, will be (re)tried.
+	// step, will be retried.
 	RetryUntil *time.Time `json:"retry_until,omitempty" yaml:"retry_until"`
 
 	// FailedState is the state an upgrade was in if/when it failed. Use the

@@ -1176,10 +1176,10 @@ type UpgradeDetailsMetadata struct {
 	// Any error encountered during the upgrade process.
 	ErrorMsg string `protobuf:"bytes,4,opt,name=error_msg,json=errorMsg,proto3" json:"error_msg,omitempty"`
 	// Any error message that is a result of a retryable upgrade
-	// step, e.g. the download step, being (re)tried.
+	// step, e.g. the download step, being retried.
 	RetryableErrorMsg string `protobuf:"bytes,5,opt,name=retryable_error_msg,json=retryableErrorMsg,proto3" json:"retryable_error_msg,omitempty"`
 	// The deadline until when a retryable upgrade step, e.g. the download
-	// step, will be (re)tried.
+	// step, will be retried.
 	RetryUntil string `protobuf:"bytes,6,opt,name=retry_until,json=retryUntil,proto3" json:"retry_until,omitempty"`
 }
 

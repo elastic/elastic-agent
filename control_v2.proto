@@ -227,11 +227,11 @@ message UpgradeDetailsMetadata {
   string error_msg = 4;
 
   // Any error message that is a result of a retryable upgrade
-  // step, e.g. the download step, being (re)tried.
+  // step, e.g. the download step, being retried.
   string retryable_error_msg = 5;
 
   // The deadline until when a retryable upgrade step, e.g. the download
-  // step, will be (re)tried.
+  // step, will be retried.
   string retry_until = 6;
 }
 
