@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 )
 
 const diagnosticsArchiveGlobPattern = "elastic-agent-diagnostics-*.zip"
@@ -94,7 +96,7 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
@@ -119,13 +121,10 @@ func TestDiagnosticsCommand(t *testing.T) {
 	f, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = f.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
-
-	ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
 
 	err = f.Run(ctx, integrationtest.State{
 		Configure:  simpleConfig2,

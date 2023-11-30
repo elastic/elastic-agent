@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 )
 
@@ -42,7 +43,9 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
-	ctx := context.Background()
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
