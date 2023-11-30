@@ -14,18 +14,6 @@ const (
 	// for installing Elastic Agent's files.
 	DefaultBasePath = "/Library"
 
-	// ControlSocketPath is the control socket path used when installed.
-	ControlSocketPath = "unix:///var/run/elastic-agent.sock"
-
-	// ControlSocketUnprivilegedPath is the control socket path used when installed as non-root.
-	// This must exist inside of a directory in '/var/run/' because the permissions need to be set
-	// on that directory during installation time, because once the service is spawned it will not
-	// have permissions to create the socket in the '/var/run/' directory.
-	ControlSocketUnprivilegedPath = "unix:///var/run/elastic-agent/elastic-agent.sock"
-
-	// ShipperSocketPipePattern is the socket path used when installed for a shipper pipe.
-	ShipperSocketPipePattern = "unix:///var/run/elastic-agent-%s-pipe.sock"
-
 	// ServiceName is the service name when installed.
 	ServiceName = "co.elastic.elastic-agent"
 

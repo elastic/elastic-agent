@@ -116,6 +116,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	}
 
 	// we just installed agent, the control socket is at a well-known location
+	socketPath :=
 	socketPath := paths.ControlSocketPath
 	if installOpts.Unprivileged {
 		socketPath = paths.ControlSocketUnprivilegedPath

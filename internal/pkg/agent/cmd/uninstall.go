@@ -10,7 +10,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -51,7 +50,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if status == install.NotInstalled {
 		return fmt.Errorf("not installed")
 	}
-	if status == install.Installed && !info.RunningInstalled() {
+	if status == install.Installed && !paths.RunningInstalled() {
 		return fmt.Errorf("can only be uninstalled by executing the installed Elastic Agent at: %s", install.ExecutablePath(paths.Top()))
 	}
 

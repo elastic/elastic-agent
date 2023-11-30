@@ -606,7 +606,7 @@ func ensureInstallMarkerPresent() error {
 
 	// Only an installed Elastic Agent can be self-upgraded. So, if the
 	// installation marker file is already present, we're all set.
-	if info.RunningInstalled() {
+	if paths.RunningInstalled() {
 		return nil
 	}
 

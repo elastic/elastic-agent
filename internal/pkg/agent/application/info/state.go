@@ -12,25 +12,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-// MarkerFileName is the name of the file that's created by
-// `elastic-agent install` in the Agent's topPath folder to
-// indicate that the Agent executing from the binary under
-// the same topPath folder is an installed Agent.
-const MarkerFileName = ".installed"
-
-// RunningInstalled returns true when executing Agent is the installed Agent.
-func RunningInstalled() bool {
-	// Check if install marker created by `elastic-agent install` exists
-	markerFilePath := filepath.Join(paths.Top(), MarkerFileName)
-	if _, err := os.Stat(markerFilePath); err != nil {
-		return false
-	}
-
-	return true
-}
-
 func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
-	markerFilePath := filepath.Join(topPath, MarkerFileName)
+	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
 	if _, err := os.Create(markerFilePath); err != nil {
 		return err
 	}

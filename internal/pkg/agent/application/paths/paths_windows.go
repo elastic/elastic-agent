@@ -7,6 +7,8 @@
 package paths
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -21,12 +23,6 @@ const (
 
 	// ControlSocketPath is the control socket path used when installed.
 	ControlSocketPath = `\\.\pipe\elastic-agent-system`
-
-	// ControlSocketUnprivilegedPath is the control socket path used when installed as non-root.
-	ControlSocketUnprivilegedPath = ControlSocketPath
-
-	// ShipperSocketPipePattern is the socket path used when installed for a shipper pipe.
-	ShipperSocketPipePattern = `\\.\pipe\elastic-agent-%s-pipe.sock`
 
 	// ServiceName is the service name when installed.
 	ServiceName = "Elastic Agent"
@@ -49,4 +45,14 @@ func ArePathsEqual(expected, actual string) bool {
 // AgentVaultPath is the directory that contains all the files for the value
 func AgentVaultPath() string {
 	return filepath.Join(Config(), defaultAgentVaultPath)
+}
+
+func initialControlSocketPath(topPath string) string {
+	// when installed the control address is fixed
+	if RunningInstalled() {
+		return ControlSocketPath
+	}
+	// entire string cannot be longer than 256 characters, this forces the
+	// length to always be 87 characters (but unique per data path)
+	return fmt.Sprintf(`\\.\pipe\elastic-agent-%x`, sha256.Sum256([]byte(Data())))
 }
