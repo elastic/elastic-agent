@@ -243,7 +243,6 @@ steps:
       manual:
         allowed: true
 
-
   - wait: ~
     continue_on_failure: true
   - label: "Processing test results"
