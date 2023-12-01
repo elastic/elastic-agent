@@ -282,6 +282,10 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		return errors.New("RunBeat() can't be run against elastic-agent")
 	}
 
+	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
+		f.t.Fatal("Context passed to Fixture.RunBeat() has no deadline set.")
+	}
+
 	var err error
 	err = f.EnsurePrepared(ctx)
 	if err != nil {
@@ -357,6 +361,10 @@ func RunProcess(t *testing.T,
 	ctx context.Context, runLength time.Duration,
 	logOutput, allowErrs bool,
 	processPath string, args ...string) error {
+	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
+		t.Fatal("Context passed to RunProcess() has no deadline set.")
+	}
+
 	var err error
 	var logProxy Logger
 	if logOutput {
@@ -435,6 +443,10 @@ func RunProcess(t *testing.T,
 //
 // if isClientEnabled is set to bool, communicating state does not happen.
 func (f *Fixture) RunWithClient(ctx context.Context, isClientEnabled bool, states ...State) error {
+	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
+		f.t.Fatal("Context passed to Fixture.Run() has no deadline set.")
+	}
+
 	if f.binaryName != "elastic-agent" {
 		return errors.New("Run() can only be used with elastic-agent, use RunBeat()")
 	}

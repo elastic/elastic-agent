@@ -23,6 +23,7 @@ import (
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
@@ -108,7 +109,7 @@ func TestFileProcessing(t *testing.T) {
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
@@ -154,7 +155,7 @@ func TestAPMIngestion(t *testing.T) {
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
