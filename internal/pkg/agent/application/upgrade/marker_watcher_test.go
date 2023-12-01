@@ -185,7 +185,7 @@ details:
 			expectedErrLogMsg:   false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
-				State:         details.StateRollback,
+				State:         details.StateWatching,
 			},
 		},
 		"same_version_same_hash_no_details": {
