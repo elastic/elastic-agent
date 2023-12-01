@@ -10,6 +10,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -29,7 +31,7 @@ func TestPackageVersion(t *testing.T) {
 	f, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = f.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
@@ -93,7 +95,7 @@ func testAfterRemovingPkgVersionFiles(ctx context.Context, f *atesting.Fixture) 
 		}
 		testf := func() error {
 			// check the version returned by the running agent
-			stdout, stderr, processState := getAgentVersionOutput(t, f, context.Background(), false)
+			stdout, stderr, processState := getAgentVersionOutput(t, f, ctx, false)
 
 			binaryActualVersion := unmarshalVersionOutput(t, stdout, "binary")
 			assert.Equal(t, version.GetDefaultVersion(), binaryActualVersion, "binary version does not return default beat version when the package version file is missing")
