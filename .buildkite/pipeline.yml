@@ -158,6 +158,20 @@ steps:
       provider: "gcp"
       machineType: "n1-standard-8"
 
+<<<<<<< HEAD
+=======
+  - label: "Serverless Beats Tests"
+    key: "serverless-beats-integration-tests"
+    command: ".buildkite/scripts/steps/beats_tests.sh"
+    if: "build.env('CRON') == 'yes'"
+    agents:
+      provider: "gcp"
+      machineType: "n1-standard-8"
+    retry:
+      manual:
+        allowed: true
+
+>>>>>>> 124975624a (Integration tests: Added 2 hours simeout for gotesst (#3830))
   - wait: ~
     continue_on_failure: true
   - label: "Processing test results"
