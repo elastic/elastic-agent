@@ -18,12 +18,14 @@ import (
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestInstallWithoutBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Default,
 		// We require sudo for this test to run
 		// `elastic-agent install`.
 		Sudo: true,
@@ -37,8 +39,11 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
-	err = fixture.Prepare(context.Background())
+	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
 	// Check that default base path is clean
@@ -58,7 +63,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{Force: true})
+	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true})
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
@@ -66,11 +71,12 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Check that Agent was installed in default base path
 	checkInstallSuccess(t, topPath)
-	t.Run("check agent package version", testAgentPackageVersion(context.Background(), fixture, true))
+	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }
 
 func TestInstallWithBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Default,
 		// We require sudo for this test to run
 		// `elastic-agent install`.
 		Sudo: true,
@@ -84,8 +90,11 @@ func TestInstallWithBasePath(t *testing.T) {
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
-	err = fixture.Prepare(context.Background())
+	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
 	// Set up random temporary directory to serve as base path for Elastic Agent
@@ -95,7 +104,7 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{
+	out, err := fixture.Install(ctx, &atesting.InstallOpts{
 		BasePath: randomBasePath,
 		Force:    true,
 	})
@@ -107,7 +116,7 @@ func TestInstallWithBasePath(t *testing.T) {
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
 	checkInstallSuccess(t, topPath)
-	t.Run("check agent package version", testAgentPackageVersion(context.Background(), fixture, true))
+	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }
 
 func checkInstallSuccess(t *testing.T, topPath string) {

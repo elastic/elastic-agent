@@ -53,6 +53,7 @@ agent.monitoring:
 
 func TestAPMConfig(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: Default,
 		Stack: &define.Stack{},
 	})
 	f, err := define.NewFixture(t, define.Version())
