@@ -521,8 +521,16 @@ func (f *Fixture) PrepareAgentCommand(ctx context.Context, args []string, opts .
 		return nil, fmt.Errorf("failed to prepare before exec: %w", err)
 	}
 
+	binaryPath := f.binaryPath()
+
+	// unprivileged always runs the command as the elastic-agent user
+	if f.installed && f.installOpts != nil && f.installOpts.Unprivileged {
+		binaryPath = "sudo"
+		args = append([]string{"-u", "elastic-agent", f.binaryPath()}, args...)
+	}
+
 	// #nosec G204 -- Not so many ways to support variadic arguments to the elastic-agent command :(
-	cmd := exec.CommandContext(ctx, f.binaryPath(), args...)
+	cmd := exec.CommandContext(ctx, binaryPath, args...)
 	for _, o := range opts {
 		if err := o(cmd); err != nil {
 			return nil, fmt.Errorf("error adding opts to Exec: %w", err)

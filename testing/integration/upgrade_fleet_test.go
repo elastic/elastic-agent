@@ -101,10 +101,10 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool)
 		currentVersion, err := version.ParseVersion(define.Version())
 		require.NoError(t, err)
 		if currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) {
-			t.Skipf("Version is %s is less than 8.12 and doesn't suppoert unprivileged mode.")
+			t.Skipf("Version is %s is less than 8.12 and doesn't suppoert unprivileged mode.", define.Version())
 		}
 		if runtime.GOOS != define.Linux {
-			t.Skipf("Unprivileged mode is currently only supported on linux")
+			t.Skip("Unprivileged mode is currently only supported on linux")
 		}
 	}
 
