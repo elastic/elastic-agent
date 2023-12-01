@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
@@ -51,11 +52,13 @@ func TestFQDN(t *testing.T) {
 	origEtcHosts, err := getEtcHosts()
 	require.NoError(t, err)
 
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	// Save original hostname so we can restore it at the end of each test
-	origHostname, err := getHostname(context.Background())
+	origHostname, err := getHostname(ctx)
 	require.NoError(t, err)
 
-	ctx := context.Background()
 	kibClient := info.KibanaClient
 
 	shortName := strings.ToLower(randStr(6))
@@ -92,7 +95,7 @@ func TestFQDN(t *testing.T) {
 		assert.NoError(t, fleettools.UnEnrollAgent(info.KibanaClient, policy.ID))
 
 		t.Log("Restoring hostname...")
-		err := setHostname(context.Background(), origHostname, t.Log)
+		err := setHostname(ctx, origHostname, t.Log)
 		require.NoError(t, err)
 
 		t.Log("Restoring original /etc/hosts...")

@@ -241,7 +241,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 		Force:          true,
 	}
 
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
@@ -352,7 +352,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 		Force:          true,
 	}
 
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
@@ -496,7 +496,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 		Sudo:    true, // requires Agent installation
 	})
 
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	// Get path to agent executable.
@@ -526,7 +526,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	c := fixture.Client()
