@@ -243,6 +243,10 @@ func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 //
 // If no `states` are provided then the Elastic Agent runs until the context is cancelled.
 func (f *Fixture) Run(ctx context.Context, states ...State) error {
+	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
+		f.t.Fatal("Context passed to Fixture.Run() has no deadline set.")
+	}
+
 	if f.installed {
 		return errors.New("fixture is installed; cannot be run")
 	}
