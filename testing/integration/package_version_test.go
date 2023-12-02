@@ -24,6 +24,7 @@ import (
 
 func TestPackageVersion(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Default,
 		Local: true,
 	})
 

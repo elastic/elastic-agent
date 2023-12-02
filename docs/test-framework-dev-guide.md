@@ -67,6 +67,16 @@ between, and it can be very specific or not very specific.
 > **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
 
+#### Selecting specific group
+
+By default, the runner will run all test groups. Each group runs on a dedicated machine instance. When working on groups of tests it's better to limit to a specific
+group of tests instead of running all tests. This can be done by using the `TEST_GROUPS="default upgrade-standalone"`
+environment variable. This variable can take multiple groups with a space between.
+
+- `TEST_GROUPS="default" mage integration:test` to execute only tests in the "default" group.
+- `TEST_GROUPS="default upgrade-standalone" mage integration:test` to execute only tests in the "default" or
+"upgrade-standalone" group.
+
 #### Passing additional go test flags
 
 When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.
@@ -167,6 +177,17 @@ to write tests using the integration and E2E testing framework. Also look at
 the `github.com/elastic/elastic-agent/pkg/testing/define` package for the test
 framework's API and the `github.com/elastic/elastic-agent/pkg/testing/tools`
 package for helper utilities.
+
+### Test group
+
+Every `define.Require` must define a `Group` that it belongs too. Each group is executed on a separate instance with all tests with in the same group executed
+on the same instance. Placing similar tests in the same group allows those tests to run on its own instance
+as well as provides a way for a developer to select a specific group of tests with `TEST_GROUP="{group-name}"`.
+
+Grouping tests is another way of spreading out the testing load across multiple instances. The more groups that
+are defined the more instances will be provisioned to complete all tests. A balance between a small good set of
+groups is better than a ton of groups each executing a small set of tests, as the time to set up an instance can
+out weight the benefits of creating another group.
 
 ### Test namespaces
 
