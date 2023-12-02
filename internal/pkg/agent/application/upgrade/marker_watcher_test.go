@@ -83,6 +83,7 @@ func TestMarkerWatcher(t *testing.T) {
 func TestProcessMarker(t *testing.T) {
 	cases := map[string]struct {
 		markerFileContents string
+		upgradeStarted     bool
 
 		currentAgentVersion string
 		currentAgentHash    string
@@ -94,11 +95,13 @@ func TestProcessMarker(t *testing.T) {
 			markerFileContents: `
 invalid
 `,
+			upgradeStarted:    false,
 			expectedErrLogMsg: true,
 			expectedDetails:   nil,
 		},
 		"no_marker": {
 			markerFileContents: "",
+			upgradeStarted:     false,
 			expectedErrLogMsg:  false,
 			expectedDetails:    nil,
 		},
@@ -106,6 +109,7 @@ invalid
 			markerFileContents: `
 prev_version: 8.9.2
 `,
+			upgradeStarted: false,
 			expectedDetails: &details.Details{
 				TargetVersion: "unknown",
 				State:         details.StateRollback,
@@ -117,6 +121,7 @@ prev_version: 8.9.2
 details:
   target_version: 8.9.2
 `,
+			upgradeStarted:    false,
 			expectedErrLogMsg: false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
@@ -130,6 +135,7 @@ details:
   target_version: 8.9.2
   state: UPG_WATCHING
 `,
+			upgradeStarted:    false,
 			expectedErrLogMsg: false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
@@ -143,6 +149,7 @@ details:
   target_version: 8.9.2
   state: UPG_WATCHING
 `,
+			upgradeStarted:    false,
 			expectedErrLogMsg: false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
@@ -194,6 +201,20 @@ prev_hash: aaaaaa
 				State:         details.StateRollback,
 			},
 		},
+		"upgrade_started": {
+			markerFileContents: `
+prev_version: 8.9.2
+details:
+  target_version: 8.9.2
+  state: UPG_REPLACING
+`,
+			upgradeStarted:    true,
+			expectedErrLogMsg: false,
+			expectedDetails: &details.Details{
+				TargetVersion: "8.9.2",
+				State:         details.StateReplacing,
+			},
+		},
 	}
 
 	for name, test := range cases {
@@ -240,6 +261,10 @@ prev_hash: aaaaaa
 			}
 			if test.currentAgentHash != "" {
 				currentCommit = test.currentAgentHash
+			}
+
+			if test.upgradeStarted {
+				mfw.SetUpgradeStarted()
 			}
 
 			mfw.processMarker(currentVersion, currentCommit)
