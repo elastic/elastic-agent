@@ -19,7 +19,7 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
 	github.com/elastic/go-elasticsearch/v8 v8.10.1
 	github.com/elastic/go-licenser v0.4.1
-	github.com/elastic/go-sysinfo v1.11.1
+	github.com/elastic/go-sysinfo v1.11.2
 	github.com/elastic/go-ucfg v0.8.6
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.6.0
