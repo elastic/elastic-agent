@@ -33,6 +33,7 @@ import (
 
 func TestFQDN(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: Default, // placed in default only because its skipped
 		OS: []define.OS{
 			{Type: define.Linux},
 		},

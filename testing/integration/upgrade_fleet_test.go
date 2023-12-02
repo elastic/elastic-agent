@@ -31,6 +31,7 @@ import (
 // versions as the standalone tests already perform those tests and would be redundant.
 func TestFleetManagedUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: Fleet,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
