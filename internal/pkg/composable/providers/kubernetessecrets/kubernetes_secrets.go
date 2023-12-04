@@ -89,16 +89,16 @@ func getK8sClient(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclien
 	return kubernetes.GetKubernetesClient(kubeconfig, opt)
 }
 
-// Update the secrets in the cache every TTL minutes
+// Update the secrets in the cache every RefreshInterval
 func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
-	timer := time.NewTimer(p.config.TTLUpdate)
+	timer := time.NewTimer(p.config.RefreshInterval)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
 			p.updateCache()
-			timer.Reset(p.config.TTLUpdate)
+			timer.Reset(p.config.RefreshInterval)
 		}
 	}
 }

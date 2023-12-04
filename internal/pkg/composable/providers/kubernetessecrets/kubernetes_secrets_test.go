@@ -145,7 +145,7 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 	ttlDelete, err := time.ParseDuration("1s")
 	require.NoError(t, err)
 
-	ttlUpdate, err := time.ParseDuration("100ms")
+	refreshInterval, err := time.ParseDuration("100ms")
 	require.NoError(t, err)
 
 	secret := &v1.Secret{
@@ -167,8 +167,8 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 	logger := logp.NewLogger("test_k8s_secrets")
 
 	c := map[string]interface{}{
-		"ttl_update": ttlUpdate,
-		"ttl_delete": ttlDelete,
+		"refresh_interval": refreshInterval,
+		"ttl_delete":       ttlDelete,
 	}
 	cfg, err := config.NewConfigFrom(c)
 	require.NoError(t, err)
@@ -237,11 +237,11 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 	require.NoError(t, err)
 
 	// wait for ttl update
-	<-time.After(ttlUpdate)
+	<-time.After(refreshInterval)
 	assert.Eventuallyf(t, func() bool {
 		val, found = fp.Fetch(key)
 		return found && val == newPass
-	}, ttlUpdate*3, ttlUpdate, "Failed to update the secret value after TTL update has passed.")
+	}, refreshInterval*3, refreshInterval, "Failed to update the secret value after TTL update has passed.")
 
 	// After TTL delete, secret should no longer be found in cache since it was never
 	// fetched during that time

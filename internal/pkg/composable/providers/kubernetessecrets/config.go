@@ -15,11 +15,11 @@ type Config struct {
 	KubeConfig        string                       `config:"kube_config"`
 	KubeClientOptions kubernetes.KubeClientOptions `config:"kube_client_options"`
 
-	TTLUpdate time.Duration `config:"ttl_update"`
-	TTLDelete time.Duration `config:"ttl_delete"`
+	RefreshInterval time.Duration `config:"refresh_interval"`
+	TTLDelete       time.Duration `config:"ttl_delete"`
 }
 
 func (c *Config) InitDefaults() {
-	c.TTLUpdate = 60 * time.Second
+	c.RefreshInterval = 60 * time.Second
 	c.TTLDelete = 1 * time.Hour
 }
