@@ -6,8 +6,7 @@ package server
 
 import (
 	"testing"
-
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,11 +18,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
 func TestStateMapping(t *testing.T) {
-
+	now := time.Now()
 	testcases := []struct {
 		name           string
 		agentState     cproto.State
@@ -62,9 +62,14 @@ func TestStateMapping(t *testing.T) {
 			upgradeDetails: &details.Details{
 				TargetVersion: "8.13.0",
 				State:         details.StateDownloading,
-				ActionID:      "",
+				ActionID:      "some-action-id",
 				Metadata: details.Metadata{
+					ScheduledAt:     &now,
 					DownloadPercent: 1.7,
+					ErrorMsg:        "some error",
+					RetryUntil:      &now,
+					RetryErrorMsg:   "some retryable error",
+					FailedState:     details.StateWatching,
 				},
 			},
 		},
@@ -167,11 +172,17 @@ func TestStateMapping(t *testing.T) {
 					DownloadPercent: float32(tc.upgradeDetails.Metadata.DownloadPercent),
 					FailedState:     string(tc.upgradeDetails.Metadata.FailedState),
 					ErrorMsg:        tc.upgradeDetails.Metadata.ErrorMsg,
+					RetryErrorMsg:   tc.upgradeDetails.Metadata.RetryErrorMsg,
 				}
 
 				if tc.upgradeDetails.Metadata.ScheduledAt != nil &&
 					!tc.upgradeDetails.Metadata.ScheduledAt.IsZero() {
-					expectedMetadata.ScheduledAt = timestamppb.New(*tc.upgradeDetails.Metadata.ScheduledAt)
+					expectedMetadata.ScheduledAt = tc.upgradeDetails.Metadata.ScheduledAt.Format(control.TimeFormat())
+				}
+
+				if tc.upgradeDetails.Metadata.RetryUntil != nil &&
+					!tc.upgradeDetails.Metadata.RetryUntil.IsZero() {
+					expectedMetadata.RetryUntil = tc.upgradeDetails.Metadata.RetryUntil.Format(control.TimeFormat())
 				}
 
 				assert.Equal(t, string(tc.upgradeDetails.State), stateResponse.UpgradeDetails.State)

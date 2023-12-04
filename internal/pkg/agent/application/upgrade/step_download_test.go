@@ -94,7 +94,10 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
-		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
+
+		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
+		minRetryDeadline := time.Now().Add(settings.Timeout)
+
 		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
@@ -102,6 +105,16 @@ func TestDownloadWithRetries(t *testing.T) {
 		logs := obs.TakeAll()
 		require.Len(t, logs, 1)
 		require.Equal(t, "download attempt 1", logs[0].Message)
+
+		// Check that upgradeDetails.Metadata.RetryUntil was set at some point
+		// during the retryable download and then check that it was unset upon
+		// successful download.
+		require.GreaterOrEqual(t, *upgradeDetailsRetryUntil, minRetryDeadline)
+		require.True(t, *upgradeDetailsRetryUntilWasUnset)
+		require.Nil(t, upgradeDetails.Metadata.RetryUntil)
+
+		// Check that upgradeDetails.Metadata.RetryErrorMsg was never set.
+		require.Empty(t, *upgradeDetailsRetryErrorMsg)
 	})
 
 	// Downloader constructor failing on first attempt, but succeeding on second attempt (= first retry)
@@ -131,7 +144,10 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
-		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
+
+		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
+		minRetryDeadline := time.Now().Add(settings.Timeout)
+
 		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
@@ -141,6 +157,19 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.Equal(t, "download attempt 1", logs[0].Message)
 		require.Contains(t, logs[1].Message, "unable to create fetcher: failed to construct downloader")
 		require.Equal(t, "download attempt 2", logs[2].Message)
+
+		// Check that upgradeDetails.Metadata.RetryUntil was set at some point
+		// during the retryable download and then check that it was unset upon
+		// successful download.
+		require.GreaterOrEqual(t, *upgradeDetailsRetryUntil, minRetryDeadline)
+		require.True(t, *upgradeDetailsRetryUntilWasUnset)
+		require.Nil(t, upgradeDetails.Metadata.RetryUntil)
+
+		// Check that upgradeDetails.Metadata.RetryErrorMsg was set at some point
+		// during the retryable download and then check that it was unset upon
+		// successful download.
+		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
+		require.Empty(t, upgradeDetails.Metadata.RetryErrorMsg)
 	})
 
 	// Download failing on first attempt, but succeeding on second attempt (= first retry)
@@ -170,7 +199,10 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
-		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
+
+		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
+		minRetryDeadline := time.Now().Add(settings.Timeout)
+
 		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
@@ -180,6 +212,19 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.Equal(t, "download attempt 1", logs[0].Message)
 		require.Contains(t, logs[1].Message, "unable to download package: download failed; retrying")
 		require.Equal(t, "download attempt 2", logs[2].Message)
+
+		// Check that upgradeDetails.Metadata.RetryUntil was set at some point
+		// during the retryable download and then check that it was unset upon
+		// successful download.
+		require.GreaterOrEqual(t, *upgradeDetailsRetryUntil, minRetryDeadline)
+		require.True(t, *upgradeDetailsRetryUntilWasUnset)
+		require.Nil(t, upgradeDetails.Metadata.RetryUntil)
+
+		// Check that upgradeDetails.Metadata.RetryErrorMsg was set at some point
+		// during the retryable download and then check that it was unset upon
+		// successful download.
+		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
+		require.Empty(t, upgradeDetails.Metadata.RetryErrorMsg)
 	})
 
 	// Download timeout expired (before all retries are exhausted)
@@ -197,7 +242,10 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
-		upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
+
+		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
+		minRetryDeadline := time.Now().Add(testCaseSettings.Timeout)
+
 		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails)
 		require.Equal(t, "context deadline exceeded", err.Error())
 		require.Equal(t, "", path)
@@ -209,5 +257,48 @@ func TestDownloadWithRetries(t *testing.T) {
 			require.Equal(t, fmt.Sprintf("download attempt %d", i+1), logs[(2*i)].Message)
 			require.Contains(t, logs[(2*i+1)].Message, "unable to download package: download failed; retrying")
 		}
+
+		// Check that upgradeDetails.Metadata.RetryUntil was set at some point
+		// during the retryable download and then check that it was never unset,
+		// since we didn't have a successful download.
+		require.GreaterOrEqual(t, *upgradeDetailsRetryUntil, minRetryDeadline)
+		require.False(t, *upgradeDetailsRetryUntilWasUnset)
+		require.Equal(t, *upgradeDetailsRetryUntil, *upgradeDetails.Metadata.RetryUntil)
+
+		// Check that upgradeDetails.Metadata.RetryErrorMsg was set at some point
+		// during the retryable download and then check that it was never unset,
+		//since we didn't have a successful download.
+		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
+		require.Equal(t, *upgradeDetailsRetryErrorMsg, upgradeDetails.Metadata.RetryErrorMsg)
 	})
+}
+
+// mockUpgradeDetails returns a *details.Details value that has an observer registered on it for inspecting
+// certain properties of the object being set and unset.  It also returns:
+// - a *time.Time value, which will be not nil if Metadata.RetryUntil is set on the mock value,
+// - a *bool value, which will be true if Metadata.RetryUntil is set and then unset on the mock value,
+// - a *string value, which will be non-empty if Metadata.RetryErrorMsg is set on the mock value.
+func mockUpgradeDetails(parsedVersion *agtversion.ParsedSemVer) (*details.Details, *time.Time, *bool, *string) {
+	var upgradeDetailsRetryUntil time.Time
+	var upgradeDetailsRetryUntilWasUnset bool
+	var upgradeDetailsRetryErrorMsg string
+
+	upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
+	upgradeDetails.RegisterObserver(func(details *details.Details) {
+		if details.Metadata.RetryUntil != nil {
+			upgradeDetailsRetryUntil = *details.Metadata.RetryUntil
+		}
+
+		if !upgradeDetailsRetryUntil.IsZero() && details.Metadata.RetryUntil == nil {
+			upgradeDetailsRetryUntilWasUnset = true
+		}
+
+		if details.Metadata.RetryErrorMsg != "" {
+			upgradeDetailsRetryErrorMsg = details.Metadata.RetryErrorMsg
+		}
+	})
+
+	return upgradeDetails,
+		&upgradeDetailsRetryUntil, &upgradeDetailsRetryUntilWasUnset,
+		&upgradeDetailsRetryErrorMsg
 }
