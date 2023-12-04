@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent/pkg/version"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -88,8 +88,8 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, aVersion version.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
-	artifactPath, err := artifact.GetArtifactPath(a, aVersion, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
+func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+	artifactPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
 		return errors.New(err, "retrieving package path")
 	}
@@ -98,7 +98,7 @@ func (v *Verifier) Verify(a artifact.Artifact, aVersion version.ParsedSemVer, sk
 		return fmt.Errorf("failed to verify SHA512 hash: %w", err)
 	}
 
-	if err = v.verifyAsc(a, aVersion, skipDefaultPgp, pgpBytes...); err != nil {
+	if err = v.verifyAsc(a, version, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
 			if err := os.Remove(artifactPath); err != nil {
@@ -116,13 +116,13 @@ func (v *Verifier) Verify(a artifact.Artifact, aVersion version.ParsedSemVer, sk
 	return nil
 }
 
-func (v *Verifier) verifyAsc(a artifact.Artifact, aVersion version.ParsedSemVer, skipDefaultKey bool, pgpSources ...string) error {
-	filename, err := artifact.GetArtifactName(a, aVersion, v.config.OS(), v.config.Arch())
+func (v *Verifier) verifyAsc(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultKey bool, pgpSources ...string) error {
+	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return errors.New(err, "retrieving package name")
 	}
 
-	fullPath, err := artifact.GetArtifactPath(a, aVersion, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
+	fullPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
 		return errors.New(err, "retrieving package path")
 	}

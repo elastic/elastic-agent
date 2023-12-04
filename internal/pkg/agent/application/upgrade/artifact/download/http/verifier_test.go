@@ -49,7 +49,7 @@ func TestVerify(t *testing.T) {
 
 			upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
-			artifact, err := testClient.Download(context.Background(), beatSpec, aVersion)
+			artifact, err := testClient.Download(context.Background(), beatSpec, version)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -64,7 +64,7 @@ func TestVerify(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = testVerifier.Verify(beatSpec, *aVersion, false)
+			err = testVerifier.Verify(beatSpec, *version, false)
 			require.NoError(t, err)
 		})
 	}

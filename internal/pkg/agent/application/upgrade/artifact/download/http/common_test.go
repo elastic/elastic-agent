@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
-	"github.com/elastic/elastic-agent/pkg/version"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/pgptest"
 )
 
@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	aVersion = version.NewParsedSemVer(7, 5, 1, "", "")
+	version  = agtversion.NewParsedSemVer(7, 5, 1, "", "")
 	beatSpec = artifact.Artifact{
 		Name:     "filebeat",
 		Cmd:      "filebeat",
@@ -57,16 +57,16 @@ func getTestCases() []testCase {
 
 func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
 	correctValues := map[string]struct{}{
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, aVersion, "i386.deb"):             {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, aVersion, "amd64.deb"):            {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, aVersion, "i686.rpm"):             {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, aVersion, "x86_64.rpm"):           {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, aVersion, "linux-x86.tar.gz"):     {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, aVersion, "linux-arm64.tar.gz"):   {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, aVersion, "linux-x86_64.tar.gz"):  {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, aVersion, "windows-x86.zip"):      {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, aVersion, "windows-x86_64.zip"):   {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, aVersion, "darwin-x86_64.tar.gz"): {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "i386.deb"):             {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "amd64.deb"):            {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "i686.rpm"):             {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "x86_64.rpm"):           {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-x86.tar.gz"):     {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-arm64.tar.gz"):   {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-x86_64.tar.gz"):  {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "windows-x86.zip"):      {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "windows-x86_64.zip"):   {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "darwin-x86_64.tar.gz"): {},
 	}
 	var resp []byte
 	content := []byte("anything will do")

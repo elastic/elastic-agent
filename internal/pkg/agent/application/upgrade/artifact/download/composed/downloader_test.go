@@ -13,7 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
-	"github.com/elastic/elastic-agent/pkg/version"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -26,7 +26,7 @@ type FailingDownloader struct {
 	called bool
 }
 
-func (d *FailingDownloader) Download(ctx context.Context, a artifact.Artifact, version *version.ParsedSemVer) (string, error) {
+func (d *FailingDownloader) Download(context.Context, artifact.Artifact, *agtversion.ParsedSemVer) (string, error) {
 	d.called = true
 	return "", errors.New("failing")
 }
@@ -37,7 +37,7 @@ type SuccDownloader struct {
 	called bool
 }
 
-func (d *SuccDownloader) Download(ctx context.Context, a artifact.Artifact, version *version.ParsedSemVer) (string, error) {
+func (d *SuccDownloader) Download(context.Context, artifact.Artifact, *agtversion.ParsedSemVer) (string, error) {
 	d.called = true
 	return succ, nil
 }
@@ -64,7 +64,7 @@ func TestComposed(t *testing.T) {
 		},
 	}
 
-	parseVersion, err := version.ParseVersion("1.2.3")
+	parseVersion, err := agtversion.ParseVersion("1.2.3")
 	require.NoError(t, err)
 	for _, tc := range testCases {
 		d := NewDownloader(tc.downloaders[0], tc.downloaders[1])

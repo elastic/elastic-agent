@@ -15,7 +15,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/version"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -65,7 +65,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Veri
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version version.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return fmt.Errorf("could not get artifact name: %w", err)
