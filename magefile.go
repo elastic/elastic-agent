@@ -1601,7 +1601,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 			extraFlags = append(extraFlags, goTestFlags...)
 		}
 		extraFlags = append(extraFlags, "-test.shuffle", "on",
-			"-test.timeout", "0", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
+			"-test.timeout", "2h", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
 		params := mage.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
@@ -1781,6 +1781,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		StateDir:          ".integration-cache",
 		DiagnosticsDir:    diagDir,
 		Platforms:         testPlatforms(),
+		Groups:            testGroups(),
 		Matrix:            matrix,
 		SingleTest:        singleTest,
 		VerboseMode:       mg.Verbose(),
@@ -1869,6 +1870,20 @@ func testPlatforms() []string {
 		}
 	}
 	return platforms
+}
+
+func testGroups() []string {
+	groupsStr := os.Getenv("TEST_GROUPS")
+	if groupsStr == "" {
+		return nil
+	}
+	var groups []string
+	for _, g := range strings.Split(groupsStr, " ") {
+		if g != "" {
+			groups = append(groups, g)
+		}
+	}
+	return groups
 }
 
 // Pre-requisite: user must have the gcloud CLI installed

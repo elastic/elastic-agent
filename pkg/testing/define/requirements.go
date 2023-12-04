@@ -12,6 +12,11 @@ import (
 )
 
 const (
+	// Default constant can be used as the default group for tests.
+	Default = "default"
+)
+
+const (
 	// Darwin is macOS platform
 	Darwin = component.Darwin
 	// Linux is Linux platform
@@ -82,6 +87,13 @@ type Stack struct {
 
 // Requirements defines the testing requirements for the test to run.
 type Requirements struct {
+	// Group must be set on each test to define which group the tests belongs to.
+	// Tests that are in the same group are executed on the same runner.
+	//
+	// Useful when tests take a long time to complete and sharding them across multiple
+	// hosts can improve the total amount of time to complete all the tests.
+	Group string `json:"group"`
+
 	// OS defines the operating systems this test can run on. In the case
 	// multiple are provided the test is ran multiple times one time on each
 	// combination.
@@ -97,10 +109,6 @@ type Requirements struct {
 	// when a full test run is performed.
 	Local bool `json:"local"`
 
-	// Isolate defines that this test must be isolated to its own dedicated VM and the test
-	// cannot be shared with other tests.
-	Isolate bool `json:"isolate"`
-
 	// Sudo defines that this test must run under superuser permissions. On Mac and Linux the
 	// test gets executed under sudo and on Windows it gets run under Administrator.
 	Sudo bool `json:"sudo"`
@@ -108,6 +116,9 @@ type Requirements struct {
 
 // Validate returns an error if not valid.
 func (r Requirements) Validate() error {
+	if r.Group == "" {
+		return errors.New("group is required")
+	}
 	for i, o := range r.OS {
 		if err := o.Validate(); err != nil {
 			return fmt.Errorf("invalid os %d: %w", i, err)
