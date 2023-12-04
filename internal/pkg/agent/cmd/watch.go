@@ -126,7 +126,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		}
 
 		marker.Details.SetState(details.StateRollback)
-		err = upgrade.SaveMarker(marker)
+		err = upgrade.SaveMarker(marker, true)
 		if err != nil {
 			log.Errorf("unable to save upgrade marker before attempting to rollback: %s", err.Error())
 		}
@@ -136,7 +136,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 			log.Error("rollback failed", err)
 
 			marker.Details.Fail(err)
-			err = upgrade.SaveMarker(marker)
+			err = upgrade.SaveMarker(marker, true)
 			if err != nil {
 				log.Errorf("unable to save upgrade marker after rollback failed: %s", err.Error())
 			}
@@ -146,7 +146,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 
 	// watch succeeded - upgrade was successful!
 	marker.Details.SetState(details.StateCompleted)
-	err = upgrade.SaveMarker(marker)
+	err = upgrade.SaveMarker(marker, false)
 	if err != nil {
 		log.Errorf("unable to save upgrade marker after successful watch: %s", err.Error())
 	}

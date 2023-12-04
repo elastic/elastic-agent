@@ -194,7 +194,10 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 	}, nil
 }
 
-func SaveMarker(marker *UpdateMarker) error {
+// SaveMarker serializes and persists the given upgrade marker to disk.
+// For critical upgrade transitions, pass shouldFsync as true so the marker
+// file is immediately flushed to persistent storage.
+func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
 	makerSerializer := &updateMarkerSerializer{
 		Hash:        marker.Hash,
 		UpdatedOn:   marker.UpdatedOn,
@@ -209,7 +212,7 @@ func SaveMarker(marker *UpdateMarker) error {
 		return err
 	}
 
-	return writeMarkerFile(markerFilePath(), markerBytes)
+	return writeMarkerFile(markerFilePath(), markerBytes, shouldFsync)
 }
 
 func markerFilePath() string {
