@@ -43,7 +43,7 @@ func testAgentPackageVersion(ctx context.Context, f *integrationtest.Fixture, bi
 		require.NotEmpty(t, pkgVersion, "elastic agent has been packaged with an empty package version")
 
 		// check the version returned by the running agent
-		actualVersionBytes := getAgentVersion(t, f, context.Background(), binaryOnly)
+		actualVersionBytes := getAgentVersion(t, f, ctx, binaryOnly)
 
 		actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "binary")
 		assert.Equal(t, pkgVersion, actualVersion, "binary version does not match package version")
