@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWriteMarkerFileCommon(t *testing.T) {
+func TestWriteMarkerFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	markerFile := filepath.Join(tmpDir, markerFilename)
 
 	markerBytes := []byte("foo bar")
-	err := writeMarkerFileCommon(markerFile, markerBytes, true)
+	err := writeMarkerFile(markerFile, markerBytes, true)
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(markerFile)
