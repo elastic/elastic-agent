@@ -44,12 +44,12 @@ service:
       exporters:
         - file`)
 
-var apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error message
+const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error message
 2023-06-20 12:50:00 DEBUG This is a test debug message 2
 2023-06-20 12:51:00 DEBUG This is a test debug message 3
 2023-06-20 12:52:00 DEBUG This is a test debug message 4`
 
-var apmOtelConfig = `receivers:
+const apmOtelConfig = `receivers:
   filelog:
     include: [ %s ]
     operators:
