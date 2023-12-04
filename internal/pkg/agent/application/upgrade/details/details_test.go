@@ -9,6 +9,7 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -102,10 +103,16 @@ func TestDetailsDownloadRateJSON(t *testing.T) {
 func TestEquals(t *testing.T) {
 	details1 := NewDetails("8.12.0", StateDownloading, "foobar")
 	details1.SetDownloadProgress(0.1234, 34.56)
+	details1.SetRetryableError(errors.New("retryable error"))
+	retryUntil1 := time.Date(2023, 11, 29, 11, 00, 32, 0, time.UTC)
+	details1.SetRetryUntil(&retryUntil1)
 	details1.Fail(errors.New("download failed"))
 
 	details2 := NewDetails("8.12.0", StateDownloading, "foobar")
 	details2.SetDownloadProgress(0.1234, 34.56)
+	details2.SetRetryableError(errors.New("retryable error"))
+	retryUntil2 := time.Date(2023, 11, 29, 11, 00, 32, 0, time.UTC)
+	details2.SetRetryUntil(&retryUntil2)
 	details2.Fail(errors.New("download failed"))
 
 	details3 := NewDetails("8.12.0", StateDownloading, "foobar")
