@@ -122,8 +122,8 @@ func TestFileProcessing(t *testing.T) {
 	var fixtureWg sync.WaitGroup
 	fixtureWg.Add(1)
 	go func() {
+		defer fixtureWg.Done()
 		err = fixture.RunWithClient(ctx, false)
-		fixtureWg.Done()
 	}()
 
 	require.Eventually(t,
