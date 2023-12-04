@@ -83,6 +83,10 @@ func TestMarkerWatcher(t *testing.T) {
 func TestProcessMarker(t *testing.T) {
 	cases := map[string]struct {
 		markerFileContents string
+		upgradeStarted     bool
+
+		currentAgentVersion string
+		currentAgentHash    string
 
 		expectedErrLogMsg bool
 		expectedDetails   *details.Details
@@ -91,11 +95,13 @@ func TestProcessMarker(t *testing.T) {
 			markerFileContents: `
 invalid
 `,
+			upgradeStarted:    false,
 			expectedErrLogMsg: true,
 			expectedDetails:   nil,
 		},
 		"no_marker": {
 			markerFileContents: "",
+			upgradeStarted:     false,
 			expectedErrLogMsg:  false,
 			expectedDetails:    nil,
 		},
@@ -103,6 +109,7 @@ invalid
 			markerFileContents: `
 prev_version: 8.9.2
 `,
+			upgradeStarted: false,
 			expectedDetails: &details.Details{
 				TargetVersion: "unknown",
 				State:         details.StateRollback,
@@ -114,6 +121,7 @@ prev_version: 8.9.2
 details:
   target_version: 8.9.2
 `,
+			upgradeStarted:    false,
 			expectedErrLogMsg: false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
@@ -127,6 +135,7 @@ details:
   target_version: 8.9.2
   state: UPG_WATCHING
 `,
+			upgradeStarted:    false,
 			expectedErrLogMsg: false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
@@ -140,10 +149,70 @@ details:
   target_version: 8.9.2
   state: UPG_WATCHING
 `,
+			upgradeStarted:    false,
 			expectedErrLogMsg: false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
 				State:         details.StateWatching,
+			},
+		},
+		"same_version_different_hash": {
+			markerFileContents: `
+prev_version: 8.9.2
+prev_hash: aaaaaa
+details:
+  target_version: 8.9.2
+  state: UPG_WATCHING
+`,
+			currentAgentVersion: "8.9.2",
+			currentAgentHash:    "bbbbbb",
+			expectedErrLogMsg:   false,
+			expectedDetails: &details.Details{
+				TargetVersion: "8.9.2",
+				State:         details.StateWatching,
+			},
+		},
+		"same_version_same_hash": {
+			markerFileContents: `
+prev_version: 8.9.2
+prev_hash: aaaaaa
+details:
+  target_version: 8.9.2
+  state: UPG_WATCHING
+`,
+			currentAgentVersion: "8.9.2",
+			currentAgentHash:    "aaaaaa",
+			expectedErrLogMsg:   false,
+			expectedDetails: &details.Details{
+				TargetVersion: "8.9.2",
+				State:         details.StateRollback,
+			},
+		},
+		"same_version_same_hash_no_details": {
+			markerFileContents: `
+prev_version: 8.9.2
+prev_hash: aaaaaa
+`,
+			currentAgentVersion: "8.9.2",
+			currentAgentHash:    "aaaaaa",
+			expectedErrLogMsg:   false,
+			expectedDetails: &details.Details{
+				TargetVersion: "unknown",
+				State:         details.StateRollback,
+			},
+		},
+		"upgrade_started": {
+			markerFileContents: `
+prev_version: 8.9.2
+details:
+  target_version: 8.9.2
+  state: UPG_REPLACING
+`,
+			upgradeStarted:    true,
+			expectedErrLogMsg: false,
+			expectedDetails: &details.Details{
+				TargetVersion: "8.9.2",
+				State:         details.StateReplacing,
 			},
 		},
 	}
@@ -182,7 +251,23 @@ details:
 				}
 			}()
 
-			mfw.processMarker("8.9.2")
+			// default values for version and hash
+			currentVersion := "8.9.2"
+			currentCommit := ""
+
+			// apply overrides from testcase
+			if test.currentAgentVersion != "" {
+				currentVersion = test.currentAgentVersion
+			}
+			if test.currentAgentHash != "" {
+				currentCommit = test.currentAgentHash
+			}
+
+			if test.upgradeStarted {
+				mfw.SetUpgradeStarted()
+			}
+
+			mfw.processMarker(currentVersion, currentCommit)
 
 			// error loading marker
 			if test.expectedErrLogMsg {

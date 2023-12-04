@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 )
 
@@ -43,7 +44,9 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
-	ctx := context.Background()
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
@@ -137,6 +140,7 @@ func testMonitoringLogsAreShipped(
 			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/instance-id\\\": dial tcp 169.254.169.254:443: connect: connection refused",                 // okay for the openstack metadata to not work
 			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/hostname\\\": dial tcp 169.254.169.254:443: connect: connection refused",                    // okay for the cloud metadata to not work
 			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/placement/availability-zone\\\": dial tcp 169.254.169.254:443: connect: connection refused", // okay for the cloud metadata to not work
+			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/instance-type\\\": dial tcp 169.254.169.254:443: connect: connection refused",               // okay for the cloud metadata to not work
 			"add_cloud_metadata: received error failed with http status code 404", // okay for the cloud metadata to not work
 			"add_cloud_metadata: received error failed fetching EC2 Identity Document: operation error ec2imds: GetInstanceIdentityDocument, http response error StatusCode: 404, request to EC2 IMDS failed", // okay for the cloud metadata to not work
 		})

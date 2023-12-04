@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/fsnotify/fsnotify"
 
@@ -19,12 +20,15 @@ import (
 type MarkerWatcher interface {
 	Watch() <-chan UpdateMarker
 	Run(ctx context.Context) error
+	SetUpgradeStarted()
 }
 
 type MarkerFileWatcher struct {
 	markerFilePath string
 	logger         *logger.Logger
 	updateCh       chan UpdateMarker
+
+	upgradeStarted atomic.Bool
 }
 
 func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) MarkerWatcher {
@@ -39,6 +43,10 @@ func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) M
 
 func (mfw *MarkerFileWatcher) Watch() <-chan UpdateMarker {
 	return mfw.updateCh
+}
+
+func (mfw *MarkerFileWatcher) SetUpgradeStarted() {
+	mfw.upgradeStarted.Store(true)
 }
 
 func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
@@ -91,10 +99,10 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 				case e.Op&(fsnotify.Create|fsnotify.Write) != 0:
 					// Upgrade marker file was created or updated; read its contents
 					// and send them over the update channel.
-					mfw.processMarker(version.GetAgentPackageVersion())
+					mfw.processMarker(version.GetAgentPackageVersion(), version.Commit())
 				}
 			case <-doInitialRead:
-				mfw.processMarker(version.GetAgentPackageVersion())
+				mfw.processMarker(version.GetAgentPackageVersion(), version.Commit())
 			}
 		}
 	}()
@@ -102,7 +110,7 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 	return nil
 }
 
-func (mfw *MarkerFileWatcher) processMarker(currentVersion string) {
+func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string) {
 	marker, err := loadMarker(mfw.markerFilePath)
 	if err != nil {
 		mfw.logger.Error(err)
@@ -115,12 +123,12 @@ func (mfw *MarkerFileWatcher) processMarker(currentVersion string) {
 	}
 
 	// If the marker exists but the version of Agent we're running right
-	// now is the same as the prevVersion recorded in the marker, it means
-	// the upgrade was rolled back. Ideally, this UPG_ROLLBACK state would've
+	// now is the same as the prevVersion recorded in the marker AND an upgrade
+	// has not started, it means the upgrade was rolled back. Ideally, this UPG_ROLLBACK state would've
 	// been recorded in the marker's upgrade details field but, in case it
 	// isn't for some reason, we fallback to explicitly setting that state as
 	// part of the upgrade details in the marker.
-	if marker.PrevVersion == currentVersion {
+	if marker.PrevVersion == currentVersion && marker.PrevHash == commit && !mfw.upgradeStarted.Load() {
 		if marker.Details == nil {
 			marker.Details = details.NewDetails("unknown", details.StateRollback, marker.GetActionID())
 		} else {
