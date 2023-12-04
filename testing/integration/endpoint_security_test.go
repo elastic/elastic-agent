@@ -36,7 +36,7 @@ import (
 
 const (
 	// TODO: Setup a GitHub Action to update this for each release of https://github.com/elastic/endpoint-package
-	endpointPackageVersion       = "8.9.0"
+	endpointPackageVersion       = "8.11.0"
 	endpointHealthPollingTimeout = 2 * time.Minute
 )
 

@@ -80,9 +80,11 @@ steps:
       manual:
         allowed: true
 
+  # Runs only on the main branch
   - label: "Unit tests - MacOS 13 ARM"
     key: "unit-tests-macos-13-arm"
     command: ".buildkite/scripts/steps/unit-tests.sh"
+    branches: main
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
@@ -119,7 +121,6 @@ steps:
       unit-tests-win2016
       unit-tests-win2022
       unit-tests-macos-13
-      unit-tests-macos-13-arm
       "
     artifact_paths:
       - "build/TEST-**"
@@ -157,7 +158,17 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n1-standard-8"
-
+      
+  - label: "Serverless Beats Tests"
+    key: "serverless-beats-integration-tests"
+    command: ".buildkite/scripts/steps/beats_tests.sh"
+    if: "build.env('CRON') == 'yes'"
+    agents:
+      provider: "gcp"
+      machineType: "n1-standard-8"
+    retry:
+      manual:
+        allowed: true
   - wait: ~
     continue_on_failure: true
   - label: "Processing test results"

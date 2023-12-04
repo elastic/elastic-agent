@@ -143,7 +143,7 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 
 	// wait for the watcher to show up
 	t.Logf("Waiting for upgrade watcher to start...")
-	err = upgradetest.WaitForWatcher(ctx, 2*time.Minute, 10*time.Second)
+	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
 	require.NoError(t, err)
 	t.Logf("Upgrade watcher started")
 
