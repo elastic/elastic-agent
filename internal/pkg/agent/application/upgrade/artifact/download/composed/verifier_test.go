@@ -11,7 +11,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/version"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/stretchr/testify/assert"
@@ -88,7 +87,7 @@ func TestVerifier(t *testing.T) {
 		},
 	}
 
-	testVersion := version.NewParsedSemVer(1, 2, 3, "", "")
+	testVersion := agtversion.NewParsedSemVer(1, 2, 3, "", "")
 	for _, tc := range testCases {
 		d := NewVerifier(log, tc.verifiers[0], tc.verifiers[1], tc.verifiers[2])
 		err := d.Verify(artifact.Artifact{Name: "a", Cmd: "a", Artifact: "a/a"}, *testVersion, false)
