@@ -104,24 +104,28 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
 }
 
 func (p *contextProviderK8sSecrets) updateCache() {
-	p.secretsCacheMx.Lock()
 	// deleting entries does not free the memory, so we need to create a new map
 	// to place the secrets we want to keep
 	cacheTmp := make(map[string]*secretsData)
+
+	p.secretsCacheMx.RLock()
 	for name, data := range p.secretsCache {
 		diff := time.Since(data.lastAccess)
-		if diff > p.config.TTLDelete {
-			delete(p.secretsCache, name)
-		} else {
-			newValue, ok := p.fetchSecret(name)
-			if !ok {
-				delete(p.secretsCache, name)
-			} else {
-				data.value = newValue
-				cacheTmp[name] = data
+		if diff < p.config.TTLDelete {
+			value, ok := p.fetchSecretWithTimeout(name)
+			if ok {
+				newData := &secretsData{
+					value:      value,
+					lastAccess: data.lastAccess,
+				}
+				cacheTmp[name] = newData
 			}
+
 		}
 	}
+	p.secretsCacheMx.RUnlock()
+
+	p.secretsCacheMx.Lock()
 	p.secretsCache = cacheTmp
 	p.secretsCacheMx.Unlock()
 }
@@ -168,7 +172,7 @@ func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
 		}, false
 	}
 
-	value, ok := p.fetchSecret(key)
+	value, ok := p.fetchSecretWithTimeout(key)
 	data := secretsData{
 		value: value,
 	}
@@ -180,12 +184,34 @@ func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
 	return data, ok
 }
 
-func (p *contextProviderK8sSecrets) fetchSecret(key string) (string, bool) {
+type Result struct {
+	value string
+	ok    bool
+}
+
+func (p *contextProviderK8sSecrets) fetchSecretWithTimeout(key string) (string, bool) {
+	ctxTimeout, cancel := context.WithTimeout(context.Background(), p.config.Timeout)
+	defer cancel()
+
+	resultCh := make(chan Result, 1)
+	go p.fetchSecret(ctxTimeout, key, resultCh)
+
+	select {
+	case <-ctxTimeout.Done():
+		p.logger.Errorf("Could not retrieve value for key %v: %v", key, ctxTimeout.Err())
+		return "", false
+	case result := <-resultCh:
+		return result.value, result.ok
+	}
+}
+
+func (p *contextProviderK8sSecrets) fetchSecret(context context.Context, key string, resultCh chan Result) {
 	p.clientMx.Lock()
 	client := p.client
 	p.clientMx.Unlock()
 	if client == nil {
-		return "", false
+		resultCh <- Result{value: "", ok: false}
+		return
 	}
 
 	tokens := strings.Split(key, ".")
@@ -199,17 +225,19 @@ func (p *contextProviderK8sSecrets) fetchSecret(key string) (string, bool) {
 	secretVar := tokens[3]
 
 	secretInterface := client.CoreV1().Secrets(ns)
-	ctx := context.TODO()
-	secret, err := secretInterface.Get(ctx, secretName, metav1.GetOptions{})
+	secret, err := secretInterface.Get(context, secretName, metav1.GetOptions{})
+
 	if err != nil {
 		p.logger.Errorf("Could not retrieve secret from k8s API: %v", err)
-		return "", false
+		resultCh <- Result{value: "", ok: false}
+		return
 	}
 	if _, ok := secret.Data[secretVar]; !ok {
 		p.logger.Errorf("Could not retrieve value %v for secret %v", secretVar, secretName)
-		return "", false
+		resultCh <- Result{value: "", ok: false}
+		return
 	}
-	secretString := secret.Data[secretVar]
 
-	return string(secretString), true
+	secretString := secret.Data[secretVar]
+	resultCh <- Result{value: string(secretString), ok: true}
 }

@@ -17,9 +17,11 @@ type Config struct {
 
 	RefreshInterval time.Duration `config:"refresh_interval"`
 	TTLDelete       time.Duration `config:"ttl_delete"`
+	Timeout         time.Duration `config:"timeout"`
 }
 
 func (c *Config) InitDefaults() {
 	c.RefreshInterval = 60 * time.Second
 	c.TTLDelete = 1 * time.Hour
+	c.Timeout = 5 * time.Second
 }
