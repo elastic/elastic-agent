@@ -31,7 +31,7 @@ func TestNonDefaultSourceURI(t *testing.T) {
 	config := artifact.Config{
 		SourceURI: "localhost:1234",
 	}
-	sourceURI, err := snapshotURI(http.DefaultClient, version, &config)
+	sourceURI, err := snapshotURI(context.TODO(), http.DefaultClient, version, &config)
 	require.NoError(t, err)
 	require.Equal(t, config.SourceURI, sourceURI)
 
