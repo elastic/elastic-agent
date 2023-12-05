@@ -29,7 +29,7 @@ import (
 var testVersion = agtversion.NewParsedSemVer(7, 5, 1, "", "")
 
 var (
-	beatSpec = artifact.Artifact{
+	agentSpec = artifact.Artifact{
 		Name:     "Elastic Agent",
 		Cmd:      "elastic-agent",
 		Artifact: "beat/elastic-agent"}
@@ -216,12 +216,12 @@ func TestVerify(t *testing.T) {
 				},
 			}
 
-			pgpKey := prepareTestCase(t, beatSpec, testVersion, config)
+			pgpKey := prepareTestCase(t, agentSpec, testVersion, config)
 
 			testClient := NewDownloader(config)
-			artifactPath, err := testClient.Download(context.Background(), beatSpec, testVersion)
+			artifactPath, err := testClient.Download(context.Background(), agentSpec, testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts")
-			_, err = testClient.DownloadAsc(context.Background(), beatSpec, *testVersion)
+			_, err = testClient.DownloadAsc(context.Background(), agentSpec, *testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts .asc file")
 
 			_, err = os.Stat(artifactPath)
@@ -230,7 +230,7 @@ func TestVerify(t *testing.T) {
 			testVerifier, err := NewVerifier(log, config, pgpKey)
 			require.NoError(t, err)
 
-			err = testVerifier.Verify(beatSpec, *testVersion, false, tc.RemotePGPUris...)
+			err = testVerifier.Verify(agentSpec, *testVersion, false, tc.RemotePGPUris...)
 			require.NoError(t, err)
 
 			// log message informing remote PGP was skipped
