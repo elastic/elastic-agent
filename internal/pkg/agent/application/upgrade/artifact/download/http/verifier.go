@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -87,7 +88,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
+func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	artifactPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
 		return errors.New(err, "retrieving package path")
@@ -115,7 +116,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bo
 	return nil
 }
 
-func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultKey bool, pgpSources ...string) error {
+func (v *Verifier) verifyAsc(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultKey bool, pgpSources ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return errors.New(err, "retrieving package name")

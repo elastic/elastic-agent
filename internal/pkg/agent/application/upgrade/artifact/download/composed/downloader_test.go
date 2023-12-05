@@ -9,8 +9,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -23,7 +26,7 @@ type FailingDownloader struct {
 	called bool
 }
 
-func (d *FailingDownloader) Download(ctx context.Context, _ artifact.Artifact, _ string) (string, error) {
+func (d *FailingDownloader) Download(context.Context, artifact.Artifact, *agtversion.ParsedSemVer) (string, error) {
 	d.called = true
 	return "", errors.New("failing")
 }
@@ -34,7 +37,7 @@ type SuccDownloader struct {
 	called bool
 }
 
-func (d *SuccDownloader) Download(ctx context.Context, _ artifact.Artifact, _ string) (string, error) {
+func (d *SuccDownloader) Download(context.Context, artifact.Artifact, *agtversion.ParsedSemVer) (string, error) {
 	d.called = true
 	return succ, nil
 }
@@ -61,9 +64,11 @@ func TestComposed(t *testing.T) {
 		},
 	}
 
+	parseVersion, err := agtversion.ParseVersion("1.2.3")
+	require.NoError(t, err)
 	for _, tc := range testCases {
 		d := NewDownloader(tc.downloaders[0], tc.downloaders[1])
-		r, _ := d.Download(context.TODO(), artifact.Artifact{Name: "a"}, "b")
+		r, _ := d.Download(context.TODO(), artifact.Artifact{Name: "a"}, parseVersion)
 
 		assert.Equal(t, tc.expectedResult, r == succ)
 

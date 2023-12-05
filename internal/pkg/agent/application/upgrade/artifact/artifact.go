@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 var packageArchMap = map[string]string{
@@ -31,18 +32,18 @@ type Artifact struct {
 }
 
 // GetArtifactName constructs a path to a downloaded artifact
-func GetArtifactName(a Artifact, version, operatingSystem, arch string) (string, error) {
+func GetArtifactName(a Artifact, version agtversion.ParsedSemVer, operatingSystem, arch string) (string, error) {
 	key := fmt.Sprintf("%s-binary-%s", operatingSystem, arch)
 	suffix, found := packageArchMap[key]
 	if !found {
 		return "", errors.New(fmt.Sprintf("'%s' is not a valid combination for a package", key), errors.TypeConfig)
 	}
 
-	return fmt.Sprintf("%s-%s-%s", a.Cmd, version, suffix), nil
+	return fmt.Sprintf("%s-%s-%s", a.Cmd, version.String(), suffix), nil
 }
 
 // GetArtifactPath returns a full path of artifact for a program in specific version
-func GetArtifactPath(a Artifact, version, operatingSystem, arch, targetDir string) (string, error) {
+func GetArtifactPath(a Artifact, version agtversion.ParsedSemVer, operatingSystem, arch, targetDir string) (string, error) {
 	artifactName, err := GetArtifactName(a, version, operatingSystem, arch)
 	if err != nil {
 		return "", err
