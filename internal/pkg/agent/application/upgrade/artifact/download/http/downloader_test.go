@@ -5,13 +5,16 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"testing"
@@ -23,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/assert"
@@ -340,4 +344,187 @@ func printLogs(t *testing.T, logs []observer.LoggedEntry) {
 	for _, entry := range logs {
 		t.Logf("[%s] %s", entry.Level, entry.Message)
 	}
+}
+
+var agentSpec = artifact.Artifact{
+	Name:     "Elastic Agent",
+	Cmd:      "elastic-agent",
+	Artifact: "beat/elastic-agent",
+}
+
+type downloadHttpResponse struct {
+	statusCode int
+	headers    http.Header
+	Body       []byte
+}
+
+func TestDownloadVersion(t *testing.T) {
+
+	type fields struct {
+		config *artifact.Config
+	}
+	type args struct {
+		a       artifact.Artifact
+		version *agtversion.ParsedSemVer
+	}
+	tests := []struct {
+		name    string
+		files   map[string]downloadHttpResponse
+		fields  fields
+		args    args
+		want    string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "happy path released version",
+			files: map[string]downloadHttpResponse{
+				"/beat/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz": {
+					statusCode: http.StatusOK,
+					Body:       []byte("This is a fake linux elastic agent archive"),
+				},
+				"/beat/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz.sha512": {
+					statusCode: http.StatusOK,
+					Body:       []byte("somesha512 elastic-agent-1.2.3-linux-x86_64.tar.gz"),
+				},
+			},
+			fields: fields{
+				config: &artifact.Config{
+					OperatingSystem: "linux",
+					Architecture:    "64",
+				},
+			},
+			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
+			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "no hash released version",
+			files: map[string]downloadHttpResponse{
+				"/beat/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz": {
+					statusCode: http.StatusOK,
+					Body:       []byte("This is a fake linux elastic agent archive"),
+				},
+			},
+			fields: fields{
+				config: &artifact.Config{
+					OperatingSystem: "linux",
+					Architecture:    "64",
+				},
+			},
+			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
+			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
+			wantErr: assert.Error,
+		},
+		{
+			name: "happy path snapshot version",
+			files: map[string]downloadHttpResponse{
+				"/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz": {
+					statusCode: http.StatusOK,
+					Body:       []byte("This is a fake linux elastic agent archive"),
+				},
+				"/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.sha512": {
+					statusCode: http.StatusOK,
+					Body:       []byte("somesha512 elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz"),
+				},
+			},
+			fields: fields{
+				config: &artifact.Config{
+					OperatingSystem: "linux",
+					Architecture:    "64",
+				},
+			},
+			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")},
+			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "happy path released version with build metadata",
+			files: map[string]downloadHttpResponse{
+				"/beat/elastic-agent/elastic-agent-1.2.3+build19700101-linux-x86_64.tar.gz": {
+					statusCode: http.StatusOK,
+					Body:       []byte("This is a fake linux elastic agent archive"),
+				},
+				"/beat/elastic-agent/elastic-agent-1.2.3+build19700101-linux-x86_64.tar.gz.sha512": {
+					statusCode: http.StatusOK,
+					Body:       []byte("somesha512 elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz"),
+				},
+			},
+			fields: fields{
+				config: &artifact.Config{
+					OperatingSystem: "linux",
+					Architecture:    "64",
+				},
+			},
+			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "build19700101")},
+			want:    "elastic-agent-1.2.3+build19700101-linux-x86_64.tar.gz",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "happy path snapshot version with build metadata",
+			files: map[string]downloadHttpResponse{
+				"/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz": {
+					statusCode: http.StatusOK,
+					Body:       []byte("This is a fake linux elastic agent archive"),
+				},
+				"/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz.sha512": {
+					statusCode: http.StatusOK,
+					Body:       []byte("somesha512 elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz"),
+				},
+			},
+			fields: fields{
+				config: &artifact.Config{
+					OperatingSystem: "linux",
+					Architecture:    "64",
+				},
+			},
+			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "build19700101")},
+			want:    "elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz",
+			wantErr: assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			targetDirPath := t.TempDir()
+
+			handleDownload := func(rw http.ResponseWriter, req *http.Request) {
+				path := req.URL.Path
+
+				resp, ok := tt.files[path]
+				if !ok {
+					rw.WriteHeader(http.StatusNotFound)
+					return
+				}
+
+				for k, values := range resp.headers {
+					for _, v := range values {
+						rw.Header().Set(k, v)
+					}
+				}
+
+				rw.WriteHeader(resp.statusCode)
+				io.Copy(rw, bytes.NewReader(resp.Body))
+			}
+			server := httptest.NewServer(http.HandlerFunc(handleDownload))
+			defer server.Close()
+
+			elasticClient := server.Client()
+			log, _ := logger.NewTesting("downloader")
+			upgradeDetails := details.NewDetails(tt.args.version.String(), details.StateRequested, "")
+			config := tt.fields.config
+			config.SourceURI = server.URL
+			config.TargetDirectory = targetDirPath
+			downloader := NewDownloaderWithClient(log, config, *elasticClient, upgradeDetails)
+
+			got, err := downloader.Download(context.TODO(), tt.args.a, tt.args.version)
+
+			if !tt.wantErr(t, err, fmt.Sprintf("Download(%v, %v)", tt.args.a, tt.args.version)) {
+				return
+			}
+
+			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
+		})
+	}
+
 }
