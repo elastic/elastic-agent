@@ -5,6 +5,9 @@
 package snapshot
 
 import (
+	gohttp "net/http"
+
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
@@ -16,6 +19,7 @@ import (
 type Verifier struct {
 	verifier        download.Verifier
 	versionOverride *agtversion.ParsedSemVer
+	client          *gohttp.Client
 }
 
 func (v *Verifier) Name() string {
@@ -25,7 +29,13 @@ func (v *Verifier) Name() string {
 // NewVerifier creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
 func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte, versionOverride *agtversion.ParsedSemVer) (download.Verifier, error) {
-	cfg, err := snapshotConfig(config, versionOverride)
+
+	client, err := config.HTTPTransportSettings.Client(httpcommon.WithAPMHTTPInstrumentation())
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := snapshotConfig(client, config, versionOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -37,6 +47,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte, versio
 	return &Verifier{
 		verifier:        v,
 		versionOverride: versionOverride,
+		client:          client,
 	}, nil
 }
 
@@ -52,7 +63,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 		return nil
 	}
 
-	cfg, err := snapshotConfig(c, v.versionOverride)
+	cfg, err := snapshotConfig(v.client, c, v.versionOverride)
 	if err != nil {
 		return errors.New(err, "snapshot.downloader: failed to generate snapshot config")
 	}
