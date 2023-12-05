@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
-	"github.com/elastic/elastic-agent/pkg/version"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -182,7 +181,7 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 	}
 	type args struct {
 		a       artifact.Artifact
-		version version.ParsedSemVer
+		version agtversion.ParsedSemVer
 	}
 	tests := []struct {
 		name    string

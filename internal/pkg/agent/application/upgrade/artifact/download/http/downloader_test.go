@@ -504,7 +504,8 @@ func TestDownloadVersion(t *testing.T) {
 				}
 
 				rw.WriteHeader(resp.statusCode)
-				io.Copy(rw, bytes.NewReader(resp.Body))
+				_, err := io.Copy(rw, bytes.NewReader(resp.Body))
+				assert.NoError(t, err, "error writing response content")
 			}
 			server := httptest.NewServer(http.HandlerFunc(handleDownload))
 			defer server.Close()

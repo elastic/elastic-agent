@@ -5,6 +5,7 @@
 package snapshot
 
 import (
+	"context"
 	gohttp "net/http"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -35,7 +36,8 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte, versio
 		return nil, err
 	}
 
-	cfg, err := snapshotConfig(client, config, versionOverride)
+	// TODO: decide an appropriate timeout for this
+	cfg, err := snapshotConfig(context.TODO(), client, config, versionOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +65,8 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 		return nil
 	}
 
-	cfg, err := snapshotConfig(v.client, c, v.versionOverride)
+	// TODO: decide an appropriate timeout for this
+	cfg, err := snapshotConfig(context.TODO(), v.client, c, v.versionOverride)
 	if err != nil {
 		return errors.New(err, "snapshot.downloader: failed to generate snapshot config")
 	}
