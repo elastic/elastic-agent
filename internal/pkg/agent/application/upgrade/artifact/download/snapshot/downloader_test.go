@@ -209,7 +209,8 @@ func TestDownloadVersion(t *testing.T) {
 				}
 
 				rw.WriteHeader(resp.statusCode)
-				io.Copy(rw, bytes.NewReader(resp.Body))
+				_, err := io.Copy(rw, bytes.NewReader(resp.Body))
+				assert.NoError(t, err, "error writing out response body")
 			}
 			server := httptest.NewTLSServer(http.HandlerFunc(handleDownload))
 			defer server.Close()
