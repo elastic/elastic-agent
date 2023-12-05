@@ -15,10 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/utils"
-
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-
 	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
 
@@ -42,8 +38,10 @@ import (
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -452,35 +450,30 @@ func (c *enrollCmd) prepareFleetTLS() error {
 }
 
 func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
-	err := c.daemonReload(ctx)
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, context.DeadlineExceeded) ||
-		errors.Is(err, context.Canceled) {
-		return fmt.Errorf("could not reload daemon: %w", err)
-	}
-
 	signal := make(chan struct{})
 	defer close(signal)
-	backExp := backoff.NewExpBackoff(signal, 10*time.Second, 1*time.Minute)
+	backExp := backoff.NewExpBackoff(signal, 1*time.Second, 1*time.Minute)
 
+	var lastErr error
 	for i := 0; i < 5; i++ {
-		backExp.Wait()
-		c.log.Info("Retrying to restart...")
+		attempt := i
 
-		err = c.daemonReload(ctx)
-		if err == nil {
-			return nil
-		}
-		if errors.Is(err, context.DeadlineExceeded) ||
-			errors.Is(err, context.Canceled) {
-			return fmt.Errorf("could not reload daemon after %d retries: %w",
-				i+1, err)
+		c.log.Infof("Restarting agent daemon, attempt %d", attempt)
+		if err := c.daemonReload(ctx); err == nil {
+			// If the context was cancelled, return early
+			if errors.Is(err, context.DeadlineExceeded) ||
+				errors.Is(err, context.Canceled) {
+				return fmt.Errorf("could not reload daemon after %d retries: %w",
+					attempt, err)
+			}
+			lastErr = err
+
+			c.log.Errorf("Restart attempt %d failed: '%s'. Waiting for %s", attempt, err, backExp.NextWait().String())
+			backExp.Wait()
 		}
 	}
 
-	return fmt.Errorf("could not reload agent's daemon, all retries failed. Last error: %w", err)
+	return fmt.Errorf("could not reload agent's daemon, all retries failed. Last error: %w", lastErr)
 }
 
 func (c *enrollCmd) daemonReload(ctx context.Context) error {

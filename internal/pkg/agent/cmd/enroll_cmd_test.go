@@ -16,7 +16,6 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -155,6 +154,7 @@ func TestEnroll(t *testing.T) {
 					EnrollAPIKey:         "my-enrollment-api-key",
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
 					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
 				},
 				"",
 				store,
@@ -164,16 +164,11 @@ func TestEnroll(t *testing.T) {
 			streams, _, _, _ := cli.NewTestingIOStreams()
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 			defer cancel()
-			err = cmd.Execute(ctx, streams)
 
-			// There is no agent running, therefore nothing to be restarted.
-			// However, this will cause the Enroll command to return an error
-			// which we'll ignore here.
-			require.ErrorContainsf(t, err,
-				"could not reload agent daemon, unable to trigger restart",
-				"enroll command returned an unexpected error")
-			require.ErrorContainsf(t, err, context.DeadlineExceeded.Error(),
-				"it should fail only due to %q", context.DeadlineExceeded)
+			if err := cmd.Execute(ctx, streams); err != nil {
+				t.Fatalf("enrrol coms returned and unexpected error: %v", err)
+			}
+
 			config, err := readConfig(store.Content)
 			require.NoError(t, err)
 
@@ -221,6 +216,7 @@ func TestEnroll(t *testing.T) {
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
 					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
 				},
 				"",
 				store,
@@ -230,22 +226,18 @@ func TestEnroll(t *testing.T) {
 			streams, _, _, _ := cli.NewTestingIOStreams()
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 			defer cancel()
-			err = cmd.Execute(ctx, streams)
-			if err != nil &&
-				// There is no agent running, therefore nothing to be restarted.
-				// However, this will cause the Enroll command to return an error
-				// which we'll ignore here.
-				!strings.Contains(err.Error(),
-					"could not reload agent daemon, unable to trigger restart") {
+
+			if err := cmd.Execute(ctx, streams); err != nil {
 				t.Fatalf("enrrol coms returned and unexpected error: %v", err)
 			}
 
 			assert.True(t, store.Called)
-			config, err := readConfig(store.Content)
 
-			assert.NoError(t, err)
-			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			assert.Equal(t, host, config.Client.Host)
+			config, err := readConfig(store.Content)
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey,
+				"The stored 'Access API Key' must be the same returned by Fleet-Server")
+			assert.Equal(t, host, config.Client.Host,
+				"The stored Fleet-Server host must match the one used during enrol")
 		},
 	))
 
@@ -288,6 +280,7 @@ func TestEnroll(t *testing.T) {
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
 					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
 				},
 				"",
 				store,
@@ -298,15 +291,7 @@ func TestEnroll(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 			defer cancel()
 			err = cmd.Execute(ctx, streams)
-
-			if err != nil &&
-				// There is no agent running, therefore nothing to be restarted.
-				// However, this will cause the Enroll command to return an error
-				// which we'll ignore here.
-				!strings.Contains(err.Error(),
-					"could not reload agent daemon, unable to trigger restart") {
-				t.Fatalf("enrrol coms returned and unexpected error: %v", err)
-			}
+			require.NoError(t, err, "enroll command should return no error")
 
 			assert.True(t, store.Called)
 			config, err := readConfig(store.Content)
