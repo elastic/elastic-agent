@@ -1,0 +1,8 @@
+kind: feature
+summary: Add performance presets to the Elasticsearch output configuration.
+
+description: Add a "preset" field to Elasticsearch output configurations that applies a set of configuration overrides based on a desired performance priority. Valid values are "balanced", "throughput", "scale", "latency" and "custom". The default if unspecified is "custom".
+
+component: all
+pr: https://github.com/elastic/beats/pull/37259
+issue: https://github.com/elastic/elastic-agent/issues/3797

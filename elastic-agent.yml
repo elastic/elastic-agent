@@ -12,6 +12,7 @@ outputs:
     type: elasticsearch
     hosts: [127.0.0.1:9200]
     api_key: "example-key"
+    preset: balanced
     #username: "elastic"
     #password: "changeme"
 
