@@ -439,7 +439,7 @@ func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedS
 			return ctx.Err()
 		case <-t.C:
 			status, err := f.ExecStatus(ctx)
-			if err != nil {
+			if err != nil && status.IsZero() {
 				lastErr = err
 				continue
 			}
