@@ -280,14 +280,6 @@ func PerformUpgrade(
 		return err
 	}
 
-	// Check that, upon successful upgrade, the upgrade details have been cleared out
-	// from Agent status.
-	logger.Logf("Checking upgrade details state after successful upgrade")
-	if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, 10*time.Second, logger); err != nil {
-		// error context added by checkUpgradeDetailsState
-		return err
-	}
-
 	// it is unstable to continue until the watcher is done
 	// the maximum wait time is 1 minutes (2 minutes for grace) some older versions
 	// do not respect the `ConfigureFastWatcher` so we have to kill the watcher after the
@@ -298,6 +290,14 @@ func PerformUpgrade(
 		return fmt.Errorf("watcher never stopped running: %w", err)
 	}
 	logger.Logf("upgrade watcher finished")
+
+	// Check that, upon successful upgrade, the upgrade details have been cleared out
+	// from Agent status.
+	logger.Logf("Checking upgrade details state after successful upgrade")
+	if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, 10*time.Second, logger); err != nil {
+		// error context added by checkUpgradeDetailsState
+		return err
+	}
 
 	// now that the watcher has stopped lets ensure that it's still the expected
 	// version, otherwise it's possible that it was rolled back to the original version
