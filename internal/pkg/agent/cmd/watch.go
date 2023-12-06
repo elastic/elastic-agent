@@ -106,34 +106,24 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 
 	// About to start watching the upgrade. Initialize upgrade details and save them in the
 	// upgrade marker.
-	upgradeDetails := details.NewDetails(version.GetAgentPackageVersion(), details.StateWatching, marker.GetActionID())
-	upgradeDetails.RegisterObserver(func(details *details.Details) {
-		marker.Details = details
-		if err := upgrade.SaveMarker(marker, true); err != nil {
-			if details != nil {
-				log.Errorf("unable to save upgrade marker after setting upgrade details (state = %s): %s", details.State, err.Error())
-			} else {
-				log.Errorf("unable to save upgrade marker after clearing upgrade details: %s", err.Error())
-			}
-		}
-	})
+	upgradeDetails := initUpgradeDetails(marker, upgrade.SaveMarker, log)
 
 	errorCheckInterval := cfg.Settings.Upgrade.Watcher.ErrorCheck.Interval
 	ctx := context.Background()
 	if err := watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
-		marker.Details.SetState(details.StateRollback)
+		upgradeDetails.SetState(details.StateRollback)
 		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
 			log.Error("rollback failed", err)
-			marker.Details.Fail(err)
+			upgradeDetails.Fail(err)
 		}
 		return err
 	}
 
 	// watch succeeded - upgrade was successful!
-	marker.Details.SetState(details.StateCompleted)
+	upgradeDetails.SetState(details.StateCompleted)
 
 	// cleanup older versions,
 	// in windows it might leave self untouched, this will get cleaned up
@@ -243,4 +233,20 @@ func getConfig(streams *cli.IOStreams) *configuration.Configuration {
 	}
 
 	return cfg
+}
+
+func initUpgradeDetails(marker *upgrade.UpdateMarker, saveMarker func(*upgrade.UpdateMarker, bool) error, log *logp.Logger) *details.Details {
+	upgradeDetails := details.NewDetails(version.GetAgentPackageVersion(), details.StateWatching, marker.GetActionID())
+	upgradeDetails.RegisterObserver(func(details *details.Details) {
+		marker.Details = details
+		if err := saveMarker(marker, true); err != nil {
+			if details != nil {
+				log.Errorf("unable to save upgrade marker after setting upgrade details (state = %s): %s", details.State, err.Error())
+			} else {
+				log.Errorf("unable to save upgrade marker after clearing upgrade details: %s", err.Error())
+			}
+		}
+	})
+
+	return upgradeDetails
 }
