@@ -434,7 +434,7 @@ func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedS
 		select {
 		case <-ctx.Done():
 			if lastErr != nil {
-				return fmt.Errorf("failed waiting for status (%w): %s", ctx.Err(), lastErr.Error())
+				return fmt.Errorf("failed waiting for status: %w", errors.Join(ctx.Err(), lastErr))
 			}
 			return ctx.Err()
 		case <-t.C:
