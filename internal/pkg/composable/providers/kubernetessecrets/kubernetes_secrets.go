@@ -6,6 +6,7 @@ package kubernetessecrets
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -108,7 +109,7 @@ func (p *contextProviderK8sSecrets) updateCache() {
 	// to place the secrets we want to keep
 	cacheTmp := make(map[string]*secretsData)
 
-	p.secretsCacheMx.RLock()
+	p.secretsCacheMx.Lock()
 	for name, data := range p.secretsCache {
 		diff := time.Since(data.lastAccess)
 		if diff < p.config.TTLDelete {
@@ -123,9 +124,6 @@ func (p *contextProviderK8sSecrets) updateCache() {
 
 		}
 	}
-	p.secretsCacheMx.RUnlock()
-
-	p.secretsCacheMx.Lock()
 	p.secretsCache = cacheTmp
 	p.secretsCacheMx.Unlock()
 }
@@ -148,6 +146,7 @@ func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
 	p.secretsCacheMx.Lock()
 	data, ok := p.secretsCache[key]
 	data.lastAccess = time.Now()
+	fmt.Println(data.lastAccess)
 	pass = data.value
 	p.secretsCacheMx.Unlock()
 	return pass, ok
