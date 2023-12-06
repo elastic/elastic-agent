@@ -29,7 +29,7 @@ func TestContainerCMD(t *testing.T) {
 		// which leaves files under /usr/share/elastic-agent. Run it isolated
 		// to avoid interfering with other tests and better simulate a container
 		// environment we run it in isolation
-		Isolate: true,
+		Group: "container",
 	})
 	ctx := context.Background()
 
