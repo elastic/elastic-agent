@@ -29,6 +29,7 @@ type MarkerFileWatcher struct {
 	updateCh       chan UpdateMarker
 
 	upgradeStarted atomic.Bool
+	lastMarker     *UpdateMarker
 }
 
 func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) MarkerWatcher {
@@ -100,6 +101,16 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 					// Upgrade marker file was created or updated; read its contents
 					// and send them over the update channel.
 					mfw.processMarker(version.GetAgentPackageVersion(), version.Commit())
+				case e.Op&(fsnotify.Remove) != 0:
+					// Upgrade marker file was removed.
+					// - Upgrade could've been rolled back
+					// - Upgrade could've been successful
+					// If last known Upgrade Details state is not `UPG_ROLLBACK`, assume
+					// upgrade was successful
+					if mfw.lastMarker != nil && mfw.lastMarker.Details != nil && mfw.lastMarker.Details.State != details.StateRollback {
+						mfw.lastMarker.Details = nil
+						mfw.updateCh <- *mfw.lastMarker
+					}
 				}
 			case <-doInitialRead:
 				mfw.processMarker(version.GetAgentPackageVersion(), version.Commit())
@@ -139,5 +150,6 @@ func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string
 		}
 	}
 
+	mfw.lastMarker = marker
 	mfw.updateCh <- *marker
 }
