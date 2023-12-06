@@ -459,7 +459,7 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 		attempt := i
 
 		c.log.Infof("Restarting agent daemon, attempt %d", attempt)
-		if err := c.daemonReload(ctx); err == nil {
+		if err := c.daemonReload(ctx); err != nil {
 			// If the context was cancelled, return early
 			if errors.Is(err, context.DeadlineExceeded) ||
 				errors.Is(err, context.Canceled) {
