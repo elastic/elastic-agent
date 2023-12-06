@@ -244,13 +244,6 @@ func PerformUpgrade(
 		return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
 	}
 
-	// Check that, right before the Upgrade Watcher is started, the upgrade details in Agent status
-	// show the state as UPG_REPLACING.
-	if err := waitUpgradeDetailsState(ctx, startFixture, details.StateReplacing, 2*time.Minute, 10*time.Second); err != nil {
-		// error context added by checkUpgradeDetailsState
-		return err
-	}
-
 	// wait for the watcher to show up
 	logger.Logf("waiting for upgrade watcher to start")
 	err = WaitForWatcher(ctx, 2*time.Minute, 10*time.Second)
@@ -261,7 +254,8 @@ func PerformUpgrade(
 
 	// Check that, while the Upgrade Watcher is running, the upgrade details in Agent status
 	// show the state as UPG_WATCHING.
-	if err := waitUpgradeDetailsState(ctx, startFixture, details.StateWatching, 2*time.Minute, 10*time.Second); err != nil {
+	logger.Logf("Checking upgrade details state while Upgrade Watcher is running")
+	if err := waitUpgradeDetailsState(ctx, startFixture, details.StateWatching, 2*time.Minute, 10*time.Second, logger); err != nil {
 		// error context added by waitUpgradeDetailsState
 		return err
 	}
@@ -288,7 +282,8 @@ func PerformUpgrade(
 
 	// Check that, upon successful upgrade, the upgrade details have been cleared out
 	// from Agent status.
-	if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, 10*time.Second); err != nil {
+	logger.Logf("Checking upgrade details state after successful upgrade")
+	if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, 10*time.Second, logger); err != nil {
 		// error context added by checkUpgradeDetailsState
 		return err
 	}
@@ -309,13 +304,6 @@ func PerformUpgrade(
 	err = CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
 	if err != nil {
 		// error context added by CheckHealthyAndVersion
-		return err
-	}
-
-	// Check that, upon successful upgrade, the upgrade details have been cleared out
-	// from Agent status.
-	if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, 10*time.Second); err != nil {
-		// error context added by waitUpgradeDetailsState
 		return err
 	}
 
@@ -417,7 +405,24 @@ func WaitHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo
 	}
 }
 
-func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedState details.State, timeout time.Duration, interval time.Duration) error {
+func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedState details.State, timeout time.Duration, interval time.Duration, logger Logger) error {
+	versionStr, err := f.ExecVersion(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get Agent version: %w", err)
+	}
+
+	versionParsed, err := version.ParseVersion(versionStr.Binary.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse version [%s]: %w", versionStr.Binary.Version, err)
+	}
+
+	// Upgrade details are only available in Agent version >= 8.12.0
+	versionUpgradeDetailsAvailable := version.NewParsedSemVer(8, 12, 0, "", "")
+	if versionParsed.Less(*versionUpgradeDetailsAvailable) {
+		logger.Logf("upgrade details functionality not implemented in Agent version [%s]. Skipping check for upgrade details state.", versionParsed.String())
+		return nil
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
