@@ -6,7 +6,6 @@ package kubernetessecrets
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -129,10 +128,10 @@ func (p *contextProviderK8sSecrets) updateCache() {
 }
 
 func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
-	p.secretsCacheMx.RLock()
-	_, ok := p.secretsCache[key]
-	p.secretsCacheMx.RUnlock()
+	p.secretsCacheMx.Lock()
+	defer p.secretsCacheMx.Unlock()
 
+	_, ok := p.secretsCache[key]
 	// if value is still not present in cache, it is possible we haven't tried to fetch it yet
 	if !ok {
 		data, ok := p.addToCache(key)
@@ -142,16 +141,14 @@ func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
 		}
 	}
 
-	var pass string
-	p.secretsCacheMx.Lock()
 	data, ok := p.secretsCache[key]
 	data.lastAccess = time.Now()
-	fmt.Println(data.lastAccess)
-	pass = data.value
-	p.secretsCacheMx.Unlock()
+	pass := data.value
+
 	return pass, ok
 }
 
+// This is only called by getFromCache function, which is already locking the cache.
 func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
 	// Make sure the key has the expected format "kubernetes_secrets.somenamespace.somesecret.value"
 	tokens := strings.Split(key, ".")
@@ -176,9 +173,7 @@ func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
 		value: value,
 	}
 	if ok {
-		p.secretsCacheMx.Lock()
 		p.secretsCache[key] = &data
-		p.secretsCacheMx.Unlock()
 	}
 	return data, ok
 }
