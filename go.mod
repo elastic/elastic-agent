@@ -55,14 +55,15 @@ require (
 	go.elastic.co/ecszap v1.0.1
 	go.elastic.co/go-licence-detector v0.5.0
 	go.uber.org/zap v1.25.0
-	golang.org/x/crypto v0.14.0
+	golang.org/x/crypto v0.16.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
-	golang.org/x/sync v0.3.0
-	golang.org/x/sys v0.13.0
-	golang.org/x/term v0.13.0
-	golang.org/x/text v0.13.0
+	golang.org/x/sync v0.5.0
+	golang.org/x/sys v0.15.0
+	golang.org/x/term v0.15.0
+	golang.org/x/text v0.14.0
 	golang.org/x/time v0.3.0
-	golang.org/x/tools v0.7.0
+	golang.org/x/tools v0.16.0
+	golang.org/x/tools/go/vcs v0.1.0-deprecated
 	google.golang.org/grpc v1.58.3
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/ini.v1 v1.67.0
@@ -147,9 +148,9 @@ require (
 	go.elastic.co/apm/v2 v2.0.0 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
-	golang.org/x/mod v0.9.0 // indirect
-	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/exp v0.0.0-20231127185646-65229373498e // indirect
+	golang.org/x/mod v0.14.0 // indirect
+	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
@@ -176,6 +177,7 @@ replace (
 	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
 	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
+	github.com/elastic/elastic-agent-client/v7 => github.com/blakerouse/elastic-agent-client/v7 v7.0.0-20231206170140-87b7594d1a40 // Remove once merged upstream. See https://github.com/elastic/elastic-agent-client/pull/89 for PR.
 	github.com/fsnotify/fsnotify => github.com/adriansr/fsnotify v1.4.8-0.20211018144411-a81f2b630e7c
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
