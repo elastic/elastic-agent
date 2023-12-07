@@ -3481,6 +3481,164 @@ LOOP:
 	require.NoError(t, err)
 }
 
+func TestManager_FakeInput_Chunk(t *testing.T) {
+	testPaths(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	grpcConfig := configuration.DefaultGRPCConfig()
+	grpcConfig.MaxMsgSize = 120 // very small size to test chunking
+
+	ai, _ := info.NewAgentInfo(ctx, true)
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), grpcConfig)
+	require.NoError(t, err)
+	errCh := make(chan error)
+	go func() {
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := waitForReady(waitCtx, m); err != nil {
+		require.NoError(t, err)
+	}
+
+	binaryPath := testBinary(t, "component")
+	comp := component.Component{
+		ID: "fake-default",
+		InputSpec: &component.InputRuntimeSpec{
+			InputType:  "fake",
+			BinaryName: "",
+			BinaryPath: binaryPath,
+			Spec:       fakeInputSpec,
+		},
+		Units: []component.Unit{
+			{
+				ID:       "fake-input-1",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": "Fake Healthy 1",
+				}),
+			},
+			{
+				ID:       "fake-input-2",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": "Fake Healthy 2",
+				}),
+			},
+			{
+				ID:       "fake-input-3",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": "Fake Healthy 3",
+				}),
+			},
+			{
+				ID:       "fake-input-4",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": "Fake Healthy 4",
+				}),
+			},
+		},
+	}
+
+	subCtx, subCancel := context.WithCancel(context.Background())
+	defer subCancel()
+	subErrCh := make(chan error)
+	go func() {
+		sub := m.Subscribe(subCtx, "fake-default")
+		for {
+			select {
+			case <-subCtx.Done():
+				return
+			case state := <-sub.Ch():
+				t.Logf("component state changed: %+v", state)
+				if state.State == client.UnitStateFailed {
+					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
+				} else {
+					healthyCount := 0
+					stoppedCount := 0
+					for _, unit := range state.Units {
+						if unit.State == client.UnitStateFailed {
+							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+						} else if unit.State == client.UnitStateHealthy {
+							healthyCount += 1
+						} else if unit.State == client.UnitStateStopped {
+							stoppedCount += 1
+						} else if unit.State == client.UnitStateStarting {
+							// acceptable
+						} else {
+							// unknown state that should not have occurred
+							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+						}
+					}
+					if healthyCount == 4 {
+						// remove the component which will stop it
+						m.Update(component.Model{Components: []component.Component{}})
+						err := <-m.errCh
+						if err != nil {
+							subErrCh <- err
+						}
+					} else if stoppedCount == 4 {
+						subErrCh <- nil
+					}
+				}
+			}
+		}
+	}()
+
+	defer drainErrChan(errCh)
+	defer drainErrChan(subErrCh)
+
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
+	require.NoError(t, err)
+
+	endTimer := time.NewTimer(30 * time.Second)
+	defer endTimer.Stop()
+LOOP:
+	for {
+		select {
+		case <-endTimer.C:
+			t.Fatalf("timed out after 30 seconds")
+		case err := <-errCh:
+			require.NoError(t, err)
+		case err := <-subErrCh:
+			require.NoError(t, err)
+			break LOOP
+		}
+	}
+
+	subCancel()
+	cancel()
+
+	err = <-errCh
+	require.NoError(t, err)
+
+	workDir := filepath.Join(paths.Run(), comp.ID)
+	_, err = os.Stat(workDir)
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
 func newDebugLogger(t *testing.T) *logger.Logger {
 	t.Helper()
 
