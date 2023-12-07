@@ -75,11 +75,11 @@ func TestContainerCMD(t *testing.T) {
 	}
 
 	cmd, err := agentFixture.PrepareAgentCommand(ctx, []string{"container"})
-	cmd.Env = append(os.Environ(), []string{
+	cmd.Env = append(os.Environ(),
 		"FLEET_ENROLL=1",
-		"FLEET_URL=" + fleetURL,
-		"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken.APIKey,
-	}...)
+		"FLEET_URL="+fleetURL,
+		"FLEET_ENROLLMENT_TOKEN="+enrollmentToken.APIKey,
+	)
 
 	t.Logf(">> running binary with: %v", cmd.Args)
 	output, err := cmd.CombinedOutput()

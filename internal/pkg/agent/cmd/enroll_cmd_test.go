@@ -232,8 +232,8 @@ func TestEnroll(t *testing.T) {
 			}
 
 			assert.True(t, store.Called)
-
 			config, err := readConfig(store.Content)
+			require.NoError(t, err, "readConfig returned an error")
 			assert.Equal(t, "my-access-api-key", config.AccessAPIKey,
 				"The stored 'Access API Key' must be the same returned by Fleet-Server")
 			assert.Equal(t, host, config.Client.Host,
