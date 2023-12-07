@@ -1,0 +1,3 @@
+id_ed25519*
+.terraform.lock.hcl
+*.tfstate
