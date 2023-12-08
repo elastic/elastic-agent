@@ -29,61 +29,6 @@ const (
 	pass = "testing_passpass"
 )
 
-func Test_K8sSecretsProvider_Fetch(t *testing.T) {
-	client := k8sfake.NewSimpleClientset()
-	secret := &v1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "apps/v1beta1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "testing_secret",
-			Namespace: ns,
-		},
-		Data: map[string][]byte{
-			"secret_value": []byte(pass),
-		},
-	}
-	_, err := client.CoreV1().Secrets(ns).Create(context.Background(), secret, metav1.CreateOptions{})
-	require.NoError(t, err)
-
-	logger := logp.NewLogger("test_k8s_secrets")
-	cfg, err := config.NewConfigFrom(map[string]string{"a": "b"})
-	require.NoError(t, err)
-
-	p, err := ContextProviderBuilder(logger, cfg, true)
-	require.NoError(t, err)
-
-	fp, _ := p.(*contextProviderK8sSecrets)
-
-	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
-		return client, nil
-	}
-	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	comm := ctesting.NewContextComm(ctx)
-
-	go func() {
-		_ = fp.Run(ctx, comm)
-	}()
-
-	for {
-		fp.clientMx.Lock()
-		client := fp.client
-		fp.clientMx.Unlock()
-		if client != nil {
-			break
-		}
-		<-time.After(10 * time.Millisecond)
-	}
-
-	val, found := fp.Fetch("kubernetes_secrets.test_namespace.testing_secret.secret_value")
-	assert.True(t, found)
-	assert.Equal(t, val, pass)
-}
-
 func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 	client := k8sfake.NewSimpleClientset()
 	secret := &v1.Secret{
@@ -139,7 +84,7 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 	assert.EqualValues(t, val, "")
 }
 
-func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
+func Test_K8sSecretsProvider_Fetch_Cache_Enabled(t *testing.T) {
 	client := k8sfake.NewSimpleClientset()
 
 	ttlDelete, err := time.ParseDuration("1s")
@@ -169,6 +114,7 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 	c := map[string]interface{}{
 		"refresh_interval": refreshInterval,
 		"ttl_delete":       ttlDelete,
+		"disable_cache":    false,
 	}
 	cfg, err := config.NewConfigFrom(c)
 	require.NoError(t, err)
@@ -253,4 +199,94 @@ func Test_K8sSecretsProvider_Check_TTL(t *testing.T) {
 		return size == 0
 	}, ttlDelete*3, ttlDelete, "Failed to delete the secret after TTL delete has passed.")
 
+}
+
+func Test_K8sSecretsProvider_Fetch_Cache_Disabled(t *testing.T) {
+	client := k8sfake.NewSimpleClientset()
+
+	secret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "apps/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testing_secret",
+			Namespace: ns,
+		},
+		Data: map[string][]byte{
+			"secret_value": []byte(pass),
+		},
+	}
+	_, err := client.CoreV1().Secrets(ns).Create(context.Background(), secret, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	logger := logp.NewLogger("test_k8s_secrets")
+
+	c := map[string]interface{}{
+		"disable_cache": true,
+	}
+	cfg, err := config.NewConfigFrom(c)
+	require.NoError(t, err)
+
+	p, err := ContextProviderBuilder(logger, cfg, true)
+	require.NoError(t, err)
+
+	fp, _ := p.(*contextProviderK8sSecrets)
+
+	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
+		return client, nil
+	}
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := ctesting.NewContextComm(ctx)
+
+	go func() {
+		_ = fp.Run(ctx, comm)
+	}()
+
+	for {
+		fp.clientMx.Lock()
+		client := fp.client
+		fp.clientMx.Unlock()
+		if client != nil {
+			break
+		}
+		<-time.After(10 * time.Millisecond)
+	}
+
+	key := "kubernetes_secrets.test_namespace.testing_secret.secret_value"
+
+	// Secret should be in the cache after this call
+	val, found := fp.Fetch(key)
+	assert.True(t, found)
+	assert.Equal(t, val, pass)
+
+	// Update the secret and check the result
+	newPass := "new-pass"
+	secret = &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "apps/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testing_secret",
+			Namespace: ns,
+		},
+		Data: map[string][]byte{
+			"secret_value": []byte(newPass),
+		},
+	}
+	_, err = client.CoreV1().Secrets(ns).Update(context.Background(), secret, metav1.UpdateOptions{})
+	require.NoError(t, err)
+
+	val, found = fp.Fetch(key)
+	assert.True(t, found)
+	assert.Equal(t, val, newPass)
+
+	// Check key that does not exist
+	val, found = fp.Fetch(key + "doesnotexist")
+	assert.False(t, found)
+	assert.Equal(t, "", val)
 }

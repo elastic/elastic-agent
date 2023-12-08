@@ -62,7 +62,16 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 }
 
 func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
-	return p.getFromCache(key)
+	if p.config.DisableCache {
+		valid := p.validateKey(key)
+		if valid {
+			return p.fetchSecretWithTimeout(key)
+		} else {
+			return "", false
+		}
+	} else {
+		return p.getFromCache(key)
+	}
 }
 
 // Run initializes the k8s secrets context provider.
@@ -75,7 +84,10 @@ func (p *contextProviderK8sSecrets) Run(ctx context.Context, comm corecomp.Conte
 	p.clientMx.Lock()
 	p.client = client
 	p.clientMx.Unlock()
-	go p.updateSecrets(ctx)
+
+	if !p.config.DisableCache {
+		go p.updateSecrets(ctx)
+	}
 
 	<-comm.Done()
 
@@ -148,14 +160,11 @@ func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
 	return pass, ok
 }
 
-// This is only called by getFromCache function, which is already locking the cache.
-func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
+func (p *contextProviderK8sSecrets) validateKey(key string) bool {
 	// Make sure the key has the expected format "kubernetes_secrets.somenamespace.somesecret.value"
 	tokens := strings.Split(key, ".")
 	if len(tokens) > 0 && tokens[0] != "kubernetes_secrets" {
-		return secretsData{
-			value: "",
-		}, false
+		return false
 	}
 	if len(tokens) != 4 {
 		p.logger.Debugf(
@@ -163,6 +172,15 @@ func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
 			key,
 			"kubernetes_secrets.somenamespace.somesecret.value",
 		)
+		return false
+	}
+	return true
+}
+
+// This is only called by getFromCache function, which is already locking the cache.
+func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
+	valid := p.validateKey(key)
+	if !valid {
 		return secretsData{
 			value: "",
 		}, false
@@ -184,11 +202,11 @@ type Result struct {
 }
 
 func (p *contextProviderK8sSecrets) fetchSecretWithTimeout(key string) (string, bool) {
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), p.config.Timeout)
+	ctxTimeout, cancel := context.WithTimeout(context.Background(), p.config.RequestTimeout)
 	defer cancel()
 
 	resultCh := make(chan Result, 1)
-	go p.fetchSecret(ctxTimeout, key, resultCh)
+	p.fetchSecret(ctxTimeout, key, resultCh)
 
 	select {
 	case <-ctxTimeout.Done():
