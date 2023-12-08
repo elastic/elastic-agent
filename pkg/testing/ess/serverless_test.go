@@ -95,6 +95,6 @@ func TestStartServerless(t *testing.T) {
 	t.Logf("got endpoints: %#v", clientHandle.proj.Endpoints)
 	t.Logf("got auth: %#v", clientHandle.proj.Credentials)
 
-	err = clientHandle.DeleteDeployment()
+	err = clientHandle.DeleteDeployment(ctx)
 	require.NoError(t, err)
 }

@@ -178,7 +178,7 @@ func (prov *ServerlessProvisioner) Delete(ctx context.Context, stack runner.Stac
 	client.proj.Credentials.Password = stack.Password
 
 	prov.log.Logf("Destroying serverless stack %s [stack_id: %s, deployment_id: %s]", stack.Version, stack.ID, deploymentID)
-	err = client.DeleteDeployment()
+	err = client.DeleteDeployment(ctx)
 	if err != nil {
 		return fmt.Errorf("error removing serverless stack %s [stack_id: %s, deployment_id: %s]: %w", stack.Version, stack.ID, deploymentID, err)
 	}
