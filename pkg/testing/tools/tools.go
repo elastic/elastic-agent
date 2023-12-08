@@ -99,7 +99,7 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 	}
 
 	// Get default Fleet Server URL
-	fleetServerURL, err := fleettools.DefaultURL(kibClient)
+	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
 	if err != nil {
 		return fmt.Errorf("unable to get default Fleet Server URL: %w", err)
 	}
@@ -126,7 +126,7 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 	// Wait for Agent to be healthy
 	require.Eventually(
 		t,
-		check.FleetAgentStatus(t, kibClient, policyID, "online"),
+		check.FleetAgentStatus(ctx, t, kibClient, policyID, "online"),
 		timeout,
 		10*time.Second,
 		"Elastic Agent status is not online",
