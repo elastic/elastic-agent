@@ -9,6 +9,11 @@ outputs:
     # username: "elastic"
     # password: "changeme"
 
+    # Performance preset for elasticsearch outputs. One of "balanced", "throughput",
+    # "scale", "latency" and "custom".
+    # The default if unspecified is "custom".
+    preset: balanced
+
 inputs:
   - type: system/metrics
     # Each input must have a unique ID.
