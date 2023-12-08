@@ -88,7 +88,7 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 		createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
-	check.ConnectedToFleet(t, agentFixture, 5*time.Minute)
+	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
 
 	t.Run("Monitoring logs are shipped", func(t *testing.T) {
 		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)

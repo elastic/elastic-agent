@@ -20,13 +20,13 @@ import (
 // ConnectedToFleet checks if the agent defined in the fixture is connected to
 // Fleet Server. It uses assert.Eventually and if it fails the last error will
 // be printed. It returns if the agent is connected to Fleet Server or not.
-func ConnectedToFleet(t *testing.T, fixture *integrationtest.Fixture, timeout time.Duration) bool {
+func ConnectedToFleet(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, timeout time.Duration) bool {
 	t.Helper()
 
 	var err error
 	var agentStatus integrationtest.AgentStatusOutput
 	assertFn := func() bool {
-		agentStatus, err = fixture.ExecStatus(context.Background())
+		agentStatus, err = fixture.ExecStatus(ctx)
 		return agentStatus.FleetState == int(cproto.State_HEALTHY)
 	}
 
