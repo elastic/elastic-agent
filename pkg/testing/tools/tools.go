@@ -22,10 +22,10 @@ import (
 // given agent's policy revision has reached the given policy revision; false
 // otherwise. The returned function is intended
 // for use with assert.Eventually or require.Eventually.
-func IsPolicyRevision(t *testing.T, client *kibana.Client, agentID string, policyRevision int) func() bool {
+func IsPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, agentID string, policyRevision int) func() bool {
 	return func() bool {
 		getAgentReq := kibana.GetAgentRequest{ID: agentID}
-		updatedPolicyAgent, err := client.GetAgent(context.Background(), getAgentReq)
+		updatedPolicyAgent, err := client.GetAgent(ctx, getAgentReq)
 		if err != nil {
 			t.Logf("failed to get agent document to check policy revision: %v", err)
 			return false
@@ -136,10 +136,10 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 }
 
 // InstallStandaloneAgent force install the Elastic Agent through agentFixture.
-func InstallStandaloneAgent(agentFixture *atesting.Fixture) ([]byte, error) {
+func InstallStandaloneAgent(ctx context.Context, agentFixture *atesting.Fixture) ([]byte, error) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
 	}
-	return agentFixture.Install(context.Background(), &installOpts)
+	return agentFixture.Install(ctx, &installOpts)
 }

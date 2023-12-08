@@ -130,7 +130,7 @@ func TestFQDN(t *testing.T) {
 	expectedAgentPolicyRevision := agent.PolicyRevision + 1
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, expectedAgentPolicyRevision),
 		2*time.Minute,
 		1*time.Second,
 	)
@@ -161,7 +161,7 @@ func TestFQDN(t *testing.T) {
 	expectedAgentPolicyRevision++
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, expectedAgentPolicyRevision),
 		2*time.Minute,
 		1*time.Second,
 	)
