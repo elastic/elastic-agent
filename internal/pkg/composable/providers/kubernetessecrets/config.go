@@ -15,10 +15,10 @@ type Config struct {
 	KubeConfig        string                       `config:"kube_config"`
 	KubeClientOptions kubernetes.KubeClientOptions `config:"kube_client_options"`
 
-	RefreshInterval time.Duration `config:"refresh_interval"`
-	TTLDelete       time.Duration `config:"ttl_delete"`
-	RequestTimeout  time.Duration `config:"request_timeout"`
-	DisableCache    bool          `config:"disable_cache"`
+	RefreshInterval time.Duration `config:"cache_refresh_interval"`
+	TTLDelete       time.Duration `config:"cache_ttl_delete"`
+	RequestTimeout  time.Duration `config:"cache_request_timeout"`
+	DisableCache    bool          `config:"cache_disable_cache"`
 }
 
 func (c *Config) InitDefaults() {

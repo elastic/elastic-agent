@@ -112,9 +112,9 @@ func Test_K8sSecretsProvider_Fetch_Cache_Enabled(t *testing.T) {
 	logger := logp.NewLogger("test_k8s_secrets")
 
 	c := map[string]interface{}{
-		"refresh_interval": refreshInterval,
-		"ttl_delete":       ttlDelete,
-		"disable_cache":    false,
+		"cache_refresh_interval": refreshInterval,
+		"cache_ttl_delete":       ttlDelete,
+		"cache_disable_cache":    false,
 	}
 	cfg, err := config.NewConfigFrom(c)
 	require.NoError(t, err)
@@ -223,7 +223,7 @@ func Test_K8sSecretsProvider_Fetch_Cache_Disabled(t *testing.T) {
 	logger := logp.NewLogger("test_k8s_secrets")
 
 	c := map[string]interface{}{
-		"disable_cache": true,
+		"cache_disable_cache": true,
 	}
 	cfg, err := config.NewConfigFrom(c)
 	require.NoError(t, err)
