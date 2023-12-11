@@ -41,7 +41,7 @@ func IsOtelConfig(ctx context.Context, pathConfigFile string) (bool, error) {
 		return true, nil
 	}
 
-	if suffix := filepath.Ext(cleanFileName); suffix != ".yml" && suffix != ".yaml" {
+	if suffix := filepath.Ext(fileName); suffix != ".yml" && suffix != ".yaml" {
 		return false, nil
 	}
 
