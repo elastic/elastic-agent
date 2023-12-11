@@ -192,7 +192,10 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, fleettools.UnEnrollAgent(ctx, info.KibanaClient, policy.ID))
+		// Use a separate context as the one in the test body will have been cancelled at this point.
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cleanupCancel()
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policy.ID))
 	})
 
 	t.Log("Installing Elastic Defend")

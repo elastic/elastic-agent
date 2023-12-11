@@ -92,11 +92,15 @@ func TestFQDN(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
+		// Use a separate context as the one in the test body will have been cancelled at this point.
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cleanupCancel()
+
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, fleettools.UnEnrollAgent(ctx, info.KibanaClient, policy.ID))
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policy.ID))
 
 		t.Log("Restoring hostname...")
-		err := setHostname(ctx, origHostname, t.Log)
+		err := setHostname(cleanupCtx, origHostname, t.Log)
 		require.NoError(t, err)
 
 		t.Log("Restoring original /etc/hosts...")
