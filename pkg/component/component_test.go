@@ -36,6 +36,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// fake error type used for the test below
+type testErr struct {
+	data string
+}
+
+func (t testErr) Error() string {
+	return t.data
+}
+
+func TestComponentMarshalError(t *testing.T) {
+	testComponent := Component{
+		ID:  "test-device",
+		Err: testErr{data: "test error value"},
+	}
+	componentConfigs := []Component{testComponent}
+
+	outData, err := yaml.Marshal(struct {
+		Components []Component `yaml:"components"`
+	}{
+		Components: componentConfigs,
+	})
+	require.NoError(t, err)
+	require.Contains(t, string(outData), "test error value")
+}
+
 func TestToComponents(t *testing.T) {
 	linuxAMD64Platform := PlatformDetail{
 		Platform: Platform{

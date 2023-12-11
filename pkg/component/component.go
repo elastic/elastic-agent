@@ -156,7 +156,11 @@ type Component struct {
 
 	// Err used when there is an error with running this input. Used by the runtime to alert
 	// the reason that all of these units are failed.
-	Err error `yaml:"error,omitempty"`
+	Err error `yaml:"-"`
+	// the YAML marshaller won't handle `error` values, since they don't implement MarshalYAML()
+	// the Component's own MarshalYAML method needs to handle this, and place any error values here instead of `Err`,
+	// so they can properly be rendered as a string
+	ErrMsg string `yaml:"error,omitempty"`
 
 	// InputSpec on how the input should run. (not set when ShipperSpec set)
 	InputSpec *InputRuntimeSpec `yaml:"input_spec,omitempty"`
@@ -185,6 +189,13 @@ type Component struct {
 	// ShipperRef references the component/unit that this component used as its output.
 	// (only applies to inputs targeting a shipper, not set when ShipperSpec is)
 	ShipperRef *ShipperReference `yaml:"shipper,omitempty"`
+}
+
+func (c Component) MarshalYAML() (interface{}, error) {
+	if c.Err != nil {
+		c.ErrMsg = c.Err.Error()
+	}
+	return c, nil
 }
 
 // Type returns the type of the component.

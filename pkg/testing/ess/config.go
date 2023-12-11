@@ -17,8 +17,13 @@ type Config struct {
 }
 
 func defaultConfig() *Config {
+	baseURL := os.Getenv("TEST_INTEG_AUTH_ESS_URL")
+	if baseURL == "" {
+		baseURL = "https://cloud.elastic.co"
+	}
+	url := strings.TrimRight(baseURL, "/") + "/api/v1"
 	return &Config{
-		BaseUrl: `https://staging.found.no/api/v1`,
+		BaseUrl: url,
 	}
 }
 

@@ -57,6 +57,9 @@ type Stack struct {
 	// Version is the version of the stack.
 	Version string `yaml:"version"`
 
+	// Ready determines if the stack is ready to be used.
+	Ready bool `yaml:"ready"`
+
 	// Elasticsearch is the URL to communicate with elasticsearch.
 	Elasticsearch string `yaml:"elasticsearch"`
 
@@ -89,11 +92,12 @@ type StackProvisioner interface {
 	// SetLogger sets the logger for it to use.
 	SetLogger(l Logger)
 
-	// Provision brings up the stacks
-	//
-	// The provision should re-use already prepared stacks when possible.
-	Provision(ctx context.Context, requests []StackRequest) ([]Stack, error)
+	// Create creates a stack.
+	Create(ctx context.Context, request StackRequest) (Stack, error)
 
-	// Clean cleans up all provisioned resources.
-	Clean(ctx context.Context, stacks []Stack) error
+	// WaitForReady should block until the stack is ready or the context is cancelled.
+	WaitForReady(ctx context.Context, stack Stack) (Stack, error)
+
+	// Delete deletes the stack.
+	Delete(ctx context.Context, stack Stack) error
 }

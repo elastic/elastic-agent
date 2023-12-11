@@ -1,0 +1,14 @@
+version: 8.11.1
+entries:
+    - kind: feature
+      summary: Add component {id, binary} to monitoring metrics from Elastic-Agent and Beats
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3626
+      issue:
+        - https://github.com/elastic/integrations/issues/7977
+      timestamp: 1697735373
+      file:
+        name: 1697735373-Add-component-fields-to-metrics.yaml
+        checksum: e78d27aa33269834757dceee23e195ae6ea8ecd5

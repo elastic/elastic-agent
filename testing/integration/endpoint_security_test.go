@@ -36,7 +36,7 @@ import (
 
 const (
 	// TODO: Setup a GitHub Action to update this for each release of https://github.com/elastic/endpoint-package
-	endpointPackageVersion       = "8.9.0"
+	endpointPackageVersion       = "8.11.0"
 	endpointHealthPollingTimeout = 2 * time.Minute
 )
 
@@ -74,10 +74,10 @@ var protectionTests = []struct {
 // test automatically.
 func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
@@ -100,10 +100,10 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 // but at this point endpoint is already uninstalled.
 func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
@@ -128,10 +128,10 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 
 func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
@@ -241,7 +241,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 		Force:          true,
 	}
 
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
@@ -352,7 +352,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 		Force:          true,
 	}
 
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
@@ -490,13 +490,13 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 // path other than default
 func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	// Get path to agent executable.
@@ -526,7 +526,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	c := fixture.Client()

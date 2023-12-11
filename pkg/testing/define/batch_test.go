@@ -93,6 +93,7 @@ func TestBatch(t *testing.T) {
 	}
 	expected := []Batch{
 		{
+			Group: Default,
 			OS: OS{
 				Type: Darwin,
 				Arch: AMD64,
@@ -101,6 +102,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: darwinSudoTests,
 		},
 		{
+			Group: Default,
 			OS: OS{
 				Type: Darwin,
 				Arch: ARM64,
@@ -109,6 +111,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: darwinSudoTests,
 		},
 		{
+			Group: Default,
 			OS: OS{
 				Type: Linux,
 				Arch: AMD64,
@@ -117,6 +120,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: linuxSudoTests,
 		},
 		{
+			Group: Default,
 			OS: OS{
 				Type:    Linux,
 				Arch:    ARM64,
@@ -152,6 +156,7 @@ func TestBatch(t *testing.T) {
 			SudoTests: linuxSudoTests,
 		},
 		{
+			Group: Default,
 			OS: OS{
 				Type: Windows,
 				Arch: AMD64,
@@ -160,170 +165,47 @@ func TestBatch(t *testing.T) {
 			SudoTests: windowsSudoTests,
 		},
 		{
+			Group: "one",
 			OS: OS{
-				Type: Darwin,
-				Arch: AMD64,
+				Type:    Linux,
+				Arch:    ARM64,
+				Version: "20.04",
+				Distro:  "ubuntu",
 			},
-			Isolate: true,
+			Stack: &Stack{
+				Version: "8.8.0",
+			},
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
 					Tests: []BatchPackageTest{
 						{
-							Name: "TestAnyIsolate",
+							Name:  "TestGroup_One_One",
+							Stack: true,
+						},
+						{
+							Name:  "TestGroup_One_Two",
+							Stack: true,
 						},
 					},
 				},
 			},
 		},
 		{
-			OS: OS{
-				Type: Darwin,
-				Arch: ARM64,
-			},
-			Isolate: true,
-			Tests: []BatchPackageTests{
-				{
-					Name: pkgName,
-					Tests: []BatchPackageTest{
-						{
-							Name: "TestAnyIsolate",
-						},
-					},
-				},
-			},
-		},
-		{
-			OS: OS{
-				Type: Linux,
-				Arch: AMD64,
-			},
-			Isolate: true,
-			Tests: []BatchPackageTests{
-				{
-					Name: pkgName,
-					Tests: []BatchPackageTest{
-						{
-							Name: "TestAnyIsolate",
-						},
-					},
-				},
-			},
-		},
-		{
+			Group: "two",
 			OS: OS{
 				Type: Linux,
 				Arch: ARM64,
 			},
-			Isolate: true,
 			Tests: []BatchPackageTests{
 				{
 					Name: pkgName,
 					Tests: []BatchPackageTest{
 						{
-							Name: "TestAnyIsolate",
+							Name: "TestGroup_Two_One",
 						},
-					},
-				},
-			},
-		},
-		{
-			OS: OS{
-				Type: Windows,
-				Arch: AMD64,
-			},
-			Isolate: true,
-			Tests: []BatchPackageTests{
-				{
-					Name: pkgName,
-					Tests: []BatchPackageTest{
 						{
-							Name: "TestAnyIsolate",
-						},
-					},
-				},
-			},
-		},
-		{
-			OS: OS{
-				Type: Darwin,
-				Arch: AMD64,
-			},
-			Isolate: true,
-			Tests: []BatchPackageTests{
-				{
-					Name: pkgName,
-					Tests: []BatchPackageTest{
-						{
-							Name: "TestDarwinIsolate",
-						},
-					},
-				},
-			},
-		},
-		{
-			OS: OS{
-				Type: Darwin,
-				Arch: ARM64,
-			},
-			Isolate: true,
-			Tests: []BatchPackageTests{
-				{
-					Name: pkgName,
-					Tests: []BatchPackageTest{
-						{
-							Name: "TestDarwinIsolate",
-						},
-					},
-				},
-			},
-		},
-		{
-			OS: OS{
-				Type: Linux,
-				Arch: AMD64,
-			},
-			Isolate: true,
-			Tests: []BatchPackageTests{
-				{
-					Name: pkgName,
-					Tests: []BatchPackageTest{
-						{
-							Name: "TestLinuxIsolate",
-						},
-					},
-				},
-			},
-		},
-		{
-			OS: OS{
-				Type: Linux,
-				Arch: ARM64,
-			},
-			Isolate: true,
-			Tests: []BatchPackageTests{
-				{
-					Name: pkgName,
-					Tests: []BatchPackageTest{
-						{
-							Name: "TestLinuxIsolate",
-						},
-					},
-				},
-			},
-		},
-		{
-			OS: OS{
-				Type: Windows,
-				Arch: AMD64,
-			},
-			Isolate: true,
-			Tests: []BatchPackageTests{
-				{
-					Name: pkgName,
-					Tests: []BatchPackageTest{
-						{
-							Name: "TestWindowsIsolate",
+							Name: "TestGroup_Two_Two",
 						},
 					},
 				},
@@ -344,6 +226,7 @@ var testLinuxLocalTests = []BatchPackageTest{
 
 var testLinuxLocalBatch = []Batch{
 	{
+		Group: Default,
 		OS: OS{
 			Type: "linux",
 			Arch: "amd64",
@@ -356,6 +239,7 @@ var testLinuxLocalBatch = []Batch{
 		},
 	},
 	{
+		Group: Default,
 		OS: OS{
 			Type: "linux",
 			Arch: "arm64",

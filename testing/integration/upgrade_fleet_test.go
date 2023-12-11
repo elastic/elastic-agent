@@ -31,6 +31,7 @@ import (
 // versions as the standalone tests already perform those tests and would be redundant.
 func TestFleetManagedUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: Fleet,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -142,7 +143,7 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 
 	// wait for the watcher to show up
 	t.Logf("Waiting for upgrade watcher to start...")
-	err = upgradetest.WaitForWatcher(ctx, 2*time.Minute, 10*time.Second)
+	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
 	require.NoError(t, err)
 	t.Logf("Upgrade watcher started")
 

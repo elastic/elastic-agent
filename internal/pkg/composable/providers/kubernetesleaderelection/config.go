@@ -13,10 +13,18 @@ type Config struct {
 	// Name of the leaderelection lease
 	LeaderLease string `config:"leader_lease"`
 
+	//Parameters to configure election process
+	LeaseDuration int `config:"leader_leaseduration"`
+	RenewDeadline int `config:"leader_renewdeadline"`
+	RetryPeriod   int `config:"leader_retryperiod"`
+
 	KubeClientOptions kubernetes.KubeClientOptions `config:"kube_client_options"`
 }
 
 // InitDefaults initializes the default values for the config.
 func (c *Config) InitDefaults() {
 	c.LeaderLease = "elastic-agent-cluster-leader"
+	c.LeaseDuration = 15
+	c.RenewDeadline = 10
+	c.RetryPeriod = 2
 }

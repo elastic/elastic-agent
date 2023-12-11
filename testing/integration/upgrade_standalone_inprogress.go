@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build integration
+
 package integration
 
 import (
@@ -15,6 +17,7 @@ import (
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -24,11 +27,12 @@ import (
 // the second upgrade.
 func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// For this test we start with a version of Agent that's two minors older

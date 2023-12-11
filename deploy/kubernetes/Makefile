@@ -79,7 +79,7 @@ else
 	echo "INFO: create pull request"
 	@gh pr create \
 		--title "Update kubernetes templates for elastic-agent" \
-		--body "Automated by ${BUILD_URL}" \
+		--body "Automated by ${BUILDKITE_BUILD_URL}" \
 		--label automation \
 		--label release_note:skip \
 		--base main \

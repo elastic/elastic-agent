@@ -928,7 +928,6 @@ func packageAgent(platforms []string, packagingFn func()) {
 			// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/assetbeat/latest/8.11.0-SNAPSHOT.json
 			externalBinaries := map[string]string{
 				"auditbeat":             "beats",
 				"filebeat":              "beats",
@@ -944,7 +943,6 @@ func packageAgent(platforms []string, packagingFn func()) {
 				"pf-elastic-collector":  "prodfiler",
 				"pf-elastic-symbolizer": "prodfiler",
 				"pf-host-agent":         "prodfiler",
-				"assetbeat":             "assetbeat", // only supporting linux/amd64 or linux/arm64
 			}
 
 			// Only log fatal logs for logs produced using logrus. This is the global logger
@@ -1603,7 +1601,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 			extraFlags = append(extraFlags, goTestFlags...)
 		}
 		extraFlags = append(extraFlags, "-test.shuffle", "on",
-			"-test.timeout", "0", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
+			"-test.timeout", "2h", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
 		params := mage.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
@@ -1732,13 +1730,16 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 	datacenter := os.Getenv("TEST_INTEG_AUTH_GCP_DATACENTER")
 	if datacenter == "" {
+		// us-central1-a is used because T2A instances required for ARM64 testing are only
+		// available in the central regions
 		datacenter = "us-central1-a"
 	}
 
-	// Valid values are gcp-us-central1 (default), azure-eastus2
+	// Possible to change the region for deployment, default is gcp-us-west2 which is
+	// the CFT region.
 	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
 	if essRegion == "" {
-		essRegion = "gcp-us-central1"
+		essRegion = "gcp-us-west2"
 	}
 
 	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
@@ -1780,6 +1781,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		StateDir:          ".integration-cache",
 		DiagnosticsDir:    diagDir,
 		Platforms:         testPlatforms(),
+		Groups:            testGroups(),
 		Matrix:            matrix,
 		SingleTest:        singleTest,
 		VerboseMode:       mg.Verbose(),
@@ -1868,6 +1870,20 @@ func testPlatforms() []string {
 		}
 	}
 	return platforms
+}
+
+func testGroups() []string {
+	groupsStr := os.Getenv("TEST_GROUPS")
+	if groupsStr == "" {
+		return nil
+	}
+	var groups []string
+	for _, g := range strings.Split(groupsStr, " ") {
+		if g != "" {
+			groups = append(groups, g)
+		}
+	}
+	return groups
 }
 
 // Pre-requisite: user must have the gcloud CLI installed

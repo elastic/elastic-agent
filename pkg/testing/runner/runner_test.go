@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -86,7 +87,7 @@ func TestNewRunner_Clean(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.ElementsMatch(t, ip.instances, []Instance{i1, i2})
-	assert.ElementsMatch(t, sp.stacks, []Stack{s1, s2})
+	assert.ElementsMatch(t, sp.deletedStacks, []Stack{s1, s2})
 }
 
 type fakeInstanceProvisioner struct {
@@ -123,31 +124,38 @@ func (f *fakeInstanceProvisioner) Clean(_ context.Context, _ Config, instances [
 }
 
 type fakeStackProvisioner struct {
-	requests []StackRequest
-	stacks   []Stack
+	mx            sync.Mutex
+	requests      []StackRequest
+	deletedStacks []Stack
 }
 
 func (f *fakeStackProvisioner) SetLogger(_ Logger) {
 }
 
-func (f *fakeStackProvisioner) Provision(_ context.Context, requests []StackRequest) ([]Stack, error) {
-	f.requests = requests
-	var stacks []Stack
-	for _, req := range requests {
-		stacks = append(stacks, Stack{
-			ID:            req.ID,
-			Version:       req.Version,
-			Elasticsearch: "http://localhost:9200",
-			Kibana:        "http://localhost:5601",
-			Username:      "elastic",
-			Password:      "changeme",
-			Internal:      nil,
-		})
-	}
-	return stacks, nil
+func (f *fakeStackProvisioner) Create(_ context.Context, request StackRequest) (Stack, error) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+	f.requests = append(f.requests, request)
+	return Stack{
+		ID:            request.ID,
+		Version:       request.Version,
+		Elasticsearch: "http://localhost:9200",
+		Kibana:        "http://localhost:5601",
+		Username:      "elastic",
+		Password:      "changeme",
+		Internal:      nil,
+		Ready:         false,
+	}, nil
 }
 
-func (f *fakeStackProvisioner) Clean(_ context.Context, stacks []Stack) error {
-	f.stacks = stacks
+func (f *fakeStackProvisioner) WaitForReady(_ context.Context, stack Stack) (Stack, error) {
+	stack.Ready = true
+	return stack, nil
+}
+
+func (f *fakeStackProvisioner) Delete(_ context.Context, stack Stack) error {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+	f.deletedStacks = append(f.deletedStacks, stack)
 	return nil
 }

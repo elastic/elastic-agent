@@ -82,6 +82,16 @@ data:
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
               type: metrics
+              dataset: kubernetes.state_namespace
+            metricsets:
+              - state_namespace
+            add_metadata: true
+            hosts:
+              - 'localhost:8080'
+            period: 10s
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          - data_stream:
+              type: metrics
               dataset: kubernetes.state_node
             metricsets:
               - state_node
@@ -173,4 +183,4 @@ data:
         meta:
           package:
             name: kubernetes
-            version: 1.42.0
+            version: 1.52.0

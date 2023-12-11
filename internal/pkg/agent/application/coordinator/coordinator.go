@@ -93,10 +93,7 @@ type RuntimeManager interface {
 	Runner
 
 	// Update updates the current components model.
-	Update(model component.Model) error
-
-	// State returns the current components model state.
-	State() []runtime.ComponentComponentState
+	Update(model component.Model)
 
 	// PerformAction executes an action on a unit.
 	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
@@ -219,17 +216,19 @@ type Coordinator struct {
 	// into the reported state before broadcasting -- State() will report
 	// agentclient.Failed if one of these is set, even if the underlying
 	// coordinator state is agentclient.Healthy.
-	runtimeMgrErr error // Currently unused
-	configMgrErr  error
-	actionsErr    error
-	varsMgrErr    error
+	// Errors from the runtime manager report policy update failures and are
+	// stored in runtimeUpdateErr below.
+	configMgrErr error
+	actionsErr   error
+	varsMgrErr   error
 
 	// Errors resulting from different possible failure modes when setting a
 	// new policy. Right now there are three different stages where a policy
 	// update can fail:
 	// - in generateAST, converting the policy to an AST
 	// - in process, converting the AST and vars into a full component model
-	// - while sending the final component model to the runtime manager
+	// - while applying the final component model in the runtime manager
+	//   (reported asynchronously via the runtime manager error channel)
 	//
 	// The plan is to improve our preprocessing so we can always detect
 	// failures immediately https://github.com/elastic/elastic-agent/issues/2887.
@@ -851,7 +850,13 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		return
 
 	case runtimeErr := <-c.managerChans.runtimeManagerError:
-		c.setRuntimeManagerError(runtimeErr)
+		// runtime manager errors report the result of a policy update.
+		// Coordinator transitions from starting to healthy when a policy update
+		// is successful.
+		c.setRuntimeUpdateError(runtimeErr)
+		if runtimeErr == nil {
+			c.setCoordinatorState(agentclient.Healthy, "Running")
+		}
 
 	case configErr := <-c.managerChans.configManagerError:
 		if c.isManaged {
@@ -1070,12 +1075,7 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 
 	c.logger.Info("Updating running component model")
 	c.logger.With("components", model.Components).Debug("Updating running component model")
-	err = c.runtimeMgr.Update(model)
-	c.setRuntimeUpdateError(err)
-	if err != nil {
-		return fmt.Errorf("updating runtime: %w", err)
-	}
-	c.setCoordinatorState(agentclient.Healthy, "Running")
+	c.runtimeMgr.Update(model)
 	return nil
 }
 
@@ -1149,11 +1149,11 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 	for _, component := range comps {
 		// If this is an input component (not a shipper), make sure its type is allowed
 		if component.InputSpec != nil && !c.caps.AllowInput(component.InputType) {
-			c.logger.Info("Component '%v' with input type '%v' filtered by capabilities.yml", component.InputType)
+			c.logger.Infof("Component '%v' with input type '%v' filtered by capabilities.yml", component.ID, component.InputType)
 			continue
 		}
 		if !c.caps.AllowOutput(component.OutputType) {
-			c.logger.Info("Component '%v' with output type '%v' filtered by capabilities.yml", component.ID, component.OutputType)
+			c.logger.Infof("Component '%v' with output type '%v' filtered by capabilities.yml", component.ID, component.OutputType)
 			continue
 		}
 		result = append(result, component)
