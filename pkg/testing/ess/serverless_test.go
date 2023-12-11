@@ -16,7 +16,7 @@ import (
 )
 
 func TestProvisionGetRegions(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*240)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
 	_ = logp.DevelopmentSetup()
@@ -39,7 +39,7 @@ func TestProvisionGetRegions(t *testing.T) {
 }
 
 func TestStackProvisioner(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	_ = logp.DevelopmentSetup()
@@ -82,7 +82,7 @@ func TestStartServerless(t *testing.T) {
 		key,
 		&defaultLogger{wrapped: logp.L()})
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*240)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
 	req := ServerlessRequest{Name: "ingest-e2e-test", RegionID: "aws-eu-west-1"}
