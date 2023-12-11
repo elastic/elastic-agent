@@ -5,6 +5,7 @@
 package testing
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -153,10 +154,12 @@ type State struct {
 
 	// Before is called once when this state is the next state trying to be resolved.
 	// This is called before the configuration is sent to the Elastic Agent if `Configuration` is set.
-	Before func() error
+	// Before is passed the context that was passed to fixture.Run().
+	Before func(ctx context.Context) error
 
 	// After is called once after this state has been resolved and the next state is going to be tried.
-	After func() error
+	// After is passed the context that was passed to fixture.Run().
+	After func(ctx context.Context) error
 }
 
 // Validate ensures correctness of state definition.
@@ -208,7 +211,7 @@ func newStateMachine(states []State) (*stateMachine, error) {
 	}, nil
 }
 
-func (sm *stateMachine) next(agentState *client.AgentState) (string, bool, error) {
+func (sm *stateMachine) next(ctx context.Context, agentState *client.AgentState) (string, bool, error) {
 	if sm.current >= len(sm.states) {
 		// already made it to the end, should be stopped
 		return "", false, nil
@@ -224,7 +227,7 @@ func (sm *stateMachine) next(agentState *client.AgentState) (string, bool, error
 	}
 	if reached {
 		if state.After != nil {
-			if err := state.After(); err != nil {
+			if err := state.After(ctx); err != nil {
 				return "", false, fmt.Errorf("failed to perform After on state %d: %w", sm.current, err)
 			}
 		}
@@ -235,7 +238,7 @@ func (sm *stateMachine) next(agentState *client.AgentState) (string, bool, error
 		}
 		next := sm.states[sm.current]
 		if next.Before != nil {
-			if err := next.Before(); err != nil {
+			if err := next.Before(ctx); err != nil {
 				return "", false, fmt.Errorf("failed to perform Before on state %d: %w", sm.current, err)
 			}
 		}
@@ -244,7 +247,7 @@ func (sm *stateMachine) next(agentState *client.AgentState) (string, bool, error
 			return next.Configure, true, nil
 		}
 		// no configuration on this state; so we can determine if this next state has already been reached as well
-		return sm.next(agentState)
+		return sm.next(ctx, agentState)
 	}
 	return "", true, nil
 }
