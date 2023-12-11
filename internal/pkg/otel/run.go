@@ -31,8 +31,8 @@ const buildDescription = "Elastic opentelemetry-collector distribution"
 //
 // in case of other filename it checks for `agent`, `inputs`, `outputs` keyword. If at least one of these is present
 // it assumes agent config and returns (false, nil).
-// If these keywords are missing it checks for presense of otel specific keywords `exporters`, `receivers`,`processors`
-// or `extensions` in combination with `service` defintion. In case these are found (true, nil) is returned.
+// If these keywords are missing it checks for presence of otel specific keywords `exporters`, `receivers`,`processors`
+// or `extensions` in combination with `service` definition. In case these are found (true, nil) is returned.
 // If none of these conditions are satisfied (false, nil) is returned assuming agent config for backward compatibility.
 func IsOtelConfig(ctx context.Context, pathConfigFile string) (bool, error) {
 	fileName := filepath.Base(pathConfigFile)
