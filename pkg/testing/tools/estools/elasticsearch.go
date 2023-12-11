@@ -490,7 +490,7 @@ func GetLogsForDatasetWithContext(ctx context.Context, client elastictransport.I
 	return performQueryForRawQuery(ctx, indexQuery, "logs-elastic_agent*", client)
 }
 
-// GetLogsForIndexWithContext returns any logs associated with the datastream
+// GetLogsForIndexWithContext returns any logs that match the given condition
 func GetLogsForIndexWithContext(ctx context.Context, client elastictransport.Interface, index string, match map[string]interface{}) (Documents, error) {
 	indexQuery := map[string]interface{}{
 		"query": map[string]interface{}{
