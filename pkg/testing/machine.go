@@ -286,7 +286,9 @@ func stateComponentsReached(components map[string]ComponentState, agentComponent
 		return false
 	}
 	found := make(map[string]bool)
-	for _, agentComp := range agentComponents {
+	for i := range agentComponents {
+		// Index the array to avoid aliasing a temporary loop value when taking the address below.
+		agentComp := agentComponents[i]
 		state, ok := components[agentComp.ID]
 		if !ok {
 			if strict {
@@ -301,7 +303,7 @@ func stateComponentsReached(components map[string]ComponentState, agentComponent
 			return false
 		}
 	}
-	for compID, _ := range components {
+	for compID := range components {
 		_, ok := found[compID]
 		if !ok {
 			// was not found
@@ -337,7 +339,9 @@ func stateComponentUnitsReached(units map[ComponentUnitKey]ComponentUnitState, c
 		return false
 	}
 	found := make(map[ComponentUnitKey]bool)
-	for _, compUnit := range compUnits {
+	for i := range compUnits {
+		// Index the array to avoid aliasing a temporary loop value when taking the address below.
+		compUnit := compUnits[i]
 		key := ComponentUnitKey{UnitType: compUnit.UnitType, UnitID: compUnit.UnitID}
 		state, ok := units[key]
 		if !ok {
@@ -353,7 +357,7 @@ func stateComponentUnitsReached(units map[ComponentUnitKey]ComponentUnitState, c
 			return false
 		}
 	}
-	for key, _ := range units {
+	for key := range units {
 		_, ok := found[key]
 		if !ok {
 			// was not found
