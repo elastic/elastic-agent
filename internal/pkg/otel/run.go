@@ -24,11 +24,25 @@ import (
 
 const buildDescription = "Elastic opentelemetry-collector distribution"
 
+// IsOtelConfig returns true if file is named:
+//   - otel.(yaml|yml)
+//   - otlp.(yaml|yml)
+//   - otelcol.(yaml|yml)
+//
+// in case of other filename it checks for `agent`, `inputs`, `outputs` keyword. If at least one of these is present
+// it assumes agent config and returns (false, nil).
+// If these keywords are missing it checks for presense of otel specific keywords `exporters`, `receivers`,`processors`
+// or `extensions` in combination with `service` defintion. In case these are found (true, nil) is returned.
+// If none of these conditions are satisfied (false, nil) is returned assuming agent config for backward compatibility.
 func IsOtelConfig(ctx context.Context, pathConfigFile string) (bool, error) {
 	fileName := filepath.Base(pathConfigFile)
 	cleanFileName := strings.TrimSpace(strings.ToLower(strings.TrimSuffix(fileName, filepath.Ext(fileName))))
 	if cleanFileName == "otel" || cleanFileName == "otlp" || cleanFileName == "otelcol" {
 		return true, nil
+	}
+
+	if suffix := filepath.Ext(cleanFileName); suffix != ".yml" && suffix != ".yaml" {
+		return false, nil
 	}
 
 	rawConfig, err := config.LoadFile(pathConfigFile)
@@ -60,8 +74,9 @@ func IsOtelConfig(ctx context.Context, pathConfigFile string) (bool, error) {
 	_, hasExporters := mapConfig["exporters"]
 	_, hasReceivers := mapConfig["receivers"]
 	_, hasProcessors := mapConfig["processors"]
+	_, hasExtensions := mapConfig["extensions"]
 
-	if hasService && (hasExporters || hasReceivers || hasProcessors) {
+	if hasService && (hasExporters || hasReceivers || hasProcessors || hasExtensions) {
 		return true, nil
 	}
 
@@ -71,7 +86,7 @@ func IsOtelConfig(ctx context.Context, pathConfigFile string) (bool, error) {
 
 func Run(ctx context.Context, cancel context.CancelFunc, stop chan bool, testingMode bool) error {
 	fmt.Fprintln(os.Stdout, "Starting in otel mode")
-	settings, err := newSettings([]string{paths.ConfigFile()}, release.Version())
+	settings, err := newSettings(paths.ConfigFile(), release.Version())
 	if err != nil {
 		return err
 	}
@@ -92,7 +107,7 @@ func Run(ctx context.Context, cancel context.CancelFunc, stop chan bool, testing
 	return svc.Run(cancelCtx)
 }
 
-func newSettings(configPaths []string, version string) (*otelcol.CollectorSettings, error) {
+func newSettings(configPaths string, version string) (*otelcol.CollectorSettings, error) {
 	buildInfo := component.BuildInfo{
 		Command:     os.Args[0],
 		Description: buildDescription,
@@ -102,7 +117,7 @@ func newSettings(configPaths []string, version string) (*otelcol.CollectorSettin
 	fmp := NewFileProviderWithDefaults()
 	configProviderSettings := otelcol.ConfigProviderSettings{
 		ResolverSettings: confmap.ResolverSettings{
-			URIs:       configPaths,
+			URIs:       []string{configPaths},
 			Providers:  map[string]confmap.Provider{fmp.Scheme(): fmp},
 			Converters: []confmap.Converter{expandconverter.New()},
 		},
@@ -113,9 +128,11 @@ func newSettings(configPaths []string, version string) (*otelcol.CollectorSettin
 	}
 
 	return &otelcol.CollectorSettings{
-		Factories:               components,
-		BuildInfo:               buildInfo,
-		ConfigProvider:          provider,
+		Factories:      components,
+		BuildInfo:      buildInfo,
+		ConfigProvider: provider,
+		// we're handling DisableGracefulShutdown via the cancelCtx being passed
+		// to the collector's Run method in the Run function
 		DisableGracefulShutdown: true,
 	}, nil
 }

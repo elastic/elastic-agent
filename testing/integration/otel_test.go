@@ -17,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/require"
 
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -165,9 +164,7 @@ func TestAPMIngestion(t *testing.T) {
 	fileName := "content.log"
 	fixture.WriteFileToWorkDir(ctx, "", fileName)
 
-	testUuid, err := uuid.NewV4()
-	require.NoError(t, err, "failed to create test id")
-	testId := testUuid.String()
+	testId := info.Namespace
 
 	apmConfig := fmt.Sprintf(apmOtelConfig, filepath.Join(agentWorkDir, fileName), testId)
 
@@ -194,7 +191,7 @@ func TestAPMIngestion(t *testing.T) {
 		require.NoError(t, err, "failed to create Elasticsearch client")
 	}
 
-	esApiKey, err := getESApiKey(esClient, esHost, esUsername, esPass)
+	esApiKey, err := createESApiKey(esClient, esHost, esUsername, esPass)
 	require.NoError(t, err, "failed to get api key")
 	require.True(t, len(esApiKey) > 1, "api key is invalid %q", esApiKey)
 
@@ -230,7 +227,7 @@ func TestAPMIngestion(t *testing.T) {
 
 	go func() {
 		// delayed write
-		<-time.After(30 * time.Second)
+		<-time.After(10 * time.Second)
 		fixture.WriteFileToWorkDir(ctx, apmProcessingContent, fileName)
 	}()
 
@@ -269,7 +266,7 @@ func getESHost() (string, error) {
 	return fixedESHost, nil
 }
 
-func getESApiKey(esClient *elasticsearch.Client, esHost, esUser, esPass string) (string, error) {
+func createESApiKey(esClient *elasticsearch.Client, esHost, esUser, esPass string) (string, error) {
 	apiResp, err := estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
 	if err != nil {
 		return "", err
