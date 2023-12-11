@@ -17,8 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/version"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-libs/version"
 
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -142,15 +143,6 @@ func TestFileProcessing(t *testing.T) {
 }
 
 func TestAPMIngestion(t *testing.T) {
-	stackVersion, err := version.New(define.Version())
-	require.NoError(t, err, "failed to get stack version")
-	agentVersion, err := version.New(aVersion.Agent)
-	require.NoError(t, err, "failed to get agent version")
-
-	if stackVersion.LessThan(agentVersion) {
-		t.Skip("agent version needs to be equal to stack version")
-	}
-
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Stack: &define.Stack{},
@@ -160,6 +152,14 @@ func TestAPMIngestion(t *testing.T) {
 			{Type: define.Linux},
 		},
 	})
+
+	stackVersion := info.KibanaClient.GetVersion()
+	agentVersion, err := version.New(aVersion.Agent)
+	require.NoError(t, err, "failed to get agent version")
+
+	if stackVersion.LessThan(agentVersion) {
+		t.Skip("agent version needs to be equal to stack version")
+	}
 
 	// prepare agent
 	fixture, err := define.NewFixture(t, define.Version())
