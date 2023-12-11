@@ -235,8 +235,11 @@ func (u *Upgrader) downloadWithRetries(
 	settings *artifact.Config,
 	upgradeDetails *details.Details,
 ) (string, error) {
-	cancelCtx, cancel := context.WithTimeout(ctx, settings.Timeout)
+	cancelDeadline := time.Now().Add(settings.Timeout)
+	cancelCtx, cancel := context.WithDeadline(ctx, cancelDeadline)
 	defer cancel()
+
+	upgradeDetails.SetRetryUntil(&cancelDeadline)
 
 	expBo := backoff.NewExponentialBackOff()
 	expBo.InitialInterval = settings.RetrySleepInitDuration
@@ -259,11 +262,16 @@ func (u *Upgrader) downloadWithRetries(
 	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
 		u.log.Warnf("download attempt %d failed: %s; retrying in %s.",
 			attempt, err.Error(), retryAfter)
+		upgradeDetails.SetRetryableError(err)
 	}
 
 	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
 		return "", err
 	}
+
+	// Clear retry details upon success
+	upgradeDetails.SetRetryableError(nil)
+	upgradeDetails.SetRetryUntil(nil)
 
 	return path, nil
 }

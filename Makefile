@@ -29,17 +29,7 @@ help: Makefile
 ## notice : Generates the NOTICE file.
 .PHONY: notice
 notice:
-	@echo "Generating NOTICE"
-	go mod tidy
-	go mod download
-	go list -m -json all | go run go.elastic.co/go-licence-detector \
-		-includeIndirect \
-		-rules dev-tools/notice/rules.json \
-		-overrides dev-tools/notice/overrides.json \
-		-noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
-		-noticeOut NOTICE.txt \
-		-depsOut ""
-	cat dev-tools/notice/NOTICE.txt.append >> NOTICE.txt
+	@mage notice
 
 ## check-ci: Run all the checks under the ci, this doesn't include the linter which is run via a github action.
 .PHONY: check-ci

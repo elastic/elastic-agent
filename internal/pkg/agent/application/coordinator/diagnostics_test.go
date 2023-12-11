@@ -441,6 +441,7 @@ func TestDiagnosticState(t *testing.T) {
 				DownloadPercent: 0.17469,
 				ScheduledAt:     &now,
 				DownloadRate:    123.56,
+				RetryUntil:      &now,
 			},
 		},
 	}
@@ -470,7 +471,8 @@ upgrade_details:
     download_percent: 0.17469
     scheduled_at: %s
     download_rate: 123.56
-`, now.Format(time.RFC3339Nano))
+    retry_until: %s
+`, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 
 	coord := &Coordinator{
 		// This test needs a broadcaster since the components-actual diagnostic
