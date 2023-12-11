@@ -17,12 +17,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/version"
 	"github.com/stretchr/testify/require"
 
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	aVersion "github.com/elastic/elastic-agent/version"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
@@ -140,6 +142,15 @@ func TestFileProcessing(t *testing.T) {
 }
 
 func TestAPMIngestion(t *testing.T) {
+	stackVersion, err := version.New(define.Version())
+	require.NoError(t, err, "failed to get stack version")
+	agentVersion, err := version.New(aVersion.Agent)
+	require.NoError(t, err, "failed to get agent version")
+
+	if stackVersion.LessThan(agentVersion) {
+		t.Skip("agent version needs to be equal to stack version")
+	}
+
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Stack: &define.Stack{},
