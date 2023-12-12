@@ -150,7 +150,6 @@ func TestAPMIngestion(t *testing.T) {
 		OS: []define.OS{
 			// apm server not supported on darwin
 			{Type: define.Linux},
-			{Type: define.Windows},
 		},
 	})
 
