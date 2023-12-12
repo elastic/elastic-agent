@@ -159,6 +159,9 @@ func TestAPMIngestion(t *testing.T) {
 	require.NoError(t, err, "failed to get agent version")
 
 	if stackVersion.LessThan(agentVersion) {
+		// at the transition period when new version of stack is not yet released
+		// and we use override with previous version this test would fail with
+		// events being produced by newer APM than stack version
 		t.Skip("agent version needs to be equal to stack version")
 	}
 
