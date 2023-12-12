@@ -45,6 +45,15 @@ func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, current
 	return getUpgradableVersions(ctx, vList, upgradeToVersion, currentMajorVersions, previousMajorVersions)
 }
 
+// The same as version.SortableParsedVersions but considers prerelease (SNAPSHOT) versions as newer.
+type sortableWithGreaterPrerelease []*version.ParsedSemVer
+
+func (spv sortableWithGreaterPrerelease) Len() int      { return len(spv) }
+func (spv sortableWithGreaterPrerelease) Swap(i, j int) { spv[i], spv[j] = spv[j], spv[i] }
+func (spv sortableWithGreaterPrerelease) Less(i, j int) bool {
+	return spv[i].LessWithGreaterPrerelease(*spv[j])
+}
+
 // Internal version of GetUpgradableVersions() with the artifacts API dependency removed for testing.
 func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int) ([]*version.ParsedSemVer, error) {
 	parsedUpgradeToVersion, err := version.ParseVersion(upgradeToVersion)
@@ -55,7 +64,7 @@ func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgrad
 	currentMajor := parsedUpgradeToVersion.Major()
 	var currentMajorSelected, previousMajorSelected int
 
-	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
+	sortedParsedVersions := make(sortableWithGreaterPrerelease, 0, len(vList.Versions))
 	for _, v := range vList.Versions {
 		pv, err := version.ParseVersion(v)
 		if err != nil {
@@ -71,12 +80,12 @@ func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgrad
 	// normally the output of the versions returned by artifact API is already sorted in ascending order,
 	// we want to sort in descending orders, so we sort them
 	sort.Sort(sort.Reverse(sortedParsedVersions))
+	fmt.Println(sortedParsedVersions)
 
-	// If the only available build of the most recent version is a snapshot it is unreleased.
-	// This is always true on main and true until the first release of each minor version branch.
-	mostRecentVersion := sortedParsedVersions[0]
-	mostRecentIsUnreleased := mostRecentVersion.IsSnapshot()
-
+	// Set of upgradable snapsot minor releases (considering only the major.minor release numbers).
+	// The latest minor release for each minor branch is considered upgradable to ensure we always test
+	// against the latest changes.
+	upgradeableSnapshotMinors := map[string]bool{}
 	var upgradableVersions []*version.ParsedSemVer
 	for _, parsedVersion := range sortedParsedVersions {
 		if currentMajorSelected == currentMajorVersions && previousMajorSelected == previousMajorVersions {
@@ -85,25 +94,28 @@ func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgrad
 		}
 
 		if !parsedVersion.Less(*parsedUpgradeToVersion) {
-			// skip as testing version is less than version to upgrade from
+			// skip as testing version is less than or the same version to upgrade from
 			continue
 		}
 
-		isPrevMinor := (parsedUpgradeToVersion.Major() == parsedVersion.Major()) &&
-			(parsedUpgradeToVersion.Minor()-parsedVersion.Minor()) == 1
+		// Check if the last version in the upgradable list is the same as the current version.
+		// This is the case if the snapshot version of the current version is in the upgradable list.
+		if len(upgradableVersions) > 0 {
+			prevVersion := upgradableVersions[len(upgradableVersions)-1]
+			if prevVersion.CoreVersion() == parsedVersion.CoreVersion() {
+				continue
+			}
+		}
 
-		if parsedVersion.IsSnapshot() {
-			// Allow returning the snapshot build of the previous minor if the current version is unreleased.
-			// In this situation the previous minor branch may also be unreleased immediately after feature freeze.
-			if !mostRecentIsUnreleased || !isPrevMinor {
+		// If there is already a snapshot release in this major.minor release branch, skip all other
+		// snapshots in this minor release series.
+		if parsedVersion.Prerelease() != "" {
+			minor := fmt.Sprintf("%d.%d", parsedVersion.Major(), parsedVersion.Minor())
+			exists := upgradeableSnapshotMinors[minor]
+			if exists {
 				continue
 			}
-		} else {
-			// Skip the non-snapshot build of the previous minor since it might only be available at
-			// staging.elastic.co which is not a default binary download location.
-			if mostRecentIsUnreleased && isPrevMinor {
-				continue
-			}
+			upgradeableSnapshotMinors[minor] = true
 		}
 
 		if parsedVersion.Major() == currentMajor && currentMajorSelected < currentMajorVersions {

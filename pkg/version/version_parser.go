@@ -107,6 +107,33 @@ func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 	return false
 }
 
+// The same as Less() but considers a version with a prerelease version to be newer.
+// For convenience where we want to prefer SNAPSHOT prerelease versions since those
+// contain the latest code for testing.
+func (psv ParsedSemVer) LessWithGreaterPrerelease(other ParsedSemVer) bool {
+	// compare major version
+	if psv.major != other.major {
+		return psv.major < other.major
+	}
+
+	//same major, check minor
+	if psv.minor != other.minor {
+		return psv.minor < other.minor
+	}
+
+	//same minor, check patch
+	if psv.patch != other.patch {
+		return psv.patch < other.patch
+	}
+
+	// Check the prerelease and consider the version with prerelease as greater.
+	if psv.prerelease == "" && other.prerelease != "" {
+		return true
+	}
+
+	return false
+}
+
 func (psv ParsedSemVer) GetPreviousMinor() (*ParsedSemVer, error) {
 	major := psv.Major()
 	minor := psv.Minor()
