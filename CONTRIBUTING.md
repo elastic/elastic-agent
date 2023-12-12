@@ -13,7 +13,7 @@ Have a problem you want Elastic Agent to solve for you?
 
 ## Something Not Working? Found a Bug?
 
-If you think you found a bug, it probably is a bug. File it in [GitHub](https://github.com/elastic/elastic-agent/issues)
+If you think you found a bug, it probably is a bug. Fill it in [GitHub](https://github.com/elastic/elastic-agent/issues)
 
 ## Found a Security Issue?
 
