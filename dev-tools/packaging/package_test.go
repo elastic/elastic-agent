@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	"github.com/blakesmith/ar"
-	rpm "github.com/cavaliercoder/go-rpm"
+	"github.com/cavaliercoder/go-rpm"
 )
 
 const (
@@ -85,7 +85,7 @@ func TestTar(t *testing.T) {
 }
 
 func TestZip(t *testing.T) {
-	zips := getFiles(t, regexp.MustCompile(`^\w+beat-\S+.zip$`))
+	zips := getFiles(t, regexp.MustCompile(`^\w+\S+.zip$`))
 	for _, zip := range zips {
 		checkZip(t, zip)
 	}
