@@ -480,6 +480,14 @@ func untar(sourceFile, destinationDir string) error {
 			if err = writer.Close(); err != nil {
 				return err
 			}
+		case tar.TypeSymlink:
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				return err
+			}
+			if err := os.Symlink(header.Linkname, path); err != nil {
+				return fmt.Errorf("error creating symlink %s pointing to %s: %w", path, header.Linkname, err)
+			}
+
 		default:
 			return fmt.Errorf("unable to untar type=%c in file=%s", header.Typeflag, path)
 		}
