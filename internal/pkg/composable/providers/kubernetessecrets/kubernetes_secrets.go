@@ -120,8 +120,7 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
 func (p *contextProviderK8sSecrets) mergeWithCurrent(updatedMap map[string]*secretsData) map[string]*secretsData {
 	merged := make(map[string]*secretsData)
 	for name, data := range p.secretsCache {
-		lastAccess := data.lastAccess
-		diff := time.Since(lastAccess)
+		diff := time.Since(data.lastAccess)
 		if diff < p.config.TTLDelete {
 			merged[name] = data
 		}
