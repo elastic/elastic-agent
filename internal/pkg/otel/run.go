@@ -38,11 +38,11 @@ func IsOtelConfig(ctx context.Context, pathConfigFile string) (bool, error) {
 	fileName := filepath.Base(pathConfigFile)
 	cleanFileName := strings.TrimSpace(strings.ToLower(strings.TrimSuffix(fileName, filepath.Ext(fileName))))
 	if cleanFileName == "otel" || cleanFileName == "otlp" || cleanFileName == "otelcol" {
-		return true, nil
-	}
+		if suffix := filepath.Ext(fileName); suffix != ".yml" && suffix != ".yaml" {
+			return false, nil
+		}
 
-	if suffix := filepath.Ext(fileName); suffix != ".yml" && suffix != ".yaml" {
-		return false, nil
+		return true, nil
 	}
 
 	rawConfig, err := config.LoadFile(pathConfigFile)

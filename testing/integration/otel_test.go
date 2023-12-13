@@ -189,22 +189,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.NoError(t, err)
 
 	// start apm default config just configure ES output
-	esHost, err := getESHost()
-	require.NoError(t, err, "failed to get ES host")
-	require.True(t, len(esHost) > 0)
-
-	esUsername := os.Getenv("ELASTICSEARCH_USERNAME")
-	require.True(t, len(esUsername) > 0)
-
-	esPass := os.Getenv("ELASTICSEARCH_PASSWORD")
-	require.True(t, len(esPass) > 0)
-
 	esClient := info.ESClient
-	if esClient == nil {
-		esClient, err = getESClient(esHost, esUsername, esPass)
-		require.NoError(t, err, "failed to create Elasticsearch client")
-	}
-
 	esApiKey, err := createESApiKey(esClient, esHost, esUsername, esPass)
 	require.NoError(t, err, "failed to get api key")
 	require.True(t, len(esApiKey) > 1, "api key is invalid %q", esApiKey)
