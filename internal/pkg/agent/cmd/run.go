@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -285,8 +286,9 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	// this provides backwards compatibility as the control socket was moved with the addition of --unprivileged
 	// option during installation
 	if isRoot && paths.ControlSocketRunSymlink != "" {
-		if err := os.Symlink(paths.ControlSocket(), paths.ControlSocketRunSymlink); err != nil {
-			l.Errorf("failed to create control socket symlink %s -> %s: %s", paths.ControlSocket(), paths.ControlSocketRunSymlink, err)
+		socketPath := strings.TrimPrefix("unix://", paths.ControlSocket())
+		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
+			l.Errorf("failed to create control socket symlink %s -> %s: %s", socketPath, paths.ControlSocketRunSymlink, err)
 		}
 		defer func() {
 			// delete the symlink on exit; ignore the error
