@@ -19,13 +19,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/version"
-
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
-	aVersion "github.com/elastic/elastic-agent/version"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
@@ -153,16 +150,12 @@ func TestOtelAPMIngestion(t *testing.T) {
 		},
 	})
 
-	stackVersion := info.KibanaClient.GetVersion()
-	agentVersion, err := version.New(aVersion.Agent)
-	require.NoError(t, err, "failed to get agent version")
-
-	if stackVersion.LessThan(agentVersion) {
-		// at the transition period when new version of stack is not yet released
-		// and we use override with previous version this test would fail with
-		// events being produced by newer APM than stack version
-		t.Skip("agent version needs to be equal to stack version")
-	}
+	const apmVersionMismatch = "The APM integration must be upgraded"
+	const apmReadyLog = "all precondition checks are now satisfied"
+	logWatcher := aTesting.NewLogWatcher(t,
+		apmVersionMismatch, // apm version mismatch
+		apmReadyLog,        // apm ready
+	)
 
 	// prepare agent
 	fixture, err := define.NewFixture(t, define.Version())
@@ -189,6 +182,16 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.NoError(t, err)
 
 	// start apm default config just configure ES output
+	esHost, err := getESHost()
+	require.NoError(t, err, "failed to get ES host")
+	require.True(t, len(esHost) > 0)
+
+	esUsername := os.Getenv("ELASTICSEARCH_USERNAME")
+	require.True(t, len(esUsername) > 0)
+
+	esPass := os.Getenv("ELASTICSEARCH_PASSWORD")
+	require.True(t, len(esPass) > 0)
+
 	esClient := info.ESClient
 	esApiKey, err := createESApiKey(esClient, esHost, esUsername, esPass)
 	require.NoError(t, err, "failed to get api key")
@@ -210,6 +213,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	defer apmCancel()
 	go func() {
 		aTesting.RunProcess(t,
+			logWatcher,
 			apmContext, 0,
 			true, true,
 			apmPath, apmArgs...)
@@ -224,27 +228,43 @@ func TestOtelAPMIngestion(t *testing.T) {
 		fixtureWg.Done()
 	}()
 
-	go func() {
-		// delayed write
-		<-time.After(10 * time.Second)
-		fixture.WriteFileToWorkDir(ctx, apmProcessingContent, fileName)
-	}()
+	err = logWatcher.WaitForKeys(context.Background(),
+		10*time.Minute,
+		500*time.Millisecond,
+		apmReadyLog,
+	)
+	require.NoError(t, err, "APM not initialized")
+	fixture.WriteFileToWorkDir(ctx, apmProcessingContent, fileName)
 
 	// check index
 	var hits int
 	match := map[string]interface{}{
 		"labels.host_test-id": testId,
 	}
-	require.Eventually(t,
-		func() bool {
-			docs := findESDocs(t, func() (estools.Documents, error) {
-				return estools.GetLogsForIndexWithContext(context.Background(), esClient, "logs-apm*", match)
-			})
-			hits = len(docs.Hits.Hits)
-			return hits > 0
-		},
-		5*time.Minute, 500*time.Millisecond,
-		"there should be apm logs by now")
+
+	// apm mismatch or proper docs in ES
+	err = logWatcher.WaitForKeys(context.Background(),
+		20*time.Second,
+		500*time.Millisecond,
+		apmVersionMismatch)
+	if err == nil {
+		// err nil means there's a match within time limit
+		// mark skipped to make it explicit it was not successfully evaluated
+		t.Skip("agent version needs to be equal to stack version")
+	} else {
+		// failed to get APM version mismatch in time
+		// processing should be running
+		require.Eventually(t,
+			func() bool {
+				docs := findESDocs(t, func() (estools.Documents, error) {
+					return estools.GetLogsForIndexWithContext(context.Background(), esClient, "logs-apm*", match)
+				})
+				hits = len(docs.Hits.Hits)
+				return hits > 0
+			},
+			5*time.Minute, 500*time.Millisecond,
+			"there should be apm logs by now")
+	}
 
 	// cleanup apm
 	cancel()

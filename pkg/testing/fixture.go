@@ -358,6 +358,7 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 // RunProcess runs the given given process
 // the process will run until an error, or the given timeout is reached
 func RunProcess(t *testing.T,
+	lp Logger,
 	ctx context.Context, runLength time.Duration,
 	logOutput, allowErrs bool,
 	processPath string, args ...string) error {
@@ -368,7 +369,7 @@ func RunProcess(t *testing.T,
 	var err error
 	var logProxy Logger
 	if logOutput {
-		logProxy = t
+		logProxy = lp
 	}
 	stdOut := newLogWatcher(logProxy)
 	stdErr := newLogWatcher(logProxy)
