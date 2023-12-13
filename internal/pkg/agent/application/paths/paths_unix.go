@@ -12,11 +12,6 @@ import (
 	"path/filepath"
 )
 
-const (
-	// ControlSocketName is the control socket name.
-	ControlSocketName = "elastic-agent.sock"
-)
-
 func initialControlSocketPath(topPath string) string {
 	path := fmt.Sprintf("unix://%s", filepath.Join(topPath, ControlSocketName))
 	if len(path) < 104 {

@@ -164,6 +164,12 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	}
 	pathConfigFile := paths.AgentConfigFile()
 
+	// try early to check if running as root
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to check for root permissions: %w", err)
+	}
+
 	// agent ID needs to stay empty in bootstrap mode
 	createAgentID := true
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
@@ -274,6 +280,19 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		return err
 	}
 	defer control.Stop()
+
+	// create symlink from /run/elastic-agent.sock to `paths.ControlSocket()` when running as root
+	// this provides backwards compatibility as the control socket was moved with the addition of --unprivileged
+	// option during installation
+	if isRoot && paths.ControlSocketRunSymlink != "" {
+		if err := os.Symlink(paths.ControlSocket(), paths.ControlSocketRunSymlink); err != nil {
+			l.Errorf("failed to create control socket symlink %s -> %s: %s", paths.ControlSocket(), paths.ControlSocketRunSymlink, err)
+		}
+		defer func() {
+			// delete the symlink on exit; ignore the error
+			_ = os.Remove(paths.ControlSocketRunSymlink)
+		}()
+	}
 
 	appDone := make(chan bool)
 	appErr := make(chan error)

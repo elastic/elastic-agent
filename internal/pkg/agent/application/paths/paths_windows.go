@@ -24,6 +24,9 @@ const (
 	// ControlSocketPath is the control socket path used when installed.
 	ControlSocketPath = `\\.\pipe\elastic-agent-system`
 
+	// ControlSocketRunSymlink is not created on Windows.
+	ControlSocketRunSymlink = ""
+
 	// ServiceName is the service name when installed.
 	ServiceName = "Elastic Agent"
 

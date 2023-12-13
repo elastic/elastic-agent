@@ -14,6 +14,10 @@ const (
 	// for installing Elastic Agent's files.
 	DefaultBasePath = "/Library"
 
+	// ControlSocketRunSymlink is the path to the symlink that should be
+	// created to the control socket when Elastic Agent is running with root.
+	ControlSocketRunSymlink = "/var/run/elastic-agent.sock"
+
 	// ServiceName is the service name when installed.
 	ServiceName = "co.elastic.elastic-agent"
 

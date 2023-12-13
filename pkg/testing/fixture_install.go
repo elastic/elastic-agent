@@ -116,10 +116,15 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	}
 
 	// we just installed agent, the control socket is at a well-known location
-	socketPath :=
-	socketPath := paths.ControlSocketPath
-	if installOpts.Unprivileged {
-		socketPath = paths.ControlSocketUnprivilegedPath
+	socketPath := fmt.Sprintf("unix://%s", paths.ControlSocketRunSymlink) // use symlink as that works for all versions
+	if runtime.GOOS == "windows" {
+		// Windows uses a fixed named pipe, that is always the same.
+		// It is the same even running in unprivileged mode.
+		socketPath = `\\.\pipe\elastic-agent-system`
+	} else if installOpts.Unprivileged {
+		// Unprivileged versions move the socket to inside the installed directory
+		// of the Elastic Agent.
+		socketPath = fmt.Sprintf("unix://%s", filepath.Join(f.workDir, paths.ControlSocketName))
 	}
 	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)

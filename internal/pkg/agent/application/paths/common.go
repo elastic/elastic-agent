@@ -23,6 +23,9 @@ const (
 	// AgentLockFileName is the name of the overall Elastic Agent file lock.
 	AgentLockFileName = "agent.lock"
 
+	// ControlSocketName is the control socket name.
+	ControlSocketName = "elastic-agent.sock"
+
 	// MarkerFileName is the name of the file that's created by
 	// `elastic-agent install` in the Agent's topPath folder to
 	// indicate that the Agent executing from the binary under
