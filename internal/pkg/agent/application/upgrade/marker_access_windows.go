@@ -49,9 +49,9 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 // mechanism is necessary since the marker file could be accessed by multiple
 // processes (the Upgrade Watcher and the main Agent process) at the same time,
 // which could fail on Windows.
-func writeMarkerFile(markerFile string, markerBytes []byte) error {
+func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) error {
 	writeFn := func() error {
-		return os.WriteFile(markerFile, markerBytes, 0600)
+		return writeMarkerFileCommon(markerFile, markerBytes, shouldFsync)
 	}
 
 	if err := accessMarkerFileWithRetries(writeFn); err != nil {

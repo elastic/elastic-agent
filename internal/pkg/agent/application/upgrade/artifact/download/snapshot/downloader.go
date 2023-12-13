@@ -8,7 +8,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	gohttp "net/http"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 
@@ -26,6 +28,7 @@ const snapshotURIFormat = "https://snapshots.elastic.co/%s-%s/downloads/"
 type Downloader struct {
 	downloader      download.Downloader
 	versionOverride *agtversion.ParsedSemVer
+	client          *gohttp.Client
 }
 
 // NewDownloader creates a downloader which first checks local directory
@@ -34,19 +37,30 @@ type Downloader struct {
 // artifact.Config struct is part of agent configuration and a version
 // override makes no sense there
 func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer, upgradeDetails *details.Details) (download.Downloader, error) {
-	cfg, err := snapshotConfig(config, versionOverride)
+	client, err := config.HTTPTransportSettings.Client(
+		httpcommon.WithAPMHTTPInstrumentation(),
+		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewDownloaderWithClient(log, config, versionOverride, client, upgradeDetails)
+}
+
+func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer, client *gohttp.Client, upgradeDetails *details.Details) (download.Downloader, error) {
+	// TODO: decide an appropriate timeout for this
+	cfg, err := snapshotConfig(context.TODO(), client, config, versionOverride)
 	if err != nil {
 		return nil, fmt.Errorf("error creating snapshot config: %w", err)
 	}
 
-	httpDownloader, err := http.NewDownloader(log, cfg, upgradeDetails)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create snapshot downloader: %w", err)
-	}
+	httpDownloader := http.NewDownloaderWithClient(log, cfg, *client, upgradeDetails)
 
 	return &Downloader{
 		downloader:      httpDownloader,
 		versionOverride: versionOverride,
+		client:          client,
 	}, nil
 }
 
@@ -56,7 +70,8 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 		return nil
 	}
 
-	cfg, err := snapshotConfig(c, e.versionOverride)
+	// TODO: decide an appropriate timeout for this
+	cfg, err := snapshotConfig(context.TODO(), e.client, c, e.versionOverride)
 	if err != nil {
 		return fmt.Errorf("snapshot.downloader: failed to generate snapshot config: %w", err)
 	}
@@ -66,12 +81,14 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version string) (string, error) {
-	return e.downloader.Download(ctx, a, version)
+func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
+	// remove build metadata to match filename of the package for the specific snapshot build
+	strippedVersion := agtversion.NewParsedSemVer(version.Major(), version.Minor(), version.Patch(), version.Prerelease(), "")
+	return e.downloader.Download(ctx, a, strippedVersion)
 }
 
-func snapshotConfig(config *artifact.Config, versionOverride *agtversion.ParsedSemVer) (*artifact.Config, error) {
-	snapshotURI, err := snapshotURI(versionOverride, config)
+func snapshotConfig(ctx context.Context, client *gohttp.Client, config *artifact.Config, versionOverride *agtversion.ParsedSemVer) (*artifact.Config, error) {
+	snapshotURI, err := snapshotURI(ctx, client, versionOverride, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect remote snapshot repo, proceeding with configured: %w", err)
 	}
@@ -88,7 +105,7 @@ func snapshotConfig(config *artifact.Config, versionOverride *agtversion.ParsedS
 	}, nil
 }
 
-func snapshotURI(versionOverride *agtversion.ParsedSemVer, config *artifact.Config) (string, error) {
+func snapshotURI(ctx context.Context, client *gohttp.Client, versionOverride *agtversion.ParsedSemVer, config *artifact.Config) (string, error) {
 	// Respect a non-default source URI even if the version is a snapshot.
 	if config.SourceURI != artifact.DefaultSourceURI {
 		return config.SourceURI, nil
@@ -107,14 +124,13 @@ func snapshotURI(versionOverride *agtversion.ParsedSemVer, config *artifact.Conf
 		version = versionOverride.CoreVersion()
 	}
 
-	// we go through the artifact API to find the location of the latest snapshot build for the specified version
-	client, err := config.HTTPTransportSettings.Client(httpcommon.WithAPMHTTPInstrumentation())
+	artifactsURI := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s-SNAPSHOT/elastic-agent", version)
+	request, err := gohttp.NewRequestWithContext(ctx, gohttp.MethodGet, artifactsURI, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("creating request to artifact api: %w", err)
 	}
 
-	artifactsURI := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s-SNAPSHOT/elastic-agent", version)
-	resp, err := client.Get(artifactsURI)
+	resp, err := client.Do(request)
 	if err != nil {
 		return "", err
 	}

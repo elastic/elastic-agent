@@ -72,7 +72,7 @@ func init() {
 	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
 	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
-	fs.StringVar(&installPath, "path.install", installPath, "Install path contains binaries Agent extracts")
+	fs.StringVar(&installPath, "path.install", installPath, "DEPRECATED, setting this flag has no effect since v8.6.0")
 	fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
 
 	// enable user to download update artifacts to alternative place
