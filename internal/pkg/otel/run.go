@@ -107,7 +107,7 @@ func Run(ctx context.Context, cancel context.CancelFunc, stop chan bool, testing
 	return svc.Run(cancelCtx)
 }
 
-func newSettings(configPaths string, version string) (*otelcol.CollectorSettings, error) {
+func newSettings(configPath string, version string) (*otelcol.CollectorSettings, error) {
 	buildInfo := component.BuildInfo{
 		Command:     os.Args[0],
 		Description: buildDescription,
@@ -117,7 +117,7 @@ func newSettings(configPaths string, version string) (*otelcol.CollectorSettings
 	fmp := NewFileProviderWithDefaults()
 	configProviderSettings := otelcol.ConfigProviderSettings{
 		ResolverSettings: confmap.ResolverSettings{
-			URIs:       []string{configPaths},
+			URIs:       []string{configPath},
 			Providers:  map[string]confmap.Provider{fmp.Scheme(): fmp},
 			Converters: []confmap.Converter{expandconverter.New()},
 		},

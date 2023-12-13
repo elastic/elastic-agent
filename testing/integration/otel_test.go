@@ -93,7 +93,7 @@ service:
         - debug
         - otlp/elastic`
 
-func TestFileProcessing(t *testing.T) {
+func TestOtelFileProcessing(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
 		Local: true,
@@ -142,7 +142,7 @@ func TestFileProcessing(t *testing.T) {
 	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
 }
 
-func TestAPMIngestion(t *testing.T) {
+func TestOtelAPMIngestion(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Stack: &define.Stack{},
