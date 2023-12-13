@@ -36,12 +36,12 @@ const buildDescription = "Elastic opentelemetry-collector distribution"
 // If none of these conditions are satisfied (false, nil) is returned assuming agent config for backward compatibility.
 func IsOtelConfig(ctx context.Context, pathConfigFile string) (bool, error) {
 	fileName := filepath.Base(pathConfigFile)
+	if suffix := filepath.Ext(fileName); suffix != ".yml" && suffix != ".yaml" {
+		return false, nil
+	}
+
 	cleanFileName := strings.TrimSpace(strings.ToLower(strings.TrimSuffix(fileName, filepath.Ext(fileName))))
 	if cleanFileName == "otel" || cleanFileName == "otlp" || cleanFileName == "otelcol" {
-		if suffix := filepath.Ext(fileName); suffix != ".yml" && suffix != ".yaml" {
-			return false, nil
-		}
-
 		return true, nil
 	}
 
