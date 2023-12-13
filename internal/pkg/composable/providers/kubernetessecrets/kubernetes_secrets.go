@@ -115,12 +115,29 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
 	}
 }
 
+// mergeWithCurrent merges the updated map with the cache map.
+// This function needs to be called between the mutex lock for the map.
+func (p *contextProviderK8sSecrets) mergeWithCurrent(updatedMap map[string]*secretsData) map[string]*secretsData {
+	merged := make(map[string]*secretsData)
+	for name, data := range p.secretsCache {
+		lastAccess := data.lastAccess
+		diff := time.Since(lastAccess)
+		if diff < p.config.TTLDelete {
+			merged[name] = data
+		}
+	}
+	for name, data := range updatedMap {
+		merged[name] = data
+	}
+	return merged
+}
+
 func (p *contextProviderK8sSecrets) updateCache() {
 	// deleting entries does not free the memory, so we need to create a new map
 	// to place the secrets we want to keep
 	cacheTmp := make(map[string]*secretsData)
 
-	p.secretsCacheMx.Lock()
+	p.secretsCacheMx.RLock()
 	for name, data := range p.secretsCache {
 		diff := time.Since(data.lastAccess)
 		if diff < p.config.TTLDelete {
@@ -135,7 +152,13 @@ func (p *contextProviderK8sSecrets) updateCache() {
 
 		}
 	}
-	p.secretsCache = cacheTmp
+	p.secretsCacheMx.RUnlock()
+
+	// While the cache was updated, it is possible that some secret was added through another go routine.
+	// We need to merge the updated map with the current cache map to catch the new entries and avoid
+	// loss of data.
+	p.secretsCacheMx.Lock()
+	p.secretsCache = p.mergeWithCurrent(cacheTmp)
 	p.secretsCacheMx.Unlock()
 }
 
