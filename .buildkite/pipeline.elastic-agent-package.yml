@@ -99,6 +99,10 @@ steps:
           .buildkite/scripts/steps/package.sh
         artifact_paths:
           - "build/distributions/**/*"
+  
+  - label: ":elastic-stack: Trigger Elastic Agent msi build"
+    
+
 
   - label: ":elastic-stack: Publishing to DRA"
     key: dra-publish
