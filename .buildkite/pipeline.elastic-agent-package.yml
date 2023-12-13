@@ -101,6 +101,12 @@ steps:
           - "build/distributions/**/*"
   
   - label: ":elastic-stack: Trigger Elastic Agent msi build"
+    trigger: "buildkite-pipeline-elastic-stack-installers"
+    build:
+      branch: main
+      commit: HEAD
+      message: "Trigger from Elastic Agent repository"
+      #env - Anything specific we should pass here?
     
 
 
