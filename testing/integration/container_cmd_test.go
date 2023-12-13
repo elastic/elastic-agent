@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,7 +75,23 @@ func TestContainerCMD(t *testing.T) {
 		t.Fatalf("could not get Fleet URL: %s", err)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	cmd, err := agentFixture.PrepareAgentCommand(ctx, []string{"container"})
+	if err != nil {
+		t.Fatalf("could not prepare agent command: %s", err)
+	}
+
+	t.Cleanup(func() {
+		t.Log(">> cleaning up: killing the Elastic-Agent process")
+		if err := cmd.Process.Kill(); err != nil {
+			t.Fatalf("could not kill Elastic-Agent process: %s", err)
+		}
+	})
+
+	agentOutput := strings.Builder{}
+	cmd.Stderr = &agentOutput
+	cmd.Stdout = &agentOutput
 	cmd.Env = append(os.Environ(),
 		"FLEET_ENROLL=1",
 		"FLEET_URL="+fleetURL,
@@ -82,21 +99,21 @@ func TestContainerCMD(t *testing.T) {
 	)
 
 	t.Logf(">> running binary with: %v", cmd.Args)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Errorf("error running container cmd: %s", err)
-		t.Log("Container command output:")
-		t.Log(string(output))
-		t.FailNow()
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	require.Eventually(t, func() bool {
-		healthy, err := agentFixture.IsHealthy(ctx)
-		if err != nil {
-			t.Logf("error checking agent health, retrying soon. Err: %s", err)
-		}
+	require.Eventuallyf(t, func() bool {
+		// This will returns errors until it connects to the agent,
+		// they're mostly noise because until the agent starts running
+		// we will get connection errors. If the test fails
+		// the agent logs will be present in the error message
+		// which should help to explain why the agent was not
+		// healthy.
+		healthy, _ := agentFixture.IsHealthy(ctx)
 		return healthy
 	},
-		3*time.Minute, 10*time.Second, "Elastic-Agent did not report healthy",
+		3*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent logs\n%s", &agentOutput,
 	)
 }
