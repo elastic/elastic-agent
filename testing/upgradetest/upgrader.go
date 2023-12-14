@@ -182,8 +182,12 @@ func PerformUpgrade(
 	if err != nil {
 		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
 	}
+
+	logger.Logf("[shaunak debugging] upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck: ", upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck)
+	logger.Logf("[shaunak debugging] end version: ", endVersion.String())
 	upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck = upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck ||
 		version.NewParsedSemVer(8, 13, 0, "", "").Less(*endVersion)
+	logger.Logf("[shaunak debugging] upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck: ", upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck)
 
 	if upgradeOpts.preInstallHook != nil {
 		if err := upgradeOpts.preInstallHook(); err != nil {
