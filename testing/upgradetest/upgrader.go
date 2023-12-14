@@ -34,6 +34,10 @@ type upgradeOpts struct {
 	customPgp        *CustomPGP
 	customWatcherCfg string
 
+	// TODO: should be removed along with all references once 8.13.0 has been released.
+	// See also WithDisableUpgradeWatcherUpgradeDetailsCheck.
+	disableUpgradeWatcherUpgradeDetailsCheck bool
+
 	preInstallHook  func() error
 	postInstallHook func() error
 	preUpgradeHook  func() error
@@ -108,6 +112,17 @@ func WithCustomWatcherConfig(cfg string) upgradeOpt {
 	}
 }
 
+// WithDisableUpgradeWatcherUpgradeDetailsCheck disables any assertions for
+// upgrade details that are being set by the Upgrade Watcher. This option is
+// useful in upgrade tests where the end Agent version does not contain changes
+// in the Upgrade Watcher whose effects are being asserted upon in PerformUpgrade.
+// TODO: should be removed along with all references once 8.13.0 has been released.
+func WithDisableUpgradeWatcherUpgradeDetailsCheck() upgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.disableUpgradeWatcherUpgradeDetailsCheck = true
+	}
+}
+
 // PerformUpgrade performs the upgrading of the Elastic Agent.
 func PerformUpgrade(
 	ctx context.Context,
@@ -159,6 +174,16 @@ func PerformUpgrade(
 	if err != nil {
 		return fmt.Errorf("failed to get end agent build version info: %w", err)
 	}
+
+	// For asserting on the effects of any Upgrade Watcher changes made in 8.13.0, we need
+	// the endVersion to be >= 8.13.0.  Otherwise, these assertions will fail as those changes
+	// won't be present in the Upgrade Watcher.
+	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
+	}
+	upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck = upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck ||
+		version.NewParsedSemVer(8, 13, 0, "", "").Less(*endVersion)
 
 	if upgradeOpts.preInstallHook != nil {
 		if err := upgradeOpts.preInstallHook(); err != nil {
@@ -253,16 +278,8 @@ func PerformUpgrade(
 	logger.Logf("upgrade watcher started")
 
 	// Check that, while the Upgrade Watcher is running, the upgrade details in Agent status
-	// show the state as UPG_WATCHING. However, this UPG_WATCHING state is set by the Upgrade
-	// Watcher, which will be of the target version of the upgrade. And the logic to set this
-	// state is only present in Upgrade Watcher code >= v8.13.0. So we must only run this check
-	// if the endFixture's version, that is the target version of the upgrade, is >= 8.13.0.
-	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
-	if err != nil {
-		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
-	}
-
-	if !endVersion.Less(*version.NewParsedSemVer(8, 13, 0, "", "")) {
+	// show the state as UPG_WATCHING.
+	if !upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck {
 		logger.Logf("Checking upgrade details state while Upgrade Watcher is running")
 		if err := waitUpgradeDetailsState(ctx, startFixture, details.StateWatching, 2*time.Minute, 10*time.Second, logger); err != nil {
 			// error context added by waitUpgradeDetailsState
@@ -302,11 +319,8 @@ func PerformUpgrade(
 	logger.Logf("upgrade watcher finished")
 
 	// Check that, upon successful upgrade, the upgrade details have been cleared out
-	// from Agent status.  However, the logic to clear out upgrade details is implemented in
-	// the Upgrade Watcher, which will be of the target version of the upgrade. And this logic
-	// is only present in Upgrade Watcher code >= v8.13.0. So we must only run this check
-	// if the endFixture's version, that is the target version of the upgrade, is >= 8.13.0.
-	if !endVersion.Less(*version.NewParsedSemVer(8, 13, 0, "", "")) {
+	// from Agent status.
+	if !upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck {
 		logger.Logf("Checking upgrade details state after successful upgrade")
 		if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, 10*time.Second, logger); err != nil {
 			// error context added by checkUpgradeDetailsState
