@@ -119,15 +119,23 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
 // This function needs to be called between the mutex lock for the map.
 func (p *contextProviderK8sSecrets) mergeWithCurrent(updatedMap map[string]*secretsData) map[string]*secretsData {
 	merged := make(map[string]*secretsData)
+
 	for name, data := range p.secretsCache {
 		diff := time.Since(data.lastAccess)
 		if diff < p.config.TTLDelete {
 			merged[name] = data
 		}
 	}
+
 	for name, data := range updatedMap {
-		merged[name] = data
+		// We need to check if the key is already in the new map. If it is, lastAccess cannot be overwritten since
+		// it could have been updated when trying to fetch the secret at the same time we are running update cache.
+		// In that case, we only update the value.
+		if _, ok := merged[name]; ok {
+			merged[name].value = data.value
+		}
 	}
+
 	return merged
 }
 
