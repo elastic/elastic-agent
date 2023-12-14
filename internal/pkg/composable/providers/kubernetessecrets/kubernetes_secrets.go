@@ -209,7 +209,6 @@ func (p *contextProviderK8sSecrets) validateKey(key string) bool {
 	return true
 }
 
-// This is only called by getFromCache function, which is already locking the cache.
 func (p *contextProviderK8sSecrets) addToCache(key string) (string, bool) {
 	valid := p.validateKey(key)
 	if !valid {
