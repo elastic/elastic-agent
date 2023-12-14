@@ -289,7 +289,8 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	if isRoot && paths.ControlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
 		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
-		if err := os.Symlink(paths.ControlSocketRunSymlink, socketPath); err != nil {
+		_ = os.Remove(paths.ControlSocketRunSymlink) // ensure it doesn't exist before creating the symlink
+		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
 			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", paths.ControlSocketRunSymlink, socketPath, err)
 		} else {
 			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", paths.ControlSocketRunSymlink, socketPath, paths.ControlSocketRunSymlink)
