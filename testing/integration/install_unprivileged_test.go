@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -176,7 +175,7 @@ func checkInstallUnprivilegedSuccess(t *testing.T, topPath string) {
 	require.NoError(t, err)
 
 	// Check that the socket is created with the correct permissions.
-	socketPath := strings.TrimPrefix(paths.ControlSocketUnprivilegedPath, "unix://")
+	socketPath := filepath.Join(topPath, paths.ControlSocketName)
 	require.Eventuallyf(t, func() bool {
 		_, err = os.Stat(socketPath)
 		return err == nil

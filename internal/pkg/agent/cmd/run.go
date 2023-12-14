@@ -286,7 +286,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	// this provides backwards compatibility as the control socket was moved with the addition of --unprivileged
 	// option during installation
 	if isRoot && paths.ControlSocketRunSymlink != "" {
-		socketPath := strings.TrimPrefix("unix://", paths.ControlSocket())
+		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
 		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
 			l.Errorf("failed to create control socket symlink %s -> %s: %s", socketPath, paths.ControlSocketRunSymlink, err)
 		}
