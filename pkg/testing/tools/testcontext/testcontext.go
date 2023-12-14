@@ -22,3 +22,14 @@ func WithDeadline(
 	ctx, cancel := context.WithDeadline(parent, deadline)
 	return ctx, cancel
 }
+
+// WithTimeout returns a context with a deadline calculated from the provided
+// timeout duration. It is the equivalent of calling WithDeadline with the
+// deadline specified as time.Now() + timeout.
+func WithTimeout(
+	t *testing.T,
+	parentCtx context.Context,
+	timeout time.Duration,
+) (context.Context, context.CancelFunc) {
+	return WithDeadline(t, parentCtx, time.Now().Add(timeout))
+}
