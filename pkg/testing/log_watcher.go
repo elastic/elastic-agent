@@ -14,7 +14,7 @@ import (
 
 var _ Logger = &LogWatcher{}
 
-// LogWatcher wraps actual logger and watches for occurences of strings
+// LogWatcher wraps actual logger and watches for occurrences of strings
 type LogWatcher struct {
 	activeWatches map[string]bool
 	wrapped       Logger
