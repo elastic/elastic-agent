@@ -8,7 +8,6 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -193,7 +192,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.True(t, len(esPass) > 0)
 
 	esClient := info.ESClient
-	esApiKey, err := createESApiKey(esClient, esHost, esUsername, esPass)
+	esApiKey, err := createESApiKey(esClient)
 	require.NoError(t, err, "failed to get api key")
 	require.True(t, len(esApiKey) > 1, "api key is invalid %q", esApiKey)
 
@@ -285,27 +284,11 @@ func getESHost() (string, error) {
 	return fixedESHost, nil
 }
 
-func createESApiKey(esClient *elasticsearch.Client, esHost, esUser, esPass string) (string, error) {
+func createESApiKey(esClient *elasticsearch.Client) (string, error) {
 	apiResp, err := estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
 	if err != nil {
 		return "", err
 	}
 
 	return fmt.Sprintf("%s:%s", apiResp.Id, apiResp.APIKey), nil
-}
-
-// getESClient creates the elasticsearch client from the information passed from the test runner.
-func getESClient(esHost, esUser, esPass string) (*elasticsearch.Client, error) {
-	if esHost == "" || esUser == "" || esPass == "" {
-		return nil, errors.New("ELASTICSEARCH_* must be defined by the test runner")
-	}
-	c, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{esHost},
-		Username:  esUser,
-		Password:  esPass,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create elasticsearch client: %w", err)
-	}
-	return c, nil
 }
