@@ -266,7 +266,8 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
-	control := server.New(l.Named("control"), agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+	controlLog := l.Named("control")
+	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
 
 	// if the configMgr implements the TestModeConfigSetter in means that Elastic Agent is in testing mode and
 	// the configuration will come in over the control protocol, so we set the config setting on the control protocol
@@ -287,8 +288,11 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	// option during installation
 	if isRoot && paths.ControlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
+		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
 		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
-			l.Errorf("failed to create control socket symlink %s -> %s: %s", socketPath, paths.ControlSocketRunSymlink, err)
+			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", socketPath, paths.ControlSocketRunSymlink, err)
+		} else {
+			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", socketPath, paths.ControlSocketRunSymlink, paths.ControlSocketRunSymlink)
 		}
 		defer func() {
 			// delete the symlink on exit; ignore the error
