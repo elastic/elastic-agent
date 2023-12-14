@@ -276,7 +276,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		}
 	}()
 
-	if c.agentProc != nil && !c.options.SkipDaemonRestart {
+	if c.agentProc == nil && !c.options.SkipDaemonRestart {
 		if err = c.daemonReloadWithBackoff(ctx); err != nil {
 			c.log.Errorf("Elastic Agent might not be running; unable to trigger restart: %v", err)
 			return fmt.Errorf("could not reload agent daemon, unable to trigger restart: %w", err)
@@ -459,18 +459,22 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 		attempt := i
 
 		c.log.Infof("Restarting agent daemon, attempt %d", attempt)
-		if err := c.daemonReload(ctx); err != nil {
-			// If the context was cancelled, return early
-			if errors.Is(err, context.DeadlineExceeded) ||
-				errors.Is(err, context.Canceled) {
-				return fmt.Errorf("could not reload daemon after %d retries: %w",
-					attempt, err)
-			}
-			lastErr = err
-
-			c.log.Errorf("Restart attempt %d failed: '%s'. Waiting for %s", attempt, err, backExp.NextWait().String())
-			backExp.Wait()
+		err := c.daemonReload(ctx)
+		if err == nil {
+			return nil
 		}
+
+		// If the context was cancelled, return early
+		if errors.Is(err, context.DeadlineExceeded) ||
+			errors.Is(err, context.Canceled) {
+			return fmt.Errorf("could not reload daemon after %d retries: %w",
+				attempt, err)
+		}
+		lastErr = err
+
+		c.log.Errorf("Restart attempt %d failed: '%s'. Waiting for %s", attempt, err, backExp.NextWait().String())
+		backExp.Wait()
+
 	}
 
 	return fmt.Errorf("could not reload agent's daemon, all retries failed. Last error: %w", lastErr)
