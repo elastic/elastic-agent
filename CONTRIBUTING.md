@@ -50,7 +50,7 @@ Keep these in mind as both authors and reviewers of PRs:
 
 * I must first focus on whether the PR works functionally -- i.e. does it solve the problem (bug, feature, etc.) it sets out to solve.
 
-* Then I should ask myself: can I understand what the code in this PR is doing and, more importantly, why its doing whatever its doing, within 1 or 2 passes over the PR?
+* Then I should ask myself: can I understand what the code in this PR is doing and, more importantly, why it's doing whatever it's doing, within 1 or 2 passes over the PR?
 
   * If yes, approve the PR!
 
