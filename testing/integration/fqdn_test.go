@@ -95,6 +95,9 @@ func TestFQDN(t *testing.T) {
 		assert.NoError(t, fleettools.UnEnrollAgent(info.KibanaClient, policy.ID))
 
 		t.Log("Restoring hostname...")
+		ctx, cancel := testcontext.WithTimeout(t, context.Background(), 1*time.Minute)
+		defer cancel()
+
 		err := setHostname(ctx, origHostname, t.Log)
 		require.NoError(t, err)
 
