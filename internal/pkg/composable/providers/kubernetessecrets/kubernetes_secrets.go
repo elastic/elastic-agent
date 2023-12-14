@@ -144,8 +144,15 @@ func (p *contextProviderK8sSecrets) updateCache() {
 	// to place the secrets we want to keep
 	cacheTmp := make(map[string]*secretsData)
 
+	// to not hold the lock for long, we copy the current state of the cache map
+	copyMap := make(map[string]secretsData)
 	p.secretsCacheMx.RLock()
 	for name, data := range p.secretsCache {
+		copyMap[name] = *data
+	}
+	p.secretsCacheMx.RUnlock()
+
+	for name, data := range copyMap {
 		diff := time.Since(data.lastAccess)
 		if diff < p.config.TTLDelete {
 			value, ok := p.fetchSecretWithTimeout(name)
@@ -159,7 +166,6 @@ func (p *contextProviderK8sSecrets) updateCache() {
 
 		}
 	}
-	p.secretsCacheMx.RUnlock()
 
 	// While the cache was updated, it is possible that some secret was added through another go routine.
 	// We need to merge the updated map with the current cache map to catch the new entries and avoid
