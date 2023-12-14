@@ -28,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/kibana"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -103,9 +102,7 @@ func TestFleetAirGappedUpgrade(t *testing.T) {
 	ctx, _ := testcontext.WithDeadline(
 		t, context.Background(), time.Now().Add(10*time.Minute))
 
-	artifactAPI := tools.NewArtifactAPIClient()
-	latest, err := artifactAPI.GetLatestSnapshotVersion(ctx, t)
-	require.NoError(t, err, "could not fetch latest version from artifacts API")
+	latest := define.Version()
 
 	// We need to prepare it first because it'll download the artifact, and it
 	// has to happen before we block the artifacts API IPs.
@@ -113,14 +110,14 @@ func TestFleetAirGappedUpgrade(t *testing.T) {
 	// uses it to get some information about the agent version.
 	upgradeTo, err := atesting.NewFixture(
 		t,
-		latest.String(),
+		latest,
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
 	err = upgradeTo.Prepare(ctx)
 	require.NoError(t, err)
 
-	s := newArtifactsServer(ctx, t, latest.String())
+	s := newArtifactsServer(ctx, t, latest)
 	host := "artifacts.elastic.co"
 	simulateAirGapedEnvironment(t, host)
 
