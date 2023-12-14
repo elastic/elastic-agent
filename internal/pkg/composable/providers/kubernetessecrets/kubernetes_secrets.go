@@ -170,22 +170,24 @@ func (p *contextProviderK8sSecrets) updateCache() {
 }
 
 func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
-	p.secretsCacheMx.Lock()
-	defer p.secretsCacheMx.Unlock()
-
+	p.secretsCacheMx.RLock()
 	_, ok := p.secretsCache[key]
+	p.secretsCacheMx.RUnlock()
+
 	// if value is still not present in cache, it is possible we haven't tried to fetch it yet
 	if !ok {
-		data, ok := p.addToCache(key)
+		value, ok := p.addToCache(key)
 		// if it was not possible to fetch the secret, return
 		if !ok {
-			return data.value, ok
+			return value, ok
 		}
 	}
 
+	p.secretsCacheMx.Lock()
 	data, ok := p.secretsCache[key]
 	data.lastAccess = time.Now()
 	pass := data.value
+	p.secretsCacheMx.Unlock()
 
 	return pass, ok
 }
@@ -208,22 +210,19 @@ func (p *contextProviderK8sSecrets) validateKey(key string) bool {
 }
 
 // This is only called by getFromCache function, which is already locking the cache.
-func (p *contextProviderK8sSecrets) addToCache(key string) (secretsData, bool) {
+func (p *contextProviderK8sSecrets) addToCache(key string) (string, bool) {
 	valid := p.validateKey(key)
 	if !valid {
-		return secretsData{
-			value: "",
-		}, false
+		return "", false
 	}
 
 	value, ok := p.fetchSecretWithTimeout(key)
-	data := secretsData{
-		value: value,
-	}
 	if ok {
-		p.secretsCache[key] = &data
+		p.secretsCacheMx.Lock()
+		p.secretsCache[key] = &secretsData{value: value}
+		p.secretsCacheMx.Unlock()
 	}
-	return data, ok
+	return value, ok
 }
 
 type Result struct {
