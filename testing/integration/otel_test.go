@@ -185,12 +185,6 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.NoError(t, err, "failed to get ES host")
 	require.True(t, len(esHost) > 0)
 
-	esUsername := os.Getenv("ELASTICSEARCH_USERNAME")
-	require.True(t, len(esUsername) > 0)
-
-	esPass := os.Getenv("ELASTICSEARCH_PASSWORD")
-	require.True(t, len(esPass) > 0)
-
 	esClient := info.ESClient
 	esApiKey, err := createESApiKey(esClient)
 	require.NoError(t, err, "failed to get api key")
