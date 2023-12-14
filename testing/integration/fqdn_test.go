@@ -54,9 +54,6 @@ func TestFQDN(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	defer func() {
-		t.Log("DEBUGGING: After context has been cancelled")
-	}()
 
 	// Save original hostname so we can restore it at the end of each test
 	origHostname, err := getHostname(ctx)
