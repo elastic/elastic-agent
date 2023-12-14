@@ -89,6 +89,6 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	// is fetched from the artifacts API and it may not contain changes in the Upgrade Watcher whose effects are
 	// being asserted upon in upgradetest.PerformUpgrade.
 	// TODO: Stop passing this option and remove these comments once 8.13.0 has been released.
-	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithDisableUpgradeWatcherUpgradeDetailsCheck)
+	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithDisableUpgradeWatcherUpgradeDetailsCheck())
 	assert.NoError(t, err)
 }
