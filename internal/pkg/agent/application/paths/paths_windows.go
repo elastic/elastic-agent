@@ -56,6 +56,7 @@ func initialControlSocketPath(topPath string) string {
 		return ControlSocketPath
 	}
 	// entire string cannot be longer than 256 characters, this forces the
-	// length to always be 87 characters (but unique per data path)
-	return fmt.Sprintf(`\\.\pipe\elastic-agent-%x`, sha256.Sum256([]byte(Data())))
+	// length to always be 87 characters (but unique per execution path)
+	socketPath := filepath.Join(topPath, ControlSocketName)
+	return fmt.Sprintf(`\\.\pipe\elastic-agent-%x`, sha256.Sum256([]byte(socketPath)))
 }

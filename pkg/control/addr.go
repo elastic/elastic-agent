@@ -31,16 +31,16 @@ func AddressFromPath(platform string, path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to evaluate all symlinks of %s: %w", absDir, err)
 	}
-
-	dataPath := filepath.Join(noSyms, "data")
+	// socket should be inside this directory
+	socketPath := filepath.Join(noSyms, paths.ControlSocketName)
 	if platform == "windows" {
-		return fmt.Sprintf(`\\.\pipe\elastic-agent-%x`, sha256.Sum256([]byte(dataPath))), nil
+		// on windows the control socket is always at the sha256 of the socketPath
+		return fmt.Sprintf(`\\.\pipe\elastic-agent-%x`, sha256.Sum256([]byte(socketPath))), nil
 	}
-	socketPath := filepath.Join(dataPath, "tmp", "elastic-agent-control")
-	socketPath = fmt.Sprintf("unix://%s.sock", socketPath)
-	// unix socket path must be less than 104 characters
-	if len(socketPath) < 104 {
-		return socketPath, nil
+	unixSocket := fmt.Sprintf("unix://%s", socketPath)
+	if len(unixSocket) < 104 {
+		// small enough to fit
+		return unixSocket, nil
 	}
 	// place in global /tmp to ensure that its small enough to fit; current path is way to long
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
