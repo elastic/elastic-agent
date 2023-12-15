@@ -177,17 +177,18 @@ func PerformUpgrade(
 
 	// For asserting on the effects of any Upgrade Watcher changes made in 8.13.0, we need
 	// the endVersion to be >= 8.13.0.  Otherwise, these assertions will fail as those changes
-	// won't be present in the Upgrade Watcher.
+	// won't be present in the Upgrade Watcher. So we disable these assertions if the endVersion
+	// is < 8.13.0.
 	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
 	if err != nil {
 		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
 	}
 
-	logger.Logf("[shaunak debugging] upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck: ", upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck)
-	logger.Logf("[shaunak debugging] end version: ", endVersion.String())
+	logger.Logf("[shaunak debugging] upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck: %v", upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck)
+	logger.Logf("[shaunak debugging] end version: %s ", endVersion.String())
 	upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck = upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck ||
-		version.NewParsedSemVer(8, 13, 0, "", "").Less(*endVersion)
-	logger.Logf("[shaunak debugging] upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck: ", upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck)
+		endVersion.Less(*version.NewParsedSemVer(8, 13, 0, "", ""))
+	logger.Logf("[shaunak debugging] upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck: %v", upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck)
 
 	if upgradeOpts.preInstallHook != nil {
 		if err := upgradeOpts.preInstallHook(); err != nil {
