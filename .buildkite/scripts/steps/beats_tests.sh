@@ -12,11 +12,12 @@ source .buildkite/scripts/common.sh
 STACK_PROVISIONER="${1:-"serverless"}"
 
 run_test_for_beat(){
+    export GOFLAGS=-buildvcs=false
     local beat_name=$1
     
     #build
     export WORKSPACE="build/beats/x-pack/${beat_name}"
-    SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz,zip mage package
+
 
     #run
     export AGENT_BUILD_DIR="build/beats/x-pack/${beat_name}/build/distributions"
