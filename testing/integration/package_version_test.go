@@ -50,20 +50,20 @@ func TestPackageVersion(t *testing.T) {
 	t.Run("remove package versions file and test version again", testAfterRemovingPkgVersionFiles(ctx, f))
 }
 
-func testVersionWithRunningAgent(ctx context.Context, f *atesting.Fixture) func(*testing.T) {
+func testVersionWithRunningAgent(runCtx context.Context, f *atesting.Fixture) func(*testing.T) {
 
 	return func(t *testing.T) {
 
-		testf := func() error {
+		testf := func(ctx context.Context) error {
 			testAgentPackageVersion(ctx, f, false)
 			return nil
 		}
 
-		runAgentWithAfterTest(ctx, f, t, testf)
+		runAgentWithAfterTest(runCtx, f, t, testf)
 	}
 }
 
-func testVersionAfterUpdatingFile(ctx context.Context, f *atesting.Fixture) func(*testing.T) {
+func testVersionAfterUpdatingFile(runCtx context.Context, f *atesting.Fixture) func(*testing.T) {
 
 	return func(t *testing.T) {
 		pkgVersionFiles := findPkgVersionFiles(t, f.WorkDir())
@@ -75,16 +75,16 @@ func testVersionAfterUpdatingFile(ctx context.Context, f *atesting.Fixture) func
 			require.NoError(t, err)
 		}
 
-		testf := func() error {
+		testf := func(ctx context.Context) error {
 			testAgentPackageVersion(ctx, f, false)
 			return nil
 		}
 
-		runAgentWithAfterTest(ctx, f, t, testf)
+		runAgentWithAfterTest(runCtx, f, t, testf)
 	}
 }
 
-func testAfterRemovingPkgVersionFiles(ctx context.Context, f *atesting.Fixture) func(*testing.T) {
+func testAfterRemovingPkgVersionFiles(runCtx context.Context, f *atesting.Fixture) func(*testing.T) {
 	return func(t *testing.T) {
 		matches := findPkgVersionFiles(t, f.WorkDir())
 
@@ -93,7 +93,7 @@ func testAfterRemovingPkgVersionFiles(ctx context.Context, f *atesting.Fixture) 
 			err := os.Remove(m)
 			require.NoErrorf(t, err, "error removing package version file %q", m)
 		}
-		testf := func() error {
+		testf := func(ctx context.Context) error {
 			// check the version returned by the running agent
 			stdout, stderr, processState := getAgentVersionOutput(t, f, ctx, false)
 
@@ -108,14 +108,14 @@ func testAfterRemovingPkgVersionFiles(ctx context.Context, f *atesting.Fixture) 
 			return nil
 		}
 
-		runAgentWithAfterTest(ctx, f, t, testf)
+		runAgentWithAfterTest(runCtx, f, t, testf)
 	}
 
 }
 
-func runAgentWithAfterTest(ctx context.Context, f *atesting.Fixture, t *testing.T, testf func() error) {
+func runAgentWithAfterTest(runCtx context.Context, f *atesting.Fixture, t *testing.T, testf func(ctx context.Context) error) {
 
-	err := f.Run(ctx, atesting.State{
+	err := f.Run(runCtx, atesting.State{
 		AgentState: atesting.NewClientState(client.Healthy),
 		// we don't really need a config and a state but the testing fwk wants it anyway
 		Configure: simpleConfig2,
