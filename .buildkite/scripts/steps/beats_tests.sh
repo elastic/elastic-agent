@@ -17,7 +17,7 @@ run_test_for_beat(){
     
     #build
     export WORKSPACE="build/beats/x-pack/${beat_name}"
-
+    SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz,zip mage package
 
     #run
     export AGENT_BUILD_DIR="build/beats/x-pack/${beat_name}/build/distributions"
