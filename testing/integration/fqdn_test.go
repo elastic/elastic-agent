@@ -27,11 +27,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
 func TestFQDN(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: Default, // placed in default only because its skipped
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
@@ -39,7 +41,6 @@ func TestFQDN(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
-	t.Skip("Flaky test, see https://github.com/elastic/elastic-agent/issues/3154")
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
@@ -51,11 +52,13 @@ func TestFQDN(t *testing.T) {
 	origEtcHosts, err := getEtcHosts()
 	require.NoError(t, err)
 
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	// Save original hostname so we can restore it at the end of each test
-	origHostname, err := getHostname(context.Background())
+	origHostname, err := getHostname(ctx)
 	require.NoError(t, err)
 
-	ctx := context.Background()
 	kibClient := info.KibanaClient
 
 	shortName := strings.ToLower(randStr(6))
@@ -92,7 +95,10 @@ func TestFQDN(t *testing.T) {
 		assert.NoError(t, fleettools.UnEnrollAgent(info.KibanaClient, policy.ID))
 
 		t.Log("Restoring hostname...")
-		err := setHostname(context.Background(), origHostname, t.Log)
+		ctx, cancel := testcontext.WithTimeout(t, context.Background(), 1*time.Minute)
+		defer cancel()
+
+		err := setHostname(ctx, origHostname, t.Log)
 		require.NoError(t, err)
 
 		t.Log("Restoring original /etc/hosts...")

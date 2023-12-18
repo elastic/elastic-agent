@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -93,7 +94,7 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version string) (_ string, err error) {
+func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
 	remoteArtifact := a.Artifact
 	downloadedFiles := make([]string, 0, 2)
 	defer func() {
@@ -107,13 +108,13 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	}()
 
 	// download from source to dest
-	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, version)
+	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
-	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, version)
+	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
 	downloadedFiles = append(downloadedFiles, hashPath)
 	return path, err
 }
@@ -135,7 +136,7 @@ func (e *Downloader) composeURI(artifactName, packageName string) (string, error
 	return uri.String(), nil
 }
 
-func (e *Downloader) download(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version string) (string, error) {
+func (e *Downloader) download(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
 	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
 	if err != nil {
 		return "", errors.New(err, "generating package name failed")
@@ -149,7 +150,7 @@ func (e *Downloader) download(ctx context.Context, remoteArtifact string, operat
 	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
 }
 
-func (e *Downloader) downloadHash(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version string) (string, error) {
+func (e *Downloader) downloadHash(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
 	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
 	if err != nil {
 		return "", errors.New(err, "generating package name failed")

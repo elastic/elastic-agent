@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
@@ -40,11 +41,12 @@ agent.upgrade.watcher:
 // that the Agent is rolled back to the previous version.
 func TestStandaloneUpgradeRollback(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Upgrade from an old build because the new watcher from the new build will
@@ -154,11 +156,12 @@ inputs:
 // rolled back to the previous version.
 func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Upgrade from an old build because the new watcher from the new build will

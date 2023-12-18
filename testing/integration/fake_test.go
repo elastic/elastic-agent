@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 )
 
 var simpleConfig1 = `
@@ -44,13 +45,14 @@ inputs:
 
 func TestFakeComponent(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Default,
 		Local: true,
 	})
 
 	f, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = f.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)

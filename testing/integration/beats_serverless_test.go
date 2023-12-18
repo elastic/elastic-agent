@@ -50,6 +50,7 @@ type BeatRunner struct {
 
 func TestBeatsServerless(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: Default,
 		OS: []define.OS{
 			{Type: define.Linux},
 		},

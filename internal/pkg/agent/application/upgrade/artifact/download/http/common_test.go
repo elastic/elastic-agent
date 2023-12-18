@@ -19,16 +19,17 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/pgptest"
 )
 
 const (
-	version       = "7.5.1"
 	sourcePattern = "/downloads/beats/filebeat/"
 	source        = "http://artifacts.elastic.co/downloads/"
 )
 
 var (
+	version  = agtversion.NewParsedSemVer(7, 5, 1, "", "")
 	beatSpec = artifact.Artifact{
 		Name:     "filebeat",
 		Cmd:      "filebeat",

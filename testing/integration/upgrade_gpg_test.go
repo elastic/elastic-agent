@@ -10,18 +10,21 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -34,7 +37,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Start at the build version as we want to test the retry
@@ -77,6 +80,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 
 func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Upgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -89,7 +93,7 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Start at the build version as we want to test the retry

@@ -8,9 +8,10 @@ import (
 	"context"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 // Downloader is an interface allowing download of an artifact
 type Downloader interface {
-	Download(ctx context.Context, a artifact.Artifact, version string) (string, error)
+	Download(ctx context.Context, a artifact.Artifact, version *version.ParsedSemVer) (string, error)
 }

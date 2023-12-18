@@ -23,10 +23,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 )
 
 func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Default,
 		// We require sudo for this test to run
 		// `elastic-agent install` (even though it will
 		// be installed as non-root).
@@ -48,8 +50,11 @@ func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
-	err = fixture.Prepare(context.Background())
+	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
 	// Check that default base path is clean
@@ -69,7 +74,7 @@ func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{Force: true, Unprivileged: true})
+	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true, Unprivileged: true})
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
@@ -80,6 +85,7 @@ func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 
 func TestInstallUnprivilegedWithBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Group: Default,
 		// We require sudo for this test to run
 		// `elastic-agent install` (even though it will
 		// be installed as non-root).
@@ -101,8 +107,11 @@ func TestInstallUnprivilegedWithBasePath(t *testing.T) {
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
-	err = fixture.Prepare(context.Background())
+	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
 	// Other test `TestInstallWithBasePath` uses a random directory for the base
@@ -123,7 +132,7 @@ func TestInstallUnprivilegedWithBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{
+	out, err := fixture.Install(ctx, &atesting.InstallOpts{
 		BasePath:     basePath,
 		Force:        true,
 		Unprivileged: true,

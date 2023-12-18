@@ -28,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/kibana"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -41,6 +40,7 @@ import (
 // versions as the standalone tests already perform those tests and would be redundant.
 func TestFleetManagedUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: Fleet,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -91,20 +91,18 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 func TestFleetAirGappedUpgrade(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
+		Group: FleetAirgapped,
 		Stack: &define.Stack{},
 		// The test uses iptables to simulate the air-gaped environment.
-		OS:      []define.OS{{Type: define.Linux}},
-		Isolate: true,  // Needed as the test blocks IPs using iptables.
-		Local:   false, // Needed as the test requires Agent installation
-		Sudo:    true,  // Needed as the test uses iptables and installs the Agent
+		OS:    []define.OS{{Type: define.Linux}},
+		Local: false, // Needed as the test requires Agent installation
+		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
 	})
 
 	ctx, _ := testcontext.WithDeadline(
 		t, context.Background(), time.Now().Add(10*time.Minute))
 
-	artifactAPI := tools.NewArtifactAPIClient()
-	latest, err := artifactAPI.GetLatestSnapshotVersion(ctx, t)
-	require.NoError(t, err, "could not fetch latest version from artifacts API")
+	latest := define.Version()
 
 	// We need to prepare it first because it'll download the artifact, and it
 	// has to happen before we block the artifacts API IPs.
@@ -112,14 +110,14 @@ func TestFleetAirGappedUpgrade(t *testing.T) {
 	// uses it to get some information about the agent version.
 	upgradeTo, err := atesting.NewFixture(
 		t,
-		latest.String(),
+		latest,
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
 	err = upgradeTo.Prepare(ctx)
 	require.NoError(t, err)
 
-	s := newArtifactsServer(ctx, t, latest.String())
+	s := newArtifactsServer(ctx, t, latest)
 	host := "artifacts.elastic.co"
 	simulateAirGapedEnvironment(t, host)
 
