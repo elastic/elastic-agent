@@ -643,5 +643,14 @@ func ensureInstallMarkerPresent() error {
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
 
+	// In v8.14.0, the control socket was moved to be in the installation path instead at
+	// a system level location, except on Windows where it remained at `\\.\pipe\elastic-agent-system`.
+	// For Windows to be able to determine if it is running installed is from the creation of
+	// `.installed` marker that was not created until v8.8.0. Upgrading from any pre-8.8 version results
+	// in the `paths.ControlSocket()` in returning the incorrect control socket (only on Windows).
+	// Now that the install marker has been created we need to ensure that `paths.ControlSocket()` will
+	// return the correct result.
+	paths.ResolveControlSocket()
+
 	return nil
 }

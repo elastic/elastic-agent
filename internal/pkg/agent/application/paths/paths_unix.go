@@ -22,3 +22,6 @@ func initialControlSocketPath(topPath string) string {
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
 	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(socketPath)))
 }
+
+// ResolveControlSocket does nothing on non-Windows hosts.
+func ResolveControlSocket() {}
