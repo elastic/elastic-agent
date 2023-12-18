@@ -43,7 +43,7 @@ mage -l
 mkdir -p /tmp/beats-build
 pushd /tmp/beats-build
 
-git clone --filter=tree:0 git@github.com:elastic/beats.git
+git clone git@github.com:elastic/beats.git
 popd
 
 # export WORKSPACE=beats/x-pack/metricbeat
