@@ -7,6 +7,8 @@
 package paths
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -48,7 +50,7 @@ func AgentVaultPath() string {
 	return filepath.Join(Config(), defaultAgentVaultPath)
 }
 
-func controlSocketSHA256Path(topPath string) {
+func controlSocketSHA256Path(topPath string) string {
 	// entire string cannot be longer than 256 characters, this forces the
 	// length to always be 87 characters (but unique per execution path)
 	socketPath := filepath.Join(topPath, ControlSocketName)
