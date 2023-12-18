@@ -664,6 +664,7 @@ func (m *Manager) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 	for _, support := range initCheckin.Supports {
 		if support == proto.ConnectionSupports_CheckinChunking {
 			runtime.comm.chunkingAllowed = true
+			break
 		}
 	}
 

@@ -18,8 +18,8 @@ import (
 	"github.com/gofrs/uuid"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -280,7 +280,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 	go func() {
 		for {
 			// always allow a chunked observed message to be received
-			checkin, err := utils.RecvChunkedObserved(server)
+			checkin, err := chunk.RecvObserved(server)
 			if err != nil {
 				if reportableErr(err) {
 					c.logger.Debugf("check-in stream failed to receive data: %s", err)
@@ -412,12 +412,12 @@ func genServerName() (string, error) {
 	return strings.Replace(u.String(), "-", "", -1), nil
 }
 
-func sendExpectedChunked(server proto.ElasticAgent_CheckinV2Server, msg *proto.CheckinExpected, chunk bool, maxSize int) error {
-	if !chunk {
+func sendExpectedChunked(server proto.ElasticAgent_CheckinV2Server, msg *proto.CheckinExpected, chunkingAllowed bool, maxSize int) error {
+	if !chunkingAllowed {
 		// chunking is disabled
 		return server.Send(msg)
 	}
-	msgs, err := utils.ChunkedExpected(msg, maxSize)
+	msgs, err := chunk.Expected(msg, maxSize)
 	if err != nil {
 		return err
 	}
