@@ -26,6 +26,9 @@ func TestContainerCMD(t *testing.T) {
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
 		// This test runs the command we use when executing inside a container
 		// which leaves files under /usr/share/elastic-agent. Run it isolated
 		// to avoid interfering with other tests and better simulate a container
