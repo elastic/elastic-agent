@@ -7,6 +7,7 @@ outputs:
     hosts: '${ELASTICSEARCH_HOSTS:http://elasticsearch:9200}'
     username: '${ELASTICSEARCH_USERNAME:elastic}'
     password: '${ELASTICSEARCH_PASSWORD:changeme}'
+    preset: balanced
 
 inputs:
   - type: system/metrics
