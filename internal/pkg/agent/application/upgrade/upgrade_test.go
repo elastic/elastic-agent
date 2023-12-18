@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofrs/flock"
 	"github.com/stretchr/testify/assert"
@@ -249,6 +250,15 @@ agent.download:
 agent.download:
   source_uri: "https://this.sourceURI.co/downloads/beats/"
 `},
+		{
+			name:      "retry_sleep_init_duration",
+			sourceURL: "https://this.gets.applied",
+			cfg: `
+agent.download:
+  sourceURI: "https://this.gets.applied"
+  retry_sleep_init_duration: 42
+  process.stop_timeout: "1.618s"
+`},
 	}
 
 	for _, tc := range tcs {
@@ -277,5 +287,38 @@ agent.download:
 				t.Logf(l.Message)
 			}
 		})
+	}
+}
+
+func TestUpgraderReload_odd_Unpack(t *testing.T) {
+	fleetCfg := `
+agent:
+  download:
+    sourceURI: "https://this.gets.applied"
+    retry_sleep_init_duration: "42s"
+    timeout: "11s"
+`
+	log, o := logger.NewTesting("")
+
+	u := Upgrader{
+		log:      log,
+		settings: artifact.DefaultConfig(),
+	}
+
+	cfg, err := config.NewConfigFrom(fleetCfg)
+	require.NoError(t, err, "failed to create new config")
+
+	err = u.Reload(cfg)
+	require.NoError(t, err, "error reloading config")
+
+	// this does not work for some reason
+	assert.Equal(t, u.settings.RetrySleepInitDuration, 42*time.Second)
+
+	// those works as expected
+	assert.Equal(t, u.settings.SourceURI, "https://this.gets.applied")
+	assert.Equal(t, u.settings.Timeout, 11*time.Second)
+
+	for _, l := range o.TakeAll() {
+		t.Logf(l.Message)
 	}
 }

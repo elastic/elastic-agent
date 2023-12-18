@@ -26,6 +26,9 @@ func DefaultConfiguration() *Configuration {
 // NewFromConfig creates a configuration based on common Config.
 func NewFromConfig(cfg *config.Config) (*Configuration, error) {
 	c := DefaultConfiguration()
+	// c is right, RetrySleepInitDuration is set to the default 30s
+	// however is retry_sleep_init_duration isn't in cfg, RetrySleepInitDuration
+	// is set to 0
 	if err := cfg.Unpack(c); err != nil {
 		return nil, errors.New(err, errors.TypeConfig)
 	}
