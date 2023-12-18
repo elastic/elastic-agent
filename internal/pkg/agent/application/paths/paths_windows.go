@@ -73,8 +73,8 @@ func initialControlSocketPath(topPath string) string {
 func ResolveControlSocket() {
 	currentPath := ControlSocket()
 	if currentPath == controlSocketSHA256Path(Top()) && RunningInstalled() {
-		// path is not correct being that it's not installed
-		// reset the control socket path to be the correct path
+		// path is not correct being that it's installed
+		// reset the control socket path to be the installed path
 		SetControlSocket(ControlSocketPath)
 	}
 }
