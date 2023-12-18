@@ -243,6 +243,8 @@ func (u *Upgrader) downloadWithRetries(
 
 	expBo := backoff.NewExponentialBackOff()
 	expBo.InitialInterval = settings.RetrySleepInitDuration
+	u.log.Infof("*Upgrader.downloadWithRetries: expBo.InitialInterval: %s",
+		expBo.InitialInterval)
 	boCtx := backoff.WithContext(expBo, cancelCtx)
 
 	var path string

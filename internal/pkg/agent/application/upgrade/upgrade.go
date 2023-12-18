@@ -122,7 +122,14 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 		cfg.Settings.DownloadConfig.SourceURI = artifact.DefaultSourceURI
 	}
 
+	u.log.Infof("*Upgrader.Reload: received config: %s",
+		cfg.Settings.DownloadConfig.RetrySleepInitDuration)
+
+	u.log.Infof("*Upgrader.Reload: OLD: u.settings.RetrySleepInitDuration: %s",
+		u.settings.RetrySleepInitDuration)
 	u.settings = cfg.Settings.DownloadConfig
+	u.log.Infof("*Upgrader.Reload: NEW: u.settings.RetrySleepInitDuration: %s",
+		u.settings.RetrySleepInitDuration)
 	return nil
 }
 

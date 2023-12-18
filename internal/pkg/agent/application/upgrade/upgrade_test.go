@@ -253,7 +253,7 @@ agent.download:
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			log, _ := logger.NewTesting("")
+			log, o := logger.NewTesting("")
 
 			u := Upgrader{
 				log:      log,
@@ -271,6 +271,10 @@ agent.download:
 				require.NotNilf(t, u.settings.Proxy.URL,
 					"ProxyURI should not be nil, want %s", tc.proxyURL)
 				assert.Equal(t, tc.proxyURL, u.settings.Proxy.URL.String())
+			}
+
+			for _, l := range o.TakeAll() {
+				t.Logf(l.Message)
 			}
 		})
 	}
