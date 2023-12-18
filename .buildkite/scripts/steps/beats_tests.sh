@@ -12,7 +12,7 @@ source .buildkite/scripts/common.sh
 STACK_PROVISIONER="${1:-"serverless"}"
 
 run_test_for_beat(){
-    export GOFLAGS=-buildvcs=false
+    export GOFLAGS='-buildvcs=false'
     local beat_name=$1
     
     #build
