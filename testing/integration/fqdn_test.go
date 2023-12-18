@@ -92,11 +92,19 @@ func TestFQDN(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
+		// Use a separate context as the one in the test body will have been cancelled at this point.
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cleanupCancel()
+
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, fleettools.UnEnrollAgent(info.KibanaClient, policy.ID))
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policy.ID))
 
 		t.Log("Restoring hostname...")
+<<<<<<< HEAD
 		err := setHostname(ctx, origHostname, t.Log)
+=======
+		err := setHostname(cleanupCtx, origHostname, t.Log)
+>>>>>>> dcc6493e2e (Add missing contexts (and therefore timeouts) to integration test code (#3892))
 		require.NoError(t, err)
 
 		t.Log("Restoring original /etc/hosts...")
@@ -105,7 +113,7 @@ func TestFQDN(t *testing.T) {
 	})
 
 	t.Log("Verify that agent name is short hostname")
-	agent := verifyAgentName(t, policy.ID, shortName, info.KibanaClient)
+	agent := verifyAgentName(ctx, t, policy.ID, shortName, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname")
 	verifyHostNameInIndices(t, "logs-*", shortName, info.Namespace, info.ESClient)
@@ -130,13 +138,13 @@ func TestFQDN(t *testing.T) {
 	expectedAgentPolicyRevision := agent.PolicyRevision + 1
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, expectedAgentPolicyRevision),
 		2*time.Minute,
 		1*time.Second,
 	)
 
 	t.Log("Verify that agent name is FQDN")
-	verifyAgentName(t, policy.ID, fqdn, info.KibanaClient)
+	verifyAgentName(ctx, t, policy.ID, fqdn, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is FQDN")
 	verifyHostNameInIndices(t, "logs-*", fqdn, info.Namespace, info.ESClient)
@@ -161,13 +169,13 @@ func TestFQDN(t *testing.T) {
 	expectedAgentPolicyRevision++
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, expectedAgentPolicyRevision),
 		2*time.Minute,
 		1*time.Second,
 	)
 
 	t.Log("Verify that agent name is short hostname again")
-	verifyAgentName(t, policy.ID, shortName, info.KibanaClient)
+	verifyAgentName(ctx, t, policy.ID, shortName, info.KibanaClient)
 
 	// TODO: Re-enable assertion once https://github.com/elastic/elastic-agent/issues/3078 is
 	// investigated for root cause and resolved.
@@ -176,7 +184,7 @@ func TestFQDN(t *testing.T) {
 	// verifyHostNameInIndices(t, "metrics-*", shortName, info.ESClient)
 }
 
-func verifyAgentName(t *testing.T, policyID, hostname string, kibClient *kibana.Client) *kibana.AgentExisting {
+func verifyAgentName(ctx context.Context, t *testing.T, policyID, hostname string, kibClient *kibana.Client) *kibana.AgentExisting {
 	t.Helper()
 
 	var agent *kibana.AgentExisting
@@ -185,7 +193,7 @@ func verifyAgentName(t *testing.T, policyID, hostname string, kibClient *kibana.
 	require.Eventually(
 		t,
 		func() bool {
-			agent, err = fleettools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policyID, hostname)
+			agent, err = fleettools.GetAgentByPolicyIDAndHostnameFromList(ctx, kibClient, policyID, hostname)
 			return err == nil && agent != nil
 		},
 		5*time.Minute,

@@ -107,8 +107,13 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 	require.NoError(t, err)
 
 	t.Log("Getting default Fleet Server URL...")
+<<<<<<< HEAD
 	fleetServerURL, err := fleettools.DefaultURL(kibClient)
 	require.NoError(t, err)
+=======
+	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
+	require.NoError(t, err, "failed getting Fleet Server URL")
+>>>>>>> dcc6493e2e (Add missing contexts (and therefore timeouts) to integration test code (#3892))
 
 	t.Log("Enrolling Elastic Agent...")
 	var nonInteractiveFlag bool
@@ -135,12 +140,40 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
+<<<<<<< HEAD
 	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policy.ID, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	t.Logf("Upgrading from version %q to version %q...", startParsedVersion, endVersionInfo.Binary.String())
 	err = fleettools.UpgradeAgent(kibClient, policy.ID, endVersionInfo.Binary.String(), true)
 	require.NoError(t, err)
 
+=======
+	require.Eventually(t,
+		check.FleetAgentStatus(
+			ctx, t, kibClient, policyResp.ID, "online"),
+		2*time.Minute,
+		10*time.Second,
+		"Agent status is not online")
+
+	t.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"...",
+		startParsedVersion, startVersionInfo.Binary.Commit,
+		endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
+	err = fleettools.UpgradeAgent(ctx, kibClient, policyResp.ID, endVersionInfo.Binary.String(), true)
+	require.NoError(t, err)
+
+	t.Log("Waiting from upgrade details to show up in Fleet")
+	hostname, err := os.Hostname()
+	require.NoError(t, err)
+	var agent *kibana.AgentExisting
+	require.Eventuallyf(t, func() bool {
+		agent, err = fleettools.GetAgentByPolicyIDAndHostnameFromList(ctx, kibClient, policy.ID, hostname)
+		return err == nil && agent.UpgradeDetails != nil
+	},
+		5*time.Minute, time.Second,
+		"last error: %v. agent.UpgradeDetails: %s",
+		err, agentUpgradeDetailsString(agent))
+
+>>>>>>> dcc6493e2e (Add missing contexts (and therefore timeouts) to integration test code (#3892))
 	// wait for the watcher to show up
 	t.Logf("Waiting for upgrade watcher to start...")
 	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
@@ -152,12 +185,20 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
+<<<<<<< HEAD
 	require.Eventually(t, check.FleetAgentStatus(t, kibClient, policy.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+=======
+	require.Eventually(t, check.FleetAgentStatus(ctx, t, kibClient, policyResp.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+>>>>>>> dcc6493e2e (Add missing contexts (and therefore timeouts) to integration test code (#3892))
 
 	// wait for version
 	require.Eventually(t, func() bool {
 		t.Log("Getting Agent version...")
+<<<<<<< HEAD
 		newVersion, err := fleettools.GetAgentVersion(kibClient, policy.ID)
+=======
+		newVersion, err := fleettools.GetAgentVersion(ctx, kibClient, policyResp.ID)
+>>>>>>> dcc6493e2e (Add missing contexts (and therefore timeouts) to integration test code (#3892))
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
 			return false

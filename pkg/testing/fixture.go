@@ -328,8 +328,13 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
 			}
 		case state := <-stateCh:
+<<<<<<< HEAD
 			if sm != nil {
 				cfg, cont, err := sm.next(state)
+=======
+			if smInstance != nil {
+				cfg, cont, err := smInstance.next(ctx, state)
+>>>>>>> dcc6493e2e (Add missing contexts (and therefore timeouts) to integration test code (#3892))
 				if err != nil {
 					killProc()
 					return fmt.Errorf("state management failed with unexpected error: %w", err)

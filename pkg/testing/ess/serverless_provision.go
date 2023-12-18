@@ -45,12 +45,17 @@ type ServerlessRegions struct {
 }
 
 // NewServerlessProvisioner creates a new StackProvisioner instance for serverless
+<<<<<<< HEAD:pkg/testing/ess/serverless_provision.go
 func NewServerlessProvisioner(cfg ProvisionerConfig) (runner.StackProvisioner, error) {
 	prov := &ServerlessProvision{
+=======
+func NewServerlessProvisioner(ctx context.Context, cfg ProvisionerConfig) (runner.StackProvisioner, error) {
+	prov := &ServerlessProvisioner{
+>>>>>>> dcc6493e2e (Add missing contexts (and therefore timeouts) to integration test code (#3892)):pkg/testing/ess/serverless_provisioner.go
 		cfg: cfg,
 		log: &defaultLogger{wrapped: logp.L()},
 	}
-	err := prov.CheckCloudRegion()
+	err := prov.CheckCloudRegion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error checking region setting: %w", err)
 	}
@@ -171,7 +176,7 @@ func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack)
 	client.proj.Credentials.Password = stack.Password
 
 	prov.log.Logf("Destroying serverless stack %s [stack_id: %s, deployment_id: %s]", stack.Version, stack.ID, deploymentID)
-	err = client.DeleteDeployment()
+	err = client.DeleteDeployment(ctx)
 	if err != nil {
 		return fmt.Errorf("error removing serverless stack %s [stack_id: %s, deployment_id: %s]: %w", stack.Version, stack.ID, deploymentID, err)
 	}
@@ -181,10 +186,14 @@ func (prov *ServerlessProvision) Delete(ctx context.Context, stack runner.Stack)
 // CheckCloudRegion checks to see if the provided region is valid for the serverless
 // if we have an invalid region, overwrite with a valid one.
 // The "normal" and serverless ESS APIs have different regions, hence why we need this.
+<<<<<<< HEAD:pkg/testing/ess/serverless_provision.go
 func (prov *ServerlessProvision) CheckCloudRegion() error {
+=======
+func (prov *ServerlessProvisioner) CheckCloudRegion(ctx context.Context) error {
+>>>>>>> dcc6493e2e (Add missing contexts (and therefore timeouts) to integration test code (#3892)):pkg/testing/ess/serverless_provisioner.go
 	urlPath := fmt.Sprintf("%s/api/v1/serverless/regions", serverlessURL)
 
-	httpHandler, err := http.NewRequestWithContext(context.Background(), "GET", urlPath, nil)
+	httpHandler, err := http.NewRequestWithContext(ctx, "GET", urlPath, nil)
 	if err != nil {
 		return fmt.Errorf("error creating new httpRequest: %w", err)
 	}

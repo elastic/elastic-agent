@@ -1821,8 +1821,16 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		if err != nil {
 			return nil, err
 		}
+<<<<<<< HEAD
 	} else if stackProvisionerMode == "serverless" {
 		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
+=======
+
+	} else if stackProvisionerMode == ess.ProvisionerServerless {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
+>>>>>>> dcc6493e2e (Add missing contexts (and therefore timeouts) to integration test code (#3892))
 		if err != nil {
 			return nil, err
 		}
