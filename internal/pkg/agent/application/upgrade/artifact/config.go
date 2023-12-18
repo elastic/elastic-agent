@@ -56,6 +56,7 @@ type Config struct {
 
 	// RetrySleepInitDuration: the duration to sleep for before the first retry attempt. This duration
 	// will increase for subsequent retry attempts in a randomized exponential backoff manner.
+	// This key is, for some reason, problematic
 	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
 
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
