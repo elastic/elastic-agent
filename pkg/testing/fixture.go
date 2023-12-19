@@ -19,11 +19,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -480,7 +480,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 			}
 		case state := <-stateCh:
 			if smInstance != nil {
-				cfg, cont, err := smInstance.next(state)
+				cfg, cont, err := smInstance.next(ctx, state)
 				if err != nil {
 					killProc()
 					return fmt.Errorf("state management failed with unexpected error: %w", err)
@@ -572,9 +572,10 @@ func (e *ExecErr) Unwrap() error {
 // ExecStatus executes the status subcommand on the prepared Elastic Agent binary.
 // It returns the parsed output and the error from the execution. Keep in mind
 // the agent exits with status 1 if it's unhealthy, but it still outputs the
-// status successfully. Therefore, a not empty AgentStatusOutput is valid
+// status successfully. Therefore, a non-empty AgentStatusOutput is valid
 // regardless of the error. An empty AgentStatusOutput and non nil error
-// means the output could not be parsed.
+// means the output could not be parsed. Use AgentStatusOutput.IsZero() to
+// determine if the returned AgentStatusOutput is empty or not.
 // It should work with any 8.6+ agent
 func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
 	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
@@ -1007,8 +1008,13 @@ type AgentStatusOutput struct {
 			} `json:"meta"`
 		} `json:"version_info,omitempty"`
 	} `json:"components"`
-	FleetState   int    `json:"FleetState"`
-	FleetMessage string `json:"FleetMessage"`
+	FleetState     int              `json:"FleetState"`
+	FleetMessage   string           `json:"FleetMessage"`
+	UpgradeDetails *details.Details `json:"upgrade_details"`
+}
+
+func (aso *AgentStatusOutput) IsZero() bool {
+	return aso.Info.ID == ""
 }
 
 type AgentInspectOutput struct {

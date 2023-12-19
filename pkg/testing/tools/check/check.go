@@ -20,13 +20,13 @@ import (
 // ConnectedToFleet checks if the agent defined in the fixture is connected to
 // Fleet Server. It uses assert.Eventually and if it fails the last error will
 // be printed. It returns if the agent is connected to Fleet Server or not.
-func ConnectedToFleet(t *testing.T, fixture *integrationtest.Fixture, timeout time.Duration) bool {
+func ConnectedToFleet(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, timeout time.Duration) bool {
 	t.Helper()
 
 	var err error
 	var agentStatus integrationtest.AgentStatusOutput
 	assertFn := func() bool {
-		agentStatus, err = fixture.ExecStatus(context.Background())
+		agentStatus, err = fixture.ExecStatus(ctx)
 		return agentStatus.FleetState == int(cproto.State_HEALTHY)
 	}
 
@@ -45,12 +45,13 @@ func ConnectedToFleet(t *testing.T, fixture *integrationtest.Fixture, timeout ti
 // FleetAgentStatus returns a niladic function that returns true if the agent
 // has reached expectedStatus; false otherwise. The returned function is intended
 // for use with assert.Eventually or require.Eventually.
-func FleetAgentStatus(t *testing.T,
+func FleetAgentStatus(ctx context.Context,
+	t *testing.T,
 	client *kibana.Client,
 	policyID,
 	expectedStatus string) func() bool {
 	return func() bool {
-		currentStatus, err := fleettools.GetAgentStatus(client, policyID)
+		currentStatus, err := fleettools.GetAgentStatus(ctx, client, policyID)
 		if err != nil {
 			t.Errorf("unable to determine agent status: %s", err.Error())
 			return false

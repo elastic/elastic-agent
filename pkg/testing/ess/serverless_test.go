@@ -16,6 +16,9 @@ import (
 )
 
 func TestProvisionGetRegions(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+
 	_ = logp.DevelopmentSetup()
 	key, found, err := GetESSAPIKey()
 	if !found {
@@ -29,13 +32,16 @@ func TestProvisionGetRegions(t *testing.T) {
 		cfg: cfg,
 		log: &defaultLogger{wrapped: logp.L()},
 	}
-	err = prov.CheckCloudRegion()
+	err = prov.CheckCloudRegion(ctx)
 	require.NoError(t, err)
 	require.NotEqual(t, "bad-region-ID", prov.cfg.Region)
 
 }
 
 func TestStackProvisioner(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
 	_ = logp.DevelopmentSetup()
 	key, found, err := GetESSAPIKey()
 	if !found {
@@ -45,12 +51,10 @@ func TestStackProvisioner(t *testing.T) {
 	require.True(t, found)
 
 	cfg := ProvisionerConfig{Region: "aws-eu-west-1", APIKey: key}
-	provClient, err := NewServerlessProvisioner(cfg)
+	provClient, err := NewServerlessProvisioner(ctx, cfg)
 	require.NoError(t, err)
 	request := runner.StackRequest{ID: "stack-test-one", Version: "8.9.0"}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-	defer cancel()
 	stack, err := provClient.Create(ctx, request)
 	require.NoError(t, err)
 	t.Logf("got results:")
@@ -78,7 +82,7 @@ func TestStartServerless(t *testing.T) {
 		key,
 		&defaultLogger{wrapped: logp.L()})
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*240)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
 	req := ServerlessRequest{Name: "ingest-e2e-test", RegionID: "aws-eu-west-1"}
@@ -95,6 +99,6 @@ func TestStartServerless(t *testing.T) {
 	t.Logf("got endpoints: %#v", clientHandle.proj.Endpoints)
 	t.Logf("got auth: %#v", clientHandle.proj.Credentials)
 
-	err = clientHandle.DeleteDeployment()
+	err = clientHandle.DeleteDeployment(ctx)
 	require.NoError(t, err)
 }

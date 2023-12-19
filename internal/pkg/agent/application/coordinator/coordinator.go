@@ -481,7 +481,6 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	}
 	det := details.NewDetails(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.SetUpgradeDetails)
-	det.RegisterObserver(c.logUpgradeDetails)
 
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
