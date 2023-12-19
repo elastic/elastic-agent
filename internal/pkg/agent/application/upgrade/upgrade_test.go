@@ -360,7 +360,7 @@ agent:
 	cfg, err := configuration.NewFromConfig(rawcfg)
 	require.NoError(t, err, "error reloading config")
 
-	// this does not work for some reason
+	// those do not work for some reason
 	assert.Equalf(t, 42*time.Second, cfg.Settings.DownloadConfig.RetrySleepInitDuration, "download config is wrong")
 	assert.Equalf(t, 43*time.Second, cfg.Settings.DownloadConfig.AnotherRetrySleepInitDuration, "download config is wrong")
 	assert.Equalf(t, 44*time.Second, cfg.Settings.DownloadConfig.YetOdd, "download config is wrong")
@@ -371,7 +371,7 @@ agent:
 	assert.Equalf(t, "44*time.Second", cfg.Settings.DownloadConfig.StrYetOdd, "STR download config is wrong")
 	assert.Equalf(t, "45*time.Second", cfg.Settings.DownloadConfig.StrTwoUnderscores, "STR download config is wrong")
 
-	// those work
+	// those, on the other hand, work
 	assert.Equalf(t, 42*time.Second, cfg.Settings.ProcessConfig.RetrySleepInitDuration, "process config is wrong")
 	assert.Equalf(t, 43*time.Second, cfg.Settings.ProcessConfig.AnotherRetrySleepInitDuration, "process config is wrong")
 	assert.Equalf(t, 44*time.Second, cfg.Settings.ProcessConfig.YetOdd, "process config is wrong")

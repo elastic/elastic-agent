@@ -26,5 +26,10 @@ func DefaultConfig() *Config {
 		SpawnTimeout:   30 * time.Second,
 		StopTimeout:    30 * time.Second,
 		FailureTimeout: 10 * time.Second,
+
+		RetrySleepInitDuration:        30 * time.Second,
+		AnotherRetrySleepInitDuration: 30 * time.Second,
+		YetOdd:                        30 * time.Second,
+		TwoUnderscores:                30 * time.Second,
 	}
 }
