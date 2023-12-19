@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 )
 
 const diagnosticsArchiveGlobPattern = "elastic-agent-diagnostics-*.zip"
@@ -95,7 +97,7 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
@@ -107,7 +109,7 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 		Configure:  simpleConfig2,
 		AgentState: integrationtest.NewClientState(client.Healthy),
 		Components: componentSetup,
-		After:      testDiagnosticsFactory(ctx, t, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
+		After:      testDiagnosticsFactory(t, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
 	})
 
 }
@@ -121,25 +123,22 @@ func TestDiagnosticsCommand(t *testing.T) {
 	f, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = f.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
-
-	ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
 
 	err = f.Run(ctx, integrationtest.State{
 		Configure:  simpleConfig2,
 		AgentState: integrationtest.NewClientState(client.Healthy),
 		Components: componentSetup,
-		After:      testDiagnosticsFactory(ctx, t, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+		After:      testDiagnosticsFactory(t, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 	})
 	assert.NoError(t, err)
 }
 
-func testDiagnosticsFactory(ctx context.Context, t *testing.T, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func() error {
-	return func() error {
+func testDiagnosticsFactory(t *testing.T, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
 		diagnosticCommandWD := t.TempDir()
 		diagnosticCmdOutput, err := fix.Exec(ctx, cmd, process.WithWorkDir(diagnosticCommandWD))
 

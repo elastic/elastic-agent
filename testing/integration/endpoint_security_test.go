@@ -192,7 +192,10 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, fleettools.UnEnrollAgent(info.KibanaClient, policy.ID))
+		// Use a separate context as the one in the test body will have been cancelled at this point.
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cleanupCancel()
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policy.ID))
 	})
 
 	t.Log("Installing Elastic Defend")
@@ -241,7 +244,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 		Force:          true,
 	}
 
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
@@ -273,7 +276,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	hostname, err := os.Hostname()
 	require.NoError(t, err)
 
-	agentID, err := fleettools.GetAgentIDByHostname(info.KibanaClient, policy.ID, hostname)
+	agentID, err := fleettools.GetAgentIDByHostname(ctx, info.KibanaClient, policy.ID, hostname)
 	require.NoError(t, err)
 
 	_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{ID: agentID})
@@ -353,7 +356,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 		Force:          true,
 	}
 
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
@@ -497,7 +500,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	// Get path to agent executable.
@@ -527,7 +530,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	c := fixture.Client()

@@ -1646,7 +1646,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 			extraFlags = append(extraFlags, goTestFlags...)
 		}
 		extraFlags = append(extraFlags, "-test.shuffle", "on",
-			"-test.timeout", "0", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
+			"-test.timeout", "2h", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
 		params := mage.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
@@ -1887,7 +1887,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		}
 
 	} else if stackProvisionerMode == ess.ProvisionerServerless {
-		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
 		if err != nil {
 			return nil, err
 		}

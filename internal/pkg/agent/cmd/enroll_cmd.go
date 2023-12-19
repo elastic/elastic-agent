@@ -601,7 +601,7 @@ func (c *enrollCmd) startAgent(ctx context.Context) (<-chan *os.ProcessState, er
 	args := []string{
 		"run", "-e", "-c", paths.ConfigFile(),
 		"--path.home", paths.Top(), "--path.config", paths.Config(),
-		"--path.logs", paths.Logs(),
+		"--path.logs", paths.Logs(), "--path.socket", paths.ControlSocket(),
 	}
 	if paths.Downloads() != "" {
 		args = append(args, "--path.downloads", paths.Downloads())

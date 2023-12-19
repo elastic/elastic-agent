@@ -203,17 +203,6 @@ func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.Progres
 		}
 	}
 
-	// create socket path when installing as non-root
-	// now is the only time to do it while root is available (without doing this it will not be possible
-	// for the service to create the control socket)
-	// windows: uses npipe and doesn't need a directory created
-	if unprivileged {
-		err = createSocketDir(ownership)
-		if err != nil {
-			return ownership, fmt.Errorf("failed to create socket directory: %w", err)
-		}
-	}
-
 	// install service
 	pt.Describe("Installing service")
 	svc, err := newService(topPath, withUserGroup(username, groupName))

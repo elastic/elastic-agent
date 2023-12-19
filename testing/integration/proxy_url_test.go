@@ -20,6 +20,7 @@ import (
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/fleetservertest"
 	"github.com/elastic/elastic-agent/testing/proxytest"
 	"github.com/elastic/elastic-agent/version"
@@ -63,7 +64,7 @@ func SetupTest(t *testing.T) *ProxyURL {
 		integrationtest.WithLogOutput())
 	require.NoError(t, err, "SetupTest: NewFixture failed")
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	err = f.Prepare(ctx)
@@ -79,7 +80,10 @@ func TearDownTest(t *testing.T, p *ProxyURL) {
 		return // nothing to do
 	}
 
-	out, err := p.fixture.Uninstall(context.Background(),
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	out, err := p.fixture.Uninstall(ctx,
 		&integrationtest.UninstallOpts{Force: true})
 	if err != nil &&
 		!errors.Is(err, integrationtest.ErrNotInstalled) &&
@@ -115,8 +119,11 @@ func TestProxyURL_EnrollProxyAndNoProxyInThePolicy(t *testing.T) {
 		action,
 	)
 
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	out, err := p.fixture.Install(
-		context.Background(),
+		ctx,
 		&integrationtest.InstallOpts{
 			Force:          true,
 			NonInteractive: true,
@@ -131,7 +138,7 @@ func TestProxyURL_EnrollProxyAndNoProxyInThePolicy(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
+	check.ConnectedToFleet(ctx, t, p.fixture, 5*time.Minute)
 }
 
 func TestProxyURL_EnrollProxyAndEmptyProxyInThePolicy(t *testing.T) {
@@ -161,8 +168,12 @@ func TestProxyURL_EnrollProxyAndEmptyProxyInThePolicy(t *testing.T) {
 		0,
 		action,
 	)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	out, err := p.fixture.Install(
-		context.Background(),
+		ctx,
 		&integrationtest.InstallOpts{
 			Force:          true,
 			NonInteractive: true,
@@ -177,7 +188,7 @@ func TestProxyURL_EnrollProxyAndEmptyProxyInThePolicy(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
+	check.ConnectedToFleet(ctx, t, p.fixture, 5*time.Minute)
 }
 
 func TestProxyURL_ProxyInThePolicyTakesPrecedence(t *testing.T) {
@@ -207,8 +218,12 @@ func TestProxyURL_ProxyInThePolicyTakesPrecedence(t *testing.T) {
 		0,
 		action,
 	)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	out, err := p.fixture.Install(
-		context.Background(),
+		ctx,
 		&integrationtest.InstallOpts{
 			Force:          true,
 			NonInteractive: true,
@@ -223,7 +238,7 @@ func TestProxyURL_ProxyInThePolicyTakesPrecedence(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
+	check.ConnectedToFleet(ctx, t, p.fixture, 5*time.Minute)
 
 	// ensure the agent is communicating through the proxy set in the policy
 	want := fleetservertest.NewPathCheckin(p.policyData.AgentID)
@@ -267,12 +282,16 @@ func TestProxyURL_NoEnrollProxyAndProxyInThePolicy(t *testing.T) {
 		0,
 		action,
 	)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	t.Logf("fleet: %s, proxy1: %s, proxy2: %s",
 		p.fleet.LocalhostURL,
 		p.proxy1.LocalhostURL,
 		p.proxy2.LocalhostURL)
 	out, err := p.fixture.Install(
-		context.Background(),
+		ctx,
 		&integrationtest.InstallOpts{
 			Force:          true,
 			NonInteractive: true,
@@ -286,7 +305,7 @@ func TestProxyURL_NoEnrollProxyAndProxyInThePolicy(t *testing.T) {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
+	check.ConnectedToFleet(ctx, t, p.fixture, 5*time.Minute)
 
 	// ensure the agent is communicating through the new proxy
 	if !assert.Eventually(t, func() bool {
@@ -331,8 +350,12 @@ func TestProxyURL_RemoveProxyFromThePolicy(t *testing.T) {
 		0,
 		action,
 	)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	out, err := p.fixture.Install(
-		context.Background(),
+		ctx,
 		&integrationtest.InstallOpts{
 			Force:          true,
 			NonInteractive: true,
@@ -348,7 +371,7 @@ func TestProxyURL_RemoveProxyFromThePolicy(t *testing.T) {
 	}
 
 	// assert the agent is actually connected to fleet.
-	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
+	check.ConnectedToFleet(ctx, t, p.fixture, 5*time.Minute)
 
 	// ensure the agent is communicating through the proxy set in the policy
 	if !assert.Eventually(t, func() bool {
@@ -366,7 +389,7 @@ func TestProxyURL_RemoveProxyFromThePolicy(t *testing.T) {
 	}
 
 	// Assert the proxy is set on the agent
-	inspect, err := p.fixture.ExecInspect(context.Background())
+	inspect, err := p.fixture.ExecInspect(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, *p.policyData.FleetProxyURL, inspect.Fleet.ProxyURL)
 
@@ -389,12 +412,12 @@ func TestProxyURL_RemoveProxyFromThePolicy(t *testing.T) {
 		return p.checkinWithAcker.Acked(actionIDRemoveProxyFromPolicy)
 	},
 		30*time.Second, 5*time.Second)
-	inspect, err = p.fixture.ExecInspect(context.Background())
+	inspect, err = p.fixture.ExecInspect(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, inspect.Fleet.ProxyURL, want)
 
 	// assert, again, the agent is actually connected to fleet.
-	check.ConnectedToFleet(t, p.fixture, 5*time.Minute)
+	check.ConnectedToFleet(ctx, t, p.fixture, 5*time.Minute)
 }
 
 func (p *ProxyURL) setupFleet(t *testing.T, fleetHost string) {

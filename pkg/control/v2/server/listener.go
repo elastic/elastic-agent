@@ -47,7 +47,8 @@ func createListener(log *logger.Logger) (net.Listener, error) {
 		lis.Close()
 		return nil, err
 	}
-	return lis, err
+	log.With("address", control.Address()).Infof("GRPC control socket listening at %s", control.Address())
+	return lis, nil
 }
 
 func cleanupListener(log *logger.Logger) {

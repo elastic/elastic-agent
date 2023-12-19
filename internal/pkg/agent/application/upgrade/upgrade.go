@@ -63,7 +63,7 @@ type Upgrader struct {
 func IsUpgradeable() bool {
 	// only upgradeable if running from Agent installer and running under the
 	// control of the system supervisor (or built specifically with upgrading enabled)
-	return release.Upgradeable() || (info.RunningInstalled() && info.RunningUnderSupervisor())
+	return release.Upgradeable() || (paths.RunningInstalled() && info.RunningUnderSupervisor())
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
@@ -134,6 +134,16 @@ func (u *Upgrader) Upgradeable() bool {
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+
+	// Inform the Upgrade Marker Watcher that we've started upgrading. Note that this
+	// is only possible to do in-memory since, today, the  process that's initiating
+	// the upgrade is the same as the Agent process in which the Upgrade Marker Watcher is
+	// running. If/when, in the future, the process initiating the upgrade is separated
+	// from the Agent process in which the Upgrade Marker Watcher is running, such in-memory
+	// communication will need to be replaced with inter-process communication (e.g. via
+	// a file, e.g. the Upgrade Marker file or something else).
+	u.markerWatcher.SetUpgradeStarted()
+
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
 
@@ -188,7 +198,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	det.SetState(details.StateWatching)
 	if err := u.markUpgrade(ctx, u.log, newHash, action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
@@ -243,7 +252,7 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 
 	marker.Acked = true
 
-	return SaveMarker(marker)
+	return SaveMarker(marker, false)
 }
 
 func (u *Upgrader) MarkerWatcher() MarkerWatcher {

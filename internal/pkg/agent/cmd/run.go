@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -164,6 +165,12 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	}
 	pathConfigFile := paths.AgentConfigFile()
 
+	// try early to check if running as root
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to check for root permissions: %w", err)
+	}
+
 	// agent ID needs to stay empty in bootstrap mode
 	createAgentID := true
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
@@ -259,7 +266,8 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
-	control := server.New(l.Named("control"), agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+	controlLog := l.Named("control")
+	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
 
 	// if the configMgr implements the TestModeConfigSetter in means that Elastic Agent is in testing mode and
 	// the configuration will come in over the control protocol, so we set the config setting on the control protocol
@@ -274,6 +282,24 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		return err
 	}
 	defer control.Stop()
+
+	// create symlink from /run/elastic-agent.sock to `paths.ControlSocket()` when running as root
+	// this provides backwards compatibility as the control socket was moved with the addition of --unprivileged
+	// option during installation
+	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink != "" {
+		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
+		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
+		_ = os.Remove(paths.ControlSocketRunSymlink) // ensure it doesn't exist before creating the symlink
+		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
+			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", paths.ControlSocketRunSymlink, socketPath, err)
+		} else {
+			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", paths.ControlSocketRunSymlink, socketPath, paths.ControlSocketRunSymlink)
+		}
+		defer func() {
+			// delete the symlink on exit; ignore the error
+			_ = os.Remove(paths.ControlSocketRunSymlink)
+		}()
+	}
 
 	appDone := make(chan bool)
 	appErr := make(chan error)
@@ -606,7 +632,7 @@ func ensureInstallMarkerPresent() error {
 
 	// Only an installed Elastic Agent can be self-upgraded. So, if the
 	// installation marker file is already present, we're all set.
-	if info.RunningInstalled() {
+	if paths.RunningInstalled() {
 		return nil
 	}
 
@@ -616,6 +642,15 @@ func ensureInstallMarkerPresent() error {
 	if err := info.CreateInstallMarker(paths.Top(), utils.CurrentFileOwner()); err != nil {
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
+
+	// In v8.14.0, the control socket was moved to be in the installation path instead at
+	// a system level location, except on Windows where it remained at `\\.\pipe\elastic-agent-system`.
+	// For Windows to be able to determine if it is running installed is from the creation of
+	// `.installed` marker that was not created until v8.8.0. Upgrading from any pre-8.8 version results
+	// in the `paths.ControlSocket()` in returning the incorrect control socket (only on Windows).
+	// Now that the install marker has been created we need to ensure that `paths.ControlSocket()` will
+	// return the correct result.
+	paths.ResolveControlSocket()
 
 	return nil
 }

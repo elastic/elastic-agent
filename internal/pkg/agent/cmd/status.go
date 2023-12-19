@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
@@ -168,8 +169,8 @@ func listUpgradeDetails(l list.Writer, upgradeDetails *cproto.UpgradeDetails) {
 	if upgradeDetails.Metadata != nil {
 		l.AppendItem("metadata")
 		l.Indent()
-		if upgradeDetails.Metadata.ScheduledAt != nil && !upgradeDetails.Metadata.ScheduledAt.AsTime().IsZero() {
-			l.AppendItem("scheduled_at: " + upgradeDetails.Metadata.ScheduledAt.AsTime().UTC().Format(time.RFC3339))
+		if upgradeDetails.Metadata.ScheduledAt != "" {
+			l.AppendItem("scheduled_at: " + upgradeDetails.Metadata.ScheduledAt)
 		}
 		if upgradeDetails.Metadata.FailedState != "" {
 			l.AppendItem("failed_state: " + upgradeDetails.Metadata.FailedState)
@@ -179,6 +180,12 @@ func listUpgradeDetails(l list.Writer, upgradeDetails *cproto.UpgradeDetails) {
 		}
 		if upgradeDetails.State == string(details.StateDownloading) {
 			l.AppendItem(fmt.Sprintf("download_percent: %.2f%%", upgradeDetails.Metadata.DownloadPercent*100))
+		}
+		if upgradeDetails.Metadata.RetryUntil != "" {
+			l.AppendItem("retry_until: " + humanDurationUntil(upgradeDetails.Metadata.RetryUntil, time.Now()))
+		}
+		if upgradeDetails.Metadata.RetryErrorMsg != "" {
+			l.AppendItem("retry_error_msg: " + upgradeDetails.Metadata.RetryErrorMsg)
 		}
 		l.UnIndent()
 	}
@@ -235,4 +242,14 @@ func yamlOutput(w io.Writer, out interface{}) error {
 	}
 	fmt.Fprintf(w, "%s\n", bytes)
 	return nil
+}
+
+func humanDurationUntil(targetTime string, from time.Time) string {
+	target, err := time.Parse(control.TimeFormat(), targetTime)
+	if err != nil {
+		return targetTime
+	}
+
+	until := target.Sub(from)
+	return until.String()
 }

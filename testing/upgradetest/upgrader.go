@@ -7,10 +7,12 @@ package upgradetest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -32,6 +34,10 @@ type upgradeOpts struct {
 	skipDefaultPgp   bool
 	customPgp        *CustomPGP
 	customWatcherCfg string
+
+	// TODO: should be removed along with all references once 8.13.0 has been released.
+	// See also WithDisableUpgradeWatcherUpgradeDetailsCheck.
+	disableUpgradeWatcherUpgradeDetailsCheck bool
 
 	preInstallHook  func() error
 	postInstallHook func() error
@@ -114,6 +120,17 @@ func WithCustomWatcherConfig(cfg string) UpgradeOpt {
 	}
 }
 
+// WithDisableUpgradeWatcherUpgradeDetailsCheck disables any assertions for
+// upgrade details that are being set by the Upgrade Watcher. This option is
+// useful in upgrade tests where the end Agent version does not contain changes
+// in the Upgrade Watcher whose effects are being asserted upon in PerformUpgrade.
+// TODO: should be removed along with all references once 8.13.0 has been released.
+func WithDisableUpgradeWatcherUpgradeDetailsCheck() upgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.disableUpgradeWatcherUpgradeDetailsCheck = true
+	}
+}
+
 // PerformUpgrade performs the upgrading of the Elastic Agent.
 func PerformUpgrade(
 	ctx context.Context,
@@ -165,6 +182,18 @@ func PerformUpgrade(
 	if err != nil {
 		return fmt.Errorf("failed to get end agent build version info: %w", err)
 	}
+
+	// For asserting on the effects of any Upgrade Watcher changes made in 8.13.0, we need
+	// the endVersion to be >= 8.13.0.  Otherwise, these assertions will fail as those changes
+	// won't be present in the Upgrade Watcher. So we disable these assertions if the endVersion
+	// is < 8.13.0.
+	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
+	}
+
+	upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck = upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck ||
+		endVersion.Less(*version.NewParsedSemVer(8, 13, 0, "", ""))
 
 	if upgradeOpts.preInstallHook != nil {
 		if err := upgradeOpts.preInstallHook(); err != nil {
@@ -259,6 +288,16 @@ func PerformUpgrade(
 	}
 	logger.Logf("upgrade watcher started")
 
+	// Check that, while the Upgrade Watcher is running, the upgrade details in Agent status
+	// show the state as UPG_WATCHING.
+	if !upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck {
+		logger.Logf("Checking upgrade details state while Upgrade Watcher is running")
+		if err := waitUpgradeDetailsState(ctx, startFixture, details.StateWatching, 2*time.Minute, 10*time.Second, logger); err != nil {
+			// error context added by waitUpgradeDetailsState
+			return err
+		}
+	}
+
 	if upgradeOpts.postUpgradeHook != nil {
 		if err := upgradeOpts.postUpgradeHook(); err != nil {
 			return fmt.Errorf("post upgrade hook failed: %w", err)
@@ -290,6 +329,16 @@ func PerformUpgrade(
 	}
 	logger.Logf("upgrade watcher finished")
 
+	// Check that, upon successful upgrade, the upgrade details have been cleared out
+	// from Agent status.
+	if !upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck {
+		logger.Logf("Checking upgrade details state after successful upgrade")
+		if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, 10*time.Second, logger); err != nil {
+			// error context added by checkUpgradeDetailsState
+			return err
+		}
+	}
+
 	// now that the watcher has stopped lets ensure that it's still the expected
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
@@ -297,6 +346,7 @@ func PerformUpgrade(
 		// error context added by CheckHealthyAndVersion
 		return err
 	}
+
 	return nil
 }
 
@@ -391,6 +441,71 @@ func WaitHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo
 			}
 			lastErr = err
 			logger.Logf("waiting for healthy agent and proper version: %s", err)
+		}
+	}
+}
+
+func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedState details.State, timeout time.Duration, interval time.Duration, logger Logger) error {
+	versionStr, err := f.ExecVersion(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get Agent version: %w", err)
+	}
+
+	versionParsed, err := version.ParseVersion(versionStr.Binary.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse version [%s]: %w", versionStr.Binary.Version, err)
+	}
+
+	// Upgrade details are only available in Agent version >= 8.12.0
+	versionUpgradeDetailsAvailable := version.NewParsedSemVer(8, 12, 0, "", "")
+	if versionParsed.Less(*versionUpgradeDetailsAvailable) {
+		logger.Logf("upgrade details functionality not implemented in Agent version [%s]. Skipping check for upgrade details state.", versionParsed.String())
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	t := time.NewTicker(interval)
+	defer t.Stop()
+
+	var lastErr error
+	for {
+		select {
+		case <-ctx.Done():
+			if lastErr != nil {
+				return fmt.Errorf("failed waiting for status: %w", errors.Join(ctx.Err(), lastErr))
+			}
+			return ctx.Err()
+		case <-t.C:
+			status, err := f.ExecStatus(ctx)
+			if err != nil && status.IsZero() {
+				lastErr = err
+				continue
+			}
+
+			if expectedState == "" {
+				if status.UpgradeDetails == nil {
+					// Expected and actual match, so we're good
+					return nil
+				}
+
+				lastErr = errors.New("upgrade details found in status but they were expected to be absent")
+				continue
+			}
+
+			if status.UpgradeDetails == nil {
+				lastErr = fmt.Errorf("upgrade details not found in status but expected upgrade details state was [%s]", expectedState)
+				continue
+			}
+
+			// Neither expected nor actual are nil, so compare the two
+			if status.UpgradeDetails.State == expectedState {
+				return nil
+			}
+
+			lastErr = fmt.Errorf("upgrade details state in status [%s] is not the same as expected upgrade details state  [%s]", status.UpgradeDetails.State, expectedState)
+			continue
 		}
 	}
 }

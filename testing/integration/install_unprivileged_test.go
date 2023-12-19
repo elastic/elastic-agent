@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -23,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 )
 
 func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
@@ -49,8 +49,11 @@ func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
-	err = fixture.Prepare(context.Background())
+	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
 	// Check that default base path is clean
@@ -70,7 +73,7 @@ func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{Force: true, Unprivileged: true})
+	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true, Unprivileged: true})
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
@@ -103,8 +106,11 @@ func TestInstallUnprivilegedWithBasePath(t *testing.T) {
 	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
-	err = fixture.Prepare(context.Background())
+	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
 	// Other test `TestInstallWithBasePath` uses a random directory for the base
@@ -125,7 +131,7 @@ func TestInstallUnprivilegedWithBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(context.Background(), &atesting.InstallOpts{
+	out, err := fixture.Install(ctx, &atesting.InstallOpts{
 		BasePath:     basePath,
 		Force:        true,
 		Unprivileged: true,
@@ -169,7 +175,7 @@ func checkInstallUnprivilegedSuccess(t *testing.T, topPath string) {
 	require.NoError(t, err)
 
 	// Check that the socket is created with the correct permissions.
-	socketPath := strings.TrimPrefix(paths.ControlSocketUnprivilegedPath, "unix://")
+	socketPath := filepath.Join(topPath, paths.ControlSocketName)
 	require.Eventuallyf(t, func() bool {
 		_, err = os.Stat(socketPath)
 		return err == nil
@@ -191,10 +197,10 @@ func checkInstallUnprivilegedSuccess(t *testing.T, topPath string) {
 
 	// Executing `elastic-agent status` as the original user should fail, because that
 	// user is not in the 'elastic-agent' group.
-	originalUser := os.Getenv("USER")
+	originalUser := os.Getenv("SUDO_USER")
 	if originalUser != "" {
 		cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
 		output, err := cmd.CombinedOutput()
-		require.Error(t, err, "running elastic-agent status should have failed: %s", output)
+		require.Error(t, err, "running sudo -u %s elastic-agent status should have failed: %s", originalUser, output)
 	}
 }

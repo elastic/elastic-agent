@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
@@ -40,7 +41,6 @@ func TestFQDN(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
-	t.Skip("Flaky test, see https://github.com/elastic/elastic-agent/issues/3154")
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
@@ -52,11 +52,13 @@ func TestFQDN(t *testing.T) {
 	origEtcHosts, err := getEtcHosts()
 	require.NoError(t, err)
 
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
 	// Save original hostname so we can restore it at the end of each test
-	origHostname, err := getHostname(context.Background())
+	origHostname, err := getHostname(ctx)
 	require.NoError(t, err)
 
-	ctx := context.Background()
 	kibClient := info.KibanaClient
 
 	shortName := strings.ToLower(randStr(6))
@@ -89,11 +91,15 @@ func TestFQDN(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
+		// Use a separate context as the one in the test body will have been cancelled at this point.
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cleanupCancel()
+
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, fleettools.UnEnrollAgent(info.KibanaClient, policy.ID))
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policy.ID))
 
 		t.Log("Restoring hostname...")
-		err := setHostname(context.Background(), origHostname, t.Log)
+		err := setHostname(cleanupCtx, origHostname, t.Log)
 		require.NoError(t, err)
 
 		t.Log("Restoring original /etc/hosts...")
@@ -102,7 +108,7 @@ func TestFQDN(t *testing.T) {
 	})
 
 	t.Log("Verify that agent name is short hostname")
-	agent := verifyAgentName(t, policy.ID, shortName, info.KibanaClient)
+	agent := verifyAgentName(ctx, t, policy.ID, shortName, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname")
 	verifyHostNameInIndices(t, "logs-*", shortName, info.Namespace, info.ESClient)
@@ -127,13 +133,13 @@ func TestFQDN(t *testing.T) {
 	expectedAgentPolicyRevision := agent.PolicyRevision + 1
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, expectedAgentPolicyRevision),
 		2*time.Minute,
 		1*time.Second,
 	)
 
 	t.Log("Verify that agent name is FQDN")
-	verifyAgentName(t, policy.ID, fqdn, info.KibanaClient)
+	verifyAgentName(ctx, t, policy.ID, fqdn, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is FQDN")
 	verifyHostNameInIndices(t, "logs-*", fqdn, info.Namespace, info.ESClient)
@@ -158,13 +164,13 @@ func TestFQDN(t *testing.T) {
 	expectedAgentPolicyRevision++
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, expectedAgentPolicyRevision),
 		2*time.Minute,
 		1*time.Second,
 	)
 
 	t.Log("Verify that agent name is short hostname again")
-	verifyAgentName(t, policy.ID, shortName, info.KibanaClient)
+	verifyAgentName(ctx, t, policy.ID, shortName, info.KibanaClient)
 
 	// TODO: Re-enable assertion once https://github.com/elastic/elastic-agent/issues/3078 is
 	// investigated for root cause and resolved.
@@ -173,7 +179,7 @@ func TestFQDN(t *testing.T) {
 	// verifyHostNameInIndices(t, "metrics-*", shortName, info.ESClient)
 }
 
-func verifyAgentName(t *testing.T, policyID, hostname string, kibClient *kibana.Client) *kibana.AgentExisting {
+func verifyAgentName(ctx context.Context, t *testing.T, policyID, hostname string, kibClient *kibana.Client) *kibana.AgentExisting {
 	t.Helper()
 
 	var agent *kibana.AgentExisting
@@ -182,7 +188,7 @@ func verifyAgentName(t *testing.T, policyID, hostname string, kibClient *kibana.
 	require.Eventually(
 		t,
 		func() bool {
-			agent, err = fleettools.GetAgentByPolicyIDAndHostnameFromList(kibClient, policyID, hostname)
+			agent, err = fleettools.GetAgentByPolicyIDAndHostnameFromList(ctx, kibClient, policyID, hostname)
 			return err == nil && agent != nil
 		},
 		5*time.Minute,

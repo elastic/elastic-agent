@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 		t.Skipf("Version %s is lower than min version %s; test cannot be performed", define.Version(), upgradetest.Version_8_11_0_SNAPSHOT)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Start on a snapshot build, we want this test to upgrade to our
