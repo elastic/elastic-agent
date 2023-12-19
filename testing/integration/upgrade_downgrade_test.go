@@ -85,6 +85,10 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), endParsedVersion.String())
 
-	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t)
+	// We pass the upgradetest.WithDisableUpgradeWatcherUpgradeDetailsCheck option here because the endFixture
+	// is fetched from the artifacts API and it may not contain changes in the Upgrade Watcher whose effects are
+	// being asserted upon in upgradetest.PerformUpgrade.
+	// TODO: Stop passing this option and remove these comments once 8.13.0 has been released.
+	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithDisableUpgradeWatcherUpgradeDetailsCheck())
 	assert.NoError(t, err)
 }
