@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/elastic/elastic-agent/pkg/version"
+	"runtime"
 	"testing"
 	"time"
 
@@ -39,7 +40,12 @@ func TestStandaloneUpgrade(t *testing.T) {
 
 	for _, startVersion := range versionList {
 		unprivilegedAvailable := true
-		if startVersion.Less(*upgradetest.Version_8_13_0) || endVersion.Less(*upgradetest.Version_8_13_0) {
+		if runtime.GOOS != define.Linux {
+			// only available on Linux at the moment
+			unprivilegedAvailable = false
+		}
+		if unprivilegedAvailable && (startVersion.Less(*upgradetest.Version_8_13_0) || endVersion.Less(*upgradetest.Version_8_13_0)) {
+			// only available if both versions are 8.13+
 			unprivilegedAvailable = false
 		}
 		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {

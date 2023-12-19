@@ -573,6 +573,13 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
+
+		// Only supports Linux at the moment.
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+			},
+		},
 	})
 
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
