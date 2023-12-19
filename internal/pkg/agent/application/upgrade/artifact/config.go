@@ -5,6 +5,7 @@
 package artifact
 
 import (
+	"reflect"
 	"runtime"
 	"strings"
 	"time"
@@ -28,6 +29,38 @@ const (
 
 type ConfigReloader interface {
 	Reload(*Config) error
+}
+
+// configWithoutHTTPTransportSettings is a copy of Config without
+// httpcommon.HTTPTransportSettings so we can handle the  HTTPTransportSettings
+// config separately during *Config.Unpack
+type configWithoutHTTPTransportSettings struct {
+	// OperatingSystem: operating system [linux, windows, darwin]
+	OperatingSystem string `json:"-" config:",ignore"`
+
+	// Architecture: target architecture [32, 64]
+	Architecture string `json:"-" config:",ignore"`
+
+	// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
+	SourceURI string `json:"sourceURI" config:"sourceURI"`
+
+	// TargetDirectory: path to the directory containing downloaded packages
+	TargetDirectory string `json:"targetDirectory" config:"target_directory"`
+
+	// InstallPath: path to the directory containing installed packages
+	InstallPath string `yaml:"installPath" config:"install_path"`
+
+	// DropPath: path where elastic-agent can find installation files for download.
+	// Difference between this and TargetDirectory is that when fetching packages (from web or fs) they are stored in TargetDirectory
+	// DropPath specifies where Filesystem downloader can find packages which will then be placed in TargetDirectory. This can be
+	// local or network disk.
+	// If not provided FileSystem Downloader will fallback to /beats subfolder of elastic-agent directory.
+	DropPath string `yaml:"dropPath" config:"drop_path"`
+
+	// RetrySleepInitDuration: the duration to sleep for before the first retry attempt. This duration
+	// will increase for subsequent retry attempts in a randomized exponential backoff manner.
+	// This key is, for some reason, problematic
+	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
 }
 
 // Config is a configuration used for verifier and downloader
@@ -206,20 +239,30 @@ func (c *Config) Arch() string {
 
 // Unpack reads a config object into the settings.
 func (c *Config) Unpack(cfg *c.C) error {
-	tmp := struct {
-		OperatingSystem string `json:"-" config:",ignore"`
-		Architecture    string `json:"-" config:",ignore"`
-		SourceURI       string `json:"sourceURI" config:"sourceURI"`
-		TargetDirectory string `json:"targetDirectory" config:"target_directory"`
-		InstallPath     string `yaml:"installPath" config:"install_path"`
-		DropPath        string `yaml:"dropPath" config:"drop_path"`
-	}{
-		OperatingSystem: c.OperatingSystem,
-		Architecture:    c.Architecture,
-		SourceURI:       c.SourceURI,
-		TargetDirectory: c.TargetDirectory,
-		InstallPath:     c.InstallPath,
-		DropPath:        c.DropPath,
+	// c.HTTPTransportSettings need to be unpacked separately (see
+	// https://github.com/elastic/elastic-agent/pull/776). Therefore, to ensure
+	// we don't miss out any value, we'll use reflection to copy them all.
+	// see https://go.dev/blog/laws-of-reflection to understand the reflection part.
+
+	tmp := configWithoutHTTPTransportSettings{}
+
+	cValue := reflect.ValueOf(c).Elem()
+	tmpType := reflect.TypeOf(tmp)
+	tmpValue := reflect.ValueOf(&tmp).Elem()
+
+	// Copy all values of c to tmp. As Config has more fields than
+	// configWithoutHTTPTransportSettings, we iterate over the fields of
+	// configWithoutHTTPTransportSettings and for each field we get the value
+	// of the field in c and set in tmp.
+	// There is a test to ensure Config will always be a superset of
+	// configWithoutHTTPTransportSettings.
+	for i := 0; i < tmpType.NumField(); i++ {
+		name := tmpType.Field(i).Name
+		tmpField := tmpValue.FieldByName(name)
+
+		if tmpField.IsValid() && tmpField.CanSet() {
+			tmpField.Set(cValue.Field(i))
+		}
 	}
 
 	if err := cfg.Unpack(&tmp); err != nil {
@@ -230,15 +273,22 @@ func (c *Config) Unpack(cfg *c.C) error {
 	if err := cfg.Unpack(&transport); err != nil {
 		return err
 	}
-
-	*c = Config{
-		OperatingSystem:       tmp.OperatingSystem,
-		Architecture:          tmp.Architecture,
-		SourceURI:             tmp.SourceURI,
-		TargetDirectory:       tmp.TargetDirectory,
-		InstallPath:           tmp.InstallPath,
-		DropPath:              tmp.DropPath,
-		HTTPTransportSettings: transport,
+	// HTTPTransportSettings.Proxy.Headers defaults to empty. If absent in cfg,
+	// Unpack will set it to nil. To ensure consistency, we reset it to empty.
+	if transport.Proxy.Headers == nil {
+		transport.Proxy.Headers = map[string]string{}
 	}
+
+	// Now copy back all updated values of tmp to c.
+	for i := 0; i < tmpType.NumField(); i++ {
+		name := tmpType.Field(i).Name
+		cField := cValue.FieldByName(name)
+
+		if cField.IsValid() && cField.CanSet() {
+			cField.Set(tmpValue.Field(i))
+		}
+	}
+	c.HTTPTransportSettings = transport
+
 	return nil
 }
