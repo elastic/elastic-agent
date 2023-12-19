@@ -17,8 +17,6 @@ import (
 	"go.opentelemetry.io/collector/otelcol"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
@@ -29,59 +27,20 @@ const buildDescription = "Elastic opentelemetry-collector distribution"
 //   - otlp.(yaml|yml)
 //   - otelcol.(yaml|yml)
 //
-// in case of other filename it checks for `agent`, `inputs`, `outputs` keyword. If at least one of these is present
-// it assumes agent config and returns (false, nil).
-// If these keywords are missing it checks for presence of otel specific keywords `exporters`, `receivers`,`processors`
-// or `extensions` in combination with `service` definition. In case these are found (true, nil) is returned.
-// If none of these conditions are satisfied (false, nil) is returned assuming agent config for backward compatibility.
-func IsOtelConfig(ctx context.Context, pathConfigFile string) (bool, error) {
+// In other cases it returns false assuming agent config for backwards compatibility
+func IsOtelConfig(ctx context.Context, pathConfigFile string) bool {
 	fileName := filepath.Base(pathConfigFile)
 	if suffix := filepath.Ext(fileName); suffix != ".yml" && suffix != ".yaml" {
-		return false, nil
+		return false
 	}
 
 	cleanFileName := strings.TrimSpace(strings.ToLower(strings.TrimSuffix(fileName, filepath.Ext(fileName))))
 	if cleanFileName == "otel" || cleanFileName == "otlp" || cleanFileName == "otelcol" {
-		return true, nil
-	}
-
-	rawConfig, err := config.LoadFile(pathConfigFile)
-	if err != nil {
-		return false, errors.New(err,
-			fmt.Sprintf("could not read configuration file %s", pathConfigFile),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile))
-	}
-
-	mapConfig, err := rawConfig.ToMapStr()
-	if err != nil {
-		return false, errors.New(err,
-			errors.TypeConfig,
-			errors.M(errors.MetaKeyPath, pathConfigFile))
-	}
-
-	// contains agent definition
-	_, hasAgent := mapConfig["agent"]
-	_, hasInputs := mapConfig["inputs"]
-	_, hasOutputs := mapConfig["outputs"]
-
-	if hasAgent || hasInputs || hasOutputs {
-		return false, nil
-	}
-
-	// contains otel service definition
-	_, hasService := mapConfig["service"]
-	_, hasExporters := mapConfig["exporters"]
-	_, hasReceivers := mapConfig["receivers"]
-	_, hasProcessors := mapConfig["processors"]
-	_, hasExtensions := mapConfig["extensions"]
-
-	if hasService && (hasExporters || hasReceivers || hasProcessors || hasExtensions) {
-		return true, nil
+		return true
 	}
 
 	// default behavior is Elastic Agent
-	return false, nil
+	return false
 }
 
 func Run(ctx context.Context, cancel context.CancelFunc, stop chan bool, testingMode bool) error {

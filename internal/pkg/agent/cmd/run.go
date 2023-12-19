@@ -135,12 +135,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	go service.ProcessWindowsControlEvents(stopBeat)
 
 	// detect otel
-	runAsOtel, err := otel.IsOtelConfig(ctx, paths.ConfigFile())
-	if err != nil {
-		return err
-	}
-
-	if runAsOtel {
+	if runAsOtel := otel.IsOtelConfig(ctx, paths.ConfigFile()); runAsOtel {
 		return otel.Run(ctx, cancel, stop, testingMode)
 	}
 
