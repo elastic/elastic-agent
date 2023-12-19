@@ -286,7 +286,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	// create symlink from /run/elastic-agent.sock to `paths.ControlSocket()` when running as root
 	// this provides backwards compatibility as the control socket was moved with the addition of --unprivileged
 	// option during installation
-	if isRoot && paths.ControlSocketRunSymlink != "" {
+	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
 		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
 		_ = os.Remove(paths.ControlSocketRunSymlink) // ensure it doesn't exist before creating the symlink
