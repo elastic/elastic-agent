@@ -7,11 +7,13 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -104,17 +106,18 @@ func TestOtelFileProcessing(t *testing.T) {
 		_ = os.Remove(fileProcessingFilename)
 	})
 
-	fixture, err := define.NewFixture(t, define.Version())
+	// replace default elastic-agent.yml with otel config
+	// otel mode should be detected automatically
+	tempDir := t.TempDir()
+	cfgFilePath := filepath.Join(tempDir, "otel.yml")
+	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileProcessingConfig), 0600))
+
+	fixture, err := define.NewFixture(t, define.Version(), aTesting.WithAdditionalArgs([]string{"-c", cfgFilePath}))
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
-	require.NoError(t, err)
-
-	// replace default elastic-agent.yml with otel config
-	// otel mode should be detected automatically
-	err = fixture.Configure(ctx, fileProcessingConfig)
 	require.NoError(t, err)
 
 	var fixtureWg sync.WaitGroup
@@ -124,14 +127,32 @@ func TestOtelFileProcessing(t *testing.T) {
 		err = fixture.RunWithClient(ctx, false)
 	}()
 
+	var content []byte
+	watchLines := linesTrackMap([]string{
+		`"stringValue":"syslog"`,     // syslog is being processed
+		`"stringValue":"system.log"`, // system.log is being processed
+	})
 	require.Eventually(t,
 		func() bool {
 			// verify file exists
-			content, err := os.ReadFile(fileProcessingFilename)
-			return err == nil && len(content) > 0
+			content, err = os.ReadFile(fileProcessingFilename)
+			if err != nil || len(content) == 0 {
+				return false
+			}
+
+			for k, alreadyFound := range watchLines {
+				if alreadyFound {
+					continue
+				}
+				if bytes.Contains(content, []byte(k)) {
+					watchLines[k] = true
+				}
+			}
+
+			return mapAtLeastOneTrue(watchLines)
 		},
-		5*time.Minute, 500*time.Millisecond,
-		"there should be exported logs by now")
+		3*time.Minute, 500*time.Millisecond,
+		fmt.Sprintf("there should be exported logs by now"))
 
 	cancel()
 	fixtureWg.Wait()
@@ -157,7 +178,15 @@ func TestOtelAPMIngestion(t *testing.T) {
 	)
 
 	// prepare agent
-	fixture, err := define.NewFixture(t, define.Version())
+	testId := info.Namespace
+	tempDir := t.TempDir()
+	cfgFilePath := filepath.Join(tempDir, "otel.yml")
+	fileName := "content.log"
+	apmConfig := fmt.Sprintf(apmOtelConfig, filepath.Join(tempDir, fileName), testId)
+	require.NoError(t, os.WriteFile(cfgFilePath, []byte(apmConfig), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, fileName), []byte{}, 0600))
+
+	fixture, err := define.NewFixture(t, define.Version(), aTesting.WithAdditionalArgs([]string{"-c", cfgFilePath}))
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -167,14 +196,8 @@ func TestOtelAPMIngestion(t *testing.T) {
 
 	// prepare input
 	agentWorkDir := fixture.WorkDir()
-	fileName := "content.log"
-	fixture.WriteFileToWorkDir(ctx, "", fileName)
 
-	testId := info.Namespace
-
-	apmConfig := fmt.Sprintf(apmOtelConfig, filepath.Join(agentWorkDir, fileName), testId)
-
-	err = fixture.Configure(ctx, []byte(apmConfig))
+	err = fixture.EnsurePrepared(ctx)
 	require.NoError(t, err)
 
 	componentsDir, err := aTesting.FindComponentsDir(agentWorkDir)
@@ -227,7 +250,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 		apmReadyLog,
 	)
 	require.NoError(t, err, "APM not initialized")
-	fixture.WriteFileToWorkDir(ctx, apmProcessingContent, fileName)
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, fileName), []byte(apmProcessingContent), 0600))
 
 	// check index
 	var hits int
@@ -245,18 +268,43 @@ func TestOtelAPMIngestion(t *testing.T) {
 		// mark skipped to make it explicit it was not successfully evaluated
 		t.Skip("agent version needs to be equal to stack version")
 	} else {
+		watchLines := linesTrackMap([]string{"This is a test error message",
+			"This is a test debug message 2",
+			"This is a test debug message 3",
+			"This is a test debug message 4"})
+
 		// failed to get APM version mismatch in time
 		// processing should be running
 		require.Eventually(t,
 			func() bool {
 				docs := findESDocs(t, func() (estools.Documents, error) {
-					return estools.GetLogsForIndexWithContext(context.Background(), esClient, "logs-apm*", match)
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					return estools.GetLogsForIndexWithContext(ctx, esClient, "logs-apm*", match)
 				})
+
 				hits = len(docs.Hits.Hits)
-				return hits > 0
+				if hits <= 0 {
+					return false
+				}
+
+				for _, hit := range docs.Hits.Hits {
+					s, found := hit.Source["message"]
+					if !found {
+						continue
+					}
+
+					for k := range watchLines {
+						if strings.Contains(fmt.Sprint(s), k) {
+							watchLines[k] = true
+						}
+					}
+				}
+
+				return mapAllTrue(watchLines)
 			},
 			5*time.Minute, 500*time.Millisecond,
-			"there should be apm logs by now")
+			fmt.Sprintf("there should be apm logs by now: %#v", watchLines))
 	}
 
 	// cleanup apm
@@ -285,4 +333,32 @@ func createESApiKey(esClient *elasticsearch.Client) (string, error) {
 	}
 
 	return fmt.Sprintf("%s:%s", apiResp.Id, apiResp.APIKey), nil
+}
+
+func linesTrackMap(lines []string) map[string]bool {
+	mm := make(map[string]bool)
+	for _, l := range lines {
+		mm[l] = false
+	}
+	return mm
+}
+
+func mapAllTrue(mm map[string]bool) bool {
+	for _, v := range mm {
+		if !v {
+			return false
+		}
+	}
+
+	return true
+}
+
+func mapAtLeastOneTrue(mm map[string]bool) bool {
+	for _, v := range mm {
+		if v {
+			return true
+		}
+	}
+
+	return false
 }
