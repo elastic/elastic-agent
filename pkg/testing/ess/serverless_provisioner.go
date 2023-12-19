@@ -47,12 +47,12 @@ type ServerlessRegions struct {
 }
 
 // NewServerlessProvisioner creates a new StackProvisioner instance for serverless
-func NewServerlessProvisioner(cfg ProvisionerConfig) (runner.StackProvisioner, error) {
+func NewServerlessProvisioner(ctx context.Context, cfg ProvisionerConfig) (runner.StackProvisioner, error) {
 	prov := &ServerlessProvisioner{
 		cfg: cfg,
 		log: &defaultLogger{wrapped: logp.L()},
 	}
-	err := prov.CheckCloudRegion()
+	err := prov.CheckCloudRegion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error checking region setting: %w", err)
 	}
@@ -178,7 +178,7 @@ func (prov *ServerlessProvisioner) Delete(ctx context.Context, stack runner.Stac
 	client.proj.Credentials.Password = stack.Password
 
 	prov.log.Logf("Destroying serverless stack %s [stack_id: %s, deployment_id: %s]", stack.Version, stack.ID, deploymentID)
-	err = client.DeleteDeployment()
+	err = client.DeleteDeployment(ctx)
 	if err != nil {
 		return fmt.Errorf("error removing serverless stack %s [stack_id: %s, deployment_id: %s]: %w", stack.Version, stack.ID, deploymentID, err)
 	}
@@ -188,10 +188,10 @@ func (prov *ServerlessProvisioner) Delete(ctx context.Context, stack runner.Stac
 // CheckCloudRegion checks to see if the provided region is valid for the serverless
 // if we have an invalid region, overwrite with a valid one.
 // The "normal" and serverless ESS APIs have different regions, hence why we need this.
-func (prov *ServerlessProvisioner) CheckCloudRegion() error {
+func (prov *ServerlessProvisioner) CheckCloudRegion(ctx context.Context) error {
 	urlPath := fmt.Sprintf("%s/api/v1/serverless/regions", serverlessURL)
 
-	httpHandler, err := http.NewRequestWithContext(context.Background(), "GET", urlPath, nil)
+	httpHandler, err := http.NewRequestWithContext(ctx, "GET", urlPath, nil)
 	if err != nil {
 		return fmt.Errorf("error creating new httpRequest: %w", err)
 	}
