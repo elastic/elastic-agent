@@ -5,21 +5,25 @@
 package configuration
 
 import (
+	"time"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
 // Configuration is a overall agent configuration
 type Configuration struct {
-	Fleet    *FleetAgentConfig `config:"fleet"  yaml:"fleet" json:"fleet"`
-	Settings *SettingsConfig   `config:"agent"  yaml:"agent" json:"agent"`
+	Fleet                  *FleetAgentConfig `config:"fleet"  yaml:"fleet" json:"fleet"`
+	Settings               *SettingsConfig   `config:"agent"  yaml:"agent" json:"agent"`
+	RetrySleepInitDuration time.Duration     `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
 }
 
 // DefaultConfiguration creates a configuration prepopulated with default values.
 func DefaultConfiguration() *Configuration {
 	return &Configuration{
-		Fleet:    DefaultFleetAgentConfig(),
-		Settings: DefaultSettingsConfig(),
+		RetrySleepInitDuration: 30 * time.Second,
+		Fleet:                  DefaultFleetAgentConfig(),
+		Settings:               DefaultSettingsConfig(),
 	}
 }
 

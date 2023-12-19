@@ -100,6 +100,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	// h.signatureValidationKey = signatureValidationKey
 
 	c, err := config.NewConfigFrom(action.Policy)
+	h.log.Infow("handlerPolicyChange: received policy", "policy", action.Policy)
 	if err != nil {
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}

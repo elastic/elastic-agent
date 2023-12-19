@@ -57,7 +57,15 @@ type Config struct {
 	// RetrySleepInitDuration: the duration to sleep for before the first retry attempt. This duration
 	// will increase for subsequent retry attempts in a randomized exponential backoff manner.
 	// This key is, for some reason, problematic
-	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
+	RetrySleepInitDuration        time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
+	AnotherRetrySleepInitDuration time.Duration `yaml:"anotherretry_sleep_init_duration" config:"anotherretry_sleep_init_duration"`
+	YetOdd                        time.Duration `yaml:"one_two_three_underscores" config:"one_two_three_underscores"`
+	TwoUnderscores                time.Duration `yaml:"with_two_underscores" config:"with_two_underscores"`
+
+	StrRetrySleepInitDuration        string `yaml:"STRretry_sleep_init_duration" config:"retry_sleep_init_duration"`
+	StrAnotherRetrySleepInitDuration string `yaml:"STRanotherretry_sleep_init_duration" config:"anotherretry_sleep_init_duration"`
+	StrYetOdd                        string `yaml:"STRone_two_three_underscores" config:"one_two_three_underscores"`
+	StrTwoUnderscores                string `yaml:"STRwith_two_underscores" config:"with_two_underscores"`
 
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
@@ -162,11 +170,19 @@ func DefaultConfig() *Config {
 	transport.Timeout = 120 * time.Minute
 
 	return &Config{
-		SourceURI:              DefaultSourceURI,
-		TargetDirectory:        paths.Downloads(),
-		InstallPath:            paths.Install(),
-		RetrySleepInitDuration: 30 * time.Second,
-		HTTPTransportSettings:  transport,
+		SourceURI:                     DefaultSourceURI,
+		TargetDirectory:               paths.Downloads(),
+		InstallPath:                   paths.Install(),
+		RetrySleepInitDuration:        30 * time.Second,
+		AnotherRetrySleepInitDuration: 30 * time.Second,
+		YetOdd:                        30 * time.Second,
+		TwoUnderscores:                30 * time.Second,
+
+		StrRetrySleepInitDuration:        "30 * time.Second",
+		StrAnotherRetrySleepInitDuration: "30 * time.Second",
+		StrYetOdd:                        "30 * time.Second",
+		StrTwoUnderscores:                "30 * time.Second",
+		HTTPTransportSettings:            transport,
 	}
 }
 

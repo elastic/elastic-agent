@@ -42,8 +42,9 @@ func (e *FleetAgentConfig) Valid() error {
 // DefaultFleetAgentConfig creates a default configuration for fleet.
 func DefaultFleetAgentConfig() *FleetAgentConfig {
 	return &FleetAgentConfig{
-		Enabled: false,
-		Client:  remote.DefaultClientConfig(),
-		Info:    &AgentInfo{},
+		AccessAPIKey: "default",
+		Enabled:      false,
+		Client:       remote.DefaultClientConfig(),
+		Info:         &AgentInfo{},
 	}
 }

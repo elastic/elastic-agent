@@ -12,6 +12,11 @@ type Config struct {
 	StopTimeout    time.Duration `yaml:"stop_timeout" config:"stop_timeout"`
 	FailureTimeout time.Duration `yaml:"failure_timeout" config:"failure_timeout"`
 
+	RetrySleepInitDuration        time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
+	AnotherRetrySleepInitDuration time.Duration `yaml:"anotherretry_sleep_init_duration" config:"anotherretry_sleep_init_duration"`
+	YetOdd                        time.Duration `yaml:"one_two_three_underscores" config:"one_two_three_underscores"`
+	TwoUnderscores                time.Duration `yaml:"with_two_underscores" config:"with_two_underscores"`
+
 	// TODO: cgroups and namespaces
 }
 

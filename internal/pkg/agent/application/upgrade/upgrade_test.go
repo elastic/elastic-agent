@@ -322,8 +322,67 @@ agent:
 	assert.Equal(t, u.settings.Timeout, 11*time.Second)
 	assert.NotEqual(t,
 		u.settings.DropPath, defaultcfg.Settings.DownloadConfig.DropPath)
-
 	for _, l := range o.TakeAll() {
 		t.Logf(l.Message)
 	}
+}
+func TestOdd_Unpack(t *testing.T) {
+	defaultcfg := configuration.DefaultConfiguration()
+	fleetCfg := `
+#retry_sleep_init_duration: "42s"
+fleet:
+  access_api_key: "changed-api-key"
+agent:
+  download:
+    sourceURI: "https://this.gets.applied"
+    retry_sleep_init_duration: "42s"
+    anotherretry_sleep_init_duration: "43s"
+    one_two_three_underscores: "44s"
+    with_two_underscores: "45s"
+    STRretry_sleep_init_duration: "42s"
+    STRanotherretry_sleep_init_duration: "43s"
+    STRone_two_three_underscores: "44s"
+    STRwith_two_underscores: "45s"
+    timeout: "11s"
+  process:
+    sourceURI: "https://this.gets.applied"
+    retry_sleep_init_duration: "42s"
+    anotherretry_sleep_init_duration: "43s"
+    one_two_three_underscores: "44s"
+    with_two_underscores: "45s"
+    timeout: "11s"
+#    dropPath: "/tmp" # not set, therefore not overridden
+`
+
+	rawcfg, err := config.NewConfigFrom(fleetCfg)
+	require.NoError(t, err, "failed to create new config")
+
+	cfg, err := configuration.NewFromConfig(rawcfg)
+	require.NoError(t, err, "error reloading config")
+
+	// this does not work for some reason
+	assert.Equalf(t, 42*time.Second, cfg.Settings.DownloadConfig.RetrySleepInitDuration, "download config is wrong")
+	assert.Equalf(t, 43*time.Second, cfg.Settings.DownloadConfig.AnotherRetrySleepInitDuration, "download config is wrong")
+	assert.Equalf(t, 44*time.Second, cfg.Settings.DownloadConfig.YetOdd, "download config is wrong")
+	assert.Equalf(t, 45*time.Second, cfg.Settings.DownloadConfig.TwoUnderscores, "download config is wrong")
+
+	assert.Equalf(t, "42*time.Second", cfg.Settings.DownloadConfig.StrRetrySleepInitDuration, "STR download config is wrong")
+	assert.Equalf(t, "43*time.Second", cfg.Settings.DownloadConfig.StrAnotherRetrySleepInitDuration, "STR download config is wrong")
+	assert.Equalf(t, "44*time.Second", cfg.Settings.DownloadConfig.StrYetOdd, "STR download config is wrong")
+	assert.Equalf(t, "45*time.Second", cfg.Settings.DownloadConfig.StrTwoUnderscores, "STR download config is wrong")
+
+	// those work
+	assert.Equalf(t, 42*time.Second, cfg.Settings.ProcessConfig.RetrySleepInitDuration, "process config is wrong")
+	assert.Equalf(t, 43*time.Second, cfg.Settings.ProcessConfig.AnotherRetrySleepInitDuration, "process config is wrong")
+	assert.Equalf(t, 44*time.Second, cfg.Settings.ProcessConfig.YetOdd, "process config is wrong")
+	assert.Equalf(t, 45*time.Second, cfg.Settings.ProcessConfig.TwoUnderscores, "process config is wrong")
+
+	assert.Equalf(t, defaultcfg.RetrySleepInitDuration, cfg.RetrySleepInitDuration, "top level config is wrong")
+
+	// those works as expected
+	assert.Equal(t, cfg.Fleet.AccessAPIKey, "changed-api-key")
+	assert.Equal(t, "https://this.gets.applied", cfg.Settings.DownloadConfig.SourceURI)
+	assert.Equal(t, 11*time.Second, cfg.Settings.DownloadConfig.Timeout)
+	assert.Equal(t,
+		defaultcfg.Settings.DownloadConfig.DropPath, cfg.Settings.DownloadConfig.DropPath)
 }
