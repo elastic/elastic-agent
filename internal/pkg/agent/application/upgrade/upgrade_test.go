@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -291,12 +292,14 @@ agent.download:
 }
 
 func TestUpgraderReload_odd_Unpack(t *testing.T) {
+	defaultcfg := configuration.DefaultConfiguration()
 	fleetCfg := `
 agent:
   download:
     sourceURI: "https://this.gets.applied"
     retry_sleep_init_duration: "42s"
     timeout: "11s"
+#    dropPath: "/tmp" # not set, therefore not overridden
 `
 	log, o := logger.NewTesting("")
 
@@ -317,6 +320,8 @@ agent:
 	// those works as expected
 	assert.Equal(t, u.settings.SourceURI, "https://this.gets.applied")
 	assert.Equal(t, u.settings.Timeout, 11*time.Second)
+	assert.NotEqual(t,
+		u.settings.DropPath, defaultcfg.Settings.DownloadConfig.DropPath)
 
 	for _, l := range o.TakeAll() {
 		t.Logf(l.Message)
