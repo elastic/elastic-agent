@@ -1887,7 +1887,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		}
 
 	} else if stackProvisionerMode == ess.ProvisionerServerless {
-		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
 		if err != nil {
 			return nil, err
 		}
