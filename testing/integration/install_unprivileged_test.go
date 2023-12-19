@@ -73,7 +73,7 @@ func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true, Unprivileged: true})
+	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true, Privileged: false})
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
@@ -132,9 +132,9 @@ func TestInstallUnprivilegedWithBasePath(t *testing.T) {
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	out, err := fixture.Install(ctx, &atesting.InstallOpts{
-		BasePath:     basePath,
-		Force:        true,
-		Unprivileged: true,
+		BasePath:   basePath,
+		Force:      true,
+		Privileged: false,
 	})
 	if err != nil {
 		t.Logf("install output: %s", out)

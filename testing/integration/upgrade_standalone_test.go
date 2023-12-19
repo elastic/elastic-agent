@@ -29,58 +29,44 @@ func TestStandaloneUpgrade(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
-	defer cancel()
-
 	// test 2 current 8.x version and 1 previous 7.x version
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(1*time.Minute))
+	defer cancel()
 	versionList, err := upgradetest.GetUpgradableVersions(ctx, define.Version(), 2, 1)
+	require.NoError(t, err)
+	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
 	for _, startVersion := range versionList {
-		t.Run(fmt.Sprintf("Upgrade %s to %s", startVersion, define.Version()), func(t *testing.T) {
-			startFixture, err := atesting.NewFixture(
-				t,
-				startVersion.String(),
-				atesting.WithFetcher(atesting.ArtifactFetcher()),
-			)
-			require.NoError(t, err, "error creating previous agent fixture")
-
-			endFixture, err := define.NewFixture(t, define.Version())
-			require.NoError(t, err)
-
-			err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t)
-			assert.NoError(t, err)
+		unprivilegedAvailable := true
+		if startVersion.Less(*upgradetest.Version_8_13_0) || endVersion.Less(*upgradetest.Version_8_13_0) {
+			unprivilegedAvailable = false
+		}
+		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
+			testStandaloneUpgrade(t, startVersion, define.Version(), true)
 		})
+		if unprivilegedAvailable {
+			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
+				testStandaloneUpgrade(t, startVersion, define.Version(), false)
+			})
+		}
 	}
 }
 
-func TestStandaloneUpgradeUnprivileged(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: UpgradeUnprivileged,
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
-	})
-
-	currentVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
-	if currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) {
-		t.Skipf("Version %s is lower than min version %s; test cannot be performed", define.Version(), upgradetest.Version_8_12_0_SNAPSHOT)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
+func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, privileged bool) {
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	// this can only currently test upgrading from snapshot 8.12 to build of 8.12.
 	startFixture, err := atesting.NewFixture(
 		t,
-		upgradetest.EnsureSnapshot(define.Version()),
+		startVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err, "error creating previous agent fixture")
 
-	endFixture, err := define.NewFixture(t, define.Version())
+	endFixture, err := define.NewFixture(t, endVersion)
 	require.NoError(t, err)
 
-	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithUnprivileged(true))
+	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithPrivileged(privileged))
 	assert.NoError(t, err)
 }

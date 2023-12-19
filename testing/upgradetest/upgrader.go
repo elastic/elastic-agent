@@ -29,7 +29,7 @@ type CustomPGP struct {
 type upgradeOpts struct {
 	sourceURI *string
 
-	unprivileged     bool
+	privileged       *bool
 	skipVerify       bool
 	skipDefaultPgp   bool
 	customPgp        *CustomPGP
@@ -57,10 +57,10 @@ func WithSourceURI(sourceURI string) UpgradeOpt {
 	}
 }
 
-// WithUnprivileged sets the install to be unprivileged
-func WithUnprivileged(unprivileged bool) UpgradeOpt {
+// WithPrivileged sets the install to be privileged
+func WithPrivileged(privileged bool) UpgradeOpt {
 	return func(opts *upgradeOpts) {
-		opts.unprivileged = unprivileged
+		opts.privileged = &privileged
 	}
 }
 
@@ -125,7 +125,7 @@ func WithCustomWatcherConfig(cfg string) UpgradeOpt {
 // useful in upgrade tests where the end Agent version does not contain changes
 // in the Upgrade Watcher whose effects are being asserted upon in PerformUpgrade.
 // TODO: should be removed along with all references once 8.13.0 has been released.
-func WithDisableUpgradeWatcherUpgradeDetailsCheck() upgradeOpt {
+func WithDisableUpgradeWatcherUpgradeDetailsCheck() UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.disableUpgradeWatcherUpgradeDetailsCheck = true
 	}
@@ -178,22 +178,47 @@ func PerformUpgrade(
 	if err != nil {
 		return fmt.Errorf("failed to get parsed start agent build version (%s): %w", startVersionInfo.Binary.String(), err)
 	}
+	startVersion, err := version.ParseVersion(startVersionInfo.Binary.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse version of starting Agent binary: %w", err)
+	}
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get end agent build version info: %w", err)
+	}
+	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
+	}
+
+	// in the (un-)privileged is unset we adjust it to use unprivileged when the version allows it
+	// in the case that its explicitly set then we ensure the version supports it
+	if upgradeOpts.privileged == nil {
+		if !startVersion.Less(*Version_8_13_0) && !endVersion.Less(*Version_8_13_0) {
+			// both version support --unprivileged
+			privileged := false
+			upgradeOpts.privileged = &privileged
+			logger.Logf("installation of Elastic Agent will use --unprivileged as both start and end version support --unprivileged mode")
+		} else {
+			// must be privileged
+			privileged := true
+			upgradeOpts.privileged = &privileged
+		}
+	} else if !*upgradeOpts.privileged {
+		if startVersion.Less(*Version_8_13_0) {
+			return errors.New("cannot install starting version with --unprivileged (which is default) because the it is older than 8.13")
+		}
+		if endVersion.Less(*Version_8_13_0) {
+			return errors.New("cannot upgrade to ending version as end version doesn't support running with --unprivileged (which is default) because it is older than 8.13")
+		}
 	}
 
 	// For asserting on the effects of any Upgrade Watcher changes made in 8.13.0, we need
 	// the endVersion to be >= 8.13.0.  Otherwise, these assertions will fail as those changes
 	// won't be present in the Upgrade Watcher. So we disable these assertions if the endVersion
 	// is < 8.13.0.
-	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
-	if err != nil {
-		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
-	}
-
 	upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck = upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck ||
-		endVersion.Less(*version.NewParsedSemVer(8, 13, 0, "", ""))
+		endVersion.Less(*Version_8_13_0)
 
 	if upgradeOpts.preInstallHook != nil {
 		if err := upgradeOpts.preInstallHook(); err != nil {
@@ -211,7 +236,7 @@ func PerformUpgrade(
 	installOpts := atesting.InstallOpts{
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
-		Unprivileged:   upgradeOpts.unprivileged,
+		Privileged:     *upgradeOpts.privileged,
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	if err != nil {

@@ -36,8 +36,9 @@ import (
 )
 
 // TestFleetManagedUpgrade tests that the build under test can retrieve an action from
-// Fleet and perform the upgrade. It does not need to test all the combinations of
-// versions as the standalone tests already perform those tests and would be redundant.
+// Fleet and perform the upgrade as an unprivileged Elastic Agent. It does not need to test
+// all the combinations of versions as the standalone tests already perform those tests and
+// would be redundant.
 func TestFleetManagedUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Fleet,
@@ -48,11 +49,11 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	testFleetManagedUpgrade(t, info, false)
 }
 
-// TestFleetManagedUpgrade tests that the build under test can retrieve an action from
-// Fleet and perform the upgrade install as unprivileged. It does not need to test all
-// the combinations of  versions as the standalone tests already perform those tests
-// and would be redundant.
-func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
+// TestFleetManagedUpgradePrivileged tests that the build under test can retrieve an action from
+// Fleet and perform the upgrade as a privileged Elastic Agent. It does not need to test all
+// the combinations of  versions as the standalone tests already perform those tests and
+// would be redundant.
+func TestFleetManagedUpgradePrivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: FleetUnprivileged,
 		Stack: &define.Stack{},
@@ -62,7 +63,7 @@ func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
 	testFleetManagedUpgrade(t, info, true)
 }
 
-func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool) {
+func testFleetManagedUpgrade(t *testing.T, info *define.Info, privileged bool) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
@@ -96,11 +97,11 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool)
 			startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
 	}
 
-	if unprivileged {
+	if !privileged {
 		currentVersion, err := version.ParseVersion(define.Version())
 		require.NoError(t, err)
-		if currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) {
-			t.Skipf("Version is %s is less than 8.12 and doesn't suppoert unprivileged mode.", define.Version())
+		if currentVersion.Less(*upgradetest.Version_8_13_0) {
+			t.Skipf("Version is %s is less than 8.13 and doesn't suppoert unprivileged mode.", define.Version())
 		}
 		if runtime.GOOS != define.Linux {
 			t.Skip("Unprivileged mode is currently only supported on linux")
@@ -110,7 +111,7 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool)
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), endVersionInfo.Binary.String())
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged)
+	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), privileged)
 }
 
 func TestFleetAirGappedUpgrade(t *testing.T) {
@@ -212,7 +213,7 @@ func testUpgradeFleetManagedElasticAgent(
 	startFixture *atesting.Fixture,
 	endFixture *atesting.Fixture,
 	policy kibana.AgentPolicy,
-	unprivileged bool) {
+	privileged bool) {
 	kibClient := info.KibanaClient
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
@@ -250,7 +251,7 @@ func testUpgradeFleetManagedElasticAgent(
 			URL:             fleetServerURL,
 			EnrollmentToken: enrollmentToken.APIKey,
 		},
-		Unprivileged: unprivileged,
+		Privileged: privileged,
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))

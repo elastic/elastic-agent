@@ -57,13 +57,20 @@ type InstallOpts struct {
 	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
-	Unprivileged   bool   // --unprivileged
+
+	// Privileged is inverse of the actual flag of --unprivileged because
+	// the default for all integration tests is to install with --unprivileged.
+	// Setting to true will result in --unprivileged being used.
+	Privileged bool
 
 	EnrollOpts
 }
 
 func (i InstallOpts) toCmdArgs() []string {
 	var args []string
+	if !i.Privileged {
+		args = append(args, "--unprivileged")
+	}
 	if i.BasePath != "" {
 		args = append(args, "--base-path", i.BasePath)
 	}
@@ -78,9 +85,6 @@ func (i InstallOpts) toCmdArgs() []string {
 	}
 	if i.ProxyURL != "" {
 		args = append(args, "--proxy-url="+i.ProxyURL)
-	}
-	if i.Unprivileged {
-		args = append(args, "--unprivileged")
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
@@ -121,7 +125,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 		// Windows uses a fixed named pipe, that is always the same.
 		// It is the same even running in unprivileged mode.
 		socketPath = `\\.\pipe\elastic-agent-system`
-	} else if installOpts.Unprivileged {
+	} else if !installOpts.Privileged {
 		// Unprivileged versions move the socket to inside the installed directory
 		// of the Elastic Agent.
 		socketPath = fmt.Sprintf("unix://%s", filepath.Join(f.workDir, paths.ControlSocketName))

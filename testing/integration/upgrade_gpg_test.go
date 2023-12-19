@@ -8,7 +8,6 @@ package integration
 
 import (
 	"context"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -79,18 +78,11 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 		PGP: newPgp,
 	}
 
-	upgradeOpts := []upgradetest.UpgradeOpt{
+	err = upgradetest.PerformUpgrade(
+		ctx, startFixture, endFixture, t,
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
-		upgradetest.WithSkipVerify(false),
-	}
-	if !currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) && runtime.GOOS == define.Linux {
-		// on Linux and 8.12+ we run this test as unprivileged
-		upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(true))
-	}
-
-	err = upgradetest.PerformUpgrade(
-		ctx, startFixture, endFixture, t, upgradeOpts...)
+		upgradetest.WithSkipVerify(false))
 	require.NoError(t, err, "perform upgrade failed")
 }
 
@@ -141,16 +133,6 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	customPGP := upgradetest.CustomPGP{
 		PGP:    newPgp,
 		PGPUri: "https://127.0.0.1:3456/non/existing/path",
-	}
-
-	upgradeOpts := []upgradetest.UpgradeOpt{
-		upgradetest.WithSourceURI(""),
-		upgradetest.WithCustomPGP(customPGP),
-		upgradetest.WithSkipVerify(false),
-	}
-	if !currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) && runtime.GOOS == define.Linux {
-		// on Linux and 8.12+ we run this test as unprivileged
-		upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(true))
 	}
 
 	err = upgradetest.PerformUpgrade(

@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"errors"
-	"runtime"
 	"testing"
 	"time"
 
@@ -62,16 +61,8 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 		return ErrPostExit
 	}
 
-	upgradeOpts := []upgradetest.UpgradeOpt{
-		upgradetest.WithPostUpgradeHook(postUpgradeHook),
-	}
-	if !currentVersion.Less(*upgradetest.Version_8_12_0_SNAPSHOT) && runtime.GOOS == define.Linux {
-		// on Linux and 8.12+ we run this test as unprivileged
-		upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(true))
-	}
-
 	err = upgradetest.PerformUpgrade(
-		ctx, startFixture, endFixture, t, upgradeOpts...)
+		ctx, startFixture, endFixture, t, upgradetest.WithPostUpgradeHook(postUpgradeHook))
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}
