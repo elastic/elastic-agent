@@ -197,10 +197,10 @@ func checkInstallUnprivilegedSuccess(t *testing.T, topPath string) {
 
 	// Executing `elastic-agent status` as the original user should fail, because that
 	// user is not in the 'elastic-agent' group.
-	originalUser := os.Getenv("USER")
+	originalUser := os.Getenv("SUDO_USER")
 	if originalUser != "" {
 		cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
 		output, err := cmd.CombinedOutput()
-		require.Error(t, err, "running elastic-agent status should have failed: %s", output)
+		require.Error(t, err, "running sudo -u %s elastic-agent status should have failed: %s", originalUser, output)
 	}
 }

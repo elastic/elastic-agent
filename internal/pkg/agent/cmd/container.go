@@ -397,6 +397,7 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		"--path.home", paths.Top(), // --path.home actually maps to paths.Top()
 		"--path.config", paths.Config(),
 		"--path.logs", paths.Logs(),
+		"--path.socket", paths.ControlSocket(),
 	}
 	if paths.Downloads() != "" {
 		args = append(args, "--path.downloads", paths.Downloads())
