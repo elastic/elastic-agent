@@ -128,18 +128,18 @@ details:
 				State:         details.StateRollback,
 			},
 		},
-		"same_version_with_details_wrong_state": {
+		"same_version_with_details_some_state": {
 			markerFileContents: `
 prev_version: 8.9.2
 details:
   target_version: 8.9.2
-  state: UPG_WATCHING
+  state: UPG_REPLACING
 `,
 			upgradeStarted:    false,
 			expectedErrLogMsg: false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
-				State:         details.StateRollback,
+				State:         details.StateReplacing,
 			},
 		},
 		"different_version": {
@@ -185,7 +185,7 @@ details:
 			expectedErrLogMsg:   false,
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
-				State:         details.StateRollback,
+				State:         details.StateWatching,
 			},
 		},
 		"same_version_same_hash_no_details": {
