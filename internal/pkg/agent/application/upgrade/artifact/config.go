@@ -285,7 +285,7 @@ func (c *Config) Unpack(cfg *c.C) error {
 		cField := cValue.FieldByName(name)
 
 		if cField.IsValid() && cField.CanSet() {
-			cField.Set(tmpValue.Field(i))
+			cField.Set(tmpValue.FieldByName(name))
 		}
 	}
 	c.HTTPTransportSettings = transport
