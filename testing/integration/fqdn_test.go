@@ -100,11 +100,7 @@ func TestFQDN(t *testing.T) {
 		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policy.ID))
 
 		t.Log("Restoring hostname...")
-<<<<<<< HEAD
-		err := setHostname(ctx, origHostname, t.Log)
-=======
 		err := setHostname(cleanupCtx, origHostname, t.Log)
->>>>>>> dcc6493e2e (Add missing contexts (and therefore timeouts) to integration test code (#3892))
 		require.NoError(t, err)
 
 		t.Log("Restoring original /etc/hosts...")
