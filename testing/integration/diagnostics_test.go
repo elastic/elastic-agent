@@ -109,7 +109,7 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 		Configure:  simpleConfig2,
 		AgentState: integrationtest.NewClientState(client.Healthy),
 		Components: componentSetup,
-		After:      testDiagnosticsFactory(ctx, t, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
+		After:      testDiagnosticsFactory(t, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
 	})
 
 }
@@ -132,13 +132,13 @@ func TestDiagnosticsCommand(t *testing.T) {
 		Configure:  simpleConfig2,
 		AgentState: integrationtest.NewClientState(client.Healthy),
 		Components: componentSetup,
-		After:      testDiagnosticsFactory(ctx, t, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+		After:      testDiagnosticsFactory(t, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 	})
 	assert.NoError(t, err)
 }
 
-func testDiagnosticsFactory(ctx context.Context, t *testing.T, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func() error {
-	return func() error {
+func testDiagnosticsFactory(t *testing.T, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
 		diagnosticCommandWD := t.TempDir()
 		diagnosticCmdOutput, err := fix.Exec(ctx, cmd, process.WithWorkDir(diagnosticCommandWD))
 
