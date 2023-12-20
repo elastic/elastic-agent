@@ -136,7 +136,7 @@ inputs:
 		require.NoError(t, err)
 
 		require.NotNil(t, state.UpgradeDetails)
-		require.Equal(t, details.StateRollback, state.UpgradeDetails.State)
+		require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
 	}
 
 	// rollback should stop the watcher
@@ -268,7 +268,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotNil(t, state.UpgradeDetails)
-		require.Equal(t, details.StateRollback, state.UpgradeDetails.State)
+		require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
 	}
 
 	// rollback should stop the watcher

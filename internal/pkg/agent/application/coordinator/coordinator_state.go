@@ -120,6 +120,8 @@ func (c *Coordinator) setOverrideState(overrideState *coordinatorOverrideState) 
 func (c *Coordinator) setUpgradeDetails(upgradeDetails *details.Details) {
 	c.state.UpgradeDetails = upgradeDetails
 	c.stateNeedsRefresh = true
+
+	c.logUpgradeDetails(upgradeDetails)
 }
 
 // Forward the current state to the broadcaster and clear the stateNeedsRefresh
