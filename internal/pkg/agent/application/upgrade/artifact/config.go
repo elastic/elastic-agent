@@ -261,7 +261,7 @@ func (c *Config) Unpack(cfg *c.C) error {
 		tmpField := tmpValue.FieldByName(name)
 
 		if tmpField.IsValid() && tmpField.CanSet() {
-			tmpField.Set(cValue.Field(i))
+			tmpField.Set(cValue.FieldByName(name))
 		}
 	}
 
