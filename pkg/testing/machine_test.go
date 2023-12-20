@@ -5,6 +5,7 @@
 package testing
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -789,6 +790,9 @@ func TestStateMachine(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			m, err := newStateMachine(scenario.States)
 			if scenario.Err != nil {
 				require.Error(t, err)
@@ -797,7 +801,7 @@ func TestStateMachine(t *testing.T) {
 				require.NoError(t, err)
 			}
 			for _, nextCall := range scenario.AgentStates {
-				cfg, cont, err := m.next(nextCall.AgentState)
+				cfg, cont, err := m.next(ctx, nextCall.AgentState)
 				if nextCall.Err != nil {
 					require.Error(t, err)
 					require.Equal(t, nextCall.Err.Error(), err.Error())
@@ -821,32 +825,35 @@ func TestStateMachine_Before_After(t *testing.T) {
 		{
 			Configure:  "my config",
 			AgentState: NewClientState(client.Configuring),
-			Before: func() error {
+			Before: func(ctx context.Context) error {
 				firstBefore = true
 				return nil
 			},
-			After: func() error {
+			After: func(ctx context.Context) error {
 				firstAfter = true
 				return nil
 			},
 		},
 		{
 			AgentState: NewClientState(client.Healthy),
-			Before: func() error {
+			Before: func(ctx context.Context) error {
 				secondBefore = true
 				return nil
 			},
-			After: func() error {
+			After: func(ctx context.Context) error {
 				secondAfter = true
 				return nil
 			},
 		},
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	m, err := newStateMachine(states)
 	require.NoError(t, err)
 
-	cfg, cont, err := m.next(&client.AgentState{
+	cfg, cont, err := m.next(ctx, &client.AgentState{
 		State: client.Configuring,
 	})
 	require.NoError(t, err)
@@ -855,7 +862,7 @@ func TestStateMachine_Before_After(t *testing.T) {
 	require.True(t, firstBefore)
 	require.False(t, firstAfter)
 
-	cfg, cont, err = m.next(&client.AgentState{
+	cfg, cont, err = m.next(ctx, &client.AgentState{
 		State: client.Configuring,
 	})
 	require.NoError(t, err)
@@ -865,7 +872,7 @@ func TestStateMachine_Before_After(t *testing.T) {
 	require.True(t, secondBefore)
 	require.False(t, secondAfter)
 
-	cfg, cont, err = m.next(&client.AgentState{
+	cfg, cont, err = m.next(ctx, &client.AgentState{
 		State: client.Healthy,
 	})
 	require.NoError(t, err)
