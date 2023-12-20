@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
 	"strings"
 	"testing"
 	"text/template"
@@ -56,6 +57,12 @@ func TestAPMConfig(t *testing.T) {
 		Group: Default,
 		Stack: &define.Stack{},
 	})
+
+	if runtime.GOOS == "windows" {
+		// This test hangs indefinitely on Windows. Root cause is TBD.
+		t.Skip("Flaky test: https://github.com/elastic/ingest-dev/issues/2668")
+	}
+
 	f, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
