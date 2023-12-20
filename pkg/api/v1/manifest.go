@@ -14,10 +14,10 @@ import (
 const ManifestKind = "PackageManifest"
 
 type PackageDesc struct {
-	Version       string            `yaml:"version,omitempty" json:"version,omitempty"`
-	Snapshot      bool              `yaml:"snapshot,omitempty" json:"snapshot,omitempty"`
-	VersionedHome string            `yaml:"versioned-home,omitempty" json:"versionedHome,omitempty"`
-	PathMappings  map[string]string `yaml:"path-mappings,omitempty" json:"pathMappings,omitempty"`
+	Version       string              `yaml:"version,omitempty" json:"version,omitempty"`
+	Snapshot      bool                `yaml:"snapshot,omitempty" json:"snapshot,omitempty"`
+	VersionedHome string              `yaml:"versioned-home,omitempty" json:"versionedHome,omitempty"`
+	PathMappings  []map[string]string `yaml:"path-mappings,omitempty" json:"pathMappings,omitempty"`
 }
 
 type PackageManifest struct {

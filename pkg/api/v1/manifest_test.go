@@ -33,7 +33,9 @@ package:
   # - key is a prefix representing a path relative to the top of the archive 
   # - value is the substitution to be applied when extracting the files
   path-mappings:
-    data/elastic-agent-4f2d39/ : data/elastic-agent-8.12.0/
+    - data/elastic-agent-4f2d39/ : data/elastic-agent-8.12.0/
+      foo: bar
+    - manifest.yaml : data/elastic-agent-8.12.0/manifest.yaml 
 `
 	m, err := ParseManifest(strings.NewReader(manifest))
 	assert.NoError(t, err)
@@ -43,5 +45,5 @@ package:
 	assert.Equal(t, m.Package.Version, "8.12.0")
 	assert.Equal(t, m.Package.Snapshot, false)
 	assert.Equal(t, m.Package.VersionedHome, "data/elastic-agent-4f2d39/")
-	assert.Equal(t, m.Package.PathMappings, map[string]string{"data/elastic-agent-4f2d39/": "data/elastic-agent-8.12.0/"})
+	assert.Equal(t, m.Package.PathMappings, []map[string]string{{"data/elastic-agent-4f2d39/": "data/elastic-agent-8.12.0/", "foo": "bar"}, {"manifest.yaml": "data/elastic-agent-8.12.0/manifest.yaml"}})
 }
