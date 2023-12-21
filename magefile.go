@@ -1584,7 +1584,7 @@ func readFrameworkState() (runner.State, error) {
 	return state, nil
 }
 
-func listVMs() (string, []runner.StateInstance, error) {
+func listInstances() (string, []runner.StateInstance, error) {
 	builder := strings.Builder{}
 	state, err := readFrameworkState()
 	if err != nil {
@@ -1664,7 +1664,7 @@ func listStacks() (string, error) {
 }
 
 func askForVM() (runner.StateInstance, error) {
-	vms, instances, err := listVMs()
+	vms, instances, err := listInstances()
 	if err != nil {
 		fmt.Errorf("cannot list VMs: %w", err)
 	}
@@ -1689,7 +1689,7 @@ func askForVM() (runner.StateInstance, error) {
 }
 
 func askForStack() (runner.Stack, error) {
-	mg.Deps(Integration.ListStacks)
+	mg.Deps(Integration.Stacks)
 
 	state, err := readFrameworkState()
 	if err != nil {
@@ -1752,15 +1752,15 @@ func generateEnvFile(stack runner.Stack) error {
 // PrintState prints details about cloud stacks and VMs
 func (Integration) PrintState(ctx context.Context) {
 	fmt.Println("Virtual Machines")
-	mg.Deps(Integration.ListVMs)
+	mg.Deps(Integration.ListInstances)
 	fmt.Print("\n\n")
 	fmt.Println("Cloud Stacks")
-	mg.Deps(Integration.ListStacks)
+	mg.Deps(Integration.Stacks)
 }
 
-// ListVMs lists all VMs in a human readable form, including connection details
-func (Integration) ListVMs() error {
-	t, _, err := listVMs()
+// ListInstances lists all VMs in a human readable form, including connection details
+func (Integration) ListInstances() error {
+	t, _, err := listInstances()
 	if err != nil {
 		fmt.Errorf("cannot list VMs: %w", err)
 	}
@@ -1770,8 +1770,8 @@ func (Integration) ListVMs() error {
 	return nil
 }
 
-// SSHVM prints to stdout the SSH command to connect to a VM, a menu is printed to stderr.
-func (Integration) SSHVM() error {
+// SSH prints to stdout the SSH command to connect to a VM, a menu is printed to stderr.
+func (Integration) SSH() error {
 	absStateDir, err := filepath.Abs(stateDir)
 	if err != nil {
 		return fmt.Errorf("cannot get absolute path from state directory '%s': %w", stateDir, err)
@@ -1786,8 +1786,8 @@ func (Integration) SSHVM() error {
 	return nil
 }
 
-// ListStacks lists all stack deployments in a human readable form
-func (Integration) ListStacks() error {
+// Stacks lists all stack deployments in a human readable form
+func (Integration) Stacks() error {
 	stacks, err := listStacks()
 	if err != nil {
 		return fmt.Errorf("cannot list stacks: %w", err)
