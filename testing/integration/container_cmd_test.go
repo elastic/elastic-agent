@@ -73,7 +73,7 @@ func TestContainerCMD(t *testing.T) {
 		t.Fatalf("unable to create enrolment API key: %s", err)
 	}
 
-	fleetURL, err := fleettools.DefaultURL(info.KibanaClient)
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
 		t.Fatalf("could not get Fleet URL: %s", err)
 	}
