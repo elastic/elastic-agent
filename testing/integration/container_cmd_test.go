@@ -86,10 +86,14 @@ func TestContainerCMD(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		t.Log(">> cleaning up: killing the Elastic-Agent process")
-		if err := cmd.Process.Kill(); err != nil {
-			t.Fatalf("could not kill Elastic-Agent process: %s", err)
+		if cmd.Process != nil {
+			t.Log(">> cleaning up: killing the Elastic-Agent process")
+			if err := cmd.Process.Kill(); err != nil {
+				t.Fatalf("could not kill Elastic-Agent process: %s", err)
+			}
+			return
 		}
+		t.Log(">> cleaning up: no process to kill")
 	})
 
 	agentOutput := strings.Builder{}
