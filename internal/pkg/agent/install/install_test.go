@@ -71,8 +71,8 @@ package:
     snapshot: true
     versioned-home: elastic-agent-fb7370
     path-mappings:
-        data/elastic-agent-fb7370: data/elastic-agent-8.13.0-SNAPSHOT-fb7370
-        manifest.yaml: data/elastic-agent-8.13.0-SNAPSHOT-fb7370/manifest.yaml
+        - data/elastic-agent-fb7370: data/elastic-agent-8.13.0-SNAPSHOT-fb7370
+          manifest.yaml: data/elastic-agent-8.13.0-SNAPSHOT-fb7370/manifest.yaml
 `
 
 type testLogWriter struct {
@@ -103,7 +103,7 @@ func TestCopyFiles(t *testing.T) {
 		name          string
 		setupFiles    []files
 		expectedFiles []files
-		mappings      map[string]string
+		mappings      []map[string]string
 	}
 
 	testcases := []testcase{
@@ -121,9 +121,11 @@ func TestCopyFiles(t *testing.T) {
 				{fType: REGULAR, path: filepath.Join("data", "elastic-agent-8.13.0-SNAPSHOT-fb7370", "elastic-agent"), content: []byte("this is an elastic-agent wannabe")},
 				{fType: SYMLINK, path: "elastic-agent", content: []byte(filepath.Join("data", "elastic-agent-8.13.0-SNAPSHOT-fb7370", "elastic-agent"))},
 			},
-			mappings: map[string]string{
-				"data/elastic-agent-fb7370": "data/elastic-agent-8.13.0-SNAPSHOT-fb7370",
-				"manifest.yaml":             "data/elastic-agent-8.13.0-SNAPSHOT-fb7370/manifest.yaml",
+			mappings: []map[string]string{
+				{
+					"data/elastic-agent-fb7370": "data/elastic-agent-8.13.0-SNAPSHOT-fb7370",
+					"manifest.yaml":             "data/elastic-agent-8.13.0-SNAPSHOT-fb7370/manifest.yaml",
+				},
 			}},
 	}
 
