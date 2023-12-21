@@ -79,7 +79,7 @@ func TestAPMConfig(t *testing.T) {
 	agentConfig := generateAgentConfigForAPM(t, agentConfigTemplateString, info, environment)
 	t.Logf("Rendered agent config:\n%s", agentConfig)
 
-	testAPMTraces := func() error {
+	testAPMTraces := func(ctx context.Context) error {
 		state, err := f.Client().State(ctx)
 		require.NoError(t, err)
 
@@ -87,7 +87,7 @@ func TestAPMConfig(t *testing.T) {
 
 		// test that APM traces are being sent using initial configuration
 		require.Eventually(t, func() bool {
-			count, errCount := countAPMTraces(t, info.ESClient, name, environment)
+			count, errCount := countAPMTraces(ctx, t, info.ESClient, name, environment)
 			if errCount != nil {
 				t.Logf("Error retrieving APM traces count for service %q and environment %q: %s", name, environment, errCount)
 				return false
@@ -104,7 +104,7 @@ func TestAPMConfig(t *testing.T) {
 
 		// check that we receive traces with the new environment string
 		require.Eventually(t, func() bool {
-			count, errCount := countAPMTraces(t, info.ESClient, name, environment)
+			count, errCount := countAPMTraces(ctx, t, info.ESClient, name, environment)
 			if errCount != nil {
 				t.Logf("Error retrieving APM traces count for service %q and environment %q: %s", name, environment, errCount)
 				return false
@@ -138,7 +138,7 @@ func TestAPMConfig(t *testing.T) {
 
 }
 
-func countAPMTraces(t *testing.T, esClient *elasticsearch.Client, serviceName, environment string) (int, error) {
+func countAPMTraces(ctx context.Context, t *testing.T, esClient *elasticsearch.Client, serviceName, environment string) (int, error) {
 	queryRaw := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
@@ -171,6 +171,7 @@ func countAPMTraces(t *testing.T, esClient *elasticsearch.Client, serviceName, e
 	count := esClient.Count
 
 	response, err := count(
+		count.WithContext(ctx),
 		count.WithIndex("traces-apm-default"),
 		count.WithBody(buf),
 	)

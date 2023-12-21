@@ -480,7 +480,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 			}
 		case state := <-stateCh:
 			if smInstance != nil {
-				cfg, cont, err := smInstance.next(state)
+				cfg, cont, err := smInstance.next(ctx, state)
 				if err != nil {
 					killProc()
 					return fmt.Errorf("state management failed with unexpected error: %w", err)
