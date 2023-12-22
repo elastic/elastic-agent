@@ -7,10 +7,14 @@ package upgrade
 import (
 	"fmt"
 	"os"
+
+	"github.com/elastic/elastic-agent-libs/file"
 )
 
 func writeMarkerFileCommon(markerFile string, markerBytes []byte, shouldFsync bool) error {
-	f, err := os.OpenFile(markerFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	tmpMarkerFile := fmt.Sprintf("%s.tmp", markerFile)
+
+	f, err := os.OpenFile(tmpMarkerFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open upgrade marker file for writing: %w", err)
 	}
@@ -26,6 +30,10 @@ func writeMarkerFileCommon(markerFile string, markerBytes []byte, shouldFsync bo
 
 	if err := f.Sync(); err != nil {
 		return fmt.Errorf("failed to sync upgrade marker file to disk: %w", err)
+	}
+
+	if err := file.SafeFileRotate(markerFile, tmpMarkerFile); err != nil {
+		return fmt.Errorf("failed to safe rotate upgrade marker file: %w", err)
 	}
 
 	return nil
