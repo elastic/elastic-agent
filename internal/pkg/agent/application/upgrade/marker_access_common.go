@@ -7,12 +7,13 @@ package upgrade
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/file"
 )
 
 func writeMarkerFileCommon(markerFile string, markerBytes []byte, shouldFsync bool) error {
-	tmpMarkerFile := fmt.Sprintf("%s.tmp", markerFile)
+	tmpMarkerFile := fmt.Sprintf("%s-%d-%d.tmp", markerFile, os.Getpid(), time.Now().UnixMilli())
 
 	f, err := os.OpenFile(tmpMarkerFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
