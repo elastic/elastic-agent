@@ -10,7 +10,7 @@ import (
 )
 
 func writeMarkerFileCommon(markerFile string, markerBytes []byte, shouldFsync bool) error {
-	f, err := os.OpenFile(markerFile, os.O_WRONLY|os.O_CREATE, 0600)
+	f, err := os.OpenFile(markerFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open upgrade marker file for writing: %w", err)
 	}
