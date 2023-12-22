@@ -12,8 +12,8 @@ updates:
     allow:
       # Only update internal dependencies for now while we evaluate this workflow.
       - dependency-name: "github.com/elastic/*"
-      - dependency-name: "go.opentelemetry.io/*"
-      - dependency-name: "github.com/open-telemetry/*"
+      - dependency-name: "go.opentelemetry.io/collector/*"
+      - dependency-name: "github.com/open-telemetry/opentelemetry-collector-contrib/*"
     reviewers:
       - "elastic/elastic-agent-control-plane"
     open-pull-requests-limit: 10
