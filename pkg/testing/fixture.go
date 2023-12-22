@@ -511,7 +511,11 @@ func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, stat
 	}
 
 	killProc := func() {
-		_ = proc.Kill()
+		err := proc.Kill()
+		if err != nil {
+			f.t.Logf("Error killing process: %s", err)
+			return
+		}
 		<-proc.Wait()
 	}
 
