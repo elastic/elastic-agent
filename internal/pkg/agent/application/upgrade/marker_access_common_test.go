@@ -90,7 +90,7 @@ func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh
 					return
 				}
 
-				errCh <- fmt.Errorf("upgrade marker watch returned error: %s", err)
+				errCh <- fmt.Errorf("upgrade marker watch returned error: %w", err)
 				continue
 			case e, ok := <-watcher.Events:
 				if !ok { // Channel was closed (i.e. Watcher.Close() was called).
