@@ -67,6 +67,7 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	// If the marker file isn't listed in openfiles, it might be free now,
 	// therefore, try again.
 	if err != nil && !inOpenfiles(t, testMarkerFile) {
+		t.Logf("not inOpenfiles, trying once more")
 		err = writeMarkerFile(testMarkerFile, randomBytes(40), true)
 	}
 	require.NoError(t, err, "could not write long marker file")
@@ -83,6 +84,7 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	// If the marker file isn't listed in openfiles, it might be free now,
 	// therefore, try again.
 	if err != nil && !inOpenfiles(t, testMarkerFile) {
+		t.Logf("not inOpenfiles, trying once more")
 		err = writeMarkerFile(testMarkerFile, randomBytes(25), true)
 	}
 	require.NoError(t, err)
@@ -141,6 +143,8 @@ func inOpenfiles(t *testing.T, file string) bool {
 	if !found {
 		t.Logf("openfiles called, but nothing about %q was found",
 			file)
+		t.Log("openfiles output:")
+		t.Log(output)
 	}
 
 	return found
