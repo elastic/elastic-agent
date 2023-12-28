@@ -71,6 +71,25 @@ func accessMarkerFileWithRetries(accessFn func() error) error {
 	defer cancel()
 
 	expBackoffWithTimeout := backoff.WithContext(expBackoff, ctx)
+	start := time.Now()
 
-	return backoff.Retry(accessFn, expBackoffWithTimeout)
+	var duration time.Duration
+	var count int
+	var err error
+	if err = accessFn(); err == nil {
+		return nil
+	}
+
+	for duration = expBackoffWithTimeout.NextBackOff(); duration != backoff.Stop; duration = expBackoffWithTimeout.NextBackOff() {
+		time.Sleep(duration)
+
+		if err = accessFn(); err == nil {
+			return nil
+		}
+
+		count++
+	}
+
+	return fmt.Errorf("could not write narker after %s and %d retries. Last error: %w",
+		time.Since(start), count, err)
 }

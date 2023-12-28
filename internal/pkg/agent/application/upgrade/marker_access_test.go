@@ -54,7 +54,9 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	}()
 
 	// Write a long marker file
+	t.Logf("writing long marker file: %q", testMarkerFile)
 	err := writeMarkerFile(testMarkerFile, randomBytes(40), true)
+	t.Logf("wrote long marker file: %q", testMarkerFile)
 	require.NoError(t, err)
 
 	// Get length of file
@@ -63,7 +65,9 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	originalSize := fileInfo.Size()
 
 	// Write a shorter marker file
+	t.Logf("writing shorter marker file: %q", testMarkerFile)
 	err = writeMarkerFile(testMarkerFile, randomBytes(25), true)
+	t.Logf("wrote shorter marker file: %q", testMarkerFile)
 	require.NoError(t, err)
 
 	// Get length of file
