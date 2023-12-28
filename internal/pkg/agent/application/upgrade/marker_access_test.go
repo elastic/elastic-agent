@@ -31,7 +31,7 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	testMarkerFile := filepath.Join(tmpDir, markerFilename)
 
 	// it seems the watcher accessing the file is preventing the marker file to
-	// be written. 'writeMarkerFile' is constanly failing with "The process
+	// be written. 'writeMarkerFile' is constantly failing with "The process
 	// cannot access the file because it is being used by another process."
 	//
 	// TODO(AndersonQ|ycombinator): is it rally necessary to have this watcher?
