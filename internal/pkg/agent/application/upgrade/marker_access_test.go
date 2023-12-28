@@ -10,10 +10,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/fsnotify/fsnotify"
@@ -37,12 +34,6 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	tmpDir := t.TempDir()
 	testMarkerFile := filepath.Join(tmpDir, markerFilename)
 
-	// it seems the watcher accessing the file is preventing the marker file to
-	// be written. 'writeMarkerFile' is constantly failing with "The process
-	// cannot access the file because it is being used by another process."
-	//
-	// TODO(AndersonQ|ycombinator): is it rally necessary to have this watcher?
-	//
 	// Watch marker file for the duration of this test, to ensure
 	// it's never empty (truncated).
 	ctx, cancel := context.WithCancel(context.Background())
@@ -62,16 +53,7 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	}()
 
 	// Write a long marker file
-	t.Log("marker file path:", testMarkerFile)
-	t.Log("writing long marker file")
 	err := writeMarkerFile(testMarkerFile, randomBytes(40), true)
-	t.Log("after writing long marker file")
-	// If the marker file isn't listed in openfiles, it might be free now,
-	// therefore, try again.
-	if err != nil && !inOpenfiles(t, testMarkerFile) {
-		t.Logf("not inOpenfiles, trying once more")
-		err = writeMarkerFile(testMarkerFile, randomBytes(40), true)
-	}
 	require.NoError(t, err, "could not write long marker file")
 
 	// Get length of file
@@ -79,16 +61,7 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	require.NoError(t, err)
 	originalSize := fileInfo.Size()
 
-	// Write a shorter marker file
-	t.Log("writing shorter marker file")
 	err = writeMarkerFile(testMarkerFile, randomBytes(25), true)
-	t.Log("after writing shorter marker file")
-	// If the marker file isn't listed in openfiles, it might be free now,
-	// therefore, try again.
-	if err != nil && !inOpenfiles(t, testMarkerFile) {
-		t.Logf("not inOpenfiles, trying once more")
-		err = writeMarkerFile(testMarkerFile, randomBytes(25), true)
-	}
 	require.NoError(t, err)
 
 	// Get length of file
@@ -104,52 +77,6 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	cancel()
 	require.NoError(t, watchErr)
 	close(errCh)
-}
-
-// inOpenfiles uses Windows 'openfiles' program to try to find out which
-// process is using 'file'. It returns true if found, false otherwise. It also
-// returns false if the platform isn't Windows or `openfiles` isn't found.
-func inOpenfiles(t *testing.T, file string) bool {
-	if runtime.GOOS != "windows" {
-		return false
-	}
-
-	openfiles, err := exec.LookPath("openfiles")
-	if err != nil {
-		t.Logf("did not fing openfiles to debug what proces is accessing the marker file: %v", err)
-		return false
-	}
-
-	// docs: https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/openfiles
-	cmd := exec.Command(openfiles, "/query", "/fo", "csv")
-	output, err := cmd.Output()
-	if err != nil {
-		t.Logf("failed running openfiles: Err: %v, Output: %q", err, output)
-		var errExit *exec.ExitError
-		if errors.As(err, &errExit) && len(errExit.Stderr) > 0 {
-			t.Logf("failed running openfiles: stderr: %s", errExit.Stderr)
-		}
-		return false
-	}
-
-	lines := strings.Split(string(output), "\n")
-	var found bool
-	for _, line := range lines {
-		// check if the line is about the marker file
-		if strings.Contains(line, file) {
-			found = true
-			t.Log("openfiles output about the marker file\n", line)
-		}
-	}
-
-	if !found {
-		t.Logf("openfiles called, but nothing about %q was found",
-			file)
-		t.Log("openfiles output:")
-		t.Log(output)
-	}
-
-	return found
 }
 
 func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh chan error) {
