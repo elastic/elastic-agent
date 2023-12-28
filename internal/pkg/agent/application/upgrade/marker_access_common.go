@@ -7,16 +7,15 @@ package upgrade
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/elastic/elastic-agent-libs/file"
 )
 
 func writeMarkerFileCommon(markerFile string, markerBytes []byte, shouldFsync bool) error {
-	tmpMarkerFile := fmt.Sprintf("%s-%d-%d.tmp", markerFile, os.Getpid(), time.Now().UnixMilli())
-
-	f, err := os.OpenFile(tmpMarkerFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := os.CreateTemp(
+		filepath.Dir(markerFile), fmt.Sprintf("%d-*.tmp", os.Getpid()))
 	if err != nil {
 		return fmt.Errorf("failed to open upgrade marker file for writing: %w", err)
 	}
@@ -42,7 +41,7 @@ func writeMarkerFileCommon(markerFile string, markerBytes []byte, shouldFsync bo
 	// I think we need to close before trying to swap the files on Windows
 	closeFile()
 
-	if err := file.SafeFileRotate(markerFile, tmpMarkerFile); err != nil {
+	if err := file.SafeFileRotate(markerFile, f.Name()); err != nil {
 		return fmt.Errorf("failed to safe rotate upgrade marker file: %w", err)
 	}
 
