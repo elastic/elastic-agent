@@ -5,11 +5,15 @@
 package upgrade
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -55,10 +59,34 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	// }()
 
 	// Write a long marker file
-	t.Logf("writing long marker file: %q", testMarkerFile)
+	t.Log("marker file path:", testMarkerFile)
+	t.Log("writing long marker file")
 	err := writeMarkerFile(testMarkerFile, randomBytes(40), true)
-	t.Logf("wrote long marker file: %q", testMarkerFile)
-	require.NoError(t, err)
+	t.Log("wrote long marker file")
+	assert.NoError(t, err)
+	if err != nil && strings.Contains(err.Error(), "the file because it is being used by another process") {
+		openfiles, err := exec.LookPath("openfiles")
+		if err != nil {
+			t.Logf("did not fing openfiles to debug what proces is accessing the marker file: %v", err)
+			return
+		}
+
+		// docs: https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/openfiles
+		cmd := exec.Command(openfiles, "/query", "/fo", "csv")
+		output, err := cmd.Output()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			// check if the line is about the marker file
+			if strings.Contains(line, testMarkerFile) {
+				t.Log("openfiles output about the marker file\n", line)
+			}
+		}
+	}
 
 	// Get length of file
 	fileInfo, err := os.Stat(testMarkerFile)
@@ -66,9 +94,9 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	originalSize := fileInfo.Size()
 
 	// Write a shorter marker file
-	t.Logf("writing shorter marker file: %q", testMarkerFile)
+	t.Log("writing shorter marker file")
 	err = writeMarkerFile(testMarkerFile, randomBytes(25), true)
-	t.Logf("wrote shorter marker file: %q", testMarkerFile)
+	t.Log("wrote shorter marker file")
 	require.NoError(t, err)
 
 	// Get length of file
