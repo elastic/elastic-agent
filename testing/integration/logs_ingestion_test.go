@@ -151,7 +151,7 @@ func testMonitoringLogsAreShipped(
 	}
 	require.Empty(t, docs.Hits.Hits)
 
-	// Stage 4: Make sure we have message confirming central management is running
+	// Stage 3: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
 	docs = findESDocs(t, func() (estools.Documents, error) {
 		return estools.FindMatchingLogLines(ctx, info.ESClient, info.Namespace,
@@ -159,7 +159,7 @@ func testMonitoringLogsAreShipped(
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
-	// Stage 5: verify logs from the monitoring components are not sent to the output
+	// Stage 4: verify logs from the monitoring components are not sent to the output
 	t.Log("Check monitoring logs")
 	hostname, err := os.Hostname()
 	if err != nil {
