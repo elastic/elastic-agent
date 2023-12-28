@@ -5,15 +5,17 @@
 package upgrade
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
 func TestWriteMarkerFile(t *testing.T) {
@@ -61,9 +63,11 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	t.Log("marker file path:", testMarkerFile)
 	t.Log("writing long marker file")
 	err := writeMarkerFile(testMarkerFile, randomBytes(40), true)
-	t.Log("wrote long marker file")
-	if err != nil {
-		checkOpenfiles(t, testMarkerFile)
+	t.Log("after writing long marker file")
+	// If the marker file isn't listed in openfiles, it might be free now,
+	// therefore, try again.
+	if err != nil && !inOpenfiles(t, testMarkerFile) {
+		err = writeMarkerFile(testMarkerFile, randomBytes(40), true)
 	}
 	require.NoError(t, err, "could not write long marker file")
 
@@ -75,9 +79,11 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	// Write a shorter marker file
 	t.Log("writing shorter marker file")
 	err = writeMarkerFile(testMarkerFile, randomBytes(25), true)
-	t.Log("wrote shorter marker file")
-	if err != nil {
-		checkOpenfiles(t, testMarkerFile)
+	t.Log("after writing shorter marker file")
+	// If the marker file isn't listed in openfiles, it might be free now,
+	// therefore, try again.
+	if err != nil && !inOpenfiles(t, testMarkerFile) {
+		err = writeMarkerFile(testMarkerFile, randomBytes(25), true)
 	}
 	require.NoError(t, err)
 
@@ -96,26 +102,37 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	// close(errCh)
 }
 
-func checkOpenfiles(t *testing.T, testMarkerFile string) {
+// inOpenfiles uses Windows 'openfiles' program to try to find out which
+// process is using 'file'. It returns true if found, false otherwise. It also
+// returns false if the platform isn't Windows or `openfiles` isn't found.
+func inOpenfiles(t *testing.T, file string) bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+
 	openfiles, err := exec.LookPath("openfiles")
 	if err != nil {
 		t.Logf("did not fing openfiles to debug what proces is accessing the marker file: %v", err)
-		return
+		return false
 	}
 
 	// docs: https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/openfiles
 	cmd := exec.Command(openfiles, "/query", "/fo", "csv")
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Println(err)
-		return
+		t.Logf("failed running openfiles: Err: %v, Output: %q", err, output)
+		var errExit exec.ExitError
+		if errors.As(err, &errExit) && len(errExit.Stderr) > 0 {
+			t.Logf("failed running openfiles: stderr: %s", errExit.Stderr)
+		}
+		return false
 	}
 
 	lines := strings.Split(string(output), "\n")
 	var found bool
 	for _, line := range lines {
 		// check if the line is about the marker file
-		if strings.Contains(line, testMarkerFile) {
+		if strings.Contains(line, file) {
 			found = true
 			t.Log("openfiles output about the marker file\n", line)
 		}
@@ -123,10 +140,10 @@ func checkOpenfiles(t *testing.T, testMarkerFile string) {
 
 	if !found {
 		t.Logf("openfiles called, but nothing about %q was found",
-			testMarkerFile)
+			file)
 	}
 
-	return
+	return found
 }
 
 // func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh chan error) {
