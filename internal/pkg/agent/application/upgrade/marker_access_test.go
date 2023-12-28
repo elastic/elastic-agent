@@ -13,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -63,30 +62,10 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	t.Log("writing long marker file")
 	err := writeMarkerFile(testMarkerFile, randomBytes(40), true)
 	t.Log("wrote long marker file")
-	assert.NoError(t, err)
-	if err != nil && strings.Contains(err.Error(), "the file because it is being used by another process") {
-		openfiles, err := exec.LookPath("openfiles")
-		if err != nil {
-			t.Logf("did not fing openfiles to debug what proces is accessing the marker file: %v", err)
-			return
-		}
-
-		// docs: https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/openfiles
-		cmd := exec.Command(openfiles, "/query", "/fo", "csv")
-		output, err := cmd.Output()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		lines := strings.Split(string(output), "\n")
-		for _, line := range lines {
-			// check if the line is about the marker file
-			if strings.Contains(line, testMarkerFile) {
-				t.Log("openfiles output about the marker file\n", line)
-			}
-		}
+	if err != nil {
+		checkOpenfiles(t, testMarkerFile)
 	}
+	require.NoError(t, err, "could not write long marker file")
 
 	// Get length of file
 	fileInfo, err := os.Stat(testMarkerFile)
@@ -97,6 +76,9 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	t.Log("writing shorter marker file")
 	err = writeMarkerFile(testMarkerFile, randomBytes(25), true)
 	t.Log("wrote shorter marker file")
+	if err != nil {
+		checkOpenfiles(t, testMarkerFile)
+	}
 	require.NoError(t, err)
 
 	// Get length of file
@@ -112,6 +94,39 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	// cancel()
 	// require.NoError(t, watchErr)
 	// close(errCh)
+}
+
+func checkOpenfiles(t *testing.T, testMarkerFile string) {
+	openfiles, err := exec.LookPath("openfiles")
+	if err != nil {
+		t.Logf("did not fing openfiles to debug what proces is accessing the marker file: %v", err)
+		return
+	}
+
+	// docs: https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/openfiles
+	cmd := exec.Command(openfiles, "/query", "/fo", "csv")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	lines := strings.Split(string(output), "\n")
+	var found bool
+	for _, line := range lines {
+		// check if the line is about the marker file
+		if strings.Contains(line, testMarkerFile) {
+			found = true
+			t.Log("openfiles output about the marker file\n", line)
+		}
+	}
+
+	if !found {
+		t.Logf("openfiles called, but nothing about %q was found",
+			testMarkerFile)
+	}
+
+	return
 }
 
 // func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh chan error) {
