@@ -121,7 +121,7 @@ func inOpenfiles(t *testing.T, file string) bool {
 	output, err := cmd.Output()
 	if err != nil {
 		t.Logf("failed running openfiles: Err: %v, Output: %q", err, output)
-		var errExit exec.ExitError
+		var errExit *exec.ExitError
 		if errors.As(err, &errExit) && len(errExit.Stderr) > 0 {
 			t.Logf("failed running openfiles: stderr: %s", errExit.Stderr)
 		}
