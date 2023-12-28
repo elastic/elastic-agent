@@ -15,6 +15,9 @@ import (
 )
 
 func TestCheckPlatformCompat(t *testing.T) {
+	t.Skip("there is no failure condition on this test and it's flaky, " +
+		"failing due to the default 10min timeout. " +
+		"See https://github.com/elastic/elastic-agent/issues/3964")
 	if !(runtime.GOARCH == "amd64" && (isLinux() ||
 		isWindows())) {
 		t.Skip("Test not support on current platform")
