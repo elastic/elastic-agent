@@ -15,7 +15,8 @@ import (
 	"github.com/cenkalti/backoff/v4"
 )
 
-const markerAccessTimeout = 10 * time.Second
+// TODO(AndersonQ|ycombinator): is there an upper limit for this timeout?
+const markerAccessTimeout = 15 * time.Second
 const markerAccessBackoffInitialInterval = 50 * time.Millisecond
 const minMarkerAccessRetries = 5
 
