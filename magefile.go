@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"log"
 	"os"
 	"os/exec"
@@ -2242,4 +2243,63 @@ func hasCleanOnExit() bool {
 	clean := os.Getenv("TEST_INTEG_CLEAN_ON_EXIT")
 	b, _ := strconv.ParseBool(clean)
 	return b
+}
+
+type dependency struct {
+	Name    string
+	Version string
+}
+
+func OtelReadme() error {
+	fmt.Println("Generating otel/README")
+
+	const (
+		readmeTmpl = ""
+		readmeOut  = ""
+	)
+
+	// read README template
+	tmpls, err := template.ParseFiles(readmeTmpl)
+	if err != nil {
+		return errors.New(err, "failed to parse README template")
+	}
+
+	if len(tmpls) != 1 {
+		fmt.Println("No OTel README template")
+		return nil
+	}
+
+	tmpl := tmpls[0]
+
+	receivers, exporters, processors, err := getDependencies()
+	if err != nil {
+		return errors.New(err, "Failed to get OTel dependencies")
+	}
+
+	data := struct {
+		Receivers  []dependency
+		Exporters  []dependency
+		Processors []dependency
+	}{
+		Receivers:  receivers,
+		Exporters:  exporters,
+		Processors: processors,
+	}
+
+	// resolve template
+	out, err := os.OpenFile(readmeOut, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", outfn, err)
+	}
+	defer out.Close()
+
+	return tmpl.Execute(out, data)
+}
+
+func getDependencies() (receivers, exporters, processors []dependency, err error) {
+	// read go.mod
+	// parse otel imports
+
+	// group exporters, receivers and processors
+	return
 }
