@@ -267,11 +267,13 @@ func TestOtelAPMIngestion(t *testing.T) {
 
 	// failed to get APM version mismatch in time
 	// processing should be running
+	var apmVersionMismatchEncountered bool
 	require.Eventually(t,
 		func() bool {
 			if logWatcher.KeyOccured(apmVersionMismatch) {
 				// mark skipped to make it explicit it was not successfully evaluated
-				t.Skip("agent version needs to be equal to stack version")
+				apmVersionMismatchEncountered = true
+				return true
 			}
 
 			docs := findESDocs(t, func() (estools.Documents, error) {
@@ -302,6 +304,10 @@ func TestOtelAPMIngestion(t *testing.T) {
 		},
 		5*time.Minute, 500*time.Millisecond,
 		fmt.Sprintf("there should be apm logs by now: %#v", watchLines))
+
+	if apmVersionMismatchEncountered {
+		t.Skip("agent version needs to be equal to stack version")
+	}
 
 	// cleanup apm
 	cancel()
