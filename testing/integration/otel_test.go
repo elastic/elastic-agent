@@ -259,53 +259,49 @@ func TestOtelAPMIngestion(t *testing.T) {
 	}
 
 	// apm mismatch or proper docs in ES
-	err = logWatcher.WaitForKeys(context.Background(),
-		20*time.Second,
-		500*time.Millisecond,
-		apmVersionMismatch)
-	if err == nil {
-		// err nil means there's a match within time limit
-		// mark skipped to make it explicit it was not successfully evaluated
-		t.Skip("agent version needs to be equal to stack version")
-	} else {
-		watchLines := linesTrackMap([]string{"This is a test error message",
-			"This is a test debug message 2",
-			"This is a test debug message 3",
-			"This is a test debug message 4"})
 
-		// failed to get APM version mismatch in time
-		// processing should be running
-		require.Eventually(t,
-			func() bool {
-				docs := findESDocs(t, func() (estools.Documents, error) {
-					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-					defer cancel()
-					return estools.GetLogsForIndexWithContext(ctx, esClient, "logs-apm*", match)
-				})
+	watchLines := linesTrackMap([]string{"This is a test error message",
+		"This is a test debug message 2",
+		"This is a test debug message 3",
+		"This is a test debug message 4"})
 
-				hits = len(docs.Hits.Hits)
-				if hits <= 0 {
-					return false
+	// failed to get APM version mismatch in time
+	// processing should be running
+	require.Eventually(t,
+		func() bool {
+			if logWatcher.KeyOccured(apmVersionMismatch) {
+				// mark skipped to make it explicit it was not successfully evaluated
+				t.Skip("agent version needs to be equal to stack version")
+			}
+
+			docs := findESDocs(t, func() (estools.Documents, error) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				return estools.GetLogsForIndexWithContext(ctx, esClient, "logs-apm*", match)
+			})
+
+			hits = len(docs.Hits.Hits)
+			if hits <= 0 {
+				return false
+			}
+
+			for _, hit := range docs.Hits.Hits {
+				s, found := hit.Source["message"]
+				if !found {
+					continue
 				}
 
-				for _, hit := range docs.Hits.Hits {
-					s, found := hit.Source["message"]
-					if !found {
-						continue
-					}
-
-					for k := range watchLines {
-						if strings.Contains(fmt.Sprint(s), k) {
-							watchLines[k] = true
-						}
+				for k := range watchLines {
+					if strings.Contains(fmt.Sprint(s), k) {
+						watchLines[k] = true
 					}
 				}
+			}
 
-				return mapAllTrue(watchLines)
-			},
-			5*time.Minute, 500*time.Millisecond,
-			fmt.Sprintf("there should be apm logs by now: %#v", watchLines))
-	}
+			return mapAllTrue(watchLines)
+		},
+		5*time.Minute, 500*time.Millisecond,
+		fmt.Sprintf("there should be apm logs by now: %#v", watchLines))
 
 	// cleanup apm
 	cancel()
