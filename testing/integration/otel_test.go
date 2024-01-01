@@ -279,11 +279,9 @@ func TestOtelAPMIngestion(t *testing.T) {
 			}
 			fmt.Fprint(os.Stderr, "running eventually check - no occured")
 
-			docs := findESDocs(t, func() (estools.Documents, error) {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				return estools.GetLogsForIndexWithContext(ctx, esClient, "logs-apm*", match)
-			})
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			docs = estools.GetLogsForIndexWithContext(ctx, esClient, "logs-apm*", match)
 
 			hits = len(docs.Hits.Hits)
 			fmt.Fprintf(os.Stderr, "running eventually check - have hits %v", hits)
