@@ -6,6 +6,8 @@ package kubernetessecrets
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -184,10 +186,20 @@ func Test_K8sSecretsProvider_Fetch_Cache_Enabled(t *testing.T) {
 
 	// wait for ttl update
 	<-time.After(refreshInterval)
+	status := &strings.Builder{}
+	duration := refreshInterval * 3
 	assert.Eventuallyf(t, func() bool {
 		val, found = fp.Fetch(key)
-		return found && val == newPass
-	}, refreshInterval*3, refreshInterval, "Failed to update the secret value after TTL update has passed.")
+		isNewPass := val == newPass
+		if found && isNewPass {
+			return true
+		}
+
+		fmt.Fprintf(status, "found: %t, isNewPass: %t", found, isNewPass)
+		return false
+	}, duration, refreshInterval,
+		"Failed to update the secret value after TTL update has passed. Tried fetching for %d. Last status: %s",
+		duration, status)
 
 	// After TTL delete, secret should no longer be found in cache since it was never
 	// fetched during that time
