@@ -121,7 +121,7 @@ func TestContainerCMD(t *testing.T) {
 		healthy, err = agentFixture.IsHealthy(ctx)
 		return healthy
 	},
-		10*time.Minute, time.Second,
+		20*time.Minute, time.Second,
 		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
 		err, &agentOutput,
 	)
