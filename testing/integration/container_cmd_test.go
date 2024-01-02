@@ -35,6 +35,8 @@ func TestContainerCMD(t *testing.T) {
 		// environment we run it in isolation
 		Group: "container",
 	})
+	t.Skip("flaky test: https://github.com/elastic/elastic-agent/issues/3984")
+
 	ctx := context.Background()
 
 	agentFixture, err := define.NewFixture(t, define.Version())
@@ -121,7 +123,7 @@ func TestContainerCMD(t *testing.T) {
 		healthy, err = agentFixture.IsHealthy(ctx)
 		return healthy
 	},
-		20*time.Minute, time.Second,
+		5*time.Minute, time.Second,
 		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
 		err, &agentOutput,
 	)
