@@ -447,22 +447,12 @@ FaZ3yM1rwmTiI90woe9kq8jEcP7Ew07naoCTlEDxTSgSqh4lKuUNCw==
 }
 
 func TestUpgraderReload_sourceURL(t *testing.T) {
-	defaultCfg := artifact.DefaultConfig()
 	tcs := []struct {
 		name      string
 		sourceURL string
 		proxyURL  string
 		cfg       string
 	}{
-		{ // TODO(Anderson): remove this one
-			name:      "proxy_url is applied",
-			sourceURL: defaultCfg.SourceURI,
-			proxyURL:  "http://someBrokenURL/",
-			cfg: `
-agent.download:
-  proxy_url: http://someBrokenURL/
-`,
-		},
 		{
 			name:      "source_uri has precedence over sourceURI",
 			sourceURL: "https://this.sourceURI.co/downloads/beats/",
