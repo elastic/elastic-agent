@@ -15,6 +15,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 )
 
+// TODO: is there an upper limit for this timeout?
 const markerAccessTimeout = 10 * time.Second
 const markerAccessBackoffInitialInterval = 50 * time.Millisecond
 const minMarkerAccessRetries = 5
@@ -71,6 +72,25 @@ func accessMarkerFileWithRetries(accessFn func() error) error {
 	defer cancel()
 
 	expBackoffWithTimeout := backoff.WithContext(expBackoff, ctx)
+	start := time.Now()
 
-	return backoff.Retry(accessFn, expBackoffWithTimeout)
+	var duration time.Duration
+	var count int
+	var err error
+	if err = accessFn(); err == nil {
+		return nil
+	}
+
+	for duration = expBackoffWithTimeout.NextBackOff(); duration != backoff.Stop; duration = expBackoffWithTimeout.NextBackOff() {
+		time.Sleep(duration)
+
+		if err = accessFn(); err == nil {
+			return nil
+		}
+
+		count++
+	}
+
+	return fmt.Errorf("could not write narker after %s and %d retries. Last error: %w",
+		time.Since(start), count, err)
 }
