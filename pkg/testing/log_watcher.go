@@ -49,6 +49,11 @@ func (l *LogWatcher) Logf(format string, args ...any) {
 	l.checkLine(line)
 }
 
+// KeyOccured return true in case key was hit before
+func (l *LogWatcher) KeyOccured(key string) bool {
+	return l.keysOccured(key)
+}
+
 // WaitForKeys waits for all keys to occur in a log stream.
 func (l *LogWatcher) WaitForKeys(ctx context.Context, timeout, interval time.Duration, keys ...string) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
