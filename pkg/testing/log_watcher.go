@@ -7,8 +7,8 @@ package testing
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -18,6 +18,8 @@ var _ Logger = &LogWatcher{}
 type LogWatcher struct {
 	activeWatches map[string]bool
 	wrapped       Logger
+
+	watchesLock sync.Mutex
 }
 
 // NewLogWatcher returns watches initialised with watches and underlying logger
@@ -49,9 +51,7 @@ func (l *LogWatcher) Logf(format string, args ...any) {
 
 // KeyOccured return true in case key was hit before
 func (l *LogWatcher) KeyOccured(key string) bool {
-	o := l.keysOccured(key)
-	fmt.Fprintf(os.Stderr, "KeyOccured check %q:%v %#v", key, o, l.activeWatches)
-	return o
+	return l.keysOccured(key)
 }
 
 // WaitForKeys waits for all keys to occur in a log stream.
@@ -75,22 +75,29 @@ func (l *LogWatcher) WaitForKeys(ctx context.Context, timeout, interval time.Dur
 }
 
 func (l *LogWatcher) checkLine(line string) {
+	l.watchesLock.Lock()
+	defer l.watchesLock.Unlock()
+
+	var removeKeys []string
 	for k := range l.activeWatches {
-		fmt.Fprintf(os.Stderr, "Checking %q against line %q", k, line)
 		if strings.Contains(line, k) {
-			l.activeWatches[k] = true
+			removeKeys = append(removeKeys, k)
 		}
+	}
+
+	for _, k := range removeKeys {
+		delete(l.activeWatches, k)
 	}
 
 }
 func (l *LogWatcher) keysOccured(keys ...string) bool {
-	allFound := true
+	l.watchesLock.Lock()
+	defer l.watchesLock.Unlock()
+
 	for _, k := range keys {
-		if v, found := l.activeWatches[k]; found {
-			allFound = allFound && v
-		} else {
-			allFound = false
+		if _, found := l.activeWatches[k]; found {
+			return false
 		}
 	}
-	return allFound
+	return true
 }

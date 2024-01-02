@@ -270,14 +270,11 @@ func TestOtelAPMIngestion(t *testing.T) {
 	var apmVersionMismatchEncountered bool
 	require.Eventually(t,
 		func() bool {
-			fmt.Fprint(os.Stderr, "running eventually check")
 			if logWatcher.KeyOccured(apmVersionMismatch) {
 				// mark skipped to make it explicit it was not successfully evaluated
 				apmVersionMismatchEncountered = true
-				fmt.Fprint(os.Stderr, "running eventually check - returning true")
 				return true
 			}
-			fmt.Fprint(os.Stderr, "running eventually check - no occured")
 
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
@@ -287,7 +284,6 @@ func TestOtelAPMIngestion(t *testing.T) {
 			}
 
 			hits = len(docs.Hits.Hits)
-			fmt.Fprintf(os.Stderr, "running eventually check - have hits %v", hits)
 			if hits <= 0 {
 				return false
 			}
@@ -304,7 +300,6 @@ func TestOtelAPMIngestion(t *testing.T) {
 					}
 				}
 			}
-			fmt.Fprint(os.Stderr, "running eventually check - done")
 			return mapAllTrue(watchLines)
 		},
 		5*time.Minute, 500*time.Millisecond,
