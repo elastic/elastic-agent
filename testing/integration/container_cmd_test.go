@@ -35,6 +35,8 @@ func TestContainerCMD(t *testing.T) {
 		// environment we run it in isolation
 		Group: "container",
 	})
+	t.Skip("flaky test: https://github.com/elastic/elastic-agent/issues/3984")
+
 	ctx := context.Background()
 
 	agentFixture, err := define.NewFixture(t, define.Version())
