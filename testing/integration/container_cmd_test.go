@@ -103,11 +103,6 @@ func TestContainerCMD(t *testing.T) {
 		"FLEET_ENROLL=1",
 		"FLEET_URL="+fleetURL,
 		"FLEET_ENROLLMENT_TOKEN="+enrollmentToken.APIKey,
-		// As the agent isn't built for a container, it's upgradable, triggering
-		// the start of the upgrade watcher. If `STATE_PATH` isn't set, the
-		// upgrade watcher will commence from a different path within the
-		// container, distinct from the current execution path.
-		"STATE_PATH="+agentFixture.WorkDir(),
 	)
 
 	t.Logf(">> running binary with: %v", cmd.Args)
@@ -117,7 +112,7 @@ func TestContainerCMD(t *testing.T) {
 
 	require.Eventuallyf(t, func() bool {
 		var healthy bool
-		// This will return errors until it connects to the agent,
+		// This will returns errors until it connects to the agent,
 		// they're mostly noise because until the agent starts running
 		// we will get connection errors. If the test fails
 		// the agent logs will be present in the error message
