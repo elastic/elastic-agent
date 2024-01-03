@@ -26,25 +26,25 @@ This sections provides a summary of components included in Elastic OpenTelemetry
 
 | Dependency | Version |
 |---|---|
-| github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver | v0.89.0|
-| go.opentelemetry.io/collector/receiver/otlpreceiver | v0.89.0|
+| filelogreceiver | v0.89.0|
+| otlpreceiver | v0.89.0|
 
 
 ### Exporters
 
 | Dependency | Version |
 |---|---|
-| github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter | v0.89.0|
-| go.opentelemetry.io/collector/exporter/debugexporter | v0.89.0|
-| go.opentelemetry.io/collector/exporter/otlpexporter | v0.89.0|
+| fileexporter | v0.89.0|
+| debugexporter | v0.89.0|
+| otlpexporter | v0.89.0|
 
 
 ### Processors
 
 | Dependency | Version |
 |---|---|
-| github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor | v0.89.0|
-| github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor | v0.89.0|
-| github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor | v0.89.0|
-| go.opentelemetry.io/collector/processor/batchprocessor | v0.89.0|
-| go.opentelemetry.io/collector/processor/memorylimiterprocessor | v0.89.0|
+| attributesprocessor | v0.89.0|
+| resourceprocessor | v0.89.0|
+| transformprocessor | v0.89.0|
+| batchprocessor | v0.89.0|
+| memorylimiterprocessor | v0.89.0|

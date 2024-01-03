@@ -2305,6 +2305,15 @@ func getDependencies() (receivers, exporters, processors []dependency, err error
 			continue
 		}
 
+		cleanFn := func(dep, sep string) string {
+			chunks := strings.SplitN(dep, sep, 2)
+			if len(chunks) == 2 {
+				return chunks[1]
+			}
+
+			return dep
+		}
+
 		parseLine := func(line string) (dependency, error) {
 			chunks := strings.SplitN(line, " ", 2)
 			if len(chunks) != 2 {
@@ -2322,10 +2331,13 @@ func getDependencies() (receivers, exporters, processors []dependency, err error
 		}
 
 		if strings.Contains(l, "/receiver/") {
+			d.Name = cleanFn(d.Name, "/receiver/")
 			receivers = append(receivers, d)
 		} else if strings.Contains(l, "/processor/") {
+			d.Name = cleanFn(d.Name, "/processor/")
 			processors = append(processors, d)
 		} else if strings.Contains(l, "/exporter/") {
+			d.Name = cleanFn(d.Name, "/exporter/")
 			exporters = append(exporters, d)
 		}
 	}
