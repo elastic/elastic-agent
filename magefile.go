@@ -2250,6 +2250,20 @@ type dependency struct {
 	Version string
 }
 
+func (d dependency) Clean(sep string) dependency {
+	cleanFn := func(dep, sep string) string {
+		chunks := strings.SplitN(dep, sep, 2)
+		if len(chunks) == 2 {
+			return chunks[1]
+		}
+
+		return dep
+	}
+
+	d.Name = cleanFn(d.Name, sep)
+	return d
+}
+
 func OtelReadme() error {
 	fmt.Println(">> Building internal/pkg/otel/README.md")
 
@@ -2305,15 +2319,6 @@ func getDependencies() (receivers, exporters, processors []dependency, err error
 			continue
 		}
 
-		cleanFn := func(dep, sep string) string {
-			chunks := strings.SplitN(dep, sep, 2)
-			if len(chunks) == 2 {
-				return chunks[1]
-			}
-
-			return dep
-		}
-
 		parseLine := func(line string) (dependency, error) {
 			chunks := strings.SplitN(line, " ", 2)
 			if len(chunks) != 2 {
@@ -2331,14 +2336,11 @@ func getDependencies() (receivers, exporters, processors []dependency, err error
 		}
 
 		if strings.Contains(l, "/receiver/") {
-			d.Name = cleanFn(d.Name, "/receiver/")
-			receivers = append(receivers, d)
+			receivers = append(receivers, d.Clean("/receiver/"))
 		} else if strings.Contains(l, "/processor/") {
-			d.Name = cleanFn(d.Name, "/processor/")
-			processors = append(processors, d)
+			processors = append(processors, d.Clean("/processor/"))
 		} else if strings.Contains(l, "/exporter/") {
-			d.Name = cleanFn(d.Name, "/exporter/")
-			exporters = append(exporters, d)
+			exporters = append(exporters, d.Clean("/exporter/"))
 		}
 	}
 
