@@ -27,6 +27,9 @@ updates:
         otel-dependencies:
             patterns:
              - "*"
+            update-types:
+             - "minor"
+             - "patch"
     allow:
       # Only update internal dependencies for now while we evaluate this workflow.
       - dependency-name: "go.opentelemetry.io/collector/*"
