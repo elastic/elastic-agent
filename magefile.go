@@ -2260,8 +2260,10 @@ func (d dependency) Clean(sep string) dependency {
 		return dep
 	}
 
-	d.Name = cleanFn(d.Name, sep)
-	return d
+	return dependency{
+		Name:    cleanFn(d.Name, sep),
+		Version: d.Version,
+	}
 }
 
 func OtelReadme() error {
