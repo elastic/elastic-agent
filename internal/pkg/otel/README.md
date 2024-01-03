@@ -56,13 +56,3 @@ This section provides a summary of components included in the Elastic Distributi
 
 
 
-
-### Extensions
-
-| Component | Version |
-|---|---|
-| fileexporter | v0.89.0|
-| debugexporter | v0.89.0|
-| otlpexporter | v0.89.0|
-| auth | v0.89.0 // indirect|
-

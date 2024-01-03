@@ -2324,6 +2324,10 @@ func getOtelDependencies() (*dependencies, error) {
 			continue
 		}
 
+		if strings.Contains(l, "// indirect") {
+			continue
+		}
+
 		parseLine := func(line string) (dependency, error) {
 			chunks := strings.SplitN(line, " ", 2)
 			if len(chunks) != 2 {
@@ -2347,7 +2351,7 @@ func getOtelDependencies() (*dependencies, error) {
 		} else if strings.Contains(l, "/exporter/") {
 			exporters = append(exporters, d.Clean("/exporter/"))
 		} else if strings.Contains(l, "/extension/") {
-			extensions = append(exporters, d.Clean("/extension/"))
+			extensions = append(extensions, d.Clean("/extension/"))
 		}
 	}
 
