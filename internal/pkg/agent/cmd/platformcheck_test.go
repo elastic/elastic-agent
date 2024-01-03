@@ -15,6 +15,9 @@ import (
 )
 
 func TestCheckPlatformCompat(t *testing.T) {
+	t.Skip("there is no failure condition on this test and it's flaky, " +
+		"failing due to the default 10min timeout. " +
+		"See https://github.com/elastic/elastic-agent/issues/3964")
 	if !(runtime.GOARCH == "amd64" && (isLinux() ||
 		isWindows())) {
 		t.Skip("Test not support on current platform")
@@ -29,13 +32,16 @@ func TestCheckPlatformCompat(t *testing.T) {
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(), "GOARCH=386")
 	require.NoError(t, cmd.Run(), "failed to compile test helper")
+	t.Logf("compiled test binary %q", helper)
 
 	// run test helper
 	cmd = exec.Command(helper, "-test.v", "-test.run", "TestHelper")
 	cmd.Env = []string{"GO_USE_HELPER=1"}
+	t.Logf("running %q", cmd.Args)
 	output, err := cmd.Output()
 	if err != nil {
-		t.Logf("32bit binary tester failed.\n Output: %s", output)
+		t.Logf("32bit binary tester failed.\n Err: %v\nOutput: %s",
+			err, output)
 	}
 }
 

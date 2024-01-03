@@ -243,15 +243,6 @@ steps:
       manual:
         allowed: true
 
-  - wait: ~
-    continue_on_failure: true
-  - label: "Processing test results"
-    agents:
-      provider: "gcp"
-    plugins:
-      - junit-annotate#v2.4.1:
-          artifacts: build/TEST-go-integration*.xml
-
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
   - label: "Trigger k8s sync"
