@@ -16,11 +16,11 @@ Both `yaml` and `yml` suffixes are supported.
 
 > In case this condition is not met, Elastic Agent will run in its default mode and will not behave as OpenTelemetry Collector.
 
-Note that `validate` subcommand and `feature gates` are not supported yet.
+Note that `validate` subcommand and [feature gates](https://github.com/open-telemetry/opentelemetry-collector/blob/main/featuregate/README.md#controlling-gates) are not supported yet.
 
 ## Components
 
-This sections provides a summary of components included in Elastic OpenTelemetry Collector distribution.
+This section provides a summary of components included in the Elastic Distribution for OpenTelemetry Collector.
 
 
 ### Receivers
