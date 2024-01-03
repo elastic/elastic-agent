@@ -121,6 +121,9 @@ type Cloud mg.Namespace
 // Integration namespace contains tasks related to operating and running integration tests.
 type Integration mg.Namespace
 
+// Otel namespace contains Open Telemetry related tasks.
+type Otel mg.Namespace
+
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
@@ -551,7 +554,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg, OtelReadme)
+	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
 }
 
 // CrossBuild cross-builds the beat for all target platforms.
@@ -2250,6 +2253,13 @@ type dependency struct {
 	Version string
 }
 
+type dependencies struct {
+	Receivers  []dependency
+	Exporters  []dependency
+	Processors []dependency
+	Extensions []dependency
+}
+
 func (d dependency) Clean(sep string) dependency {
 	cleanFn := func(dep, sep string) string {
 		chunks := strings.SplitN(dep, sep, 2)
@@ -2266,7 +2276,7 @@ func (d dependency) Clean(sep string) dependency {
 	}
 }
 
-func OtelReadme() error {
+func (Otel) Readme() error {
 	fmt.Println(">> Building internal/pkg/otel/README.md")
 
 	readmeTmpl := filepath.Join("internal", "pkg", "otel", "templates", "README.md.tmpl")
@@ -2278,19 +2288,9 @@ func OtelReadme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	receivers, exporters, processors, err := getDependencies()
+	data, err := getOtelDependencies()
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
-	}
-
-	data := struct {
-		Receivers  []dependency
-		Exporters  []dependency
-		Processors []dependency
-	}{
-		Receivers:  receivers,
-		Exporters:  exporters,
-		Processors: processors,
 	}
 
 	// resolve template
@@ -2303,15 +2303,18 @@ func OtelReadme() error {
 	return tmpl.Execute(out, data)
 }
 
-func getDependencies() (receivers, exporters, processors []dependency, err error) {
+func getOtelDependencies() (*dependencies, error) {
 	// read go.mod
 	readFile, err := os.Open("go.mod")
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
+	defer readFile.Close()
+
 	scanner := bufio.NewScanner(readFile)
 
 	scanner.Split(bufio.ScanLines)
+	var receivers, extensions, exporters, processors []dependency
 	// process imports
 	for scanner.Scan() {
 		l := strings.TrimSpace(scanner.Text())
@@ -2334,7 +2337,7 @@ func getDependencies() (receivers, exporters, processors []dependency, err error
 
 		d, err := parseLine(l)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		}
 
 		if strings.Contains(l, "/receiver/") {
@@ -2343,11 +2346,15 @@ func getDependencies() (receivers, exporters, processors []dependency, err error
 			processors = append(processors, d.Clean("/processor/"))
 		} else if strings.Contains(l, "/exporter/") {
 			exporters = append(exporters, d.Clean("/exporter/"))
+		} else if strings.Contains(l, "/extensions/") {
+			extensions = append(exporters, d.Clean("/extensions/"))
 		}
 	}
 
-	readFile.Close()
-
-	// group exporters, receivers and processors
-	return
+	return &dependencies{
+		Receivers:  receivers,
+		Exporters:  exporters,
+		Processors: processors,
+		Extensions: extensions,
+	}, nil
 }
