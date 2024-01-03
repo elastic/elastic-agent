@@ -4,7 +4,7 @@ This is an Elastic supported distribution of the [OpenTelemetry Collector](https
 
 ## Running the Elastic Distribution for OpenTelemetry Collector
 
-To run Elastic OpenTelemetry Distribution you can use Elastic-Agent binary downloaded for your OS and architecture. 
+To run the Elastic Distribution for OpenTelemetry Collector you can use Elastic-Agent binary downloaded for your OS and architecture. 
 Running command 
 
 ```bash
@@ -55,4 +55,14 @@ This section provides a summary of components included in the Elastic Distributi
 | memorylimiterprocessor | v0.89.0|
 
 
+
+
+### Extensions
+
+| Component | Version |
+|---|---|
+| fileexporter | v0.89.0|
+| debugexporter | v0.89.0|
+| otlpexporter | v0.89.0|
+| auth | v0.89.0 // indirect|
 
