@@ -2,7 +2,7 @@
 
 This is an Elastic supported distribution of the [OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector).
 
-## Running Elastic OpenTelemetry Distribution
+## Running the Elastic Distribution for OpenTelemetry Collector
 
 To run Elastic OpenTelemetry Distribution you can use Elastic-Agent binary downloaded for your OS and architecture. 
 Running command 
@@ -11,7 +11,7 @@ Running command
 ./elastic-agent -c otel.yml run
 ```
 
-from unpacked Elastic Agent package will run Elastic-Agent as a Distro. `-c` flag needs to point to [OpenTelemetry Collector Configuration file](https://opentelemetry.io/docs/collector/configuration/) named `otel`, `otlp` or `otelcol`.
+from unpacked Elastic Agent package will run Elastic-Agent as an OpenTelemetry Collector. The `-c` flag needs to point to [OpenTelemetry Collector Configuration file](https://opentelemetry.io/docs/collector/configuration/) named `otel`, `otlp` or `otelcol`.
 Both `yaml` and `yml` suffixes are supported. 
 
 > In case this condition is not met, Elastic Agent will run in its default mode and will not behave as OpenTelemetry Collector.
