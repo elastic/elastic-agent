@@ -551,7 +551,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg)
+	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg, OtelReadme)
 }
 
 // CrossBuild cross-builds the beat for all target platforms.
@@ -2251,29 +2251,20 @@ type dependency struct {
 }
 
 func OtelReadme() error {
-	fmt.Println("Generating otel/README")
+	fmt.Println(">> Building internal/pkg/otel/README.md")
 
-	const (
-		readmeTmpl = ""
-		readmeOut  = ""
-	)
+	readmeTmpl := filepath.Join("internal", "pkg", "otel", "templates", "README.md.tmpl")
+	readmeOut := filepath.Join("internal", "pkg", "otel", "README.md")
 
 	// read README template
-	tmpls, err := template.ParseFiles(readmeTmpl)
+	tmpl, err := template.ParseFiles(readmeTmpl)
 	if err != nil {
-		return errors.New(err, "failed to parse README template")
+		return fmt.Errorf("failed to parse README template: %w", err)
 	}
-
-	if len(tmpls) != 1 {
-		fmt.Println("No OTel README template")
-		return nil
-	}
-
-	tmpl := tmpls[0]
 
 	receivers, exporters, processors, err := getDependencies()
 	if err != nil {
-		return errors.New(err, "Failed to get OTel dependencies")
+		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}
 
 	data := struct {
@@ -2289,7 +2280,7 @@ func OtelReadme() error {
 	// resolve template
 	out, err := os.OpenFile(readmeOut, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", outfn, err)
+		return fmt.Errorf("failed to open file %s: %w", readmeOut, err)
 	}
 	defer out.Close()
 
@@ -2298,7 +2289,48 @@ func OtelReadme() error {
 
 func getDependencies() (receivers, exporters, processors []dependency, err error) {
 	// read go.mod
-	// parse otel imports
+	readFile, err := os.Open("go.mod")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	scanner := bufio.NewScanner(readFile)
+
+	scanner.Split(bufio.ScanLines)
+	// process imports
+	for scanner.Scan() {
+		l := strings.TrimSpace(scanner.Text())
+		// is otel
+		if !strings.Contains(l, "go.opentelemetry.io/") &&
+			!strings.Contains(l, "github.com/open-telemetry/") {
+			continue
+		}
+
+		parseLine := func(line string) (dependency, error) {
+			chunks := strings.SplitN(line, " ", 2)
+			if len(chunks) != 2 {
+				return dependency{}, fmt.Errorf("incorrect format for line %q", line)
+			}
+			return dependency{
+				Name:    chunks[0],
+				Version: chunks[1],
+			}, nil
+		}
+
+		d, err := parseLine(l)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		if strings.Contains(l, "/receiver/") {
+			receivers = append(receivers, d)
+		} else if strings.Contains(l, "/processor/") {
+			processors = append(processors, d)
+		} else if strings.Contains(l, "/exporter/") {
+			exporters = append(exporters, d)
+		}
+	}
+
+	readFile.Close()
 
 	// group exporters, receivers and processors
 	return
