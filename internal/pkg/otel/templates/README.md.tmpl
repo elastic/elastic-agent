@@ -22,23 +22,38 @@ Note that `validate` subcommand and `feature gates` are not supported yet.
 
 This sections provides a summary of components included in Elastic OpenTelemetry Collector distribution.
 
+{{ if .Receivers }}
 ### Receivers
 
 | Component | Version |
 |---|---|
 {{ range .Receivers }}| {{ .Name }} | {{ .Version -}} |
 {{ end }}
+{{ end }}
 
+{{ if .Exporters }}
 ### Exporters
 
 | Component | Version |
 |---|---|
 {{ range .Exporters }}| {{ .Name }} | {{ .Version -}} |
 {{ end }}
+{{ end }}
 
+{{ if .Processors }}
 ### Processors
 
 | Component | Version |
 |---|---|
 {{ range .Processors }}| {{ .Name }} | {{ .Version -}} |
+{{ end }}
+{{ end }}
+
+{{ if .Extensions }}
+### Extensions
+
+| Component | Version |
+|---|---|
+{{ range .Extensions }}| {{ .Name }} | {{ .Version -}} |
+{{ end }}
 {{ end }}

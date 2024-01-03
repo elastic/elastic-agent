@@ -22,12 +22,15 @@ Note that `validate` subcommand and `feature gates` are not supported yet.
 
 This sections provides a summary of components included in Elastic OpenTelemetry Collector distribution.
 
+
 ### Receivers
 
 | Component | Version |
 |---|---|
 | filelogreceiver | v0.89.0|
 | otlpreceiver | v0.89.0|
+
+
 
 
 ### Exporters
@@ -39,6 +42,8 @@ This sections provides a summary of components included in Elastic OpenTelemetry
 | otlpexporter | v0.89.0|
 
 
+
+
 ### Processors
 
 | Component | Version |
@@ -48,3 +53,6 @@ This sections provides a summary of components included in Elastic OpenTelemetry
 | transformprocessor | v0.89.0|
 | batchprocessor | v0.89.0|
 | memorylimiterprocessor | v0.89.0|
+
+
+
