@@ -24,7 +24,7 @@ This sections provides a summary of components included in Elastic OpenTelemetry
 
 ### Receivers
 
-| Dependency | Version |
+| Component | Version |
 |---|---|
 | filelogreceiver | v0.89.0|
 | otlpreceiver | v0.89.0|
@@ -32,7 +32,7 @@ This sections provides a summary of components included in Elastic OpenTelemetry
 
 ### Exporters
 
-| Dependency | Version |
+| Component | Version |
 |---|---|
 | fileexporter | v0.89.0|
 | debugexporter | v0.89.0|
@@ -41,7 +41,7 @@ This sections provides a summary of components included in Elastic OpenTelemetry
 
 ### Processors
 
-| Dependency | Version |
+| Component | Version |
 |---|---|
 | attributesprocessor | v0.89.0|
 | resourceprocessor | v0.89.0|
