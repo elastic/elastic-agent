@@ -2346,8 +2346,8 @@ func getOtelDependencies() (*dependencies, error) {
 			processors = append(processors, d.Clean("/processor/"))
 		} else if strings.Contains(l, "/exporter/") {
 			exporters = append(exporters, d.Clean("/exporter/"))
-		} else if strings.Contains(l, "/extensions/") {
-			extensions = append(exporters, d.Clean("/extensions/"))
+		} else if strings.Contains(l, "/extension/") {
+			extensions = append(exporters, d.Clean("/extension/"))
 		}
 	}
 
