@@ -89,6 +89,8 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 }
 
 // Reload reloads the artifact configuration for the upgrader.
+// As of today, December 2023, fleet-server does not send most of the configuration
+// defined in artifact.Config, what will likely change in the near future.
 func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {

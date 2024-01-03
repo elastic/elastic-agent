@@ -398,6 +398,7 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		"--path.config", paths.Config(),
 		"--path.logs", paths.Logs(),
 		"--path.socket", paths.ControlSocket(),
+		"--skip-daemon-reload",
 	}
 	if paths.Downloads() != "" {
 		args = append(args, "--path.downloads", paths.Downloads())
