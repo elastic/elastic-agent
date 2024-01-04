@@ -28,7 +28,6 @@ func createListener(log *logger.Logger) (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create npipe listener: %w", err)
 	}
-	log.With("address", control.Address()).Infof("GRPC control socket listening at %s", control.Address())
 	return lis, nil
 }
 
