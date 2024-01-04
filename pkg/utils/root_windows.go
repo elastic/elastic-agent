@@ -7,7 +7,8 @@
 package utils
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -28,14 +29,17 @@ func HasRoot() (bool, error) {
 		0, 0, 0, 0, 0, 0,
 		&sid)
 	if err != nil {
-		return false, errors.Errorf("sid error: %s", err)
+		return false, fmt.Errorf("allocate sid error: %w", err)
 	}
+	defer func() {
+		_ = windows.FreeSid(sid)
+	}()
 
 	token := windows.Token(0)
 
 	member, err := token.IsMember(sid)
 	if err != nil {
-		return false, errors.Errorf("token membership error: %s", err)
+		return false, fmt.Errorf("token membership error: %w", err)
 	}
 
 	return member, nil

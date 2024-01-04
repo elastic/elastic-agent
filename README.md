@@ -18,6 +18,11 @@ The source files for the general Elastic Agent documentation are currently store
 in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/main/docs/en/ingest-management) repository.
 The following docs are only focused on getting developers started building code for Elastic Agent.
 
+### Test Framework
+
+In addition to standard Go tests, changes to the Elastic Agent are always installed and tested on cross-platform virtual machines.
+For details on writing and running tests see the [Test Framework Developer Guide](docs/test-framework-dev-guide.md).
+
 ### Changelog
 
 The changelog for the Elastic Agent is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool). Read the [installation](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/install.md)
