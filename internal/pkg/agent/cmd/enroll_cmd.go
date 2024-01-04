@@ -80,6 +80,8 @@ type enrollCmdFleetServerOption struct {
 	ElasticsearchCA       string
 	ElasticsearchCASHA256 string
 	ElasticsearchInsecure bool
+	ElasticsearchCert     string
+	ElasticsearchCertKey  string
 	ServiceToken          string
 	ServiceTokenPath      string
 	PolicyID              string
@@ -101,6 +103,8 @@ type enrollCmdOption struct {
 	InternalURL          string                     `yaml:"-"`
 	CAs                  []string                   `yaml:"ca,omitempty"`
 	CASha256             []string                   `yaml:"ca_sha256,omitempty"`
+	Certificate          string                     `yaml:"certificate,omitempty"`
+	Key                  string                     `yaml:"key,omitempty"`
 	Insecure             bool                       `yaml:"insecure,omitempty"`
 	EnrollAPIKey         string                     `yaml:"enrollment_key,omitempty"`
 	Staging              string                     `yaml:"staging,omitempty"`
@@ -136,6 +140,12 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	}
 	if e.Insecure {
 		tlsCfg.VerificationMode = tlscommon.VerifyNone
+	}
+	if e.Certificate != "" || e.Key != "" {
+		tlsCfg.Certificate = tlscommon.CertificateConfig{
+			Certificate: e.Certificate,
+			Key:         e.Key,
+		}
 	}
 
 	cfg.Transport.TLS = &tlsCfg
@@ -344,6 +354,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 		c.options.FleetServer.PolicyID,
 		c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
 		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+		c.options.FleetServer.ElasticsearchCert, c.options.FleetServer.ElasticsearchCertKey,
 		c.options.FleetServer.Headers,
 		c.options.ProxyURL,
 		c.options.ProxyDisabled,
@@ -570,6 +581,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 			c.options.FleetServer.PolicyID,
 			c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
 			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+			c.options.FleetServer.ElasticsearchCert, c.options.FleetServer.ElasticsearchCertKey,
 			c.options.FleetServer.Headers,
 			c.options.ProxyURL, c.options.ProxyDisabled, c.options.ProxyHeaders,
 			c.options.FleetServer.ElasticsearchInsecure,
@@ -921,6 +933,7 @@ func createFleetServerBootstrapConfig(
 	connStr, serviceToken, serviceTokenPath, policyID, host string,
 	port uint16, internalPort uint16,
 	cert, key, passphrasePath, esCA, esCASHA256 string,
+	esClientCert, esClientCertKey string,
 	headers map[string]string,
 	proxyURL string,
 	proxyDisabled bool,
@@ -949,6 +962,21 @@ func createFleetServerBootstrapConfig(
 			}
 		} else {
 			es.TLS.CATrustedFingerprint = esCASHA256
+		}
+	}
+	if esClientCert != "" || esClientCertKey != "" {
+		if es.TLS == nil {
+			es.TLS = &tlscommon.Config{
+				Certificate: tlscommon.CertificateConfig{
+					Certificate: esClientCert,
+					Key:         esClientCertKey,
+				},
+			}
+		} else {
+			es.TLS.Certificate = tlscommon.CertificateConfig{
+				Certificate: esClientCert,
+				Key:         esClientCertKey,
+			}
 		}
 	}
 	if host == "" {

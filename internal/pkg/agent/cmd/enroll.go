@@ -55,6 +55,8 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("fleet-server-es-ca", "", "", "Path to certificate authority to use with communicate with elasticsearch")
 	cmd.Flags().StringP("fleet-server-es-ca-trusted-fingerprint", "", "", "Elasticsearch certificate authority's SHA256 fingerprint")
 	cmd.Flags().BoolP("fleet-server-es-insecure", "", false, "Disables validation of certificates")
+	cmd.Flags().StringP("fleet-server-es-cert", "", "", "Client certificate to use when connecting to Elasticsearch.")
+	cmd.Flags().StringP("fleet-server-es-cert-key", "", "", "Client private key to use when connecing to Elasticsearch.")
 	cmd.Flags().StringP("fleet-server-service-token", "", "", "Service token to use for communication with elasticsearch")
 	cmd.Flags().StringP("fleet-server-service-token-path", "", "", "Filepath for service token secret file to use for communication with elasticsearch")
 	cmd.Flags().StringP("fleet-server-policy", "", "", "Start and run a Fleet Server on this specific policy")
@@ -67,6 +69,8 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolP("fleet-server-insecure-http", "", false, "Expose Fleet Server over HTTP (not recommended; insecure)")
 	cmd.Flags().StringP("certificate-authorities", "a", "", "Comma separated list of root certificate for server verifications")
 	cmd.Flags().StringP("ca-sha256", "p", "", "Comma separated list of certificate authorities hash pins used for certificate verifications")
+	cmd.Flags().StringP("elastic-agent-cert", "", "", "Elastic-agent client certificate to use with fleet-server during authentication")
+	cmd.Flags().StringP("elastic-agent-cert-key", "", "", "Elastic-agent client certificate to use with fleet-server during authentication")
 	cmd.Flags().BoolP("insecure", "i", false, "Allow insecure connection to fleet-server")
 	cmd.Flags().StringP("staging", "", "", "Configures agent to download artifacts from a staging build")
 	cmd.Flags().StringP("proxy-url", "", "", "Configures the proxy url")
@@ -86,9 +90,25 @@ func validateEnrollFlags(cmd *cobra.Command) error {
 	if ca != "" && !filepath.IsAbs(ca) {
 		return errors.New("--certificate-authorities must be provided as an absolute path", errors.M("path", ca), errors.TypeConfig)
 	}
+	cert, _ := cmd.Flags().GetString("elastic-agent-cert")
+	if cert != "" && !filepath.IsAbs(cert) {
+		return errors.New("--elastic-agent-cert must be provided as an absolute path", errors.M("path", cert), errors.TypeConfig)
+	}
+	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
+	if key != "" && !filepath.IsAbs(key) {
+		return errors.New("--elastic-agent-cert-key must be provided as an absolute path", errors.M("path", key), errors.TypeConfig)
+	}
 	esCa, _ := cmd.Flags().GetString("fleet-server-es-ca")
 	if esCa != "" && !filepath.IsAbs(esCa) {
 		return errors.New("--fleet-server-es-ca must be provided as an absolute path", errors.M("path", esCa), errors.TypeConfig)
+	}
+	esCert, _ := cmd.Flags().GetString("fleet-server-es-cert")
+	if esCert != "" && !filepath.IsAbs(esCert) {
+		return errors.New("--fleet-server-es-cert must be provided as an absolute path", errors.M("path", esCert), errors.TypeConfig)
+	}
+	esCertKey, _ := cmd.Flags().GetString("fleet-server-es-cert-key")
+	if esCertKey != "" && !filepath.IsAbs(esCertKey) {
+		return errors.New("--fleet-server-es-cert-key must be provided as an absolute path", errors.M("path", esCertKey), errors.TypeConfig)
 	}
 	fCert, _ := cmd.Flags().GetString("fleet-server-cert")
 	if fCert != "" && !filepath.IsAbs(fCert) {
@@ -124,6 +144,8 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	fElasticSearchCA, _ := cmd.Flags().GetString("fleet-server-es-ca")
 	fElasticSearchCASHA256, _ := cmd.Flags().GetString("fleet-server-es-ca-trusted-fingerprint")
 	fElasticSearchInsecure, _ := cmd.Flags().GetBool("fleet-server-es-insecure")
+	fElasticSearchClientCert, _ := cmd.Flags().GetString("fleet-server-es-cert")
+	fElasticSearchClientCertKey, _ := cmd.Flags().GetString("fleet-server-es-cert-key")
 	fServiceToken, _ := cmd.Flags().GetString("fleet-server-service-token")
 	fServiceTokenPath, _ := cmd.Flags().GetString("fleet-server-service-token-path")
 	fPolicy, _ := cmd.Flags().GetString("fleet-server-policy")
@@ -135,6 +157,8 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	fHeaders, _ := cmd.Flags().GetStringSlice("header")
 	fInsecure, _ := cmd.Flags().GetBool("fleet-server-insecure-http")
 	ca, _ := cmd.Flags().GetString("certificate-authorities")
+	cert, _ := cmd.Flags().GetString("elastic-agent-cert")
+	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
 	sha256, _ := cmd.Flags().GetString("ca-sha256")
 	insecure, _ := cmd.Flags().GetBool("insecure")
 	staging, _ := cmd.Flags().GetString("staging")
@@ -166,6 +190,14 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	if fElasticSearchCASHA256 != "" {
 		args = append(args, "--fleet-server-es-ca-trusted-fingerprint")
 		args = append(args, fElasticSearchCASHA256)
+	}
+	if fElasticSearchClientCert != "" {
+		args = append(args, "--fleet-server-es-cert")
+		args = append(args, fElasticSearchClientCert)
+	}
+	if fElasticSearchClientCertKey != "" {
+		args = append(args, "--fleet-server-es-cert-key")
+		args = append(args, fElasticSearchClientCertKey)
 	}
 	if fServiceToken != "" {
 		args = append(args, "--fleet-server-service-token")
@@ -219,6 +251,14 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	if ca != "" {
 		args = append(args, "--certificate-authorities")
 		args = append(args, ca)
+	}
+	if cert != "" {
+		args = append(args, "--elastic-agent-cert")
+		args = append(args, cert)
+	}
+	if key != "" {
+		args = append(args, "--elastic-agent-cert-key")
+		args = append(args, key)
 	}
 	if sha256 != "" {
 		args = append(args, "--ca-sha256")
@@ -328,6 +368,8 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	fElasticSearchCA, _ := cmd.Flags().GetString("fleet-server-es-ca")
 	fElasticSearchCASHA256, _ := cmd.Flags().GetString("fleet-server-es-ca-trusted-fingerprint")
 	fElasticSearchInsecure, _ := cmd.Flags().GetBool("fleet-server-es-insecure")
+	fElasticSearchClientCert, _ := cmd.Flags().GetString("fleet-server-es-cert")
+	fElasticSearchClientCertKey, _ := cmd.Flags().GetString("fleet-server-es-cert-key")
 	fHeaders, _ := cmd.Flags().GetStringSlice("header")
 	fServiceToken, _ := cmd.Flags().GetString("fleet-server-service-token")
 	fServiceTokenPath, _ := cmd.Flags().GetString("fleet-server-service-token-path")
@@ -352,6 +394,8 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	CAs := cli.StringToSlice(caStr)
 	caSHA256str, _ := cmd.Flags().GetString("ca-sha256")
 	caSHA256 := cli.StringToSlice(caSHA256str)
+	cert, _ := cmd.Flags().GetString("elastic-agent-cert")
+	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
 
 	ctx := handleSignal(context.Background())
 
@@ -369,6 +413,8 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		URL:                  url,
 		CAs:                  CAs,
 		CASha256:             caSHA256,
+		Certificate:          cert,
+		Key:                  key,
 		Insecure:             insecure,
 		UserProvidedMetadata: make(map[string]interface{}),
 		Staging:              staging,
@@ -385,6 +431,8 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 			ElasticsearchCA:       fElasticSearchCA,
 			ElasticsearchCASHA256: fElasticSearchCASHA256,
 			ElasticsearchInsecure: fElasticSearchInsecure,
+			ElasticsearchCert:     fElasticSearchClientCert,
+			ElasticsearchCertKey:  fElasticSearchClientCertKey,
 			ServiceToken:          fServiceToken,
 			ServiceTokenPath:      fServiceTokenPath,
 			PolicyID:              fPolicy,
