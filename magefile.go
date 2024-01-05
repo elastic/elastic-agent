@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"log"
 	"os"
 	"os/exec"
@@ -119,6 +120,9 @@ type Cloud mg.Namespace
 
 // Integration namespace contains tasks related to operating and running integration tests.
 type Integration mg.Namespace
+
+// Otel namespace contains Open Telemetry related tasks.
+type Otel mg.Namespace
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
@@ -550,7 +554,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg)
+	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
 }
 
 // CrossBuild cross-builds the beat for all target platforms.
@@ -1887,7 +1891,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		}
 
 	} else if stackProvisionerMode == ess.ProvisionerServerless {
-		stackProvisioner, err = ess.NewServerlessProvisioner(provisionCfg)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -2240,4 +2246,119 @@ func hasCleanOnExit() bool {
 	clean := os.Getenv("TEST_INTEG_CLEAN_ON_EXIT")
 	b, _ := strconv.ParseBool(clean)
 	return b
+}
+
+type dependency struct {
+	Name    string
+	Version string
+}
+
+type dependencies struct {
+	Receivers  []dependency
+	Exporters  []dependency
+	Processors []dependency
+	Extensions []dependency
+}
+
+func (d dependency) Clean(sep string) dependency {
+	cleanFn := func(dep, sep string) string {
+		chunks := strings.SplitN(dep, sep, 2)
+		if len(chunks) == 2 {
+			return chunks[1]
+		}
+
+		return dep
+	}
+
+	return dependency{
+		Name:    cleanFn(d.Name, sep),
+		Version: d.Version,
+	}
+}
+
+func (Otel) Readme() error {
+	fmt.Println(">> Building internal/pkg/otel/README.md")
+
+	readmeTmpl := filepath.Join("internal", "pkg", "otel", "templates", "README.md.tmpl")
+	readmeOut := filepath.Join("internal", "pkg", "otel", "README.md")
+
+	// read README template
+	tmpl, err := template.ParseFiles(readmeTmpl)
+	if err != nil {
+		return fmt.Errorf("failed to parse README template: %w", err)
+	}
+
+	data, err := getOtelDependencies()
+	if err != nil {
+		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
+	}
+
+	// resolve template
+	out, err := os.OpenFile(readmeOut, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", readmeOut, err)
+	}
+	defer out.Close()
+
+	return tmpl.Execute(out, data)
+}
+
+func getOtelDependencies() (*dependencies, error) {
+	// read go.mod
+	readFile, err := os.Open("go.mod")
+	if err != nil {
+		return nil, err
+	}
+	defer readFile.Close()
+
+	scanner := bufio.NewScanner(readFile)
+
+	scanner.Split(bufio.ScanLines)
+	var receivers, extensions, exporters, processors []dependency
+	// process imports
+	for scanner.Scan() {
+		l := strings.TrimSpace(scanner.Text())
+		// is otel
+		if !strings.Contains(l, "go.opentelemetry.io/") &&
+			!strings.Contains(l, "github.com/open-telemetry/") {
+			continue
+		}
+
+		if strings.Contains(l, "// indirect") {
+			continue
+		}
+
+		parseLine := func(line string) (dependency, error) {
+			chunks := strings.SplitN(line, " ", 2)
+			if len(chunks) != 2 {
+				return dependency{}, fmt.Errorf("incorrect format for line %q", line)
+			}
+			return dependency{
+				Name:    chunks[0],
+				Version: chunks[1],
+			}, nil
+		}
+
+		d, err := parseLine(l)
+		if err != nil {
+			return nil, err
+		}
+
+		if strings.Contains(l, "/receiver/") {
+			receivers = append(receivers, d.Clean("/receiver/"))
+		} else if strings.Contains(l, "/processor/") {
+			processors = append(processors, d.Clean("/processor/"))
+		} else if strings.Contains(l, "/exporter/") {
+			exporters = append(exporters, d.Clean("/exporter/"))
+		} else if strings.Contains(l, "/extension/") {
+			extensions = append(extensions, d.Clean("/extension/"))
+		}
+	}
+
+	return &dependencies{
+		Receivers:  receivers,
+		Exporters:  exporters,
+		Processors: processors,
+		Extensions: extensions,
+	}, nil
 }

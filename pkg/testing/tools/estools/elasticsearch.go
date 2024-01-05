@@ -143,8 +143,8 @@ type Lifecycle struct {
 }
 
 // GetAllindicies returns a list of indicies on the target ES instance
-func GetAllindicies(client elastictransport.Interface) ([]Index, error) {
-	return GetIndicesWithContext(context.Background(), client, []string{})
+func GetAllindicies(ctx context.Context, client elastictransport.Interface) ([]Index, error) {
+	return GetIndicesWithContext(ctx, client, []string{})
 }
 
 // GetIndicesWithContext returns a list of indicies on the target ES instance with the provided context
@@ -202,8 +202,8 @@ func CreateAPIKey(ctx context.Context, client elastictransport.Interface, req AP
 }
 
 // FindMatchingLogLines returns any logs with message fields that match the given line
-func FindMatchingLogLines(client elastictransport.Interface, namespace, line string) (Documents, error) {
-	return FindMatchingLogLinesWithContext(context.Background(), client, namespace, line)
+func FindMatchingLogLines(ctx context.Context, client elastictransport.Interface, namespace, line string) (Documents, error) {
+	return FindMatchingLogLinesWithContext(ctx, client, namespace, line)
 }
 
 // GetLatestDocumentMatchingQuery returns the last document that matches the given query.
@@ -368,8 +368,8 @@ func FindMatchingLogLinesWithContext(ctx context.Context, client elastictranspor
 
 // CheckForErrorsInLogs checks to see if any error-level lines exist
 // excludeStrings can be used to remove any particular error strings from logs
-func CheckForErrorsInLogs(client elastictransport.Interface, namespace string, excludeStrings []string) (Documents, error) {
-	return CheckForErrorsInLogsWithContext(context.Background(), client, namespace, excludeStrings)
+func CheckForErrorsInLogs(ctx context.Context, client elastictransport.Interface, namespace string, excludeStrings []string) (Documents, error) {
+	return CheckForErrorsInLogsWithContext(ctx, client, namespace, excludeStrings)
 }
 
 // CheckForErrorsInLogsWithContext checks to see if any error-level lines exist
@@ -438,12 +438,12 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 }
 
 // GetLogsForDataset returns any logs associated with the datastream
-func GetLogsForDataset(client elastictransport.Interface, index string) (Documents, error) {
-	return GetLogsForDatasetWithContext(context.Background(), client, index)
+func GetLogsForDataset(ctx context.Context, client elastictransport.Interface, index string) (Documents, error) {
+	return GetLogsForDatasetWithContext(ctx, client, index)
 }
 
 // GetLogsForAgentID returns any logs associated with the agent ID
-func GetLogsForAgentID(client elastictransport.Interface, id string) (Documents, error) {
+func GetLogsForAgentID(ctx context.Context, client elastictransport.Interface, id string) (Documents, error) {
 	indexQuery := map[string]interface{}{
 		"query": map[string]interface{}{
 			"match": map[string]interface{}{
@@ -465,7 +465,7 @@ func GetLogsForAgentID(client elastictransport.Interface, id string) (Documents,
 		es.Search.WithBody(&buf),
 		es.Search.WithTrackTotalHits(true),
 		es.Search.WithPretty(),
-		es.Search.WithContext(context.Background()),
+		es.Search.WithContext(ctx),
 		es.Search.WithQuery(fmt.Sprintf(`elastic_agent.id:%s`, id)),
 		// magic number, we try to get all entries it helps debugging test failures
 		es.Search.WithSize(300),
@@ -488,6 +488,17 @@ func GetLogsForDatasetWithContext(ctx context.Context, client elastictransport.I
 	}
 
 	return performQueryForRawQuery(ctx, indexQuery, "logs-elastic_agent*", client)
+}
+
+// GetLogsForIndexWithContext returns any logs that match the given condition
+func GetLogsForIndexWithContext(ctx context.Context, client elastictransport.Interface, index string, match map[string]interface{}) (Documents, error) {
+	indexQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": match,
+		},
+	}
+
+	return performQueryForRawQuery(ctx, indexQuery, index, client)
 }
 
 // GetPing performs a basic ping and returns ES config info
