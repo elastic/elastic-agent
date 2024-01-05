@@ -91,6 +91,7 @@ type enrollCmdFleetServerOption struct {
 	Cert                  string
 	CertKey               string
 	CertKeyPassphrasePath string
+	ClientAuth            string
 	Insecure              bool
 	SpawnAgent            bool
 	Headers               map[string]string
@@ -354,6 +355,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 		c.options.FleetServer.PolicyID,
 		c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
 		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+		c.options.FleetServer.ClientAuth,
 		c.options.FleetServer.ElasticsearchCert, c.options.FleetServer.ElasticsearchCertKey,
 		c.options.FleetServer.Headers,
 		c.options.ProxyURL,
@@ -581,6 +583,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 			c.options.FleetServer.PolicyID,
 			c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
 			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+			c.options.FleetServer.ClientAuth,
 			c.options.FleetServer.ElasticsearchCert, c.options.FleetServer.ElasticsearchCertKey,
 			c.options.FleetServer.Headers,
 			c.options.ProxyURL, c.options.ProxyDisabled, c.options.ProxyHeaders,
@@ -933,6 +936,7 @@ func createFleetServerBootstrapConfig(
 	connStr, serviceToken, serviceTokenPath, policyID, host string,
 	port uint16, internalPort uint16,
 	cert, key, passphrasePath, esCA, esCASHA256 string,
+	clientAuth string,
 	esClientCert, esClientCertKey string,
 	headers map[string]string,
 	proxyURL string,
@@ -1016,7 +1020,7 @@ func createFleetServerBootstrapConfig(
 		cfg.Server.Policy = &configuration.FleetServerPolicyConfig{ID: policyID}
 	}
 	if cert != "" || key != "" {
-		cfg.Server.TLS = &tlscommon.Config{
+		cfg.Server.TLS = &tlscommon.ServerConfig{
 			Certificate: tlscommon.CertificateConfig{
 				Certificate:    cert,
 				Key:            key,
@@ -1025,6 +1029,12 @@ func createFleetServerBootstrapConfig(
 		}
 		if insecure {
 			cfg.Server.TLS.VerificationMode = tlscommon.VerifyNone
+		}
+	}
+
+	if cfg.Server.TLS != nil && clientAuth != "" {
+		if err := cfg.Server.TLS.ClientAuth.Unpack(clientAuth); err != nil {
+			return nil, errors.New(err, "failed to unpack --fleet-server-client-auth", errors.TypeConfig)
 		}
 	}
 

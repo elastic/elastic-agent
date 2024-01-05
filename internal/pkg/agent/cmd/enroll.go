@@ -65,6 +65,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("fleet-server-cert", "", "", "Certificate to use for exposed Fleet Server HTTPS endpoint")
 	cmd.Flags().StringP("fleet-server-cert-key", "", "", "Private key to use for exposed Fleet Server HTTPS endpoint")
 	cmd.Flags().StringP("fleet-server-cert-key-passphrase", "", "", "Path for private key passphrase file used to decrypt certificate key")
+	cmd.Flags().StringP("fleet-server-client-auth", "", "", "Fleet-server mTLS client authentication for connecting elastic-agents. Must be one of [none, optional, required]")
 	cmd.Flags().StringSliceP("header", "", []string{}, "Headers used in communication with elasticsearch")
 	cmd.Flags().BoolP("fleet-server-insecure-http", "", false, "Expose Fleet Server over HTTP (not recommended; insecure)")
 	cmd.Flags().StringP("certificate-authorities", "a", "", "Comma separated list of root certificate for server verifications")
@@ -82,7 +83,8 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("skip-daemon-reload", false, "Skip daemon reload after enrolling")
 	cmd.Flags().StringSliceP("tag", "", []string{}, "User set tags")
 
-	cmd.Flags().MarkHidden("skip-daemon-reload") //nolint:errcheck // an error is only returned if the flag does not exist.
+	cmd.Flags().MarkHidden("skip-daemon-reload")       //nolint:errcheck // an error is only returned if the flag does not exist.
+	cmd.Flags().MarkHidden("fleet-server-client-auth") //nolint:errcheck // FIXME this is not fully implemented
 }
 
 func validateEnrollFlags(cmd *cobra.Command) error {
@@ -130,6 +132,14 @@ func validateEnrollFlags(cmd *cobra.Command) error {
 	if fPassphrase != "" && !filepath.IsAbs(fPassphrase) {
 		return errors.New("--fleet-server-cert-key-passphrase must be provided as an absolute path", errors.M("path", fPassphrase), errors.TypeConfig)
 	}
+	fClientAuth, _ := cmd.Flags().GetString("fleet-server-client-auth")
+	switch fClientAuth {
+	case "":
+	case "none", "optional", "required":
+		// NOTE we can split this case if we want to do additional checks  when optional or required is passed.
+	default:
+		return errors.New("--fleet-server-client-auth must be one of [none, optional, required]")
+	}
 	return nil
 }
 
@@ -154,6 +164,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	fCert, _ := cmd.Flags().GetString("fleet-server-cert")
 	fCertKey, _ := cmd.Flags().GetString("fleet-server-cert-key")
 	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase")
+	fClientAuth, _ := cmd.Flags().GetString("fleet-server-client-auth")
 	fHeaders, _ := cmd.Flags().GetStringSlice("header")
 	fInsecure, _ := cmd.Flags().GetBool("fleet-server-insecure-http")
 	ca, _ := cmd.Flags().GetString("certificate-authorities")
@@ -230,6 +241,10 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	if fPassphrase != "" {
 		args = append(args, "--fleet-server-cert-key-passphrase")
 		args = append(args, fPassphrase)
+	}
+	if fClientAuth != "" {
+		args = append(args, "--fleet-server-client-auth")
+		args = append(args, fClientAuth)
 	}
 	if daemonTimeout != 0 {
 		args = append(args, "--daemon-timeout")
@@ -380,6 +395,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	fCert, _ := cmd.Flags().GetString("fleet-server-cert")
 	fCertKey, _ := cmd.Flags().GetString("fleet-server-cert-key")
 	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase")
+	fClientAuth, _ := cmd.Flags().GetString("fleet-server-client-auth")
 	fInsecure, _ := cmd.Flags().GetBool("fleet-server-insecure-http")
 	proxyURL, _ := cmd.Flags().GetString("proxy-url")
 	proxyDisabled, _ := cmd.Flags().GetBool("proxy-disabled")
@@ -441,6 +457,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 			Cert:                  fCert,
 			CertKey:               fCertKey,
 			CertKeyPassphrasePath: fPassphrase,
+			ClientAuth:            fClientAuth,
 			Insecure:              fInsecure,
 			SpawnAgent:            !fromInstall,
 			Headers:               mapFromEnvList(fHeaders),
