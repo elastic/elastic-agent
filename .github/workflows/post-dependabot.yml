@@ -43,7 +43,7 @@ jobs:
           git commit -m "Update NOTICE.txt"
           git push
 
-      - name: update otel README.MD
+      - name: update otel README.md
         run: mage otel:readme 
 
       - name: check for modified otel README.md
