@@ -13,7 +13,7 @@ STACK_PROVISIONER="${1:-"serverless"}"
 
 run_test_for_beat(){
     local beat_name=$1
-    
+
     #build
     export WORKSPACE="build/beats/x-pack/${beat_name}"
     SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz,zip mage package
@@ -36,7 +36,7 @@ mage -l
 mkdir -p build
 cd build
 
-git clone --filter=tree:0 git@github.com:elastic/beats.git
+git clone --depth=1 git@github.com:elastic/beats.git
 cd ..
 
 # export WORKSPACE=beats/x-pack/metricbeat
