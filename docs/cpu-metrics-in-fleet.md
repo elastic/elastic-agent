@@ -165,8 +165,9 @@ question.  The calculation of CPU (and other) metrics depends on the OS the Agen
 On Linux, CPU metrics are collected by [reading the `/proc/$PID/stat` file](https://github.com/elastic/elastic-agent-system-metrics/blob/085e4529f3c4f91dd377cadbbe7a2bf321989438/metric/system/process/process_linux_common.go#L351).
 This file contains whitespace-delimited values (fields) for various process metrics and other information. The field at
 index 13 (0-based indexing) is the number of CPU ticks utilized by the process in user-space since it was started. The
-field at index 14 is the number of CPU ticks utilized by the process in kernel-space since it was started. As such, both
-fields contain counter metrics.
+field at index 14 is the number of CPU ticks utilized by the process in kernel-space since it was started.  As such, both
+fields contain counter metrics. Both fields show the total number of CPU ticks consumed by the process across all available
+cores (as opposed to showing normalized, per-core, values; [proof](https://gist.github.com/ycombinator/d55d884ec979fb86360a00b57f807de3)).
 
 We want to convert these tick values into milliseconds so it becomes easier to figure out what percentage of CPU was
 utilized by the process over a given period of time.  For example, if the process utilized 120 milliseconds of CPU time
@@ -182,8 +183,6 @@ the user-space and kernel-space CPU utilization (which is now in milliseconds) t
 
 ## Unanswered Questions
 
-1. On Linux, are the tick values in `/proc/$PID/stat` the total across all cores? Or are they normalized per core? Consequently,
-   is the value reported by `system.process.cpu.total.value` the total across all cores or is it normalized per core?
 2. Why do we divide by 10000 (`params._interval`) in the ES query?
 3. Why do we use a `10s` interval for the derivative aggregation in the ES query? Is this related to the division above?
 4. The big question: how do any of these values compare to the output seen in `top` / `htop`?
