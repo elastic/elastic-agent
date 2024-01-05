@@ -659,7 +659,7 @@ func ensureInstallMarkerPresent() error {
 	}
 
 	// In v8.14.0, the control socket was moved to be in the installation path instead at
-	// a system level location, except on Windows where it remained at `\\.\pipe\elastic-agent-system`.
+	// a system level location, except on Windows where it remained at `npipe:///elastic-agent-system`.
 	// For Windows to be able to determine if it is running installed is from the creation of
 	// `.installed` marker that was not created until v8.8.0. Upgrading from any pre-8.8 version results
 	// in the `paths.ControlSocket()` in returning the incorrect control socket (only on Windows).

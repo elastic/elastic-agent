@@ -28,7 +28,7 @@ const (
 	ControlSocketName = "elastic-agent.sock"
 
 	// WindowsControlSocketInstalledPath is the control socket path used when installed on Windows.
-	WindowsControlSocketInstalledPath = `\\.\pipe\elastic-agent-system`
+	WindowsControlSocketInstalledPath = `npipe:///elastic-agent-system`
 
 	// MarkerFileName is the name of the file that's created by
 	// `elastic-agent install` in the Agent's topPath folder to

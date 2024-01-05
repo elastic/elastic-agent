@@ -24,7 +24,7 @@ func createListener(log *logger.Logger) (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create security descriptor: %w", err)
 	}
-	lis, err := npipe.NewListener(control.Address(), sd)
+	lis, err := npipe.NewListener(npipe.TransformString(control.Address()), sd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create npipe listener: %w", err)
 	}
