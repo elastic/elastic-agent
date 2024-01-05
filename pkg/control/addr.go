@@ -5,7 +5,6 @@
 package control
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"path/filepath"
 
@@ -31,18 +30,5 @@ func AddressFromPath(platform string, path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to evaluate all symlinks of %s: %w", absDir, err)
 	}
-	// socket should be inside this directory
-	socketPath := filepath.Join(noSyms, paths.ControlSocketName)
-	if platform == "windows" {
-		// on windows the control socket is always at the sha256 of the socketPath
-		return fmt.Sprintf(`\\.\pipe\elastic-agent-%x`, sha256.Sum256([]byte(socketPath))), nil
-	}
-	unixSocket := fmt.Sprintf("unix://%s", socketPath)
-	if len(unixSocket) < 104 {
-		// small enough to fit
-		return unixSocket, nil
-	}
-	// place in global /tmp to ensure that its small enough to fit; current path is way to long
-	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
-	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(socketPath))), nil
+	return paths.ControlSocketFromPath(platform, noSyms), nil
 }

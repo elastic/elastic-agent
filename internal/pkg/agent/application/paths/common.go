@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -25,6 +26,9 @@ const (
 
 	// ControlSocketName is the control socket name.
 	ControlSocketName = "elastic-agent.sock"
+
+	// WindowsControlSocketInstalledPath is the control socket path used when installed on Windows.
+	WindowsControlSocketInstalledPath = `\\.\pipe\elastic-agent-system`
 
 	// MarkerFileName is the name of the file that's created by
 	// `elastic-agent install` in the Agent's topPath folder to
@@ -302,4 +306,23 @@ func RunningInstalled() bool {
 		return false
 	}
 	return true
+}
+
+// ControlSocketFromPath returns the control socket path for an Elastic Agent running
+// on the defined platform, and its executing directory.
+func ControlSocketFromPath(platform string, path string) string {
+	// socket should be inside this directory
+	socketPath := filepath.Join(path, ControlSocketName)
+	if platform == "windows" {
+		// on windows the control socket always uses the fallback
+		return utils.SocketURLWithFallback(socketPath, path)
+	}
+	unixSocket := fmt.Sprintf("unix://%s", socketPath)
+	if len(unixSocket) < 104 {
+		// small enough to fit
+		return unixSocket
+	}
+	// place in global /tmp to ensure that its small enough to fit; current path is way to long
+	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
+	return utils.SocketURLWithFallback(socketPath, path)
 }

@@ -301,7 +301,10 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
 		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
-		_ = os.Remove(paths.ControlSocketRunSymlink) // ensure it doesn't exist before creating the symlink
+		// ensure it doesn't exist before creating the symlink
+		if err := os.Remove(paths.ControlSocketRunSymlink); err != nil && !errors.Is(err, os.ErrNotExist) {
+			socketLog.Errorf("Failed to remove existing control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+		}
 		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
 			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", paths.ControlSocketRunSymlink, socketPath, err)
 		} else {
