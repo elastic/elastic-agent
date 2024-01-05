@@ -58,15 +58,9 @@ require (
 	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20230711023510-fffb14384f22
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
-<<<<<<< HEAD
-	golang.org/x/sync v0.3.0
-	golang.org/x/sys v0.14.0
-	golang.org/x/term v0.14.0
-=======
 	golang.org/x/sync v0.5.0
 	golang.org/x/sys v0.15.0
 	golang.org/x/term v0.15.0
->>>>>>> 95067cf37e (Bump github.com/elastic/elastic-agent-libs from 0.7.2 to 0.7.3 (#4000))
 	golang.org/x/text v0.14.0
 	golang.org/x/time v0.3.0
 	golang.org/x/tools v0.13.0
