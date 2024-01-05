@@ -7,7 +7,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"os/signal"
@@ -40,12 +39,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
@@ -134,6 +135,17 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
 
+	// detect otel
+	if runAsOtel := otel.IsOtelConfig(ctx, paths.ConfigFile()); runAsOtel {
+		return otel.Run(ctx, cancel, stop, testingMode)
+	}
+
+	// not otel continue as usual
+	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, modifiers...)
+
+}
+
+func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		return err
@@ -289,7 +301,10 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
 		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
-		_ = os.Remove(paths.ControlSocketRunSymlink) // ensure it doesn't exist before creating the symlink
+		// ensure it doesn't exist before creating the symlink
+		if err := os.Remove(paths.ControlSocketRunSymlink); err != nil && !errors.Is(err, os.ErrNotExist) {
+			socketLog.Errorf("Failed to remove existing control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+		}
 		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
 			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", paths.ControlSocketRunSymlink, socketPath, err)
 		} else {
@@ -463,7 +478,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 		// no enrollment file exists or failed to stat it; nothing to do
 		return cfg, nil
 	}
-	contents, err := ioutil.ReadFile(enrollPath)
+	contents, err := os.ReadFile(enrollPath)
 	if err != nil {
 		return nil, errors.New(
 			err,
@@ -639,12 +654,12 @@ func ensureInstallMarkerPresent() error {
 	// Otherwise, we're being upgraded from a version of an installed Agent
 	// that didn't use an installation marker file (that is, before v8.8.0).
 	// So create the file now.
-	if err := info.CreateInstallMarker(paths.Top(), utils.CurrentFileOwner()); err != nil {
+	if err := install.CreateInstallMarker(paths.Top(), utils.CurrentFileOwner()); err != nil {
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
 
 	// In v8.14.0, the control socket was moved to be in the installation path instead at
-	// a system level location, except on Windows where it remained at `\\.\pipe\elastic-agent-system`.
+	// a system level location, except on Windows where it remained at `npipe:///elastic-agent-system`.
 	// For Windows to be able to determine if it is running installed is from the creation of
 	// `.installed` marker that was not created until v8.8.0. Upgrading from any pre-8.8 version results
 	// in the `paths.ControlSocket()` in returning the incorrect control socket (only on Windows).

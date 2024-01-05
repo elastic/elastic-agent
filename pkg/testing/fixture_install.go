@@ -124,11 +124,11 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	if runtime.GOOS == "windows" {
 		// Windows uses a fixed named pipe, that is always the same.
 		// It is the same even running in unprivileged mode.
-		socketPath = `\\.\pipe\elastic-agent-system`
+		socketPath = paths.WindowsControlSocketInstalledPath
 	} else if !installOpts.Privileged {
 		// Unprivileged versions move the socket to inside the installed directory
 		// of the Elastic Agent.
-		socketPath = fmt.Sprintf("unix://%s", filepath.Join(f.workDir, paths.ControlSocketName))
+		socketPath = paths.ControlSocketFromPath(runtime.GOOS, f.workDir)
 	}
 	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)
@@ -289,7 +289,8 @@ func (f *Fixture) collectDiagnostics() {
 		if err != nil {
 			// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
 			f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
-			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
+			timestamp := strings.ReplaceAll(time.Now().Format(time.RFC3339), ":", "-")
+			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, timestamp))
 			err = f.archiveInstallDirectory(f.workDir, zipPath)
 			if err != nil {
 				f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)

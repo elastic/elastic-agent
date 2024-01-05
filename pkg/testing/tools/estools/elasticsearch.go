@@ -490,6 +490,17 @@ func GetLogsForDatasetWithContext(ctx context.Context, client elastictransport.I
 	return performQueryForRawQuery(ctx, indexQuery, "logs-elastic_agent*", client)
 }
 
+// GetLogsForIndexWithContext returns any logs that match the given condition
+func GetLogsForIndexWithContext(ctx context.Context, client elastictransport.Interface, index string, match map[string]interface{}) (Documents, error) {
+	indexQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": match,
+		},
+	}
+
+	return performQueryForRawQuery(ctx, indexQuery, index, client)
+}
+
 // GetPing performs a basic ping and returns ES config info
 func GetPing(ctx context.Context, client elastictransport.Interface) (Ping, error) {
 	req := esapi.InfoRequest{}

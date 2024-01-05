@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -42,5 +43,10 @@ func postInstall(topPath string) error {
 		return err
 	}
 
+	return nil
+}
+
+func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
+	// TODO(blakerouse): Fix the market permissions on Windows.
 	return nil
 }

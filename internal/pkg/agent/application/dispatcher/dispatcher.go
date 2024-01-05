@@ -44,6 +44,8 @@ type ActionDispatcher struct {
 	queue    priorityQueue
 	rt       *retryConfig
 	errCh    chan error
+
+	lastUpgradeDetails *details.Details
 }
 
 // New creates a new action dispatcher.
@@ -111,12 +113,18 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 	}()
 
 	ad.removeQueuedUpgrades(actions)
-	reportNextScheduledUpgrade(actions, detailsSetter, ad.log)
+
+	// set scheduled action as soon as it's received
+	// report it before the scheduled actions go to the queue
+	ad.reportNextScheduledUpgrade(actions, detailsSetter, ad.log)
+
 	actions = ad.queueScheduledActions(actions)
 	actions = ad.dispatchCancelActions(ctx, actions, acker)
 	queued, expired := ad.gatherQueuedActions(time.Now().UTC())
 	ad.log.Debugf("Gathered %d actions from queue, %d actions expired", len(queued), len(expired))
 	ad.log.Debugf("Expired actions: %v", expired)
+
+	ad.handleExpired(expired, detailsSetter)
 	actions = append(actions, queued...)
 
 	if err := ad.queue.Save(); err != nil {
@@ -280,7 +288,35 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	}
 }
 
-func reportNextScheduledUpgrade(input []fleetapi.Action, detailsSetter details.Observer, log *logger.Logger) {
+func (ad *ActionDispatcher) handleExpired(
+	expired []fleetapi.Action,
+	upgradeDetailsSetter details.Observer) {
+
+	for _, e := range expired {
+		if e.Type() == fleetapi.ActionTypeUpgrade {
+			// there is a scheduled upgrade set, if it isn't the same actions as
+			// the expired, the current status take precedence
+			if ad.lastUpgradeDetails != nil &&
+				ad.lastUpgradeDetails.ActionID != e.ID() {
+				continue
+			}
+
+			version := "unknown"
+			expiration := "unknown"
+			if upgrade, ok := e.(*fleetapi.ActionUpgrade); ok {
+				version = upgrade.Version
+				expiration = upgrade.ActionExpiration
+			}
+			ad.lastUpgradeDetails = details.NewDetails(version, details.StateFailed, e.ID())
+			ad.lastUpgradeDetails.Fail(fmt.Errorf("upgrade action %q expired on %s",
+				e.ID(), expiration))
+
+			upgradeDetailsSetter(ad.lastUpgradeDetails)
+		}
+	}
+}
+
+func (ad *ActionDispatcher) reportNextScheduledUpgrade(input []fleetapi.Action, detailsSetter details.Observer, log *logger.Logger) {
 	var nextUpgrade *fleetapi.ActionUpgrade
 	for _, action := range input {
 		sAction, ok := action.(fleetapi.ScheduledAction)
@@ -314,14 +350,24 @@ func reportNextScheduledUpgrade(input []fleetapi.Action, detailsSetter details.O
 		}
 	}
 
-	// If there no scheduled upgrade, there are no upgrade details to report.
+	// If there is no scheduled upgrade, nothing to do.
 	if nextUpgrade == nil {
 		return
 	}
 
-	upgradeDetails := details.NewDetails(nextUpgrade.Version, details.StateScheduled, nextUpgrade.ID())
-	startTime, _ := nextUpgrade.StartTime()
+	upgradeDetails := details.NewDetails(
+		nextUpgrade.Version,
+		details.StateScheduled,
+		nextUpgrade.ID())
+	startTime, err := nextUpgrade.StartTime()
+	if err != nil {
+		ad.log.Warnw(
+			fmt.Sprintf("could not get start time from action %s: %v",
+				nextUpgrade, err),
+			"error.message", err.Error())
+	}
 	upgradeDetails.Metadata.ScheduledAt = &startTime
 
 	detailsSetter(upgradeDetails)
+	ad.lastUpgradeDetails = upgradeDetails
 }

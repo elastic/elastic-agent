@@ -42,6 +42,10 @@ shared:
         source: 'elastic-agent.yml'
         mode: 0600
         config: true
+      /etc/{{.BeatName}}/otel.yml:
+        source: 'otel.yml'
+        mode: 0600
+        config: true
       /etc/{{.BeatName}}/.elastic-agent.active.commit:
         content: >
           {{ commit }}
@@ -109,6 +113,10 @@ shared:
         source: 'elastic-agent.yml'
         mode: 0600
         config: true
+      /etc/{{.BeatName}}/otel.yml:
+        source: 'otel.yml'
+        mode: 0600
+        config: true
       /etc/{{.BeatName}}/.elastic-agent.active.commit:
         content: >
           {{ commit }}
@@ -141,6 +149,10 @@ shared:
       mode: 0644
     'elastic-agent.yml':
       source: 'elastic-agent.yml'
+      mode: 0600
+      config: true
+    'otel.yml':
+      source: 'otel.yml'
       mode: 0600
       config: true
     '.elastic-agent.active.commit':
@@ -229,6 +241,10 @@ shared:
     files:
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
+      'otel.yml':
+        source: 'otel.yml'
         mode: 0600
         config: true
       '.elastic-agent.active.commit':

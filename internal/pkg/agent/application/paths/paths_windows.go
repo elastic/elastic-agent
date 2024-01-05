@@ -7,9 +7,8 @@
 package paths
 
 import (
-	"crypto/sha256"
-	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -20,9 +19,6 @@ const (
 	// DefaultBasePath is the base path used by the install command
 	// for installing Elastic Agent's files.
 	DefaultBasePath = `C:\Program Files`
-
-	// ControlSocketPath is the control socket path used when installed.
-	ControlSocketPath = `\\.\pipe\elastic-agent-system`
 
 	// ControlSocketRunSymlink is not created on Windows.
 	ControlSocketRunSymlink = ""
@@ -50,19 +46,12 @@ func AgentVaultPath() string {
 	return filepath.Join(Config(), defaultAgentVaultPath)
 }
 
-func controlSocketSHA256Path(topPath string) string {
-	// entire string cannot be longer than 256 characters, this forces the
-	// length to always be 87 characters (but unique per execution path)
-	socketPath := filepath.Join(topPath, ControlSocketName)
-	return fmt.Sprintf(`\\.\pipe\elastic-agent-%x`, sha256.Sum256([]byte(socketPath)))
-}
-
 func initialControlSocketPath(topPath string) string {
 	// when installed the control address is fixed
 	if RunningInstalled() {
-		return ControlSocketPath
+		return WindowsControlSocketInstalledPath
 	}
-	return controlSocketSHA256Path(topPath)
+	return ControlSocketFromPath(runtime.GOOS, topPath)
 }
 
 // ResolveControlSocket updates the control socket path.
@@ -72,9 +61,9 @@ func initialControlSocketPath(topPath string) string {
 // that is fixed from the upgrade process the control socket path needs to be updated.
 func ResolveControlSocket() {
 	currentPath := ControlSocket()
-	if currentPath == controlSocketSHA256Path(Top()) && RunningInstalled() {
+	if currentPath == ControlSocketFromPath(runtime.GOOS, topPath) && RunningInstalled() {
 		// path is not correct being that it's installed
 		// reset the control socket path to be the installed path
-		SetControlSocket(ControlSocketPath)
+		SetControlSocket(WindowsControlSocketInstalledPath)
 	}
 }

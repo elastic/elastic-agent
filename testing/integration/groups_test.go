@@ -25,6 +25,9 @@ const (
 	// unprivileged and airgapped.
 	FleetAirgappedUnprivileged = "fleet-airgapped-unprivileged"
 
+	// FQDN group of tests. Used for testing Elastic Agent with FQDN enabled.
+	FQDN = "fqdn"
+
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
 

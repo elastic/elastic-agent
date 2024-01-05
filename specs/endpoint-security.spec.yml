@@ -52,9 +52,7 @@ inputs:
     platforms:
       - darwin/amd64
       - darwin/arm64
-    outputs:
-      - elasticsearch
-      - logstash
+    outputs: *outputs
     proxied_actions: *proxied_actions
     runtime:
       preventions:
@@ -71,9 +69,7 @@ inputs:
     description: "Endpoint Security"
     platforms:
       - windows/amd64
-    outputs:
-      - elasticsearch
-      - logstash
+    outputs: *outputs
     proxied_actions: *proxied_actions
     runtime:
       preventions:
