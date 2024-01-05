@@ -7,7 +7,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"os/signal"
@@ -476,7 +475,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 		// no enrollment file exists or failed to stat it; nothing to do
 		return cfg, nil
 	}
-	contents, err := ioutil.ReadFile(enrollPath)
+	contents, err := os.ReadFile(enrollPath)
 	if err != nil {
 		return nil, errors.New(
 			err,
