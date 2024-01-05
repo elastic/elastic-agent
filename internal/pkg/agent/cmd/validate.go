@@ -8,10 +8,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
-	"github.com/spf13/cobra"
 )
 
 func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {

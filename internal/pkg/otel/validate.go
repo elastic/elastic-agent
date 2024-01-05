@@ -7,8 +7,9 @@ package otel
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"go.opentelemetry.io/collector/otelcol"
+
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 func Validate(ctx context.Context, configPath string) error {
