@@ -3487,8 +3487,9 @@ func TestManager_FakeInput_Chunk(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	const grpcDefaultSize = 1024 * 1024 * 4
 	grpcConfig := configuration.DefaultGRPCConfig()
-	grpcConfig.MaxMsgSize = 120 // very small size to test chunking
+	grpcConfig.MaxMsgSize = grpcDefaultSize * 2 // set to double the default size
 
 	ai, _ := info.NewAgentInfo(ctx, true)
 	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), grpcConfig)
@@ -3502,10 +3503,41 @@ func TestManager_FakeInput_Chunk(t *testing.T) {
 		errCh <- err
 	}()
 
-	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
-	defer waitCancel()
-	if err := waitForReady(waitCtx, m); err != nil {
-		require.NoError(t, err)
+	// build the units to ensure that there is more than double the units required for the GRPC configuration
+	minimumMsgSize := grpcConfig.MaxMsgSize * 2 // double it
+	var units []component.Unit
+	var unitsSize int
+	var nextUnitID int
+	for {
+		unit := component.Unit{
+			ID:       fmt.Sprintf("fake-input-%d", nextUnitID),
+			Type:     client.UnitTypeInput,
+			LogLevel: client.UnitLogLevelError,
+			Config: component.MustExpectedConfig(map[string]interface{}{
+				"type":    "fake",
+				"state":   int(client.UnitStateHealthy),
+				"message": fmt.Sprintf("Fake Healthy %d", nextUnitID),
+				"payload": map[string]interface{}{
+					"fake-id":    nextUnitID,
+					"extra-data": fmt.Sprintf("extra data for the unit %d to make it some what larger", nextUnitID),
+				},
+			}),
+		}
+		unitExpected := proto.UnitExpected{
+			Id:             unit.ID,
+			Type:           proto.UnitType_INPUT,
+			State:          proto.State_HEALTHY,
+			ConfigStateIdx: 1,
+			Config:         unit.Config,
+			LogLevel:       proto.UnitLogLevel_ERROR,
+		}
+		units = append(units, unit)
+		unitsSize += gproto.Size(&unitExpected)
+		nextUnitID++
+
+		if unitsSize > minimumMsgSize {
+			break
+		}
 	}
 
 	binaryPath := testBinary(t, "component")
@@ -3517,48 +3549,13 @@ func TestManager_FakeInput_Chunk(t *testing.T) {
 			BinaryPath: binaryPath,
 			Spec:       fakeInputSpec,
 		},
-		Units: []component.Unit{
-			{
-				ID:       "fake-input-1",
-				Type:     client.UnitTypeInput,
-				LogLevel: client.UnitLogLevelTrace,
-				Config: component.MustExpectedConfig(map[string]interface{}{
-					"type":    "fake",
-					"state":   int(client.UnitStateHealthy),
-					"message": "Fake Healthy 1",
-				}),
-			},
-			{
-				ID:       "fake-input-2",
-				Type:     client.UnitTypeInput,
-				LogLevel: client.UnitLogLevelTrace,
-				Config: component.MustExpectedConfig(map[string]interface{}{
-					"type":    "fake",
-					"state":   int(client.UnitStateHealthy),
-					"message": "Fake Healthy 2",
-				}),
-			},
-			{
-				ID:       "fake-input-3",
-				Type:     client.UnitTypeInput,
-				LogLevel: client.UnitLogLevelTrace,
-				Config: component.MustExpectedConfig(map[string]interface{}{
-					"type":    "fake",
-					"state":   int(client.UnitStateHealthy),
-					"message": "Fake Healthy 3",
-				}),
-			},
-			{
-				ID:       "fake-input-4",
-				Type:     client.UnitTypeInput,
-				LogLevel: client.UnitLogLevelTrace,
-				Config: component.MustExpectedConfig(map[string]interface{}{
-					"type":    "fake",
-					"state":   int(client.UnitStateHealthy),
-					"message": "Fake Healthy 4",
-				}),
-			},
-		},
+		Units: units,
+	}
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := waitForReady(waitCtx, m); err != nil {
+		require.NoError(t, err)
 	}
 
 	subCtx, subCancel := context.WithCancel(context.Background())
@@ -3571,7 +3568,6 @@ func TestManager_FakeInput_Chunk(t *testing.T) {
 			case <-subCtx.Done():
 				return
 			case state := <-sub.Ch():
-				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
 				} else {
@@ -3591,14 +3587,14 @@ func TestManager_FakeInput_Chunk(t *testing.T) {
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
 					}
-					if healthyCount == 4 {
+					if healthyCount == len(units) {
 						// remove the component which will stop it
 						m.Update(component.Model{Components: []component.Component{}})
 						err := <-m.errCh
 						if err != nil {
 							subErrCh <- err
 						}
-					} else if stoppedCount == 4 {
+					} else if stoppedCount == len(units) {
 						subErrCh <- nil
 					}
 				}
@@ -3613,13 +3609,13 @@ func TestManager_FakeInput_Chunk(t *testing.T) {
 	err = <-m.errCh
 	require.NoError(t, err)
 
-	endTimer := time.NewTimer(30 * time.Second)
+	endTimer := time.NewTimer(3 * time.Minute) // very large number of units will take time
 	defer endTimer.Stop()
 LOOP:
 	for {
 		select {
 		case <-endTimer.C:
-			t.Fatalf("timed out after 30 seconds")
+			t.Fatalf("timed out after 3 minutes")
 		case err := <-errCh:
 			require.NoError(t, err)
 		case err := <-subErrCh:

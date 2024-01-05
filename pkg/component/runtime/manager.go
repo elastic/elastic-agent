@@ -667,6 +667,15 @@ func (m *Manager) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 			break
 		}
 	}
+	if runtime.comm.chunkingAllowed {
+		if m.grpcConfig.CheckinChunkingDisabled {
+			// chunking explicitly disabled
+			runtime.comm.chunkingAllowed = false
+			runtime.logger.Warn("control checkin v2 protocol supports chunking, but chunking was explicitly disabled")
+		} else {
+			runtime.logger.Info("control checkin v2 protocol has chunking enabled")
+		}
+	}
 
 	return runtime.comm.checkin(server, initCheckin)
 }
