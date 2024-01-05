@@ -736,7 +736,7 @@ func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) erro
 	}
 
 	if status.State != int(cproto.State_HEALTHY) {
-		return fmt.Errorf("agent isn't health, current status: %s",
+		return false, fmt.Errorf("agent isn't healthy, current status: %s",
 			client.State(status.State))
 	}
 

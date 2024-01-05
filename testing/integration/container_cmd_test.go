@@ -103,6 +103,11 @@ func TestContainerCMD(t *testing.T) {
 		"FLEET_ENROLL=1",
 		"FLEET_URL="+fleetURL,
 		"FLEET_ENROLLMENT_TOKEN="+enrollmentToken.APIKey,
+		// As the agent isn't built for a container, it's upgradable, triggering
+		// the start of the upgrade watcher. If `STATE_PATH` isn't set, the
+		// upgrade watcher will commence from a different path within the
+		// container, distinct from the current execution path.
+		"STATE_PATH="+agentFixture.WorkDir(),
 	)
 
 	t.Logf(">> running binary with: %v", cmd.Args)

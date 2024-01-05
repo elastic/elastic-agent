@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/fsnotify/fsnotify"
@@ -39,12 +40,20 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	errCh := make(chan error)
-	watchFileNotEmpty(t, ctx, testMarkerFile, errCh)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	watchFileNotEmpty(t, ctx, testMarkerFile, errCh, &wg)
 	var watchErr error
+
+	var lsWg sync.WaitGroup
+	lsWg.Add(1)
+	lsCtx, lsCancel := context.WithCancel(context.Background())
+	defer lsCancel()
 	go func() {
+		defer lsWg.Done()
 		for {
 			select {
-			case <-ctx.Done():
+			case <-lsCtx.Done():
 				return
 			case err := <-errCh:
 				watchErr = err
@@ -75,11 +84,18 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	// Cancel watch on marker file now that we're at the end of the test and
 	// check that there were no errors.
 	cancel()
+	wg.Wait()
+
+	// Now that the watcher Go routine is cancelled and exited, cancel the listener that listens on errCh
+	lsCancel()
+	lsWg.Wait()
+
 	require.NoError(t, watchErr)
+
 	close(errCh)
 }
 
-func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh chan error) {
+func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh chan error, wg *sync.WaitGroup) {
 	watcher, err := fsnotify.NewWatcher()
 	require.NoError(t, err)
 
@@ -89,6 +105,7 @@ func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh
 
 	// Watch file
 	go func() {
+		defer wg.Done()
 		defer watcher.Close()
 		for {
 			select {
@@ -122,6 +139,7 @@ func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh
 					fileInfo, err := os.Stat(filePath)
 					if err != nil {
 						errCh <- fmt.Errorf("failed to stat file [%s]: %w", filePath, err)
+						return
 					}
 
 					if fileInfo.Size() == 0 {
