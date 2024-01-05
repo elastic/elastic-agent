@@ -226,11 +226,95 @@ BEAT_TOTAL_MS=$(($BEAT_TOTAL_TICKS * 1000 / 100))
 echo "Stats from /proc/PID/stats files: $(($AGENT_TOTAL_MS + $BEAT_TOTAL_MS))"
 ```
 
-##### Comparison between metrics in Agent + Beats `/stats` API output and in Elasticsearch `metrics-elastic_agent-*` indices
+##### Comparison between metrics in Agent + Beats `/stats` API output and in Elasticsearch `metrics-elastic_agent*` indices
 
+This comparison is relatively easy to make.
+
+First, we call the `/stats` APIs on the machine where Agent and its Beats are running. For example, with an Agent running
+one Beat (excluding monitoring Beats):
+
+```shell
+$ sudo curl -s http://localhost:6791/stats  | jq '.beat.cpu.total.value'
+34810
+$ sudo curl -s -X GET --unix-socket '/opt/Elastic/Agent/data/tmp/PGwsYWcynGUYZEjD872Gs-npqbv-30jS.sock' 'http:/f/stats' | jq '.beat.cpu.total.value'
+795000
+```
+
+Then we call the Elasticsearch `_search` API on `metrics-elastic_agent*` indices, keeping the query filters the same as
+the query being done by Fleet UI, but only considering the latest documents for each `elastic_agent.process`, since the
+CPU utilization metrics are counter metrics.
+
+```
+curl -s -u $ES_USER:$ES_PASS -H 'Content-Type: application/json' 'https://test-cpu.es.us-central1.gcp.cloud.es.io:9243/metrics-elastic_agent*/_search' -d '{
+  "sort": [
+    {
+      "@timestamp": {
+        "order": "desc"
+      }
+    }
+  ],
+  "collapse": {
+    "field": "elastic_agent.process"
+  },
+  "_source": [
+    "@timestamp",
+    "system.process.cpu.total.value"
+  ],
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "terms": {
+            "_tier": [
+              "data_hot"
+            ]
+          }
+        },
+        {
+          "range": {
+            "@timestamp": {
+              "gte": "now-5m"
+            }
+          }
+        },
+        {
+          "terms": {
+            "elastic_agent.id": [
+              "62efabf2-21ec-4764-b5b5-32f7c6ce509b"
+            ]
+          }
+        },
+        {
+          "bool": {
+            "filter": [
+              {
+                "bool": {
+                  "should": [
+                    {
+                      "term": {
+                        "data_stream.dataset": "elastic_agent.elastic_agent"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}' | jq -r '.hits.hits[]._source | [ ."@timestamp", .system.process.cpu.total.value ] | @tsv'
+```
+```
+2024-01-05T23:21:59.164Z	794990
+2024-01-05T23:21:59.164Z	34810
+```
+
+We can see that the metrics in the Agent + Beats `/stats` API outputs match up with those in the Elasticsearch
+`metrics-elastic_agent*` indices.
 
 ## Unanswered Questions
 
 1. Why do we divide by 10000 (`params._interval`) in the ES query?
 2. Why do we use a `10s` interval for the derivative aggregation in the ES query? Is this related to the division above?
-3. The big question: how do any of these values compare to the output seen in `top` / `htop`?
