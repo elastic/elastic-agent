@@ -407,7 +407,7 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, "/path/to/token")
 	})
 
-	r.Run("fleet-es client certificates are passed", func(t *testing.T) {
+	t.Run("fleet-es client certificates are passed", func(t *testing.T) {
 		cmd := newEnrollCommandWithArgs([]string{}, streams)
 		err := cmd.Flags().Set("fleet-server-es-cert", "/path/to/cert")
 		require.NoError(t, err)
@@ -420,7 +420,7 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, "/path/to/key")
 	})
 
-	r.Run("elastic-agent client certificates are passed", func(t *testing.T) {
+	t.Run("elastic-agent client certificates are passed", func(t *testing.T) {
 		cmd := newEnrollCommandWithArgs([]string{}, streams)
 		err := cmd.Flags().Set("elastic-agent-cert", "/path/to/cert")
 		require.NoError(t, err)
