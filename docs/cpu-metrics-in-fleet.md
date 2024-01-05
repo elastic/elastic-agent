@@ -181,8 +181,56 @@ from ticks to milliseconds for both user-space and kernel-space CPU utilization.
 Finally, we [sum up](https://github.com/elastic/elastic-agent-system-metrics/blob/085e4529f3c4f91dd377cadbbe7a2bf321989438/metric/system/process/process_linux_common.go#L376)
 the user-space and kernel-space CPU utilization (which is now in milliseconds) to arrive at the total CPU utilization.
 
+##### Comparison between metrics in `top` output and in `/proc/$PID/stat` file
+
+The `%CPU` reported for a process in `top` or `htop` output is in the range `[0, n*100]`, where `n` is the number of cores
+available on the machine. For example, if a process runs two threads on a two-core machine, with each thread utilizing
+about 60% of each core, `top` or `htop` will report `%CPU` as `120.0` (or close to it).
+
+Applying the calculations from the previous section to corresponding values in the process's `/proc/{pid}/stat` file,
+the results match up with what `top` or `htop` report.
+
+##### Comparison between metrics in `/proc/$PID/stat` file and in Agent + Beats `/stats` API output
+
+Using the following script for a host running Agent and one child Beat (excluding any monitoring Beats), we can see that
+the metrics in the `/proc/$PID/stat` file match up with those in the Agent + Beats `/stats` API output.
+
+```shell
+#!/bin/bash
+
+BEAT_CPU_MS_TOTAL=$(sudo curl -s -X GET --unix-socket '/opt/Elastic/Agent/data/tmp/PGwsYWcynGUYZEjD872Gs-npqbv-30jS.sock' 'http:/f/stats' | jq '.beat.cpu.total.value')
+AGENT_CPU_MS_TOTAL=$(sudo curl -s http://localhost:6791/stats  | jq '.beat.cpu.total.value')
+
+echo "Stats from API outputs: $(($BEAT_CPU_MS_TOTAL + $AGENT_CPU_MS_TOTAL))";
+
+AGENT_PID=403165
+
+AGENT_USER_TICKS=$(cat /proc/$AGENT_PID/stat | cut -d' ' -f14)
+AGENT_SYSTEM_TICKS=$(cat /proc/$AGENT_PID/stat | cut -d' ' -f15)
+AGENT_TOTAL_TICKS=$(($AGENT_USER_TICKS + $AGENT_SYSTEM_TICKS))
+AGENT_TOTAL_MS=$(($AGENT_TOTAL_TICKS * 1000 / 100))
+
+#echo "Agent total ticks: $AGENT_TOTAL_TICKS"
+#echo "Agent total ms: $AGENT_TOTAL_MS"
+
+BEAT_PID=431834
+
+BEAT_USER_TICKS=$(cat /proc/$BEAT_PID/stat | cut -d' ' -f14)
+BEAT_SYSTEM_TICKS=$(cat /proc/$BEAT_PID/stat | cut -d' ' -f15)
+BEAT_TOTAL_TICKS=$(($BEAT_USER_TICKS + $BEAT_SYSTEM_TICKS))
+BEAT_TOTAL_MS=$(($BEAT_TOTAL_TICKS * 1000 / 100))
+
+#echo "Beat total ticks: $BEAT_TOTAL_TICKS"
+#echo "Beat total ms: $BEAT_TOTAL_MS"
+
+echo "Stats from /proc/PID/stats files: $(($AGENT_TOTAL_MS + $BEAT_TOTAL_MS))"
+```
+
+##### Comparison between metrics in Agent + Beats `/stats` API output and in Elasticsearch `metrics-elastic_agent-*` indices
+
+
 ## Unanswered Questions
 
-2. Why do we divide by 10000 (`params._interval`) in the ES query?
-3. Why do we use a `10s` interval for the derivative aggregation in the ES query? Is this related to the division above?
-4. The big question: how do any of these values compare to the output seen in `top` / `htop`?
+1. Why do we divide by 10000 (`params._interval`) in the ES query?
+2. Why do we use a `10s` interval for the derivative aggregation in the ES query? Is this related to the division above?
+3. The big question: how do any of these values compare to the output seen in `top` / `htop`?
