@@ -36,13 +36,8 @@ mage -l
 mkdir -p build
 cd build
 
-<<<<<<< HEAD
-git clone --filter=tree:0 git@github.com:elastic/beats.git
-cd ..
-=======
 git clone --depth=1 git@github.com:elastic/beats.git
-popd
->>>>>>> 3fe6d3224b (Perform a shallow clone for the beats repo (#3928))
+cd ..
 
 # export WORKSPACE=beats/x-pack/metricbeat
 
