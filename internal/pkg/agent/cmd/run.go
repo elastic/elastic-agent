@@ -40,6 +40,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -651,7 +652,7 @@ func ensureInstallMarkerPresent() error {
 	// Otherwise, we're being upgraded from a version of an installed Agent
 	// that didn't use an installation marker file (that is, before v8.8.0).
 	// So create the file now.
-	if err := info.CreateInstallMarker(paths.Top(), utils.CurrentFileOwner()); err != nil {
+	if err := install.CreateInstallMarker(paths.Top(), utils.CurrentFileOwner()); err != nil {
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
 

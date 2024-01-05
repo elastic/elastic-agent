@@ -185,6 +185,11 @@ func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.Progres
 		}
 	}
 
+	// create the install marker
+	if err := CreateInstallMarker(topPath, ownership); err != nil {
+		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
+	}
+
 	// post install (per platform)
 	err = postInstall(topPath)
 	if err != nil {
@@ -348,4 +353,12 @@ func hasAllSSDs(block ghw.BlockInfo) bool {
 	}
 
 	return true
+}
+
+func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
+	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
+	if _, err := os.Create(markerFilePath); err != nil {
+		return err
+	}
+	return fixInstallMarkerPermissions(markerFilePath, ownership)
 }

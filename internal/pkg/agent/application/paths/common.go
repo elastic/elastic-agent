@@ -301,6 +301,5 @@ func RunningInstalled() bool {
 	if _, err := os.Stat(markerFilePath); err != nil {
 		return false
 	}
-
 	return true
 }

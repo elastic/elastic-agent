@@ -6,8 +6,23 @@
 
 package install
 
+import (
+	"fmt"
+	"os"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
+)
+
 // postInstall performs post installation for unix-based systems.
 func postInstall(topPath string) error {
 	// do nothing
+	return nil
+}
+
+func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
+	err := os.Chown(markerFilePath, ownership.UID, ownership.GID)
+	if err != nil {
+		return fmt.Errorf("failed to chown %d:%d %s: %w", ownership.UID, ownership.GID, markerFilePath, err)
+	}
 	return nil
 }

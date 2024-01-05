@@ -44,3 +44,8 @@ func postInstall(topPath string) error {
 
 	return nil
 }
+
+func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
+	// TODO(blakerouse): Fix the market permissions on Windows.
+	return nil
+}
