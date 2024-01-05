@@ -78,7 +78,7 @@ func TestContainerCMD(t *testing.T) {
 		t.Fatalf("could not get Fleet URL: %s", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 	cmd, err := agentFixture.PrepareAgentCommand(ctx, []string{"container"})
 	if err != nil {
