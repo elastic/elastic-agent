@@ -725,22 +725,22 @@ func (f *Fixture) ExecVersion(ctx context.Context, opts ...process.CmdOption) (A
 }
 
 // IsHealthy checks whether the prepared Elastic Agent reports itself as healthy.
-// It returns false and an error if either the reported state isn't healthy or
-// if it fails to fetch the current state. If the status is successfully fetched
-// but isn't healthy, the error will contain the reported status.
+// It returns an error if either the reported state isn't healthy or if it fails
+// to fetch the current state. If the status is successfully fetched, but it
+// isn't healthy, the error will contain the reported status.
 // This function is compatible with any Elastic Agent version 8.6 or later.
-func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) (bool, error) {
+func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) error {
 	status, err := f.ExecStatus(ctx, opts...)
 	if err != nil {
-		return false, fmt.Errorf("agent status returned and error: %w", err)
+		return fmt.Errorf("agent status returned and error: %w", err)
 	}
 
 	if status.State != int(cproto.State_HEALTHY) {
-		return false, fmt.Errorf("agent isn't health, current status: %s",
+		return fmt.Errorf("agent isn't health, current status: %s",
 			client.State(status.State))
 	}
 
-	return true, nil
+	return nil
 }
 
 // EnsurePrepared ensures that the fixture has been prepared.
