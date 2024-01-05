@@ -22,6 +22,10 @@ jobs:
         with:
           go-version-file: .go-version
 
+      - uses: magefile/mage-action@v3
+        with:
+          install-only: true
+
       - name: update NOTICE.txt
         run: make notice
 
