@@ -298,6 +298,8 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// create symlink from /run/elastic-agent.sock to `paths.ControlSocket()` when running as root
 	// this provides backwards compatibility as the control socket was moved with the addition of --unprivileged
 	// option during installation
+	//
+	// Windows `paths.ControlSocketRunSymlink` is `""` so this is always skipped on Windows.
 	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
 		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
@@ -312,7 +314,9 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 		}
 		defer func() {
 			// delete the symlink on exit; ignore the error
-			_ = os.Remove(paths.ControlSocketRunSymlink)
+			if err := os.Remove(paths.ControlSocketRunSymlink); err != nil {
+				socketLog.Errorf("Failed to remove control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+			}
 		}()
 	}
 
