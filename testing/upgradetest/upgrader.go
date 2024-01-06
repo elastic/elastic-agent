@@ -34,7 +34,7 @@ type upgradeOpts struct {
 	customPgp        *CustomPGP
 	customWatcherCfg string
 
-	// TODO: should be removed along with all references once 8.13.0 has been released.
+	// TODO: should be removed along with all references once 8.12.0 has been released.
 	// See also WithDisableUpgradeWatcherUpgradeDetailsCheck.
 	disableUpgradeWatcherUpgradeDetailsCheck bool
 
@@ -116,7 +116,7 @@ func WithCustomWatcherConfig(cfg string) upgradeOpt {
 // upgrade details that are being set by the Upgrade Watcher. This option is
 // useful in upgrade tests where the end Agent version does not contain changes
 // in the Upgrade Watcher whose effects are being asserted upon in PerformUpgrade.
-// TODO: should be removed along with all references once 8.13.0 has been released.
+// TODO: should be removed along with all references once 8.12.0 has been released.
 func WithDisableUpgradeWatcherUpgradeDetailsCheck() upgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.disableUpgradeWatcherUpgradeDetailsCheck = true
@@ -175,17 +175,17 @@ func PerformUpgrade(
 		return fmt.Errorf("failed to get end agent build version info: %w", err)
 	}
 
-	// For asserting on the effects of any Upgrade Watcher changes made in 8.13.0, we need
-	// the endVersion to be >= 8.13.0.  Otherwise, these assertions will fail as those changes
+	// For asserting on the effects of any Upgrade Watcher changes made in 8.12.0, we need
+	// the endVersion to be >= 8.12.0.  Otherwise, these assertions will fail as those changes
 	// won't be present in the Upgrade Watcher. So we disable these assertions if the endVersion
-	// is < 8.13.0.
+	// is < 8.12.0.
 	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
 	if err != nil {
 		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
 	}
 
 	upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck = upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck ||
-		endVersion.Less(*version.NewParsedSemVer(8, 13, 0, "", ""))
+		endVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", ""))
 
 	if upgradeOpts.preInstallHook != nil {
 		if err := upgradeOpts.preInstallHook(); err != nil {
