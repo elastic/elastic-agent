@@ -355,7 +355,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 		c.options.FleetServer.PolicyID,
 		c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
 		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
-		c.options.FleetServer.ClientAuth,
+		c.options.CAs, c.options.FleetServer.ClientAuth,
 		c.options.FleetServer.ElasticsearchCert, c.options.FleetServer.ElasticsearchCertKey,
 		c.options.FleetServer.Headers,
 		c.options.ProxyURL,
@@ -583,7 +583,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 			c.options.FleetServer.PolicyID,
 			c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
 			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
-			c.options.FleetServer.ClientAuth,
+			c.options.CAs, c.options.FleetServer.ClientAuth,
 			c.options.FleetServer.ElasticsearchCert, c.options.FleetServer.ElasticsearchCertKey,
 			c.options.FleetServer.Headers,
 			c.options.ProxyURL, c.options.ProxyDisabled, c.options.ProxyHeaders,
@@ -936,7 +936,7 @@ func createFleetServerBootstrapConfig(
 	connStr, serviceToken, serviceTokenPath, policyID, host string,
 	port uint16, internalPort uint16,
 	cert, key, passphrasePath, esCA, esCASHA256 string,
-	clientAuth string,
+	cas []string, clientAuth string,
 	esClientCert, esClientCertKey string,
 	headers map[string]string,
 	proxyURL string,
@@ -1030,6 +1030,10 @@ func createFleetServerBootstrapConfig(
 		if insecure {
 			cfg.Server.TLS.VerificationMode = tlscommon.VerifyNone
 		}
+	}
+
+	if cfg.Server.TLS != nil {
+		cfg.Server.TLS.CAs = cas
 	}
 
 	if cfg.Server.TLS != nil && clientAuth != "" {
