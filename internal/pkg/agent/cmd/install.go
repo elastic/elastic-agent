@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -263,10 +262,6 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			return fmt.Errorf("enroll command failed for unknown reason: %w", err)
 		}
 		progBar.Describe("Enroll Completed")
-	}
-
-	if err := info.CreateInstallMarker(topPath, ownership); err != nil {
-		return fmt.Errorf("failed to create install marker: %w", err)
 	}
 
 	progBar.Describe("Done")

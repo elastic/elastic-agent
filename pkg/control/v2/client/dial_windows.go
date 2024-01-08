@@ -31,5 +31,5 @@ func dialer(ctx context.Context, addr string) (net.Conn, error) {
 		var d net.Dialer
 		return d.DialContext(ctx, "tcp", strings.TrimPrefix(addr, "http://"))
 	}
-	return npipe.DialContext(addr)(ctx, "", "")
+	return npipe.DialContext(npipe.TransformString(addr))(ctx, "", "")
 }

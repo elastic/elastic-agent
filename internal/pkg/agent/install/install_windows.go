@@ -46,8 +46,7 @@ func postInstall(topPath string) error {
 	return nil
 }
 
-// createSocketDir creates the socket directory.
-func createSocketDir(ownership utils.FileOwner) error {
-	// doesn't do anything on windows, no directory is needed.
+func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
+	// TODO(blakerouse): Fix the market permissions on Windows.
 	return nil
 }
