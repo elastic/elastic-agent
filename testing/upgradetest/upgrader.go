@@ -29,7 +29,7 @@ type CustomPGP struct {
 type upgradeOpts struct {
 	sourceURI *string
 
-	privileged       *bool
+	unprivileged     *bool
 	skipVerify       bool
 	skipDefaultPgp   bool
 	customPgp        *CustomPGP
@@ -57,10 +57,10 @@ func WithSourceURI(sourceURI string) UpgradeOpt {
 	}
 }
 
-// WithPrivileged sets the install to be privileged
-func WithPrivileged(privileged bool) UpgradeOpt {
+// WithUnprivileged sets the install to be explicitly unprivileged.
+func WithUnprivileged(unprivileged bool) UpgradeOpt {
 	return func(opts *upgradeOpts) {
-		opts.privileged = &privileged
+		opts.unprivileged = &unprivileged
 	}
 }
 
@@ -191,20 +191,20 @@ func PerformUpgrade(
 		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
 	}
 
-	// in the (un-)privileged is unset we adjust it to use unprivileged when the version allows it
+	// in the unprivileged is unset we adjust it to use unprivileged when the version allows it
 	// in the case that its explicitly set then we ensure the version supports it
-	if upgradeOpts.privileged == nil {
+	if upgradeOpts.unprivileged == nil {
 		if !startVersion.Less(*Version_8_13_0) && !endVersion.Less(*Version_8_13_0) {
 			// both version support --unprivileged
-			privileged := false
-			upgradeOpts.privileged = &privileged
+			unprivileged := true
+			upgradeOpts.unprivileged = &unprivileged
 			logger.Logf("installation of Elastic Agent will use --unprivileged as both start and end version support --unprivileged mode")
 		} else {
 			// must be privileged
-			privileged := true
-			upgradeOpts.privileged = &privileged
+			unprivileged := false
+			upgradeOpts.unprivileged = &unprivileged
 		}
-	} else if !*upgradeOpts.privileged {
+	} else if *upgradeOpts.unprivileged {
 		if startVersion.Less(*Version_8_13_0) {
 			return errors.New("cannot install starting version with --unprivileged (which is default) because the it is older than 8.13")
 		}
@@ -236,7 +236,7 @@ func PerformUpgrade(
 	installOpts := atesting.InstallOpts{
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
-		Privileged:     *upgradeOpts.privileged,
+		Unprivileged:   upgradeOpts.unprivileged,
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	if err != nil {

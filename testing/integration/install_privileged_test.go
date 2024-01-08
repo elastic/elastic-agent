@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInstallWithoutBasePath(t *testing.T) {
+func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
 		// We require sudo for this test to run
@@ -63,7 +63,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true})
+	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true, Unprivileged: atesting.NewBool(false)})
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
@@ -74,7 +74,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }
 
-func TestInstallWithBasePath(t *testing.T) {
+func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
 		// We require sudo for this test to run
@@ -105,8 +105,9 @@ func TestInstallWithBasePath(t *testing.T) {
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	out, err := fixture.Install(ctx, &atesting.InstallOpts{
-		BasePath: randomBasePath,
-		Force:    true,
+		BasePath:     randomBasePath,
+		Force:        true,
+		Unprivileged: atesting.NewBool(false),
 	})
 	if err != nil {
 		t.Logf("install output: %s", out)

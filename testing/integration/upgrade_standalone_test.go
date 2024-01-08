@@ -49,17 +49,17 @@ func TestStandaloneUpgrade(t *testing.T) {
 			unprivilegedAvailable = false
 		}
 		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
-			testStandaloneUpgrade(t, startVersion, define.Version(), true)
+			testStandaloneUpgrade(t, startVersion, define.Version(), false)
 		})
 		if unprivilegedAvailable {
 			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
-				testStandaloneUpgrade(t, startVersion, define.Version(), false)
+				testStandaloneUpgrade(t, startVersion, define.Version(), true)
 			})
 		}
 	}
 }
 
-func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, privileged bool) {
+func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, unprivileged bool) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -73,6 +73,6 @@ func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, end
 	endFixture, err := define.NewFixture(t, endVersion)
 	require.NoError(t, err)
 
-	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithPrivileged(privileged))
+	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithUnprivileged(unprivileged))
 	assert.NoError(t, err)
 }

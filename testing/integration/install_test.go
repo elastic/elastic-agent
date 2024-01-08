@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration && !windows
+//go:build integration
 
 package integration
 
@@ -25,7 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 )
 
-func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
+func TestInstallWithoutBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
 		// We require sudo for this test to run
@@ -36,13 +36,6 @@ func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
-
-		// Only supports Linux at the moment.
-		OS: []define.OS{
-			{
-				Type: define.Linux,
-			},
-		},
 	})
 
 	// Get path to Elastic Agent executable
@@ -73,7 +66,7 @@ func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true, Privileged: false})
+	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true})
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
@@ -82,7 +75,7 @@ func TestInstallUnprivilegedWithoutBasePath(t *testing.T) {
 	checkInstallUnprivilegedSuccess(t, topPath)
 }
 
-func TestInstallUnprivilegedWithBasePath(t *testing.T) {
+func TestInstallWithBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
 		// We require sudo for this test to run
@@ -93,13 +86,6 @@ func TestInstallUnprivilegedWithBasePath(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
-
-		// Only supports Linux at the moment.
-		OS: []define.OS{
-			{
-				Type: define.Linux,
-			},
-		},
 	})
 
 	// Get path to Elastic Agent executable
@@ -132,9 +118,8 @@ func TestInstallUnprivilegedWithBasePath(t *testing.T) {
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	out, err := fixture.Install(ctx, &atesting.InstallOpts{
-		BasePath:   basePath,
-		Force:      true,
-		Privileged: false,
+		BasePath: basePath,
+		Force:    true,
 	})
 	if err != nil {
 		t.Logf("install output: %s", out)

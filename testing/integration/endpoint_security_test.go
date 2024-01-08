@@ -185,7 +185,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Privileged:     true,
+		Unprivileged:   atesting.NewBool(false),
 	}
 
 	policy, err := tools.InstallAgentWithPolicy(ctx, t,
@@ -244,7 +244,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Privileged:     true,
+		Unprivileged:   atesting.NewBool(false),
 	}
 
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -357,7 +357,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Privileged:     true,
+		Unprivileged:   atesting.NewBool(false),
 	}
 
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -525,7 +525,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Privileged:     true,
+		Unprivileged:   atesting.NewBool(false),
 		BasePath:       filepath.Join(paths.DefaultBasePath, "not_default"),
 	}
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
@@ -603,7 +603,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Privileged:     false, // ensure always unprivileged
+		Unprivileged:   atesting.NewBool(true), // ensure always unprivileged
 	}
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)

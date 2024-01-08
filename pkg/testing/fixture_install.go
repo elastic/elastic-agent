@@ -58,19 +58,26 @@ type InstallOpts struct {
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
 
-	// Privileged is inverse of the actual flag of --unprivileged because
-	// the default for all integration tests is to install with --unprivileged.
-	// Setting to true will result in --unprivileged being used.
-	Privileged bool
+	// Unprivileged by default installs the Elastic Agent as `--unprivileged` unless
+	// the platform being tested doesn't currently support it, or it's explicitly set
+	// to false.
+	Unprivileged *bool // --unprivileged
 
 	EnrollOpts
 }
 
-func (i InstallOpts) toCmdArgs() []string {
-	var args []string
-	if !i.Privileged {
-		args = append(args, "--unprivileged")
+func (i InstallOpts) unprivileged(operatingSystem string) bool {
+	if i.Unprivileged == nil {
+		// not explicitly set, default to true on Linux only (until other platforms support it)
+		if operatingSystem == "linux" {
+			return true
+		}
 	}
+	return *i.Unprivileged
+}
+
+func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
+	var args []string
 	if i.BasePath != "" {
 		args = append(args, "--base-path", i.BasePath)
 	}
@@ -87,9 +94,22 @@ func (i InstallOpts) toCmdArgs() []string {
 		args = append(args, "--proxy-url="+i.ProxyURL)
 	}
 
+	unprivileged := i.unprivileged(operatingSystem)
+	if unprivileged {
+		if operatingSystem != "linux" {
+			return nil, fmt.Errorf("--unprivileged cannot be set to true unless testing is being done on Linux")
+		}
+		args = append(args, "--unprivileged")
+	}
+
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
 
-	return args
+	return args, nil
+}
+
+// NewBool returns a boolean pointer.
+func NewBool(value bool) *bool {
+	return &value
 }
 
 // Install installs the prepared Elastic Agent binary and registers a t.Cleanup
@@ -102,9 +122,15 @@ func (i InstallOpts) toCmdArgs() []string {
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 	installArgs := []string{"install"}
-	if installOpts != nil {
-		installArgs = append(installArgs, installOpts.toCmdArgs()...)
+	if installOpts == nil {
+		// default options when not provided
+		installOpts = &InstallOpts{}
 	}
+	installOptsArgs, err := installOpts.toCmdArgs(f.operatingSystem)
+	if err != nil {
+		return nil, err
+	}
+	installArgs = append(installArgs, installOptsArgs...)
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
 		return out, fmt.Errorf("error running agent install command: %w", err)
@@ -125,7 +151,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 		// Windows uses a fixed named pipe, that is always the same.
 		// It is the same even running in unprivileged mode.
 		socketPath = paths.WindowsControlSocketInstalledPath
-	} else if !installOpts.Privileged {
+	} else if installOpts.unprivileged(f.operatingSystem) {
 		// Unprivileged versions move the socket to inside the installed directory
 		// of the Elastic Agent.
 		socketPath = paths.ControlSocketFromPath(runtime.GOOS, f.workDir)

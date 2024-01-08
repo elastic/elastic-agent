@@ -46,7 +46,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-	testFleetManagedUpgrade(t, info, false)
+	testFleetManagedUpgrade(t, info, true)
 }
 
 // TestFleetManagedUpgradePrivileged tests that the build under test can retrieve an action from
@@ -55,15 +55,15 @@ func TestFleetManagedUpgrade(t *testing.T) {
 // would be redundant.
 func TestFleetManagedUpgradePrivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: FleetUnprivileged,
+		Group: FleetPrivileged,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-	testFleetManagedUpgrade(t, info, true)
+	testFleetManagedUpgrade(t, info, false)
 }
 
-func testFleetManagedUpgrade(t *testing.T, info *define.Info, privileged bool) {
+func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
@@ -97,21 +97,10 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, privileged bool) {
 			startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
 	}
 
-	if !privileged {
-		currentVersion, err := version.ParseVersion(define.Version())
-		require.NoError(t, err)
-		if currentVersion.Less(*upgradetest.Version_8_13_0) {
-			t.Skipf("Version is %s is less than 8.13 and doesn't suppoert unprivileged mode.", define.Version())
-		}
-		if runtime.GOOS != define.Linux {
-			t.Skip("Unprivileged mode is currently only supported on linux")
-		}
-	}
-
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), endVersionInfo.Binary.String())
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), privileged)
+	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged)
 }
 
 func TestFleetAirGappedUpgrade(t *testing.T) {
@@ -123,19 +112,19 @@ func TestFleetAirGappedUpgrade(t *testing.T) {
 		Local: false, // Needed as the test requires Agent installation
 		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
 	})
-	testFleetAirGappedUpgrade(t, stack, false)
+	testFleetAirGappedUpgrade(t, stack, true)
 }
 
-func TestFleetAirGappedUpgradeUnprivileged(t *testing.T) {
+func TestFleetAirGappedUpgradePrivileged(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
-		Group: FleetAirgappedUnprivileged,
+		Group: FleetAirgappedPrivileged,
 		Stack: &define.Stack{},
 		// The test uses iptables to simulate the air-gaped environment.
 		OS:    []define.OS{{Type: define.Linux}},
 		Local: false, // Needed as the test requires Agent installation
 		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
 	})
-	testFleetAirGappedUpgrade(t, stack, true)
+	testFleetAirGappedUpgrade(t, stack, false)
 }
 
 func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bool) {
@@ -213,7 +202,7 @@ func testUpgradeFleetManagedElasticAgent(
 	startFixture *atesting.Fixture,
 	endFixture *atesting.Fixture,
 	policy kibana.AgentPolicy,
-	privileged bool) {
+	unprivileged bool) {
 	kibClient := info.KibanaClient
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
@@ -222,6 +211,20 @@ func testUpgradeFleetManagedElasticAgent(
 	require.NoError(t, err)
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err)
+	endParsedVersion, err := version.ParseVersion(endVersionInfo.Binary.String())
+	require.NoError(t, err)
+
+	if unprivileged {
+		if startParsedVersion.Less(*upgradetest.Version_8_13_0) {
+			t.Skipf("Starting version %s is less than 8.13 and doesn't support --unprivileged", startParsedVersion.String())
+		}
+		if endParsedVersion.Less(*upgradetest.Version_8_13_0) {
+			t.Skipf("Ending version %s is less than 8.13 and doesn't support --unprivileged", endParsedVersion.String())
+		}
+		if runtime.GOOS != define.Linux {
+			t.Skip("Unprivileged mode is currently only supported on linux")
+		}
+	}
 
 	t.Log("Creating Agent policy...")
 	policyResp, err := kibClient.CreatePolicy(ctx, policy)
@@ -251,7 +254,7 @@ func testUpgradeFleetManagedElasticAgent(
 			URL:             fleetServerURL,
 			EnrollmentToken: enrollmentToken.APIKey,
 		},
-		Privileged: privileged,
+		Unprivileged: atesting.NewBool(unprivileged),
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
