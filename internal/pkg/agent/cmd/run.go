@@ -501,6 +501,9 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	}
 	options.DelayEnroll = false
 	options.FleetServer.SpawnAgent = false
+	// enrollCmd daemonReloadWithBackoff is broken, setting
+	// SkipDaemonRestart to true avoids running that code.
+	options.SkipDaemonRestart = true
 	c, err := newEnrollCmd(
 		ctx,
 		logger,
