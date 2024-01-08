@@ -151,7 +151,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 		// Windows uses a fixed named pipe, that is always the same.
 		// It is the same even running in unprivileged mode.
 		socketPath = paths.WindowsControlSocketInstalledPath
-	} else if installOpts.unprivileged(f.operatingSystem) {
+	} else if installOpts.IsUnprivileged(f.operatingSystem) {
 		// Unprivileged versions move the socket to inside the installed directory
 		// of the Elastic Agent.
 		socketPath = paths.ControlSocketFromPath(runtime.GOOS, f.workDir)

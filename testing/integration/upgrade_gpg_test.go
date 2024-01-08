@@ -47,7 +47,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err)
 
-	// Upgrade to an old build.
+	// Upgrade to an old build of the same version.
 	endFixture, err := atesting.NewFixture(
 		t,
 		upgradetest.EnsureSnapshot(define.Version()),
