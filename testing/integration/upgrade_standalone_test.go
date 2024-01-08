@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/version"
 	"runtime"
 	"testing"
 	"time"
@@ -20,6 +19,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
