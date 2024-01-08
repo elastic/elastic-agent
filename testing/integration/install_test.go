@@ -8,10 +8,12 @@ package integration
 
 import (
 	"context"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -66,13 +68,16 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true})
+	opts := &atesting.InstallOpts{Force: true}
+	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
 	}
 
-	checkInstallUnprivilegedSuccess(t, topPath)
+	// Check that Agent was installed in default base path
+	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }
 
 func TestInstallWithBasePath(t *testing.T) {
@@ -99,59 +104,39 @@ func TestInstallWithBasePath(t *testing.T) {
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
-	// Other test `TestInstallWithBasePath` uses a random directory for the base
-	// path and that works because its running root. When using a base path the
-	// base needs to be accessible by the `elastic-agent` user that will be
-	// executing the process, but is not created yet. Using a base that exists
-	// and is known to be accessible by standard users, ensures this tests
-	// works correctly and will not hit a permission issue when spawning the
-	// elastic-agent service.
-	var basePath string
-	switch runtime.GOOS {
-	case define.Linux:
-		// default is `/opt`
-		basePath = `/usr`
-	default:
-		t.Fatalf("only Linux is supported by this test; should have been skipped")
-	}
+	// Set up random temporary directory to serve as base path for Elastic Agent
+	// installation.
+	tmpDir := t.TempDir()
+	randomBasePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(ctx, &atesting.InstallOpts{
-		BasePath: basePath,
+	opts := &atesting.InstallOpts{
+		BasePath: randomBasePath,
 		Force:    true,
-	})
+	}
+	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
 	}
 
 	// Check that Agent was installed in the custom base path
-	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	checkInstallUnprivilegedSuccess(t, topPath)
+	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
+	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }
 
-func checkInstallUnprivilegedSuccess(t *testing.T, topPath string) {
+func checkInstallSuccess(t *testing.T, topPath string, unprivileged bool) {
 	t.Helper()
-
-	// Check that the elastic-agent user/group exist.
-	uid, err := install.FindUID("elastic-agent")
+	_, err := os.Stat(topPath)
 	require.NoError(t, err)
-	gid, err := install.FindGID("elastic-agent")
-	require.NoError(t, err)
-
-	// Path should now exist as well as be owned by the correct user/group.
-	info, err := os.Stat(topPath)
-	require.NoError(t, err)
-	fs, ok := info.Sys().(*syscall.Stat_t)
-	require.True(t, ok)
-	require.Equalf(t, fs.Uid, uint32(uid), "%s not owned by elastic-agent user", topPath)
-	require.Equalf(t, fs.Gid, uint32(gid), "%s not owned by elastic-agent group", topPath)
 
 	// Check that a few expected installed files are present
 	installedBinPath := filepath.Join(topPath, exeOnWindows("elastic-agent"))
 	installedDataPath := filepath.Join(topPath, "data")
 	installMarkerPath := filepath.Join(topPath, ".installed")
+
 	_, err = os.Stat(installedBinPath)
 	require.NoError(t, err)
 	_, err = os.Stat(installedDataPath)
@@ -159,33 +144,68 @@ func checkInstallUnprivilegedSuccess(t *testing.T, topPath string) {
 	_, err = os.Stat(installMarkerPath)
 	require.NoError(t, err)
 
-	// Check that the socket is created with the correct permissions.
-	socketPath := filepath.Join(topPath, paths.ControlSocketName)
-	require.Eventuallyf(t, func() bool {
-		_, err = os.Stat(socketPath)
-		return err == nil
-	}, 3*time.Minute, 1*time.Second, "%s socket never created: %s", socketPath, err)
-	info, err = os.Stat(socketPath)
-	require.NoError(t, err)
-	fs, ok = info.Sys().(*syscall.Stat_t)
-	require.True(t, ok)
-	require.Equalf(t, fs.Uid, uint32(uid), "%s not owned by elastic-agent user", socketPath)
-	require.Equalf(t, fs.Gid, uint32(gid), "%s not owned by elastic-agent group", socketPath)
+	if unprivileged {
+		// Check that the elastic-agent user/group exist.
+		uid, err := install.FindUID("elastic-agent")
+		require.NoError(t, err)
+		gid, err := install.FindGID("elastic-agent")
+		require.NoError(t, err)
 
-	// Executing `elastic-agent status` as the `elastic-agent` user should work.
-	var output []byte
-	require.Eventuallyf(t, func() bool {
-		cmd := exec.Command("sudo", "-u", "elastic-agent", "elastic-agent", "status")
-		output, err = cmd.CombinedOutput()
-		return err == nil
-	}, 3*time.Minute, 1*time.Second, "status never successful: %s (output: %s)", err, output)
+		// Path should now exist as well as be owned by the correct user/group.
+		info, err := os.Stat(topPath)
+		require.NoError(t, err)
+		fs, ok := info.Sys().(*syscall.Stat_t)
+		require.True(t, ok)
+		require.Equalf(t, fs.Uid, uint32(uid), "%s not owned by elastic-agent user", topPath)
+		require.Equalf(t, fs.Gid, uint32(gid), "%s not owned by elastic-agent group", topPath)
 
-	// Executing `elastic-agent status` as the original user should fail, because that
-	// user is not in the 'elastic-agent' group.
-	originalUser := os.Getenv("SUDO_USER")
-	if originalUser != "" {
-		cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
-		output, err := cmd.CombinedOutput()
-		require.Error(t, err, "running sudo -u %s elastic-agent status should have failed: %s", originalUser, output)
+		// Check that the socket is created with the correct permissions.
+		socketPath := filepath.Join(topPath, paths.ControlSocketName)
+		require.Eventuallyf(t, func() bool {
+			_, err = os.Stat(socketPath)
+			return err == nil
+		}, 3*time.Minute, 1*time.Second, "%s socket never created: %s", socketPath, err)
+		info, err = os.Stat(socketPath)
+		require.NoError(t, err)
+		fs, ok = info.Sys().(*syscall.Stat_t)
+		require.True(t, ok)
+		require.Equalf(t, fs.Uid, uint32(uid), "%s not owned by elastic-agent user", socketPath)
+		require.Equalf(t, fs.Gid, uint32(gid), "%s not owned by elastic-agent group", socketPath)
+
+		// Executing `elastic-agent status` as the `elastic-agent` user should work.
+		var output []byte
+		require.Eventuallyf(t, func() bool {
+			cmd := exec.Command("sudo", "-u", "elastic-agent", "elastic-agent", "status")
+			output, err = cmd.CombinedOutput()
+			return err == nil
+		}, 3*time.Minute, 1*time.Second, "status never successful: %s (output: %s)", err, output)
+
+		// Executing `elastic-agent status` as the original user should fail, because that
+		// user is not in the 'elastic-agent' group.
+		originalUser := os.Getenv("SUDO_USER")
+		if originalUser != "" {
+			cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
+			output, err := cmd.CombinedOutput()
+			require.Error(t, err, "running sudo -u %s elastic-agent status should have failed: %s", originalUser, output)
+		}
 	}
+}
+
+func randStr(length int) string {
+	rand.Seed(time.Now().UnixNano())
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+	runes := make([]rune, length)
+	for i := range runes {
+		runes[i] = letters[rand.Intn(len(letters))]
+	}
+
+	return string(runes)
+}
+
+func exeOnWindows(filename string) string {
+	if runtime.GOOS == define.Windows {
+		return filename + ".exe"
+	}
+	return filename
 }

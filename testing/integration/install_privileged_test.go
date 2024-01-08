@@ -8,7 +8,6 @@ package integration
 
 import (
 	"context"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -63,14 +62,15 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true, Unprivileged: atesting.NewBool(false)})
+	opts := &atesting.InstallOpts{Force: true, Unprivileged: atesting.NewBool(false)}
+	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
 	}
 
 	// Check that Agent was installed in default base path
-	checkInstallSuccess(t, topPath)
+	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }
 
@@ -104,11 +104,12 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	out, err := fixture.Install(ctx, &atesting.InstallOpts{
+	opts := &atesting.InstallOpts{
 		BasePath:     randomBasePath,
 		Force:        true,
 		Unprivileged: atesting.NewBool(false),
-	})
+	}
+	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
@@ -116,43 +117,6 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-	checkInstallSuccess(t, topPath)
+	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-}
-
-func checkInstallSuccess(t *testing.T, topPath string) {
-	t.Helper()
-	_, err := os.Stat(topPath)
-	require.NoError(t, err)
-
-	// Check that a few expected installed files are present
-	installedBinPath := filepath.Join(topPath, exeOnWindows("elastic-agent"))
-	installedDataPath := filepath.Join(topPath, "data")
-	installMarkerPath := filepath.Join(topPath, ".installed")
-
-	_, err = os.Stat(installedBinPath)
-	require.NoError(t, err)
-	_, err = os.Stat(installedDataPath)
-	require.NoError(t, err)
-	_, err = os.Stat(installMarkerPath)
-	require.NoError(t, err)
-}
-
-func randStr(length int) string {
-	rand.Seed(time.Now().UnixNano())
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-	runes := make([]rune, length)
-	for i := range runes {
-		runes[i] = letters[rand.Intn(len(letters))]
-	}
-
-	return string(runes)
-}
-
-func exeOnWindows(filename string) string {
-	if runtime.GOOS == define.Windows {
-		return filename + ".exe"
-	}
-	return filename
 }

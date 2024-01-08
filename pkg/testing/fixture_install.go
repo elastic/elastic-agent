@@ -66,7 +66,7 @@ type InstallOpts struct {
 	EnrollOpts
 }
 
-func (i InstallOpts) unprivileged(operatingSystem string) bool {
+func (i InstallOpts) IsUnprivileged(operatingSystem string) bool {
 	if i.Unprivileged == nil {
 		// not explicitly set, default to true on Linux only (until other platforms support it)
 		if operatingSystem == "linux" {
@@ -94,7 +94,7 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 		args = append(args, "--proxy-url="+i.ProxyURL)
 	}
 
-	unprivileged := i.unprivileged(operatingSystem)
+	unprivileged := i.IsUnprivileged(operatingSystem)
 	if unprivileged {
 		if operatingSystem != "linux" {
 			return nil, fmt.Errorf("--unprivileged cannot be set to true unless testing is being done on Linux")
