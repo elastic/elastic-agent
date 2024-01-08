@@ -18,6 +18,9 @@ const (
 	// FleetAirgapped group of tests. Used for testing Elastic Agent with Fleet and airgapped.
 	FleetAirgapped = "fleet-airgapped"
 
+	// FQDN group of tests. Used for testing Elastic Agent with FQDN enabled.
+	FQDN = "fqdn"
+
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
 )

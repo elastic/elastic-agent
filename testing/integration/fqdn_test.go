@@ -33,7 +33,7 @@ import (
 
 func TestFQDN(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Default, // placed in default only because its skipped
+		Group: FQDN,
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
@@ -41,7 +41,6 @@ func TestFQDN(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
-	t.Skip("Flaky test, see https://github.com/elastic/elastic-agent/issues/3154")
 
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
