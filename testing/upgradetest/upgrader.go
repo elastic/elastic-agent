@@ -178,13 +178,19 @@ func PerformUpgrade(
 	// the endVersion to be >= 8.12.0.  Otherwise, these assertions will fail as those changes
 	// won't be present in the Upgrade Watcher. So we disable these assertions if the endVersion
 	// is < 8.12.0.
+	//
+	// The start version also needs to be >= 8.10.0. Versions before 8.10.0 will launch the watcher
+	// process from the starting version of the agent and not the ending version of the agent. So
+	// even though an 8.12.0 watcher knows to write the upgrade details, prior to 8.10.0 the 8.12.0
+	// watcher version never executes and the upgrade details are never populated.
 	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
 	if err != nil {
 		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
 	}
 
 	upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck = upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck ||
-		endVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", ""))
+		endVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) ||
+		startParsedVersion.Less(*version.NewParsedSemVer(8, 10, 0, "", ""))
 
 	if upgradeOpts.preInstallHook != nil {
 		if err := upgradeOpts.preInstallHook(); err != nil {
