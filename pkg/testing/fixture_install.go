@@ -58,6 +58,7 @@ type InstallOpts struct {
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
 	Unprivileged   bool   // --unprivileged
+	DelayEnroll    bool   // --delay-enroll
 
 	EnrollOpts
 }
@@ -81,6 +82,9 @@ func (i InstallOpts) toCmdArgs() []string {
 	}
 	if i.Unprivileged {
 		args = append(args, "--unprivileged")
+	}
+	if i.DelayEnroll {
+		args = append(args, "--delay-enroll")
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
