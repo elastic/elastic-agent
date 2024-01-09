@@ -1,6 +1,6 @@
 # How Agent CPU metrics in Fleet are calculated
 
-## Journey
+## Data Flow
 
 ```mermaid
 flowchart TD
