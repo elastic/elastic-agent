@@ -72,6 +72,7 @@ func (i InstallOpts) IsUnprivileged(operatingSystem string) bool {
 		if operatingSystem == "linux" {
 			return true
 		}
+		return false
 	}
 	return *i.Unprivileged
 }
