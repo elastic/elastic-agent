@@ -35,8 +35,6 @@ func TestContainerCMD(t *testing.T) {
 		// environment we run it in isolation
 		Group: "container",
 	})
-	t.Skip("flaky test: https://github.com/elastic/elastic-agent/issues/3984")
-
 	ctx := context.Background()
 
 	agentFixture, err := define.NewFixture(t, define.Version())
@@ -80,7 +78,7 @@ func TestContainerCMD(t *testing.T) {
 		t.Fatalf("could not get Fleet URL: %s", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 	cmd, err := agentFixture.PrepareAgentCommand(ctx, []string{"container"})
 	if err != nil {
@@ -105,6 +103,11 @@ func TestContainerCMD(t *testing.T) {
 		"FLEET_ENROLL=1",
 		"FLEET_URL="+fleetURL,
 		"FLEET_ENROLLMENT_TOKEN="+enrollmentToken.APIKey,
+		// As the agent isn't built for a container, it's upgradable, triggering
+		// the start of the upgrade watcher. If `STATE_PATH` isn't set, the
+		// upgrade watcher will commence from a different path within the
+		// container, distinct from the current execution path.
+		"STATE_PATH="+agentFixture.WorkDir(),
 	)
 
 	t.Logf(">> running binary with: %v", cmd.Args)
@@ -113,15 +116,14 @@ func TestContainerCMD(t *testing.T) {
 	}
 
 	require.Eventuallyf(t, func() bool {
-		var healthy bool
-		// This will returns errors until it connects to the agent,
+		// This will return errors until it connects to the agent,
 		// they're mostly noise because until the agent starts running
 		// we will get connection errors. If the test fails
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		healthy, err = agentFixture.IsHealthy(ctx)
-		return healthy
+		err = agentFixture.IsHealthy(ctx)
+		return err == nil
 	},
 		5*time.Minute, time.Second,
 		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",

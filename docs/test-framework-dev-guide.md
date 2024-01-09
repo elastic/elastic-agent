@@ -1,5 +1,13 @@
 # Developer Guide for the Integration and E2E Testing Framework
 
+The agent testing framework allows running integration and end-to-end tests against real agents
+installed on remotely provisioned virtual machines. The current set of integration tests can be
+found in https://github.com/elastic/elastic-agent/tree/main/testing/integration. Each test must
+start with a `define.Require` declaration describing how the test can be run. The diagram below
+provides a high level overview of the testing framework.
+
+<center><img src="./images/testing-framework.png" alt="Elastic Agent Testing Framework"></center>
+
 ## Prerequisites
 
 ### Dependencies
