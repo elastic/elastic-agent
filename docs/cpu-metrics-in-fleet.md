@@ -314,3 +314,61 @@ curl -s -u $ES_USER:$ES_PASS -H 'Content-Type: application/json' 'https://test-c
 
 We can see that the metrics in the Agent + Beats `/stats` API outputs match up with those in the Elasticsearch
 `metrics-elastic_agent*` indices.
+
+### Comparison between data in `metrics-elastic_agent*` indices and data shown in Fleet UI
+
+Given the findings in the previous sections, and looking at the Elasticsearch query, it follows that the CPU usage
+metrics shown in the Fleet UI for every Agent are computed as follows from the data in the `metrics-elatic_agent*` indices:
+
+1. For the Agent process and for every Beat process that's managed by Agent:
+   1. CPU utilization (in milliseconds; stored in the `system.process.cpu.total.value` field) is considered over a 5-minute period.
+   2. This 5-minute period is broken down into 1-minute buckets. This is the `cpu_time_series` aggregation in the Elasticsearch
+      query.
+   3. Recall that the values stored in `system.process.cpu.total.value` field are counter values, meaning they are expected
+      to be non-decreasing over time. So to consider a single CPU utilization value for each 1-minute bucket, we take the
+      `max(system.process.cpu.total.value)`. This is the `max_cpu` aggregation in the Elasticsearch query.
+   4. Given that the values stored in `system.process.cpu.total.value` field are counter values, to get CPU utilization
+      (in milliseconds) for each 1-minute period, we subtract the `max(system.process.cpu.total.value)` of a 1-minute
+      bucket from the same value of the previous 1-minute bucket. Further, we recalculate this value for 10-second buckets
+      (essentially dividing the 1-minute bucket value by 6). This is all done by the `cpu_derivative` aggregation in the
+      Elasticsearch query.
+   5. this per-10-second CPU utilization (in milliseconds) is divided by `10 * 1000` (= 10 seconds expressed as milliseconds),
+      to get the _percentage_ CPU utilization over 10 elapsed seconds. This is the `cpu` aggregation in the Elasticsearch query.
+   6. So now we end up with five CPU utilization (in %) values, one for each minute.
+   7. These are averaged to arrive at the CPU utilization (in %) over five minutes. This is the `avg_cpu` aggregation in
+      the Elasticsearch query.
+2. The 5-minute average CPU utilization (in %) for each of the processes is summed up to arrive at a total CPU utilization
+   (in %) for the Agent process and all Beat processes managed by Agent. This is the `sum_cpu` aggregation in the Elasticsearch
+   query. The result is the total CPU utilization (in %) by Agent and it's child Beat processes across all available cores
+   (as opposed to being normalized per-core). For example, if a machine has 8 cores, the resulting value will be in the range of
+   (0%, 800%).
+
+## Observations
+
+* The CPU utilization (in %) of Agent and each of the Beat processes can vary wildly. Generally speaking, the Agent process
+  itself does not utilize much CPU. And each Beat process may utilize CPU depending on the type of computations it is performing
+  on the data.
+
+* Also, CPU utilization is rarely constant. If the output of `top` or `htop` for Agent and Beat processes is observed over
+  time, the CPU utilization % shown varies for each process over time.
+
+* To relate the output seen in `top` or `htop` for Agent and Beat processes with the single value shown in the Fleet UI,
+  one must observe the values in the `top` / `htop` output over five minutes, arrive at an average CPU utilization (in %)
+  value for each process, and sum it up.  The resulting value will roughly be equal to the single value shown for that Agent
+  in the Agent Listing page in the Fleet UI.
+
+## Suggested improvements
+
+* We should document the observations above in an appropriate location and perhaps link to this documentation from the "i"
+  icon in CPU column in the Agent Listing page in the Fleet UI.
+
+* Rather than showing a single value for every Agent in the Agent Listing page in the Fleet UI, we should consider showing
+  the constituent values for Agent and each of the Beats processes managed by the Agent. Concretely, this would mean
+  getting rid of the `sum_cpu` aggregation in the Elasticsearch query. The challenge, of course, would be in presenting
+  these values in a user-friendly manner, especially in cases where an Agent is managing several Beats. Also, by showing
+  the values for the Beat processes (along with the Agent process), we would be exposing internals of Agent to users, which
+  may be confusing for some users.
+
+* We should enhance collection and aggregation to include CPU utilization for Beats, which are Agent components managed by
+  the command runtime, but also Agent components managed by the service runtime (e.g. Endpoint).
+
