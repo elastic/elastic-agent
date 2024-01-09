@@ -37,7 +37,7 @@ type upgradeOpts struct {
 	customPgp        *CustomPGP
 	customWatcherCfg string
 
-	// TODO: should be removed along with all references once 8.13.0 has been released.
+	// Used to disable upgrade details checks for versions that don't support them, like 7.17.x.
 	// See also WithDisableUpgradeWatcherUpgradeDetailsCheck.
 	disableUpgradeWatcherUpgradeDetailsCheck bool
 
@@ -126,7 +126,6 @@ func WithCustomWatcherConfig(cfg string) UpgradeOpt {
 // upgrade details that are being set by the Upgrade Watcher. This option is
 // useful in upgrade tests where the end Agent version does not contain changes
 // in the Upgrade Watcher whose effects are being asserted upon in PerformUpgrade.
-// TODO: should be removed along with all references once 8.13.0 has been released.
 func WithDisableUpgradeWatcherUpgradeDetailsCheck() UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.disableUpgradeWatcherUpgradeDetailsCheck = true
@@ -215,12 +214,18 @@ func PerformUpgrade(
 		}
 	}
 
-	// For asserting on the effects of any Upgrade Watcher changes made in 8.13.0, we need
-	// the endVersion to be >= 8.13.0.  Otherwise, these assertions will fail as those changes
+	// For asserting on the effects of any Upgrade Watcher changes made in 8.12.0, we need
+	// the endVersion to be >= 8.12.0.  Otherwise, these assertions will fail as those changes
 	// won't be present in the Upgrade Watcher. So we disable these assertions if the endVersion
-	// is < 8.13.0.
+	// is < 8.12.0.
+	//
+	// The start version also needs to be >= 8.10.0. Versions before 8.10.0 will launch the watcher
+	// process from the starting version of the agent and not the ending version of the agent. So
+	// even though an 8.12.0 watcher knows to write the upgrade details, prior to 8.10.0 the 8.12.0
+	// watcher version never executes and the upgrade details are never populated.
 	upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck = upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck ||
-		endVersion.Less(*Version_8_13_0)
+		endVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) ||
+		startParsedVersion.Less(*version.NewParsedSemVer(8, 10, 0, "", ""))
 
 	if upgradeOpts.preInstallHook != nil {
 		if err := upgradeOpts.preInstallHook(); err != nil {
