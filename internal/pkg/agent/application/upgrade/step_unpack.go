@@ -7,6 +7,7 @@ package upgrade
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -52,6 +54,22 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (string, error) {
 	defer r.Close()
 
 	fileNamePrefix := strings.TrimSuffix(filepath.Base(archivePath), ".zip") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
+
+	pm := pathMapper{}
+	manifestFile, err := r.Open("manifest.yaml")
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		// we got a real error looking up for the manifest
+		return "", fmt.Errorf("looking up manifest in package: %w", err)
+	}
+	if err == nil {
+		// load manifest
+		defer manifestFile.Close()
+		manifest, err := v1.ParseManifest(manifestFile)
+		if err != nil {
+			return "", fmt.Errorf("parsing package manifest: %w", err)
+		}
+		pm.mappings = manifest.Package.PathMappings
+	}
 
 	unpackFile := func(f *zip.File) (err error) {
 		rc, err := f.Open()
@@ -127,6 +145,27 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (string, error) {
 }
 
 func untar(log *logger.Logger, version string, archivePath, dataDir string) (string, error) {
+
+	// Look up manifest in the archive and prepare path mappings, if any
+	pm := pathMapper{}
+
+	// quickly open the archive and look up manifest.yaml file
+	manifestReader, err := getManifestFromTar(archivePath)
+
+	if err != nil {
+		return "", fmt.Errorf("looking for package manifest: %w", err)
+	}
+
+	if manifestReader != nil {
+		manifest, err := v1.ParseManifest(manifestReader)
+		if err != nil {
+			return "", fmt.Errorf("parsing package manifest: %w", err)
+		}
+
+		// set the path mappings
+		pm.mappings = manifest.Package.PathMappings
+	}
+
 	r, err := os.Open(archivePath)
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("artifact for 'elastic-agent' version '%s' could not be found at '%s'", version, archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
@@ -141,7 +180,7 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (str
 	tr := tar.NewReader(zr)
 	var rootDir string
 	var hash string
-	fileNamePrefix := strings.TrimSuffix(filepath.Base(archivePath), ".tar.gz") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
+	fileNamePrefix := getFileNamePrefix(archivePath)
 
 	// go through all the content of a tar archive
 	// if elastic-agent.active.commit file is found, get commit of the version unpacked
@@ -172,6 +211,12 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (str
 			hash = string(hashBytes[:hashLen])
 			continue
 		}
+
+		// map the filename
+		fileName = pm.Map(fileName)
+
+		// we should check that the path is a local one but since we discard anything that is not under "data/" we can
+		// skip the additional check
 
 		// skip everything outside data/
 		if !strings.HasPrefix(fileName, "data/") {
@@ -236,9 +281,71 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (str
 	return hash, nil
 }
 
+func getFileNamePrefix(archivePath string) string {
+	return strings.TrimSuffix(filepath.Base(archivePath), ".tar.gz") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
+}
+
 func validFileName(p string) bool {
 	if p == "" || strings.Contains(p, `\`) || strings.HasPrefix(p, "/") || strings.Contains(p, "../") {
 		return false
 	}
 	return true
+}
+
+type pathMapper struct {
+	mappings []map[string]string
+}
+
+func (pm pathMapper) Map(path string) string {
+	for _, mapping := range pm.mappings {
+		for pkgPath, mappedPath := range mapping {
+			if strings.HasPrefix(path, pkgPath) {
+				return filepath.Join(mappedPath, path[len(pkgPath):])
+			}
+		}
+	}
+	return path
+}
+
+func getManifestFromTar(archivePath string) (io.Reader, error) {
+	r, err := os.Open(archivePath)
+	if err != nil {
+		return nil, fmt.Errorf("opening package %s: %w", archivePath, err)
+	}
+	defer r.Close()
+
+	zr, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, fmt.Errorf("package %s does not seem to have a valid gzip compression: %w", archivePath, err)
+	}
+
+	tr := tar.NewReader(zr)
+	prefix := getFileNamePrefix(archivePath)
+
+	// go through all the content of a tar archive
+	// if manifest.yaml is found, read the contents and return a bytereader, nil otherwise ,
+	for {
+		f, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("reading archive: %w", err)
+		}
+
+		fileName := strings.TrimPrefix(f.Name, prefix)
+		if fileName == "manifest.yaml" {
+			manifestBytes, err := io.ReadAll(tr)
+			if err != nil {
+				return nil, fmt.Errorf("reading manifest bytes: %w", err)
+			}
+
+			reader := bytes.NewReader(manifestBytes)
+			return reader, nil
+		}
+
+	}
+
+	return nil, nil
 }
