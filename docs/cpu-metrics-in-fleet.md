@@ -131,27 +131,6 @@ aggregations are shown; memory-related aggregations are omitted.
 }
 ```
 
-### Metricbeat collects CPU metrics for Agent and the Beats it manages
-
-There is one input in particular in the Agent policy that ultimately generates the data for the above ES query made by
-the Fleet UI. This input is of type `http/metrics`, use the `monitoring` output, and has `id` = `metrics-monitoring-agent`.
-A Metricbeat process is spawned for this input.
-
-There are multiple inputs in the Metricbeat configuration that generate the data for the ES query.
-  * One input is for generating data for the Agent itself. This input will have `namespace` = `agent` and
-    `id` = `metrics-monitoring-agent`.
-  * The remaining inputs will generate data for the various Beats managed by Agent. The number of inputs depends on the
-    number of Beats. These inputs will have `namespace` = `agent` and `id` = `metrics-monitoring-*beat-$n`, where `$n`
-    is the 1-based index of the Beat.
-
-All these inputs run the `http` Metricbeat module, `json` metricset, and poll `$hostname/stats` endpoint every minute,
-where `$hostname` is either the TCP address or unix socket path of the Agent's HTTP API or the Beats' HTTP APIs. Each
-input has a `copy_fields` processor that copies the value of the `http.agent.beat.cpu` field to the `system.process.cpu` field.
-
-Since the ES query aggregates on the `system.process.cpu.total.value` field, the corresponding field in the
-`$hostname/stats` API response that we're interested in is `.beat.cpu.total.value`. The `.beat.cpu.total.value` returns
-a counter value representing the total (user-space + kernel-space) duration, in milliseconds, spent by the Agent or Beat
-utilizing the CPU since the process was started. More on how this duration is calculated in the next section.
 
 ### Agent and Beats collect CPU metrics using `elastic-agent-system-metrics`
 
@@ -160,9 +139,9 @@ from the `github.com/elastic/elastic-agent-system-metrics/report` package.  This
 monitoring registry. Whenever this function is called, it calculates and reports CPU and other metrics for the process in
 question.  The calculation of CPU (and other) metrics depends on the OS the Agent or Beat process is running on.
 
-#### Linux
+#### Collecting CPU usage metrics on Linux
 
-On Linux, CPU metrics are collected by [reading the `/proc/$PID/stat` file](https://github.com/elastic/elastic-agent-system-metrics/blob/085e4529f3c4f91dd377cadbbe7a2bf321989438/metric/system/process/process_linux_common.go#L351).
+On Linux, CPU usage metrics are collected by [reading the `/proc/$PID/stat` file](https://github.com/elastic/elastic-agent-system-metrics/blob/085e4529f3c4f91dd377cadbbe7a2bf321989438/metric/system/process/process_linux_common.go#L351).
 This file contains whitespace-delimited values (fields) for various process metrics and other information. The field at
 index 13 (0-based indexing) is the number of CPU ticks utilized by the process in user-space since it was started. The
 field at index 14 is the number of CPU ticks utilized by the process in kernel-space since it was started.  As such, both
@@ -190,7 +169,29 @@ about 60% of each core, `top` or `htop` will report `%CPU` as `120.0` (or close 
 Applying the calculations from the previous section to corresponding values in the process's `/proc/{pid}/stat` file,
 the results match up with what `top` or `htop` report.
 
-##### Comparison between metrics in `/proc/$PID/stat` file and in Agent + Beats `/stats` API output
+### Metricbeat collects CPU metrics for Agent and the Beats it manages
+
+There is one input in particular in the Agent policy that ultimately generates the data for the above ES query made by
+the Fleet UI. This input is of type `http/metrics`, use the `monitoring` output, and has `id` = `metrics-monitoring-agent`.
+A Metricbeat process is spawned for this input.
+
+There are multiple inputs in the Metricbeat configuration that generate the data for the ES query.
+* One input is for generating data for the Agent itself. This input will have `namespace` = `agent` and
+  `id` = `metrics-monitoring-agent`.
+* The remaining inputs will generate data for the various Beats managed by Agent. The number of inputs depends on the
+  number of Beats. These inputs will have `namespace` = `agent` and `id` = `metrics-monitoring-*beat-$n`, where `$n`
+  is the 1-based index of the Beat.
+
+All these inputs run the `http` Metricbeat module, `json` metricset, and poll `$hostname/stats` endpoint every minute,
+where `$hostname` is either the TCP address or unix socket path of the Agent's HTTP API or the Beats' HTTP APIs. Each
+input has a `copy_fields` processor that copies the value of the `http.agent.beat.cpu` field to the `system.process.cpu` field.
+
+Since the ES query aggregates on the `system.process.cpu.total.value` field, the corresponding field in the
+`$hostname/stats` API response that we're interested in is `.beat.cpu.total.value`. The `.beat.cpu.total.value` returns
+a counter value representing the total (user-space + kernel-space) duration, in milliseconds, spent by the Agent or Beat
+utilizing the CPU since the process was started. More on how this duration is calculated in the next section.
+
+#### Comparison between metrics in `/proc/$PID/stat` file and in Agent + Beats `/stats` API output
 
 Using the following script for a host running Agent and one child Beat (excluding any monitoring Beats), we can see that
 the metrics in the `/proc/$PID/stat` file match up with those in the Agent + Beats `/stats` API output.
@@ -226,7 +227,7 @@ BEAT_TOTAL_MS=$(($BEAT_TOTAL_TICKS * 1000 / 100))
 echo "Stats from /proc/PID/stats files: $(($AGENT_TOTAL_MS + $BEAT_TOTAL_MS))"
 ```
 
-##### Comparison between metrics in Agent + Beats `/stats` API output and in Elasticsearch `metrics-elastic_agent*` indices
+### Comparison between metrics in Agent + Beats `/stats` API output and in Elasticsearch `metrics-elastic_agent*` indices
 
 This comparison is relatively easy to make.
 
