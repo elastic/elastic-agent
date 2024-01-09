@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -46,6 +47,7 @@ func New(
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
+	runAsOtel bool,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -144,6 +146,9 @@ func New(
 			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
 			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
 		}
+	} else if runAsOtel {
+		// ignoring configuration in elastic-agent.yml
+		configMgr = otel.NewOtelModeConfigManager()
 	} else {
 		isManaged = true
 		var store storage.Store
