@@ -313,8 +313,3 @@ curl -s -u $ES_USER:$ES_PASS -H 'Content-Type: application/json' 'https://test-c
 
 We can see that the metrics in the Agent + Beats `/stats` API outputs match up with those in the Elasticsearch
 `metrics-elastic_agent*` indices.
-
-## Unanswered Questions
-
-1. Why do we divide by 10000 (`params._interval`) in the ES query?
-2. Why do we use a `10s` interval for the derivative aggregation in the ES query? Is this related to the division above?
