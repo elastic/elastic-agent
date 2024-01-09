@@ -1221,7 +1221,12 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	c.derivedConfig = cfg
 	c.lastComponentModel = c.componentModel
 	c.componentModel = comps
-	c.checkAndLogUpdate()
+
+	// don't run a bunch of relatively costly code unless we're in debug mode
+	if c.logger.IsDebug() {
+		c.checkAndLogUpdate()
+	}
+
 	return nil
 }
 
@@ -1229,7 +1234,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 // logging any differences.
 func (c *Coordinator) checkAndLogUpdate() {
 	if c.lastComponentModel == nil {
-		c.logger.Infof("Recieved initial component update; total of %d components", len(c.componentModel))
+		c.logger.Debugf("Recieved initial component update; total of %d components", len(c.componentModel))
 		return
 	}
 	type compCheck struct {
@@ -1295,22 +1300,20 @@ func (c *Coordinator) checkAndLogUpdate() {
 	}
 
 	if len(addedList) > 0 {
-		c.logger.Infof("The following components have been added: %v", addedList)
+		c.logger.Debugf("The following components have been added: %v", addedList)
 	}
 	if len(removedList) > 0 {
-		c.logger.Infof("The following components have been removed: %v", removedList)
+		c.logger.Debugf("The following components have been removed: %v", removedList)
 	}
 
 	if len(addedOutputs) > 0 {
-		c.logger.Infof("The following outputs have been added: %v", addedOutputs)
+		c.logger.Debugf("The following outputs have been added: %v", addedOutputs)
 	}
 	if len(removedOutputs) > 0 {
-		c.logger.Infof("The following outputs have been removed: %v", removedOutputs)
+		c.logger.Debugf("The following outputs have been removed: %v", removedOutputs)
 	}
 
-	c.logger.Infof("There are %d configured components: %v", len(currentCompIDs), currentCompIDs)
-
-	//TODO: diff the actual components
+	c.logger.Debugf("There are %d configured components: %v", len(currentCompIDs), currentCompIDs)
 }
 
 // Filter any inputs and outputs in the generated component model
