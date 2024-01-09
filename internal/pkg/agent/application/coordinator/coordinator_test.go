@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	goruntime "runtime"
 	"strings"
 	"testing"
@@ -95,6 +96,58 @@ func waitForState(
 			return
 		}
 	}
+}
+
+func TestComponentUpdateDiff(t *testing.T) {
+	logdir := t.TempDir()
+	logConfig := logp.Config{
+		Files: logp.FileConfig{
+			Path:        logdir,
+			Name:        "testlog",
+			MaxSize:     10000,
+			Permissions: 0o744,
+		},
+	}
+	err := logp.Configure(logConfig)
+	require.NoError(t, err)
+	old := []component.Component{
+		{
+			ID:         "component-one",
+			OutputType: "elasticsearch",
+		},
+		{
+			ID:         "component-two",
+			OutputType: "kafka",
+		},
+	}
+
+	new := []component.Component{
+		{
+			ID:         "component-three",
+			OutputType: "logstash",
+		},
+	}
+
+	testCoord := Coordinator{
+		logger:             logp.L(),
+		lastComponentModel: old,
+		componentModel:     new,
+	}
+	testCoord.checkAndLogUpdate()
+
+	// use regex since the order of lists in the logs is random
+	matcher := regexp.MustCompile(`The following (components|outputs) have been removed: \[(component\-one|component\-two|elasticsearch|kafka) (component\-one|component\-two|elasticsearch|kafka)\]`)
+
+	files, err := filepath.Glob(filepath.Join(logdir, "testlog*"))
+	require.NoError(t, err)
+	logs, err := os.ReadFile(files[0])
+	require.NoError(t, err)
+	t.Logf("got logs: %s", string(logs))
+	require.Contains(t, string(logs), "The following components have been added: [component-three]")
+	require.Contains(t, string(logs), "The following outputs have been added: [logstash]")
+	// Make sure we have two matches, one for the component line, one for the output line
+	require.Equal(t, 2, len(matcher.FindAllString(string(logs), -1)))
+
 }
 
 func TestCoordinator_State_Starting(t *testing.T) {

@@ -273,6 +273,9 @@ type Coordinator struct {
 	// value that is sent to the runtime manager).
 	componentModel []component.Component
 
+	// The last value for the total agent component model, used for providing a diff of the config.
+	lastComponentModel []component.Component
+
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 
@@ -1216,8 +1219,98 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	// If we made it this far, update our internal derived values and
 	// return with no error
 	c.derivedConfig = cfg
+	c.lastComponentModel = c.componentModel
 	c.componentModel = comps
+	c.checkAndLogUpdate()
 	return nil
+}
+
+// compares the last component model with an updated model,
+// logging any differences.
+func (c *Coordinator) checkAndLogUpdate() {
+	if c.lastComponentModel == nil {
+		c.logger.Infof("Recieved initial component update; total of %d components", len(c.componentModel))
+		return
+	}
+	type compCheck struct {
+		inNew  bool
+		inLast bool
+	}
+
+	type compOutputs struct {
+		inNew  bool
+		inLast bool
+	}
+
+	compOutputTypes := map[string]compOutputs{}
+	// collect current and last component list
+	compMap := map[string]compCheck{}
+	currentCompIDs := make([]string, len(c.componentModel))
+
+	// combine last and current lists
+	for i, newComp := range c.componentModel {
+		currentCompIDs[i] = newComp.ID
+		compMap[newComp.ID] = compCheck{inNew: true}
+		compOutputTypes[newComp.OutputType] = compOutputs{inNew: true}
+	}
+
+	for _, lastComp := range c.lastComponentModel {
+		if current, ok := compMap[lastComp.ID]; ok {
+			current.inLast = true
+			compMap[lastComp.ID] = current
+		} else {
+			compMap[lastComp.ID] = compCheck{inLast: true}
+		}
+		if current, ok := compOutputTypes[lastComp.OutputType]; ok {
+			current.inLast = true
+			compOutputTypes[lastComp.OutputType] = current
+		} else {
+			compOutputTypes[lastComp.OutputType] = compOutputs{inLast: true}
+		}
+	}
+
+	// reduce to list of added/removed inputs
+	addedList := []string{}
+	removedList := []string{}
+	for ID, comp := range compMap {
+		if comp.inLast && !comp.inNew {
+			removedList = append(removedList, ID)
+		}
+		if !comp.inLast && comp.inNew {
+			addedList = append(addedList, ID)
+		}
+
+	}
+
+	// reduced to list of added/removed outputs
+	addedOutputs := []string{}
+	removedOutputs := []string{}
+	for output, comp := range compOutputTypes {
+		if comp.inLast && !comp.inNew {
+			removedOutputs = append(removedOutputs, output)
+		}
+		if !comp.inLast && comp.inNew {
+			addedOutputs = append(addedOutputs, output)
+		}
+	}
+
+	if len(addedList) > 0 {
+		c.logger.Infof("The following components have been added: %v", addedList)
+	}
+	if len(removedList) > 0 {
+		c.logger.Infof("The following components have been removed: %v", removedList)
+	}
+
+	if len(addedOutputs) > 0 {
+		c.logger.Infof("The following outputs have been added: %v", addedOutputs)
+	}
+	if len(removedOutputs) > 0 {
+		c.logger.Infof("The following outputs have been removed: %v", removedOutputs)
+	}
+
+	c.logger.Infof("There are %d configured components: %v", len(currentCompIDs), currentCompIDs)
+
+	//TODO: diff the actual components
 }
 
 // Filter any inputs and outputs in the generated component model
