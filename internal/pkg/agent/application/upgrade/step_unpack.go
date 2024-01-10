@@ -24,8 +24,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+type unpackResult struct {
+	hash string
+	// TODO add mapped path of executable
+	// agentExecutable string
+	versionedHome string
+}
+
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-func (u *Upgrader) unpack(version, archivePath, dataDir string) (string, error) {
+func (u *Upgrader) unpack(version, archivePath, dataDir string) (unpackResult, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
 	var hash string
@@ -38,37 +45,42 @@ func (u *Upgrader) unpack(version, archivePath, dataDir string) (string, error) 
 
 	if err != nil {
 		u.log.Errorw("Failed to unpack upgrade artifact", "error.message", err, "version", version, "file.path", archivePath, "hash", hash)
-		return "", err
+		return unpackResult{}, err
 	}
 
 	u.log.Infow("Unpacked upgrade artifact", "version", version, "file.path", archivePath, "hash", hash)
-	return hash, nil
+	return unpackResult{
+		hash:          hash,
+		versionedHome: "",
+	}, nil
 }
 
-func unzip(log *logger.Logger, archivePath, dataDir string) (string, error) {
+func unzip(log *logger.Logger, archivePath, dataDir string) (unpackResult, error) {
 	var hash, rootDir string
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
-		return "", err
+		return unpackResult{}, err
 	}
 	defer r.Close()
 
 	fileNamePrefix := strings.TrimSuffix(filepath.Base(archivePath), ".zip") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
 
 	pm := pathMapper{}
+	versionedHome := ""
 	manifestFile, err := r.Open("manifest.yaml")
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		// we got a real error looking up for the manifest
-		return "", fmt.Errorf("looking up manifest in package: %w", err)
+		return unpackResult{}, fmt.Errorf("looking up manifest in package: %w", err)
 	}
 	if err == nil {
 		// load manifest
 		defer manifestFile.Close()
 		manifest, err := v1.ParseManifest(manifestFile)
 		if err != nil {
-			return "", fmt.Errorf("parsing package manifest: %w", err)
+			return unpackResult{}, fmt.Errorf("parsing package manifest: %w", err)
 		}
 		pm.mappings = manifest.Package.PathMappings
+		versionedHome = filepath.Clean(manifest.Package.VersionedHome)
 	}
 
 	unpackFile := func(f *zip.File) (err error) {
@@ -137,14 +149,17 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (string, error) {
 		}
 
 		if err := unpackFile(f); err != nil {
-			return "", err
+			return unpackResult{}, err
 		}
 	}
 
-	return hash, nil
+	return unpackResult{
+		hash:          hash,
+		versionedHome: "",
+	}, nil
 }
 
-func untar(log *logger.Logger, version string, archivePath, dataDir string) (string, error) {
+func untar(log *logger.Logger, version string, archivePath, dataDir string) (unpackResult, error) {
 
 	// Look up manifest in the archive and prepare path mappings, if any
 	pm := pathMapper{}
@@ -153,28 +168,30 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (str
 	manifestReader, err := getManifestFromTar(archivePath)
 
 	if err != nil {
-		return "", fmt.Errorf("looking for package manifest: %w", err)
+		return unpackResult{}, fmt.Errorf("looking for package manifest: %w", err)
 	}
 
+	versionedHome := ""
 	if manifestReader != nil {
 		manifest, err := v1.ParseManifest(manifestReader)
 		if err != nil {
-			return "", fmt.Errorf("parsing package manifest: %w", err)
+			return unpackResult{}, fmt.Errorf("parsing package manifest: %w", err)
 		}
 
 		// set the path mappings
 		pm.mappings = manifest.Package.PathMappings
+		versionedHome = filepath.Clean(manifest.Package.VersionedHome)
 	}
 
 	r, err := os.Open(archivePath)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("artifact for 'elastic-agent' version '%s' could not be found at '%s'", version, archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
+		return unpackResult{}, errors.New(fmt.Sprintf("artifact for 'elastic-agent' version '%s' could not be found at '%s'", version, archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
 	}
 	defer r.Close()
 
 	zr, err := gzip.NewReader(r)
 	if err != nil {
-		return "", errors.New("requires gzip-compressed body", err, errors.TypeFilesystem)
+		return unpackResult{}, errors.New("requires gzip-compressed body", err, errors.TypeFilesystem)
 	}
 
 	tr := tar.NewReader(zr)
@@ -192,11 +209,11 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (str
 			break
 		}
 		if err != nil {
-			return "", err
+			return unpackResult{}, err
 		}
 
 		if !validFileName(f.Name) {
-			return "", errors.New("tar contained invalid filename: %q", f.Name, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, f.Name))
+			return unpackResult{}, errors.New("tar contained invalid filename: %q", f.Name, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, f.Name))
 		}
 
 		//get hash
@@ -205,7 +222,7 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (str
 		if fileName == agentCommitFile {
 			hashBytes, err := io.ReadAll(tr)
 			if err != nil || len(hashBytes) < hashLen {
-				return "", err
+				return unpackResult{}, err
 			}
 
 			hash = string(hashBytes[:hashLen])
@@ -239,13 +256,13 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (str
 			// just to be sure, it should already be created by Dir type
 			// remove any world permissions from the directory
 			if err = os.MkdirAll(filepath.Dir(abs), 0o750); err != nil {
-				return "", errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				return unpackResult{}, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
 			// remove any world permissions from the file
 			wf, err := os.OpenFile(abs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm()&0770)
 			if err != nil {
-				return "", errors.New(err, "TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				return unpackResult{}, errors.New(err, "TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
 			//nolint:gosec // legacy
@@ -254,7 +271,7 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (str
 				err = closeErr
 			}
 			if err != nil {
-				return "", fmt.Errorf("TarInstaller: error writing to %s: %w", abs, err)
+				return unpackResult{}, fmt.Errorf("TarInstaller: error writing to %s: %w", abs, err)
 			}
 		case mode.IsDir():
 			log.Debugw("Unpacking directory", "archive", "tar", "file.path", abs)
@@ -262,23 +279,26 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (str
 			_, err = os.Stat(abs)
 			if errors.Is(err, fs.ErrNotExist) {
 				if err := os.MkdirAll(abs, mode.Perm()&0770); err != nil {
-					return "", errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+					return unpackResult{}, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 				}
 			} else if err != nil {
-				return "", errors.New(err, "TarInstaller: stat() directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				return unpackResult{}, errors.New(err, "TarInstaller: stat() directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			} else {
 				// set the appropriate permissions
 				err = os.Chmod(abs, mode.Perm()&0o770)
 				if err != nil {
-					return "", errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0o770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+					return unpackResult{}, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0o770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 				}
 			}
 		default:
-			return "", errors.New(fmt.Sprintf("tar file entry %s contained unsupported file type %v", fileName, mode), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fileName))
+			return unpackResult{}, errors.New(fmt.Sprintf("tar file entry %s contained unsupported file type %v", fileName, mode), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fileName))
 		}
 	}
 
-	return hash, nil
+	return unpackResult{
+		hash:          hash,
+		versionedHome: versionedHome,
+	}, nil
 }
 
 func getFileNamePrefix(archivePath string) string {
