@@ -123,6 +123,11 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 		timeout = time.Until(deadline)
 	}
 
+	// Don't check fleet status if --delay-enroll
+	if installOpts.DelayEnroll {
+		return nil
+	}
+
 	// Wait for Agent to be healthy
 	require.Eventually(
 		t,
