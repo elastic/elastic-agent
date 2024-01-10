@@ -5,6 +5,7 @@
 package details
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -93,7 +94,17 @@ func (d *Details) SetDownloadProgress(percent, rateBytesPerSecond float64) {
 	defer d.mu.Unlock()
 
 	d.Metadata.DownloadPercent = percent
-	d.Metadata.DownloadRate = details.DownloadRate(rateBytesPerSecond)
+
+	// A download rate of +Inf is possible if the download completes near instantaneously. Since
+	// +Inf (or -Inf or NaN) are not indexable into Elasticsearch or generally informative since the
+	// download percent is 100% when this happens, just reset download rate to the default value of
+	// zero when this happens. https://github.com/elastic/elastic-agent/issues/4041
+	if math.IsInf(rateBytesPerSecond, 0) || math.IsNaN(rateBytesPerSecond) {
+		d.Metadata.DownloadRate = 0
+	} else {
+		d.Metadata.DownloadRate = details.DownloadRate(rateBytesPerSecond)
+	}
+
 	d.notifyObservers()
 }
 
