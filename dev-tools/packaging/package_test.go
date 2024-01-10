@@ -18,7 +18,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/blakesmith/ar"
-	rpm "github.com/cavaliercoder/go-rpm"
+	"github.com/cavaliercoder/go-rpm"
 )
 
 const (
@@ -85,7 +84,7 @@ func TestTar(t *testing.T) {
 }
 
 func TestZip(t *testing.T) {
-	zips := getFiles(t, regexp.MustCompile(`^\w+beat-\S+.zip$`))
+	zips := getFiles(t, regexp.MustCompile(`^\w+\S+.zip$`))
 	for _, zip := range zips {
 		checkZip(t, zip)
 	}
@@ -792,7 +791,7 @@ type dockerManifest struct {
 }
 
 func readDockerManifest(r io.Reader) (*dockerManifest, error) {
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
@@ -820,7 +819,7 @@ type dockerInfo struct {
 }
 
 func readDockerInfo(r io.Reader) (*dockerInfo, error) {
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
