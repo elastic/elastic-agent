@@ -374,6 +374,10 @@ metrics shown in the Fleet UI for every Agent are computed as follows from the d
   the values for the Beat processes (along with the Agent process), we would be exposing internals of Agent to users, which
   may be confusing for some users.
 
+* We may want to reconsider taking a 5-minute average in the Elasticsearch query made by the Fleet UI and instead take a
+  30-second or 1-minute average (making corresponding adjustments to the `calendar_interval` value in the `cpu_time_series`
+  aggregation). This would result in a value closer to what's observed in `top` / `htop` output.
+
 * We should enhance collection and aggregation to include CPU utilization for Agent components managed by the service
   runtime (e.g. Endpoint) as well, not justAgent components managed by
   the command runtime (e.g. Beats) as we do today.
