@@ -359,6 +359,11 @@ metrics shown in the Fleet UI for every Agent are computed as follows from the d
 
 ## Suggested improvements
 
+* The `processes` aggregation in the Elasticsearch query should use the field `component.id` instead of `elastic_agent.process`.
+  This is to correctly account for multiple instances of the same type of Beat (e.g. Filebeat).  This can happen if there
+  are multiple outputs defined in the Agent policy and some inputs of a type (e.g. log) use one output while other inputs
+  of the same type use another output.
+
 * We should document the observations above in an appropriate location and perhaps link to this documentation from the "i"
   icon in CPU column in the Agent Listing page in the Fleet UI.
 
