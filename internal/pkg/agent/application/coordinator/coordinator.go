@@ -1234,7 +1234,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 // logging any differences.
 func (c *Coordinator) checkAndLogUpdate() {
 	if c.lastComponentModel == nil {
-		c.logger.Debugf("Recieved initial component update; total of %d components", len(c.componentModel))
+		c.logger.Debugf("Received initial component update; total of %d components", len(c.componentModel))
 		return
 	}
 	type compCheck struct {
