@@ -58,6 +58,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.logs"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.downloads"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.install"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.socket"))
 
 	// logging flags
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("v"))

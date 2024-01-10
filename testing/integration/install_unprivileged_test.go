@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -176,7 +175,7 @@ func checkInstallUnprivilegedSuccess(t *testing.T, topPath string) {
 	require.NoError(t, err)
 
 	// Check that the socket is created with the correct permissions.
-	socketPath := strings.TrimPrefix(paths.ControlSocketUnprivilegedPath, "unix://")
+	socketPath := filepath.Join(topPath, paths.ControlSocketName)
 	require.Eventuallyf(t, func() bool {
 		_, err = os.Stat(socketPath)
 		return err == nil
@@ -198,10 +197,10 @@ func checkInstallUnprivilegedSuccess(t *testing.T, topPath string) {
 
 	// Executing `elastic-agent status` as the original user should fail, because that
 	// user is not in the 'elastic-agent' group.
-	originalUser := os.Getenv("USER")
+	originalUser := os.Getenv("SUDO_USER")
 	if originalUser != "" {
 		cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
 		output, err := cmd.CombinedOutput()
-		require.Error(t, err, "running elastic-agent status should have failed: %s", output)
+		require.Error(t, err, "running sudo -u %s elastic-agent status should have failed: %s", originalUser, output)
 	}
 }

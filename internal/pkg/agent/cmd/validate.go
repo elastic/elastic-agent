@@ -18,7 +18,7 @@ import (
 func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "validate",
-		Short:         "Validates the config without running the collector",
+		Short:         "Validates the OpenTelemetry collector configuration without running the collector",
 		SilenceUsage:  true, // do not display usage on error
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
