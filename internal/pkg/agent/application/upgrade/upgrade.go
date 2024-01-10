@@ -169,14 +169,19 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	det.SetState(details.StateExtracting)
-
-	newHash, err := u.unpack(version, archivePath, paths.Data())
+	// TODO: add check that no archive files end up in the current versioned home
+	unpackRes, err := u.unpack(version, archivePath, paths.Data())
 	if err != nil {
 		return nil, err
 	}
 
+	newHash := unpackRes.Hash
 	if newHash == "" {
 		return nil, errors.New("unknown hash")
+	}
+	if unpackRes.versionedHome == "" {
+		// FIXME this should be treated as an error
+		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
 	}
 
 	if strings.HasPrefix(release.Commit(), newHash) {
@@ -184,17 +189,30 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, nil
 	}
 
-	if err := copyActionStore(u.log, newHash); err != nil {
+	newHome := filepath.Join(paths.Top(), unpackRes.versionedHome)
+
+	if err := copyActionStore(u.log, newHome); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
-	if err := copyRunDirectory(u.log, newHash); err != nil {
+	newRunPath := filepath.Join(newHome, "run")
+	oldRunPath := filepath.Join(paths.Home(), "run")
+
+	if err := copyRunDirectory(u.log, oldRunPath, newRunPath); err != nil {
 		return nil, errors.New(err, "failed to copy run directory")
 	}
 
 	det.SetState(details.StateReplacing)
 
-	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
+	// create symlink to the <new versioned-home>/elastic-agent
+	hashedDir := unpackRes.versionedHome
+
+	symlinkPath := filepath.Join(paths.Top(), agentName)
+
+	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
+	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
+
+	if err := changeSymlinkInternal(u.log, symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
@@ -274,10 +292,9 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, hash string) {
 	_ = ChangeSymlink(ctx, log, release.ShortCommit())
 }
 
-func copyActionStore(log *logger.Logger, newHash string) error {
+func copyActionStore(log *logger.Logger, newHome string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
-	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
 	log.Infow("Copying action store", "new_home_path", newHome)
 
 	for _, currentActionStorePath := range storePaths {
@@ -300,9 +317,7 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 	return nil
 }
 
-func copyRunDirectory(log *logger.Logger, newHash string) error {
-	newRunPath := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash), "run")
-	oldRunPath := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, release.ShortCommit()), "run")
+func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 
