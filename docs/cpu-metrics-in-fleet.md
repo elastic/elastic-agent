@@ -364,21 +364,17 @@ metrics shown in the Fleet UI for every Agent are computed as follows from the d
   are multiple outputs defined in the Agent policy and some inputs of a type (e.g. log) use one output while other inputs
   of the same type use another output.
 
-* We should document the observations above in an appropriate location and perhaps link to this documentation from the "i"
-  icon in CPU column in the Agent Listing page in the Fleet UI.
-
-* Rather than showing a single value for every Agent in the Agent Listing page in the Fleet UI, we should consider showing
-  the constituent values for Agent and each of the Beats processes managed by the Agent. Concretely, this would mean
-  getting rid of the `sum_cpu` aggregation in the Elasticsearch query. The challenge, of course, would be in presenting
-  these values in a user-friendly manner, especially in cases where an Agent is managing several Beats. Also, by showing
-  the values for the Beat processes (along with the Agent process), we would be exposing internals of Agent to users, which
-  may be confusing for some users.
-
-* We may want to reconsider taking a 5-minute average in the Elasticsearch query made by the Fleet UI and instead take a
+* We should reconsider taking a 5-minute average in the Elasticsearch query made by the Fleet UI and instead take a
   30-second or 1-minute average (making corresponding adjustments to the `calendar_interval` value in the `cpu_time_series`
   aggregation). This would result in a value closer to what's observed in `top` / `htop` output.
 
+* We should link the value shown in the Fleet UI to a chart that breaks it down for that Agent by `component.id` over time,
+  so the user can see the CPU utilization per Agent component process, over time.
+
+* The tooltip shown with the "i" in the CPU column should explain that the value is sum of current CPU utilization (in %)
+  of all Agent component processes, ranging from 0 to (number of cores * 100).
+
 * We should enhance collection and aggregation to include CPU utilization for Agent components managed by the service
-  runtime (e.g. Endpoint) as well, not justAgent components managed by
+  runtime (e.g. Endpoint) as well, not just Agent components managed by
   the command runtime (e.g. Beats) as we do today.
 
