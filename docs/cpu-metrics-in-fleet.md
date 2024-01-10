@@ -369,6 +369,7 @@ metrics shown in the Fleet UI for every Agent are computed as follows from the d
   the values for the Beat processes (along with the Agent process), we would be exposing internals of Agent to users, which
   may be confusing for some users.
 
-* We should enhance collection and aggregation to include CPU utilization for Beats, which are Agent components managed by
-  the command runtime, but also Agent components managed by the service runtime (e.g. Endpoint).
+* We should enhance collection and aggregation to include CPU utilization for Agent components managed by the service
+  runtime (e.g. Endpoint) as well, not justAgent components managed by
+  the command runtime (e.g. Beats) as we do today.
 
