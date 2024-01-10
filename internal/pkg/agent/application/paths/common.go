@@ -128,8 +128,12 @@ func SetConfig(path string) {
 
 // ConfigFile returns the path to the configuration file.
 func ConfigFile() string {
-	if configFilePath == "" || configFilePath == DefaultConfigName {
-		return filepath.Join(Config(), DefaultConfigName)
+	return ConfigFileWithDefault(DefaultConfigName)
+}
+
+func ConfigFileWithDefault(defaultConfigFile string) string {
+	if configFilePath == "" || configFilePath == defaultConfigFile {
+		return filepath.Join(Config(), defaultConfigFile)
 	}
 	if filepath.IsAbs(configFilePath) {
 		return configFilePath

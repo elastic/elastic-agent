@@ -23,7 +23,7 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			cfgFile := paths.ConfigFile()
+			cfgFile := paths.ConfigFileWithDefault("otel.yml")
 			return validateOtelConfig(ctx, cfgFile)
 		},
 	}
