@@ -32,7 +32,7 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 }
 
 func validateOtelConfig(ctx context.Context, cfgFile string) error {
-	if runAsOtel := otel.IsOtelConfig(ctx, cfgFile); !runAsOtel {
+	if !otel.IsOtelConfig(ctx, cfgFile) {
 		return fmt.Errorf("%q is not an otel config. file should be named 'otel.yml', 'otlp.yml' or 'otelcol.yml'", cfgFile)
 	}
 
