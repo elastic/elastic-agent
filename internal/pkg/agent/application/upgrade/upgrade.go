@@ -179,17 +179,18 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	if newHash == "" {
 		return nil, errors.New("unknown hash")
 	}
-	if unpackRes.versionedHome == "" {
+
+	if unpackRes.VersionedHome == "" {
 		// FIXME this should be treated as an error
 		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
 	}
 
-	if strings.HasPrefix(release.Commit(), newHash) {
-		u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
-		return nil, nil
-	}
+	//if strings.HasPrefix(release.Commit(), newHash) {
+	//	u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
+	//	return nil, nil
+	//}
 
-	newHome := filepath.Join(paths.Top(), unpackRes.versionedHome)
+	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
 
 	if err := copyActionStore(u.log, newHome); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
@@ -205,7 +206,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	det.SetState(details.StateReplacing)
 
 	// create symlink to the <new versioned-home>/elastic-agent
-	hashedDir := unpackRes.versionedHome
+	hashedDir := unpackRes.VersionedHome
 
 	symlinkPath := filepath.Join(paths.Top(), agentName)
 
