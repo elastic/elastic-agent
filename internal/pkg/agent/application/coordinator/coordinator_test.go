@@ -101,6 +101,7 @@ func waitForState(
 func TestComponentUpdateDiff(t *testing.T) {
 	logdir := t.TempDir()
 	logConfig := logp.Config{
+		Level: logp.DebugLevel,
 		Files: logp.FileConfig{
 			Path:        logdir,
 			Name:        "testlog",
@@ -129,11 +130,10 @@ func TestComponentUpdateDiff(t *testing.T) {
 	}
 
 	testCoord := Coordinator{
-		logger:             logp.L(),
-		lastComponentModel: old,
-		componentModel:     new,
+		logger:         logp.L(),
+		componentModel: new,
 	}
-	testCoord.checkAndLogUpdate()
+	testCoord.checkAndLogUpdate(old)
 
 	// use regex since the order of lists in the logs is random
 	matcher := regexp.MustCompile(`The following (components|outputs) have been removed: \[(component\-one|component\-two|elasticsearch|kafka) (component\-one|component\-two|elasticsearch|kafka)\]`)

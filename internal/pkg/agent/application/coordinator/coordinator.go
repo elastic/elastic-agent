@@ -273,9 +273,6 @@ type Coordinator struct {
 	// value that is sent to the runtime manager).
 	componentModel []component.Component
 
-	// The last value for the total agent component model, used for providing a diff of the config.
-	lastComponentModel []component.Component
-
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 
@@ -1219,12 +1216,13 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	// If we made it this far, update our internal derived values and
 	// return with no error
 	c.derivedConfig = cfg
-	c.lastComponentModel = c.componentModel
+
+	lastComponentModel := c.componentModel
 	c.componentModel = comps
 
 	// don't run a bunch of relatively costly code unless we're in debug mode
 	if c.logger.IsDebug() {
-		c.checkAndLogUpdate()
+		c.checkAndLogUpdate(lastComponentModel)
 	}
 
 	return nil
@@ -1232,8 +1230,8 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 // compares the last component model with an updated model,
 // logging any differences.
-func (c *Coordinator) checkAndLogUpdate() {
-	if c.lastComponentModel == nil {
+func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component) {
+	if lastComponentModel == nil {
 		c.logger.Debugf("Received initial component update; total of %d components", len(c.componentModel))
 		return
 	}
@@ -1259,7 +1257,7 @@ func (c *Coordinator) checkAndLogUpdate() {
 		compOutputTypes[newComp.OutputType] = compOutputs{inNew: true}
 	}
 
-	for _, lastComp := range c.lastComponentModel {
+	for _, lastComp := range lastComponentModel {
 		if current, ok := compMap[lastComp.ID]; ok {
 			current.inLast = true
 			compMap[lastComp.ID] = current
