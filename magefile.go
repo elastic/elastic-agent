@@ -462,7 +462,7 @@ func FixDRADockerArtifacts() error {
 		log.Printf("--- Found artifacts to rename %s %d", distributionsPath, len(matches))
 	}
 	// Match the artifact name and break down into groups so that we can reconstruct the names as its expected by the DRA DSL
-	artifactRegexp, err := regexp.Compile(`([\w+-]+)-(([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+)?)-([\w]+)-([\w]+)-([\w]+)\.([\w]+)\.([\w.]+)`)
+	artifactRegexp, err := regexp.Compile(`([\w+-]+)-(([0-9]+)\.([0-9]+)\.([0-9]+))-?([\w]+)?-([\w]+)-([\w]+)\.([\w]+)\.([\w.]+)`)
 	if err != nil {
 		return err
 	}
@@ -476,7 +476,7 @@ func FixDRADockerArtifacts() error {
 		}
 		match := artifactRegexp.FindAllStringSubmatch(artifactFile.Name(), -1)
 		// The groups here is tightly coupled with the regexp above.
-		targetName := fmt.Sprintf("%s-%s-%s-%s-image-%s-%s.%s", match[0][1], match[0][2], match[0][7], match[0][10], match[0][8], match[0][9], match[0][11])
+		targetName := fmt.Sprintf("%s-%s-%s-%s-image-%s-%s.%s", match[0][1], match[0][2], match[0][6], match[0][9], match[0][7], match[0][8], match[0][10])
 		if mg.Verbose() {
 			fmt.Printf("%#v\n", match)
 			fmt.Printf("Artifact: %s \n", artifactFile.Name())
