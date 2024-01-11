@@ -28,7 +28,7 @@ type UnpackResult struct {
 	Hash string `json:"hash" yaml:"hash"`
 	// TODO add mapped path of executable
 	// agentExecutable string
-	versionedHome string `json:"versioned-home" yaml:"versioned-home"`
+	VersionedHome string `json:"versioned-home" yaml:"versioned-home"`
 }
 
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
@@ -152,7 +152,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 
 	return UnpackResult{
 		Hash:          hash,
-		versionedHome: versionedHome,
+		VersionedHome: versionedHome,
 	}, nil
 }
 
@@ -177,7 +177,7 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 
 		// set the path mappings
 		pm.mappings = manifest.Package.PathMappings
-		versionedHome = filepath.Clean(manifest.Package.VersionedHome)
+		versionedHome = filepath.Clean(pm.Map(manifest.Package.VersionedHome))
 	}
 
 	r, err := os.Open(archivePath)
@@ -294,7 +294,7 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 
 	return UnpackResult{
 		Hash:          hash,
-		versionedHome: versionedHome,
+		VersionedHome: versionedHome,
 	}, nil
 }
 
