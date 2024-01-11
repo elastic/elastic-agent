@@ -74,8 +74,8 @@ func init() {
 	fs.StringVar(&topPath, "path.home", topPath, "Agent root path")
 	fs.BoolVar(&unversionedHome, "path.home.unversioned", unversionedHome, "Agent root path is not versioned based on build")
 	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
-	fs.StringVar(&configFilePath, "config", DefaultConfigName, "Configuration file, relative to path.config")
-	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
+	fs.StringVar(&configFilePath, "config", "", "Configuration file, relative to path.config")
+	fs.StringVar(&configFilePath, "c", "", "Configuration file, relative to path.config")
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
 	fs.StringVar(&installPath, "path.install", installPath, "DEPRECATED, setting this flag has no effect since v8.6.0")
 	fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
@@ -150,8 +150,8 @@ func ConfigFile() string {
 }
 
 func ConfigFileWithDefault(defaultConfigFile string) string {
-	if configFilePath == "" || configFilePath == defaultConfigFile {
-		return filepath.Join(Config(), defaultConfigFile)
+	if configFilePath == "" {
+		return filepath.Join(Config(), defaultConfigFile) // override default value
 	}
 	if filepath.IsAbs(configFilePath) {
 		return configFilePath
