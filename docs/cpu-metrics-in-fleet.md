@@ -378,3 +378,5 @@ metrics shown in the Fleet UI for every Agent are computed as follows from the d
   runtime (e.g. Endpoint) as well, not just Agent components managed by
   the command runtime (e.g. Beats) as we do today.
 
+* We should enhance collection to include CPU utilization for Agent monitoring components so their contributions are also
+  counted.
