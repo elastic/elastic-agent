@@ -362,21 +362,21 @@ metrics shown in the Fleet UI for every Agent are computed as follows from the d
 * The `processes` aggregation in the Elasticsearch query should use the field `component.id` instead of `elastic_agent.process`.
   This is to correctly account for multiple instances of the same type of Beat (e.g. Filebeat).  This can happen if there
   are multiple outputs defined in the Agent policy and some inputs of a type (e.g. log) use one output while other inputs
-  of the same type use another output.
+  of the same type use another output: https://github.com/elastic/kibana/issues/174458.
 
 * We should reconsider taking a 5-minute average in the Elasticsearch query made by the Fleet UI and instead take a
   30-second or 1-minute average (making corresponding adjustments to the `calendar_interval` value in the `cpu_time_series`
-  aggregation). This would result in a value closer to what's observed in `top` / `htop` output.
+  aggregation). This would result in a value closer to what's observed in `top` / `htop` output: https://github.com/elastic/kibana/issues/174799.
 
 * We should link the value shown in the Fleet UI to a chart that breaks it down for that Agent by `component.id` over time,
-  so the user can see the CPU utilization per Agent component process, over time.
+  so the user can see the CPU utilization per Agent component process, over time: https://github.com/elastic/kibana/issues/174800.
 
 * The tooltip shown with the "i" in the CPU column should explain that the value is sum of current CPU utilization (in %)
-  of all Agent component processes, ranging from 0 to (number of cores * 100).
+  of all Agent component processes, ranging from 0 to (number of cores * 100): https://github.com/elastic/kibana/issues/174801.
 
 * We should enhance collection and aggregation to include CPU utilization for Agent components managed by the service
   runtime (e.g. Endpoint) as well, not just Agent components managed by
-  the command runtime (e.g. Beats) as we do today.
+  the command runtime (e.g. Beats) as we do today: https://github.com/elastic/elastic-agent/issues/4083.
 
 * We should enhance collection to include CPU utilization for Agent monitoring components so their contributions are also
-  counted.
+  counted: https://github.com/elastic/elastic-agent/issues/4082.
