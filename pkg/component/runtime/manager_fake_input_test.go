@@ -89,9 +89,6 @@ func (suite *FakeInputSuite) setupTestPaths() {
 	t := suite.T()
 	t.Helper()
 
-	//versioned := paths.IsVersionHome()
-	//topPath := paths.Top()
-
 	tmpDir, err := os.MkdirTemp("", "at-*")
 	if err != nil {
 		t.Fatalf("failed to create temp directory: %s", err)
@@ -100,8 +97,6 @@ func (suite *FakeInputSuite) setupTestPaths() {
 	paths.SetTop(tmpDir)
 
 	t.Cleanup(func() {
-		//paths.SetVersionHome(versioned)
-		//paths.SetTop(topPath)
 		_ = os.RemoveAll(tmpDir)
 	})
 }
