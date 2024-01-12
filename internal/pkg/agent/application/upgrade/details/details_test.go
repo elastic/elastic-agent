@@ -71,33 +71,32 @@ func TestDetailsObserver(t *testing.T) {
 func TestDetailsDownloadRateJSON(t *testing.T) {
 	det := NewDetails("99.999.9999", StateRequested, "test_action_id")
 
-	// Normal (non-infinity) download rate
-	t.Run("non_infinity", func(t *testing.T) {
-		det.SetDownloadProgress(.8, 1794.7)
+	tests := []struct {
+		name     string
+		percent  float64
+		rate_in  float64
+		rate_out float64
+	}{
+		{"non_infinity", .8, 1794.7, 1794},
+		{"positive_infinity", 0.99, math.Inf(1), 0},
+		{"negative_infinity", 0.99, math.Inf(-1), 0},
+		{"not_a_number", 0.99, math.NaN(), 0},
+	}
 
-		data, err := json.Marshal(det)
-		require.NoError(t, err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			det.SetDownloadProgress(tc.percent, tc.rate_in)
 
-		var unmarshalledDetails Details
-		err = json.Unmarshal(data, &unmarshalledDetails)
-		require.NoError(t, err)
-		require.Equal(t, float64(1794), float64(unmarshalledDetails.Metadata.DownloadRate))
-		require.Equal(t, .8, unmarshalledDetails.Metadata.DownloadPercent)
-	})
+			data, err := json.Marshal(det)
+			require.NoError(t, err)
 
-	// Infinity download rate
-	t.Run("infinity", func(t *testing.T) {
-		det.SetDownloadProgress(0.99, math.Inf(1))
-
-		data, err := json.Marshal(det)
-		require.NoError(t, err)
-
-		var unmarshalledDetails Details
-		err = json.Unmarshal(data, &unmarshalledDetails)
-		require.NoError(t, err)
-		require.Equal(t, math.Inf(1), float64(unmarshalledDetails.Metadata.DownloadRate))
-		require.Equal(t, 0.99, unmarshalledDetails.Metadata.DownloadPercent)
-	})
+			var unmarshalledDetails Details
+			err = json.Unmarshal(data, &unmarshalledDetails)
+			require.NoError(t, err)
+			require.Equal(t, tc.rate_out, float64(unmarshalledDetails.Metadata.DownloadRate))
+			require.Equal(t, tc.percent, unmarshalledDetails.Metadata.DownloadPercent)
+		})
+	}
 }
 
 func TestEquals(t *testing.T) {
