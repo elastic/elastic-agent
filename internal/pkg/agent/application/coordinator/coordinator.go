@@ -1311,7 +1311,7 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 	addedOutputs := []string{}
 	removedOutputs := []string{}
 
-	// take our diff map and format everyting for output
+	// take our diff map and format everything for output
 	for id, diff := range compDiffMap {
 		if diff.inLast && !diff.inNew {
 			removedList = append(removedList, id)
@@ -1434,7 +1434,7 @@ func diffUnitList(old, new []component.Unit) map[string]diffCheck {
 		diffMap[id] = diff
 	}
 	// find removed units
-	for id, _ := range oldMap {
+	for id := range oldMap {
 		diffMap[id] = diffCheck{inLast: true}
 	}
 	return diffMap

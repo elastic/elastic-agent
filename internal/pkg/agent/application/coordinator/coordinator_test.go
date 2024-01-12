@@ -137,8 +137,8 @@ func TestComponentUpdateDiff(t *testing.T) {
 				},
 			},
 			logtest: func(t *testing.T, logs string) {
-				require.Contains(t, string(logs), "The following components have been removed: [component-two]")
-				require.Contains(t, string(logs), "The following outputs have been removed: [kafka]")
+				require.Contains(t, logs, "The following components have been removed: [component-two]")
+				require.Contains(t, logs, "The following outputs have been removed: [kafka]")
 			},
 		},
 		{
@@ -162,8 +162,8 @@ func TestComponentUpdateDiff(t *testing.T) {
 			logtest: func(t *testing.T, logs string) {
 				matcher := regexp.MustCompile(`The following components have been removed: \[(component\-one|component\-two) (component\-one|component\-two)\]`)
 				require.Equal(t, 1, len(matcher.FindAllString(string(logs), -1)))
-				require.Contains(t, string(logs), "The following components have been added: [component-three]")
-				require.Contains(t, string(logs), "The following outputs have been removed: [kafka]")
+				require.Contains(t, logs, "The following components have been added: [component-three]")
+				require.Contains(t, logs, "The following outputs have been removed: [kafka]")
 			},
 		},
 		{
@@ -191,9 +191,9 @@ func TestComponentUpdateDiff(t *testing.T) {
 				},
 			},
 			logtest: func(t *testing.T, logs string) {
-				require.Contains(t, string(logs), "The following components have been updated")
-				require.Contains(t, string(logs), "unit-three: added")
-				require.Contains(t, string(logs), "unit-x: removed")
+				require.Contains(t, logs, "The following components have been updated")
+				require.Contains(t, logs, "unit-three: added")
+				require.Contains(t, logs, "unit-x: removed")
 			},
 		},
 	}
