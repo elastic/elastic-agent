@@ -111,42 +111,116 @@ func TestComponentUpdateDiff(t *testing.T) {
 	}
 	err := logp.Configure(logConfig)
 	require.NoError(t, err)
-	old := []component.Component{
+
+	cases := []struct {
+		name    string
+		old     []component.Component
+		new     []component.Component
+		logtest func(t *testing.T, logs string)
+	}{
 		{
-			ID:         "component-one",
-			OutputType: "elasticsearch",
+			name: "test-basic-removed",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+				{
+					ID:         "component-two",
+					OutputType: "kafka",
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+			},
+			logtest: func(t *testing.T, logs string) {
+				require.Contains(t, string(logs), "The following components have been removed: [component-two]")
+				require.Contains(t, string(logs), "The following outputs have been removed: [kafka]")
+			},
 		},
 		{
-			ID:         "component-two",
-			OutputType: "kafka",
+			name: "test-added-and-removed",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+				{
+					ID:         "component-two",
+					OutputType: "kafka",
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-three",
+					OutputType: "elasticsearch",
+				},
+			},
+			logtest: func(t *testing.T, logs string) {
+				matcher := regexp.MustCompile(`The following components have been removed: \[(component\-one|component\-two) (component\-one|component\-two)\]`)
+				require.Equal(t, 1, len(matcher.FindAllString(string(logs), -1)))
+				require.Contains(t, string(logs), "The following components have been added: [component-three]")
+				require.Contains(t, string(logs), "The following outputs have been removed: [kafka]")
+			},
+		},
+		{
+			name: "test-updated-component",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "unit-one"},
+						{ID: "unit-two"},
+						{ID: "unit-x"},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "unit-one"},
+						{ID: "unit-two"},
+						{ID: "unit-three"},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs string) {
+				require.Contains(t, string(logs), "The following components have been updated")
+				require.Contains(t, string(logs), "unit-three: added")
+				require.Contains(t, string(logs), "unit-x: removed")
+			},
 		},
 	}
 
-	new := []component.Component{
-		{
-			ID:         "component-three",
-			OutputType: "logstash",
-		},
+	for _, testcase := range cases {
+
+		t.Run(testcase.name, func(t *testing.T) {
+			testCoord := Coordinator{
+				logger:         logp.L(),
+				componentModel: testcase.new,
+			}
+			testCoord.checkAndLogUpdate(testcase.old)
+
+			files, err := filepath.Glob(filepath.Join(logdir, "testlog*"))
+			require.NoError(t, err)
+			require.NotEmpty(t, files, "no log files found")
+			logs, err := os.ReadFile(files[0])
+			require.NoError(t, err)
+			t.Logf("got logs for test %s: \n%s", testcase.name, string(logs))
+
+			testcase.logtest(t, string(logs))
+
+			err = os.Truncate(files[0], 0)
+			require.NoError(t, err)
+		})
+
 	}
-
-	testCoord := Coordinator{
-		logger:         logp.L(),
-		componentModel: new,
-	}
-	testCoord.checkAndLogUpdate(old)
-
-	// use regex since the order of lists in the logs is random
-	matcher := regexp.MustCompile(`The following (components|outputs) have been removed: \[(component\-one|component\-two|elasticsearch|kafka) (component\-one|component\-two|elasticsearch|kafka)\]`)
-
-	files, err := filepath.Glob(filepath.Join(logdir, "testlog*"))
-	require.NoError(t, err)
-	logs, err := os.ReadFile(files[0])
-	require.NoError(t, err)
-	t.Logf("got logs: %s", string(logs))
-	require.Contains(t, string(logs), "The following components have been added: [component-three]")
-	require.Contains(t, string(logs), "The following outputs have been added: [logstash]")
-	// Make sure we have two matches, one for the component line, one for the output line
-	require.Equal(t, 2, len(matcher.FindAllString(string(logs), -1)))
 
 }
 

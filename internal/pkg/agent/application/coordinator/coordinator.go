@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -296,6 +297,13 @@ type managerChans struct {
 	varsManagerError  <-chan error
 
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
+}
+
+// helper method for diffing component states
+type diffCheck struct {
+	inNew   bool
+	inLast  bool
+	updated bool
 }
 
 // New creates a new coordinator.
@@ -1235,60 +1243,109 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 		c.logger.Debugf("Received initial component update; total of %d components", len(c.componentModel))
 		return
 	}
+
 	type compCheck struct {
 		inNew  bool
 		inLast bool
+
+		diffUnits map[string]diffCheck
 	}
 
-	type compOutputs struct {
-		inNew  bool
-		inLast bool
-	}
+	lastCompMap := convertComponentListToMap(lastComponentModel)
+	currentCompMap := convertComponentListToMap(c.componentModel)
 
-	compOutputTypes := map[string]compOutputs{}
-	// collect current and last component list
-	compMap := map[string]compCheck{}
-	currentCompIDs := make([]string, len(c.componentModel))
-
-	// combine last and current lists
-	for i, newComp := range c.componentModel {
-		currentCompIDs[i] = newComp.ID
-		compMap[newComp.ID] = compCheck{inNew: true}
-		compOutputTypes[newComp.OutputType] = compOutputs{inNew: true}
-	}
-
-	for _, lastComp := range lastComponentModel {
-		if current, ok := compMap[lastComp.ID]; ok {
-			current.inLast = true
-			compMap[lastComp.ID] = current
+	compDiffMap := map[string]compCheck{}
+	outDiffMap := map[string]diffCheck{}
+	// kinda-callbacks for dealing with output logic
+	foundInLast := func(outName string) {
+		if outDiff, ok := outDiffMap[outName]; ok {
+			outDiff.inLast = true
+			outDiffMap[outName] = outDiff
 		} else {
-			compMap[lastComp.ID] = compCheck{inLast: true}
-		}
-		if current, ok := compOutputTypes[lastComp.OutputType]; ok {
-			current.inLast = true
-			compOutputTypes[lastComp.OutputType] = current
-		} else {
-			compOutputTypes[lastComp.OutputType] = compOutputs{inLast: true}
+			outDiffMap[outName] = diffCheck{inLast: true}
 		}
 	}
 
-	// reduce to list of added/removed inputs
+	foundInUpdated := func(outName string) {
+		if outDiff, ok := outDiffMap[outName]; ok {
+			outDiff.inNew = true
+			outDiffMap[outName] = outDiff
+		} else {
+			outDiffMap[outName] = diffCheck{inNew: true}
+		}
+	}
+
+	// diff the maps
+
+	// find added & updated components
+	for id, comp := range currentCompMap {
+		// check output
+		foundInUpdated(comp.OutputType)
+		// compare with last state
+		diff := compCheck{inNew: true}
+		if lastComp, ok := lastCompMap[id]; ok {
+			diff.inLast = true
+			// if the unit is in both the past and previous, check for updated units
+			diff.diffUnits = diffUnitList(lastComp.Units, comp.Units)
+			foundInLast(lastComp.OutputType)
+			// a bit of optimization: after we're done, we'll need to iterate over lastCompMap to fetch removed units,
+			// so delete items we don't need to iterate over
+			delete(lastCompMap, id)
+		}
+		compDiffMap[id] = diff
+	}
+
+	//find removed components
+	// if something is still in this map, that means it's only in this map
+	for id, comp := range lastCompMap {
+		compDiffMap[id] = compCheck{inLast: true}
+		foundInLast(comp.OutputType)
+	}
+
 	addedList := []string{}
 	removedList := []string{}
-	for ID, comp := range compMap {
-		if comp.inLast && !comp.inNew {
-			removedList = append(removedList, ID)
-		}
-		if !comp.inLast && comp.inNew {
-			addedList = append(addedList, ID)
-		}
 
-	}
+	formattedUpdated := []string{}
 
 	// reduced to list of added/removed outputs
 	addedOutputs := []string{}
 	removedOutputs := []string{}
-	for output, comp := range compOutputTypes {
+
+	// take our diff map and format everyting for output
+	for id, diff := range compDiffMap {
+		if diff.inLast && !diff.inNew {
+			removedList = append(removedList, id)
+		}
+		if !diff.inLast && diff.inNew {
+			addedList = append(addedList, id)
+		}
+		// format a user-readable list of diffs
+		if diff.inLast && diff.inNew {
+			units := []string{}
+			for unitId, state := range diff.diffUnits {
+				action := ""
+				if state.inLast && !state.inNew {
+					action = "removed"
+				}
+				if state.inNew && !state.inLast {
+					action = "added"
+				}
+				if state.updated {
+					action = "updated"
+				}
+				if action != "" {
+					units = append(units, fmt.Sprintf("(%s: %s)", unitId, action))
+				}
+			}
+			if len(units) > 0 {
+				formatted := fmt.Sprintf("%s: %v", id, units)
+				formattedUpdated = append(formattedUpdated, formatted)
+			}
+		}
+	}
+
+	// format outputs
+	for output, comp := range outDiffMap {
 		if comp.inLast && !comp.inNew {
 			removedOutputs = append(removedOutputs, output)
 		}
@@ -1311,7 +1368,11 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 		c.logger.Debugf("The following outputs have been removed: %v", removedOutputs)
 	}
 
-	c.logger.Debugf("There are %d configured components: %v", len(currentCompIDs), currentCompIDs)
+	if len(formattedUpdated) > 0 {
+		c.logger.Debugf("The following components have been updated: %v", formattedUpdated)
+	}
+
+	c.logger.Debugf("There are %d configured components", len(c.componentModel))
 }
 
 // Filter any inputs and outputs in the generated component model
@@ -1335,6 +1396,48 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 		result = append(result, component)
 	}
 	return result
+}
+
+// helpers for checkAndLogUpdate
+
+func convertUnitListToMap(unitList []component.Unit) map[string]component.Unit {
+	unitMap := map[string]component.Unit{}
+	for _, c := range unitList {
+		unitMap[c.ID] = c
+	}
+	return unitMap
+}
+
+func convertComponentListToMap(compList []component.Component) map[string]component.Component {
+	compMap := map[string]component.Component{}
+	for _, c := range compList {
+		compMap[c.ID] = c
+	}
+	return compMap
+}
+
+func diffUnitList(old, new []component.Unit) map[string]diffCheck {
+	oldMap := convertUnitListToMap(old)
+	newMap := convertUnitListToMap(new)
+
+	diffMap := map[string]diffCheck{}
+	// find new and updated units
+	for id, newUnits := range newMap {
+		diff := diffCheck{inNew: true}
+		if oldUnit, ok := oldMap[id]; ok {
+			diff.inLast = true
+			if newUnits.Config != nil && oldUnit.Config != nil {
+				diff.updated = reflect.DeepEqual(newUnits.Config.GetSource().AsMap(), oldUnit.Config.GetSource().AsMap())
+			}
+			delete(oldMap, id)
+		}
+		diffMap[id] = diff
+	}
+	// find removed units
+	for id, _ := range oldMap {
+		diffMap[id] = diffCheck{inLast: true}
+	}
+	return diffMap
 }
 
 // collectManagerErrors listens on the shutdown channels for the
