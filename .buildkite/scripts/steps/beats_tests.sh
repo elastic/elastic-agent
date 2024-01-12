@@ -14,7 +14,7 @@ STACK_PROVISIONER="${1:-"serverless"}"
 run_test_for_beat(){
     export GOFLAGS='-buildvcs=false'
     local beat_name=$1
-    
+
     #build
     export WORKSPACE="/tmp/beats-build/beats/x-pack/${beat_name}"
     pushd $WORKSPACE
@@ -43,7 +43,7 @@ mage -l
 mkdir -p /tmp/beats-build
 pushd /tmp/beats-build
 
-git clone git@github.com:elastic/beats.git
+git clone --depth=1 git@github.com:elastic/beats.git
 popd
 
 # export WORKSPACE=beats/x-pack/metricbeat

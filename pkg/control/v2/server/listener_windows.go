@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net"
 	"os/user"
-	"strings"
 
 	"github.com/elastic/elastic-agent-libs/api/npipe"
 
@@ -23,9 +22,13 @@ import (
 func createListener(log *logger.Logger) (net.Listener, error) {
 	sd, err := securityDescriptor(log)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create security descriptor: %w", err)
 	}
-	return npipe.NewListener(control.Address(), sd)
+	lis, err := npipe.NewListener(npipe.TransformString(control.Address()), sd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create npipe listener: %w", err)
+	}
+	return lis, nil
 }
 
 func cleanupListener(_ *logger.Logger) {
@@ -37,14 +40,10 @@ func securityDescriptor(log *logger.Logger) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get current user: %w", err)
 	}
-	// Named pipe security and access rights.
-	// We create the pipe and the specific users should only be able to write to it.
-	// See docs: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights
-	// String definition: https://docs.microsoft.com/en-us/windows/win32/secauthz/ace-strings
-	// Give generic read/write access to the specified user.
+
 	descriptor := "D:P(A;;GA;;;" + u.Uid + ")"
 
-	if isAdmin, err := isWindowsAdmin(u); err != nil {
+	if isAdmin, err := utils.HasRoot(); err != nil {
 		// do not fail, agent would end up in a loop, continue with limited permissions
 		log.Warnf("failed to detect admin: %w", err)
 	} else if isAdmin {
@@ -53,32 +52,6 @@ func securityDescriptor(log *logger.Logger) (string, error) {
 		// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
 		descriptor += "(A;;GA;;;" + utils.AdministratorSID + ")"
 	}
+
 	return descriptor, nil
-}
-
-func isWindowsAdmin(u *user.User) (bool, error) {
-	if u.Username == "NT AUTHORITY\\SYSTEM" {
-		return true, nil
-	}
-
-	if equalsSystemGroup(u.Uid) || equalsSystemGroup(u.Gid) {
-		return true, nil
-	}
-
-	groups, err := u.GroupIds()
-	if err != nil {
-		return false, fmt.Errorf("failed to get current user groups: %w", err)
-	}
-
-	for _, groupSid := range groups {
-		if equalsSystemGroup(groupSid) {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func equalsSystemGroup(s string) bool {
-	return strings.EqualFold(s, utils.SystemSID) || strings.EqualFold(s, utils.AdministratorSID)
 }
