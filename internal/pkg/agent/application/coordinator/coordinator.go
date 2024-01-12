@@ -1372,7 +1372,7 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 		c.logger.Debugf("The following components have been updated: %v", formattedUpdated)
 	}
 
-	c.logger.Debugf("There are %d configured components", len(c.componentModel))
+	c.logger.Debugf("There are %d configured component(s)", len(c.componentModel))
 }
 
 // Filter any inputs and outputs in the generated component model
@@ -1427,7 +1427,7 @@ func diffUnitList(old, new []component.Unit) map[string]diffCheck {
 		if oldUnit, ok := oldMap[id]; ok {
 			diff.inLast = true
 			if newUnits.Config != nil && oldUnit.Config != nil {
-				diff.updated = reflect.DeepEqual(newUnits.Config.GetSource().AsMap(), oldUnit.Config.GetSource().AsMap())
+				diff.updated = !reflect.DeepEqual(newUnits.Config.GetSource().AsMap(), oldUnit.Config.GetSource().AsMap())
 			}
 			delete(oldMap, id)
 		}

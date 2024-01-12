@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -196,6 +198,55 @@ func TestComponentUpdateDiff(t *testing.T) {
 				require.Contains(t, logs, "unit-x: removed")
 			},
 		},
+		{
+			name: "just-change-output",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "logstash",
+				},
+			},
+			logtest: func(t *testing.T, logs string) {
+				require.Contains(t, logs, "The following outputs have been removed: [elasticsearch]")
+				require.Contains(t, logs, "The following outputs have been added: [logstash]")
+			},
+		},
+		{
+			name: "config-update",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "value"})},
+						},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "two"})},
+						},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs string) {
+				require.Contains(t, logs, "The following components have been updated")
+			},
+		},
 	}
 
 	for _, testcase := range cases {
@@ -222,6 +273,12 @@ func TestComponentUpdateDiff(t *testing.T) {
 
 	}
 
+}
+
+func mustNewStruct(t *testing.T, v map[string]interface{}) *structpb.Struct {
+	str, err := structpb.NewStruct(v)
+	require.NoError(t, err)
+	return str
 }
 
 func TestCoordinator_State_Starting(t *testing.T) {
