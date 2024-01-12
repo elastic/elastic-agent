@@ -7,6 +7,7 @@ package upgrade
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -215,19 +216,19 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	if err := changeSymlinkInternal(u.log, symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
-		rollbackInstall(ctx, u.log, newHash)
+		rollbackInstall(ctx, u.log, hashedDir)
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, u.log, newHash, action, det); err != nil {
+	if err := u.markUpgrade(ctx, u.log, version, unpackRes.Hash, unpackRes.VersionedHome, action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackInstall(ctx, u.log, newHash)
+		rollbackInstall(ctx, u.log, hashedDir)
 		return nil, err
 	}
 
 	if err := InvokeWatcher(u.log); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackInstall(ctx, u.log, newHash)
+		rollbackInstall(ctx, u.log, hashedDir)
 		return nil, err
 	}
 
@@ -288,8 +289,13 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	return u.settings.SourceURI
 }
 
-func rollbackInstall(ctx context.Context, log *logger.Logger, hash string) {
-	os.RemoveAll(filepath.Join(paths.Data(), fmt.Sprintf("%s-%s", agentName, hash)))
+func rollbackInstall(ctx context.Context, log *logger.Logger, versionedHome string) {
+	err := os.RemoveAll(filepath.Join(paths.Top(), versionedHome))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		// TODO should this be a warning or an error ?
+		log.Warnw("error rolling back install", "error.message", err)
+	}
+	// FIXME update
 	_ = ChangeSymlink(ctx, log, release.ShortCommit())
 }
 
