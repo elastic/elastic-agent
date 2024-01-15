@@ -163,7 +163,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	}
 
 	if err := runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, runAsOtel, awaiters, modifiers...); err != nil {
-		multierror.Append(resErr, err)
+		resErr = multierror.Append(resErr, err)
 	}
 
 	return resErr
