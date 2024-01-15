@@ -501,6 +501,10 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	}
 	options.DelayEnroll = false
 	options.FleetServer.SpawnAgent = false
+	// enrollCmd daemonReloadWithBackoff is broken
+	// see https://github.com/elastic/elastic-agent/issues/4043
+	// SkipDaemonRestart to true avoids running that code.
+	options.SkipDaemonRestart = true
 	c, err := newEnrollCmd(
 		ctx,
 		logger,
