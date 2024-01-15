@@ -1030,13 +1030,11 @@ func createFleetServerBootstrapConfig(
 		if insecure {
 			cfg.Server.TLS.VerificationMode = tlscommon.VerifyNone
 		}
-	}
 
-	if cfg.Server.TLS != nil {
 		cfg.Server.TLS.CAs = cas
-	}
 
-	if cfg.Server.TLS != nil && clientAuth != "" {
+		var cAuth tlscommon.TLSClientAuth
+		cfg.Server.TLS.ClientAuth = &cAuth
 		if err := cfg.Server.TLS.ClientAuth.Unpack(clientAuth); err != nil {
 			return nil, errors.New(err, "failed to unpack --fleet-server-client-auth", errors.TypeConfig)
 		}

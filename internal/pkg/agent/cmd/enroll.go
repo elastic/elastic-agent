@@ -65,7 +65,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("fleet-server-cert", "", "", "Certificate to use for exposed Fleet Server HTTPS endpoint")
 	cmd.Flags().StringP("fleet-server-cert-key", "", "", "Private key to use for exposed Fleet Server HTTPS endpoint")
 	cmd.Flags().StringP("fleet-server-cert-key-passphrase", "", "", "Path for private key passphrase file used to decrypt certificate key")
-	cmd.Flags().StringP("fleet-server-client-auth", "", "", "Fleet-server mTLS client authentication for connecting elastic-agents. Must be one of [none, optional, required]")
+	cmd.Flags().StringP("fleet-server-client-auth", "", "none", "Fleet-server mTLS client authentication for connecting elastic-agents. Must be one of [none, optional, required]")
 	cmd.Flags().StringSliceP("header", "", []string{}, "Headers used in communication with elasticsearch")
 	cmd.Flags().BoolP("fleet-server-insecure-http", "", false, "Expose Fleet Server over HTTP (not recommended; insecure)")
 	cmd.Flags().StringP("certificate-authorities", "a", "", "Comma separated list of root certificate for server verifications")
@@ -134,7 +134,6 @@ func validateEnrollFlags(cmd *cobra.Command) error {
 	}
 	fClientAuth, _ := cmd.Flags().GetString("fleet-server-client-auth")
 	switch fClientAuth {
-	case "":
 	case "none", "optional", "required":
 		// NOTE we can split this case if we want to do additional checks  when optional or required is passed.
 	default:

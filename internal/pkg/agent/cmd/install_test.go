@@ -9,7 +9,6 @@ package cmd
 import (
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -52,10 +51,10 @@ func TestInvalidBasePath(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			streams := cli.NewIOStreams()
-			cmd := cobra.Command{}
-			cmd.Flags().String(flagInstallBasePath, test.basePath, "")
+			cmd := newInstallCommandWithArgs([]string{}, streams)
+			cmd.Flags().Set(flagInstallBasePath, test.basePath)
 
-			err := installCmd(streams, &cmd)
+			err := installCmd(streams, cmd)
 
 			if test.expectedError == "" {
 				require.NoError(t, err)
