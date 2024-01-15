@@ -971,12 +971,13 @@ func createFleetServerBootstrapConfig(
 	if esClientCert != "" || esClientCertKey != "" {
 		if es.TLS == nil {
 			es.TLS = &tlscommon.Config{}
-		} 
+		}
 
 		es.TLS.Certificate = tlscommon.CertificateConfig{
-				Certificate: esClientCert,
-				Key:         esClientCertKey,
+			Certificate: esClientCert,
+			Key:         esClientCertKey,
 		}
+	}
 	if host == "" {
 		host = defaultFleetServerHost
 	}
