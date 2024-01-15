@@ -22,9 +22,13 @@ import (
 func createListener(log *logger.Logger) (net.Listener, error) {
 	sd, err := securityDescriptor(log)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create security descriptor: %w", err)
 	}
-	return npipe.NewListener(control.Address(), sd)
+	lis, err := npipe.NewListener(npipe.TransformString(control.Address()), sd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create npipe listener: %w", err)
+	}
+	return lis, nil
 }
 
 func cleanupListener(_ *logger.Logger) {
