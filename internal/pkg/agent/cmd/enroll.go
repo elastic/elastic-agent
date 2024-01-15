@@ -135,7 +135,7 @@ func validateEnrollFlags(cmd *cobra.Command) error {
 	fClientAuth, _ := cmd.Flags().GetString("fleet-server-client-auth")
 	switch fClientAuth {
 	case "none", "optional", "required":
-		// NOTE we can split this case if we want to do additional checks  when optional or required is passed.
+		// NOTE we can split this case if we want to do additional checks when optional or required is passed.
 	default:
 		return errors.New("--fleet-server-client-auth must be one of [none, optional, required]")
 	}
