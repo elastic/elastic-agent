@@ -150,8 +150,9 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		otelStartWg.Add(1)
 		go func() {
 			otelStartWg.Done()
-			err := otel.Run(ctx, stop)
-			resErr = multierror.Append(resErr, err)
+			if err := otel.Run(ctx, stop); err != nil {
+				resErr = multierror.Append(resErr, err)
+			}
 
 			// close awaiter handled in run loop
 			close(otelAwaiter)
@@ -161,8 +162,11 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		otelStartWg.Wait()
 	}
 
-	// not otel continue as usual
-	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, runAsOtel, awaiters, modifiers...)
+	if err := runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, runAsOtel, awaiters, modifiers...); err != nil {
+		multierror.Append(resErr, err)
+	}
+
+	return resErr
 }
 
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, runAsOtel bool, awaiters awaiters, modifiers ...component.PlatformModifier) error {
