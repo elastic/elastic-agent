@@ -53,7 +53,7 @@ func TestInvalidBasePath(t *testing.T) {
 			streams := cli.NewIOStreams()
 			cmd := newInstallCommandWithArgs([]string{}, streams)
 			err := cmd.Flags().Set(flagInstallBasePath, test.basePath)
-			require.NoEror(t, err)
+			require.NoError(t, err)
 
 			err = installCmd(streams, cmd)
 
