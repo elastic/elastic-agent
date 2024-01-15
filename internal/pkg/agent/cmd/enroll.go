@@ -83,8 +83,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("skip-daemon-reload", false, "Skip daemon reload after enrolling")
 	cmd.Flags().StringSliceP("tag", "", []string{}, "User set tags")
 
-	cmd.Flags().MarkHidden("skip-daemon-reload")       //nolint:errcheck // an error is only returned if the flag does not exist.
-	cmd.Flags().MarkHidden("fleet-server-client-auth") //nolint:errcheck // FIXME this is not fully implemented
+	cmd.Flags().MarkHidden("skip-daemon-reload") //nolint:errcheck // an error is only returned if the flag does not exist.
 }
 
 func validateEnrollFlags(cmd *cobra.Command) error {
