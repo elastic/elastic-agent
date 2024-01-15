@@ -52,10 +52,11 @@ func TestInvalidBasePath(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			streams := cli.NewIOStreams()
-			cmd := cobra.Command{}
-			cmd.Flags().String(flagInstallBasePath, test.basePath, "")
+			cmd := newInstallCommandWithArgs([]string{}, streams)
+			err := cmd.Flags().Set(flagInstallBasePath, test.basePath)
+			require.NoError(t, err)
 
-			err := installCmd(streams, &cmd)
+			err = installCmd(streams, &cmd)
 
 			if test.expectedError == "" {
 				require.NoError(t, err)
