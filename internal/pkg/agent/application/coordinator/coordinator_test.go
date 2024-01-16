@@ -280,13 +280,11 @@ func TestComponentUpdateDiff(t *testing.T) {
 		})
 
 	}
-
+	err = logp.Sync()
+	require.NoError(t, err)
 	err = logp.Configure(logp.Config{
 		ToStderr: true,
 	})
-	require.NoError(t, err)
-
-	err = logp.Sync()
 	require.NoError(t, err)
 
 }
