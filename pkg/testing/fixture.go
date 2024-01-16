@@ -486,7 +486,7 @@ func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, stat
 		agentClient = client.New(client.WithAddress(cAddr))
 		f.setClient(agentClient)
 		defer f.setClient(nil)
-		stateCh, stateErrCh = watchState(ctx, agentClient, f.connectTimout)
+		stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
 	}
 
 	var logProxy Logger
@@ -546,7 +546,7 @@ func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, stat
 		case err := <-stateErrCh:
 			if !stopping {
 				// Give the log watchers a second to write out the agent logs.
-				// Usually if this error occurs it will happen quickly before logs are printed.
+				// Client connnection failures can happen quickly enough to prevent logging.
 				time.Sleep(time.Second)
 				// connection to elastic-agent failed
 				killProc()
@@ -1024,13 +1024,14 @@ func attachOutErr(stdOut *logWatcher, stdErr *logWatcher) process.CmdOption {
 	}
 }
 
-func watchState(ctx context.Context, c client.Client, timeout time.Duration) (chan *client.AgentState, chan error) {
+func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time.Duration) (chan *client.AgentState, chan error) {
 	stateCh := make(chan *client.AgentState)
 	errCh := make(chan error)
 	go func() {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
+		t.Logf("%s: Elastic agent client connecting...", time.Now().UTC().Format(time.RFC3339))
 		err := c.Connect(ctx)
 		if err != nil {
 			errCh <- err
