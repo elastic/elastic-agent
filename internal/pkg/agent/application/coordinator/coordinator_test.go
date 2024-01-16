@@ -5,12 +5,13 @@
 package coordinator
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	goruntime "runtime"
 	"strings"
 	"testing"
@@ -118,7 +119,7 @@ func TestComponentUpdateDiff(t *testing.T) {
 		name    string
 		old     []component.Component
 		new     []component.Component
-		logtest func(t *testing.T, logs string)
+		logtest func(t *testing.T, logs UpdateStats)
 	}{
 		{
 			name: "test-basic-removed",
@@ -138,9 +139,10 @@ func TestComponentUpdateDiff(t *testing.T) {
 					OutputType: "elasticsearch",
 				},
 			},
-			logtest: func(t *testing.T, logs string) {
-				require.Contains(t, logs, "The following components have been removed: [component-two]")
-				require.Contains(t, logs, "The following outputs have been removed: [kafka]")
+			logtest: func(t *testing.T, logs UpdateStats) {
+
+				require.Equal(t, []string{"component-two"}, logs.Components.Removed)
+				require.Equal(t, []string{"kafka"}, logs.Outputs.Removed)
 			},
 		},
 		{
@@ -161,11 +163,10 @@ func TestComponentUpdateDiff(t *testing.T) {
 					OutputType: "elasticsearch",
 				},
 			},
-			logtest: func(t *testing.T, logs string) {
-				matcher := regexp.MustCompile(`The following components have been removed: \[(component\-one|component\-two) (component\-one|component\-two)\]`)
-				require.Equal(t, 1, len(matcher.FindAllString(logs, -1)))
-				require.Contains(t, logs, "The following components have been added: [component-three]")
-				require.Contains(t, logs, "The following outputs have been removed: [kafka]")
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Equal(t, 2, len(logs.Components.Removed))
+				require.Equal(t, []string{"component-three"}, logs.Components.Added)
+				require.Equal(t, []string{"kafka"}, logs.Outputs.Removed)
 			},
 		},
 		{
@@ -192,10 +193,9 @@ func TestComponentUpdateDiff(t *testing.T) {
 					},
 				},
 			},
-			logtest: func(t *testing.T, logs string) {
-				require.Contains(t, logs, "The following components have been updated")
-				require.Contains(t, logs, "unit-three: added")
-				require.Contains(t, logs, "unit-x: removed")
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Contains(t, logs.Components.Updated[0], "unit-three: added")
+				require.Contains(t, logs.Components.Updated[0], "unit-x: removed")
 			},
 		},
 		{
@@ -212,9 +212,9 @@ func TestComponentUpdateDiff(t *testing.T) {
 					OutputType: "logstash",
 				},
 			},
-			logtest: func(t *testing.T, logs string) {
-				require.Contains(t, logs, "The following outputs have been removed: [elasticsearch]")
-				require.Contains(t, logs, "The following outputs have been added: [logstash]")
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Equal(t, []string{"elasticsearch"}, logs.Outputs.Removed)
+				require.Equal(t, []string{"logstash"}, logs.Outputs.Added)
 			},
 		},
 		{
@@ -243,10 +243,14 @@ func TestComponentUpdateDiff(t *testing.T) {
 					},
 				},
 			},
-			logtest: func(t *testing.T, logs string) {
-				require.Contains(t, logs, "The following components have been updated")
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.NotEmpty(t, logs.Components.Updated)
 			},
 		},
+	}
+
+	type logWrapper struct {
+		Changes UpdateStats `json:"changes"`
 	}
 
 	for _, testcase := range cases {
@@ -265,7 +269,11 @@ func TestComponentUpdateDiff(t *testing.T) {
 			require.NoError(t, err)
 			t.Logf("got logs for test %s: \n%s", testcase.name, string(logs))
 
-			testcase.logtest(t, string(logs))
+			result := logWrapper{}
+			err = json.Unmarshal(bytes.Trim(logs, "\x00"), &result)
+			require.NoError(t, err)
+
+			testcase.logtest(t, result.Changes)
 
 			err = os.Truncate(files[0], 0)
 			require.NoError(t, err)

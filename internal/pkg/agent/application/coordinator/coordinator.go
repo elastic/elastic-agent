@@ -299,11 +299,26 @@ type managerChans struct {
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 }
 
-// helper method for diffing component states
+// diffCheck is a container used by checkAndLogUpdate()
 type diffCheck struct {
 	inNew   bool
 	inLast  bool
 	updated bool
+}
+
+// UpdateStats reports the diff of a component update.
+// This is primarily used as a log message, and exported in case it's needed elsewhere.
+type UpdateStats struct {
+	Components UpdateComponentChange `json:"components"`
+	Outputs    UpdateComponentChange `json:"outputs"`
+}
+
+// UpdateComponentChange reports stats for changes to a particular part of a config.
+type UpdateComponentChange struct {
+	Added   []string `json:"added,omitempty"`
+	Removed []string `json:"removed,omitempty"`
+	Updated []string `json:"updated,omitempty"`
+	Count   int      `json:"count,omitempty"`
 }
 
 // New creates a new coordinator.
@@ -1228,10 +1243,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	lastComponentModel := c.componentModel
 	c.componentModel = comps
 
-	// don't run a bunch of relatively costly code unless we're in debug mode
-	if c.logger.IsDebug() {
-		c.checkAndLogUpdate(lastComponentModel)
-	}
+	c.checkAndLogUpdate(lastComponentModel)
 
 	return nil
 }
@@ -1245,8 +1257,8 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 	}
 
 	type compCheck struct {
-		inNew  bool
-		inLast bool
+		inCurrent bool
+		inLast    bool
 
 		diffUnits map[string]diffCheck
 	}
@@ -1282,7 +1294,7 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 		// check output
 		foundInUpdated(comp.OutputType)
 		// compare with last state
-		diff := compCheck{inNew: true}
+		diff := compCheck{inCurrent: true}
 		if lastComp, ok := lastCompMap[id]; ok {
 			diff.inLast = true
 			// if the unit is in both the past and previous, check for updated units
@@ -1295,7 +1307,7 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 		compDiffMap[id] = diff
 	}
 
-	//find removed components
+	// find removed components
 	// if something is still in this map, that means it's only in this map
 	for id, comp := range lastCompMap {
 		compDiffMap[id] = compCheck{inLast: true}
@@ -1313,14 +1325,14 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 
 	// take our diff map and format everything for output
 	for id, diff := range compDiffMap {
-		if diff.inLast && !diff.inNew {
+		if diff.inLast && !diff.inCurrent {
 			removedList = append(removedList, id)
 		}
-		if !diff.inLast && diff.inNew {
+		if !diff.inLast && diff.inCurrent {
 			addedList = append(addedList, id)
 		}
 		// format a user-readable list of diffs
-		if diff.inLast && diff.inNew {
+		if diff.inLast && diff.inCurrent {
 			units := []string{}
 			for unitId, state := range diff.diffUnits {
 				action := ""
@@ -1354,25 +1366,20 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 		}
 	}
 
-	if len(addedList) > 0 {
-		c.logger.Debugf("The following components have been added: %v", addedList)
-	}
-	if len(removedList) > 0 {
-		c.logger.Debugf("The following components have been removed: %v", removedList)
-	}
-
-	if len(addedOutputs) > 0 {
-		c.logger.Debugf("The following outputs have been added: %v", addedOutputs)
-	}
-	if len(removedOutputs) > 0 {
-		c.logger.Debugf("The following outputs have been removed: %v", removedOutputs)
-	}
-
-	if len(formattedUpdated) > 0 {
-		c.logger.Debugf("The following components have been updated: %v", formattedUpdated)
+	logStruct := UpdateStats{
+		Components: UpdateComponentChange{
+			Added:   addedList,
+			Removed: removedList,
+			Count:   len(c.componentModel),
+			Updated: formattedUpdated,
+		},
+		Outputs: UpdateComponentChange{
+			Added:   addedOutputs,
+			Removed: removedOutputs,
+		},
 	}
 
-	c.logger.Debugf("There are %d configured component(s)", len(c.componentModel))
+	c.logger.Infow("state update", "changes", logStruct)
 }
 
 // Filter any inputs and outputs in the generated component model
