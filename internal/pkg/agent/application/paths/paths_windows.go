@@ -67,3 +67,28 @@ func ResolveControlSocket() {
 		SetControlSocket(WindowsControlSocketInstalledPath)
 	}
 }
+
+// HasPrefix tests if the path starts with the prefix.
+func HasPrefix(path string, prefix string) bool {
+	if path == "" || prefix == "" {
+		return false
+	}
+
+	if strings.ToUpper(filepath.VolumeName(path)) != strings.ToUpper(filepath.VolumeName(prefix)) {
+		return false
+	}
+
+	prefixParts := pathSplit(filepath.Clean(prefix))
+	pathParts := pathSplit(filepath.Clean(path))
+
+	if len(prefixParts) > len(pathParts) {
+		return false
+	}
+
+	for i := 0; i < len(prefixParts); i++ {
+		if strings.ToUpper(prefixParts[0]) != strings.ToUpper(pathParts[0]) {
+			return false
+		}
+	}
+	return true
+}
