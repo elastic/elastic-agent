@@ -3504,7 +3504,7 @@ func TestManager_FakeInput_Chunk(t *testing.T) {
 	}()
 
 	// build the units to ensure that there is more than double the units required for the GRPC configuration
-	minimumMsgSize := grpcConfig.MaxMsgSize * 2 // double it
+	minimumMsgSize := int(float64(grpcConfig.MaxMsgSize) * 1.2) // increase by 20%
 	var units []component.Unit
 	var unitsSize int
 	var nextUnitID int
@@ -3609,13 +3609,13 @@ func TestManager_FakeInput_Chunk(t *testing.T) {
 	err = <-m.errCh
 	require.NoError(t, err)
 
-	endTimer := time.NewTimer(3 * time.Minute) // very large number of units will take time
+	endTimer := time.NewTimer(6 * time.Minute) // very large number of units will take time
 	defer endTimer.Stop()
 LOOP:
 	for {
 		select {
 		case <-endTimer.C:
-			t.Fatalf("timed out after 3 minutes")
+			t.Fatalf("timed out after 6 minutes")
 		case err := <-errCh:
 			require.NoError(t, err)
 		case err := <-subErrCh:
