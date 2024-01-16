@@ -545,6 +545,9 @@ func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, stat
 			}
 		case err := <-stateErrCh:
 			if !stopping {
+				// Give the log watchers a second to write out the agent logs.
+				// Usually if this error occurs it will happen quickly before logs are printed.
+				time.Sleep(time.Second)
 				// connection to elastic-agent failed
 				killProc()
 				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
