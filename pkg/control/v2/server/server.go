@@ -85,6 +85,7 @@ func (s *Server) Start() error {
 		s.logger.Errorf("unable to create listener: %s", err)
 		return err
 	}
+	s.logger.With("address", control.Address()).Infof("GRPC control socket listening at %s", control.Address())
 	s.listener = lis
 	if s.tracer != nil {
 		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(s.tracer))
