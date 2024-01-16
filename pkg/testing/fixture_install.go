@@ -57,6 +57,7 @@ type InstallOpts struct {
 	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
+	DelayEnroll    bool   // --delay-enroll
 
 	// Unprivileged by default installs the Elastic Agent as `--unprivileged` unless
 	// the platform being tested doesn't currently support it, or it's explicitly set
@@ -93,6 +94,9 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	}
 	if i.ProxyURL != "" {
 		args = append(args, "--proxy-url="+i.ProxyURL)
+	}
+	if i.DelayEnroll {
+		args = append(args, "--delay-enroll")
 	}
 
 	unprivileged := i.IsUnprivileged(operatingSystem)
