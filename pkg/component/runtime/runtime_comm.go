@@ -118,7 +118,7 @@ func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) err
 	if !hasV2 {
 		srvs = append(srvs, proto.ConnInfoServices_CheckinV2)
 	}
-	connInfo := &proto.ConnInfo{
+	startupInfo := &proto.StartUpInfo{
 		Addr:       c.listenAddr,
 		ServerName: c.name,
 		Token:      c.token,
@@ -130,13 +130,13 @@ func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) err
 		Supports:       []proto.ConnectionSupports{proto.ConnectionSupports_CheckinChunking},
 		MaxMessageSize: uint32(c.maxMessageSize),
 	}
-	infoBytes, err := protobuf.Marshal(connInfo)
+	infoBytes, err := protobuf.Marshal(startupInfo)
 	if err != nil {
-		return fmt.Errorf("failed to marshal connection information: %w", err)
+		return fmt.Errorf("failed to marshal startup information: %w", err)
 	}
 	_, err = w.Write(infoBytes)
 	if err != nil {
-		return fmt.Errorf("failed to write connection information: %w", err)
+		return fmt.Errorf("failed to write startup information: %w", err)
 	}
 	return nil
 }
@@ -146,7 +146,7 @@ func (c *runtimeComm) CheckinExpected(
 	observed *proto.CheckinObserved,
 ) {
 	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
-		expected.AgentInfo = &proto.CheckinAgentInfo{
+		expected.AgentInfo = &proto.AgentInfo{
 			Id:       c.agentInfo.AgentID(),
 			Version:  c.agentInfo.Version(),
 			Snapshot: c.agentInfo.Snapshot(),

@@ -101,8 +101,7 @@ func TestStateMapping(t *testing.T) {
 							State:   client.UnitStateHealthy,
 							Message: "component healthy",
 							VersionInfo: runtime.ComponentVersionInfo{
-								Name:    "awesome-comp",
-								Version: "0.0.1",
+								Name: "awesome-comp",
 								Meta: map[string]string{
 									"foo": "bar",
 								},
@@ -159,9 +158,8 @@ func TestStateMapping(t *testing.T) {
 						},
 					},
 					VersionInfo: &cproto.ComponentVersionInfo{
-						Name:    "awesome-comp",
-						Version: "0.0.1",
-						Meta:    map[string]string{"foo": "bar"},
+						Name: "awesome-comp",
+						Meta: map[string]string{"foo": "bar"},
 					},
 				}
 				assert.Equal(t, expectedCompState, stateResponse.Components[0])
