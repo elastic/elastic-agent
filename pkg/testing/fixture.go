@@ -1031,7 +1031,7 @@ func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		t.Logf("%s: Elastic agent client connecting...", time.Now().UTC().Format(time.RFC3339))
+		t.Logf("%s: Elastic agent client connecting...", time.Now().UTC().Format(time.RFC3339Nano))
 		err := c.Connect(ctx)
 		if err != nil {
 			errCh <- err
