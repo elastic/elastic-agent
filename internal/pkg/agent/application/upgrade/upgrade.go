@@ -63,7 +63,7 @@ type Upgrader struct {
 func IsUpgradeable() bool {
 	// only upgradeable if running from Agent installer and running under the
 	// control of the system supervisor (or built specifically with upgrading enabled)
-	return release.Upgradeable() || (info.RunningInstalled() && info.RunningUnderSupervisor())
+	return release.Upgradeable() || (paths.RunningInstalled() && info.RunningUnderSupervisor())
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
@@ -89,6 +89,8 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 }
 
 // Reload reloads the artifact configuration for the upgrader.
+// As of today, December 2023, fleet-server does not send most of the configuration
+// defined in artifact.Config, what will likely change in the near future.
 func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
