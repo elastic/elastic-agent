@@ -5,9 +5,7 @@
 package coordinator
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -102,17 +100,8 @@ func waitForState(
 }
 
 func TestComponentUpdateDiff(t *testing.T) {
-	logdir := t.TempDir()
-	logConfig := logp.Config{
-		Level: logp.DebugLevel,
-		Files: logp.FileConfig{
-			Path:        logdir,
-			Name:        "testlog",
-			MaxSize:     10000,
-			Permissions: 0o744,
-		},
-	}
-	err := logp.Configure(logConfig)
+
+	err := logp.DevelopmentSetup(logp.ToObserverOutput())
 	require.NoError(t, err)
 
 	cases := []struct {
@@ -249,10 +238,6 @@ func TestComponentUpdateDiff(t *testing.T) {
 		},
 	}
 
-	type logWrapper struct {
-		Changes UpdateStats `json:"changes"`
-	}
-
 	for _, testcase := range cases {
 
 		t.Run(testcase.name, func(t *testing.T) {
@@ -262,24 +247,17 @@ func TestComponentUpdateDiff(t *testing.T) {
 			}
 			testCoord.checkAndLogUpdate(testcase.old)
 
-			files, err := filepath.Glob(filepath.Join(logdir, "testlog*"))
-			require.NoError(t, err)
-			require.NotEmpty(t, files, "no log files found")
-			logs, err := os.ReadFile(files[0])
-			require.NoError(t, err)
-			t.Logf("got logs for test %s: \n%s", testcase.name, string(logs))
+			obsLogs := logp.ObserverLogs().TakeAll()
+			last := obsLogs[len(obsLogs)-1]
 
-			result := logWrapper{}
-			err = json.Unmarshal(bytes.Trim(logs, "\x00"), &result)
-			require.NoError(t, err)
-
-			testcase.logtest(t, result.Changes)
-
-			err = os.Truncate(files[0], 0)
-			require.NoError(t, err)
+			// extract the structured data from the log message
+			testcase.logtest(t, last.Context[0].Interface.(UpdateStats))
 		})
 
 	}
+
+	logp.ObserverLogs()
+
 	err = logp.Sync()
 	require.NoError(t, err)
 	err = logp.Configure(logp.Config{
