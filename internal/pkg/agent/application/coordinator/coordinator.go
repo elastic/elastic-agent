@@ -1379,7 +1379,7 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 		},
 	}
 
-	c.logger.Infow("state update", "changes", logStruct)
+	c.logger.Infow("component model updated", "changes", logStruct)
 }
 
 // Filter any inputs and outputs in the generated component model
