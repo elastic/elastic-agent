@@ -146,7 +146,7 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 		fetcher:         ArtifactFetcher(),
 		operatingSystem: runtime.GOOS,
 		architecture:    runtime.GOARCH,
-		connectTimout:   5 * time.Second,
+		connectTimout:   15 * time.Second,
 		// default to elastic-agent, can be changed by a set FixtureOpt below
 		binaryName: "elastic-agent",
 	}
@@ -1030,22 +1030,9 @@ func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time
 	errCh := make(chan error)
 
 	go func() {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
-		// Attempt to connect for up to 1 minute as the control server may not be listening yet.
-		expBackoff := backoff.NewExponentialBackOff()
-		expBackoff.MaxElapsedTime = time.Minute
-		expBackoffCtx := backoff.WithContext(expBackoff, ctx)
-		err := backoff.RetryNotify(
-			func() error { return c.Connect(ctx) },
-			expBackoffCtx,
-			func(err error, retryAfter time.Duration) {
-				t.Logf("%s: connect failed: %s retrying: %s", time.Now().UTC().Format(time.RFC3339Nano), err.Error(), retryAfter)
-			},
-		)
+		err := c.Connect(ctx)
 		if err != nil {
-			errCh <- err
+			errCh <- fmt.Errorf("Connect() failed: %w", err)
 			return
 		}
 		defer c.Disconnect()
@@ -1053,27 +1040,30 @@ func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time
 		// StateWatch will return an error if the client is not fully connected
 		// we retry this in a loop based on the timeout to ensure that we can
 		// get a valid StateWatch connection
-		started := time.Now()
 		var sub client.ClientStateWatch
-		for {
-			sub, err = c.StateWatch(ctx)
-			if err != nil {
-				if time.Since(started) > timeout {
-					// failed to connected in timeout range
-					errCh <- err
-					return
-				}
-				<-time.After(100 * time.Millisecond)
-			} else {
-				// connected successfully
-				break
-			}
+		expBackoff := backoff.NewExponentialBackOff()
+		expBackoff.MaxElapsedTime = timeout
+		expBackoff.MaxInterval = 2 * time.Second
+		err = backoff.RetryNotify(
+			func() error {
+				var err error
+				sub, err = c.StateWatch(ctx)
+				return err
+			},
+			backoff.WithContext(expBackoff, ctx),
+			func(err error, retryAfter time.Duration) {
+				t.Logf("%s: StateWatch failed: %s retrying: %s", time.Now().UTC().Format(time.RFC3339Nano), err.Error(), retryAfter)
+			},
+		)
+		if err != nil {
+			errCh <- fmt.Errorf("StateWatch() failed: %w", err)
+			return
 		}
 
 		for {
 			recv, err := sub.Recv()
 			if err != nil {
-				errCh <- err
+				errCh <- fmt.Errorf("Recv() failed: %w", err)
 				return
 			}
 			stateCh <- recv
