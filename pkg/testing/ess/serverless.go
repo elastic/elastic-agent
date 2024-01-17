@@ -139,9 +139,9 @@ func (srv *ServerlessClient) DeploymentIsReady(ctx context.Context) (bool, error
 }
 
 // DeleteDeployment deletes the deployment
-func (srv *ServerlessClient) DeleteDeployment() error {
+func (srv *ServerlessClient) DeleteDeployment(ctx context.Context) error {
 	endpoint := fmt.Sprintf("%s/api/v1/serverless/projects/%s/%s", serverlessURL, srv.proj.Type, srv.proj.ID)
-	req, err := http.NewRequestWithContext(context.Background(), "DELETE", endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, "DELETE", endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("error creating HTTP request: %w", err)
 	}

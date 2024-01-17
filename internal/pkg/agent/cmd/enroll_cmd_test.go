@@ -17,7 +17,9 @@ import (
 	"runtime"
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -152,6 +154,7 @@ func TestEnroll(t *testing.T) {
 					EnrollAPIKey:         "my-enrollment-api-key",
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
 					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
 				},
 				"",
 				store,
@@ -159,14 +162,18 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+
+			if err := cmd.Execute(ctx, streams); err != nil {
+				t.Fatalf("enrrol coms returned and unexpected error: %v", err)
+			}
 
 			config, err := readConfig(store.Content)
-
 			require.NoError(t, err)
-			require.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			require.Equal(t, host, config.Client.Host)
+
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
+			assert.Equal(t, host, config.Client.Host)
 		},
 	))
 
@@ -209,6 +216,7 @@ func TestEnroll(t *testing.T) {
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
 					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
 				},
 				"",
 				store,
@@ -216,16 +224,20 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
 
-			require.True(t, store.Called)
+			if err := cmd.Execute(ctx, streams); err != nil {
+				t.Fatalf("enrrol coms returned and unexpected error: %v", err)
+			}
 
+			assert.True(t, store.Called)
 			config, err := readConfig(store.Content)
-
-			require.NoError(t, err)
-			require.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			require.Equal(t, host, config.Client.Host)
+			require.NoError(t, err, "readConfig returned an error")
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey,
+				"The stored 'Access API Key' must be the same returned by Fleet-Server")
+			assert.Equal(t, host, config.Client.Host,
+				"The stored Fleet-Server host must match the one used during enrol")
 		},
 	))
 
@@ -268,6 +280,7 @@ func TestEnroll(t *testing.T) {
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
 					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
 				},
 				"",
 				store,
@@ -275,16 +288,16 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			require.NoError(t, err, "enroll command should return no error")
 
-			require.True(t, store.Called)
-
+			assert.True(t, store.Called)
 			config, err := readConfig(store.Content)
-
 			require.NoError(t, err)
-			require.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			require.Equal(t, host, config.Client.Host)
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
+			assert.Equal(t, host, config.Client.Host)
 		},
 	))
 

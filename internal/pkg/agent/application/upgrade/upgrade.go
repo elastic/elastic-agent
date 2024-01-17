@@ -89,6 +89,8 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 }
 
 // Reload reloads the artifact configuration for the upgrader.
+// As of today, December 2023, fleet-server does not send most of the configuration
+// defined in artifact.Config, what will likely change in the near future.
 func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
@@ -198,7 +200,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	det.SetState(details.StateWatching)
 	if err := u.markUpgrade(ctx, u.log, newHash, action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)

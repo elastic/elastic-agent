@@ -58,6 +58,7 @@ type InstallOpts struct {
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
 	Unprivileged   bool   // --unprivileged
+	DelayEnroll    bool   // --delay-enroll
 
 	EnrollOpts
 }
@@ -81,6 +82,9 @@ func (i InstallOpts) toCmdArgs() []string {
 	}
 	if i.Unprivileged {
 		args = append(args, "--unprivileged")
+	}
+	if i.DelayEnroll {
+		args = append(args, "--delay-enroll")
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
@@ -279,7 +283,8 @@ func (f *Fixture) collectDiagnostics() {
 		if err != nil {
 			// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
 			f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
-			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
+			timestamp := strings.ReplaceAll(time.Now().Format(time.RFC3339), ":", "-")
+			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, timestamp))
 			err = f.archiveInstallDirectory(f.workDir, zipPath)
 			if err != nil {
 				f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)

@@ -1,0 +1,70 @@
+version: 8.11.2
+entries:
+    - kind: other
+      summary: hb-bump-node-18.18.x
+      description: Update NodeJS version bundled with Heartbeat to v18.18.2.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3655
+      issue: []
+      timestamp: 1698247934
+      file:
+        name: 1698247934-hb-bump-node.yaml
+        checksum: b316b799a0edf0c6e9bf7db58f3dbcfad6710608
+    - kind: bug-fix
+      summary: Fix logging calls that incorrectly use non-f variants and have missing arguments.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3679
+      issue: []
+      timestamp: 1698808222
+      file:
+        name: 1698808222-orphan-verbs.yaml
+        checksum: 12dc7541b29aae73966c462fff63c7107f9ebe35
+    - kind: enhancement
+      summary: Add configuration parameters for the Kubernetes `leader_election` provider.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3625
+      issue: []
+      timestamp: 1699010487
+      file:
+        name: 1699010487-leaderelectionconfig.yaml
+        checksum: 95881c900b77e81aa14e28a188240f8c32bacfb9
+    - kind: security
+      summary: Update Go version to 1.20.11.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3748
+      issue: []
+      timestamp: 1700000391
+      file:
+        name: 1700000391-Upgrade-to-Go-1.20.11.yaml
+        checksum: 3a5ac3d69411fa1ca3872c27dead2b1683d36f03
+    - kind: bug-fix
+      summary: Fix Fleet-managed Agent ignoring the `agent.download.proxy_url` setting after a policy is updated.
+      description: ""
+      component: Upgrader
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3803
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3560
+      timestamp: 1700678892
+      file:
+        name: 1700678892-Fixes-the-Elastic-Agent-ignoring-agent.download.proxy_url-on-policy-update.yaml
+        checksum: 7d54a106a69fc6042ea997a99829b221cff3d4d6
+    - kind: bug-fix
+      summary: custom-yaml-marshal-for-component
+      description: Create a custom `MarshalYAML()` method to properly handle error fields in agent diagnostics.
+      component: component
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3835
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2940
+      timestamp: 1701208315
+      file:
+        name: 1701208315-custom-yaml-marshal-for-component.yaml
+        checksum: 6126221771bc26bd51566d33bd5873ffbe599fae
