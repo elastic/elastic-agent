@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
 
@@ -1027,12 +1028,22 @@ func attachOutErr(stdOut *logWatcher, stdErr *logWatcher) process.CmdOption {
 func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time.Duration) (chan *client.AgentState, chan error) {
 	stateCh := make(chan *client.AgentState)
 	errCh := make(chan error)
+
 	go func() {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		t.Logf("%s: Elastic agent client connecting...", time.Now().UTC().Format(time.RFC3339Nano))
-		err := c.Connect(ctx)
+		// Attempt to connect for up to 1 minute as the control server may not be listening yet.
+		expBackoff := backoff.NewExponentialBackOff()
+		expBackoff.MaxElapsedTime = time.Minute
+		expBackoffCtx := backoff.WithContext(expBackoff, ctx)
+		err := backoff.RetryNotify(
+			func() error { return c.Connect(ctx) },
+			expBackoffCtx,
+			func(err error, retryAfter time.Duration) {
+				t.Logf("%s: connect failed: %s retrying: %s", time.Now().UTC().Format(time.RFC3339Nano), err.Error(), retryAfter)
+			},
+		)
 		if err != nil {
 			errCh <- err
 			return
