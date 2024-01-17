@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
 
