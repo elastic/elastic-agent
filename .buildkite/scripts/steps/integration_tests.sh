@@ -8,22 +8,22 @@ MAGE_TARGET="${2:-"integration:test"}"
 MAGE_SUBTARGET="${3:-""}"
 
 
-# Override the agent stack version using a string with format <major>.<minor>.<patch>
-# NOTE: use only after version bump when the new snapshot is not yet available, for example:
+# Override the agent package version using a string with format <major>.<minor>.<patch>
+# NOTE: use only after version bump when the new version is not yet available, for example:
 # OVERRIDE_AGENT_PACKAGE_VERSION="8.10.3" otherwise OVERRIDE_AGENT_PACKAGE_VERSION="".
-OVERRIDE_AGENT_STACK_VERSION="8.12.0"
+OVERRIDE_AGENT_PACKAGE_VERSION=""
 
-if [[ -n "$OVERRIDE_AGENT_STACK_VERSION" ]]; then
-  OVERRIDE_AGENT_STACK_VERSION=${OVERRIDE_AGENT_STACK_VERSION}"-SNAPSHOT"
+if [[ -n "$OVERRIDE_AGENT_PACKAGE_VERSION" ]]; then
+  OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
 else
- OVERRIDE_AGENT_STACK_VERSION=""
+ OVERRIDE_TEST_AGENT_VERSION=""
 fi
 # PACKAGE
-DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64,windows/amd64 PACKAGES=tar.gz,zip mage package
+AGENT_PACKAGE_VERSION="${OVERRIDE_AGENT_PACKAGE_VERSION}" DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64,windows/amd64 PACKAGES=tar.gz,zip mage package
 
 # Run integration tests
 set +e
-AGENT_STACK_VERSION="${OVERRIDE_AGENT_STACK_VERSION}" TEST_INTEG_CLEAN_ON_EXIT=true  STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage "$MAGE_TARGET" "$MAGE_SUBTARGET"
+AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}" TEST_INTEG_CLEAN_ON_EXIT=true  STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage $MAGE_TARGET $MAGE_SUBTARGET
 TESTS_EXIT_STATUS=$?
 set -e
 
