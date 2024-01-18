@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -123,6 +124,10 @@ func TestUpgrader_unpack(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" {
+				t.Skip("tar.gz tests only run on Linux/MacOS")
+			}
+
 			testTop := t.TempDir()
 			testDataDir := filepath.Join(testTop, "data")
 			err := os.MkdirAll(testDataDir, 0o777)
