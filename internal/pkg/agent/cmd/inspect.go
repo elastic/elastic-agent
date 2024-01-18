@@ -136,7 +136,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 	if !opts.variables && !opts.includeMonitoring {
 		fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true)
 		if err != nil {
-			return fmt.Errorf("error loading agent config: %w", err) //I bet it's here
+			return fmt.Errorf("error loading agent config: %w", err)
 		}
 		err = printConfig(fullCfg, streams)
 		if err != nil {
