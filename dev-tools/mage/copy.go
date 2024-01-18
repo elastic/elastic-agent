@@ -6,7 +6,7 @@ package mage
 
 import (
 	"io"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -41,7 +41,7 @@ func (t *CopyTask) Execute() error {
 		return errors.Wrapf(err, "copy failed: cannot stat source file %v", t.Source)
 	}
 
-	return errors.Wrap(t.recursiveCopy(t.Source, t.Dest, info), "copy failed")
+	return errors.Wrap(t.recursiveCopy(t.Source, t.Dest, fs.FileInfoToDirEntry(info)), "copy failed")
 }
 
 func (t *CopyTask) init() error {
@@ -64,14 +64,14 @@ func (t *CopyTask) isExcluded(src string) bool {
 	return false
 }
 
-func (t *CopyTask) recursiveCopy(src, dest string, info os.FileInfo) error {
-	if info.IsDir() {
-		return t.dirCopy(src, dest, info)
+func (t *CopyTask) recursiveCopy(src, dest string, entry fs.DirEntry) error {
+	if entry.IsDir() {
+		return t.dirCopy(src, dest, entry)
 	}
-	return t.fileCopy(src, dest, info)
+	return t.fileCopy(src, dest, entry)
 }
 
-func (t *CopyTask) fileCopy(src, dest string, info os.FileInfo) error {
+func (t *CopyTask) fileCopy(src, dest string, entry fs.DirEntry) error {
 	if t.isExcluded(src) {
 		return nil
 	}
@@ -82,14 +82,14 @@ func (t *CopyTask) fileCopy(src, dest string, info os.FileInfo) error {
 	}
 	defer srcFile.Close()
 
-	if !info.Mode().IsRegular() {
+	if !entry.Type().IsRegular() {
 		return errors.Errorf("failed to copy source file because it is not a " +
 			"regular file")
 	}
 
 	mode := t.Mode
 	if mode == 0 {
-		mode = info.Mode()
+		mode = entry.Type()
 	}
 	destFile, err := os.OpenFile(createDir(dest),
 		os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode&os.ModePerm)
@@ -104,20 +104,20 @@ func (t *CopyTask) fileCopy(src, dest string, info os.FileInfo) error {
 	return destFile.Close()
 }
 
-func (t *CopyTask) dirCopy(src, dest string, info os.FileInfo) error {
+func (t *CopyTask) dirCopy(src, dest string, entry fs.DirEntry) error {
 	if t.isExcluded(src) {
 		return nil
 	}
 
 	mode := t.DirMode
 	if mode == 0 {
-		mode = info.Mode()
+		mode = entry.Type()
 	}
 	if err := os.MkdirAll(dest, mode&os.ModePerm); err != nil {
 		return errors.Wrap(err, "failed creating dirs")
 	}
 
-	contents, err := ioutil.ReadDir(src)
+	contents, err := os.ReadDir(src)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read dir %v", src)
 	}

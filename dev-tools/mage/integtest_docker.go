@@ -7,7 +7,7 @@ package mage
 import (
 	"fmt"
 	"go/build"
-	"io/ioutil"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -138,14 +138,14 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[st
 	}
 
 	// Docker-compose rm is noisy. So only pass through stderr when in verbose.
-	out := ioutil.Discard
+	out := io.Discard
 	if mg.Verbose() {
 		out = os.Stderr
 	}
 
 	_, err = sh.Exec(
 		composeEnv,
-		ioutil.Discard,
+		io.Discard,
 		out,
 		"docker-compose",
 		"-p", dockerComposeProjectName(),
@@ -266,7 +266,7 @@ func dockerComposeBuildImages() error {
 		args = append(args, "--pull")
 	}
 
-	out := ioutil.Discard
+	out := io.Discard
 	if mg.Verbose() {
 		out = os.Stderr
 	}

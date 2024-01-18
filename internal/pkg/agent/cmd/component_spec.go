@@ -6,7 +6,7 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -22,7 +22,7 @@ func newComponentSpecCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.
 		Long:  "Validates a component specification that instructs the Elastic Agent how it should be ran.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			data, err := ioutil.ReadFile(args[0])
+			data, err := os.ReadFile(args[0])
 			if err != nil {
 				return err
 			}

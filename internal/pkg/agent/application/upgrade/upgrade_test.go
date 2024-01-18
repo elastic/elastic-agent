@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -112,7 +111,7 @@ func Test_CopyFile(t *testing.T) {
 
 func TestShutdownCallback(t *testing.T) {
 	l, _ := logger.New("test", false)
-	tmpDir, err := ioutil.TempDir("", "shutdown-test-")
+	tmpDir, err := os.MkdirTemp("", "shutdown-test-")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
@@ -135,14 +134,14 @@ func TestShutdownCallback(t *testing.T) {
 	cb := shutdownCallback(l, homePath, sourceVersion, targetVersion, newCommit)
 
 	oldFilename := filepath.Join(sourceDir, filename)
-	err = ioutil.WriteFile(oldFilename, content, 0640)
+	err = os.WriteFile(oldFilename, content, 0640)
 	require.NoError(t, err, "preparing file failed")
 
 	err = cb()
 	require.NoError(t, err, "callback failed")
 
 	newFilename := filepath.Join(targetDir, filename)
-	newContent, err := ioutil.ReadFile(newFilename)
+	newContent, err := os.ReadFile(newFilename)
 	require.NoError(t, err, "reading file failed")
 	require.Equal(t, content, newContent, "contents are not equal")
 }

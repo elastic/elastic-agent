@@ -9,7 +9,6 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -478,7 +477,7 @@ func withTLSServer(
 }
 
 func bytesToTMPFile(b []byte) (string, error) {
-	f, err := ioutil.TempFile("", "prefix")
+	f, err := os.CreateTemp("", "prefix")
 	if err != nil {
 		return "", err
 	}

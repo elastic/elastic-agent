@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -45,7 +44,7 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 		err = s.Save(in)
 		require.NoError(t, err)
 
-		writtenContent, err := ioutil.ReadFile(target)
+		writtenContent, err := os.ReadFile(target)
 		require.NoError(t, err)
 
 		require.True(t, bytes.Equal(writtenContent, replaceWith))
@@ -70,7 +69,7 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 		err = s.Save(in)
 		require.Error(t, err)
 
-		writtenContent, err := ioutil.ReadFile(target)
+		writtenContent, err := os.ReadFile(target)
 		require.NoError(t, err)
 
 		require.True(t, bytes.Equal(writtenContent, oldContent))
@@ -94,7 +93,7 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 		err = s.Save(in)
 		require.Error(t, err)
 
-		writtenContent, err := ioutil.ReadFile(target)
+		writtenContent, err := os.ReadFile(target)
 		require.NoError(t, err)
 
 		require.True(t, bytes.Equal(writtenContent, replaceWith))
@@ -124,7 +123,7 @@ func TestDiskStore(t *testing.T) {
 		err = d.Save(bytes.NewReader(msg))
 		require.NoError(t, err)
 
-		content, err := ioutil.ReadFile(target)
+		content, err := os.ReadFile(target)
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
@@ -132,7 +131,7 @@ func TestDiskStore(t *testing.T) {
 	})
 
 	t.Run("when the target do no exist", func(t *testing.T) {
-		dir, err := ioutil.TempDir("", "configs")
+		dir, err := os.MkdirTemp("", "configs")
 		require.NoError(t, err)
 		defer os.Remove(dir)
 
@@ -143,7 +142,7 @@ func TestDiskStore(t *testing.T) {
 		err = d.Save(bytes.NewReader(msg))
 		require.NoError(t, err)
 
-		content, err := ioutil.ReadFile(target)
+		content, err := os.ReadFile(target)
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
@@ -160,7 +159,7 @@ func TestDiskStore(t *testing.T) {
 		require.NoError(t, err)
 		defer r.Close()
 
-		content, err := ioutil.ReadAll(r)
+		content, err := io.ReadAll(r)
 		require.NoError(t, err)
 		require.Equal(t, msg, content)
 		checkPerms(t, target, perms)
@@ -168,12 +167,12 @@ func TestDiskStore(t *testing.T) {
 }
 
 func genFile(b []byte) (string, error) {
-	dir, err := ioutil.TempDir("", "configs")
+	dir, err := os.MkdirTemp("", "configs")
 	if err != nil {
 		return "", err
 	}
 
-	f, err := ioutil.TempFile(dir, "config-")
+	f, err := os.CreateTemp(dir, "config-")
 	if err != nil {
 		return "", err
 	}
@@ -187,7 +186,7 @@ func genFile(b []byte) (string, error) {
 }
 
 func requireFilesCount(t *testing.T, dir string, l int) {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	require.NoError(t, err)
 	require.Equal(t, l, len(files))
 }
