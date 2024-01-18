@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -193,7 +194,7 @@ func untar(log *logger.Logger, version string, archivePath string) (string, erro
 			log.Debugw("Unpacking file", "archive", "tar", "file.path", abs)
 			// just to be sure, it should already be created by Dir type
 			// remove any world permissions from the directory
-			if err := os.MkdirAll(filepath.Dir(abs), mode.Perm()&0770); err != nil {
+			if err = os.MkdirAll(filepath.Dir(abs), 0o750); err != nil {
 				return "", errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
@@ -214,8 +215,19 @@ func untar(log *logger.Logger, version string, archivePath string) (string, erro
 		case mode.IsDir():
 			log.Debugw("Unpacking directory", "archive", "tar", "file.path", abs)
 			// remove any world permissions from the directory
-			if err := os.MkdirAll(abs, mode.Perm()&0770); err != nil {
-				return "", errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+			_, err = os.Stat(abs)
+			if errors.Is(err, fs.ErrNotExist) {
+				if err := os.MkdirAll(abs, mode.Perm()&0770); err != nil {
+					return "", errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				}
+			} else if err != nil {
+				return "", errors.New(err, "TarInstaller: stat() directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+			} else {
+				// set the appropriate permissions
+				err = os.Chmod(abs, mode.Perm()&0o770)
+				if err != nil {
+					return "", errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0o770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				}
 			}
 		default:
 			return "", errors.New(fmt.Sprintf("tar file entry %s contained unsupported file type %v", fileName, mode), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fileName))
