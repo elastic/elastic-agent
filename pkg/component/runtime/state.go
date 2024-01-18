@@ -52,8 +52,6 @@ func (key ComponentUnitKey) MarshalYAML() (interface{}, error) {
 type ComponentVersionInfo struct {
 	// Name of the binary.
 	Name string `yaml:"name"`
-	// Version of the binary.
-	Version string `yaml:"version"`
 	// Additional metadata about the binary.
 	Meta map[string]string `yaml:"meta,omitempty"`
 }
@@ -345,10 +343,6 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 	if checkin.VersionInfo != nil {
 		if checkin.VersionInfo.Name != "" && s.VersionInfo.Name != checkin.VersionInfo.Name {
 			s.VersionInfo.Name = checkin.VersionInfo.Name
-			changed = true
-		}
-		if checkin.VersionInfo.Version != "" && s.VersionInfo.Version != checkin.VersionInfo.Version {
-			s.VersionInfo.Version = checkin.VersionInfo.Version
 			changed = true
 		}
 		if checkin.VersionInfo.Meta != nil && diffMeta(s.VersionInfo.Meta, checkin.VersionInfo.Meta) {
