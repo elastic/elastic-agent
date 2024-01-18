@@ -18,21 +18,20 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-func (u *Upgrader) unpack(version, archivePath string) (string, error) {
+func (u *Upgrader) unpack(version, archivePath, dataDir string) (string, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
 	var hash string
 	var err error
 	if runtime.GOOS == windows {
-		hash, err = unzip(u.log, archivePath)
+		hash, err = unzip(u.log, archivePath, dataDir)
 	} else {
-		hash, err = untar(u.log, version, archivePath)
+		hash, err = untar(u.log, version, archivePath, dataDir)
 	}
 
 	if err != nil {
@@ -44,7 +43,7 @@ func (u *Upgrader) unpack(version, archivePath string) (string, error) {
 	return hash, nil
 }
 
-func unzip(log *logger.Logger, archivePath string) (string, error) {
+func unzip(log *logger.Logger, archivePath, dataDir string) (string, error) {
 	var hash, rootDir string
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -82,7 +81,7 @@ func unzip(log *logger.Logger, archivePath string) (string, error) {
 			return nil
 		}
 
-		path := filepath.Join(paths.Data(), strings.TrimPrefix(fileName, "data/"))
+		path := filepath.Join(dataDir, strings.TrimPrefix(fileName, "data/"))
 
 		if f.FileInfo().IsDir() {
 			log.Debugw("Unpacking directory", "archive", "zip", "file.path", path)
@@ -127,7 +126,7 @@ func unzip(log *logger.Logger, archivePath string) (string, error) {
 	return hash, nil
 }
 
-func untar(log *logger.Logger, version string, archivePath string) (string, error) {
+func untar(log *logger.Logger, version string, archivePath, dataDir string) (string, error) {
 	r, err := os.Open(archivePath)
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("artifact for 'elastic-agent' version '%s' could not be found at '%s'", version, archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
@@ -180,7 +179,7 @@ func untar(log *logger.Logger, version string, archivePath string) (string, erro
 		}
 
 		rel := filepath.FromSlash(strings.TrimPrefix(fileName, "data/"))
-		abs := filepath.Join(paths.Data(), rel)
+		abs := filepath.Join(dataDir, rel)
 
 		// find the root dir
 		if currentDir := filepath.Dir(abs); rootDir == "" || len(filepath.Dir(rootDir)) > len(currentDir) {

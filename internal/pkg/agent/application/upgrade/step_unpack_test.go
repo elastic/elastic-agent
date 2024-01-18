@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -119,10 +118,8 @@ func TestUpgrader_unpack(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		prevTop := paths.Top()
 		t.Run(tt.name, func(t *testing.T) {
 			testTop := t.TempDir()
-			paths.SetTop(testTop)
 			testDataDir := filepath.Join(testTop, "data")
 			err := os.MkdirAll(testDataDir, 0o777)
 			assert.NoErrorf(t, err, "error creating initial structure %q", testDataDir)
@@ -134,13 +131,12 @@ func TestUpgrader_unpack(t *testing.T) {
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")
 
-			got, err := u.unpack(tt.args.version, archiveFile)
+			got, err := u.unpack(tt.args.version, archiveFile, testDataDir)
 			if !tt.wantErr(t, err, fmt.Sprintf("unpack(%v, %v)", tt.args.version, tt.args.archiveGenerator)) {
 				return
 			}
 			assert.Equalf(t, tt.want, got, "unpack(%v, %v)", tt.args.version, tt.args.archiveGenerator)
 		})
-		paths.SetTop(prevTop)
 	}
 }
 
