@@ -24,15 +24,12 @@ const (
 	artifactsAPIV1VersionBuildsEndpoint = "v1/versions/%s/builds/"
 	artifactAPIV1BuildDetailsEndpoint   = "v1/versions/%s/builds/%s"
 	// artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
-
-	artifactElasticAgentProject = "elastic-agent-package"
 )
 
 var (
 	ErrLatestVersionNil        = errors.New("latest version is nil")
 	ErrSnapshotVersionsEmpty   = errors.New("snapshot list is nil")
 	ErrInvalidVersionRetrieved = errors.New("invalid version retrieved from artifact API")
-	ErrNoMatchingBuild         = errors.New("no matching build found")
 
 	ErrBadHTTPStatusCode = errors.New("bad http status code")
 )
@@ -179,27 +176,6 @@ func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version st
 
 	defer resp.Body.Close()
 	return checkResponseAndUnmarshal[VersionBuilds](resp)
-}
-
-// GetLastBuildForVersion returns the last build for the given version that does not match the given agent's commit hash.
-// version should be one of the version strings returned by the GetVersions (expected format is semver
-// with optional prerelease but no build metadata, for example 8.9.0-SNAPSHOT)
-// excludeHash must be a long commit hash string
-func (aac ArtifactAPIClient) GetLastBuildForVersion(ctx context.Context, version, excludeHash string) (buildDetails *BuildDetails, err error) {
-	resp, err := aac.GetBuildsForVersion(ctx, version)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get a list of builds for version %s: %w", version, err)
-	}
-	for _, buildID := range resp.Builds {
-		details, err := aac.GetBuildDetails(ctx, version, buildID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get build details for %q: %w", buildID, err)
-		}
-		if details.Build.Projects[artifactElasticAgentProject].CommitHash != excludeHash {
-			return details, nil
-		}
-	}
-	return nil, ErrNoMatchingBuild
 }
 
 // GetBuildDetails returns the list of project and artifacts related to a specific build.

@@ -8,7 +8,6 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +21,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
+)
+
+const (
+	artifactElasticAgentProject = "elastic-agent-package"
 )
 
 func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
@@ -53,18 +56,34 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	startVersion, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err)
 
-	// when picking the build we need to find one that has a different commit hash to avoid file system
-	// collisions during the upgrade process.
-	// multiple builds can have different IDs but the same commit hash.
-	build, err := aac.GetLastBuildForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease(), startVersion.Binary.Commit)
-	if errors.Is(err, tools.ErrNoMatchingBuild) {
+	// We need to find a build which is not the latest (so, we can make sure we address it by a build ID
+	// in the version prefix, e.g. x.y.z-SNAPSHOT-<buildid>) and does not have the same commit hash
+	// as the currently running binary (so, we don't have a file system collision).
+	// Multiple builds can have different IDs but the same commit hash.
+	preReleaseVersion := latestSnapshotVersion.VersionWithPrerelease()
+	resp, err := aac.GetBuildsForVersion(ctx, preReleaseVersion)
+	require.NoError(t, err)
+
+	if len(resp.Builds) < 2 {
+		t.Skipf("need at least 2 builds in the version %s", latestSnapshotVersion.VersionWithPrerelease())
+		return
+	}
+
+	var upgradeVersionString string
+	for _, buildID := range resp.Builds[1:] {
+		details, err := aac.GetBuildDetails(ctx, preReleaseVersion, buildID)
+		require.NoError(t, err)
+		if details.Build.Projects[artifactElasticAgentProject].CommitHash != startVersion.Binary.Commit {
+			upgradeVersionString = buildID
+			break
+		}
+	}
+
+	if upgradeVersionString == "" {
 		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", latestSnapshotVersion.VersionWithPrerelease())
 		return
 	}
-	require.NoError(t, err)
 
-	// find the specific build to use for the test
-	upgradeVersionString := build.Build.BuildID
 	buildFragments := strings.Split(upgradeVersionString, "-")
 	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
 	endParsedVersion := version.NewParsedSemVer(
