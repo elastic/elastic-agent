@@ -47,7 +47,7 @@ func createListener(log *logger.Logger) (net.Listener, error) {
 		lis.Close()
 		return nil, err
 	}
-	return lis, err
+	return lis, nil
 }
 
 func cleanupListener(log *logger.Logger) {

@@ -2,15 +2,17 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build windows
+//go:build !windows
 
-package info
+package paths
 
 import (
-	"github.com/elastic/elastic-agent/pkg/utils"
+	"runtime"
 )
 
-func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
-	// TODO(blakerouse): Fix the market permissions on Windows.
-	return nil
+func initialControlSocketPath(topPath string) string {
+	return ControlSocketFromPath(runtime.GOOS, topPath)
 }
+
+// ResolveControlSocket does nothing on non-Windows hosts.
+func ResolveControlSocket() {}

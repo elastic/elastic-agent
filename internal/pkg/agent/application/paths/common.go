@@ -14,15 +14,30 @@ import (
 	"sync"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
 	// DefaultConfigName is the default name of the configuration file.
 	DefaultConfigName = "elastic-agent.yml"
+
 	// AgentLockFileName is the name of the overall Elastic Agent file lock.
 	AgentLockFileName = "agent.lock"
-	tempSubdir        = "tmp"
-	tempSubdirPerms   = 0o770
+
+	// ControlSocketName is the control socket name.
+	ControlSocketName = "elastic-agent.sock"
+
+	// WindowsControlSocketInstalledPath is the control socket path used when installed on Windows.
+	WindowsControlSocketInstalledPath = `npipe:///elastic-agent-system`
+
+	// MarkerFileName is the name of the file that's created by
+	// `elastic-agent install` in the Agent's topPath folder to
+	// indicate that the Agent executing from the binary under
+	// the same topPath folder is an installed Agent.
+	MarkerFileName = ".installed"
+
+	tempSubdir      = "tmp"
+	tempSubdirPerms = 0o770
 
 	darwin = "darwin"
 )
@@ -31,21 +46,23 @@ const (
 var ExternalInputsPattern = filepath.Join("inputs.d", "*.yml")
 
 var (
-	topPath         string
-	configPath      string
-	configFilePath  string
-	logsPath        string
-	downloadsPath   string
-	componentsPath  string
-	installPath     string
-	unversionedHome bool
-	tmpCreator      sync.Once
+	topPath           string
+	configPath        string
+	configFilePath    string
+	logsPath          string
+	downloadsPath     string
+	componentsPath    string
+	installPath       string
+	controlSocketPath string
+	unversionedHome   bool
+	tmpCreator        sync.Once
 )
 
 func init() {
 	topPath = initialTop()
 	configPath = topPath
 	logsPath = topPath
+	controlSocketPath = initialControlSocketPath(topPath)
 	unversionedHome = false // only versioned by container subcommand
 
 	// these should never change
@@ -57,9 +74,11 @@ func init() {
 	fs.StringVar(&topPath, "path.home", topPath, "Agent root path")
 	fs.BoolVar(&unversionedHome, "path.home.unversioned", unversionedHome, "Agent root path is not versioned based on build")
 	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
+	fs.StringVar(&configFilePath, "config", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
 	fs.StringVar(&installPath, "path.install", installPath, "DEPRECATED, setting this flag has no effect since v8.6.0")
+	fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
 
 	// enable user to download update artifacts to alternative place
 	// TODO: remove path.downloads support on next major (this can be configured using `agent.download.targetDirectory`)
@@ -198,6 +217,18 @@ func SetInstall(path string) {
 	installPath = path
 }
 
+// ControlSocket returns the control socket directory for Agent
+func ControlSocket() string {
+	return controlSocketPath
+}
+
+// SetControlSocket overrides the ControlSocket path.
+//
+// Used by the container subcommand to adjust the control socket path.
+func SetControlSocket(path string) {
+	controlSocketPath = path
+}
+
 // initialTop returns the initial top-level path for the binary
 //
 // When nested in top-level/data/elastic-agent-${hash}/ the result is top-level/.
@@ -265,4 +296,33 @@ func InstallPath(basePath string) string {
 // This always points to the symlink that points to the latest Elastic Agent version.
 func TopBinaryPath() string {
 	return filepath.Join(Top(), BinaryName)
+}
+
+// RunningInstalled returns true when executing Agent is the installed Agent.
+func RunningInstalled() bool {
+	// Check if install marker created by `elastic-agent install` exists
+	markerFilePath := filepath.Join(Top(), MarkerFileName)
+	if _, err := os.Stat(markerFilePath); err != nil {
+		return false
+	}
+	return true
+}
+
+// ControlSocketFromPath returns the control socket path for an Elastic Agent running
+// on the defined platform, and its executing directory.
+func ControlSocketFromPath(platform string, path string) string {
+	// socket should be inside this directory
+	socketPath := filepath.Join(path, ControlSocketName)
+	if platform == "windows" {
+		// on windows the control socket always uses the fallback
+		return utils.SocketURLWithFallback(socketPath, path)
+	}
+	unixSocket := fmt.Sprintf("unix://%s", socketPath)
+	if len(unixSocket) < 104 {
+		// small enough to fit
+		return unixSocket
+	}
+	// place in global /tmp to ensure that its small enough to fit; current path is way to long
+	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
+	return utils.SocketURLWithFallback(socketPath, path)
 }

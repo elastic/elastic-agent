@@ -8,8 +8,14 @@ package paths
 
 import "path/filepath"
 
-// defaultAgentVaultPath is the directory for linux where the vault store is located or the
-const defaultAgentVaultPath = "vault"
+const (
+	// ControlSocketRunSymlink is the path to the symlink that should be
+	// created to the control socket when Elastic Agent is running with root.
+	ControlSocketRunSymlink = "/run/elastic-agent.sock"
+
+	// defaultAgentVaultPath is the directory for linux where the vault store is located or the
+	defaultAgentVaultPath = "vault"
+)
 
 // AgentVaultPath is the directory that contains all the files for the value
 func AgentVaultPath() string {

@@ -12,14 +12,19 @@ source .buildkite/scripts/common.sh
 STACK_PROVISIONER="${1:-"serverless"}"
 
 run_test_for_beat(){
+    export GOFLAGS='-buildvcs=false'
     local beat_name=$1
-    
+
     #build
-    export WORKSPACE="build/beats/x-pack/${beat_name}"
+    export WORKSPACE="/tmp/beats-build/beats/x-pack/${beat_name}"
+    pushd $WORKSPACE
+    whoami
+    ls -la
     SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz,zip mage package
+    popd
 
     #run
-    export AGENT_BUILD_DIR="build/beats/x-pack/${beat_name}/build/distributions"
+    export AGENT_BUILD_DIR="/tmp/beats-build/beats/x-pack/${beat_name}/build/distributions"
     export WORKSPACE=$(pwd)
 
     set +e
@@ -33,11 +38,13 @@ run_test_for_beat(){
 #the setup scripts will do a few things that assume we're running out of elastic-agent and will break things for beats, so run before we do actual setup
 mage -l
 
-mkdir -p build
-cd build
+# mkdir -p build
+# cd build
+mkdir -p /tmp/beats-build
+pushd /tmp/beats-build
 
-git clone --filter=tree:0 git@github.com:elastic/beats.git
-cd ..
+git clone --depth=1 git@github.com:elastic/beats.git
+popd
 
 # export WORKSPACE=beats/x-pack/metricbeat
 
