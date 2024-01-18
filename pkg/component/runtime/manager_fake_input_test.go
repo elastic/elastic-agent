@@ -3414,6 +3414,160 @@ LOOP:
 	require.NoError(t, err)
 }
 
+func (suite *FakeInputSuite) TestManager_Chunk() {
+	t := suite.T()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	const grpcDefaultSize = 1024 * 1024 * 4
+	grpcConfig := configuration.DefaultGRPCConfig()
+	grpcConfig.MaxMsgSize = grpcDefaultSize * 2 // set to double the default size
+
+	ai, _ := info.NewAgentInfo(ctx, true)
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), grpcConfig)
+	require.NoError(t, err)
+	errCh := make(chan error)
+	go func() {
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
+	}()
+
+	// build the units to ensure that there is more than double the units required for the GRPC configuration
+	minimumMsgSize := int(float64(grpcConfig.MaxMsgSize) * 1.2) // increase by 20%
+	var units []component.Unit
+	var unitsSize int
+	var nextUnitID int
+	for {
+		unit := component.Unit{
+			ID:       fmt.Sprintf("fake-input-%d", nextUnitID),
+			Type:     client.UnitTypeInput,
+			LogLevel: client.UnitLogLevelError,
+			Config: component.MustExpectedConfig(map[string]interface{}{
+				"type":    "fake",
+				"state":   int(client.UnitStateHealthy),
+				"message": fmt.Sprintf("Fake Healthy %d", nextUnitID),
+				"payload": map[string]interface{}{
+					"fake-id":    nextUnitID,
+					"extra-data": fmt.Sprintf("extra data for the unit %d to make it some what larger", nextUnitID),
+				},
+			}),
+		}
+		unitExpected := proto.UnitExpected{
+			Id:             unit.ID,
+			Type:           proto.UnitType_INPUT,
+			State:          proto.State_HEALTHY,
+			ConfigStateIdx: 1,
+			Config:         unit.Config,
+			LogLevel:       proto.UnitLogLevel_ERROR,
+		}
+		units = append(units, unit)
+		unitsSize += gproto.Size(&unitExpected)
+		nextUnitID++
+
+		if unitsSize > minimumMsgSize {
+			break
+		}
+	}
+
+	binaryPath := testBinary(t, "component")
+	comp := component.Component{
+		ID: "fake-default",
+		InputSpec: &component.InputRuntimeSpec{
+			InputType:  "fake",
+			BinaryName: "",
+			BinaryPath: binaryPath,
+			Spec:       fakeInputSpec,
+		},
+		Units: units,
+	}
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := waitForReady(waitCtx, m); err != nil {
+		require.NoError(t, err)
+	}
+
+	subCtx, subCancel := context.WithCancel(context.Background())
+	defer subCancel()
+	subErrCh := make(chan error)
+	go func() {
+		sub := m.Subscribe(subCtx, "fake-default")
+		for {
+			select {
+			case <-subCtx.Done():
+				return
+			case state := <-sub.Ch():
+				if state.State == client.UnitStateFailed {
+					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
+				} else {
+					healthyCount := 0
+					stoppedCount := 0
+					for _, unit := range state.Units {
+						if unit.State == client.UnitStateFailed {
+							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+						} else if unit.State == client.UnitStateHealthy {
+							healthyCount += 1
+						} else if unit.State == client.UnitStateStopped {
+							stoppedCount += 1
+						} else if unit.State == client.UnitStateStarting {
+							// acceptable
+						} else {
+							// unknown state that should not have occurred
+							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+						}
+					}
+					if healthyCount == len(units) {
+						// remove the component which will stop it
+						m.Update(component.Model{Components: []component.Component{}})
+						err := <-m.errCh
+						if err != nil {
+							subErrCh <- err
+						}
+					} else if stoppedCount == len(units) {
+						subErrCh <- nil
+					}
+				}
+			}
+		}
+	}()
+
+	defer drainErrChan(errCh)
+	defer drainErrChan(subErrCh)
+
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
+	require.NoError(t, err)
+
+	endTimer := time.NewTimer(6 * time.Minute) // very large number of units will take time
+	defer endTimer.Stop()
+LOOP:
+	for {
+		select {
+		case <-endTimer.C:
+			t.Fatalf("timed out after 6 minutes")
+		case err := <-errCh:
+			require.NoError(t, err)
+		case err := <-subErrCh:
+			require.NoError(t, err)
+			break LOOP
+		}
+	}
+
+	subCancel()
+	cancel()
+
+	err = <-errCh
+	require.NoError(t, err)
+
+	workDir := filepath.Join(paths.Run(), comp.ID)
+	_, err = os.Stat(workDir)
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
 func signalState(subErrCh chan error, state *ComponentState, acceptableStates []client.UnitState) {
 	if state.State == client.UnitStateFailed {
 		subErrCh <- fmt.Errorf("component failed: %s", state.Message)

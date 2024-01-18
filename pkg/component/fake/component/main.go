@@ -31,8 +31,7 @@ func main() {
 func run() error {
 	logger := zerolog.New(os.Stderr).Level(zerolog.TraceLevel).With().Timestamp().Logger()
 	ver := client.VersionInfo{
-		Name:    comp.Fake,
-		Version: "1.0",
+		Name: comp.Fake,
 		Meta: map[string]string{
 			"input": comp.Fake,
 		},
