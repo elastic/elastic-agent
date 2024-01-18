@@ -74,8 +74,6 @@ type Version struct {
 type ComponentVersionInfo struct {
 	// Name of the component.
 	Name string `json:"name" yaml:"name"`
-	// Version of the component.
-	Version string `json:"version" yaml:"version"`
 	// Extra meta information about the version.
 	Meta map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
@@ -511,9 +509,8 @@ func toState(res *cproto.StateResponse) (*AgentState, error) {
 		}
 		if comp.VersionInfo != nil {
 			cs.VersionInfo = ComponentVersionInfo{
-				Name:    comp.VersionInfo.Name,
-				Version: comp.VersionInfo.Version,
-				Meta:    comp.VersionInfo.Meta,
+				Name: comp.VersionInfo.Name,
+				Meta: comp.VersionInfo.Meta,
 			}
 		}
 		s.Components = append(s.Components, cs)
