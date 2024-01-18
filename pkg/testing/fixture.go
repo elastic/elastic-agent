@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
 
@@ -145,7 +146,7 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 		fetcher:         ArtifactFetcher(),
 		operatingSystem: runtime.GOOS,
 		architecture:    runtime.GOARCH,
-		connectTimout:   5 * time.Second,
+		connectTimout:   15 * time.Second,
 		// default to elastic-agent, can be changed by a set FixtureOpt below
 		binaryName: "elastic-agent",
 	}
@@ -407,10 +408,20 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	if err != nil {
 		return fmt.Errorf("failed to get control protcol address: %w", err)
 	}
+<<<<<<< HEAD
 	agentClient = client.New(client.WithAddress(cAddr))
 	f.setClient(agentClient)
 	defer f.setClient(nil)
 	stateCh, stateErrCh = watchState(ctx, agentClient, f.connectTimout)
+=======
+
+	if shouldWatchState {
+		agentClient = client.New(client.WithAddress(cAddr))
+		f.setClient(agentClient)
+		defer f.setClient(nil)
+		stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
+	}
+>>>>>>> 08304f74be (Add retries to control server connection and ensure logs are captured on failure (#4088))
 
 	var logProxy Logger
 	if f.logOutput {
@@ -468,6 +479,9 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 			}
 		case err := <-stateErrCh:
 			if !stopping {
+				// Give the log watchers a second to write out the agent logs.
+				// Client connnection failures can happen quickly enough to prevent logging.
+				time.Sleep(time.Second)
 				// connection to elastic-agent failed
 				killProc()
 				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
@@ -926,16 +940,14 @@ func attachOutErr(stdOut *logWatcher, stdErr *logWatcher) process.CmdOption {
 	}
 }
 
-func watchState(ctx context.Context, c client.Client, timeout time.Duration) (chan *client.AgentState, chan error) {
+func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time.Duration) (chan *client.AgentState, chan error) {
 	stateCh := make(chan *client.AgentState)
 	errCh := make(chan error)
-	go func() {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
 
+	go func() {
 		err := c.Connect(ctx)
 		if err != nil {
-			errCh <- err
+			errCh <- fmt.Errorf("Connect() failed: %w", err)
 			return
 		}
 		defer c.Disconnect()
@@ -943,27 +955,30 @@ func watchState(ctx context.Context, c client.Client, timeout time.Duration) (ch
 		// StateWatch will return an error if the client is not fully connected
 		// we retry this in a loop based on the timeout to ensure that we can
 		// get a valid StateWatch connection
-		started := time.Now()
 		var sub client.ClientStateWatch
-		for {
-			sub, err = c.StateWatch(ctx)
-			if err != nil {
-				if time.Since(started) > timeout {
-					// failed to connected in timeout range
-					errCh <- err
-					return
-				}
-				<-time.After(100 * time.Millisecond)
-			} else {
-				// connected successfully
-				break
-			}
+		expBackoff := backoff.NewExponentialBackOff()
+		expBackoff.MaxElapsedTime = timeout
+		expBackoff.MaxInterval = 2 * time.Second
+		err = backoff.RetryNotify(
+			func() error {
+				var err error
+				sub, err = c.StateWatch(ctx)
+				return err
+			},
+			backoff.WithContext(expBackoff, ctx),
+			func(err error, retryAfter time.Duration) {
+				t.Logf("%s: StateWatch failed: %s retrying: %s", time.Now().UTC().Format(time.RFC3339Nano), err.Error(), retryAfter)
+			},
+		)
+		if err != nil {
+			errCh <- fmt.Errorf("StateWatch() failed: %w", err)
+			return
 		}
 
 		for {
 			recv, err := sub.Recv()
 			if err != nil {
-				errCh <- err
+				errCh <- fmt.Errorf("Recv() failed: %w", err)
 				return
 			}
 			stateCh <- recv
