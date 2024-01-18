@@ -9,9 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
@@ -274,11 +277,10 @@ func PerformUpgrade(
 	upgradeCmdArgs := []string{"upgrade", endVersionInfo.Binary.String()}
 	if upgradeOpts.sourceURI == nil {
 		// no --source-uri set so it comes from the endFixture
-		srcPkg, err := endFixture.SrcPackage(ctx)
+		sourceURI, err := getSourceURI(ctx, endFixture, *upgradeOpts.unprivileged)
 		if err != nil {
 			return fmt.Errorf("failed to get end agent source package path: %w", err)
 		}
-		sourceURI := "file://" + filepath.Dir(srcPkg)
 		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
 	} else if *upgradeOpts.sourceURI != "" {
 		// specific --source-uri
@@ -540,4 +542,34 @@ func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedS
 			continue
 		}
 	}
+}
+
+func getSourceURI(ctx context.Context, f *atesting.Fixture, unprivileged bool) (string, error) {
+	srcPkg, err := f.SrcPackage(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get source package: %w", err)
+	}
+	if unprivileged {
+		// move the file to temp directory
+		dir, err := os.MkdirTemp("", "agent-upgrade-*")
+		if err != nil {
+			return "", fmt.Errorf("failed to create temp directory: %w", err)
+		}
+		err = os.Chmod(dir, 0777)
+		if err != nil {
+			return "", fmt.Errorf("failed to chmod temp directory: %w", err)
+		}
+		for _, suffix := range []string{"", ".sha512"} {
+			source := fmt.Sprintf("%s%s", srcPkg, suffix)
+			dest := fmt.Sprintf("%s%s", filepath.Join(dir, filepath.Base(srcPkg)), suffix)
+			err = copy.Copy(source, dest, copy.Options{
+				PermissionControl: copy.AddPermission(0777),
+			})
+			if err != nil {
+				return "", fmt.Errorf("failed to copy %s -> %s: %w", source, dest, err)
+			}
+		}
+		srcPkg = filepath.Join(dir, filepath.Base(srcPkg))
+	}
+	return "file://" + filepath.Dir(srcPkg), nil
 }
