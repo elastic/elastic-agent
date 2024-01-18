@@ -33,7 +33,7 @@ import (
 )
 
 func TestRedactResults(t *testing.T) {
-	privKey := `-----BEGIN OPENSSH PRIVATE KEY----- 
+	privKey := `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAACFwAAAAdzc2gtcn
 NhAAAAAwEAAQAAAgEAnomdLTF3Vp52cT55PealM+qwSQVEkEBsKB3dSXEIvCqvOmDRZic6
 mjhkShOBr6nHUzhdHiNlMTNUaU0AxyuMofFnCCBVhnnC9w+CnTrL+lbVXmMClTrbqIGT8g
@@ -126,7 +126,7 @@ sequence:
 - one
 - two
 mapping:
-  ? sky 
+  ? sky
   : blue
   ? sea : green`
 
@@ -149,7 +149,7 @@ func TestUnitAndStateMapping(t *testing.T) {
 			{UnitType: agentclient.UnitTypeInput, UnitID: "test-unit"}:    {Message: "test unit"},
 			{UnitType: agentclient.UnitTypeOutput, UnitID: "test-unit-2"}: {Message: "test unit 2"},
 		},
-		VersionInfo: agentruntime.ComponentVersionInfo{Name: "test-component", Version: "0"},
+		VersionInfo: agentruntime.ComponentVersionInfo{Name: "test-component"},
 	}
 
 	formatted, err := yaml.Marshal(exampleState)
