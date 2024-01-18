@@ -427,8 +427,7 @@ func TestDiagnosticState(t *testing.T) {
 					State:   client.UnitStateDegraded,
 					Message: "degraded message",
 					VersionInfo: runtime.ComponentVersionInfo{
-						Name:    "version name",
-						Version: "version value",
+						Name: "version name",
 					},
 				},
 			},
@@ -462,7 +461,6 @@ components:
       units: {}
       version_info:
         name: "version name"
-        version: "version value"
 upgrade_details:
   target_version: 8.12.0
   state: UPG_DOWNLOADING
@@ -505,8 +503,7 @@ func TestDiagnosticStateForAPM(t *testing.T) {
 					State:   client.UnitStateDegraded,
 					Message: "degraded message",
 					VersionInfo: runtime.ComponentVersionInfo{
-						Name:    "version name",
-						Version: "version value",
+						Name: "version name",
 					},
 					Component: &proto.Component{
 						ApmConfig: &proto.APMConfig{
@@ -543,7 +540,6 @@ components:
       units: {}
       version_info:
         name: "version name"
-        version: "version value"
       component:
         apmconfig:
           elastic:
