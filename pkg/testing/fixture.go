@@ -408,20 +408,11 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	if err != nil {
 		return fmt.Errorf("failed to get control protcol address: %w", err)
 	}
-<<<<<<< HEAD
+
 	agentClient = client.New(client.WithAddress(cAddr))
 	f.setClient(agentClient)
 	defer f.setClient(nil)
-	stateCh, stateErrCh = watchState(ctx, agentClient, f.connectTimout)
-=======
-
-	if shouldWatchState {
-		agentClient = client.New(client.WithAddress(cAddr))
-		f.setClient(agentClient)
-		defer f.setClient(nil)
-		stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
-	}
->>>>>>> 08304f74be (Add retries to control server connection and ensure logs are captured on failure (#4088))
+	stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
 
 	var logProxy Logger
 	if f.logOutput {
