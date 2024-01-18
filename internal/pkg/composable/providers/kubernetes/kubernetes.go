@@ -42,11 +42,15 @@ type dynamicProvider struct {
 
 // DynamicProviderBuilder builds the dynamic provider.
 func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (composable.DynamicProvider, error) {
-	var cfg Config
+	cfg := defaultConfig()
+	err := cfg.Validate()
+	if err != nil {
+		return nil, errors.New(err, "failed to unpack default configuration")
+	}
 	if c == nil {
 		c = config.New()
 	}
-	err := c.Unpack(&cfg)
+	err = c.Unpack(&cfg)
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}

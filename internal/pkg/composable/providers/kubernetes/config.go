@@ -86,3 +86,17 @@ func (c *Config) Validate() error {
 
 	return nil
 }
+
+// defaultConfig initializes the default values for the config.
+func defaultConfig() Config {
+	return Config{
+		CleanupTimeout:      60 * time.Second,
+		SyncPeriod:          10 * time.Minute,
+		Scope:               nodeScope,
+		LabelsDedot:         true,
+		AnnotationsDedot:    true,
+		AddResourceMetadata: metadata.GetDefaultResourceMetadataConfig(),
+		Prefix:              "co.elastic",
+		Hints:               Hints{DefaultContainerLogs: true},
+	}
+}
