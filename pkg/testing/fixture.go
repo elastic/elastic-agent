@@ -1060,6 +1060,7 @@ func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time
 			return
 		}
 
+		t.Logf("%s: StateWatch started", time.Now().UTC().Format(time.RFC3339Nano))
 		for {
 			recv, err := sub.Recv()
 			if err != nil {
