@@ -163,10 +163,12 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"fleet.proxy_url": "http://some.proxy",
 				})
 
-			err := h.handleFleetServerHosts(context.Background(), cfg)
+			newFleetCfg, newClient, err := h.handleFleetServerHosts(context.Background(), cfg)
 			require.Error(t, err) // it needs to fail to rollback
 
 			assert.Equal(t, 0, setterCalledCount)
+			assert.Nil(t, newFleetCfg)
+			assert.Nil(t, newClient)
 			assert.Equal(t,
 				originalCfg.Fleet.Client.Host,
 				h.config.Fleet.Client.Host)
@@ -219,10 +221,14 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"fleet.proxy_url": "http://some.proxy",
 				})
 
-			err := h.handleFleetServerHosts(context.Background(), cfg)
+			newFleetCfg, newClient, err := h.handleFleetServerHosts(context.Background(), cfg)
 			require.Error(t, err) // it needs to fail to rollback
 
 			assert.Equal(t, 0, setterCalledCount)
+
+			assert.Nil(t, newFleetCfg)
+			assert.Nil(t, newClient)
+
 			assert.Equal(t,
 				originalCfg.Fleet.Client.Host,
 				h.config.Fleet.Client.Host)
@@ -265,13 +271,16 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 			map[string]interface{}{
 				"fleet.host": fleetServer.URL})
 
-		err := h.handleFleetServerHosts(context.Background(), cfg)
+		newFleetCfg, newClient, err := h.handleFleetServerHosts(context.Background(), cfg)
 		require.NoError(t, err)
 
+		require.NotNil(t, newFleetCfg)
+		assert.NotNil(t, newClient)
+
 		assert.Equal(t, 1, setterCalledCount)
-		assert.Equal(t, fleetServer.URL, h.config.Fleet.Client.Host)
+		assert.Equal(t, fleetServer.URL, newFleetCfg.Host)
 		assert.Empty(t,
-			h.config.Fleet.Client.Transport.Proxy.URL)
+			newFleetCfg.Transport.Proxy.URL)
 	})
 
 	t.Run("A policy with new Hosts and no proxy changes the Hosts", func(t *testing.T) {
@@ -306,13 +315,16 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 			map[string]interface{}{
 				"fleet.hosts": wantHosts})
 
-		err := h.handleFleetServerHosts(context.Background(), cfg)
+		newFleetCfg, newClient, err := h.handleFleetServerHosts(context.Background(), cfg)
 		require.NoError(t, err)
 
+		require.NotNil(t, newFleetCfg)
+		assert.NotNil(t, newClient)
+
 		assert.Equal(t, 1, setterCalledCount)
-		assert.Equal(t, wantHosts, h.config.Fleet.Client.Hosts)
+		assert.Equal(t, wantHosts, newFleetCfg.Hosts)
 		assert.Empty(t,
-			h.config.Fleet.Client.Transport.Proxy.URL)
+			newFleetCfg.Transport.Proxy.URL)
 	})
 
 	t.Run("A policy with proxy changes the fleet client", func(t *testing.T) {
@@ -352,13 +364,16 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				"fleet.proxy_url": mockProxy.URL,
 				"fleet.host":      fleetServer.URL})
 
-		err := h.handleFleetServerHosts(context.Background(), cfg)
+		newFleetCfg, newClient, err := h.handleFleetServerHosts(context.Background(), cfg)
 		require.NoError(t, err)
+
+		require.NotNil(t, newFleetCfg)
+		assert.NotNil(t, newClient)
 
 		assert.Equal(t, 1, setterCalledCount)
 		assert.Equal(t,
 			mockProxy.URL,
-			h.config.Fleet.Client.Transport.Proxy.URL.String())
+			newFleetCfg.Transport.Proxy.URL.String())
 	})
 
 	t.Run("A policy with empty proxy don't change the fleet client",
@@ -405,13 +420,16 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"fleet.proxy_url": "",
 					"fleet.host":      fleetServer.URL})
 
-			err = h.handleFleetServerHosts(context.Background(), cfg)
+			newFleetCfg, newClient, err := h.handleFleetServerHosts(context.Background(), cfg)
 			require.NoError(t, err)
+
+			require.NotNil(t, newFleetCfg)
+			assert.NotNil(t, newClient)
 
 			assert.Equal(t, 1, setterCalledCount)
 			assert.Equal(t,
 				wantProxy,
-				h.config.Fleet.Client.Transport.Proxy.URL.String())
+				newFleetCfg.Transport.Proxy.URL.String())
 		})
 }
 

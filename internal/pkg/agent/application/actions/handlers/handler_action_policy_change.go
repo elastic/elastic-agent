@@ -9,13 +9,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sort"
 	"time"
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -35,14 +35,19 @@ const (
 	apiStatusTimeout = 15 * time.Second
 )
 
+type LogLevelSetter interface {
+	SetLogLevel(ctx context.Context, lvl logp.Level) error
+}
+
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
-	log       *logger.Logger
-	agentInfo *info.AgentInfo
-	config    *configuration.Configuration
-	store     storage.Store
-	ch        chan coordinator.ConfigChange
-	setters   []actions.ClientSetter
+	log          *logger.Logger
+	agentInfo    *info.AgentInfo
+	config       *configuration.Configuration
+	store        storage.Store
+	ch           chan coordinator.ConfigChange
+	setters      []actions.ClientSetter
+	logLvlSetter LogLevelSetter // TODO: set the coordinator here in constructor
 
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
@@ -104,10 +109,56 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
 
+	var configNeedToBeSaved bool
+
 	h.log.Debugf("handlerPolicyChange: emit configuration for action %+v", a)
-	err = h.handleFleetServerHosts(ctx, c)
+	fleetClientCfg, newFleetClient, err := h.handleFleetServerHosts(ctx, c)
 	if err != nil {
-		return err
+		return fmt.Errorf("error handling fleet configuration: %w", err)
+	}
+	if fleetClientCfg != nil {
+		/// we received a new fleet client config, set it in the configuration
+		h.config.Fleet.Client = *fleetClientCfg
+		configNeedToBeSaved = true
+	}
+
+	newLogLevel, err := h.handleLogLevel(ctx, c)
+	if err != nil {
+		return fmt.Errorf("error handling log level setting: %w", err)
+	}
+
+	if newLogLevel != nil {
+		h.config.Settings.LoggingConfig.Level = *newLogLevel
+	}
+
+	// Persist configuration
+	if configNeedToBeSaved {
+		h.log.With("action.id", a.ID()).Debug("persisting new configuration")
+		// store the new config and update fleet clients
+		reader, err := fleetToReader(h.agentInfo, h.config)
+		if err != nil {
+			return errors.New(
+				err, "fail to persist new Fleet Server API client hosts",
+				errors.TypeUnexpected, errors.M("hosts", h.config.Fleet.Client.Hosts))
+		}
+
+		err = h.store.Save(reader)
+		if err != nil {
+			return errors.New(
+				err, "fail to persist new Fleet Server API client hosts",
+				errors.TypeFilesystem, errors.M("hosts", h.config.Fleet.Client.Hosts))
+		}
+	}
+
+	// Post-save actions
+	if newFleetClient != nil {
+		for _, setter := range h.setters {
+			setter.SetClient(newFleetClient)
+		}
+	}
+
+	if newLogLevel != nil {
+		h.logLvlSetter.SetLogLevel(ctx, logp.Level(*newLogLevel))
 	}
 
 	h.ch <- newPolicyChange(ctx, c, a, acker, false)
@@ -119,40 +170,104 @@ func (h *PolicyChangeHandler) Watch() <-chan coordinator.ConfigChange {
 	return h.ch
 }
 
-func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *config.Config) (err error) {
+// TODO add tests
+// handleLogLevel will check for the `agent.logging.level` key in the incoming policy.
+// If the full key is not found, it will return nil for bot the new level and the error,
+// signaling that no change should occur.
+// If the key is present it will unpack the loglevel and return it.
+// In case of error the newLogLevel will be nil and an appropriate error will be returned
+func (h *PolicyChangeHandler) handleLogLevel(ctx context.Context, c *config.Config) (*logger.Level, error) {
+	data, err := c.ToMapStr()
+	if err != nil {
+		return nil, errors.New(err, "could not convert the configuration from the policy", errors.TypeConfig)
+	}
+
+	rawLoggingLevel, err := getNestedMap[string](data, "agent", "logging", "level")
+	if errors.Is(err, ErrKeyNotFound) {
+		//no logging level found in the input policy, nothing to do
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error reading log level from policy: %w", err)
+	}
+
+	newLogLvl, ok := rawLoggingLevel.(string)
+	if !ok {
+		return nil, fmt.Errorf("log level is not a string: %T: %v", rawLoggingLevel, rawLoggingLevel)
+	}
+	// *copy* the current level
+	lvl := h.config.Settings.LoggingConfig.Level
+	err = lvl.Unpack(newLogLvl)
+	if err != nil {
+		return nil, fmt.Errorf("error unpacking log level: %w", err)
+	}
+	return &lvl, nil
+}
+
+var ErrNoKeys = errors.New("no key provided")
+var ErrKeyNotFound = errors.New("key not found")
+var ErrValueNotMap = errors.New("value is not a map")
+
+// getNestedMap is a utility function to traverse nested maps using a series of key
+func getNestedMap[K comparable](src map[K]any, keys ...K) (any, error) {
+	if len(keys) == 0 {
+		return nil, ErrNoKeys
+	}
+	if _, ok := src[keys[0]]; !ok {
+		// no key found
+		return nil, ErrKeyNotFound
+	}
+
+	if len(keys) == 1 {
+		// we reached the final key, return the value
+		return src[keys[0]], nil
+	}
+
+	// we have more keys to go through
+	valueMap, ok := src[keys[0]].(map[K]any)
+	if !ok {
+		return nil, ErrValueNotMap
+	}
+
+	return getNestedMap[K](valueMap, keys[1:]...)
+}
+
+func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *config.Config) (*remote.Config, *remote.Client, error) {
 	// do not update fleet-server host from policy; no setters provided with local Fleet Server
 	if len(h.setters) == 0 {
-		return nil
+		return nil, nil, nil
 	}
 	data, err := c.ToMapStr()
 	if err != nil {
-		return errors.New(err, "could not convert the configuration from the policy", errors.TypeConfig)
+		return nil, nil, errors.New(err, "could not convert the configuration from the policy", errors.TypeConfig)
 	}
 	if _, ok := data["fleet"]; !ok {
 		// no fleet information in the configuration (skip checking client)
-		return nil
+		return nil, nil, nil
 	}
 
 	cfg, err := configuration.NewFromConfig(c)
 	if err != nil {
-		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
+		return nil, nil, errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
 
 	if clientEqual(h.config.Fleet.Client, cfg.Fleet.Client) {
 		// already the same hosts
-		return nil
+		return nil, nil, nil
+	}
+
+	// Clone existing confing and apply the new parameters (we don't want any side effects here)
+	newFleetClient, err := cloneSerializable[remote.Config](&h.config.Fleet.Client)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cloning existing fleet client settings: %w", err)
 	}
 
 	// only set protocol/hosts as that is all Fleet currently sends
-	prevProtocol := h.config.Fleet.Client.Protocol
-	prevPath := h.config.Fleet.Client.Path
-	prevHost := h.config.Fleet.Client.Host
-	prevHosts := h.config.Fleet.Client.Hosts
-	prevProxy := h.config.Fleet.Client.Transport.Proxy
-	h.config.Fleet.Client.Protocol = cfg.Fleet.Client.Protocol
-	h.config.Fleet.Client.Path = cfg.Fleet.Client.Path
-	h.config.Fleet.Client.Host = cfg.Fleet.Client.Host
-	h.config.Fleet.Client.Hosts = cfg.Fleet.Client.Hosts
+	newFleetClient.Protocol = cfg.Fleet.Client.Protocol
+	newFleetClient.Path = cfg.Fleet.Client.Path
+	newFleetClient.Host = cfg.Fleet.Client.Host
+	newFleetClient.Hosts = cfg.Fleet.Client.Hosts
 
 	// Empty proxies from fleet are ignored. That way a proxy set by --proxy-url
 	// it won't be overridden by an absent or empty proxy from fleet-server.
@@ -162,29 +277,19 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 		cfg.Fleet.Client.Transport.Proxy.URL.String() == "" {
 		h.log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
 	} else {
-		h.config.Fleet.Client.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
+		newFleetClient.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
 		h.log.Debug("received proxy from fleet, applying it")
 	}
 
-	// rollback on failure
-	defer func() {
-		if err != nil {
-			h.config.Fleet.Client.Protocol = prevProtocol
-			h.config.Fleet.Client.Path = prevPath
-			h.config.Fleet.Client.Host = prevHost
-			h.config.Fleet.Client.Hosts = prevHosts
-			h.config.Fleet.Client.Transport.Proxy = prevProxy
-		}
-	}()
-
+	// test client creation and fleet connection with the new settings
 	client, err := client.NewAuthWithConfig(
-		h.log, h.config.Fleet.AccessAPIKey, h.config.Fleet.Client)
+		h.log, h.config.Fleet.AccessAPIKey, *newFleetClient)
 	if err != nil {
-		return errors.New(
+		return nil, nil, errors.New(
 			err, "fail to create API client with updated config",
 			errors.TypeConfig,
 			errors.M("hosts", append(
-				h.config.Fleet.Client.Hosts, h.config.Fleet.Client.Host)))
+				newFleetClient.Hosts, newFleetClient.Host)))
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
@@ -192,33 +297,31 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 
 	resp, err := client.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
 	if err != nil {
-		return errors.New(
+		return nil, nil, errors.New(
 			err, "fail to communicate with Fleet Server API client hosts",
-			errors.TypeNetwork, errors.M("hosts", h.config.Fleet.Client.Hosts))
+			errors.TypeNetwork, errors.M("hosts", newFleetClient.Hosts))
 	}
 
 	// discard body for proper cancellation and connection reuse
-	_, _ = io.Copy(ioutil.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 
-	reader, err := fleetToReader(h.agentInfo, h.config)
-	if err != nil {
-		return errors.New(
-			err, "fail to persist new Fleet Server API client hosts",
-			errors.TypeUnexpected, errors.M("hosts", h.config.Fleet.Client.Hosts))
-	}
+	// the new settings work and we can connect to Fleet, return those with a nil error
+	return newFleetClient, client, nil
+}
 
-	err = h.store.Save(reader)
+func cloneSerializable[T any](src *T) (*T, error) {
+	// Marshal/Unmarshal the source object
+	marshaledBytes, err := yaml.Marshal(src)
 	if err != nil {
-		return errors.New(
-			err, "fail to persist new Fleet Server API client hosts",
-			errors.TypeFilesystem, errors.M("hosts", h.config.Fleet.Client.Hosts))
+		return nil, fmt.Errorf("marshaling %T: %w", src, err)
 	}
-
-	for _, setter := range h.setters {
-		setter.SetClient(client)
+	cloned := new(T)
+	err = yaml.Unmarshal(marshaledBytes, cloned)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshaling %T: %w", src, err)
 	}
-	return nil
+	return cloned, nil
 }
 
 func clientEqual(k1 remote.Config, k2 remote.Config) bool {
