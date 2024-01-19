@@ -357,9 +357,8 @@ func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.
 			Message: comp.State.Message,
 			Units:   units,
 			VersionInfo: &cproto.ComponentVersionInfo{
-				Name:    comp.State.VersionInfo.Name,
-				Version: comp.State.VersionInfo.Version,
-				Meta:    comp.State.VersionInfo.Meta,
+				Name: comp.State.VersionInfo.Name,
+				Meta: comp.State.VersionInfo.Meta,
 			},
 		})
 	}

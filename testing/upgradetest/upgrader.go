@@ -316,7 +316,7 @@ func PerformUpgrade(
 
 	// wait for the watcher to show up
 	logger.Logf("waiting for upgrade watcher to start")
-	err = WaitForWatcher(ctx, 2*time.Minute, 10*time.Second)
+	err = WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to find watcher: %w", err)
 	}
