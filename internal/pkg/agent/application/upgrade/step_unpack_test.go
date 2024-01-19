@@ -84,7 +84,8 @@ func (f files) Sys() any {
 	return nil
 }
 
-type createArchiveFunc func(*testing.T, []files) (string, error)
+type createArchiveFunc func(t *testing.T, archiveFiles []files) (string, error)
+type checkExtractedPath func(t *testing.T, testDataDir string)
 
 func TestUpgrader_unpack(t *testing.T) {
 	type args struct {
@@ -93,10 +94,11 @@ func TestUpgrader_unpack(t *testing.T) {
 		archiveFiles     []files
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr assert.ErrorAssertionFunc
+		name       string
+		args       args
+		want       string
+		wantErr    assert.ErrorAssertionFunc
+		checkFiles checkExtractedPath
 	}{
 		{
 			name: "targz with file before containing folder",
@@ -107,7 +109,7 @@ func TestUpgrader_unpack(t *testing.T) {
 					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
 					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
 					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o700)},
 					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/" + agentName, content: "Placeholder for the elastic-agent binary", mode: fs.ModePerm & 0o750},
 					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
 					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/components/comp1", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
@@ -120,6 +122,16 @@ func TestUpgrader_unpack(t *testing.T) {
 			},
 			want:    "abcdef",
 			wantErr: assert.NoError,
+			checkFiles: func(t *testing.T, testDataDir string) {
+
+				versionedHome := filepath.Join(testDataDir, "elastic-agent-abcdef")
+				require.DirExists(t, versionedHome, "directory for package.version does not exists")
+				stat, err := os.Stat(versionedHome)
+				require.NoErrorf(t, err, "error calling Stat() for versionedHome %q", versionedHome)
+				expectedPermissions := fs.ModePerm & 0o700
+				actualPermissions := fs.ModePerm & stat.Mode()
+				assert.Equalf(t, expectedPermissions, actualPermissions, "Wrong permissions set on versioned home %q: expected %O, got %O", versionedHome, expectedPermissions, actualPermissions)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -141,10 +153,13 @@ func TestUpgrader_unpack(t *testing.T) {
 			require.NoError(t, err, "creation of test archive file failed")
 
 			got, err := u.unpack(tt.args.version, archiveFile, testDataDir)
-			if !tt.wantErr(t, err, fmt.Sprintf("unpack(%v, %v)", tt.args.version, tt.args.archiveGenerator)) {
+			if !tt.wantErr(t, err, fmt.Sprintf("unpack(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)) {
 				return
 			}
-			assert.Equalf(t, tt.want, got, "unpack(%v, %v)", tt.args.version, tt.args.archiveGenerator)
+			assert.Equalf(t, tt.want, got, "unpack(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)
+			if tt.checkFiles != nil {
+				tt.checkFiles(t, testDataDir)
+			}
 		})
 	}
 }
