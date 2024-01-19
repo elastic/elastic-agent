@@ -49,8 +49,7 @@ func main() {
 func run() error {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 	ver := client.VersionInfo{
-		Name:    fakeShipper,
-		Version: "1.0",
+		Name: fakeShipper,
 		Meta: map[string]string{
 			"shipper": fakeShipper,
 		},

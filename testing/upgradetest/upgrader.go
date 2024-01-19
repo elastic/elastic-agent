@@ -233,7 +233,7 @@ func PerformUpgrade(
 		}
 	}
 
-	logger.Logf("Upgrading from version %q to version %q", startParsedVersion, endVersionInfo.Binary.String())
+	logger.Logf("Upgrading from version %q (%s) to version %q (%s)", startParsedVersion, startVersionInfo.Binary.Commit, endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
 
 	upgradeCmdArgs := []string{"upgrade", endVersionInfo.Binary.String()}
 	if upgradeOpts.sourceURI == nil {
@@ -278,7 +278,7 @@ func PerformUpgrade(
 
 	// wait for the watcher to show up
 	logger.Logf("waiting for upgrade watcher to start")
-	err = WaitForWatcher(ctx, 2*time.Minute, 10*time.Second)
+	err = WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to find watcher: %w", err)
 	}
