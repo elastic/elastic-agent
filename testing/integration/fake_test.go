@@ -57,9 +57,6 @@ func TestFakeComponent(t *testing.T) {
 	err = f.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
 
-	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
 	err = f.Run(ctx, atesting.State{
 		Configure:  simpleConfig1,
 		AgentState: atesting.NewClientState(client.Healthy),

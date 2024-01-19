@@ -1042,6 +1042,7 @@ func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time
 		// get a valid StateWatch connection
 		var sub client.ClientStateWatch
 		expBackoff := backoff.NewExponentialBackOff()
+		expBackoff.InitialInterval = 100 * time.Millisecond
 		expBackoff.MaxElapsedTime = timeout
 		expBackoff.MaxInterval = 2 * time.Second
 		err = backoff.RetryNotify(
@@ -1060,6 +1061,7 @@ func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time
 			return
 		}
 
+		t.Logf("%s: StateWatch started", time.Now().UTC().Format(time.RFC3339Nano))
 		for {
 			recv, err := sub.Recv()
 			if err != nil {
