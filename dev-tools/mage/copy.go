@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -82,14 +83,19 @@ func (t *CopyTask) fileCopy(src, dest string, entry fs.DirEntry) error {
 	}
 	defer srcFile.Close()
 
-	if !entry.Type().IsRegular() {
+	info, err := entry.Info()
+	if err != nil {
+		return fmt.Errorf("converting dir entry: %w", err)
+	}
+
+	if !info.Mode().IsRegular() {
 		return errors.Errorf("failed to copy source file because it is not a " +
 			"regular file")
 	}
 
 	mode := t.Mode
 	if mode == 0 {
-		mode = entry.Type()
+		mode = info.Mode()
 	}
 	destFile, err := os.OpenFile(createDir(dest),
 		os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode&os.ModePerm)
@@ -109,10 +115,16 @@ func (t *CopyTask) dirCopy(src, dest string, entry fs.DirEntry) error {
 		return nil
 	}
 
+	info, err := entry.Info()
+	if err != nil {
+		return fmt.Errorf("converting dir entry: %w", err)
+	}
+
 	mode := t.DirMode
 	if mode == 0 {
-		mode = entry.Type()
+		mode = info.Mode()
 	}
+
 	if err := os.MkdirAll(dest, mode&os.ModePerm); err != nil {
 		return errors.Wrap(err, "failed creating dirs")
 	}
@@ -122,10 +134,10 @@ func (t *CopyTask) dirCopy(src, dest string, entry fs.DirEntry) error {
 		return errors.Wrapf(err, "failed to read dir %v", src)
 	}
 
-	for _, info := range contents {
+	for _, entry := range contents {
 		srcFile := filepath.Join(src, info.Name())
 		destFile := filepath.Join(dest, info.Name())
-		if err = t.recursiveCopy(srcFile, destFile, info); err != nil {
+		if err = t.recursiveCopy(srcFile, destFile, entry); err != nil {
 			return errors.Wrapf(err, "failed to copy %v to %v", srcFile, destFile)
 		}
 	}
