@@ -70,10 +70,7 @@ type InstallOpts struct {
 func (i InstallOpts) IsUnprivileged(operatingSystem string) bool {
 	if i.Unprivileged == nil {
 		// not explicitly set, default to true on Linux only (until other platforms support it)
-		if operatingSystem == "linux" {
-			return true
-		}
-		return false
+		return operatingSystem == "linux"
 	}
 	return *i.Unprivileged
 }
