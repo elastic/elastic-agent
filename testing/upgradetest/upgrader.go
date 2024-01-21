@@ -217,6 +217,10 @@ func PerformUpgrade(
 		}
 	}
 
+	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		return fmt.Errorf("target version has the same commit hash %q", endVersionInfo.Binary.Commit)
+	}
+
 	// For asserting on the effects of any Upgrade Watcher changes made in 8.12.0, we need
 	// the endVersion to be >= 8.12.0.  Otherwise, these assertions will fail as those changes
 	// won't be present in the Upgrade Watcher. So we disable these assertions if the endVersion
@@ -272,7 +276,7 @@ func PerformUpgrade(
 		}
 	}
 
-	logger.Logf("Upgrading from version %q (%s) to version %q (%s)", startParsedVersion, startVersionInfo.Binary.Commit, endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
+	logger.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"", startParsedVersion, startVersionInfo.Binary.Commit, endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
 
 	upgradeCmdArgs := []string{"upgrade", endVersionInfo.Binary.String()}
 	if upgradeOpts.sourceURI == nil {

@@ -226,6 +226,11 @@ func testUpgradeFleetManagedElasticAgent(
 		}
 	}
 
+	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("target version has the same commit hash %q", endVersionInfo.Binary.Commit)
+		return
+	}
+
 	t.Log("Creating Agent policy...")
 	policyResp, err := kibClient.CreatePolicy(ctx, policy)
 	require.NoError(t, err, "failed creating policy")
