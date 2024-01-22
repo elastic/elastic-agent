@@ -409,11 +409,6 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 		return fmt.Errorf("failed to get control protcol address: %w", err)
 	}
 
-	agentClient = client.New(client.WithAddress(cAddr))
-	f.setClient(agentClient)
-	defer f.setClient(nil)
-	stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
-
 	var logProxy Logger
 	if f.logOutput {
 		logProxy = f.t
@@ -439,6 +434,11 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 		_ = proc.Kill()
 		<-proc.Wait()
 	}
+
+	agentClient = client.New(client.WithAddress(cAddr))
+	f.setClient(agentClient)
+	defer f.setClient(nil)
+	stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
 
 	var doneChan <-chan time.Time
 	if f.runLength != 0 {
