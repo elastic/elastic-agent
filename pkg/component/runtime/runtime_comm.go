@@ -18,6 +18,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
@@ -49,6 +50,9 @@ type runtimeComm struct {
 	token string
 	cert  *authority.Pair
 
+	maxMessageSize  int
+	chunkingAllowed bool
+
 	checkinConn bool
 	checkinDone chan bool
 	checkinLock sync.RWMutex
@@ -67,7 +71,7 @@ type runtimeComm struct {
 	actionsResponse chan *proto.ActionResponse
 }
 
-func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.CertificateAuthority, agentInfo *info.AgentInfo) (*runtimeComm, error) {
+func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.CertificateAuthority, agentInfo *info.AgentInfo, maxMessageSize int) (*runtimeComm, error) {
 	token, err := uuid.NewV4()
 	if err != nil {
 		return nil, err
@@ -88,6 +92,8 @@ func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.Cert
 		name:            name,
 		token:           token.String(),
 		cert:            pair,
+		maxMessageSize:  maxMessageSize,
+		chunkingAllowed: false, // not allow until the client says they support it
 		checkinConn:     true,
 		checkinExpected: make(chan *proto.CheckinExpected, 1),
 		checkinObserved: make(chan *proto.CheckinObserved),
@@ -112,7 +118,7 @@ func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) err
 	if !hasV2 {
 		srvs = append(srvs, proto.ConnInfoServices_CheckinV2)
 	}
-	connInfo := &proto.ConnInfo{
+	startupInfo := &proto.StartUpInfo{
 		Addr:       c.listenAddr,
 		ServerName: c.name,
 		Token:      c.token,
@@ -120,14 +126,17 @@ func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) err
 		PeerCert:   c.cert.Crt,
 		PeerKey:    c.cert.Key,
 		Services:   srvs,
+		// chunking is always allowed if the client supports it
+		Supports:       []proto.ConnectionSupports{proto.ConnectionSupports_CheckinChunking},
+		MaxMessageSize: uint32(c.maxMessageSize),
 	}
-	infoBytes, err := protobuf.Marshal(connInfo)
+	infoBytes, err := protobuf.Marshal(startupInfo)
 	if err != nil {
-		return fmt.Errorf("failed to marshal connection information: %w", err)
+		return fmt.Errorf("failed to marshal startup information: %w", err)
 	}
 	_, err = w.Write(infoBytes)
 	if err != nil {
-		return fmt.Errorf("failed to write connection information: %w", err)
+		return fmt.Errorf("failed to write startup information: %w", err)
 	}
 	return nil
 }
@@ -137,7 +146,7 @@ func (c *runtimeComm) CheckinExpected(
 	observed *proto.CheckinObserved,
 ) {
 	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
-		expected.AgentInfo = &proto.CheckinAgentInfo{
+		expected.AgentInfo = &proto.AgentInfo{
 			Id:       c.agentInfo.AgentID(),
 			Version:  c.agentInfo.Version(),
 			Snapshot: c.agentInfo.Snapshot(),
@@ -221,7 +230,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 		case <-recvDone:
 			return
 		case expected := <-initExp:
-			err := server.Send(expected)
+			err := sendExpectedChunked(server, expected, c.chunkingAllowed, c.maxMessageSize)
 			if err != nil {
 				if reportableErr(err) {
 					c.logger.Debugf("check-in stream failed to send initial expected state: %s", err)
@@ -240,7 +249,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 			case expected = <-c.checkinExpected:
 			}
 
-			err := server.Send(expected)
+			err := sendExpectedChunked(server, expected, c.chunkingAllowed, c.maxMessageSize)
 			if err != nil {
 				if reportableErr(err) {
 					c.logger.Debugf("check-in stream failed to send expected state: %s", err)
@@ -270,7 +279,8 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 
 	go func() {
 		for {
-			checkin, err := server.Recv()
+			// always allow a chunked observed message to be received
+			checkin, err := chunk.RecvObserved(server)
 			if err != nil {
 				if reportableErr(err) {
 					c.logger.Debugf("check-in stream failed to receive data: %s", err)
@@ -400,4 +410,21 @@ func genServerName() (string, error) {
 		return "", err
 	}
 	return strings.Replace(u.String(), "-", "", -1), nil
+}
+
+func sendExpectedChunked(server proto.ElasticAgent_CheckinV2Server, msg *proto.CheckinExpected, chunkingAllowed bool, maxSize int) error {
+	if !chunkingAllowed {
+		// chunking is disabled
+		return server.Send(msg)
+	}
+	msgs, err := chunk.Expected(msg, maxSize)
+	if err != nil {
+		return err
+	}
+	for _, msg := range msgs {
+		if err := server.Send(msg); err != nil {
+			return err
+		}
+	}
+	return nil
 }
