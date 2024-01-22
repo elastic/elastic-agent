@@ -5,7 +5,6 @@
 package filelock
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -16,7 +15,7 @@ import (
 const testLockFile = "test.lock"
 
 func TestAppLocker(t *testing.T) {
-	tmp, _ := ioutil.TempDir("", "locker")
+	tmp, _ := os.MkdirTemp("", "locker")
 	defer os.RemoveAll(tmp)
 
 	locker1 := NewAppLocker(tmp, testLockFile)

@@ -6,7 +6,6 @@ package upgrade
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -129,7 +128,7 @@ func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash strin
 
 	markerPath := markerFilePath()
 	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", prevHash)
-	if err := ioutil.WriteFile(markerPath, markerBytes, 0600); err != nil {
+	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
 	}
 
@@ -144,7 +143,7 @@ func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash strin
 func UpdateActiveCommit(log *logger.Logger, hash string) error {
 	activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
 	log.Infow("Updating active commit", "file.path", activeCommitPath, "hash", hash)
-	if err := ioutil.WriteFile(activeCommitPath, []byte(hash), 0600); err != nil {
+	if err := os.WriteFile(activeCommitPath, []byte(hash), 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath))
 	}
 

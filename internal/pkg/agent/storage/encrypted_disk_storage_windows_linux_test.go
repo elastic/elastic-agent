@@ -10,8 +10,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,7 +42,7 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	}
 	defer r.Close()
 
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	}
 	defer nr.Close()
 
-	b, err = ioutil.ReadAll(nr)
+	b, err = io.ReadAll(nr)
 	if err != nil {
 		t.Fatal(err)
 	}

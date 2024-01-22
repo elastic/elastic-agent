@@ -7,7 +7,6 @@ package config
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"gopkg.in/yaml.v2"
@@ -74,7 +73,7 @@ func NewConfigFrom(from interface{}, opts ...interface{}) (*Config, error) {
 		if closer, ok := from.(io.Closer); ok {
 			defer closer.Close()
 		}
-		fData, err := ioutil.ReadAll(in)
+		fData, err := io.ReadAll(in)
 		if err != nil {
 			return nil, err
 		}
