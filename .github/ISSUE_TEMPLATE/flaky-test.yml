@@ -1,9 +1,8 @@
----
 name: "Flaky Test"
-about: "Report a flaky test (one that doesn't pass consistently)"
+description: "Report a flaky test (one that doesn't pass consistently)"
 title: "[Flaky Test]: <test_case> – <short_error_message>"
 labels: ["Team:Elastic-Agent", "flaky-test"]
-projects: ["elastic/1457"]
+projects: ["elastic/979", "elastic/1457"]
 body:
   - type: markdown
     attributes:
@@ -37,19 +36,18 @@ body:
     attributes:
       label: OS
       description: "On which OS the test is failing"
-    multiple: true
-    options:
-      - Linux
-      - Mac
-      - Windows
-    default: 0
+      multiple: true
+      options:
+        - Linux
+        - Mac
+        - Windows
+      default: 0
     validations:
       required: true
   - type: textarea
     attributes:
       label: "Stacktrace and notes"
       description: "Detailed output of the test failure and your notes about possible cause."
-    render: markdown
+      render: markdown
     validations:
       required: true
----
