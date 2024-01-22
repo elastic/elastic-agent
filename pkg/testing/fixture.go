@@ -507,25 +507,11 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
 
-<<<<<<< HEAD
-	killProc := func() {
-		_ = proc.Kill()
-		<-proc.Wait()
-	}
-
 	agentClient = client.New(client.WithAddress(cAddr))
 	f.setClient(agentClient)
 	defer f.setClient(nil)
 	stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
-=======
-	if shouldWatchState {
-		agentClient = client.New(client.WithAddress(cAddr))
-		f.setClient(agentClient)
-		defer f.setClient(nil)
-		stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
-	}
->>>>>>> 2c340a00a6 (Fix integration test timeouts on Windows (#3949))
-
+å
 	var doneChan <-chan time.Time
 	if f.runLength != 0 {
 		doneChan = time.After(f.runLength)
