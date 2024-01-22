@@ -256,15 +256,6 @@ func TestComponentUpdateDiff(t *testing.T) {
 
 	}
 
-	logp.ObserverLogs()
-
-	err = logp.Sync()
-	require.NoError(t, err)
-	err = logp.Configure(logp.Config{
-		ToStderr: true,
-	})
-	require.NoError(t, err)
-
 }
 
 func mustNewStruct(t *testing.T, v map[string]interface{}) *structpb.Struct {
