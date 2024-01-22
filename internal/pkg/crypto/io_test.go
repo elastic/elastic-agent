@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -34,7 +33,7 @@ func TestIO(t *testing.T) {
 		r, err := NewReaderWithDefaults(dest, passwd)
 		require.NoError(t, err)
 
-		content, err := ioutil.ReadAll(r)
+		content, err := io.ReadAll(r)
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
@@ -61,7 +60,7 @@ func TestIO(t *testing.T) {
 		r, err := NewReaderWithDefaults(dest, passwd)
 		require.NoError(t, err)
 
-		content, err := ioutil.ReadAll(r)
+		content, err := io.ReadAll(r)
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
@@ -86,7 +85,7 @@ func TestIO(t *testing.T) {
 		r, err := NewReaderWithDefaults(dest, []byte("bad password"))
 		require.NoError(t, err)
 
-		_, err = ioutil.ReadAll(r)
+		_, err = io.ReadAll(r)
 		require.Error(t, err)
 	})
 
@@ -115,7 +114,7 @@ func TestIO(t *testing.T) {
 		r, err := NewReaderWithDefaults(dest, passwd)
 		require.NoError(t, err)
 
-		content, err := ioutil.ReadAll(r)
+		content, err := io.ReadAll(r)
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
@@ -143,7 +142,7 @@ func TestIO(t *testing.T) {
 
 		b := bufio.NewReaderSize(r, 100)
 
-		content, err := ioutil.ReadAll(b)
+		content, err := io.ReadAll(b)
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
@@ -159,7 +158,7 @@ func TestIO(t *testing.T) {
 
 		b := bufio.NewReaderSize(r, 100)
 
-		_, err = ioutil.ReadAll(b)
+		_, err = io.ReadAll(b)
 		require.Error(t, err)
 	})
 
@@ -188,7 +187,7 @@ func TestIO(t *testing.T) {
 		r, err := NewReaderWithDefaults(dest, passwd)
 		require.NoError(t, err)
 
-		content, err := ioutil.ReadAll(r)
+		content, err := io.ReadAll(r)
 		require.NoError(t, err)
 
 		require.Equal(t, expected, content)

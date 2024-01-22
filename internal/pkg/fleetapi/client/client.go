@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -100,7 +99,7 @@ func ExtractError(resp io.Reader) error {
 		Message    string `json:"message"`
 	}{}
 
-	data, err := ioutil.ReadAll(resp)
+	data, err := io.ReadAll(resp)
 	if err != nil {
 		return errors.New(err, "fail to read original error")
 	}

@@ -7,7 +7,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -80,7 +79,7 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		// get local PGP
 		pgpPath, _ := cmd.Flags().GetString(flagPGPBytesPath)
 		if len(pgpPath) > 0 {
-			content, err := ioutil.ReadFile(pgpPath)
+			content, err := os.ReadFile(pgpPath)
 			if err != nil {
 				return errors.New(err, "failed to read pgp file")
 			}
