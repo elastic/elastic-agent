@@ -312,9 +312,10 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
 
+	procWaitCh := proc.Wait()
 	killProc := func() {
 		_ = proc.Kill()
-		<-proc.Wait()
+		<-procWaitCh
 	}
 
 	var doneChan <-chan time.Time
@@ -328,7 +329,7 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		case <-ctx.Done():
 			killProc()
 			return ctx.Err()
-		case ps := <-proc.Wait():
+		case ps := <-procWaitCh:
 			if stopping {
 				return nil
 			}
@@ -429,11 +430,6 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
 
-	killProc := func() {
-		_ = proc.Kill()
-		<-proc.Wait()
-	}
-
 	agentClient = client.New(client.WithAddress(cAddr))
 	f.setClient(agentClient)
 	defer f.setClient(nil)
@@ -444,13 +440,19 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 		doneChan = time.After(f.runLength)
 	}
 
+	procWaitCh := proc.Wait()
+	killProc := func() {
+		_ = proc.Kill()
+		<-procWaitCh
+	}
+
 	stopping := false
 	for {
 		select {
 		case <-ctx.Done():
 			killProc()
 			return ctx.Err()
-		case ps := <-proc.Wait():
+		case ps := <-procWaitCh:
 			if stopping {
 				return nil
 			}
