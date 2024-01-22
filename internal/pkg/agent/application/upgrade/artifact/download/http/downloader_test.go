@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -36,7 +35,7 @@ import (
 )
 
 func TestDownload(t *testing.T) {
-	targetDir, err := ioutil.TempDir(os.TempDir(), "")
+	targetDir, err := os.MkdirTemp(os.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +97,7 @@ func TestDownloadBodyError(t *testing.T) {
 	defer srv.Close()
 	client := srv.Client()
 
-	targetDir, err := ioutil.TempDir(os.TempDir(), "")
+	targetDir, err := os.MkdirTemp(os.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +151,7 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	defer srv.Close()
 	client := srv.Client()
 
-	targetDir, err := ioutil.TempDir(os.TempDir(), "")
+	targetDir, err := os.MkdirTemp(os.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +234,7 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	defer srv.Close()
 	client := srv.Client()
 
-	targetDir, err := ioutil.TempDir(os.TempDir(), "")
+	targetDir, err := os.MkdirTemp(os.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
