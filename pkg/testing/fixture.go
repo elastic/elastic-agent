@@ -356,84 +356,7 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 	}
 }
 
-<<<<<<< HEAD
 // Run runs the provided binary.
-=======
-// RunProcess runs the given given process
-// the process will run until an error, or the given timeout is reached
-func RunProcess(t *testing.T,
-	lp Logger,
-	ctx context.Context, runLength time.Duration,
-	logOutput, allowErrs bool,
-	processPath string, args ...string) error {
-	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
-		t.Fatal("Context passed to RunProcess() has no deadline set.")
-	}
-
-	var err error
-	var logProxy Logger
-	if logOutput {
-		logProxy = lp
-	}
-	stdOut := newLogWatcher(logProxy)
-	stdErr := newLogWatcher(logProxy)
-
-	proc, err := process.Start(
-		processPath,
-		process.WithContext(ctx),
-		process.WithArgs(args),
-		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
-
-	if err != nil {
-		return fmt.Errorf("failed to spawn %q: %w", processPath, err)
-	}
-
-	procWaitCh := proc.Wait()
-	killProc := func() {
-		_ = proc.Kill()
-		<-procWaitCh
-	}
-
-	var doneChan <-chan time.Time
-	if runLength != 0 {
-		doneChan = time.After(runLength)
-	}
-
-	stopping := false
-	for {
-		select {
-		case <-ctx.Done():
-			killProc()
-			return ctx.Err()
-		case ps := <-procWaitCh:
-			if stopping {
-				return nil
-			}
-			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
-		case err := <-stdOut.Watch():
-			if !allowErrs {
-				// no errors allowed
-				killProc()
-				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
-			}
-		case err := <-stdErr.Watch():
-			if !allowErrs {
-				// no errors allowed
-				killProc()
-				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
-			}
-		case <-doneChan:
-			if !stopping {
-				// trigger the stop
-				stopping = true
-				_ = proc.Stop()
-			}
-		}
-	}
-}
-
-// RunWithClient runs the provided binary.
->>>>>>> 2c340a00a6 (Fix integration test timeouts on Windows (#3949))
 //
 // If `states` are provided, agent runs until each state has been reached. Once reached the
 // Elastic Agent is stopped. If at any time the Elastic Agent logs an error log and the Fixture is not started
@@ -511,7 +434,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	f.setClient(agentClient)
 	defer f.setClient(nil)
 	stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
-å
+
 	var doneChan <-chan time.Time
 	if f.runLength != 0 {
 		doneChan = time.After(f.runLength)
