@@ -6,7 +6,6 @@ package cleaner
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,14 +30,14 @@ func TestCleaner(t *testing.T) {
 	checkDir(t, dir, 0)
 
 	// Create files
-	err := ioutil.WriteFile(watchFilePath, []byte{}, 0600)
+	err := os.WriteFile(watchFilePath, []byte{}, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for i, fn := range removeFiles {
 		removeFilePaths[i] = filepath.Join(dir, fn)
-		err := ioutil.WriteFile(removeFilePaths[i], []byte{}, 0600)
+		err := os.WriteFile(removeFilePaths[i], []byte{}, 0600)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -102,7 +102,7 @@ func TestHTTPClient(t *testing.T) {
 			resp, err := client.Send(ctx, http.MethodGet, "/nested/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, successResp, string(body))
@@ -127,7 +127,7 @@ func TestHTTPClient(t *testing.T) {
 			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, successResp, string(body))
@@ -231,7 +231,7 @@ func TestHTTPClient(t *testing.T) {
 			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, successResp, string(body))
@@ -257,7 +257,7 @@ func TestHTTPClient(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, successResp, string(body))
@@ -300,7 +300,7 @@ func TestHTTPClient(t *testing.T) {
 			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, successResp, string(body))
@@ -331,7 +331,7 @@ func TestHTTPClient(t *testing.T) {
 			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, bytes.NewBuffer([]byte("hello")))
 			require.NoError(t, err)
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, successResp, string(body))
@@ -363,7 +363,7 @@ func TestHTTPClient(t *testing.T) {
 			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, successResp, string(body))

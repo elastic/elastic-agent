@@ -10,7 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -33,7 +33,7 @@ func Pack(patterns ...string) (string, []string, error) {
 			return "", []string{}, errors.New(err, fmt.Sprintf("error while reading pattern %s", p))
 		}
 		for _, f := range files {
-			b, err := ioutil.ReadFile(f)
+			b, err := os.ReadFile(f)
 			if err != nil {
 				return "", []string{}, errors.New(err, fmt.Sprintf("cannot read file %s", f))
 			}
