@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -745,7 +744,7 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 	if err != nil {
 		return err
 	}
-	contents, err := ioutil.ReadDir(componentsDir)
+	contents, err := os.ReadDir(componentsDir)
 	if err != nil {
 		return fmt.Errorf("failed to read contents of components directory %s: %w", componentsDir, err)
 	}
@@ -885,7 +884,7 @@ func getCacheDir(caller string, name string) (string, error) {
 // findComponentsDir identifies the directory that holds the components.
 func findComponentsDir(dir string) (string, error) {
 	dataDir := filepath.Join(dir, "data")
-	agentVersions, err := ioutil.ReadDir(dataDir)
+	agentVersions, err := os.ReadDir(dataDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to read contents of the data directory %s: %w", dataDir, err)
 	}
