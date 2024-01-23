@@ -72,7 +72,7 @@ func Cleanup(log *logger.Logger, currentVersionedHome, currentHash string, remov
 
 	// remove upgrade marker
 	if removeMarker {
-		if err := CleanMarker(log); err != nil {
+		if err := CleanMarker(log, paths.Data()); err != nil {
 			return err
 		}
 	}
@@ -89,8 +89,8 @@ func Cleanup(log *logger.Logger, currentVersionedHome, currentHash string, remov
 	}
 
 	// remove symlink to avoid upgrade failures, ignore error
-	prevSymlink := prevSymlinkPath()
-	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath())
+	prevSymlink := prevSymlinkPath(paths.Top())
+	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(paths.Top()))
 	_ = os.Remove(prevSymlink)
 
 	dirPrefix := fmt.Sprintf("%s-", agentName)

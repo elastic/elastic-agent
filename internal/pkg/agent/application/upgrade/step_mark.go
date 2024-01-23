@@ -172,8 +172,8 @@ func UpdateActiveCommit(log *logger.Logger, hash string) error {
 }
 
 // CleanMarker removes a marker from disk.
-func CleanMarker(log *logger.Logger) error {
-	markerFile := markerFilePath(paths.Data())
+func CleanMarker(log *logger.Logger, dataDirPath string) error {
+	markerFile := markerFilePath(dataDirPath)
 	log.Infow("Removing marker file", "file.path", markerFile)
 	if err := os.Remove(markerFile); !os.IsNotExist(err) {
 		return err
