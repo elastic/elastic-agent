@@ -84,7 +84,7 @@ func (p *statefulProvisioner) Create(ctx context.Context, request runner.StackRe
 		deploymentTags["buildkite_id"] = os.Getenv("BUILDKITE_BUILD_NUMBER")
 		deploymentTags["creator"] = os.Getenv("BUILDKITE_BUILD_CREATOR")
 		deploymentTags["buildkite_url"] = os.Getenv("BUILDKITE_BUILD_URL")
-		deploymentTags["ci"] = os.Getenv("BUILDKITE_BUILD_URL")
+		deploymentTags["ci"] = "true"
 	}
 	resp, err := p.createDeployment(createCtx, request, deploymentTags)
 	if err != nil {
