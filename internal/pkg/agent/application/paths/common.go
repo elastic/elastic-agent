@@ -167,11 +167,16 @@ func ExternalInputs() string {
 
 // Data returns the data directory for Agent
 func Data() string {
+	return DataFrom(Top())
+}
+
+// DataFrom returns the data directory for Agent using the passed directory as top path
+func DataFrom(topDirPath string) string {
 	if unversionedHome {
 		// unversioned means the topPath is the data path
-		return topPath
+		return topDirPath
 	}
-	return filepath.Join(Top(), "data")
+	return filepath.Join(topDirPath, "data")
 }
 
 // Run returns the run directory for Agent
