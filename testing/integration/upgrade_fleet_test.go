@@ -35,11 +35,11 @@ import (
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
-// TestFleetManagedUpgrade tests that the build under test can retrieve an action from
+// TestFleetManagedUpgradeUnprivileged tests that the build under test can retrieve an action from
 // Fleet and perform the upgrade as an unprivileged Elastic Agent. It does not need to test
 // all the combinations of versions as the standalone tests already perform those tests and
 // would be redundant.
-func TestFleetManagedUpgrade(t *testing.T) {
+func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Fleet,
 		Stack: &define.Stack{},
@@ -103,7 +103,7 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool)
 	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged)
 }
 
-func TestFleetAirGappedUpgrade(t *testing.T) {
+func TestFleetAirGappedUpgradeUnprivileged(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
 		Group: FleetAirgapped,
 		Stack: &define.Stack{},
@@ -247,7 +247,7 @@ func testUpgradeFleetManagedElasticAgent(
 	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
 
-	t.Log("Installing Elastic Agent...")
+	t.Logf("Installing Elastic Agent (unprivileged: %t)...", unprivileged)
 	var nonInteractiveFlag bool
 	if upgradetest.Version_8_2_0.Less(*startParsedVersion) {
 		nonInteractiveFlag = true
