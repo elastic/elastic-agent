@@ -130,20 +130,23 @@ type inspectConfigOpts struct {
 func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, streams *cli.IOStreams) error {
 	l, err := newErrorLogger()
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating logger: %w", err)
 	}
 
 	if !opts.variables && !opts.includeMonitoring {
 		fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true)
 		if err != nil {
-			return err
+			return fmt.Errorf("error loading agent config: %w", err)
 		}
-		return printConfig(fullCfg, streams)
+		err = printConfig(fullCfg, streams)
+		if err != nil {
+			return fmt.Errorf("error printing config: %w", err)
+		}
 	}
 
 	cfg, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
-		return err
+		return fmt.Errorf("error fetching config with variables: %w", err)
 	}
 
 	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
@@ -212,12 +215,17 @@ func printMapStringConfig(mapStr map[string]interface{}, streams *cli.IOStreams)
 	return err
 }
 
+// convert the config object to a mapstr and print to the stream specified in in streams.Out
 func printConfig(cfg *config.Config, streams *cli.IOStreams) error {
 	mapStr, err := cfg.ToMapStr()
 	if err != nil {
-		return err
+		return fmt.Errorf("error parsing config as hashmap: %w", err)
 	}
-	return printMapStringConfig(mapStr, streams)
+	err = printMapStringConfig(mapStr, streams)
+	if err != nil {
+		return fmt.Errorf("error printing config to output: %w", err)
+	}
+	return nil
 }
 
 type inspectComponentsOpts struct {

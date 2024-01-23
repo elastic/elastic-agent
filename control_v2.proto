@@ -133,8 +133,7 @@ message ComponentUnitState {
 message ComponentVersionInfo {
   // Name of the component.
   string name = 1;
-  // Version of the component.
-  string version = 2;
+  // 2 reserved - used to be used for version of component.
   // Extra meta information about the version.
   map<string, string> meta = 3;
 }
