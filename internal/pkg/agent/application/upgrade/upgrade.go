@@ -74,7 +74,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.
 		settings:      settings,
 		agentInfo:     agentInfo,
 		upgradeable:   IsUpgradeable(),
-		markerWatcher: newMarkerFileWatcher(markerFilePath(), log),
+		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
 	}, nil
 }
 

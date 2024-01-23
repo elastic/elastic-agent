@@ -147,7 +147,7 @@ func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, version, h
 		return errors.New(err, errors.TypeConfig, "failed to parse marker file")
 	}
 
-	markerPath := markerFilePath()
+	markerPath := markerFilePath(paths.Data())
 	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", prevHash)
 	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
@@ -173,7 +173,7 @@ func UpdateActiveCommit(log *logger.Logger, hash string) error {
 
 // CleanMarker removes a marker from disk.
 func CleanMarker(log *logger.Logger) error {
-	markerFile := markerFilePath()
+	markerFile := markerFilePath(paths.Data())
 	log.Infow("Removing marker file", "file.path", markerFile)
 	if err := os.Remove(markerFile); !os.IsNotExist(err) {
 		return err
@@ -185,7 +185,7 @@ func CleanMarker(log *logger.Logger) error {
 // LoadMarker loads the update marker. If the file does not exist it returns nil
 // and no error.
 func LoadMarker() (*UpdateMarker, error) {
-	return loadMarker(markerFilePath())
+	return loadMarker(markerFilePath(paths.Data()))
 }
 
 func loadMarker(markerFile string) (*UpdateMarker, error) {
@@ -238,9 +238,9 @@ func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
 		return err
 	}
 
-	return writeMarkerFile(markerFilePath(), markerBytes, shouldFsync)
+	return writeMarkerFile(markerFilePath(paths.Data()), markerBytes, shouldFsync)
 }
 
-func markerFilePath() string {
-	return filepath.Join(paths.Data(), markerFilename)
+func markerFilePath(dataDirPath string) string {
+	return filepath.Join(dataDirPath, markerFilename)
 }
