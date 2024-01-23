@@ -139,12 +139,3 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 
 	return nil
 }
-
-// InstallStandaloneAgent force install the Elastic Agent through agentFixture.
-func InstallStandaloneAgent(ctx context.Context, agentFixture *atesting.Fixture) ([]byte, error) {
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-	}
-	return agentFixture.Install(ctx, &installOpts)
-}

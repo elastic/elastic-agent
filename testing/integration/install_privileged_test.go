@@ -8,28 +8,25 @@ package integration
 
 import (
 	"context"
-	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+
+	"github.com/stretchr/testify/require"
 )
 
-func TestInstallWithoutBasePath(t *testing.T) {
+func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
 		// We require sudo for this test to run
-		// `elastic-agent install` (even though it will
-		// be installed as non-root).
+		// `elastic-agent install`.
 		Sudo: true,
 
 		// It's not safe to run this test locally as it
@@ -65,7 +62,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	opts := &atesting.InstallOpts{Force: true}
+	opts := &atesting.InstallOpts{Force: true, Unprivileged: atesting.NewBool(false)}
 	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
@@ -77,12 +74,11 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }
 
-func TestInstallWithBasePath(t *testing.T) {
+func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
 		// We require sudo for this test to run
-		// `elastic-agent install` (even though it will
-		// be installed as non-root).
+		// `elastic-agent install`.
 		Sudo: true,
 
 		// It's not safe to run this test locally as it
@@ -104,30 +100,15 @@ func TestInstallWithBasePath(t *testing.T) {
 	// Set up random temporary directory to serve as base path for Elastic Agent
 	// installation.
 	tmpDir := t.TempDir()
-	basePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
+	randomBasePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	opts := &atesting.InstallOpts{
-		BasePath: basePath,
-		Force:    true,
+		BasePath:     randomBasePath,
+		Force:        true,
+		Unprivileged: atesting.NewBool(false),
 	}
-	if opts.IsUnprivileged(runtime.GOOS) {
-		switch runtime.GOOS {
-		case define.Linux:
-			// When installing with unprivileged using a base path the
-			// base needs to be accessible by the `elastic-agent` user that will be
-			// executing the process, but is not created yet. Using a base that exists
-			// and is known to be accessible by standard users, ensures this tests
-			// works correctly and will not hit a permission issue when spawning the
-			// elastic-agent service.
-			basePath = `/usr`
-		default:
-			t.Fatalf("only Linux supports unprivileged mode")
-		}
-		opts.BasePath = basePath
-	}
-
 	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
@@ -135,66 +116,7 @@ func TestInstallWithBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in the custom base path
-	topPath := filepath.Join(basePath, "Elastic", "Agent")
+	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
 	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-}
-
-func checkInstallSuccess(t *testing.T, topPath string, unprivileged bool) {
-	t.Helper()
-	_, err := os.Stat(topPath)
-	require.NoError(t, err)
-
-	// Check that a few expected installed files are present
-	installedBinPath := filepath.Join(topPath, exeOnWindows("elastic-agent"))
-	installedDataPath := filepath.Join(topPath, "data")
-	installMarkerPath := filepath.Join(topPath, ".installed")
-
-	_, err = os.Stat(installedBinPath)
-	require.NoError(t, err)
-	_, err = os.Stat(installedDataPath)
-	require.NoError(t, err)
-	_, err = os.Stat(installMarkerPath)
-	require.NoError(t, err)
-
-	if unprivileged {
-		// Specific checks depending on the platform.
-		checkPlatformUnprivileged(t, topPath)
-
-		// Executing `elastic-agent status` as the `elastic-agent` user should work.
-		var output []byte
-		require.Eventuallyf(t, func() bool {
-			cmd := exec.Command("sudo", "-u", "elastic-agent", "elastic-agent", "status")
-			output, err = cmd.CombinedOutput()
-			return err == nil
-		}, 3*time.Minute, 1*time.Second, "status never successful: %s (output: %s)", err, output)
-
-		// Executing `elastic-agent status` as the original user should fail, because that
-		// user is not in the 'elastic-agent' group.
-		originalUser := os.Getenv("SUDO_USER")
-		if originalUser != "" {
-			cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
-			output, err := cmd.CombinedOutput()
-			require.Error(t, err, "running sudo -u %s elastic-agent status should have failed: %s", originalUser, output)
-		}
-	}
-}
-
-func randStr(length int) string {
-	rand.Seed(time.Now().UnixNano())
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-	runes := make([]rune, length)
-	for i := range runes {
-		runes[i] = letters[rand.Intn(len(letters))]
-	}
-
-	return string(runes)
-}
-
-func exeOnWindows(filename string) string {
-	if runtime.GOOS == define.Windows {
-		return filename + ".exe"
-	}
-	return filename
 }
