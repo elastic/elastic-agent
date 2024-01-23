@@ -7,7 +7,6 @@ package kubernetes
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -58,8 +57,8 @@ func (d *IntegrationTester) StepRequirements() mage.IntegrationTestSteps {
 
 // Test performs the tests with kubernetes.
 func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]string) error {
-	stdOut := ioutil.Discard
-	stdErr := ioutil.Discard
+	stdOut := io.Discard
+	stdErr := io.Discard
 	if mg.Verbose() {
 		stdOut = os.Stdout
 		stdErr = os.Stderr

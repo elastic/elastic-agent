@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -32,7 +31,7 @@ func getSeed(path string) ([]byte, error) {
 	mxSeed.Lock()
 	defer mxSeed.Unlock()
 
-	b, err := ioutil.ReadFile(fp)
+	b, err := os.ReadFile(fp)
 	if err != nil {
 		return nil, fmt.Errorf("could not read seed file: %w", err)
 	}
@@ -50,7 +49,7 @@ func createSeedIfNotExists(path string) ([]byte, error) {
 	mxSeed.Lock()
 	defer mxSeed.Unlock()
 
-	b, err := ioutil.ReadFile(fp)
+	b, err := os.ReadFile(fp)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
@@ -66,7 +65,7 @@ func createSeedIfNotExists(path string) ([]byte, error) {
 		return nil, err
 	}
 
-	err = ioutil.WriteFile(fp, seed, 0600)
+	err = os.WriteFile(fp, seed, 0600)
 	if err != nil {
 		return nil, err
 	}

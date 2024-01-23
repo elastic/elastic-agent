@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -126,14 +125,14 @@ func DefaultTestBinaryArgs() TestBinaryArgs {
 // Use MODULE=module to run only tests for `module`.
 func GoTestIntegrationForModule(ctx context.Context) error {
 	module := EnvOr("MODULE", "")
-	modulesFileInfo, err := ioutil.ReadDir("./module")
+	modulesDirEntry, err := os.ReadDir("./module")
 	if err != nil {
 		return err
 	}
 
 	foundModule := false
 	failedModules := []string{}
-	for _, fi := range modulesFileInfo {
+	for _, fi := range modulesDirEntry {
 		if !fi.IsDir() {
 			continue
 		}
@@ -327,7 +326,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		codecovReport = strings.TrimSuffix(params.CoverageProfileFile,
 			filepath.Ext(params.CoverageProfileFile)) + "-cov.xml"
 
-		coverage, err := ioutil.ReadFile(params.CoverageProfileFile)
+		coverage, err := os.ReadFile(params.CoverageProfileFile)
 		if err != nil {
 			return fmt.Errorf("failed to read code coverage report: %w", err)
 		}
@@ -364,7 +363,7 @@ func makeCommand(ctx context.Context, env map[string]string, cmd string, args ..
 	for k, v := range env {
 		c.Env = append(c.Env, k+"="+v)
 	}
-	c.Stdout = ioutil.Discard
+	c.Stdout = io.Discard
 	if mg.Verbose() {
 		c.Stdout = os.Stdout
 	}
