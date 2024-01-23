@@ -23,19 +23,19 @@ const (
 )
 
 // ChangeSymlink updates symlink paths to match current version.
-func ChangeSymlink(ctx context.Context, log *logger.Logger, targetHash string) error {
+func ChangeSymlink(ctx context.Context, log *logger.Logger, topDirPath, targetHash string) error {
 	// create symlink to elastic-agent-{hash}
 	hashedDir := fmt.Sprintf("%s-%s", agentName, targetHash)
 
-	symlinkPath := filepath.Join(paths.Top(), agentName)
+	symlinkPath := filepath.Join(topDirPath, agentName)
 
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-	newPath := paths.BinaryPath(filepath.Join(paths.Top(), "data", hashedDir), agentName)
+	newPath := paths.BinaryPath(filepath.Join(paths.DataFrom(topDirPath), hashedDir), agentName)
 
-	return changeSymlinkInternal(log, symlinkPath, newPath)
+	return changeSymlinkInternal(log, topDirPath, symlinkPath, newPath)
 }
 
-func changeSymlinkInternal(log *logger.Logger, symlinkPath, newTarget string) error {
+func changeSymlinkInternal(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 
 	// handle windows suffixes
 	if runtime.GOOS == windows {
@@ -43,7 +43,7 @@ func changeSymlinkInternal(log *logger.Logger, symlinkPath, newTarget string) er
 		newTarget += exe
 	}
 
-	prevNewPath := prevSymlinkPath(paths.Top())
+	prevNewPath := prevSymlinkPath(topDirPath)
 	log.Infow("Changing symlink", "symlink_path", symlinkPath, "new_path", newTarget, "prev_path", prevNewPath)
 
 	// remove symlink to avoid upgrade failures

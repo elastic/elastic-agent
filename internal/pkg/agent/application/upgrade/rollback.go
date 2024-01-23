@@ -34,24 +34,25 @@ const (
 
 // Rollback rollbacks to previous version which was functioning before upgrade.
 func Rollback(ctx context.Context, log *logger.Logger, prevVersionedHome, prevHash string, currentHash string) error {
-	symlinkPath := filepath.Join(paths.Top(), agentName)
+	topDirPath := paths.Top()
+	symlinkPath := filepath.Join(topDirPath, agentName)
 
 	var symlinkTarget string
 	if prevVersionedHome != "" {
-		symlinkTarget = paths.BinaryPath(filepath.Join(paths.Top(), prevVersionedHome), agentName)
+		symlinkTarget = paths.BinaryPath(filepath.Join(topDirPath, prevVersionedHome), agentName)
 	} else {
 		// fallback for upgrades that didn't use the manifest and path remapping
 		hashedDir := fmt.Sprintf("%s-%s", agentName, prevHash)
 		// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-		symlinkTarget = paths.BinaryPath(filepath.Join(paths.Top(), "data", hashedDir), agentName)
+		symlinkTarget = paths.BinaryPath(filepath.Join(paths.DataFrom(topDirPath), hashedDir), agentName)
 	}
 	// change symlink
-	if err := changeSymlinkInternal(log, symlinkPath, symlinkTarget); err != nil {
+	if err := changeSymlinkInternal(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
 		return err
 	}
 
 	// revert active commit
-	if err := UpdateActiveCommit(log, prevHash); err != nil {
+	if err := UpdateActiveCommit(log, topDirPath, prevHash); err != nil {
 		return err
 	}
 
@@ -62,23 +63,23 @@ func Rollback(ctx context.Context, log *logger.Logger, prevVersionedHome, prevHa
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, prevVersionedHome, prevHash, true, true)
+	return Cleanup(log, paths.Top(), prevVersionedHome, prevHash, true, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
-func Cleanup(log *logger.Logger, currentVersionedHome, currentHash string, removeMarker bool, keepLogs bool) error {
+func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
 	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
 	<-time.After(afterRestartDelay)
 
 	// remove upgrade marker
 	if removeMarker {
-		if err := CleanMarker(log, paths.Data()); err != nil {
+		if err := CleanMarker(log, paths.DataFrom(topDirPath)); err != nil {
 			return err
 		}
 	}
 
 	// remove data/elastic-agent-{hash}
-	dataDir, err := os.Open(paths.Data())
+	dataDir, err := os.Open(paths.DataFrom(topDirPath))
 	if err != nil {
 		return err
 	}
@@ -89,8 +90,8 @@ func Cleanup(log *logger.Logger, currentVersionedHome, currentHash string, remov
 	}
 
 	// remove symlink to avoid upgrade failures, ignore error
-	prevSymlink := prevSymlinkPath(paths.Top())
-	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(paths.Top()))
+	prevSymlink := prevSymlinkPath(topDirPath)
+	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(topDirPath))
 	_ = os.Remove(prevSymlink)
 
 	dirPrefix := fmt.Sprintf("%s-", agentName)
@@ -113,7 +114,7 @@ func Cleanup(log *logger.Logger, currentVersionedHome, currentHash string, remov
 			continue
 		}
 
-		hashedDir := filepath.Join(paths.Data(), dir)
+		hashedDir := filepath.Join(paths.DataFrom(topDirPath), dir)
 		log.Infow("Removing hashed data directory", "file.path", hashedDir)
 		var ignoredDirs []string
 		if keepLogs {
