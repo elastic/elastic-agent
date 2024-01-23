@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -43,7 +42,7 @@ func NewReplaceOnSuccessStore(target string, replaceWith []byte, wrapped Store) 
 // Save will replace a target file with new content if the wrapped store is successful.
 func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 	// Ensure we can read the target files before delegating any call to the wrapped store.
-	target, err := ioutil.ReadFile(r.target)
+	target, err := os.ReadFile(r.target)
 	if err != nil {
 		return errors.New(err,
 			fmt.Sprintf("fail to read content of %s", r.target),

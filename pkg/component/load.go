@@ -7,7 +7,6 @@ package component
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -196,7 +195,7 @@ func specFilesForDirectory(dir string) (map[string]Spec, error) {
 		return nil, err
 	}
 	for _, match := range matches {
-		data, err := ioutil.ReadFile(match)
+		data, err := os.ReadFile(match)
 		if err != nil {
 			return nil, fmt.Errorf("failed reading spec %s: %w", match, err)
 		}

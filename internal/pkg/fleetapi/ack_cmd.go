@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 
 	"go.elastic.co/apm"
 
@@ -124,7 +124,7 @@ func (e *AckCmd) Execute(ctx context.Context, r *AckRequest) (_ *AckResponse, er
 	defer resp.Body.Close()
 
 	// Read ack response always it can be sent with any status code.
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,7 @@
 package component
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -97,7 +97,7 @@ func TestLoadSpec_Components(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
-			data, err := ioutil.ReadFile(filepath.Join("..", "..", "specs", scenario.Path))
+			data, err := os.ReadFile(filepath.Join("..", "..", "specs", scenario.Path))
 			require.NoError(t, err)
 			_, err = LoadSpec(data)
 			require.NoError(t, err)
