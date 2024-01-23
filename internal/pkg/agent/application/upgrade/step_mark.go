@@ -153,7 +153,7 @@ func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, version, h
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
 	}
 
-	if err := UpdateActiveCommit(log, hash); err != nil {
+	if err := UpdateActiveCommit(log, paths.Top(), hash); err != nil {
 		return err
 	}
 
@@ -161,8 +161,8 @@ func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, version, h
 }
 
 // UpdateActiveCommit updates active.commit file to point to active version.
-func UpdateActiveCommit(log *logger.Logger, hash string) error {
-	activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
+func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string) error {
+	activeCommitPath := filepath.Join(topDirPath, agentCommitFile)
 	log.Infow("Updating active commit", "file.path", activeCommitPath, "hash", hash)
 	if err := os.WriteFile(activeCommitPath, []byte(hash), 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath))
