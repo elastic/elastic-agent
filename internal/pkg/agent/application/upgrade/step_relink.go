@@ -43,7 +43,7 @@ func changeSymlinkInternal(log *logger.Logger, symlinkPath, newTarget string) er
 		newTarget += exe
 	}
 
-	prevNewPath := prevSymlinkPath()
+	prevNewPath := prevSymlinkPath(paths.Top())
 	log.Infow("Changing symlink", "symlink_path", symlinkPath, "new_path", newTarget, "prev_path", prevNewPath)
 
 	// remove symlink to avoid upgrade failures
@@ -59,7 +59,7 @@ func changeSymlinkInternal(log *logger.Logger, symlinkPath, newTarget string) er
 	return file.SafeFileRotate(symlinkPath, prevNewPath)
 }
 
-func prevSymlinkPath() string {
+func prevSymlinkPath(topDirPath string) string {
 	agentPrevName := agentName + ".prev"
 
 	// handle windows suffixes
@@ -67,5 +67,5 @@ func prevSymlinkPath() string {
 		agentPrevName = agentName + ".exe.prev"
 	}
 
-	return filepath.Join(paths.Top(), agentPrevName)
+	return filepath.Join(topDirPath, agentPrevName)
 }
