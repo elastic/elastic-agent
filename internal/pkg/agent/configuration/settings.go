@@ -14,13 +14,14 @@ import (
 
 // SettingsConfig is an collection of agent settings configuration.
 type SettingsConfig struct {
-	ID               string                          `yaml:"id" config:"id" json:"id"`
-	DownloadConfig   *artifact.Config                `yaml:"download" config:"download" json:"download"`
-	ProcessConfig    *process.Config                 `yaml:"process" config:"process" json:"process"`
-	GRPC             *GRPCConfig                     `yaml:"grpc" config:"grpc" json:"grpc"`
-	MonitoringConfig *monitoringCfg.MonitoringConfig `yaml:"monitoring" config:"monitoring" json:"monitoring"`
-	LoggingConfig    *logger.Config                  `yaml:"logging,omitempty" config:"logging,omitempty" json:"logging,omitempty"`
-	Upgrade          *UpgradeConfig                  `yaml:"upgrade" config:"upgrade" json:"upgrade"`
+	ID                     string                          `yaml:"id" config:"id" json:"id"`
+	DownloadConfig         *artifact.Config                `yaml:"download" config:"download" json:"download"`
+	ProcessConfig          *process.Config                 `yaml:"process" config:"process" json:"process"`
+	GRPC                   *GRPCConfig                     `yaml:"grpc" config:"grpc" json:"grpc"`
+	MonitoringConfig       *monitoringCfg.MonitoringConfig `yaml:"monitoring" config:"monitoring" json:"monitoring"`
+	LoggingConfig          *logger.Config                  `yaml:"logging,omitempty" config:"logging,omitempty" json:"logging,omitempty"`
+	SensitiveLoggingConfig *logger.Config                  `yaml:"logging.sensitive,omitempty" config:"logging.sensitive,omitempty" json:"logging.sensitive,omitempty"`
+	Upgrade                *UpgradeConfig                  `yaml:"upgrade" config:"upgrade" json:"upgrade"`
 
 	// standalone config
 	Reload              *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`
@@ -31,13 +32,14 @@ type SettingsConfig struct {
 // DefaultSettingsConfig creates a config with pre-set default values.
 func DefaultSettingsConfig() *SettingsConfig {
 	return &SettingsConfig{
-		ProcessConfig:       process.DefaultConfig(),
-		DownloadConfig:      artifact.DefaultConfig(),
-		LoggingConfig:       logger.DefaultLoggingConfig(),
-		MonitoringConfig:    monitoringCfg.DefaultConfig(),
-		GRPC:                DefaultGRPCConfig(),
-		Upgrade:             DefaultUpgradeConfig(),
-		Reload:              DefaultReloadConfig(),
-		V1MonitoringEnabled: true,
+		ProcessConfig:          process.DefaultConfig(),
+		DownloadConfig:         artifact.DefaultConfig(),
+		LoggingConfig:          logger.DefaultLoggingConfig(),
+		SensitiveLoggingConfig: logger.DefaultSensitiveLoggingConfig(),
+		MonitoringConfig:       monitoringCfg.DefaultConfig(),
+		GRPC:                   DefaultGRPCConfig(),
+		Upgrade:                DefaultUpgradeConfig(),
+		Reload:                 DefaultReloadConfig(),
+		V1MonitoringEnabled:    true,
 	}
 }

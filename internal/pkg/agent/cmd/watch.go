@@ -200,7 +200,7 @@ func gracePeriod(marker *upgrade.UpdateMarker, gracePeriodDuration time.Duration
 func configuredLogger(cfg *configuration.Configuration) (*logger.Logger, error) {
 	cfg.Settings.LoggingConfig.Beat = watcherName
 	cfg.Settings.LoggingConfig.Level = logp.DebugLevel
-	internal, err := logger.MakeInternalFileOutput(cfg.Settings.LoggingConfig)
+	internal, err := logger.MakeInternalFileOutput(cfg.Settings.LoggingConfig.Beat, cfg.Settings.LoggingConfig.Level)
 	if err != nil {
 		return nil, err
 	}

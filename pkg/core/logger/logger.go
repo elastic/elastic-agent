@@ -87,7 +87,7 @@ func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
 
 	var outputs []zapcore.Core
 	if logInternal {
-		internal, err := MakeInternalFileOutput(cfg)
+		internal, err := MakeInternalFileOutput(cfg.Beat, cfg.Level)
 		if err != nil {
 			return nil, err
 		}
@@ -147,15 +147,36 @@ func DefaultLoggingConfig() *Config {
 	return &cfg
 }
 
+// DefaultLoggingConfig returns default configuration for agent logging.
+func DefaultSensitiveLoggingConfig() *Config {
+	cfg := logp.DefaultConfig(logp.DefaultEnvironment)
+	cfg.Beat = agentName
+	cfg.Level = DefaultLogLevel
+	cfg.ToFiles = true
+	// That's the same path useb by MakeInternalFileOutput
+	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory)
+	cfg.Files.Name = agentName + "-sensitive"
+	cfg.Files.MaxSize = 5 * 1024 * 1024
+	cfg.Files.MaxBackups = 2
+	cfg.Files.Permissions = 0600 // default user only
+	root, _ := utils.HasRoot()   // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		cfg.Files.Permissions = 0660
+	}
+
+	return &cfg
+}
+
 // makeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
 //
 // This is the logger that the spawned filebeat expects to read the log file from and ship to ES.
-func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
+func MakeInternalFileOutput(beatName string, level logp.Level) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
-	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
+	filename := filepath.Join(paths.Home(), DefaultLogDirectory, beatName)
+	al := zap.NewAtomicLevelAt(level.ZapLevel())
 	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
 	permissions := 0600        // default user only
 	root, _ := utils.HasRoot() // error ignored
@@ -173,6 +194,34 @@ func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	)
 	if err != nil {
 		return nil, errors.New("failed to create internal file rotator")
+	}
+
+	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())
+	encoderConfig.EncodeTime = UtcTimestampEncode
+	encoder := zapcore.NewJSONEncoder(encoderConfig)
+	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, internalLevelEnabler)), nil
+}
+
+func MakeFileOutput(cfg logp.Config) (zapcore.Core, error) {
+	filename := filepath.Join(cfg.Files.Path, cfg.Files.Name)
+	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
+	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
+	permissions := 0600        // default user only
+	root, _ := utils.HasRoot() // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		permissions = 0660
+	}
+	rotator, err := file.NewFileRotator(filename,
+		file.MaxSizeBytes(cfg.Files.MaxSize),
+		file.MaxBackups(cfg.Files.MaxBackups),
+		file.Permissions(os.FileMode(permissions)),
+		file.Interval(cfg.Files.Interval),
+		file.RotateOnStartup(cfg.Files.RotateOnStartup),
+		file.RedirectStderr(cfg.Files.RedirectStderr),
+	)
+	if err != nil {
+		return nil, errors.New("failed to create file rotator")
 	}
 
 	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())
