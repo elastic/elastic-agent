@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -91,26 +92,9 @@ func TestCleanup(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 			checkAfterCleanup: func(t *testing.T, topDir string) {
-				// the old agent directory must not exist anymore
-				oldAgentHome := "elastic-agent-abcdef"
-				assert.NoDirExists(t, filepath.Join(topDir, "data", oldAgentHome), "old agent directory should be deleted after cleanup")
-				newAgentHome := "elastic-agent-ghijkl"
-				assert.DirExists(t, filepath.Join(topDir, "data", newAgentHome), "new agent directory should exist after cleanup")
-				agentExecutable := agentName
-				if runtime.GOOS == "windows" {
-					agentExecutable += ".exe"
-				}
-				symlinkPath := filepath.Join(topDir, agentExecutable)
-				linkTarget, err := os.Readlink(symlinkPath)
-				if assert.NoError(t, err, "unable to read symbolic link") {
-					assert.Equal(t, filepath.Join("data", newAgentHome, agentExecutable), linkTarget, "symbolic link should point to the new agent executable after cleanup")
-				}
-
-				// read the elastic agent placeholder via the symlink
-				elasticAgentBytes, err := os.ReadFile(symlinkPath)
-				if assert.NoError(t, err, "error reading elastic-agent content through the symlink") {
-					assert.Equal(t, []byte("Placeholder for agent 4.5.6-SNAPSHOT"), elasticAgentBytes, "reading elastic-agent content through symbolic link should point to the new version")
-				}
+				oldAgentHome := filepath.Join("data", "elastic-agent-abcdef")
+				newAgentHome := filepath.Join("data", "elastic-agent-ghijkl")
+				checkFilesAfterCleanup(t, topDir, oldAgentHome, newAgentHome)
 			},
 		},
 		{
@@ -138,27 +122,9 @@ func TestCleanup(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 			checkAfterCleanup: func(t *testing.T, topDir string) {
-				// the old agent directory must not exist anymore
-				oldAgentHome := "elastic-agent-1.2.3-SNAPSHOT-abcdef"
-				assert.NoDirExists(t, filepath.Join(topDir, "data", oldAgentHome), "old agent directory should be deleted after cleanup")
-
-				newAgentHome := "elastic-agent-4.5.6-SNAPSHOT-ghijkl"
-				assert.DirExists(t, filepath.Join(topDir, "data", newAgentHome), "new agent directory should exist after cleanup")
-				agentExecutable := agentName
-				if runtime.GOOS == "windows" {
-					agentExecutable += ".exe"
-				}
-				symlinkPath := filepath.Join(topDir, agentExecutable)
-				linkTarget, err := os.Readlink(symlinkPath)
-				if assert.NoError(t, err, "unable to read symbolic link") {
-					assert.Equal(t, filepath.Join("data", newAgentHome, agentExecutable), linkTarget, "symbolic link should point to the new agent executable after cleanup")
-				}
-
-				// read the elastic agent placeholder via the symlink
-				elasticAgentBytes, err := os.ReadFile(symlinkPath)
-				if assert.NoError(t, err, "error reading elastic-agent content through the symlink") {
-					assert.Equal(t, []byte("Placeholder for agent 4.5.6-SNAPSHOT"), elasticAgentBytes, "reading elastic-agent content through symbolic link should point to the new version")
-				}
+				oldAgentHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef")
+				newAgentHome := filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl")
+				checkFilesAfterCleanup(t, topDir, oldAgentHome, newAgentHome)
 			},
 		},
 		{
@@ -186,27 +152,9 @@ func TestCleanup(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 			checkAfterCleanup: func(t *testing.T, topDir string) {
-				// the old agent directory must not exist anymore
-				oldAgentHome := "elastic-agent-abcdef"
-				assert.NoDirExists(t, filepath.Join(topDir, "data", oldAgentHome), "old agent directory should be deleted after cleanup")
-
-				newAgentHome := "elastic-agent-4.5.6-SNAPSHOT-ghijkl"
-				assert.DirExists(t, filepath.Join(topDir, "data", newAgentHome), "new agent directory should exist after cleanup")
-				agentExecutable := agentName
-				if runtime.GOOS == "windows" {
-					agentExecutable += ".exe"
-				}
-				symlinkPath := filepath.Join(topDir, agentExecutable)
-				linkTarget, err := os.Readlink(symlinkPath)
-				if assert.NoError(t, err, "unable to read symbolic link") {
-					assert.Equal(t, filepath.Join("data", newAgentHome, agentExecutable), linkTarget, "symbolic link should point to the new agent executable after cleanup")
-				}
-
-				// read the elastic agent placeholder via the symlink
-				elasticAgentBytes, err := os.ReadFile(symlinkPath)
-				if assert.NoError(t, err, "error reading elastic-agent content through the symlink") {
-					assert.Equal(t, []byte("Placeholder for agent 4.5.6-SNAPSHOT"), elasticAgentBytes, "reading elastic-agent content through symbolic link should point to the new version")
-				}
+				oldAgentHome := filepath.Join("data", "elastic-agent-abcdef")
+				newAgentHome := filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl")
+				checkFilesAfterCleanup(t, topDir, oldAgentHome, newAgentHome)
 			},
 		},
 	}
@@ -218,7 +166,11 @@ func TestCleanup(t *testing.T) {
 				tt.additionalSetup(t, testTop)
 			}
 			testLogger, _ := logger.NewTesting(t.Name())
-			tt.wantErr(t, Cleanup(testLogger, testTop, tt.args.currentVersionedHome, tt.args.currentHash, tt.args.removeMarker, tt.args.keepLogs), fmt.Sprintf("Cleanup(%v, %v, %v, %v)", tt.args.currentVersionedHome, tt.args.currentHash, tt.args.removeMarker, tt.args.keepLogs))
+			marker, err := LoadMarker(paths.DataFrom(testTop))
+			require.NoError(t, err, "error loading update marker")
+			require.NotNil(t, marker, "loaded marker must not be nil")
+			t.Logf("Loaded update marker %+v", marker)
+			tt.wantErr(t, Cleanup(testLogger, testTop, marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs), fmt.Sprintf("Cleanup(%v, %v, %v, %v)", marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs))
 			tt.checkAfterCleanup(t, testTop)
 		})
 	}
@@ -233,9 +185,11 @@ func TestRollback(t *testing.T) {
 		currentHash       string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr assert.ErrorAssertionFunc
+		name               string
+		agentInstallsSetup setupAgentInstallations
+		additionalSetup    hookFunc
+		args               args
+		wantErr            assert.ErrorAssertionFunc
 	}{
 		// TODO: Add test cases.
 	}
@@ -246,6 +200,35 @@ func TestRollback(t *testing.T) {
 	}
 }
 
+// checkFilesAfterCleanup is a convenience function to check the file structure within topDir.
+// *AgentHome paths must be the expected old and new agent paths relative to topDir (typically in the form of "data/elastic-agent-*")
+func checkFilesAfterCleanup(t *testing.T, topDir, oldAgentHome, newAgentHome string) {
+	t.Helper()
+	// the old agent directory must not exist anymore
+	assert.NoDirExists(t, filepath.Join(topDir, oldAgentHome), "old agent directory should be deleted after cleanup")
+
+	// check the new agent home
+	assert.DirExists(t, filepath.Join(topDir, newAgentHome), "new agent directory should exist after cleanup")
+	agentExecutable := agentName
+	if runtime.GOOS == "windows" {
+		agentExecutable += ".exe"
+	}
+	symlinkPath := filepath.Join(topDir, agentExecutable)
+	linkTarget, err := os.Readlink(symlinkPath)
+	if assert.NoError(t, err, "unable to read symbolic link") {
+		assert.Equal(t, filepath.Join(newAgentHome, agentExecutable), linkTarget, "symbolic link should point to the new agent executable after cleanup")
+	}
+
+	// read the elastic agent placeholder via the symlink
+	elasticAgentBytes, err := os.ReadFile(symlinkPath)
+	if assert.NoError(t, err, "error reading elastic-agent content through the symlink") {
+		assert.Equal(t, []byte("Placeholder for agent 4.5.6-SNAPSHOT"), elasticAgentBytes, "reading elastic-agent content through symbolic link should point to the new version")
+	}
+
+	assert.NoFileExists(t, filepath.Join(topDir, "data", markerFilename), "update marker should have been cleaned up")
+}
+
+// setupAgents create fake agent installs, update marker file and symlink pointing to one of the installations' elastic-agent placeholder
 func setupAgents(t *testing.T, topDir string, installations setupAgentInstallations) {
 
 	var (
@@ -253,6 +236,7 @@ func setupAgents(t *testing.T, topDir string, installations setupAgentInstallati
 		oldAgentVersionedHome string
 		newAgentVersion       agentVersion
 		newAgentVersionedHome string
+		useNewMarker          bool
 	)
 	for _, ia := range installations.installedAgents {
 		versionedHome := createFakeAgentInstall(t, topDir, ia.version.version, ia.version.hash, ia.useVersionInPath)
@@ -267,6 +251,7 @@ func setupAgents(t *testing.T, topDir string, installations setupAgentInstallati
 			t.Logf("Setting version %+v as TO version for the update marker", ia.version)
 			newAgentVersion = ia.version
 			newAgentVersionedHome = versionedHome
+			useNewMarker = ia.useVersionInPath
 		}
 
 		if installations.currentAgent == ia.version {
@@ -276,9 +261,11 @@ func setupAgents(t *testing.T, topDir string, installations setupAgentInstallati
 	}
 
 	t.Logf("Creating upgrade marker from %+v located at %q to %+v located at %q", oldAgentVersion, oldAgentVersionedHome, newAgentVersion, newAgentVersionedHome)
-	createUpdateMarker(t, topDir, newAgentVersion.version, newAgentVersion.hash, newAgentVersionedHome, oldAgentVersion.version, oldAgentVersion.hash, oldAgentVersionedHome)
+	createUpdateMarker(t, topDir, newAgentVersion.version, newAgentVersion.hash, newAgentVersionedHome, oldAgentVersion.version, oldAgentVersion.hash, oldAgentVersionedHome, useNewMarker)
 }
 
+// createFakeAgentInstall will create a mock agent install within topDir, possibly using the version in the directory name, depending on useVersionInPath
+// it MUST return the path to the created versionedHome relative to topDir, to mirror what step_unpack returns
 func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersionInPath bool) string {
 
 	// create versioned home
@@ -287,8 +274,8 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 		// use the version passed as parameter
 		versionedHome = fmt.Sprintf("elastic-agent-%s-%s", version, hash[:hashLen])
 	}
-
-	absVersionedHomePath := filepath.Join(topDir, "data", versionedHome)
+	relVersionedHomePath := filepath.Join("data", versionedHome)
+	absVersionedHomePath := filepath.Join(topDir, relVersionedHomePath)
 	err := os.MkdirAll(absVersionedHomePath, 0o750)
 	require.NoError(t, err, "error creating fake install versioned home directory %q", absVersionedHomePath)
 
@@ -314,7 +301,9 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 	require.NoErrorf(t, err, "error writing elastic agent binary placeholder %q", agentExecutableName)
 	err = os.WriteFile(filepath.Join(absLogsDirPath, "fakelog.ndjson"), []byte(fmt.Sprintf("Sample logs for agent %s", version)), 0o750)
 	require.NoErrorf(t, err, "error writing fake log placeholder %q")
-	return versionedHome
+
+	// return the path relative to top exactly like the step_unpack does
+	return relVersionedHomePath
 }
 
 func createLink(t *testing.T, topDir string, currentAgentVersionedHome string) {
@@ -324,11 +313,18 @@ func createLink(t *testing.T, topDir string, currentAgentVersionedHome string) {
 		linkTarget += ".exe"
 		linkName += ".exe"
 	}
-	err := os.Symlink(filepath.Join("data", linkTarget), filepath.Join(topDir, linkName))
+	err := os.Symlink(linkTarget, filepath.Join(topDir, linkName))
 	require.NoError(t, err, "error creating test symlink to fake agent install")
 }
 
-func createUpdateMarker(t *testing.T, topDir string, newAgentVersion string, newAgentHash string, newAgentVersionedHome string, oldAgentVersion string, oldAgentHash string, oldAgentVersionedHome string) {
+func createUpdateMarker(t *testing.T, topDir, newAgentVersion, newAgentHash, newAgentVersionedHome, oldAgentVersion, oldAgentHash, oldAgentVersionedHome string, useNewMarker bool) {
+
+	if !useNewMarker {
+		newAgentVersion = ""
+		newAgentVersionedHome = ""
+		oldAgentVersionedHome = ""
+	}
+
 	updMarker := UpdateMarker{
 		Version:           newAgentVersion,
 		Hash:              newAgentHash,

@@ -184,8 +184,8 @@ func CleanMarker(log *logger.Logger, dataDirPath string) error {
 
 // LoadMarker loads the update marker. If the file does not exist it returns nil
 // and no error.
-func LoadMarker() (*UpdateMarker, error) {
-	return loadMarker(markerFilePath(paths.Data()))
+func LoadMarker(dataDirPath string) (*UpdateMarker, error) {
+	return loadMarker(markerFilePath(dataDirPath))
 }
 
 func loadMarker(markerFile string) (*UpdateMarker, error) {
