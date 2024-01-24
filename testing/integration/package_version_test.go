@@ -55,7 +55,7 @@ func TestPackageVersion(t *testing.T) {
 	t.Run("remove package versions file and test version again", testAfterRemovingPkgVersionFiles(ctx, f))
 }
 
-func TestComponentPackageVersionInDiagnostics(t *testing.T) {
+func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Fleet,
 		Stack: &define.Stack{},
@@ -150,8 +150,8 @@ func TestComponentPackageVersionInDiagnostics(t *testing.T) {
 	require.NoError(t, err, "could not parse state.yaml (%s)", stateYAML.Name())
 
 	for _, c := range state.Components {
-		assert.Equalf(t, wantCommitHash, c.State.VersionInfo.Meta.Commit,
-			"component %s has a different commit hash", c.ID)
+		t.Errorf("need to assert BuildHash, not commit. beats have been updated already, a new state struct needs to be generated")
+		_ = c
 	}
 }
 
