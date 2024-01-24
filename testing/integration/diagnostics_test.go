@@ -139,26 +139,42 @@ func TestDiagnosticsCommand(t *testing.T) {
 
 func testDiagnosticsFactory(t *testing.T, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
-		diagnosticCommandWD := t.TempDir()
-		diagnosticCmdOutput, err := fix.Exec(ctx, cmd, process.WithWorkDir(diagnosticCommandWD))
-
-		t.Logf("diagnostic command completed with output \n%q\n", diagnosticCmdOutput)
-		require.NoErrorf(t, err, "error running diagnostic command: %v", err)
-
-		t.Logf("checking directory %q for the generated archive", diagnosticCommandWD)
-		files, err := filepath.Glob(filepath.Join(diagnosticCommandWD, diagnosticsArchiveGlobPattern))
-		require.NoError(t, err)
-		require.Len(t, files, 1)
-		t.Logf("Found %q diagnostic archive.", files[0])
+		diagZip, err := collectDiagnostics(ctx, t, fix, cmd...)
 
 		// get the version of the running agent
 		avi, err := getRunningAgentVersion(ctx, fix)
 		require.NoError(t, err)
 
-		verifyDiagnosticArchive(t, files[0], diagFiles, diagCompFiles, avi)
+		verifyDiagnosticArchive(t, diagZip, diagFiles, diagCompFiles, avi)
 
 		return nil
 	}
+}
+
+// collectDiagnostics collects the agent diagnostics and returns the path to the
+// zip file. If no cmd is passed, `diagnostics` will be used. The working directory
+// of the command will be set to a temporary directory.
+// Use extractZipArchive to extract the diagnostics archive.
+func collectDiagnostics(ctx context.Context, t *testing.T, f *integrationtest.Fixture, cmd ...string) (string, error) {
+	t.Helper()
+
+	if len(cmd) == 0 {
+		cmd = []string{"diagnostics"}
+	}
+
+	wd := t.TempDir()
+	diagnosticCmdOutput, err := f.Exec(ctx, cmd, process.WithWorkDir(wd))
+
+	t.Logf("diagnostic command completed with output \n%q\n", diagnosticCmdOutput)
+	require.NoErrorf(t, err, "error running diagnostic command: %v", err)
+
+	t.Logf("checking directory %q for the generated diagnostics archive", wd)
+	files, err := filepath.Glob(filepath.Join(wd, diagnosticsArchiveGlobPattern))
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	t.Logf("Found %q diagnostic archive.", files[0])
+	return files[0], err
 }
 
 func verifyDiagnosticArchive(t *testing.T, diagArchive string, diagFiles []string, diagCompFiles []string, avi *client.Version) {
@@ -217,6 +233,8 @@ func verifyDiagnosticArchive(t *testing.T, diagArchive string, diagFiles []strin
 }
 
 func extractZipArchive(t *testing.T, zipFile string, dst string) {
+	t.Helper()
+
 	zReader, err := zip.OpenReader(zipFile)
 	require.NoErrorf(t, err, "file %q is not a valid zip archive", zipFile)
 	defer zReader.Close()

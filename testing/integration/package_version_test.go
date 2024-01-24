@@ -9,15 +9,20 @@ package integration
 import (
 	"context"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/version"
 )
@@ -48,6 +53,106 @@ func TestPackageVersion(t *testing.T) {
 
 	// remove the pkg version file and check that we return the default beats version
 	t.Run("remove package versions file and test version again", testAfterRemovingPkgVersionFiles(ctx, f))
+}
+
+func TestComponentPackageVersionInDiagnostics(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+	ctx := context.Background()
+
+	f, err := atesting.NewFixture(
+		t,
+		define.Version(),
+		// TODO(AndersonQ) replace with ArtifactFetcher as soon as the beats
+		// with those changes are available in the API
+		atesting.WithFetcher(atesting.LocalFetcher("../../build/distributions/")),
+	)
+	require.NoError(t, err, "could not create new fixture")
+
+	err = f.Prepare(ctx)
+	require.NoError(t, err, "could not prepare fixture")
+
+	// Set package version
+	pkgVersionFiles := findPkgVersionFiles(t, f.WorkDir())
+	pkgVersion := "8.13.0+build20131123"
+	for _, pkgVerFile := range pkgVersionFiles {
+		err := os.WriteFile(pkgVerFile, []byte(pkgVersion), 0o644)
+		require.NoError(t, err)
+	}
+
+	enrollParams, err := fleettools.NewEnrollParams(ctx, info.KibanaClient)
+	require.NoError(t, err, "failed preparing Agent enrollment")
+
+	t.Log("Installing Elastic Agent...")
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             enrollParams.FleetURL,
+			EnrollmentToken: enrollParams.EnrollmentToken,
+		},
+	}
+	output, err := f.Install(ctx, &installOpts)
+	require.NoError(t, err,
+		"failed to install start agent [output: %s]", string(output))
+
+	wd := f.WorkDir()
+	compPaths, err := filepath.Glob(filepath.Join(wd, "data", "elastic-agent-*", "components", "filebeat"))
+	require.NoError(t, err, "failed to glob filebeat path")
+	require.Lenf(t, compPaths, 1, "got %d filebeat paths, can only have 1",
+		len(compPaths))
+	cmdVer := exec.Command(compPaths[0], "version")
+	output, err = cmdVer.CombinedOutput()
+	require.NoError(t, err, "failed to get filebeat version")
+	outStr := string(output)
+
+	// version output example:
+	// filebeat version 8.13.0 (amd64), libbeat 8.13.0 [0baedd2518bd7e5b78e2280684580cbfdcab5ae8 built 2024-01-23 06:57:37 +0000 UTC
+	t.Log("parsing commit hash from filebeat version: ", outStr)
+	splits := strings.Split(outStr, "[")
+	require.Lenf(t, splits, 2,
+		"expected beats output version to be split into 2, it was split into %q",
+		strings.Join(splits, "|"))
+	splits = strings.Split(splits[1], " built")
+	require.Lenf(t, splits, 2,
+		"expected split of beats output version to be split into 2, it was split into %q",
+		strings.Join(splits, "|"))
+	wantCommitHash := splits[0]
+
+	diagZip, err := collectDiagnostics(ctx, t, f)
+	require.NoError(t, err, "failed collecting diagnostics")
+
+	diag := t.TempDir()
+	extractZipArchive(t, diagZip, diag)
+
+	stateYAML, err := os.Open(filepath.Join(diag, "state.yaml"))
+	require.NoError(t, err, "could not open diagnostics state.yaml")
+
+	state := struct {
+		Components []struct {
+			ID    string `yaml:"id"`
+			State struct {
+				VersionInfo struct {
+					Meta struct {
+						BuildTime string `yaml:"build_time"`
+						Commit    string `yaml:"commit"`
+					} `yaml:"meta"`
+					Name string `yaml:"name"`
+				} `yaml:"version_info"`
+			} `yaml:"state"`
+		} `yaml:"components"`
+	}{}
+	err = yaml.NewDecoder(stateYAML).Decode(&state)
+	require.NoError(t, err, "could not parse state.yaml (%s)", stateYAML.Name())
+
+	for _, c := range state.Components {
+		assert.Equalf(t, wantCommitHash, c.State.VersionInfo.Meta.Commit,
+			"component %s has a different commit hash", c.ID)
+	}
 }
 
 func testVersionWithRunningAgent(runCtx context.Context, f *atesting.Fixture) func(*testing.T) {
@@ -137,4 +242,19 @@ func runAgentWithAfterTest(runCtx context.Context, f *atesting.Fixture, t *testi
 
 	require.NoError(t, err)
 
+}
+
+type StateComponentVersion struct {
+	Components []struct {
+		ID    string `yaml:"id"`
+		State struct {
+			VersionInfo struct {
+				Meta struct {
+					BuildTime string `yaml:"build_time"`
+					Commit    string `yaml:"commit"`
+				} `yaml:"meta"`
+				Name string `yaml:"name"`
+			} `yaml:"version_info"`
+		} `yaml:"state"`
+	} `yaml:"components"`
 }

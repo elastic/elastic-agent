@@ -129,6 +129,11 @@ func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) err
 		// chunking is always allowed if the client supports it
 		Supports:       []proto.ConnectionSupports{proto.ConnectionSupports_CheckinChunking},
 		MaxMessageSize: uint32(c.maxMessageSize),
+		AgentInfo: &proto.AgentInfo{
+			Id:       c.agentInfo.AgentID(),
+			Version:  c.agentInfo.Version(),
+			Snapshot: c.agentInfo.Snapshot(),
+		},
 	}
 	infoBytes, err := protobuf.Marshal(startupInfo)
 	if err != nil {
