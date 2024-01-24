@@ -33,7 +33,7 @@ import (
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath, uninstallToken string, pt *progressbar.ProgressBar) error {
+func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
@@ -69,7 +69,7 @@ func Uninstall(cfgFile, topPath, uninstallToken string, pt *progressbar.Progress
 	}
 
 	// Uninstall components first
-	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken, pt); err != nil {
+	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken, log, pt); err != nil {
 		// If service status was running it was stopped to uninstall the components.
 		// If the components uninstall failed start the service again
 		if status == service.StatusRunning {
@@ -188,31 +188,7 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	return false
 }
 
-func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, pt *progressbar.ProgressBar) error {
-	var err error
-	logCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	logCfg.Level = logp.DebugLevel
-	// Using in memory logger, so we don't write logs to the
-	// directory we are trying to delete
-	logp.ToObserverOutput()(&logCfg)
-
-	err = logp.Configure(logCfg)
-	if err != nil {
-		return fmt.Errorf("error creating logging config: %w", err)
-	}
-
-	log := logger.NewWithoutConfig("")
-
-	defer func() {
-		if err == nil {
-			return
-		}
-		oLogs := logp.ObserverLogs().TakeAll()
-		pt.Describe("Error uninstalling.  Printing logs\n")
-		for _, oLog := range oLogs {
-			fmt.Fprintf(os.Stderr, "%v\n", oLog.Entry)
-		}
-	}()
+func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
 
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
