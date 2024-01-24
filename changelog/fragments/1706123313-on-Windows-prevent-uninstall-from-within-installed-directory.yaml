@@ -11,12 +11,12 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: [Windows] prevent uninstall from within installed directory
+summary: On Windows prevent uninstall from within installed directory
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description:  On Windows, prevent uninstall from within installed directory to prevent a sharing violation.  Also for install and uninstall, print debug logs to stderr if command fails.
+description:  'On Windows, prevent uninstall from within installed directory to prevent a sharing violation.  Also for install and uninstall, print debug logs to stderr if command fails.'
 
 # Affected component; a word indicating the component this changeset affects.
 component: agent
