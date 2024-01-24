@@ -46,9 +46,8 @@ func TestRuntimeComm_WriteConnInfo_packageVersion(t *testing.T) {
 	require.NoError(t, err, "failed to write ConnInfo")
 
 	clientv2, _, err := client.NewV2FromReader(&buff, client.VersionInfo{
-		Name:    "TestRuntimeComm_WriteConnInfo",
-		Version: "not this one",
-		Meta:    nil,
+		Name: "TestRuntimeComm_WriteConnInfo",
+		Meta: nil,
 	})
 	require.NoError(t, err, "failed creating V2 client")
 
