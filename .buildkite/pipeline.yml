@@ -119,23 +119,6 @@ steps:
   - group: "Desktop Windows tests"
     key: "extended-windows"
     steps:
-      - label: "Unit tests - Windows 10"
-        key: "unit-tests-win10"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-        artifact_paths:
-          - "build/TEST-go-unit.html"
-          - "build/TEST-go-unit.xml"
-          - "build/diagnostics/*"
-          - "coverage.out"
-        agents:
-          provider: "gcp"
-          # TODO create own image
-          image: "family/endpoint-windows-10-tester-rel"
-          machine_type: "n2-standard-8"
-          disk_type: "pd-ssd"
-        retry:
-          manual:
-            allowed: true
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
@@ -165,7 +148,6 @@ steps:
       unit-tests-win2016
       unit-tests-win2022
       unit-tests-macos-13
-      unit-tests-win10
       unit-tests-win11
       "
     artifact_paths:
@@ -191,6 +173,7 @@ steps:
         matrix:
           setup:
             k8s_version:
+              - "1.29.0"
               - "1.28.0"
               - "1.27.3"
               - "1.26.6"

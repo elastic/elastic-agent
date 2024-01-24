@@ -7,7 +7,7 @@ package client
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -47,7 +47,7 @@ func TestHTTPClient(t *testing.T) {
 			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, `{ message: "hello" }`, string(body))
@@ -104,7 +104,7 @@ func TestHTTPClient(t *testing.T) {
 			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, `{ message: "hello" }`, string(body))

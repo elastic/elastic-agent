@@ -170,7 +170,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	det.SetState(details.StateExtracting)
 
-	newHash, err := u.unpack(version, archivePath)
+	newHash, err := u.unpack(version, archivePath, paths.Data())
 	if err != nil {
 		return nil, err
 	}

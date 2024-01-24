@@ -7,7 +7,6 @@ package mage
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -159,7 +158,7 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 		}
 	}
 
-	data, err := ioutil.ReadFile(confFile.Template)
+	data, err := os.ReadFile(confFile.Template)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read config template %q", confFile.Template)
 	}

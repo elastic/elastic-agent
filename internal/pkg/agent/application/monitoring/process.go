@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"syscall"
@@ -174,7 +174,7 @@ func processMetrics(ctx context.Context, endpoint, path string) ([]byte, int, er
 	}
 	defer resp.Body.Close()
 
-	rb, err := ioutil.ReadAll(resp.Body)
+	rb, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, 0, errorWithStatus(http.StatusInternalServerError, err)
 	}

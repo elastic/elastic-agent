@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -71,14 +72,21 @@ func (p *statefulProvisioner) Create(ctx context.Context, request runner.StackRe
 	// allow up to 2 minutes for request
 	createCtx, createCancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer createCancel()
-	resp, err := p.createDeployment(createCtx, request,
-		map[string]string{
-			"division":          "engineering",
-			"org":               "ingest",
-			"team":              "elastic-agent",
-			"project":           "elastic-agent",
-			"integration-tests": "true",
-		})
+	deploymentTags := map[string]string{
+		"division":          "engineering",
+		"org":               "ingest",
+		"team":              "elastic-agent",
+		"project":           "elastic-agent",
+		"integration-tests": "true",
+	}
+	// If the CI env var is set, this mean we are running inside the CI pipeline and some expected env vars are exposed
+	if _, e := os.LookupEnv("CI"); e {
+		deploymentTags["buildkite_id"] = os.Getenv("BUILDKITE_BUILD_NUMBER")
+		deploymentTags["creator"] = os.Getenv("BUILDKITE_BUILD_CREATOR")
+		deploymentTags["buildkite_url"] = os.Getenv("BUILDKITE_BUILD_URL")
+		deploymentTags["ci"] = "true"
+	}
+	resp, err := p.createDeployment(createCtx, request, deploymentTags)
 	if err != nil {
 		return runner.Stack{}, err
 	}
