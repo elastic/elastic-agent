@@ -33,8 +33,7 @@ const (
 )
 
 // Rollback rollbacks to previous version which was functioning before upgrade.
-func Rollback(ctx context.Context, log *logger.Logger, prevVersionedHome, prevHash string, currentHash string) error {
-	topDirPath := paths.Top()
+func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
 	symlinkPath := filepath.Join(topDirPath, agentName)
 
 	var symlinkTarget string
@@ -58,12 +57,12 @@ func Rollback(ctx context.Context, log *logger.Logger, prevVersionedHome, prevHa
 
 	// Restart
 	log.Info("Restarting the agent after rollback")
-	if err := restartAgent(ctx, log); err != nil {
+	if err := restartAgent(ctx, log, c); err != nil {
 		return err
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, paths.Top(), prevVersionedHome, prevHash, true, true)
+	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, true, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
@@ -156,9 +155,8 @@ func InvokeWatcher(log *logger.Logger) error {
 	return nil
 }
 
-func restartAgent(ctx context.Context, log *logger.Logger) error {
+func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) error {
 	restartViaDaemonFn := func(ctx context.Context) error {
-		c := client.New()
 		connectCtx, connectCancel := context.WithTimeout(ctx, 3*time.Second)
 		defer connectCancel()
 		err := c.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry())

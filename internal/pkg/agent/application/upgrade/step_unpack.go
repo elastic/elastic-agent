@@ -29,7 +29,7 @@ import (
 type UnpackResult struct {
 	// Hash contains the unpacked agent commit hash, limited to a length of 6 for backward compatibility
 	Hash string `json:"hash" yaml:"hash"`
-	// VersionedHome indicates the path (forward slash separated) where to find the unpacked agent files
+	// VersionedHome indicates the path (relative to topPath, formatted in os-dependent fashion) where to find the unpacked agent files
 	// The value depends on the mappings specified in manifest.yaml, if no manifest is found it assumes the legacy data/elastic-agent-<hash> format
 	VersionedHome string `json:"versioned-home" yaml:"versioned-home"`
 }
@@ -82,7 +82,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 			return UnpackResult{}, fmt.Errorf("parsing package manifest: %w", err)
 		}
 		pm.mappings = manifest.Package.PathMappings
-		versionedHome = path.Clean(pm.Map(manifest.Package.VersionedHome))
+		versionedHome = filepath.Clean(pm.Map(manifest.Package.VersionedHome))
 	}
 
 	// Load hash, the use of path.Join is intentional since in .zip file paths use slash ('/') as separator
@@ -209,8 +209,8 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 		return UnpackResult{}, fmt.Errorf("looking for package metadata files: %w", err)
 	}
 
-	manifestReader := fileContents["manifest.yaml"]
-	if manifestReader != nil {
+	manifestReader, ok := fileContents["manifest.yaml"]
+	if ok && manifestReader != nil {
 		manifest, err := v1.ParseManifest(manifestReader)
 		if err != nil {
 			return UnpackResult{}, fmt.Errorf("parsing package manifest: %w", err)
@@ -463,5 +463,5 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 }
 
 func createVersionedHomeFromHash(hash string) string {
-	return fmt.Sprintf("data/elastic-agent-%s", hash[:hashLen])
+	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:hashLen]))
 }
