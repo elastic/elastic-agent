@@ -247,7 +247,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 // Ack acks last upgrade action
 func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	// get upgrade action
-	marker, err := LoadMarker()
+	marker, err := LoadMarker(paths.Data())
 	if err != nil {
 		return err
 	}
