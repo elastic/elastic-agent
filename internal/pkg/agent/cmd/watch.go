@@ -17,6 +17,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/configure"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -114,7 +115,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		upgradeDetails.SetState(details.StateRollback)
-		err = upgrade.Rollback(ctx, log, marker.PrevVersionedHome, marker.PrevHash, marker.Hash)
+		err = upgrade.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)

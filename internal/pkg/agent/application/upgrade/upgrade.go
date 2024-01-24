@@ -186,6 +186,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
 	}
 
+	// TODO reintroduce the version check
 	//if strings.HasPrefix(release.Commit(), newHash) {
 	//	u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
 	//	return nil, nil
@@ -220,7 +221,16 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, u.log, version, unpackRes.Hash, unpackRes.VersionedHome, action, det); err != nil {
+	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+	if err != nil {
+		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
+	if err := markUpgrade(
+		u.log,
+		paths.Data(),                                     //data dir to place the marker in
+		version, unpackRes.Hash, unpackRes.VersionedHome, //new agent version data
+		release.VersionWithSnapshot(), release.Commit(), currentVersionedHome, // old agent version data
+		action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
 		return nil, err
