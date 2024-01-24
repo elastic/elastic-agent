@@ -37,7 +37,8 @@ func TestPolicyChange(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agentInfo, _ := info.NewAgentInfo(ctx, true)
+	agentInfo, err := info.NewAgentInfo(ctx, true)
+	require.NoError(t, err, "could not get new agent info")
 	nullStore := &storage.NullStore{}
 
 	t.Run("Receive a config change and successfully emits a raw configuration", func(t *testing.T) {
@@ -66,7 +67,8 @@ func TestPolicyAcked(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agentInfo, _ := info.NewAgentInfo(ctx, true)
+	agentInfo, err := info.NewAgentInfo(ctx, true)
+	require.NoError(t, err, "could not get new agent info")
 	nullStore := &storage.NullStore{}
 
 	t.Run("Config change should ACK", func(t *testing.T) {

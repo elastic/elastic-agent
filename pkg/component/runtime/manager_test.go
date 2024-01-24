@@ -28,7 +28,8 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ai, _ := info.NewAgentInfo(ctx, true)
+	ai, err := info.NewAgentInfo(ctx, true)
+	require.NoError(t, err, "could not get new agent info")
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),

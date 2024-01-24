@@ -63,7 +63,8 @@ func TestUpgradeHandler(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
-	agentInfo, _ := info.NewAgentInfo(ctx, true)
+	agentInfo, err := info.NewAgentInfo(ctx, true)
+	require.NoError(t, err, "could not get new agent info")
 	msgChan := make(chan string)
 
 	// Create and start the coordinator
@@ -82,7 +83,7 @@ func TestUpgradeHandler(t *testing.T) {
 	u := NewUpgrade(log, c)
 	a := fleetapi.ActionUpgrade{Version: "8.3.0", SourceURI: "http://localhost"}
 	ack := noopacker.New()
-	err := u.Handle(ctx, &a, ack)
+	err = u.Handle(ctx, &a, ack)
 	require.NoError(t, err)
 	msg := <-msgChan
 	require.Equal(t, "completed 8.3.0", msg)
@@ -95,7 +96,8 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
-	agentInfo, _ := info.NewAgentInfo(ctx, true)
+	agentInfo, err := info.NewAgentInfo(ctx, true)
+	require.NoError(t, err, "could not get new agent info")
 	msgChan := make(chan string)
 
 	// Create and start the Coordinator
@@ -129,7 +131,8 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
-	agentInfo, _ := info.NewAgentInfo(ctx, true)
+	agentInfo, err := info.NewAgentInfo(ctx, true)
+	require.NoError(t, err, "could not get new agent info")
 	msgChan := make(chan string)
 
 	// Create and start the Coordinator

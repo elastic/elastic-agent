@@ -159,6 +159,10 @@ func NewManager(
 	if err != nil {
 		return nil, err
 	}
+
+	if agentInfo == nil {
+		return nil, errors.New("agentInfo cannot be nil")
+	}
 	m := &Manager{
 		logger:         logger,
 		baseLogger:     baseLogger,
