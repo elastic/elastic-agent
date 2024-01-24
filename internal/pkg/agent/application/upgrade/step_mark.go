@@ -5,8 +5,6 @@
 package upgrade
 
 import (
-	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,7 +15,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -119,13 +116,8 @@ func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, version, hash, versionedHome string, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
-	prevVersion := release.VersionWithSnapshot()
-	prevHash := release.Commit()
-	prevVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
-	if err != nil {
-		return fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
-	}
+func markUpgrade(log *logger.Logger, dataDirPath, version, hash, versionedHome, prevVersion, prevHash, prevVersionedHome string, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
+
 	if len(prevHash) > hashLen {
 		prevHash = prevHash[:hashLen]
 	}
@@ -147,7 +139,7 @@ func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, version, h
 		return errors.New(err, errors.TypeConfig, "failed to parse marker file")
 	}
 
-	markerPath := markerFilePath(paths.Data())
+	markerPath := markerFilePath(dataDirPath)
 	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", prevHash)
 	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
