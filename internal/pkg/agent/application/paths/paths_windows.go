@@ -74,7 +74,7 @@ func HasPrefix(path string, prefix string) bool {
 		return false
 	}
 
-	if strings.ToUpper(filepath.VolumeName(path)) != strings.ToUpper(filepath.VolumeName(prefix)) {
+	if !strings.EqualFold(filepath.VolumeName(path), filepath.VolumeName(prefix)) {
 		return false
 	}
 
@@ -86,7 +86,7 @@ func HasPrefix(path string, prefix string) bool {
 	}
 
 	for i := 0; i < len(prefixParts); i++ {
-		if strings.ToUpper(prefixParts[0]) != strings.ToUpper(pathParts[0]) {
+		if !strings.EqualFold(prefixParts[0], pathParts[0]) {
 			return false
 		}
 	}
