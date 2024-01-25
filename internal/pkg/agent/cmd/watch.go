@@ -210,7 +210,7 @@ func configuredLogger(cfg *configuration.Configuration) (*logger.Logger, error) 
 		return nil, err
 	}
 
-	if err := configure.LoggingWithOutputs("", libC, internal); err != nil {
+	if err := configure.LoggingWithOutputs("", libC, nil, internal); err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
 	return logp.NewLogger(""), nil

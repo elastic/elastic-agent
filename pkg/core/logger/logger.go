@@ -48,7 +48,7 @@ var internalLevelEnabler *zap.AtomicLevel
 // New returns a configured ECS Logger
 func New(name string, logInternal bool) (*Logger, error) {
 	defaultCfg := DefaultLoggingConfig()
-	return new(name, defaultCfg, logInternal)
+	return new(name, defaultCfg, nil, logInternal)
 }
 
 // NewWithLogpLevel returns a configured logp Logger with specified level.
@@ -56,13 +56,16 @@ func NewWithLogpLevel(name string, level logp.Level, logInternal bool) (*Logger,
 	defaultCfg := DefaultLoggingConfig()
 	defaultCfg.Level = level
 
-	return new(name, defaultCfg, logInternal)
+	return new(name, defaultCfg, nil, logInternal)
 }
 
 // NewFromConfig takes the user configuration and generate the right logger.
-// We should finish implementation, need support on the library that we use.
-func NewFromConfig(name string, cfg *Config, logInternal bool) (*Logger, error) {
-	return new(name, cfg, logInternal)
+// The returned logger will have two outputs:
+//   - One output following the settings from `cfg`
+//   - An internal file output that uses the defaults from `logp.DefaultConfig`
+//     and cannot be configured. This outputs logs to `data/elastic-agent-<hash>/logs`
+func NewFromConfig(name string, loggerCfg, sensitiveLoggerCfg *Config, logInternal bool) (*Logger, error) {
+	return new(name, loggerCfg, sensitiveLoggerCfg, logInternal)
 }
 
 // NewWithoutConfig returns a new logger without having a configuration.
@@ -79,23 +82,35 @@ func AddCallerSkip(l *Logger, skip int) *Logger {
 	return l.WithOptions(zap.AddCallerSkip(skip))
 }
 
-func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
-	commonCfg, err := ToCommonConfig(cfg)
+// New creates a new logger from the provided configuration.
+//
+// If `sensitiveLoggerCfg` is not nil, a core is created from it and added to
+// to the logger. If `logInternal` is true, a core logging to
+// `data/elastic-agent-<hash>/logs` is also created and added to the logger.
+// This core uses the defaults from logp.DefaultConfig and cannot be configured.
+func new(name string, LoggerCfg, sensitiveLoggerCfg *Config, logInternal bool) (*Logger, error) {
+	commonCfg, err := ToCommonConfig(LoggerCfg)
 	if err != nil {
 		return nil, err
 	}
 
 	var outputs []zapcore.Core
 	if logInternal {
-		internal, err := MakeInternalFileOutput(cfg.Beat, cfg.Level)
+		internal, err := MakeInternalFileOutput(LoggerCfg.Beat, LoggerCfg.Level)
 		if err != nil {
 			return nil, err
 		}
-
 		outputs = append(outputs, internal)
 	}
 
-	if err := configure.LoggingWithOutputs("", commonCfg, outputs...); err != nil {
+	// TODO: Check if it is doing anything wrong with the config
+	sensitiveCfg, err := ToCommonConfig(sensitiveLoggerCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert sensitive logger config: %w", err)
+	}
+
+	// That's how I want to keep it
+	if err := configure.LoggingWithTypedOutputs("", commonCfg, sensitiveCfg, "log.type", "sensitive", outputs...); err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
 	return logp.NewLogger(name), nil
@@ -202,6 +217,8 @@ func MakeInternalFileOutput(beatName string, level logp.Level) (zapcore.Core, er
 	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, internalLevelEnabler)), nil
 }
 
+// MakeFileOutput creates a new file output from the provided configuration.
+// The created output writes logs in JSON compatible with ECS
 func MakeFileOutput(cfg logp.Config) (zapcore.Core, error) {
 	filename := filepath.Join(cfg.Files.Path, cfg.Files.Name)
 	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
@@ -218,7 +235,7 @@ func MakeFileOutput(cfg logp.Config) (zapcore.Core, error) {
 		file.Permissions(os.FileMode(permissions)),
 		file.Interval(cfg.Files.Interval),
 		file.RotateOnStartup(cfg.Files.RotateOnStartup),
-		file.RedirectStderr(cfg.Files.RedirectStderr),
+		file.RedirectStderr(false),
 	)
 	if err != nil {
 		return nil, errors.New("failed to create file rotator")

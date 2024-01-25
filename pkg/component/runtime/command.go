@@ -541,57 +541,6 @@ func attachOutErr(stdOut *logWriter, stdErr *logWriter) process.CmdOption {
 	}
 }
 
-// TODO: move it somewhere else, probably to logp
-
-type typedLoggerCore struct {
-	sensitiveCore zapcore.Core
-	defaultCore   zapcore.Core
-}
-
-func (s typedLoggerCore) Enabled(l zapcore.Level) bool {
-	return s.defaultCore.Enabled(l) || s.sensitiveCore.Enabled(l)
-}
-
-func (s typedLoggerCore) With(fields []zapcore.Field) zapcore.Core {
-	s.defaultCore = s.defaultCore.With(fields)
-	s.sensitiveCore = s.sensitiveCore.With(fields)
-	return s
-}
-
-func (s typedLoggerCore) Check(e zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
-	if s.defaultCore.Check(e, ce) != nil {
-		ce = ce.AddCore(e, s.defaultCore)
-	}
-	if s.sensitiveCore.Check(e, ce) != nil {
-		ce = ce.AddCore(e, s.sensitiveCore)
-	}
-
-	return ce
-}
-
-func (s typedLoggerCore) Sync() error {
-	defaultErr := s.defaultCore.Sync()
-	sensitiveErr := s.sensitiveCore.Sync()
-
-	if defaultErr != nil || sensitiveErr != nil {
-		return fmt.Errorf("error syncing loggers. DefaultCore: %s, sensitiveCore: %s", defaultErr, sensitiveErr)
-	}
-
-	return nil
-}
-
-func (s typedLoggerCore) Write(e zapcore.Entry, fields []zapcore.Field) error {
-	for _, f := range fields {
-		if f.Key == "log.type" {
-			if f.String == "sensitive" {
-				return s.sensitiveCore.Write(e, fields)
-			}
-		}
-	}
-
-	return s.defaultCore.Write(e, fields)
-}
-
 func createLogWriter(comp component.Component, baseLog *logger.Logger, cmdSpec *component.CommandSpec, typeStr string, binaryName string, ll zapcore.Level, unitLevels map[string]zapcore.Level, src logSource) *logWriter {
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 	newLogger := baseLog.With(
@@ -606,19 +555,7 @@ func createLogWriter(comp component.Component, baseLog *logger.Logger, cmdSpec *
 		},
 	)
 
-	cfg := logger.DefaultSensitiveLoggingConfig()
-	fileCore, err := logger.MakeFileOutput(*cfg)
-	if err != nil {
-		// TODO: FIXME
-		panic(err)
-	}
-
-	myCore := typedLoggerCore{
-		defaultCore:   newLogger.Core(),
-		sensitiveCore: fileCore,
-	}
-
-	return newLogWriter(myCore, cmdSpec.Log, ll, unitLevels, src)
+	return newLogWriter(newLogger.Core(), cmdSpec.Log, ll, unitLevels, src)
 }
 
 // getLogLevels returns the lowest log level and a mapping between each unit and its defined log level.

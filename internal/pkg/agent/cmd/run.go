@@ -179,7 +179,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	if cfg.Settings.LoggingConfig != nil {
 		logLvl = cfg.Settings.LoggingConfig.Level
 	}
-	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
+	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.SensitiveLoggingConfig, true)
 	if err != nil {
 		return err
 	}
