@@ -75,6 +75,20 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	// Check that Agent was installed in default base path
 	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+	// Make sure uninstall from within the topPath fails on Windows
+	if runtime.GOOS == "windows" {
+		cwd, err := os.Getwd()
+		require.NoErrorf(t, err, "GetWd failed: %s", err)
+		err = os.Chdir(topPath)
+		require.NoErrorf(t, err, "Chdir to topPath failed: %s", err)
+		t.Cleanup(func() {
+			_ = os.Chdir(cwd)
+		})
+		out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		require.Error(t, err, "uninstall should have failed")
+		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
+	}
+
 }
 
 func TestInstallWithBasePath(t *testing.T) {
@@ -138,6 +152,19 @@ func TestInstallWithBasePath(t *testing.T) {
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
 	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+	// Make sure uninstall from within the topPath fails on Windows
+	if runtime.GOOS == "windows" {
+		cwd, err := os.Getwd()
+		require.NoErrorf(t, err, "GetWd failed: %s", err)
+		err = os.Chdir(topPath)
+		require.NoErrorf(t, err, "Chdir to topPath failed: %s", err)
+		t.Cleanup(func() {
+			_ = os.Chdir(cwd)
+		})
+		out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		require.Error(t, err, "uninstall should have failed")
+		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
+	}
 }
 
 func checkInstallSuccess(t *testing.T, topPath string, unprivileged bool) {

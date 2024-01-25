@@ -326,3 +326,17 @@ func ControlSocketFromPath(platform string, path string) string {
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
 	return utils.SocketURLWithFallback(socketPath, path)
 }
+
+func pathSplit(path string) []string {
+	dir, file := filepath.Split(path)
+	if dir == "" && file == "" {
+		return []string{}
+	}
+	if dir == "" && file != "" {
+		return []string{file}
+	}
+	if dir == path {
+		return []string{}
+	}
+	return append(pathSplit(filepath.Clean(dir)), file)
+}
