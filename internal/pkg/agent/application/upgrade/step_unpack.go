@@ -82,7 +82,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 			return UnpackResult{}, fmt.Errorf("parsing package manifest: %w", err)
 		}
 		pm.mappings = manifest.Package.PathMappings
-		versionedHome = filepath.Clean(pm.Map(manifest.Package.VersionedHome))
+		versionedHome = filepath.FromSlash(pm.Map(manifest.Package.VersionedHome))
 	}
 
 	// Load hash, the use of path.Join is intentional since in .zip file paths use slash ('/') as separator
@@ -103,7 +103,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 	hash = string(hashBytes[:hashLen])
 	if versionedHome == "" {
 		// if at this point we didn't load the manifest et the versioned to the backup value
-		versionedHome = createVersionedHomeFromHash(hash)
+		versionedHome = filepath.FromSlash(createVersionedHomeFromHash(hash))
 	}
 
 	unpackFile := func(f *zip.File) (err error) {
@@ -218,7 +218,7 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 
 		// set the path mappings
 		pm.mappings = manifest.Package.PathMappings
-		versionedHome = path.Clean(pm.Map(manifest.Package.VersionedHome))
+		versionedHome = filepath.FromSlash(pm.Map(manifest.Package.VersionedHome))
 	}
 
 	if agentCommitReader, ok := fileContents[agentCommitFile]; ok {
@@ -234,7 +234,7 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 		hash = agentCommitHash[:hashLen]
 		if versionedHome == "" {
 			// set default value of versioned home if it wasn't set by reading the manifest
-			versionedHome = createVersionedHomeFromHash(agentCommitHash)
+			versionedHome = filepath.FromSlash(createVersionedHomeFromHash(agentCommitHash))
 		}
 	}
 
@@ -363,15 +363,15 @@ type pathMapper struct {
 	mappings []map[string]string
 }
 
-func (pm pathMapper) Map(path string) string {
+func (pm pathMapper) Map(packagePath string) string {
 	for _, mapping := range pm.mappings {
 		for pkgPath, mappedPath := range mapping {
-			if strings.HasPrefix(path, pkgPath) {
-				return filepath.Join(mappedPath, path[len(pkgPath):])
+			if strings.HasPrefix(packagePath, pkgPath) {
+				return path.Join(mappedPath, packagePath[len(pkgPath):])
 			}
 		}
 	}
-	return path
+	return packagePath
 }
 
 type tarCloser struct {
@@ -463,5 +463,5 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 }
 
 func createVersionedHomeFromHash(hash string) string {
-	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:hashLen]))
+	return fmt.Sprintf("data/elastic-agent-%s", hash[:hashLen])
 }
