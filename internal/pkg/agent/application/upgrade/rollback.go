@@ -70,18 +70,27 @@ func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
 	<-time.After(afterRestartDelay)
 
+	// data directory path
+	dataDirPath := paths.DataFrom(topDirPath)
+
 	// remove upgrade marker
 	if removeMarker {
-		if err := CleanMarker(log, paths.DataFrom(topDirPath)); err != nil {
+		if err := CleanMarker(log, dataDirPath); err != nil {
 			return err
 		}
 	}
 
 	// remove data/elastic-agent-{hash}
-	dataDir, err := os.Open(paths.DataFrom(topDirPath))
+	dataDir, err := os.Open(dataDirPath)
 	if err != nil {
 		return err
 	}
+	defer func(dataDir *os.File) {
+		err := dataDir.Close()
+		if err != nil {
+			log.Errorw("Error closing data directory", "file.directory", dataDirPath)
+		}
+	}(dataDir)
 
 	subdirs, err := dataDir.Readdirnames(0)
 	if err != nil {
@@ -113,7 +122,7 @@ func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 			continue
 		}
 
-		hashedDir := filepath.Join(paths.DataFrom(topDirPath), dir)
+		hashedDir := filepath.Join(dataDirPath, dir)
 		log.Infow("Removing hashed data directory", "file.path", hashedDir)
 		var ignoredDirs []string
 		if keepLogs {
