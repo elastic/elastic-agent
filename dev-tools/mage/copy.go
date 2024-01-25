@@ -135,8 +135,8 @@ func (t *CopyTask) dirCopy(src, dest string, entry fs.DirEntry) error {
 	}
 
 	for _, entry := range contents {
-		srcFile := filepath.Join(src, info.Name())
-		destFile := filepath.Join(dest, info.Name())
+		srcFile := filepath.Join(src, entry.Name())
+		destFile := filepath.Join(dest, entry.Name())
 		if err = t.recursiveCopy(srcFile, destFile, entry); err != nil {
 			return errors.Wrapf(err, "failed to copy %v to %v", srcFile, destFile)
 		}
