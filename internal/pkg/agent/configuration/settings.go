@@ -20,7 +20,7 @@ type SettingsConfig struct {
 	GRPC                   *GRPCConfig                     `yaml:"grpc" config:"grpc" json:"grpc"`
 	MonitoringConfig       *monitoringCfg.MonitoringConfig `yaml:"monitoring" config:"monitoring" json:"monitoring"`
 	LoggingConfig          *logger.Config                  `yaml:"logging,omitempty" config:"logging,omitempty" json:"logging,omitempty"`
-	SensitiveLoggingConfig *logger.Config                  `yaml:"logging.sensitive,omitempty" config:"logging.sensitive,omitempty" json:"logging.sensitive,omitempty"`
+	SensitiveLoggingConfig *logger.Config                  `config:"-" yaml:"-" json:"-"`
 	Upgrade                *UpgradeConfig                  `yaml:"upgrade" config:"upgrade" json:"upgrade"`
 
 	// standalone config

@@ -56,7 +56,10 @@ func NewWithLogpLevel(name string, level logp.Level, logInternal bool) (*Logger,
 	defaultCfg := DefaultLoggingConfig()
 	defaultCfg.Level = level
 
-	return new(name, defaultCfg, nil, logInternal)
+	sensitiveConfig := DefaultSensitiveLoggingConfig()
+	sensitiveConfig.Level = level
+
+	return new(name, defaultCfg, sensitiveConfig, logInternal)
 }
 
 // NewFromConfig takes the user configuration and generate the right logger.
@@ -82,7 +85,7 @@ func AddCallerSkip(l *Logger, skip int) *Logger {
 	return l.WithOptions(zap.AddCallerSkip(skip))
 }
 
-// New creates a new logger from the provided configurations.
+// new creates a new logger from the provided configurations.
 //
 // If `sensitiveLoggerCfg` is not nil, a core is created from it and added to
 // to the logger. If `logInternal` is true, a core logging to
@@ -173,7 +176,8 @@ func DefaultSensitiveLoggingConfig() *Config {
 	cfg.Files.MaxSize = 5 * 1024 * 1024
 	cfg.Files.MaxBackups = 2
 	cfg.Files.Permissions = 0600 // default user only
-	root, _ := utils.HasRoot()   // error ignored
+	cfg.Files.RedirectStderr = false
+	root, _ := utils.HasRoot() // error ignored
 	if !root {
 		// when not running as root, the default changes to include the group
 		cfg.Files.Permissions = 0660

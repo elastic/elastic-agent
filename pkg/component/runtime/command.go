@@ -554,7 +554,6 @@ func createLogWriter(comp component.Component, baseLog *logger.Logger, cmdSpec *
 			"source": comp.ID,
 		},
 	)
-
 	return newLogWriter(newLogger.Core(), cmdSpec.Log, ll, unitLevels, src)
 }
 
