@@ -139,7 +139,10 @@ func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
 		info := sysInfo.Info()
 		name := info.Hostname
 		if features.FQDN() {
-			fqdn, err := sysInfo.FQDN()
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+
+			fqdn, err := sysInfo.FQDN(ctx)
 			if err != nil {
 				log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), name)
 			} else {

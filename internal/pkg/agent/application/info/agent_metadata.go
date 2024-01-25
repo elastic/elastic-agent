@@ -7,6 +7,7 @@ package info
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"runtime"
 	"strings"
@@ -151,7 +152,10 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 	info := sysInfo.Info()
 	hostname := info.Hostname
 	if features.FQDN() {
-		fqdn, err := sysInfo.FQDN()
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+		defer cancel()
+
+		fqdn, err := sysInfo.FQDN(ctx)
 		if err != nil {
 			l.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
 		} else {
@@ -207,7 +211,10 @@ func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}
 	info := sysInfo.Info()
 	hostname := info.Hostname
 	if features.FQDN() {
-		fqdn, err := sysInfo.FQDN()
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+		defer cancel()
+
+		fqdn, err := sysInfo.FQDN(ctx)
 		if err != nil {
 			l.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
 		} else {
