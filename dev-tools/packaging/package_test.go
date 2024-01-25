@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -93,6 +94,7 @@ func TestZip(t *testing.T) {
 func TestDocker(t *testing.T) {
 	dockers := getFiles(t, regexp.MustCompile(`\.docker\.tar\.gz$`))
 	for _, docker := range dockers {
+		t.Log(docker)
 		checkDocker(t, docker)
 	}
 }
@@ -698,13 +700,19 @@ func readZip(t *testing.T, zipFile string, inspectors ...inspector) (*packageFil
 }
 
 func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
+	// Read the manifest file first so that the config file and layer
+	// names are known in advance.
+	manifest, err := getDockerManifest(dockerFile)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	file, err := os.Open(dockerFile)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer file.Close()
 
-	var manifest *dockerManifest
 	var info *dockerInfo
 	layers := make(map[string]*packageFile)
 
@@ -715,7 +723,6 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 	defer gzipReader.Close()
 
 	tarReader := tar.NewReader(gzipReader)
-	manifestFileName := "manifest.json"
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
@@ -726,22 +733,17 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 		}
 
 		switch {
-		case header.Name == manifestFileName:
-			manifest, err = readDockerManifest(tarReader)
-			if err != nil {
-				return nil, nil, err
-			}
-		case strings.HasSuffix(header.Name, ".json") && header.Name != manifestFileName:
+		case header.Name == manifest.Config:
 			info, err = readDockerInfo(tarReader)
 			if err != nil {
 				return nil, nil, err
 			}
-		case strings.HasSuffix(header.Name, "/layer.tar"):
+		case slices.Contains(manifest.Layers, header.Name):
 			layer, err := readTarContents(header.Name, tarReader)
 			if err != nil {
 				return nil, nil, err
 			}
-			layers[filepath.Dir(header.Name)] = layer
+			layers[header.Name] = layer
 		}
 	}
 
@@ -755,10 +757,9 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 	// Read layers in order and for each file keep only the entry seen in the later layer
 	p := &packageFile{Name: filepath.Base(dockerFile), Contents: map[string]packageEntry{}}
 	for _, layer := range manifest.Layers {
-		layerID := filepath.Dir(layer)
-		layerFile, found := layers[layerID]
+		layerFile, found := layers[layer]
 		if !found {
-			return nil, nil, fmt.Errorf("layer not found: %s", layerID)
+			return nil, nil, fmt.Errorf("layer not found: %s", layer)
 		}
 		for name, entry := range layerFile.Contents {
 			if excludedPathsPattern.MatchString(name) {
@@ -790,25 +791,6 @@ type dockerManifest struct {
 	Layers   []string
 }
 
-func readDockerManifest(r io.Reader) (*dockerManifest, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	var manifests []*dockerManifest
-	err = json.Unmarshal(data, &manifests)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(manifests) != 1 {
-		return nil, fmt.Errorf("one and only one manifest expected, %d found", len(manifests))
-	}
-
-	return manifests[0], nil
-}
-
 type dockerInfo struct {
 	Config struct {
 		Entrypoint []string
@@ -831,4 +813,61 @@ func readDockerInfo(r io.Reader) (*dockerInfo, error) {
 	}
 
 	return &info, nil
+}
+
+// getDockerManifest opens a gzipped tar file to read the Docker manifest.json
+// that it is expected to contain.
+func getDockerManifest(file string) (*dockerManifest, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	gzipReader, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, err
+	}
+	defer gzipReader.Close()
+
+	var manifest *dockerManifest
+	tarReader := tar.NewReader(gzipReader)
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
+
+		if header.Name == "manifest.json" {
+			manifest, err = readDockerManifest(tarReader)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+
+	return manifest, nil
+}
+
+func readDockerManifest(r io.Reader) (*dockerManifest, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var manifests []*dockerManifest
+	err = json.Unmarshal(data, &manifests)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(manifests) != 1 {
+		return nil, fmt.Errorf("one and only one manifest expected, %d found", len(manifests))
+	}
+
+	return manifests[0], nil
 }
