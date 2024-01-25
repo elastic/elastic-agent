@@ -333,6 +333,41 @@ func DeletePipelines(ctx context.Context, client elastictransport.Interface, nam
 	return nil
 }
 
+func FindMatchingLogLinesForAgent(client elastictransport.Interface, agentID, line string) (Documents, error) {
+	return FindMatchingLogLinesForAgentWithContext(context.Background(), client, agentID, line)
+}
+
+func FindMatchingLogLinesForAgentWithContext(ctx context.Context, client elastictransport.Interface, agentID, line string) (Documents, error) {
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match_phrase": map[string]interface{}{
+							"message": line,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"agent.id": map[string]interface{}{
+								"value": agentID,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(queryRaw)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
+}
+
 // FindMatchingLogLinesWithContext returns any logs with message fields that match the given line
 func FindMatchingLogLinesWithContext(ctx context.Context, client elastictransport.Interface, namespace, line string) (Documents, error) {
 	queryRaw := map[string]interface{}{
@@ -538,6 +573,7 @@ func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{
 		es.Search.WithTrackTotalHits(true),
 		es.Search.WithPretty(),
 		es.Search.WithContext(ctx),
+		es.Search.WithSize(2000),
 	)
 	if err != nil {
 		return Documents{}, fmt.Errorf("error performing ES search: %w", err)

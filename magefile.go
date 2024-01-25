@@ -1600,6 +1600,14 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	return integRunner(ctx, false, "TestBeatsServerless")
 }
 
+func (Integration) TestExtendedRuntime(ctx context.Context) error {
+	err := os.Setenv("TEST_EXTENDED", "true")
+	if err != nil {
+		return fmt.Errorf("error setting binary name: %w", err)
+	}
+	return integRunner(ctx, false, "TestAgentLong")
+}
+
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	mg.Deps(Build.TestBinaries)
@@ -1825,6 +1833,8 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if os.Getenv("AGENT_KEEP_INSTALLED") != "" {
 		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
 	}
+
+	extraEnv["TEST_EXTENDED"] = os.Getenv("TEST_EXTENDED")
 
 	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
 	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258

@@ -687,7 +687,10 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (Ag
 				}, uerr))
 	}
 
-	return status, err
+	if err != nil {
+		return status, fmt.Errorf("error running command (output: %s): %w", string(out), err)
+	}
+	return status, nil
 }
 
 // ExecInspect executes to inspect subcommand on the prepared Elastic Agent binary.
@@ -735,7 +738,7 @@ func (f *Fixture) ExecVersion(ctx context.Context, opts ...process.CmdOption) (A
 func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) error {
 	status, err := f.ExecStatus(ctx, opts...)
 	if err != nil {
-		return fmt.Errorf("agent status returned and error: %w", err)
+		return fmt.Errorf("agent status returned an error: %w", err)
 	}
 
 	if status.State != int(cproto.State_HEALTHY) {
