@@ -110,7 +110,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 			errors.M("directory", filepath.Dir(topPath)))
 	}
 
-	manifestFile, err := os.Open("manifest.yaml")
+	manifestFile, err := os.Open(filepath.Join(dir, "manifest.yaml"))
 	if err != nil {
 		return utils.FileOwner{}, errors.New(
 			err,
@@ -245,7 +245,9 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, dir str
 	for _, pathMapping := range pathMappings {
 		for packagePath, installedPath := range pathMapping {
 			copiedFiles[packagePath] = struct{}{}
-			err := copy.Copy(filepath.Join(dir, packagePath), filepath.Join(topPath, installedPath), copy.Options{
+			srcPath := filepath.Join(dir, packagePath)
+			dstPath := filepath.Join(topPath, installedPath)
+			err := copy.Copy(srcPath, dstPath, copy.Options{
 				OnSymlink: func(_ string) copy.SymlinkAction {
 					return copy.Shallow
 				},
@@ -274,11 +276,14 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, dir str
 
 			for _, pathMapping := range pathMappings {
 				for srcPath, dstPath := range pathMapping {
-					if strings.HasPrefix(target, srcPath) {
-						newTarget := strings.Replace(target, srcPath, dstPath, 1)
+					srcPathLocal := filepath.FromSlash(srcPath)
+					dstPathLocal := filepath.FromSlash(dstPath)
+					if strings.HasPrefix(target, srcPathLocal) {
+						newTarget := strings.Replace(target, srcPathLocal, dstPathLocal, 1)
 						rel, err := filepath.Rel(dir, source)
 						if err != nil {
-							panic(err)
+							fmt.Fprintf(streams.Err, "Error during file copy: mapping symlink location %q relative to %q: %s", source, dir, err)
+							return copy.Skip
 						}
 						symlinks[rel] = newTarget
 						return copy.Skip
@@ -293,7 +298,7 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, dir str
 			if err != nil {
 				return false, fmt.Errorf("calculating relative path for %s: %w", src, err)
 			}
-
+			relPath = filepath.ToSlash(relPath)
 			_, ok := copiedFiles[relPath]
 			return ok, nil
 		},
