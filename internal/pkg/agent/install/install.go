@@ -257,7 +257,9 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir 
 		for packagePath, installedPath := range pathMapping {
 			// flag the original path as handled
 			copiedFiles[packagePath] = struct{}{}
-			err := copy.Copy(filepath.Join(srcDir, packagePath), filepath.Join(topPath, installedPath), copy.Options{
+			srcPath := filepath.Join(srcDir, packagePath)
+			dstPath := filepath.Join(topPath, installedPath)
+			err := copy.Copy(srcPath, dstPath, copy.Options{
 				OnSymlink: func(_ string) copy.SymlinkAction {
 					return copy.Shallow
 				},
@@ -288,8 +290,10 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir 
 			// later creation with the remapped target
 			for _, pathMapping := range pathMappings {
 				for srcPath, dstPath := range pathMapping {
-					if strings.HasPrefix(target, srcPath) {
-						newTarget := strings.Replace(target, srcPath, dstPath, 1)
+					srcPathLocal := filepath.FromSlash(srcPath)
+					dstPathLocal := filepath.FromSlash(dstPath)
+					if strings.HasPrefix(target, srcPathLocal) {
+						newTarget := strings.Replace(target, srcPathLocal, dstPathLocal, 1)
 						rel, err := filepath.Rel(srcDir, source)
 						if err != nil {
 							copyErrors = append(copyErrors, fmt.Errorf("extracting relative path for %q using %q as base: %w", source, srcDir, err))
@@ -309,6 +313,7 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir 
 				return false, fmt.Errorf("calculating relative path for %s: %w", src, err)
 			}
 			// check if we already handled this path as part of the mappings: if we did, skip it
+			relPath = filepath.ToSlash(relPath)
 			_, ok := copiedFiles[relPath]
 			return ok, nil
 		},
