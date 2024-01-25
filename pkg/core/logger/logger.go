@@ -171,7 +171,7 @@ func DefaultSensitiveLoggingConfig() *Config {
 	cfg.Level = DefaultLogLevel
 	cfg.ToFiles = true
 	// That's the same path useb by MakeInternalFileOutput
-	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory)
+	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory, "sensitive")
 	cfg.Files.Name = agentName + "-sensitive"
 	cfg.Files.MaxSize = 5 * 1024 * 1024
 	cfg.Files.MaxBackups = 2
