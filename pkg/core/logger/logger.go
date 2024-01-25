@@ -61,7 +61,7 @@ func NewWithLogpLevel(name string, level logp.Level, logInternal bool) (*Logger,
 
 // NewFromConfig takes the user configuration and generate the right logger.
 // The returned logger will have two outputs:
-//   - One output following the settings from `cfg`
+//   - One output following the settings from `loggerCfg`
 //   - An internal file output that uses the defaults from `logp.DefaultConfig`
 //     and cannot be configured. This outputs logs to `data/elastic-agent-<hash>/logs`
 func NewFromConfig(name string, loggerCfg, sensitiveLoggerCfg *Config, logInternal bool) (*Logger, error) {
@@ -82,7 +82,7 @@ func AddCallerSkip(l *Logger, skip int) *Logger {
 	return l.WithOptions(zap.AddCallerSkip(skip))
 }
 
-// New creates a new logger from the provided configuration.
+// New creates a new logger from the provided configurations.
 //
 // If `sensitiveLoggerCfg` is not nil, a core is created from it and added to
 // to the logger. If `logInternal` is true, a core logging to
@@ -103,16 +103,15 @@ func new(name string, LoggerCfg, sensitiveLoggerCfg *Config, logInternal bool) (
 		outputs = append(outputs, internal)
 	}
 
-	// TODO: Check if it is doing anything wrong with the config
 	sensitiveCfg, err := ToCommonConfig(sensitiveLoggerCfg)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert sensitive logger config: %w", err)
 	}
 
-	// That's how I want to keep it
 	if err := configure.LoggingWithTypedOutputs("", commonCfg, sensitiveCfg, "log.type", "sensitive", outputs...); err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
+
 	return logp.NewLogger(name), nil
 }
 

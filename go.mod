@@ -314,4 +314,4 @@ replace (
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
 
-replace github.com/elastic/elastic-agent-libs => github.com/belimawr/elastic-agent-libs v0.2.9-0.20240125120957-35650e8bc3ac
+replace github.com/elastic/elastic-agent-libs => github.com/belimawr/elastic-agent-libs v0.2.9-0.20240125141844-ffbc66f6350b
