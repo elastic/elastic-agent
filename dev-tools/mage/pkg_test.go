@@ -42,7 +42,6 @@ func TestPackageTarGz(t *testing.T) {
 }
 
 func TestPackageRPM(t *testing.T) {
-	t.Skip("Flaky test")
 	if err := HaveDocker(); err != nil {
 		t.Skip("docker is required")
 	}
