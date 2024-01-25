@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"errors"
-	"runtime"
 	"testing"
 	"time"
 
@@ -81,16 +80,12 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	}
 	require.NoError(t, err)
 
-	// on windows watcher needs to start before uninstall,
-	// otherwise you can get a race condition where watcher hasn't
-	// started yet, so it doesn't show up in PID list, but will
-	// start before deletion of directory that will lead to
-	// sharing violation on Windows
-	if runtime.GOOS == "windows" {
-		watcherErr := upgradetest.WaitForWatcher(ctx, 1*time.Minute, time.Second)
-		if watcherErr != nil {
-			t.Logf("watcher failed to start: %s", watcherErr)
-		}
+	// watcher needs to start before uninstall, otherwise you can
+	// get a race condition where watcher hasn't started before
+	// uninstall does it's PID check to find the watcher.
+	watcherErr := upgradetest.WaitForWatcher(ctx, 1*time.Minute, time.Second)
+	if watcherErr != nil {
+		t.Logf("watcher failed to start: %s", watcherErr)
 	}
 
 	// call uninstall now, do not wait for the watcher to finish running
