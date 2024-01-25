@@ -80,6 +80,14 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	}
 	require.NoError(t, err)
 
+	// watcher needs to start before uninstall, otherwise you can
+	// get a race condition where watcher hasn't started before
+	// uninstall does it's PID check to find the watcher.
+	watcherErr := upgradetest.WaitForWatcher(ctx, 1*time.Minute, time.Second)
+	if watcherErr != nil {
+		t.Logf("watcher failed to start: %s", watcherErr)
+	}
+
 	// call uninstall now, do not wait for the watcher to finish running
 	// 8.11+ should always kill the running watcher (if it doesn't uninstall will fail)
 	uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
