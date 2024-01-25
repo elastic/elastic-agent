@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 
@@ -739,7 +738,7 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 			if err != nil {
 				return nil, nil, err
 			}
-		case slices.Contains(manifest.Layers, header.Name):
+		case sliceContains(manifest.Layers, header.Name):
 			layer, err := readTarContents(header.Name, tarReader)
 			if err != nil {
 				return nil, nil, err
@@ -792,28 +791,6 @@ type dockerManifest struct {
 	Layers   []string
 }
 
-<<<<<<< HEAD
-func readDockerManifest(r io.Reader) (*dockerManifest, error) {
-	data, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	var manifests []*dockerManifest
-	err = json.Unmarshal(data, &manifests)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(manifests) != 1 {
-		return nil, fmt.Errorf("one and only one manifest expected, %d found", len(manifests))
-	}
-
-	return manifests[0], nil
-}
-
-=======
->>>>>>> ca5fdacb66 (package_test.go - Support OCI Image Layout (#4139))
 type dockerInfo struct {
 	Config struct {
 		Entrypoint []string
@@ -893,4 +870,13 @@ func readDockerManifest(r io.Reader) (*dockerManifest, error) {
 	}
 
 	return manifests[0], nil
+}
+
+func sliceContains(s []string, e string) bool {
+	for _, v := range s {
+		if e == v {
+			return true
+		}
+	}
+	return false
 }
