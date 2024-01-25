@@ -236,6 +236,66 @@ func TestComponentUpdateDiff(t *testing.T) {
 				require.NotEmpty(t, logs.Components.Updated)
 			},
 		},
+		{
+			name: "config-no-changes",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "value"})},
+						},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "value"})},
+						},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Updated, 0)
+			},
+		},
+		{
+			name: "config-source-nil",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Id: "test"},
+						},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Id: "test"},
+						},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Updated, 0)
+			},
+		},
 	}
 
 	for _, testcase := range cases {

@@ -1433,7 +1433,7 @@ func diffUnitList(old, new []component.Unit) map[string]diffCheck {
 		diff := diffCheck{inNew: true}
 		if oldUnit, ok := oldMap[id]; ok {
 			diff.inLast = true
-			if newUnits.Config != nil && oldUnit.Config != nil {
+			if newUnits.Config != nil && oldUnit.Config != nil && newUnits.Config.GetSource() != nil && oldUnit.Config.GetSource() != nil {
 				diff.updated = !reflect.DeepEqual(newUnits.Config.GetSource().AsMap(), oldUnit.Config.GetSource().AsMap())
 			}
 			delete(oldMap, id)
