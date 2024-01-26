@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -46,9 +47,6 @@ var agentArtifact = artifact.Artifact{
 	Cmd:      agentName,
 	Artifact: "beats/" + agentName,
 }
-
-// ErrSameVersion error is returned when the upgrade results in the same installed version.
-var ErrSameVersion = errors.New("upgrade did not occur because its the same version")
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -134,6 +132,24 @@ func (u *Upgrader) Upgradeable() bool {
 	return u.upgradeable
 }
 
+type agentVersion struct {
+	version  string
+	snapshot bool
+	hash     string
+}
+
+func (av agentVersion) String() string {
+	buf := strings.Builder{}
+	buf.WriteString(av.version)
+	if av.snapshot {
+		buf.WriteString("-SNAPSHOT")
+	}
+	buf.WriteString(" (hash: ")
+	buf.WriteString(av.hash)
+	buf.WriteString(")")
+	return buf.String()
+}
+
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
@@ -170,7 +186,40 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	det.SetState(details.StateExtracting)
-	// TODO: add check that no archive files end up in the current versioned home
+
+	metadata, err := u.getPackageMetadata(archivePath)
+	if err != nil {
+		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
+	}
+
+	currentVersion := agentVersion{
+		version:  release.Version(),
+		snapshot: release.Snapshot(),
+		hash:     release.Commit(),
+	}
+
+	newVersion := agentVersion{}
+	if metadata.manifest != nil {
+		packageDesc := metadata.manifest.Package
+		newVersion.version = packageDesc.Version
+		newVersion.snapshot = packageDesc.Snapshot
+	} else {
+		// extract version info from the version string (we can ignore parsing errors as it would have never passed the download step)
+		parsedVersion, _ := agtversion.ParseVersion(version)
+		newVersion.version = strings.TrimSuffix(parsedVersion.VersionWithPrerelease(), "-SNAPSHOT")
+		newVersion.snapshot = parsedVersion.IsSnapshot()
+	}
+	newVersion.hash = metadata.hash
+
+	u.log.Debugw("Comparing current and new agent version", "current_version", currentVersion, "new_version", newVersion)
+
+	if currentVersion == newVersion {
+		return nil, fmt.Errorf("agent version is already %s", currentVersion)
+	}
+
+	u.log.Infow("Unpacking agent package", "version", newVersion)
+
+	// Nice to have: add check that no archive files end up in the current versioned home
 	unpackRes, err := u.unpack(version, archivePath, paths.Data())
 	if err != nil {
 		return nil, err
@@ -185,12 +234,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		// FIXME this should be treated as an error
 		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
 	}
-
-	// TODO reintroduce the version check
-	//if strings.HasPrefix(release.Commit(), newHash) {
-	//	u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
-	//	return nil, nil
-	//}
 
 	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
 
