@@ -131,7 +131,7 @@ func TestShutdownCallback(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sourceDir, 0755))
 	require.NoError(t, os.MkdirAll(targetDir, 0755))
 
-	cb := shutdownCallback(l, homePath, sourceVersion, targetVersion, newCommit)
+	cb := shutdownCallback(l, homePath, sourceVersion, targetVersion, newHome)
 
 	oldFilename := filepath.Join(sourceDir, filename)
 	err = os.WriteFile(oldFilename, content, 0640)
