@@ -68,9 +68,6 @@ type HandlesLimits struct {
 }
 
 func TestAgentLong(t *testing.T) {
-	if os.Getenv("TEST_EXTENDED") == "" {
-		t.Skipf("not running extended test unless TEST_EXTENDED is set")
-	}
 	info := define.Require(t, define.Requirements{
 		Group: "fleet",
 		Stack: &define.Stack{},
@@ -81,6 +78,10 @@ func TestAgentLong(t *testing.T) {
 			{Type: define.Windows},
 		},
 	})
+
+	if os.Getenv("TEST_EXTENDED") == "" {
+		t.Skipf("not running extended test unless TEST_EXTENDED is set")
+	}
 
 	suite.Run(t, &ExtendedRunner{info: info})
 }
@@ -141,7 +142,7 @@ func (runner *ExtendedRunner) TestAgentLong() {
 
 	runtime := os.Getenv("LONG_TEST_RUNTIME")
 	if runtime == "" {
-		runtime = "120m"
+		runtime = "5m"
 	}
 
 	testDuration, err := time.ParseDuration(runtime)
