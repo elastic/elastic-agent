@@ -266,37 +266,6 @@ func InstallPath(basePath string) string {
 func TopBinaryPath() string {
 	return filepath.Join(Top(), BinaryName)
 }
-<<<<<<< HEAD
-=======
-
-// RunningInstalled returns true when executing Agent is the installed Agent.
-func RunningInstalled() bool {
-	// Check if install marker created by `elastic-agent install` exists
-	markerFilePath := filepath.Join(Top(), MarkerFileName)
-	if _, err := os.Stat(markerFilePath); err != nil {
-		return false
-	}
-	return true
-}
-
-// ControlSocketFromPath returns the control socket path for an Elastic Agent running
-// on the defined platform, and its executing directory.
-func ControlSocketFromPath(platform string, path string) string {
-	// socket should be inside this directory
-	socketPath := filepath.Join(path, ControlSocketName)
-	if platform == "windows" {
-		// on windows the control socket always uses the fallback
-		return utils.SocketURLWithFallback(socketPath, path)
-	}
-	unixSocket := fmt.Sprintf("unix://%s", socketPath)
-	if len(unixSocket) < 104 {
-		// small enough to fit
-		return unixSocket
-	}
-	// place in global /tmp to ensure that its small enough to fit; current path is way to long
-	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
-	return utils.SocketURLWithFallback(socketPath, path)
-}
 
 func pathSplit(path string) []string {
 	dir, file := filepath.Split(path)
@@ -311,4 +280,3 @@ func pathSplit(path string) []string {
 	}
 	return append(pathSplit(filepath.Clean(dir)), file)
 }
->>>>>>> 1cc6585fc0 (Windows, prevent uninstall from within installed directory (#4108))

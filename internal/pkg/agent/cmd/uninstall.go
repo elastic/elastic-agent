@@ -10,11 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-=======
 	"github.com/elastic/elastic-agent-libs/logp"
->>>>>>> 1cc6585fc0 (Windows, prevent uninstall from within installed directory (#4108))
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"

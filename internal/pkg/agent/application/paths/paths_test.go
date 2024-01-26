@@ -49,6 +49,7 @@ func TestHasPrefixUnix(t *testing.T) {
 		"trailing slash":  {path: "/a/b/", prefix: "/a", want: true},
 		"no path":         {path: "", prefix: "/a", want: false},
 		"no prefix":       {path: "/a/b", prefix: "", want: false},
+		"middle differ":   {path: "/a/b/c", prefix: "/a/d/c", want: false},
 	}
 
 	for name, tc := range tests {
@@ -79,6 +80,7 @@ func TestHasPrefixWindows(t *testing.T) {
 		"no path":          {path: "", prefix: "c:\\a", want: false},
 		"no prefix":        {path: "c:\\a\\b", prefix: "", want: false},
 		"case insensitive": {path: "C:\\A\\B", prefix: "c:\\a", want: true},
+		"middle differ":    {path: "c:\\a\\b", prefix: "c:\\d\\b", want: false},
 	}
 
 	for name, tc := range tests {
