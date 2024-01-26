@@ -1,0 +1,89 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+//go:build windows
+
+package info
+
+import (
+	"fmt"
+	"runtime"
+	"syscall"
+	"unsafe"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/go-sysinfo"
+)
+
+// InjectAgentConfig injects config to a provided configuration.
+func InjectAgentConfig(c *config.Config) error {
+	globalConfig, err := agentGlobalConfig()
+	if err != nil {
+		return err
+	}
+
+	if err := c.Merge(globalConfig); err != nil {
+		return errors.New("failed to inject agent global config", err, errors.TypeConfig)
+	}
+
+	return nil
+}
+
+// agentGlobalConfig gets global config used for resolution of variables inside configuration
+// such as ${path.data}.
+func agentGlobalConfig() (map[string]interface{}, error) {
+	hostInfo, err := sysinfo.Host()
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"path": map[string]interface{}{
+			"data":   paths.Data(),
+			"config": paths.Config(),
+			"home":   paths.Home(),
+			"logs":   paths.Logs(),
+		},
+		"host": map[string]interface{}{
+			"id": hostInfo.Info().UniqueID,
+		},
+		"runtime.os":             runtime.GOOS,
+		"runtime.arch":           runtime.GOARCH,
+		"runtime.nativeArch":     nativeArch(),
+		"runtime.osinfo.type":    hostInfo.Info().OS.Type,
+		"runtime.osinfo.family":  hostInfo.Info().OS.Family,
+		"runtime.osinfo.version": hostInfo.Info().OS.Version,
+		"runtime.osinfo.major":   hostInfo.Info().OS.Major,
+		"runtime.osinfo.minor":   hostInfo.Info().OS.Minor,
+		"runtime.osinfo.patch":   hostInfo.Info().OS.Patch,
+	}, nil
+}
+
+func nativeArch() string {
+	var processMachine, nativeMachine uint16
+
+	var kernel32 = syscall.NewLazyDLL("kernel32.dll")
+	var isWow64Process2 = kernel32.NewProc("IsWow64Process2")
+
+	var currentProcessHandle, _ = syscall.GetCurrentProcess()
+	isWow64Process2.Call(uintptr(currentProcessHandle), uintptr(unsafe.Pointer(&processMachine)), uintptr(unsafe.Pointer(&nativeMachine)))
+
+	var nativeMachineStr string
+
+	switch nativeMachine {
+	case 0x8664:
+		nativeMachineStr = "amd64"
+		break
+	case 0xAA64:
+		nativeMachineStr = "arm64"
+		break
+	default:
+		// other unknown or unsupported by Elastic Defend architectures
+		nativeMachineStr = fmt.Sprintf("0x%x", nativeMachine)
+	}
+
+	return nativeMachineStr
+}

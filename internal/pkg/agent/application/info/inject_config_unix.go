@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build !windows
+
 package info
 
 import (
@@ -47,6 +49,7 @@ func agentGlobalConfig() (map[string]interface{}, error) {
 		},
 		"runtime.os":             runtime.GOOS,
 		"runtime.arch":           runtime.GOARCH,
+		"runtime.nativeArch":     "", // Unknown native CPU architecture
 		"runtime.osinfo.type":    hostInfo.Info().OS.Type,
 		"runtime.osinfo.family":  hostInfo.Info().OS.Family,
 		"runtime.osinfo.version": hostInfo.Info().OS.Version,

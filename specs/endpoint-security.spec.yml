@@ -20,6 +20,8 @@ inputs:
           message: "Elastic Defend requires Elastic Agent be running as root"
         - condition: ${install.in_default} == false
           message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
+        - condition: ${runtime.nativeArch} != 'amd64' and ${runtime.osinfo.type} == 'windows'
+          message: "Elastic Defend cannot be installed on Windows running on non-AMD64 CPU"
     service: &service
       cport: 6788
       log:
