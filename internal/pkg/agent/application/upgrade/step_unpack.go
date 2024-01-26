@@ -43,7 +43,7 @@ func (u *Upgrader) unpack(version, archivePath, dataDir string) (UnpackResult, e
 	if runtime.GOOS == windows {
 		unpackRes, err = unzip(u.log, archivePath, dataDir)
 	} else {
-		unpackRes, err = untar(u.log, version, archivePath, dataDir)
+		unpackRes, err = untar(u.log, archivePath, dataDir)
 	}
 
 	if err != nil {
@@ -194,7 +194,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 	}, nil
 }
 
-func untar(log *logger.Logger, version string, archivePath, dataDir string) (UnpackResult, error) {
+func untar(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error) {
 
 	var versionedHome string
 	var rootDir string
@@ -240,7 +240,7 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 
 	r, err := os.Open(archivePath)
 	if err != nil {
-		return UnpackResult{}, errors.New(fmt.Sprintf("artifact for 'elastic-agent' version '%s' could not be found at '%s'", version, archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
+		return UnpackResult{}, errors.New(fmt.Sprintf("artifact for 'elastic-agent' could not be found at '%s'", archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
 	}
 	defer r.Close()
 
