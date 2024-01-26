@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration
 
 import (
@@ -71,6 +73,7 @@ func TestAgentLong(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
+			{Type: define.Windows},
 		},
 	})
 
