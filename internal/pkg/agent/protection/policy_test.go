@@ -18,7 +18,7 @@ import (
 func getLogger() *logger.Logger {
 	loggerCfg := logger.DefaultLoggingConfig()
 	loggerCfg.Level = logp.DebugLevel
-	l, _ := logger.NewFromConfig("", loggerCfg, false)
+	l, _ := logger.NewFromConfig("", loggerCfg, nil, false)
 	return l
 }
 

@@ -87,7 +87,7 @@ func TestLazyAcker(t *testing.T) {
 	cfg.Level = logp.DebugLevel
 	// cfg.ToFiles = false
 	cfg.ToStderr = true
-	log, _ := logger.NewFromConfig("", cfg, true)
+	log, _ := logger.NewFromConfig("", cfg, nil, true)
 
 	// Tests
 	tests := []struct {

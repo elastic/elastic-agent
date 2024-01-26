@@ -37,7 +37,7 @@ func NewErrorLogger(t *testing.T) *logger.Logger {
 	loggerCfg := logger.DefaultLoggingConfig()
 	loggerCfg.Level = logp.ErrorLevel
 
-	log, err := logger.NewFromConfig("", loggerCfg, false)
+	log, err := logger.NewFromConfig("", loggerCfg, nil, false)
 	require.NoError(t, err)
 	return log
 }
