@@ -69,17 +69,15 @@ func nativeArch() string {
 	var isWow64Process2 = kernel32.NewProc("IsWow64Process2")
 
 	var currentProcessHandle, _ = syscall.GetCurrentProcess()
-	isWow64Process2.Call(uintptr(currentProcessHandle), uintptr(unsafe.Pointer(&processMachine)), uintptr(unsafe.Pointer(&nativeMachine)))
+	_, _, _ = isWow64Process2.Call(uintptr(currentProcessHandle), uintptr(unsafe.Pointer(&processMachine)), uintptr(unsafe.Pointer(&nativeMachine)))
 
 	var nativeMachineStr string
 
 	switch nativeMachine {
 	case 0x8664:
 		nativeMachineStr = "amd64"
-		break
 	case 0xAA64:
 		nativeMachineStr = "arm64"
-		break
 	default:
 		// other unknown or unsupported by Elastic Defend architectures
 		nativeMachineStr = fmt.Sprintf("0x%x", nativeMachine)
