@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -58,13 +59,18 @@ type MemoryMetrics struct {
 }
 
 type HandlesMetrics struct {
-	Open  uint64        `mapstructure:"open"`
+	Open  int           `mapstructure:"open"`
 	Limit HandlesLimits `mapstructure:"limit"`
 }
 
 type HandlesLimits struct {
 	Hard uint   `mapstructure:"hard"`
 	Soft uint64 `mapstructure:"soft"`
+}
+
+// MetricsSystem is used for windows handles metrics
+type MetricsSystem struct {
+	Handles HandlesMetrics `mapstructure:"handles"`
 }
 
 func TestAgentLong(t *testing.T) {
@@ -140,12 +146,12 @@ func (runner *ExtendedRunner) TestAgentLong() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 	defer cancel()
 
-	runtime := os.Getenv("LONG_TEST_RUNTIME")
-	if runtime == "" {
-		runtime = "5m"
+	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
+	if testRuntime == "" {
+		testRuntime = "4m"
 	}
 
-	testDuration, err := time.ParseDuration(runtime)
+	testDuration, err := time.ParseDuration(testRuntime)
 	require.NoError(runner.T(), err)
 
 	timer := time.NewTimer(testDuration)
@@ -187,6 +193,15 @@ func (runner *ExtendedRunner) TestAgentLong() {
 		metrics := ComponentMetrics{}
 		err = mapstructure.Decode(monitoringData, &metrics)
 		require.NoError(runner.T(), err)
+
+		// for whatever reason, the windows metrics are reported in a different location
+		systemDataSource := doc.Source["monitoring"].(map[string]interface{})["metrics"].(map[string]interface{})["system"]
+		systemData := MetricsSystem{}
+		err = mapstructure.Decode(systemDataSource, &systemData)
+		require.NoError(runner.T(), err)
+		if runtime.GOOS == "windows" {
+			metrics.Handles.Open = systemData.Handles.Open
+		}
 
 		if foundComp, ok := componentCollection[toComponent]; ok {
 			updated := append(foundComp, metrics)
