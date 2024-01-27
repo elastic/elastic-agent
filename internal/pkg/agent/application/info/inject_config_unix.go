@@ -49,7 +49,7 @@ func agentGlobalConfig() (map[string]interface{}, error) {
 		},
 		"runtime.os":             runtime.GOOS,
 		"runtime.arch":           runtime.GOARCH,
-		"runtime.nativeArch":     "", // Unknown native CPU architecture
+		"runtime.native_arch":    "", // Unknown native CPU architecture
 		"runtime.osinfo.type":    hostInfo.Info().OS.Type,
 		"runtime.osinfo.family":  hostInfo.Info().OS.Family,
 		"runtime.osinfo.version": hostInfo.Info().OS.Version,
