@@ -48,6 +48,7 @@ const (
 	// Mapped functions
 	agentPackageVersionMappedFunc    = "agent_package_version"
 	agentManifestGeneratorMappedFunc = "manifest"
+	snapshotSuffix                   = "snapshot_suffix"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -108,6 +109,7 @@ var (
 		"contains":                       strings.Contains,
 		agentPackageVersionMappedFunc:    AgentPackageVersion,
 		agentManifestGeneratorMappedFunc: PackageManifest,
+		snapshotSuffix:                   SnapshotSuffix,
 	}
 )
 
