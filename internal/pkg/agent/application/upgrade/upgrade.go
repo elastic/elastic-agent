@@ -174,7 +174,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	det.SetState(details.StateDownloading)
 
 	sourceURI = u.sourceURI(sourceURI)
-	archivePath, err := u.downloadArtifact(ctx, version, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+
+	parsedVersion, err := agtversion.ParseVersion(version)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
+	}
+
+	archivePath, err := u.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
@@ -279,7 +285,16 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	if err := InvokeWatcher(u.log); err != nil {
+	minParsedVersionForNewUpdateMarker := agtversion.NewParsedSemVer(8, 13, 0, "", "")
+	var watcherExecutable string
+	if parsedVersion.Less(*minParsedVersionForNewUpdateMarker) {
+		// use the current agent executable for watch
+		watcherExecutable = filepath.Join(paths.VersionedHome(paths.Top()), agentName)
+	} else {
+		// use the new agent executable as it should be able to parse the new update marker
+		watcherExecutable = filepath.Join(paths.Top(), unpackRes.VersionedHome, agentName)
+	}
+	if err := InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
 		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
 		return nil, err
