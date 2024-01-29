@@ -148,7 +148,7 @@ func (runner *ExtendedRunner) TestAgentLong() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "4m"
+		testRuntime = "30m"
 	}
 
 	testDuration, err := time.ParseDuration(testRuntime)
