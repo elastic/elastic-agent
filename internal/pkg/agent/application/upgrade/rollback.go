@@ -138,13 +138,13 @@ func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
 // agent during upgrade period.
-func InvokeWatcher(log *logger.Logger) error {
+func InvokeWatcher(log *logger.Logger, agentExecutable string) error {
 	if !IsUpgradeable() {
 		log.Info("agent is not upgradable, not starting watcher")
 		return nil
 	}
 
-	cmd := invokeCmd()
+	cmd := invokeCmd(agentExecutable)
 	defer func() {
 		if cmd.Process != nil {
 			log.Infof("releasing watcher %v", cmd.Process.Pid)
