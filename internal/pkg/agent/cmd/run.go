@@ -12,7 +12,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 	apmtransport "go.elastic.co/apm/transport"
 	"gopkg.in/yaml.v2"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/api"
@@ -48,7 +46,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
@@ -138,35 +135,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
 
-	// detect otel
-	runAsOtel := otel.IsOtelConfig(ctx, paths.ConfigFile())
-	var awaiters awaiters
-	var resErr error
-	if runAsOtel {
-		var otelStartWg sync.WaitGroup
-		otelAwaiter := make(chan struct{})
-		awaiters = append(awaiters, otelAwaiter)
-
-		otelStartWg.Add(1)
-		go func() {
-			otelStartWg.Done()
-			if err := otel.Run(ctx, stop); err != nil {
-				resErr = multierror.Append(resErr, err)
-			}
-
-			// close awaiter handled in run loop
-			close(otelAwaiter)
-		}()
-
-		// wait for otel to start
-		otelStartWg.Wait()
-	}
-
-	if err := runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, runAsOtel, awaiters, modifiers...); err != nil {
-		resErr = multierror.Append(resErr, err)
-	}
-
-	return resErr
+	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, false, nil, modifiers...)
 }
 
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, runAsOtel bool, awaiters awaiters, modifiers ...component.PlatformModifier) error {
@@ -208,7 +177,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	}
 
 	// agent ID needs to stay empty in bootstrap mode
-	createAgentID := true
+	createAgentID := !runAsOtel
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
 		createAgentID = false
 	}
@@ -405,7 +374,11 @@ LOOP:
 
 func loadConfig(ctx context.Context, override cfgOverrider, runAsOtel bool) (*configuration.Configuration, error) {
 	if runAsOtel {
-		return configuration.DefaultConfiguration(), nil
+		defaultCfg := configuration.DefaultConfiguration()
+		// disable monitoring to avoid injection
+		defaultCfg.Settings.MonitoringConfig.Enabled = false
+		defaultCfg.Settings.V1MonitoringEnabled = false
+		return defaultCfg, nil
 	}
 
 	pathConfigFile := paths.ConfigFile()
