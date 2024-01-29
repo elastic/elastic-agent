@@ -12,6 +12,7 @@ import (
 )
 
 const ManifestKind = "PackageManifest"
+const ManifestFileName = "manifest.yaml"
 
 type PackageDesc struct {
 	Version       string              `yaml:"version,omitempty" json:"version,omitempty"`

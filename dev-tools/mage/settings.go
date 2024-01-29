@@ -320,7 +320,7 @@ func PackageManifest() (string, error) {
 	m.Package.VersionedHome = versionedHomePath
 	m.Package.PathMappings = []map[string]string{{}}
 	m.Package.PathMappings[0][versionedHomePath] = fmt.Sprintf("data/elastic-agent-%s%s-%s", m.Package.Version, SnapshotSuffix(), commitHashShort)
-	m.Package.PathMappings[0]["manifest.yaml"] = fmt.Sprintf("data/elastic-agent-%s%s-%s/manifest.yaml", m.Package.Version, SnapshotSuffix(), commitHashShort)
+	m.Package.PathMappings[0][v1.ManifestFileName] = fmt.Sprintf("data/elastic-agent-%s%s-%s/%s", m.Package.Version, SnapshotSuffix(), commitHashShort, v1.ManifestFileName)
 	yamlBytes, err := yaml.Marshal(m)
 	if err != nil {
 		return "", fmt.Errorf("marshaling manifest: %w", err)

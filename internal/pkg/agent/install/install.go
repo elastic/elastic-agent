@@ -110,20 +110,21 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 			errors.M("directory", filepath.Dir(topPath)))
 	}
 
-	manifestFile, err := os.Open(filepath.Join(dir, "manifest.yaml"))
+	manifestFilePath := filepath.Join(dir, v1.ManifestFileName)
+	manifestFile, err := os.Open(manifestFilePath)
 	if err != nil {
 		return utils.FileOwner{}, errors.New(
 			err,
-			fmt.Sprintf("failed to open package manifest file (%s)", "manifest.yaml"),
-			errors.M("file", "manifest.yaml"))
+			fmt.Sprintf("failed to open package manifest file (%s)", manifestFilePath),
+			errors.M("file", v1.ManifestFileName))
 	}
 	defer manifestFile.Close()
 	manifest, err := v1.ParseManifest(manifestFile)
 	if err != nil {
 		return utils.FileOwner{}, errors.New(
 			err,
-			fmt.Sprintf("failed to parse package manifest file contents (%s)", "manifest.yaml"),
-			errors.M("file", "manifest.yaml"))
+			fmt.Sprintf("failed to parse package manifest file contents (%s)", manifestFilePath),
+			errors.M("file", v1.ManifestFileName))
 	}
 	pathMappings := manifest.Package.PathMappings
 

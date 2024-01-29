@@ -115,21 +115,27 @@ func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 	}
 }
 
-// markUpgrade marks update happened so we can handle grace period
-func markUpgrade(log *logger.Logger, dataDirPath, version, hash, versionedHome, prevVersion, prevHash, prevVersionedHome string, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
+type agentInstall struct {
+	version       string
+	hash          string
+	versionedHome string
+}
 
-	if len(prevHash) > hashLen {
-		prevHash = prevHash[:hashLen]
+// markUpgrade marks update happened so we can handle grace period
+func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
+
+	if len(previousAgent.hash) > hashLen {
+		previousAgent.hash = previousAgent.hash[:hashLen]
 	}
 
 	marker := &UpdateMarker{
-		Version:           version,
-		Hash:              hash,
-		VersionedHome:     versionedHome,
+		Version:           agent.version,
+		Hash:              agent.hash,
+		VersionedHome:     agent.versionedHome,
 		UpdatedOn:         time.Now(),
-		PrevVersion:       prevVersion,
-		PrevHash:          prevHash,
-		PrevVersionedHome: prevVersionedHome,
+		PrevVersion:       previousAgent.version,
+		PrevHash:          previousAgent.hash,
+		PrevVersionedHome: previousAgent.versionedHome,
 		Action:            action,
 		Details:           upgradeDetails,
 	}
@@ -140,12 +146,12 @@ func markUpgrade(log *logger.Logger, dataDirPath, version, hash, versionedHome, 
 	}
 
 	markerPath := markerFilePath(dataDirPath)
-	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", prevHash)
+	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
 	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
 	}
 
-	if err := UpdateActiveCommit(log, paths.Top(), hash); err != nil {
+	if err := UpdateActiveCommit(log, paths.Top(), agent.hash); err != nil {
 		return err
 	}
 

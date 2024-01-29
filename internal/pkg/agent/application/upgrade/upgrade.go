@@ -40,6 +40,7 @@ const (
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
 	runDirMod       = 0770
+	snapshotSuffix  = "-SNAPSHOT"
 )
 
 var agentArtifact = artifact.Artifact{
@@ -142,7 +143,7 @@ func (av agentVersion) String() string {
 	buf := strings.Builder{}
 	buf.WriteString(av.version)
 	if av.snapshot {
-		buf.WriteString("-SNAPSHOT")
+		buf.WriteString(snapshotSuffix)
 	}
 	buf.WriteString(" (hash: ")
 	buf.WriteString(av.hash)
@@ -212,7 +213,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	} else {
 		// extract version info from the version string (we can ignore parsing errors as it would have never passed the download step)
 		parsedVersion, _ := agtversion.ParseVersion(version)
-		newVersion.version = strings.TrimSuffix(parsedVersion.VersionWithPrerelease(), "-SNAPSHOT")
+		newVersion.version = strings.TrimSuffix(parsedVersion.VersionWithPrerelease(), snapshotSuffix)
 		newVersion.snapshot = parsedVersion.IsSnapshot()
 	}
 	newVersion.hash = metadata.hash
@@ -274,11 +275,23 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	if err != nil {
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
 	}
-	if err := markUpgrade(
-		u.log,
-		paths.Data(),                                     //data dir to place the marker in
-		version, unpackRes.Hash, unpackRes.VersionedHome, //new agent version data
-		release.VersionWithSnapshot(), release.Commit(), currentVersionedHome, // old agent version data
+
+	current := agentInstall{
+		version:       version,
+		hash:          unpackRes.Hash,
+		versionedHome: unpackRes.VersionedHome,
+	}
+
+	previous := agentInstall{
+		version:       release.VersionWithSnapshot(),
+		hash:          release.Commit(),
+		versionedHome: currentVersionedHome,
+	}
+
+	if err := markUpgrade(u.log,
+		paths.Data(), //data dir to place the marker in
+		current,      //new agent version data
+		previous,     // old agent version data
 		action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
@@ -419,7 +432,7 @@ func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHome string) reexec.ShutdownCallbackFn {
 	if release.Snapshot() {
 		// SNAPSHOT is part of newVersion
-		prevVersion += "-SNAPSHOT"
+		prevVersion += snapshotSuffix
 	}
 
 	return func() error {
