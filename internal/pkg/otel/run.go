@@ -8,8 +8,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
@@ -25,27 +23,6 @@ import (
 )
 
 const buildDescription = "Elastic opentelemetry-collector distribution"
-
-// IsOtelConfig returns true if file is named:
-//   - otel.(yaml|yml)
-//   - otlp.(yaml|yml)
-//   - otelcol.(yaml|yml)
-//
-// In other cases it returns false assuming agent config for backwards compatibility
-func IsOtelConfig(ctx context.Context, pathConfigFile string) bool {
-	fileName := filepath.Base(pathConfigFile)
-	if suffix := filepath.Ext(fileName); suffix != ".yml" && suffix != ".yaml" {
-		return false
-	}
-
-	cleanFileName := strings.TrimSpace(strings.ToLower(strings.TrimSuffix(fileName, filepath.Ext(fileName))))
-	if cleanFileName == "otel" || cleanFileName == "otlp" || cleanFileName == "otelcol" {
-		return true
-	}
-
-	// default behavior is Elastic Agent
-	return false
-}
 
 func Run(ctx context.Context, stop chan bool, configFiles []string) error {
 	fmt.Fprintln(os.Stdout, "Starting in otel mode")
