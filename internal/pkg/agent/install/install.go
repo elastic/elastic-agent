@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -109,35 +110,30 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 			errors.M("directory", filepath.Dir(topPath)))
 	}
 
-	// copy source into install path
-	//
-	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
-	// otherwise fall back to the default.
-	copyConcurrency := 1
-	hasSSDs, detectHWErr := HasAllSSDs()
-	if detectHWErr != nil {
-		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling copy concurrency: %s\n", detectHWErr)
-	}
-	if hasSSDs {
-		copyConcurrency = runtime.NumCPU() * 4
-	}
-
-	pt.Describe("Copying install files")
-	err = copy.Copy(dir, topPath, copy.Options{
-		OnSymlink: func(_ string) copy.SymlinkAction {
-			return copy.Shallow
-		},
-		Sync:         true,
-		NumOfWorkers: int64(copyConcurrency),
-	})
+	manifestFile, err := os.Open("manifest.yaml")
 	if err != nil {
-		pt.Describe("Error copying files")
 		return utils.FileOwner{}, errors.New(
 			err,
-			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
-			errors.M("source", dir), errors.M("destination", topPath),
-		)
+			fmt.Sprintf("failed to open package manifest file (%s)", "manifest.yaml"),
+			errors.M("file", "manifest.yaml"))
 	}
+	defer manifestFile.Close()
+	manifest, err := v1.ParseManifest(manifestFile)
+	if err != nil {
+		return utils.FileOwner{}, errors.New(
+			err,
+			fmt.Sprintf("failed to parse package manifest file contents (%s)", "manifest.yaml"),
+			errors.M("file", "manifest.yaml"))
+	}
+	pathMappings := manifest.Package.PathMappings
+
+	pt.Describe("Copying install files")
+	err = copyFiles(streams, pathMappings, dir, topPath)
+	if err != nil {
+		pt.Describe("Error copying files")
+		return utils.FileOwner{}, err
+	}
+
 	pt.Describe("Successfully copied files")
 
 	// place shell wrapper, if present on platform
@@ -227,6 +223,103 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	pt.Describe("Installed service")
 
 	return ownership, nil
+}
+
+func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, dir string, topPath string) error {
+	// copy source into install path
+	//
+	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
+	// otherwise fall back to the default.
+	copyConcurrency := 1
+	hasSSDs, detectHWErr := HasAllSSDs()
+	if detectHWErr != nil {
+		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling copy concurrency: %s\n", detectHWErr)
+	}
+	if hasSSDs {
+		copyConcurrency = runtime.NumCPU() * 4
+	}
+
+	copiedFiles := map[string]struct{}{}
+	symlinks := map[string]string{}
+
+	for _, pathMapping := range pathMappings {
+		for packagePath, installedPath := range pathMapping {
+			copiedFiles[packagePath] = struct{}{}
+			err := copy.Copy(filepath.Join(dir, packagePath), filepath.Join(topPath, installedPath), copy.Options{
+				OnSymlink: func(_ string) copy.SymlinkAction {
+					return copy.Shallow
+				},
+				Sync:         true,
+				NumOfWorkers: int64(copyConcurrency),
+			})
+			if err != nil {
+
+				return errors.New(
+					err,
+					fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", packagePath, installedPath),
+					errors.M("source", packagePath), errors.M("destination", installedPath),
+				)
+			}
+		}
+	}
+
+	err := copy.Copy(dir, topPath, copy.Options{
+		OnSymlink: func(source string) copy.SymlinkAction {
+
+			target, err := os.Readlink(source)
+			if err != nil {
+				// error reading the link, not much choice to leave it unchanged and hope for the best
+				return copy.Shallow
+			}
+
+			for _, pathMapping := range pathMappings {
+				for srcPath, dstPath := range pathMapping {
+					if strings.HasPrefix(target, srcPath) {
+						newTarget := strings.Replace(target, srcPath, dstPath, 1)
+						rel, err := filepath.Rel(dir, source)
+						if err != nil {
+							panic(err)
+						}
+						symlinks[rel] = newTarget
+						return copy.Skip
+					}
+				}
+			}
+
+			return copy.Shallow
+		},
+		Skip: func(srcinfo os.FileInfo, src, dest string) (bool, error) {
+			relPath, err := filepath.Rel(dir, src)
+			if err != nil {
+				return false, fmt.Errorf("calculating relative path for %s: %w", src, err)
+			}
+
+			_, ok := copiedFiles[relPath]
+			return ok, nil
+		},
+		Sync:         true,
+		NumOfWorkers: int64(copyConcurrency),
+	})
+	if err != nil {
+		return errors.New(
+			err,
+			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
+			errors.M("source", dir), errors.M("destination", topPath),
+		)
+	}
+
+	//Fix the symlinks
+	for src, target := range symlinks {
+		absSrcPath := filepath.Join(topPath, src)
+		err := os.Symlink(target, absSrcPath)
+		if err != nil {
+			return errors.New(
+				err,
+				fmt.Sprintf("failed to link source %q to destination %q", absSrcPath, target),
+			)
+		}
+	}
+	return nil
 }
 
 // StartService starts the installed service.
