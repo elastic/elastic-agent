@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
 
 func TestHasAllSSDs(t *testing.T) {
@@ -110,21 +111,21 @@ func TestCopyFiles(t *testing.T) {
 		{
 			name: "simple install package mockup",
 			setupFiles: []files{
-				{fType: REGULAR, path: "manifest.yaml", content: []byte(sampleManifestContent)},
+				{fType: REGULAR, path: v1.ManifestFileName, content: []byte(sampleManifestContent)},
 				{fType: DIRECTORY, path: filepath.Join("data", "elastic-agent-fb7370"), content: nil},
 				{fType: REGULAR, path: filepath.Join("data", "elastic-agent-fb7370", "elastic-agent"), content: []byte("this is an elastic-agent wannabe")},
 				{fType: SYMLINK, path: "elastic-agent", content: []byte(filepath.Join("data", "elastic-agent-fb7370", "elastic-agent"))},
 			},
 			expectedFiles: []files{
 				{fType: DIRECTORY, path: filepath.Join("data", "elastic-agent-8.13.0-SNAPSHOT-fb7370"), content: nil},
-				{fType: REGULAR, path: filepath.Join("data", "elastic-agent-8.13.0-SNAPSHOT-fb7370", "manifest.yaml"), content: []byte(sampleManifestContent)},
+				{fType: REGULAR, path: filepath.Join("data", "elastic-agent-8.13.0-SNAPSHOT-fb7370", v1.ManifestFileName), content: []byte(sampleManifestContent)},
 				{fType: REGULAR, path: filepath.Join("data", "elastic-agent-8.13.0-SNAPSHOT-fb7370", "elastic-agent"), content: []byte("this is an elastic-agent wannabe")},
 				{fType: SYMLINK, path: "elastic-agent", content: []byte(filepath.Join("data", "elastic-agent-8.13.0-SNAPSHOT-fb7370", "elastic-agent"))},
 			},
 			mappings: []map[string]string{
 				{
 					"data/elastic-agent-fb7370": "data/elastic-agent-8.13.0-SNAPSHOT-fb7370",
-					"manifest.yaml":             "data/elastic-agent-8.13.0-SNAPSHOT-fb7370/manifest.yaml",
+					v1.ManifestFileName:         "data/elastic-agent-8.13.0-SNAPSHOT-fb7370/" + v1.ManifestFileName,
 				},
 			}},
 	}

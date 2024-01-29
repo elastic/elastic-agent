@@ -201,9 +201,9 @@ func checkZip(t *testing.T, file string) {
 
 func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
 	t.Log("Checking file manifest.yaml")
-	manifestReadCloser, err := os.Open(filepath.Join(extractedPackageDir, "manifest.yaml"))
+	manifestReadCloser, err := os.Open(filepath.Join(extractedPackageDir, v1.ManifestFileName))
 	if err != nil {
-		t.Errorf("opening manifest %s : %v", "manifest.yaml", err)
+		t.Errorf("opening manifest %s : %v", v1.ManifestFileName, err)
 	}
 	defer func(closer io.ReadCloser) {
 		err := closer.Close()
