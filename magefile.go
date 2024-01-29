@@ -1835,6 +1835,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	extraEnv["TEST_EXTENDED"] = os.Getenv("TEST_EXTENDED")
+	extraEnv["LONG_TEST_RUNTIME"] = os.Getenv("LONG_TEST_RUNTIME")
 
 	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
 	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
