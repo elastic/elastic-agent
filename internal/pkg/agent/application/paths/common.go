@@ -191,6 +191,7 @@ func SetLogs(path string) {
 
 // VersionedHome returns a versioned path based on a TopPath and used commit.
 func VersionedHome(base string) string {
+	filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s-%s", release.ShortCommit()))
 	return filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
 }
 
@@ -253,8 +254,9 @@ func retrieveExecutableDir() string {
 
 // isInsideData returns true when the exePath is inside of the current Agents data path.
 func isInsideData(exeDir string) bool {
-	expectedDir := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
-	return strings.HasSuffix(exeDir, expectedDir)
+	expectedDirLegacy := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
+	expectedDirWithVersion := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())))
+	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
 // ExecDir returns the "executable" directory which is:
