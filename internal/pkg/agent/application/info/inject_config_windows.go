@@ -74,8 +74,8 @@ func nativeArch() string {
 	var nativeMachineStr string
 
 	const (
-		IMAGE_FILE_MACHINE_AMD64 = 0x8664,
-		IMAGE_FILE_MACHINE_ARM64 = 0xAA64,
+		IMAGE_FILE_MACHINE_AMD64 = 0x8664
+		IMAGE_FILE_MACHINE_ARM64 = 0xAA64
 	)
 
 	switch nativeMachine {
