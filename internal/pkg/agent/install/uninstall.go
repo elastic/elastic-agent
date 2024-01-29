@@ -33,7 +33,15 @@ import (
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath, uninstallToken string, pt *progressbar.ProgressBar) error {
+func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("unable to get current working directory")
+	}
+
+	if runtime.GOOS == "windows" && paths.HasPrefix(cwd, topPath) {
+		return fmt.Errorf("uninstall must be run from outside the installed path '%s'", topPath)
+	}
 	// uninstall the current service
 	// not creating the service, so no need to set the username and group to any value
 	svc, err := newService(topPath)
@@ -61,7 +69,7 @@ func Uninstall(cfgFile, topPath, uninstallToken string, pt *progressbar.Progress
 	}
 
 	// Uninstall components first
-	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken, pt); err != nil {
+	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken, log, pt); err != nil {
 		// If service status was running it was stopped to uninstall the components.
 		// If the components uninstall failed start the service again
 		if status == service.StatusRunning {
@@ -180,11 +188,7 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	return false
 }
 
-func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, pt *progressbar.ProgressBar) error {
-	log, err := logger.NewWithLogpLevel("", logp.ErrorLevel, false)
-	if err != nil {
-		return fmt.Errorf("error creating logger: %w", err)
-	}
+func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
 
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
@@ -217,7 +221,7 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 	}
 
 	// Need to read the features from config on uninstall, in order to set the tamper protection feature flag correctly
-	if err := features.Apply(cfg); err != nil {
+	if err = features.Apply(cfg); err != nil {
 		return fmt.Errorf("could not parse and apply feature flags config: %w", err)
 	}
 
@@ -234,7 +238,7 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 			// This component is not active
 			continue
 		}
-		if err := uninstallServiceComponent(ctx, log, comp, uninstallToken, pt); err != nil {
+		if err = uninstallServiceComponent(ctx, log, comp, uninstallToken, pt); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 			// The decision was made to change the behaviour and leave the Agent installed if Endpoint uninstall fails
 			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
