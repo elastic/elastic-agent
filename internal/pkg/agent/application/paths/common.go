@@ -61,8 +61,10 @@ var (
 
 func init() {
 	// this is needed to correctly initialize paths containing the agent package version
+	// TODO find a better solution and a way to handle errors gracefully
 	version.InitVersionInformation()
 
+	// this is the first call where we need version information (it calls isInsideData())
 	topPath = initialTop()
 	configPath = topPath
 	logsPath = topPath
