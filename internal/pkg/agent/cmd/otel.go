@@ -8,13 +8,14 @@ import (
 	"context"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
-	"github.com/hashicorp/go-multierror"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 const (

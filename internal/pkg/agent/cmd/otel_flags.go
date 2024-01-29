@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/spf13/cobra"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 func getConfigFiles(cmd *cobra.Command) ([]string, error) {
