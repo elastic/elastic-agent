@@ -5,7 +5,6 @@
 package filewatcher
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,7 +23,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("newly added files are discovered", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := ioutil.TempDir("", "watch")
+		tmp, err := os.MkdirTemp("", "watch")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmp)
 
@@ -43,7 +42,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("ignore old files", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := ioutil.TempDir("", "watch")
+		tmp, err := os.MkdirTemp("", "watch")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmp)
 
@@ -68,7 +67,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("can unwatch a watched file", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := ioutil.TempDir("", "watch")
+		tmp, err := os.MkdirTemp("", "watch")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmp)
 
@@ -97,7 +96,7 @@ func TestWatch(t *testing.T) {
 		w.Unwatch(path)
 
 		// Add new content to the file.
-		ioutil.WriteFile(path, []byte("heeeelo"), 0644)
+		os.WriteFile(path, []byte("heeeelo"), 0644)
 
 		// Should not find the file.
 		r, u, err = w.scan()
@@ -107,7 +106,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("can returns the list of watched files", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := ioutil.TempDir("", "watch")
+		tmp, err := os.MkdirTemp("", "watch")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmp)
 
@@ -125,7 +124,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("update returns updated, unchanged and watched files", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := ioutil.TempDir("", "watch")
+		tmp, err := os.MkdirTemp("", "watch")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmp)
 
@@ -184,7 +183,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("should cleanup files that disapear", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := ioutil.TempDir("", "watch")
+		tmp, err := os.MkdirTemp("", "watch")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmp)
 
@@ -201,7 +200,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("should allow to invalidate the cache ", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := ioutil.TempDir("", "watch")
+		tmp, err := os.MkdirTemp("", "watch")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmp)
 

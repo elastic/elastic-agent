@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -313,9 +312,10 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
 
+	procWaitCh := proc.Wait()
 	killProc := func() {
 		_ = proc.Kill()
-		<-proc.Wait()
+		<-procWaitCh
 	}
 
 	var doneChan <-chan time.Time
@@ -329,7 +329,7 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		case <-ctx.Done():
 			killProc()
 			return ctx.Err()
-		case ps := <-proc.Wait():
+		case ps := <-procWaitCh:
 			if stopping {
 				return nil
 			}
@@ -409,11 +409,6 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 		return fmt.Errorf("failed to get control protcol address: %w", err)
 	}
 
-	agentClient = client.New(client.WithAddress(cAddr))
-	f.setClient(agentClient)
-	defer f.setClient(nil)
-	stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
-
 	var logProxy Logger
 	if f.logOutput {
 		logProxy = f.t
@@ -435,14 +430,20 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
 
-	killProc := func() {
-		_ = proc.Kill()
-		<-proc.Wait()
-	}
+	agentClient = client.New(client.WithAddress(cAddr))
+	f.setClient(agentClient)
+	defer f.setClient(nil)
+	stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
 
 	var doneChan <-chan time.Time
 	if f.runLength != 0 {
 		doneChan = time.After(f.runLength)
+	}
+
+	procWaitCh := proc.Wait()
+	killProc := func() {
+		_ = proc.Kill()
+		<-procWaitCh
 	}
 
 	stopping := false
@@ -451,7 +452,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 		case <-ctx.Done():
 			killProc()
 			return ctx.Err()
-		case ps := <-proc.Wait():
+		case ps := <-procWaitCh:
 			if stopping {
 				return nil
 			}
@@ -745,7 +746,7 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 	if err != nil {
 		return err
 	}
-	contents, err := ioutil.ReadDir(componentsDir)
+	contents, err := os.ReadDir(componentsDir)
 	if err != nil {
 		return fmt.Errorf("failed to read contents of components directory %s: %w", componentsDir, err)
 	}
@@ -885,7 +886,7 @@ func getCacheDir(caller string, name string) (string, error) {
 // findComponentsDir identifies the directory that holds the components.
 func findComponentsDir(dir string) (string, error) {
 	dataDir := filepath.Join(dir, "data")
-	agentVersions, err := ioutil.ReadDir(dataDir)
+	agentVersions, err := os.ReadDir(dataDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to read contents of the data directory %s: %w", dataDir, err)
 	}

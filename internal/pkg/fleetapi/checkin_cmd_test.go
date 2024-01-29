@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -214,7 +214,7 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := ioutil.ReadAll(r.Body)
+				content, err := io.ReadAll(r.Body)
 				assert.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Equal(t, "linux", req.Metadata.OS.Name)
@@ -248,7 +248,7 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := ioutil.ReadAll(r.Body)
+				content, err := io.ReadAll(r.Body)
 				assert.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Nil(t, req.Metadata)

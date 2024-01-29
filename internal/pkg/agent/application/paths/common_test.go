@@ -91,3 +91,55 @@ func TestExecDir(t *testing.T) {
 		})
 	}
 }
+
+func TestPathSplitUnix(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping Unix tests on Windows")
+	}
+	tests := map[string]struct {
+		path string
+		want []string
+	}{
+		"empty string": {path: "", want: []string{}},
+		"just file":    {path: "test.txt", want: []string{"test.txt"}},
+		"just dir":     {path: "/", want: []string{}},
+		"top dir":      {path: "/test.txt", want: []string{"test.txt"}},
+		"simple":       {path: "/a/b", want: []string{"a", "b"}},
+		"long":         {path: "/a/b c/d-e/f_g", want: []string{"a", "b c", "d-e", "f_g"}},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := pathSplit(tc.path)
+			if !cmp.Equal(tc.want, got) {
+				t.Fatalf("not equal got: %v, want: %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPathSplitWindows(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Skipping Windows tests on non Windows")
+	}
+	tests := map[string]struct {
+		path string
+		want []string
+	}{
+		"empty string": {path: "", want: []string{}},
+		"just file":    {path: "test.txt", want: []string{"test.txt"}},
+		"just dir":     {path: "C:\\", want: []string{}},
+		"top dir":      {path: "C:\\test.txt", want: []string{"test.txt"}},
+		"simple":       {path: "C:\\a\\b", want: []string{"a", "b"}},
+		"long":         {path: "C:\\a\\b c\\d-e\\f_g", want: []string{"a", "b c", "d-e", "f_g"}},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := pathSplit(tc.path)
+			if !cmp.Equal(tc.want, got) {
+				t.Fatalf("not equal got: %v, want: %v", got, tc.want)
+			}
+		})
+	}
+}
