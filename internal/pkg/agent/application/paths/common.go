@@ -15,7 +15,9 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/utils"
-	"github.com/elastic/elastic-agent/version"
+
+	// this is not a leftover: this anonymous import is needed for version initialization
+	_ "github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -60,10 +62,6 @@ var (
 )
 
 func init() {
-	// this is needed to correctly initialize paths containing the agent package version
-	// TODO find a better solution and a way to handle errors gracefully
-	version.InitVersionInformation()
-
 	// this is the first call where we need version information (it calls isInsideData())
 	topPath = initialTop()
 	configPath = topPath
@@ -261,11 +259,7 @@ func retrieveExecutableDir() string {
 func isInsideData(exeDir string) bool {
 	expectedDirLegacy := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
 	expectedDirWithVersion := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())))
-	result := strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
-
-	fmt.Fprintf(os.Stderr, ">>>>> isInsideData called with %q, candidates [%q, %q]: %v\n", exeDir, expectedDirLegacy, expectedDirWithVersion, result)
-
-	return result
+	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
 // ExecDir returns the "executable" directory which is:
