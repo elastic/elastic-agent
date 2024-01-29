@@ -512,8 +512,8 @@ github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d/go.mod h1:W
 github.com/aws/aws-sdk-go v1.15.11/go.mod h1:mFuSZ37Z9YOHbQEwBWztmVzqXrEkub65tZoCYDt7FT0=
 github.com/aws/aws-sdk-go v1.43.16/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/aymerick/raymond v2.0.2+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
-github.com/belimawr/elastic-agent-libs v0.2.9-0.20240125170635-4032ca577b34 h1:jtesyntb7gGpsNEobHKVZwPKXYU+hvdBDgwJ96JpRwI=
-github.com/belimawr/elastic-agent-libs v0.2.9-0.20240125170635-4032ca577b34/go.mod h1:pGMj5myawdqu+xE+WKvM5FQzKQ/MonikkWOzoFTJxaU=
+github.com/belimawr/elastic-agent-libs v0.2.9-0.20240129141949-9d3358670084 h1:x8TYBGbzibTdzT7hDTNdpwQZQdXkLdY8LKIhLgIS3JM=
+github.com/belimawr/elastic-agent-libs v0.2.9-0.20240129141949-9d3358670084/go.mod h1:pGMj5myawdqu+xE+WKvM5FQzKQ/MonikkWOzoFTJxaU=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v0.0.0-20160804104726-4c0e84591b9a/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
