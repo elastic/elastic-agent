@@ -73,10 +73,15 @@ func nativeArch() string {
 
 	var nativeMachineStr string
 
+	const (
+		IMAGE_FILE_MACHINE_AMD64 = 0x8664,
+		IMAGE_FILE_MACHINE_ARM64 = 0xAA64,
+	)
+
 	switch nativeMachine {
-	case 0x8664:
+	case IMAGE_FILE_MACHINE_AMD64:
 		nativeMachineStr = "amd64"
-	case 0xAA64:
+	case IMAGE_FILE_MACHINE_ARM64:
 		nativeMachineStr = "arm64"
 	default:
 		// other unknown or unsupported by Elastic Defend architectures
