@@ -13,9 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -66,14 +64,7 @@ func TestUpgradeHandler(t *testing.T) {
 
 	log, _ := logger.New("", false)
 
-	// CreateAgentSecret will create the encryption key for the disk store which
-	// is used by info.NewAgentInfo.
-	err := secret.CreateAgentSecret(
-		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
-	require.NoError(t, err, "failed creating agent secret")
-
-	agentInfo, err := info.NewAgentInfo(ctx, true)
-	require.NoError(t, err, "could not get new agent info")
+	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
 
 	// Create and start the coordinator
@@ -92,7 +83,7 @@ func TestUpgradeHandler(t *testing.T) {
 	u := NewUpgrade(log, c)
 	a := fleetapi.ActionUpgrade{Version: "8.3.0", SourceURI: "http://localhost"}
 	ack := noopacker.New()
-	err = u.Handle(ctx, &a, ack)
+	err := u.Handle(ctx, &a, ack)
 	require.NoError(t, err)
 	msg := <-msgChan
 	require.Equal(t, "completed 8.3.0", msg)
@@ -106,14 +97,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 
 	log, _ := logger.New("", false)
 
-	// CreateAgentSecret will create the encryption key for the disk store which
-	// is used by info.NewAgentInfo.
-	err := secret.CreateAgentSecret(
-		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
-	require.NoError(t, err, "failed creating agent secret")
-
-	agentInfo, err := info.NewAgentInfo(ctx, true)
-	require.NoError(t, err, "could not get new agent info")
+	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
 
 	// Create and start the Coordinator
@@ -148,14 +132,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 
 	log, _ := logger.New("", false)
 
-	// CreateAgentSecret will create the encryption key for the disk store which
-	// is used by info.NewAgentInfo.
-	err := secret.CreateAgentSecret(
-		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
-	require.NoError(t, err, "failed creating agent secret")
-
-	agentInfo, err := info.NewAgentInfo(ctx, true)
-	require.NoError(t, err, "could not get new agent info")
+	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
 
 	// Create and start the Coordinator

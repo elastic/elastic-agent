@@ -20,14 +20,14 @@ import (
 // Settings handles settings change coming from fleet and updates log level.
 type Settings struct {
 	log       *logger.Logger
-	agentInfo *info.AgentInfo
+	agentInfo info.Agent
 	coord     *coordinator.Coordinator
 }
 
 // NewSettings creates a new Settings handler.
 func NewSettings(
 	log *logger.Logger,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	coord *coordinator.Coordinator,
 ) *Settings {
 	return &Settings{

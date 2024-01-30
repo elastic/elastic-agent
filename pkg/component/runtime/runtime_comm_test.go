@@ -13,22 +13,37 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 )
 
-func TestRuntimeComm_WriteConnInfo_packageVersion(t *testing.T) {
-	paths.SetConfig(t.TempDir())
-	// CreateAgentSecret will create the encryption key for the disk store which
-	// is used by info.NewAgentInfo.
-	err := secret.CreateAgentSecret(
-		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
-	require.NoError(t, err, "failed creating agent secret")
+type agentInfoMock struct {
+	agentID  string
+	snapshot bool
+	version  string
+}
 
-	agentInfo, err := info.NewAgentInfo(context.Background(), true)
-	require.NoError(t, err, "could not create agent info")
+func (a agentInfoMock) AgentID() string {
+	return a.agentID
+}
+func (a agentInfoMock) Snapshot() bool {
+	return a.snapshot
+}
+
+func (a agentInfoMock) Version() string {
+	return a.version
+}
+
+func (a agentInfoMock) Headers() map[string]string                          { panic("implement me") }
+func (a agentInfoMock) LogLevel() string                                    { panic("implement me") }
+func (a agentInfoMock) ReloadID(ctx context.Context) error                  { panic("implement me") }
+func (a agentInfoMock) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
+
+func TestRuntimeComm_WriteStartUpInfo_packageVersion(t *testing.T) {
+	agentInfo := agentInfoMock{
+		agentID:  "NCC-1701",
+		snapshot: true,
+		version:  "8.13.0+build1966-09-6",
+	}
 
 	want := client.AgentInfo{
 		ID:       agentInfo.AgentID(),

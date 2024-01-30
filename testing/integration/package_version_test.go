@@ -121,7 +121,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	require.Lenf(t, splits, 2,
 		"expected split of beats output version to be split into 2, it was split into %q",
 		strings.Join(splits, "|"))
-	wantCommitHash := splits[0]
+	wantBuildHash := splits[0]
 
 	diagZip, err := collectDiagnostics(ctx, t, f)
 	require.NoError(t, err, "failed collecting diagnostics")
@@ -131,7 +131,6 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 	stateYAML, err := os.Open(filepath.Join(diag, "state.yaml"))
 	require.NoError(t, err, "could not open diagnostics state.yaml")
-	t.Fail()
 
 	state := struct {
 		Components []struct {
@@ -152,8 +151,8 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	require.NoError(t, err, "could not parse state.yaml (%s)", stateYAML.Name())
 
 	for _, c := range state.Components {
-		assert.Equal(t, wantCommitHash, c.State.VersionInfo.BuildHash)
-		assert.Equal(t, wantCommitHash, c.State.VersionInfo.Meta.Commit)
+		assert.Equal(t, wantBuildHash, c.State.VersionInfo.BuildHash)
+		assert.Equal(t, wantBuildHash, c.State.VersionInfo.Meta.Commit)
 	}
 }
 

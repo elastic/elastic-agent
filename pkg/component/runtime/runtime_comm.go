@@ -44,7 +44,7 @@ type runtimeComm struct {
 	logger     *logger.Logger
 	listenAddr string
 	ca         *authority.CertificateAuthority
-	agentInfo  *info.AgentInfo
+	agentInfo  info.Agent
 
 	name  string
 	token string
@@ -71,7 +71,7 @@ type runtimeComm struct {
 	actionsResponse chan *proto.ActionResponse
 }
 
-func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.CertificateAuthority, agentInfo *info.AgentInfo, maxMessageSize int) (*runtimeComm, error) {
+func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.CertificateAuthority, agentInfo info.Agent, maxMessageSize int) (*runtimeComm, error) {
 	token, err := uuid.NewV4()
 	if err != nil {
 		return nil, err
