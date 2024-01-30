@@ -2,15 +2,10 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build windows
-
 package info
 
 import (
-	"fmt"
 	"runtime"
-	"syscall"
-	"unsafe"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -52,7 +47,7 @@ func agentGlobalConfig() (map[string]interface{}, error) {
 		},
 		"runtime.os":             runtime.GOOS,
 		"runtime.arch":           runtime.GOARCH,
-		"runtime.native_arch":    nativeArch(),
+		"runtime.native_arch":    nativeArchitecture(),
 		"runtime.osinfo.type":    hostInfo.Info().OS.Type,
 		"runtime.osinfo.family":  hostInfo.Info().OS.Family,
 		"runtime.osinfo.version": hostInfo.Info().OS.Version,
@@ -60,33 +55,4 @@ func agentGlobalConfig() (map[string]interface{}, error) {
 		"runtime.osinfo.minor":   hostInfo.Info().OS.Minor,
 		"runtime.osinfo.patch":   hostInfo.Info().OS.Patch,
 	}, nil
-}
-
-func nativeArch() string {
-	var processMachine, nativeMachine uint16
-
-	var kernel32 = syscall.NewLazyDLL("kernel32.dll")
-	var isWow64Process2 = kernel32.NewProc("IsWow64Process2")
-
-	var currentProcessHandle, _ = syscall.GetCurrentProcess()
-	_, _, _ = isWow64Process2.Call(uintptr(currentProcessHandle), uintptr(unsafe.Pointer(&processMachine)), uintptr(unsafe.Pointer(&nativeMachine)))
-
-	var nativeMachineStr string
-
-	const (
-		IMAGE_FILE_MACHINE_AMD64 = 0x8664
-		IMAGE_FILE_MACHINE_ARM64 = 0xAA64
-	)
-
-	switch nativeMachine {
-	case IMAGE_FILE_MACHINE_AMD64:
-		nativeMachineStr = "amd64"
-	case IMAGE_FILE_MACHINE_ARM64:
-		nativeMachineStr = "arm64"
-	default:
-		// other unknown or unsupported by Elastic Defend architectures
-		nativeMachineStr = fmt.Sprintf("0x%x", nativeMachine)
-	}
-
-	return nativeMachineStr
 }

@@ -7,6 +7,8 @@
 package info
 
 import (
+	"fmt"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -50,4 +52,34 @@ func allocSid(subAuth0 uint32) (*windows.SID, error) {
 		return nil, err
 	}
 	return sid, nil
+}
+
+func nativeArchitecture() string {
+	var nativeMachineStr string
+	var processMachine, nativeMachine uint16
+	var currentProcessHandle = windows.CurrentProcess()
+	defer windows.CloseHandle(currentProcessHandle)
+
+	err := windows.IsWow64Process2(currentProcessHandle, &processMachine, &nativeMachine)
+	if err != nil {
+		return "", err
+	}
+
+	// https://learn.microsoft.com/en-us/windows/win32/sysinfo/image-file-machine-constants
+	const (
+		IMAGE_FILE_MACHINE_AMD64 = 0x8664
+		IMAGE_FILE_MACHINE_ARM64 = 0xAA64
+	)
+
+	switch nativeMachine {
+	case IMAGE_FILE_MACHINE_AMD64:
+		nativeMachineStr = "amd64"
+	case IMAGE_FILE_MACHINE_ARM64:
+		nativeMachineStr = "arm64"
+	default:
+		// other unknown or unsupported by Elastic Defend architectures
+		nativeMachineStr = fmt.Sprintf("0x%x", nativeMachine)
+	}
+
+	return nativeMachineStr
 }

@@ -13,3 +13,8 @@ import "os"
 func RunningUnderSupervisor() bool {
 	return os.Getppid() == 1
 }
+
+func nativeArchitecture() string {
+	// unknown native architecture
+	return ""
+}
