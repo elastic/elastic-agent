@@ -1340,8 +1340,7 @@ func (suite *FakeInputSuite) TestManager_NoDeadlock() {
 	maxUpdateInterval := 15 * time.Second
 
 	// Create the runtime manager
-	ai, err := info.NewAgentInfo(context.Background(), true)
-	require.NoError(t, err, "could not get new agent info")
+	ai := &info.AgentInfo{}
 	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 
