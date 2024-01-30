@@ -480,6 +480,14 @@ func untar(sourceFile, destinationDir string) error {
 			if err = writer.Close(); err != nil {
 				return err
 			}
+		case tar.TypeSymlink:
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				return err
+			}
+			if err := os.Symlink(header.Linkname, path); err != nil {
+				return fmt.Errorf("error creating symlink %s pointing to %s: %w", path, header.Linkname, err)
+			}
+
 		default:
 			return fmt.Errorf("unable to untar type=%c in file=%s", header.Typeflag, path)
 		}
@@ -861,21 +869,21 @@ var parseVersionRegex = regexp.MustCompile(`(?m)^[^\d]*(?P<major>\d+)\.(?P<minor
 
 // ParseVersion extracts the major, minor, and optional patch number from a
 // version string.
-func ParseVersion(version string) (major, minor, patch int, err error) {
+func ParseVersion(version string) (int, int, int, error) {
 	names := parseVersionRegex.SubexpNames()
 	matches := parseVersionRegex.FindStringSubmatch(version)
 	if len(matches) == 0 {
-		err = fmt.Errorf("failed to parse version '%v'", version)
-		return
+		err := fmt.Errorf("failed to parse version '%v'", version)
+		return 0, 0, 0, err
 	}
 
 	data := map[string]string{}
 	for i, match := range matches {
 		data[names[i]] = match
 	}
-	major, _ = strconv.Atoi(data["major"])
-	minor, _ = strconv.Atoi(data["minor"])
-	patch, _ = strconv.Atoi(data["patch"])
+	major, _ := strconv.Atoi(data["major"])
+	minor, _ := strconv.Atoi(data["minor"])
+	patch, _ := strconv.Atoi(data["patch"])
 	return major, minor, patch, nil
 }
 
