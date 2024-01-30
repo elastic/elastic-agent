@@ -42,7 +42,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	}
 
 	// Init version information contained in package version file
-	err := version.InitVersionInformation()
+	err := version.InitVersionError()
 	if err != nil {
 		cmd.PrintErrf("Error initializing version information: %v\n", err)
 	}

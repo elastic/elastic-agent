@@ -86,7 +86,7 @@ func HasPrefix(path string, prefix string) bool {
 	}
 
 	for i := 0; i < len(prefixParts); i++ {
-		if !strings.EqualFold(prefixParts[0], pathParts[0]) {
+		if !strings.EqualFold(prefixParts[i], pathParts[i]) {
 			return false
 		}
 	}
