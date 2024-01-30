@@ -16,6 +16,7 @@ import (
 	"github.com/otiai10/copy"
 	"github.com/schollz/progressbar/v3"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -30,7 +31,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.ProgressBar, streams *cli.IOStreams) (utils.FileOwner, error) {
+func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *progressbar.ProgressBar, streams *cli.IOStreams) (utils.FileOwner, error) {
 	dir, err := findDirectory()
 	if err != nil {
 		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
@@ -45,7 +46,7 @@ func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.Progres
 		// Uninstall will fail on protected agent.
 		// The protected Agent will need to be uninstalled first before it can be installed.
 		pt.Describe("Uninstalling current Elastic Agent")
-		err = Uninstall(cfgFile, topPath, "", pt)
+		err = Uninstall(cfgFile, topPath, "", log, pt)
 		if err != nil {
 			pt.Describe("Failed to uninstall current Elastic Agent")
 			return utils.FileOwner{}, errors.New(
