@@ -33,6 +33,7 @@ func (md *mockDownloader) Download(ctx context.Context, a artifact.Artifact, ver
 }
 
 func TestFallbackIsAppended(t *testing.T) {
+	testAgentVersion123 := agtversion.NewParsedSemVer(1, 2, 3, "", "")
 	testCases := []struct {
 		name                 string
 		passedBytes          []string
@@ -42,12 +43,11 @@ func TestFallbackIsAppended(t *testing.T) {
 		fleetServerURI       string
 		targetVersion        *agtversion.ParsedSemVer
 	}{
-		//{"nil input", nil, 1, 0, -1, "", ""},
-		//{"empty input", []string{}, 1, 0, -1, "", ""},
+		{"nil input", nil, 1, 0, -1, "", testAgentVersion123},
+		{"empty input", []string{}, 1, 0, -1, "", testAgentVersion123},
 		{"valid input with pgp", []string{"pgp-bytes"}, 2, 1, -1, "", nil},
-		{"valid input with pgp and version, no fleet uri", []string{"pgp-bytes"}, 2, 1, -1, "", agtversion.NewParsedSemVer(1, 2, 3, "", "")},
-		{"valid input with pgp and version and fleet uri", []string{"pgp-bytes"}, 3, 1, 2, "some-uri", agtversion.NewParsedSemVer(1, 2, 3, "", "")},
-		//{"valid input with pgp and fleet uri no version", []string{"pgp-bytes"}, 2, 1, -1, "some-uri", ""},
+		{"valid input with pgp and version, no fleet uri", []string{"pgp-bytes"}, 2, 1, -1, "", testAgentVersion123},
+		{"valid input with pgp and version and fleet uri", []string{"pgp-bytes"}, 3, 1, 2, "some-uri", testAgentVersion123},
 	}
 
 	for _, tc := range testCases {

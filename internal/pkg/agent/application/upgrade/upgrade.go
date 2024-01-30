@@ -437,6 +437,7 @@ func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHo
 
 	return func() error {
 		runtimeDir := filepath.Join(homePath, "run")
+		l.Debugf("starting copy of run directories from %q to %q", homePath, newHome)
 		processDirs, err := readProcessDirs(runtimeDir)
 		if err != nil {
 			return err
@@ -446,6 +447,7 @@ func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHo
 		for _, processDir := range processDirs {
 			newDir := strings.ReplaceAll(processDir, prevVersion, newVersion)
 			newDir = strings.ReplaceAll(newDir, oldHome, newHome)
+			l.Debugf("copying %q -> %q", processDir, newDir)
 			if err := copyDir(l, processDir, newDir, true); err != nil {
 				return err
 			}
