@@ -142,7 +142,7 @@ func (runner *ExtendedRunner) SetupSuite() {
 
 }
 
-func (runner *ExtendedRunner) TestAgentLong() {
+func (runner *ExtendedRunner) TestHandleLeak() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 	defer cancel()
 
@@ -211,6 +211,7 @@ func (runner *ExtendedRunner) TestAgentLong() {
 		}
 	}
 
+	handleLimit := 500
 	// after we get all the metrics, sort by memory/handles to see if we've passed a threshhold
 	for comp, metrics := range componentCollection {
 		// we're using Sys from `runtime.ReadMemStats` for this. From the `runtime` godoc:
@@ -228,6 +229,9 @@ func (runner *ExtendedRunner) TestAgentLong() {
 		slices.SortFunc(metrics, func(a, b ComponentMetrics) int { return cmp.Compare(a.Handles.Open, b.Handles.Open) })
 
 		runner.T().Logf("Top count of open handles for %s: %d", comp.Dataset, highestHandleOpen)
+		require.LessOrEqual(runner.T(), highestHandleOpen, handleLimit, "handle count is higher than %d after %s (count: %d), check for resource leaks", handleLimit, testDuration, highestHandleOpen)
+
+		// the limit seems to only exist on linux
 		if softLimit := metrics[len(metrics)-1].Handles.Limit.Soft; softLimit > 0 {
 			limitPct := (float64(highestHandleOpen) / float64(softLimit)) * 100
 			runner.T().Logf("Percent of handle soft limit: %f", limitPct)
