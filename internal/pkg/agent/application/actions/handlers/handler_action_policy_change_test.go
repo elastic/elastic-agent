@@ -20,6 +20,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -36,6 +38,12 @@ func TestPolicyChange(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// CreateAgentSecret will create the encryption key for the disk store which
+	// is used by info.NewAgentInfo.
+	err := secret.CreateAgentSecret(
+		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
+	require.NoError(t, err, "failed creating agent secret")
 
 	agentInfo, err := info.NewAgentInfo(ctx, true)
 	require.NoError(t, err, "could not get new agent info")
@@ -66,6 +74,12 @@ func TestPolicyAcked(t *testing.T) {
 	log, _ := logger.New("", false)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// CreateAgentSecret will create the encryption key for the disk store which
+	// is used by info.NewAgentInfo.
+	err := secret.CreateAgentSecret(
+		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
+	require.NoError(t, err, "failed creating agent secret")
 
 	agentInfo, err := info.NewAgentInfo(ctx, true)
 	require.NoError(t, err, "could not get new agent info")

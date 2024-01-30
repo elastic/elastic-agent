@@ -13,7 +13,9 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -63,6 +65,13 @@ func TestUpgradeHandler(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
+
+	// CreateAgentSecret will create the encryption key for the disk store which
+	// is used by info.NewAgentInfo.
+	err := secret.CreateAgentSecret(
+		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
+	require.NoError(t, err, "failed creating agent secret")
+
 	agentInfo, err := info.NewAgentInfo(ctx, true)
 	require.NoError(t, err, "could not get new agent info")
 	msgChan := make(chan string)
@@ -96,6 +105,13 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
+
+	// CreateAgentSecret will create the encryption key for the disk store which
+	// is used by info.NewAgentInfo.
+	err := secret.CreateAgentSecret(
+		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
+	require.NoError(t, err, "failed creating agent secret")
+
 	agentInfo, err := info.NewAgentInfo(ctx, true)
 	require.NoError(t, err, "could not get new agent info")
 	msgChan := make(chan string)
@@ -131,6 +147,13 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
+
+	// CreateAgentSecret will create the encryption key for the disk store which
+	// is used by info.NewAgentInfo.
+	err := secret.CreateAgentSecret(
+		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
+	require.NoError(t, err, "failed creating agent secret")
+
 	agentInfo, err := info.NewAgentInfo(ctx, true)
 	require.NoError(t, err, "could not get new agent info")
 	msgChan := make(chan string)

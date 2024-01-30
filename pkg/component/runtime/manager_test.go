@@ -17,6 +17,8 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -27,6 +29,12 @@ import (
 func TestManager_SimpleComponentErr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// CreateAgentSecret will create the encryption key for the disk store which
+	// is used by info.NewAgentInfo.
+	err := secret.CreateAgentSecret(
+		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
+	require.NoError(t, err, "failed creating agent secret")
 
 	ai, err := info.NewAgentInfo(ctx, true)
 	require.NoError(t, err, "could not get new agent info")
