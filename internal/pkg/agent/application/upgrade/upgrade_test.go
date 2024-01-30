@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -110,40 +109,80 @@ func Test_CopyFile(t *testing.T) {
 }
 
 func TestShutdownCallback(t *testing.T) {
-	l, _ := logger.New("test", false)
-	tmpDir, err := os.MkdirTemp("", "shutdown-test-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
 
-	// make homepath agent consistent (in a form of elastic-agent-hash)
-	homePath := filepath.Join(tmpDir, fmt.Sprintf("%s-%s", agentName, release.ShortCommit()))
+	type testcase struct {
+		name                  string
+		agentHomeDirectory    string
+		newAgentHomeDirectory string
+		agentVersion          string
+		newAgentVersion       string
+		oldRunFile            string
+		newRunFile            string
+	}
 
-	filename := "file.test"
-	newCommit := "abc123"
-	sourceVersion := "7.14.0"
-	targetVersion := "7.15.0"
+	testcases := []testcase{
+		{
+			name:                  "legacy run directories",
+			agentHomeDirectory:    fmt.Sprintf("%s-%s", agentName, release.ShortCommit()),
+			newAgentHomeDirectory: fmt.Sprintf("%s-%s", agentName, "abc123"),
+			agentVersion:          "7.14.0",
+			newAgentVersion:       "7.15.0",
+			oldRunFile:            filepath.Join("run", "default", "process-7.14.0", "file.test"),
+			newRunFile:            filepath.Join("run", "default", "process-7.15.0", "file.test"),
+		},
+		{
+			name:                  "new run directories",
+			agentHomeDirectory:    "elastic-agent-abcdef",
+			newAgentHomeDirectory: "elastic-agent-ghijkl",
+			agentVersion:          "1.2.3",
+			newAgentVersion:       "4.5.6",
+			oldRunFile:            filepath.Join("run", "component", "unit", "file.test"),
+			newRunFile:            filepath.Join("run", "component", "unit", "file.test"),
+		},
+		{
+			name:                  "new run directories, agents with version in path",
+			agentHomeDirectory:    "elastic-agent-1.2.3-abcdef",
+			newAgentHomeDirectory: "elastic-agent-4.5.6-ghijkl",
+			agentVersion:          "1.2.3",
+			newAgentVersion:       "4.5.6",
+			oldRunFile:            filepath.Join("run", "component", "unit", "file.test"),
+			newRunFile:            filepath.Join("run", "component", "unit", "file.test"),
+		},
+	}
 
-	content := []byte("content")
-	newHome := strings.ReplaceAll(homePath, release.ShortCommit(), newCommit)
-	sourceDir := filepath.Join(homePath, "run", "default", "process-"+sourceVersion)
-	targetDir := filepath.Join(newHome, "run", "default", "process-"+targetVersion)
+	for _, tt := range testcases {
 
-	require.NoError(t, os.MkdirAll(sourceDir, 0755))
-	require.NoError(t, os.MkdirAll(targetDir, 0755))
+		t.Run(tt.name, func(t *testing.T) {
+			l, _ := logger.New(tt.name, false)
+			tmpDir := t.TempDir()
 
-	cb := shutdownCallback(l, homePath, sourceVersion, targetVersion, newHome)
+			// make homepath agent consistent
+			homePath := filepath.Join(tmpDir, tt.agentHomeDirectory)
+			newHome := filepath.Join(tmpDir, tt.newAgentHomeDirectory)
 
-	oldFilename := filepath.Join(sourceDir, filename)
-	err = os.WriteFile(oldFilename, content, 0640)
-	require.NoError(t, err, "preparing file failed")
+			content := []byte("content")
+			sourceDir := filepath.Join(homePath, filepath.Dir(tt.oldRunFile))
+			targetDir := filepath.Join(newHome, filepath.Dir(tt.newRunFile))
 
-	err = cb()
-	require.NoError(t, err, "callback failed")
+			require.NoError(t, os.MkdirAll(sourceDir, 0755))
+			require.NoError(t, os.MkdirAll(targetDir, 0755))
 
-	newFilename := filepath.Join(targetDir, filename)
-	newContent, err := os.ReadFile(newFilename)
-	require.NoError(t, err, "reading file failed")
-	require.Equal(t, content, newContent, "contents are not equal")
+			cb := shutdownCallback(l, homePath, tt.agentVersion, tt.newAgentVersion, newHome)
+
+			oldFilename := filepath.Join(homePath, tt.oldRunFile)
+			err := os.WriteFile(oldFilename, content, 0640)
+			require.NoError(t, err, "preparing file failed")
+
+			err = cb()
+			require.NoError(t, err, "callback failed")
+
+			newFilename := filepath.Join(newHome, tt.newRunFile)
+			newContent, err := os.ReadFile(newFilename)
+			require.NoError(t, err, "reading file failed")
+			require.Equal(t, content, newContent, "contents are not equal")
+		})
+	}
+
 }
 
 func TestIsInProgress(t *testing.T) {
