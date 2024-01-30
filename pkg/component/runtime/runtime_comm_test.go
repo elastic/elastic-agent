@@ -14,10 +14,19 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 )
 
 func TestRuntimeComm_WriteConnInfo_packageVersion(t *testing.T) {
+	paths.SetConfig(t.TempDir())
+	// CreateAgentSecret will create the encryption key for the disk store which
+	// is used by info.NewAgentInfo.
+	err := secret.CreateAgentSecret(
+		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
+	require.NoError(t, err, "failed creating agent secret")
+
 	agentInfo, err := info.NewAgentInfo(context.Background(), true)
 	require.NoError(t, err, "could not create agent info")
 
@@ -42,7 +51,7 @@ func TestRuntimeComm_WriteConnInfo_packageVersion(t *testing.T) {
 	}
 
 	buff := bytes.Buffer{}
-	err = c.WriteConnInfo(&buff)
+	err = c.WriteStartUpInfo(&buff)
 	require.NoError(t, err, "failed to write ConnInfo")
 
 	clientv2, _, err := client.NewV2FromReader(&buff, client.VersionInfo{

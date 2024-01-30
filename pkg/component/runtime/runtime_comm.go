@@ -29,7 +29,7 @@ import (
 type Communicator interface {
 	// WriteConnInfo writes the connection information to the writer, informing the component it has access
 	// to the provided services.
-	WriteConnInfo(w io.Writer, services ...client.Service) error
+	WriteStartUpInfo(w io.Writer, services ...client.Service) error
 	// CheckinExpected sends the expected state to the component.
 	//
 	// observed is the observed message received from the component and what was used to compute the provided
@@ -103,7 +103,7 @@ func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.Cert
 	}, nil
 }
 
-func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) error {
+func (c *runtimeComm) WriteStartUpInfo(w io.Writer, services ...client.Service) error {
 	hasV2 := false
 	srvs := make([]proto.ConnInfoServices, 0, len(services))
 	for _, srv := range services {

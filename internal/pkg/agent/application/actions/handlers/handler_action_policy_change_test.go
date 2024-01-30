@@ -39,6 +39,7 @@ func TestPolicyChange(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	paths.SetConfig(t.TempDir())
 	// CreateAgentSecret will create the encryption key for the disk store which
 	// is used by info.NewAgentInfo.
 	err := secret.CreateAgentSecret(
@@ -75,6 +76,7 @@ func TestPolicyAcked(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	paths.SetConfig(t.TempDir())
 	// CreateAgentSecret will create the encryption key for the disk store which
 	// is used by info.NewAgentInfo.
 	err := secret.CreateAgentSecret(
