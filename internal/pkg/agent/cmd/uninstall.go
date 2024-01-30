@@ -10,9 +10,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -39,6 +41,8 @@ Unless -f is used this command will ask confirmation before performing removal.
 }
 
 func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
+	var err error
+
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
 		return fmt.Errorf("unable to perform command while checking for administrator rights, %w", err)
@@ -81,7 +85,31 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	progBar := install.CreateAndStartNewSpinner(streams.Out, "Uninstalling Elastic Agent...")
 
-	err = install.Uninstall(paths.ConfigFile(), paths.Top(), uninstallToken, progBar)
+	logCfg := logp.DefaultConfig(logp.DefaultEnvironment)
+	logCfg.Level = logp.DebugLevel
+	// Using in memory logger, so we don't write logs to the
+	// directory we are trying to delete
+	logp.ToObserverOutput()(&logCfg)
+
+	err = logp.Configure(logCfg)
+	if err != nil {
+		return fmt.Errorf("error creating logging config: %w", err)
+	}
+
+	log := logger.NewWithoutConfig("")
+
+	defer func() {
+		if err == nil {
+			return
+		}
+		oLogs := logp.ObserverLogs().TakeAll()
+		fmt.Fprintf(os.Stderr, "Error uninstalling.  Printing logs\n")
+		for _, oLog := range oLogs {
+			fmt.Fprintf(os.Stderr, "%v\n", oLog.Entry)
+		}
+	}()
+
+	err = install.Uninstall(paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar)
 	if err != nil {
 		progBar.Describe("Failed to uninstall agent")
 		return fmt.Errorf("error uninstalling agent: %w", err)

@@ -29,12 +29,12 @@ var (
 func LoadFullAgentConfig(ctx context.Context, logger *logger.Logger, cfgPath string, failOnFleetMissing bool) (*config.Config, error) {
 	rawConfig, err := loadConfig(ctx, cfgPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error loading raw config: %w", err)
 	}
 
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating config object from raw agent config: %w", err)
 	}
 
 	if configuration.IsStandalone(cfg.Fleet) {
@@ -57,7 +57,7 @@ func LoadFullAgentConfig(ctx context.Context, logger *logger.Logger, cfgPath str
 
 	fleetConfig, err := loadFleetConfig(ctx, logger)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error obtaining fleet config: %w", err)
 	} else if fleetConfig == nil {
 		if failOnFleetMissing {
 			return nil, ErrNoFleetConfig
@@ -78,7 +78,7 @@ func LoadFullAgentConfig(ctx context.Context, logger *logger.Logger, cfgPath str
 func loadConfig(ctx context.Context, configPath string) (*config.Config, error) {
 	rawConfig, err := config.LoadFile(configPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error loading config file %s: %w", configPath, err)
 	}
 
 	path := paths.AgentConfigFile()
@@ -100,10 +100,13 @@ func loadConfig(ctx context.Context, configPath string) (*config.Config, error) 
 	}
 
 	// merge local configuration and configuration persisted from fleet.
-	_ = rawConfig.Merge(config)
+	err = rawConfig.Merge(config)
+	if err != nil {
+		return nil, fmt.Errorf("error merging local and fleet config: %w", err)
+	}
 
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error injecting agent config: %w", err)
 	}
 
 	return rawConfig, nil

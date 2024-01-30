@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -137,7 +137,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 		return nil, sendDuration, client.ExtractError(resp.Body)
 	}
 
-	rs, err := ioutil.ReadAll(resp.Body)
+	rs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, sendDuration, errors.New(err, "failed to read checkin response")
 	}

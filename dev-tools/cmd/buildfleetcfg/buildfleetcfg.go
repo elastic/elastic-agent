@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"go/format"
-	"io/ioutil"
 	"os"
 	"text/template"
 
@@ -84,7 +83,7 @@ func main() {
 		return
 	}
 
-	ioutil.WriteFile(output, data, 0640)
+	os.WriteFile(output, data, 0640)
 	return
 }
 

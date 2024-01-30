@@ -30,10 +30,10 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	})
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
-	fromVersion, err := version.ParseVersion(define.Version())
+	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	if fromVersion.Less(*minVersion) {
+	if currentVersion.Less(*minVersion) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
@@ -44,18 +44,26 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	// logic that is in the build.
 	startFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
-
-	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err)
+
+	// Upgrade to an old build of the same version.
 	endFixture, err := atesting.NewFixture(
 		t,
-		upgradeToVersion,
+		upgradetest.EnsureSnapshot(define.Version()),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
 
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	if startVersionInfo.Binary.String() == endVersionInfo.Binary.String() &&
+		startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("Build under test is the same as the build from the artifacts repository (version: %s) [commit: %s]",
+			startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
+	}
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), endVersionInfo.Binary.String())
 
 	defaultPGP := release.PGP()
 	firstSeven := string(defaultPGP[:7])
@@ -86,10 +94,10 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	})
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
-	fromVersion, err := version.ParseVersion(define.Version())
+	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	if fromVersion.Less(*minVersion) {
+	if currentVersion.Less(*minVersion) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 

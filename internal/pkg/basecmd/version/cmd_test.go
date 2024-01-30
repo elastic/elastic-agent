@@ -5,7 +5,7 @@
 package version
 
 import (
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 
@@ -30,7 +30,7 @@ func TestCmdBinaryOnly(t *testing.T) {
 	require.NoError(t, err)
 	err = cmd.Execute()
 	require.NoError(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 
 	require.NoError(t, err)
 	assert.True(t, strings.Contains(string(version), "Binary: "))
@@ -46,7 +46,7 @@ func TestCmdBinaryOnlyYAML(t *testing.T) {
 	require.NoError(t, err)
 	err = cmd.Execute()
 	require.NoError(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 
 	require.NoError(t, err)
 
@@ -67,7 +67,7 @@ func TestCmdDaemon(t *testing.T) {
 	cmd := NewCommandWithArgs(streams)
 	err := cmd.Execute()
 	require.NoError(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 
 	require.NoError(t, err)
 	assert.True(t, strings.Contains(string(version), "Binary: "))
@@ -85,7 +85,7 @@ func TestCmdDaemonYAML(t *testing.T) {
 	require.NoError(t, err)
 	err = cmd.Execute()
 	require.NoError(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 
 	require.NoError(t, err)
 
@@ -103,7 +103,7 @@ func TestCmdDaemonErr(t *testing.T) {
 	cmd := NewCommandWithArgs(streams)
 	err := cmd.Execute()
 	require.Error(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 	require.NoError(t, err)
 
 	assert.True(t, strings.Contains(string(version), "Binary: "))
@@ -118,7 +118,7 @@ func TestCmdDaemonErrYAML(t *testing.T) {
 	require.NoError(t, err)
 	err = cmd.Execute()
 	require.Error(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 
 	require.NoError(t, err)
 	var output Output

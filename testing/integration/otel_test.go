@@ -124,7 +124,7 @@ func TestOtelFileProcessing(t *testing.T) {
 	fixtureWg.Add(1)
 	go func() {
 		defer fixtureWg.Done()
-		err = fixture.RunWithClient(ctx, false)
+		err = fixture.RunWithClient(ctx, false, false)
 	}()
 
 	var content []byte
@@ -132,6 +132,23 @@ func TestOtelFileProcessing(t *testing.T) {
 		`"stringValue":"syslog"`,     // syslog is being processed
 		`"stringValue":"system.log"`, // system.log is being processed
 	})
+
+	// check `elastic-agent status` returns successfully
+	require.Eventuallyf(t, func() bool {
+		// This will return errors until it connects to the agent,
+		// they're mostly noise because until the agent starts running
+		// we will get connection errors. If the test fails
+		// the agent logs will be present in the error message
+		// which should help to explain why the agent was not
+		// healthy.
+		err := fixture.IsHealthy(ctx)
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
+		err,
+	)
+
 	require.Eventually(t,
 		func() bool {
 			// verify file exists
@@ -240,7 +257,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	var fixtureWg sync.WaitGroup
 	fixtureWg.Add(1)
 	go func() {
-		fixture.RunWithClient(ctx, false)
+		fixture.RunWithClient(ctx, false, false)
 		fixtureWg.Done()
 	}()
 
