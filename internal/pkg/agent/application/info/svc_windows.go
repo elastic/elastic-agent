@@ -62,7 +62,8 @@ func nativeArchitecture() string {
 
 	err := windows.IsWow64Process2(currentProcessHandle, &processMachine, &nativeMachine)
 	if err != nil {
-		return "", err
+		// unknown native architecture
+		return ""
 	}
 
 	// https://learn.microsoft.com/en-us/windows/win32/sysinfo/image-file-machine-constants
@@ -77,7 +78,7 @@ func nativeArchitecture() string {
 	case IMAGE_FILE_MACHINE_ARM64:
 		nativeMachineStr = "arm64"
 	default:
-		// other unknown or unsupported by Elastic Defend architectures
+		// other unknown or unsupported by Elastic architectures
 		nativeMachineStr = fmt.Sprintf("0x%x", nativeMachine)
 	}
 
