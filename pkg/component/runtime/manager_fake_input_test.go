@@ -225,8 +225,7 @@ func (suite *FakeInputSuite) TestManager_Features() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agentInfo, err := info.NewAgentInfo(ctx, true)
-	require.NoError(t, err, "could not get new agent info")
+	agentInfo := &info.AgentInfo{}
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
@@ -427,8 +426,7 @@ func (suite *FakeInputSuite) TestManager_APM() {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	agentInfo, err := info.NewAgentInfo(ctx, true)
-	require.NoError(t, err, "could not get new agent info")
+	agentInfo := &info.AgentInfo{}
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
@@ -663,8 +661,7 @@ func (suite *FakeInputSuite) TestManager_Limits() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agentInfo, err := info.NewAgentInfo(ctx, true)
-	require.NoError(t, err, "could not get new agent info")
+	agentInfo := &info.AgentInfo{}
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
@@ -828,8 +825,7 @@ func (suite *FakeInputSuite) TestManager_ShipperLimits() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agentInfo, err := info.NewAgentInfo(ctx, true)
-	require.NoError(t, err, "could not get new agent info")
+	agentInfo := &info.AgentInfo{}
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
@@ -2482,8 +2478,7 @@ func (suite *FakeInputSuite) TestManager_MultiComponent() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agentInfo, err := info.NewAgentInfo(ctx, true)
-	require.NoError(t, err, "could not get new agent info")
+	agentInfo := &info.AgentInfo{}
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
