@@ -9,7 +9,6 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +16,9 @@ import (
 	"runtime"
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -152,6 +153,7 @@ func TestEnroll(t *testing.T) {
 					EnrollAPIKey:         "my-enrollment-api-key",
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
 					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
 				},
 				"",
 				store,
@@ -159,14 +161,18 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+
+			if err := cmd.Execute(ctx, streams); err != nil {
+				t.Fatalf("enrrol coms returned and unexpected error: %v", err)
+			}
 
 			config, err := readConfig(store.Content)
-
 			require.NoError(t, err)
-			require.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			require.Equal(t, host, config.Client.Host)
+
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
+			assert.Equal(t, host, config.Client.Host)
 		},
 	))
 
@@ -209,6 +215,7 @@ func TestEnroll(t *testing.T) {
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
 					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
 				},
 				"",
 				store,
@@ -216,16 +223,20 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
 
-			require.True(t, store.Called)
+			if err := cmd.Execute(ctx, streams); err != nil {
+				t.Fatalf("enrrol coms returned and unexpected error: %v", err)
+			}
 
+			assert.True(t, store.Called)
 			config, err := readConfig(store.Content)
-
-			require.NoError(t, err)
-			require.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			require.Equal(t, host, config.Client.Host)
+			require.NoError(t, err, "readConfig returned an error")
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey,
+				"The stored 'Access API Key' must be the same returned by Fleet-Server")
+			assert.Equal(t, host, config.Client.Host,
+				"The stored Fleet-Server host must match the one used during enrol")
 		},
 	))
 
@@ -268,6 +279,7 @@ func TestEnroll(t *testing.T) {
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
 					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
 				},
 				"",
 				store,
@@ -275,16 +287,16 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			require.NoError(t, err, "enroll command should return no error")
 
-			require.True(t, store.Called)
-
+			assert.True(t, store.Called)
 			config, err := readConfig(store.Content)
-
 			require.NoError(t, err)
-			require.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			require.Equal(t, host, config.Client.Host)
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
+			assert.Equal(t, host, config.Client.Host)
 		},
 	))
 
@@ -339,13 +351,15 @@ func TestValidateArgs(t *testing.T) {
 		require.NoError(t, err)
 		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
 		require.NotNil(t, args)
-		require.Equal(t, len(args), 9)
+		require.Equal(t, len(args), 11)
 		require.Contains(t, args, "--tag")
 		require.Contains(t, args, "windows")
 		require.Contains(t, args, "production")
 		require.Contains(t, args, "--insecure")
 		require.Contains(t, args, enrolmentToken)
 		require.Contains(t, args, url)
+		require.Contains(t, args, "--fleet-server-client-auth")
+		require.Contains(t, args, "none")
 		cleanedTags := cleanTags(args)
 		require.Contains(t, cleanedTags, "windows")
 		require.Contains(t, cleanedTags, "production")
@@ -359,12 +373,14 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, "--tag")
 		require.Contains(t, args, "windows")
 		require.Contains(t, args, " production")
+		require.Contains(t, args, "--fleet-server-client-auth")
+		require.Contains(t, args, "none")
 		cleanedTags := cleanTags(args)
 		require.Contains(t, cleanedTags, "windows")
 		require.Contains(t, cleanedTags, "production")
 		// Validate that we remove the duplicates
-		require.Equal(t, len(args), 10)
-		require.Equal(t, len(cleanedTags), 7)
+		require.Equal(t, len(args), 12)
+		require.Equal(t, len(cleanedTags), 9)
 	})
 
 	t.Run("valid tag and empty tag", func(t *testing.T) {
@@ -375,6 +391,8 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, "--tag")
 		require.Contains(t, args, "windows")
 		require.Contains(t, args, " ")
+		require.Contains(t, args, "--fleet-server-client-auth")
+		require.Contains(t, args, "none")
 		cleanedTags := cleanTags(args)
 		require.Contains(t, cleanedTags, "windows")
 		require.NotContains(t, cleanedTags, " ")
@@ -392,6 +410,32 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, "/path/to/passphrase")
 		require.Contains(t, args, "--fleet-server-service-token-path")
 		require.Contains(t, args, "/path/to/token")
+	})
+
+	t.Run("fleet-es client certificates are passed", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("fleet-server-es-cert", "/path/to/cert")
+		require.NoError(t, err)
+		err = cmd.Flags().Set("fleet-server-es-cert-key", "/path/to/key")
+		require.NoError(t, err)
+		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+		require.Contains(t, args, "--fleet-server-es-cert")
+		require.Contains(t, args, "/path/to/cert")
+		require.Contains(t, args, "--fleet-server-es-cert-key")
+		require.Contains(t, args, "/path/to/key")
+	})
+
+	t.Run("elastic-agent client certificates are passed", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("elastic-agent-cert", "/path/to/cert")
+		require.NoError(t, err)
+		err = cmd.Flags().Set("elastic-agent-cert-key", "/path/to/key")
+		require.NoError(t, err)
+		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+		require.Contains(t, args, "--elastic-agent-cert")
+		require.Contains(t, args, "/path/to/cert")
+		require.Contains(t, args, "--elastic-agent-cert-key")
+		require.Contains(t, args, "/path/to/key")
 	})
 }
 
@@ -465,7 +509,7 @@ func withTLSServer(
 }
 
 func bytesToTMPFile(b []byte) (string, error) {
-	f, err := ioutil.TempFile("", "prefix")
+	f, err := os.CreateTemp("", "prefix")
 	if err != nil {
 		return "", err
 	}

@@ -57,12 +57,25 @@ type InstallOpts struct {
 	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
-	Unprivileged   bool   // --unprivileged
+	DelayEnroll    bool   // --delay-enroll
+
+	// Unprivileged by default installs the Elastic Agent as `--unprivileged` unless
+	// the platform being tested doesn't currently support it, or it's explicitly set
+	// to false.
+	Unprivileged *bool // --unprivileged
 
 	EnrollOpts
 }
 
-func (i InstallOpts) toCmdArgs() []string {
+func (i InstallOpts) IsUnprivileged(operatingSystem string) bool {
+	if i.Unprivileged == nil {
+		// not explicitly set, default to true on Linux only (until other platforms support it)
+		return operatingSystem == "linux"
+	}
+	return *i.Unprivileged
+}
+
+func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	var args []string
 	if i.BasePath != "" {
 		args = append(args, "--base-path", i.BasePath)
@@ -79,13 +92,26 @@ func (i InstallOpts) toCmdArgs() []string {
 	if i.ProxyURL != "" {
 		args = append(args, "--proxy-url="+i.ProxyURL)
 	}
-	if i.Unprivileged {
+	if i.DelayEnroll {
+		args = append(args, "--delay-enroll")
+	}
+
+	unprivileged := i.IsUnprivileged(operatingSystem)
+	if unprivileged {
+		if operatingSystem != "linux" {
+			return nil, fmt.Errorf("--unprivileged cannot be set to true unless testing is being done on Linux")
+		}
 		args = append(args, "--unprivileged")
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
 
-	return args
+	return args, nil
+}
+
+// NewBool returns a boolean pointer.
+func NewBool(value bool) *bool {
+	return &value
 }
 
 // Install installs the prepared Elastic Agent binary and registers a t.Cleanup
@@ -98,9 +124,15 @@ func (i InstallOpts) toCmdArgs() []string {
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 	installArgs := []string{"install"}
-	if installOpts != nil {
-		installArgs = append(installArgs, installOpts.toCmdArgs()...)
+	if installOpts == nil {
+		// default options when not provided
+		installOpts = &InstallOpts{}
 	}
+	installOptsArgs, err := installOpts.toCmdArgs(f.operatingSystem)
+	if err != nil {
+		return nil, err
+	}
+	installArgs = append(installArgs, installOptsArgs...)
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
 		return out, fmt.Errorf("error running agent install command: %w", err)
@@ -116,9 +148,15 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	}
 
 	// we just installed agent, the control socket is at a well-known location
-	socketPath := paths.ControlSocketPath
-	if installOpts.Unprivileged {
-		socketPath = paths.ControlSocketUnprivilegedPath
+	socketPath := fmt.Sprintf("unix://%s", paths.ControlSocketRunSymlink) // use symlink as that works for all versions
+	if runtime.GOOS == "windows" {
+		// Windows uses a fixed named pipe, that is always the same.
+		// It is the same even running in unprivileged mode.
+		socketPath = paths.WindowsControlSocketInstalledPath
+	} else if installOpts.IsUnprivileged(f.operatingSystem) {
+		// Unprivileged versions move the socket to inside the installed directory
+		// of the Elastic Agent.
+		socketPath = paths.ControlSocketFromPath(runtime.GOOS, f.workDir)
 	}
 	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)
@@ -279,7 +317,8 @@ func (f *Fixture) collectDiagnostics() {
 		if err != nil {
 			// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
 			f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
-			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, time.Now().Format(time.RFC3339)))
+			timestamp := strings.ReplaceAll(time.Now().Format(time.RFC3339), ":", "-")
+			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, timestamp))
 			err = f.archiveInstallDirectory(f.workDir, zipPath)
 			if err != nil {
 				f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)

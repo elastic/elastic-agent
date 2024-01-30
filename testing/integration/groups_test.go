@@ -15,8 +15,18 @@ const (
 	// Fleet group of tests. Used for testing Elastic Agent with Fleet.
 	Fleet = "fleet"
 
+	// FleetPrivileged group of tests. Used for testing Elastic Agent with Fleet installed privileged.
+	FleetPrivileged = "fleet-privileged"
+
 	// FleetAirgapped group of tests. Used for testing Elastic Agent with Fleet and airgapped.
 	FleetAirgapped = "fleet-airgapped"
+
+	// FleetAirgappedPrivileged group of tests. Used for testing Elastic Agent with Fleet installed
+	// privileged and airgapped.
+	FleetAirgappedPrivileged = "fleet-airgapped-privileged"
+
+	// FQDN group of tests. Used for testing Elastic Agent with FQDN enabled.
+	FQDN = "fqdn"
 
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"

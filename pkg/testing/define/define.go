@@ -78,7 +78,7 @@ func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*ate
 		buildsDir = filepath.Join(projectDir, "build", "distributions")
 	}
 
-	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir)
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir, opts...)
 
 }
 

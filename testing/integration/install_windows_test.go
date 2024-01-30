@@ -2,15 +2,14 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build windows
+//go:build integration && windows
 
-package info
+package integration
 
 import (
-	"github.com/elastic/elastic-agent/pkg/utils"
+	"testing"
 )
 
-func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
-	// TODO(blakerouse): Fix the market permissions on Windows.
-	return nil
+func checkPlatformUnprivileged(t *testing.T, topPath string) {
+	// TODO (blakerouse): validate once Windows is supported
 }

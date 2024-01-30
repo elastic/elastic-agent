@@ -19,7 +19,7 @@ type FleetServerConfig struct {
 	Host         string                   `config:"host" yaml:"host,omitempty"`
 	Port         uint16                   `config:"port" yaml:"port,omitempty"`
 	InternalPort uint16                   `config:"internal_port" yaml:"internal_port,omitempty"`
-	TLS          *tlscommon.Config        `config:"ssl" yaml:"ssl,omitempty"`
+	TLS          *tlscommon.ServerConfig  `config:"ssl" yaml:"ssl,omitempty"`
 }
 
 // FleetServerPolicyConfig is the configuration for the policy Fleet Server should run on.

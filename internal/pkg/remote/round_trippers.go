@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -67,13 +67,13 @@ func (r *DebugRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 
 	if req.Body != nil {
-		dataReq, err := ioutil.ReadAll(req.Body)
+		dataReq, err := io.ReadAll(req.Body)
 		if err != nil {
 			return nil, errors.Wrap(err, "fail to read the body of the request")
 		}
 		req.Body.Close()
 
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(dataReq))
+		req.Body = io.NopCloser(bytes.NewBuffer(dataReq))
 
 		b.WriteString("Request Body:\n")
 		b.WriteString(string(prettyBody(dataReq)) + "\n")
@@ -101,7 +101,7 @@ func (r *DebugRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 
 	// Hijack the body and output it in the log, this is only for debugging and development.
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return resp, errors.Wrap(err, "fail to read the body of the response")
 	}
@@ -110,7 +110,7 @@ func (r *DebugRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	b.WriteString("Response Body:\n")
 	b.WriteString(string(prettyBody(data)) + "\n")
 
-	resp.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	resp.Body = io.NopCloser(bytes.NewBuffer(data))
 
 	r.log.Debug(b.String())
 

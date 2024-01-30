@@ -130,7 +130,7 @@ steps:
         agents:
           provider: "gcp"
           # TODO create own image
-          image: "family/endpoint-windows-10-tester-rel"
+          image: "family/general-windows-10"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
@@ -147,7 +147,7 @@ steps:
         agents:
           provider: "gcp"
           # TODO create own image
-          image: "family/endpoint-windows-11-tester-rel"
+          image: "family/general-windows-11"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
@@ -191,6 +191,7 @@ steps:
         matrix:
           setup:
             k8s_version:
+              - "1.29.0"
               - "1.28.0"
               - "1.27.3"
               - "1.26.6"
@@ -242,15 +243,6 @@ steps:
     retry:
       manual:
         allowed: true
-
-  - wait: ~
-    continue_on_failure: true
-  - label: "Processing test results"
-    agents:
-      provider: "gcp"
-    plugins:
-      - junit-annotate#v2.4.1:
-          artifacts: build/TEST-go-integration*.xml
 
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed

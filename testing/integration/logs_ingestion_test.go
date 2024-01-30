@@ -95,7 +95,7 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	})
 
 	t.Run("Normal logs with flattened data_stream are shipped", func(t *testing.T) {
-		testFlattenedDatastreamFleetPolicy(t, ctx, info, agentFixture, policy)
+		testFlattenedDatastreamFleetPolicy(t, ctx, info, policy)
 	})
 }
 
@@ -151,7 +151,7 @@ func testMonitoringLogsAreShipped(
 	}
 	require.Empty(t, docs.Hits.Hits)
 
-	// Stage 4: Make sure we have message confirming central management is running
+	// Stage 3: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
 	docs = findESDocs(t, func() (estools.Documents, error) {
 		return estools.FindMatchingLogLines(ctx, info.ESClient, info.Namespace,
@@ -159,7 +159,7 @@ func testMonitoringLogsAreShipped(
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
-	// Stage 5: verify logs from the monitoring components are not sent to the output
+	// Stage 4: verify logs from the monitoring components are not sent to the output
 	t.Log("Check monitoring logs")
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -250,7 +250,6 @@ func testFlattenedDatastreamFleetPolicy(
 	t *testing.T,
 	ctx context.Context,
 	info *define.Info,
-	agentFixture *atesting.Fixture,
 	policy kibana.PolicyResponse,
 ) {
 	dsType := "logs"
@@ -258,14 +257,18 @@ func testFlattenedDatastreamFleetPolicy(
 	dsDataset := cleanString(fmt.Sprintf("%s-dataset", t.Name()))
 	numEvents := 60
 
-	tempDir := t.TempDir()
+	// tempDir is not deleted to help with debugging issues
+	// useful to check permissions on contents
+	tempDir, err := os.MkdirTemp("", "fleet-ingest-*")
+	if err != nil {
+		t.Fatalf("failed to create temp directory: %s", err)
+	}
+	err = os.Chmod(tempDir, 0o755)
+	if err != nil {
+		t.Fatalf("failed to chmod temp directory %s: %s", tempDir, err)
+	}
 	logFilePath := filepath.Join(tempDir, "log.log")
 	generateLogFile(t, logFilePath, 2*time.Millisecond, numEvents)
-
-	agentFixture, err := define.NewFixture(t, define.Version())
-	if err != nil {
-		t.Fatalf("could not create new fixture: %s", err)
-	}
 
 	// 1. Prepare a request to add an integration to the policy
 	tmpl, err := template.New(t.Name() + "custom-log-policy").Parse(policyJSON)
@@ -364,7 +367,11 @@ func generateLogFile(t *testing.T, fullPath string, tick time.Duration, events i
 	t.Helper()
 	f, err := os.Create(fullPath)
 	if err != nil {
-		t.Fatalf("could not create file '%s: %s", fullPath, err)
+		t.Fatalf("could not create file '%s': %s", fullPath, err)
+	}
+	err = os.Chmod(fullPath, 0o644)
+	if err != nil {
+		t.Fatalf("failed to chmod file '%s': %s", fullPath, err)
 	}
 
 	go func() {

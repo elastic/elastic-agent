@@ -172,7 +172,7 @@ func logContainerCmd(streams *cli.IOStreams) error {
 
 func containerCmd(streams *cli.IOStreams) error {
 	// set paths early so all action below use the defined paths
-	if err := setPaths("", "", "", true); err != nil {
+	if err := setPaths("", "", "", "", true); err != nil {
 		return err
 	}
 
@@ -397,6 +397,8 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		"--path.home", paths.Top(), // --path.home actually maps to paths.Top()
 		"--path.config", paths.Config(),
 		"--path.logs", paths.Logs(),
+		"--path.socket", paths.ControlSocket(),
+		"--skip-daemon-reload",
 	}
 	if paths.Downloads() != "" {
 		args = append(args, "--path.downloads", paths.Downloads())
@@ -747,7 +749,7 @@ func logToStderr(cfg *configuration.Configuration) {
 	}
 }
 
-func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
+func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
 	statePath = envWithDefault(statePath, "STATE_PATH")
 	if statePath == "" {
 		statePath = defaultStateDirectory
@@ -756,6 +758,9 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	configPath = envWithDefault(configPath, "CONFIG_PATH")
 	if configPath == "" {
 		configPath = statePath
+	}
+	if socketPath == "" {
+		socketPath = fmt.Sprintf("unix://%s", filepath.Join(topPath, paths.ControlSocketName))
 	}
 	// ensure that the directory and sub-directory data exists
 	if err := os.MkdirAll(topPath, 0755); err != nil {
@@ -773,6 +778,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	originalTop := paths.Top()
 	paths.SetTop(topPath)
 	paths.SetConfig(configPath)
+	paths.SetControlSocket(socketPath)
 	// when custom top path is provided the home directory is not versioned
 	paths.SetVersionHome(false)
 	// install path stays on container default mount (otherwise a bind mounted directory could have noexec set)
@@ -795,7 +801,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 
 	// persist the paths so other commands in the container will use the correct paths
 	if writePaths {
-		if err := writeContainerPaths(originalTop, statePath, configPath, logsPath); err != nil {
+		if err := writeContainerPaths(originalTop, statePath, configPath, logsPath, socketPath); err != nil {
 			return err
 		}
 	}
@@ -806,9 +812,10 @@ type containerPaths struct {
 	StatePath  string `config:"state_path" yaml:"state_path"`
 	ConfigPath string `config:"config_path" yaml:"config_path,omitempty"`
 	LogsPath   string `config:"logs_path" yaml:"logs_path,omitempty"`
+	SocketPath string `config:"socket_path" yaml:"socket_path,omitempty"`
 }
 
-func writeContainerPaths(original, statePath, configPath, logsPath string) error {
+func writeContainerPaths(original, statePath, configPath, logsPath, socketPath string) error {
 	pathFile := filepath.Join(original, "container-paths.yml")
 	fp, err := os.Create(pathFile)
 	if err != nil {
@@ -818,6 +825,7 @@ func writeContainerPaths(original, statePath, configPath, logsPath string) error
 		StatePath:  statePath,
 		ConfigPath: configPath,
 		LogsPath:   logsPath,
+		SocketPath: socketPath,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal for %s: %w", pathFile, err)
@@ -845,7 +853,7 @@ func tryContainerLoadPaths() error {
 	if err != nil {
 		return fmt.Errorf("failed to unpack %s: %w", pathFile, err)
 	}
-	return setPaths(paths.StatePath, paths.ConfigPath, paths.LogsPath, false)
+	return setPaths(paths.StatePath, paths.ConfigPath, paths.LogsPath, paths.SocketPath, false)
 }
 
 func copyFile(destPath string, srcPath string, mode os.FileMode) error {

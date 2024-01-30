@@ -15,9 +15,9 @@ inputs:
     runtime:
       preventions:
         - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
-          message: "No support for RHEL7 on arm64"
+          message: "Elastic Defend doesn't support RHEL7 on arm64"
         - condition: ${user.root} == false
-          message: "Elastic Agent must be running as root"
+          message: "Elastic Defend requires Elastic Agent be running as root"
         - condition: ${install.in_default} == false
           message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service: &service
@@ -52,12 +52,12 @@ inputs:
     platforms:
       - darwin/amd64
       - darwin/arm64
-    outputs:
-      - elasticsearch
-      - logstash
+    outputs: *outputs
     proxied_actions: *proxied_actions
     runtime:
       preventions:
+        - condition: ${user.root} == false
+          message: "Elastic Defend requires Elastic Agent be running as root"
         - condition: ${install.in_default} == false
           message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service:
@@ -69,14 +69,12 @@ inputs:
     description: "Endpoint Security"
     platforms:
       - windows/amd64
-    outputs:
-      - elasticsearch
-      - logstash
+    outputs: *outputs
     proxied_actions: *proxied_actions
     runtime:
       preventions:
         - condition: ${user.root} == false
-          message: "Elastic Agent must be running as Administrator or SYSTEM"
+          message: "Elastic Defend requires Elastic Agent be running as Administrator or SYSTEM"
         - condition: ${install.in_default} == false
           message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service:

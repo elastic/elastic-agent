@@ -23,6 +23,10 @@ import (
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
+const (
+	artifactElasticAgentProject = "elastic-agent-package"
+)
+
 func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Upgrade,
@@ -41,25 +45,45 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	// retrieve all the versions of agent from the artifact API
 	aac := tools.NewArtifactAPIClient()
 	latestSnapshotVersion, err := aac.GetLatestSnapshotVersion(ctx, t)
 	require.NoError(t, err)
 
-	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
-	// 2 builds are required to be available for the test to work. This is because
-	// if we upgrade to the latest build there would be no difference then passing the version
-	// string without the buildid, being agent would pick that build anyway.
-	// We pick the build that is 2 builds back to upgrade to, to ensure that the buildid is
-	// working correctly and agent is not only picking the latest build.
-	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
+	// start at the build version as we want to test the retry
+	// logic that is in the build.
+	startFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
-	if len(builds.Builds) < 2 {
-		t.Skipf("not enough SNAPSHOT builds exist for version %s. Found %d", latestSnapshotVersion.VersionWithPrerelease(), len(builds.Builds))
+	startVersion, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+
+	// We need to find a build which is not the latest (so, we can make sure we address it by a build ID
+	// in the version prefix, e.g. x.y.z-SNAPSHOT-<buildid>) and does not have the same commit hash
+	// as the currently running binary (so, we don't have a file system collision).
+	// Multiple builds can have different IDs but the same commit hash.
+	preReleaseVersion := latestSnapshotVersion.VersionWithPrerelease()
+	resp, err := aac.GetBuildsForVersion(ctx, preReleaseVersion)
+	require.NoError(t, err)
+
+	if len(resp.Builds) < 2 {
+		t.Skipf("need at least 2 builds in the version %s", latestSnapshotVersion.VersionWithPrerelease())
+		return
 	}
 
-	// find the specific build to use for the test
-	upgradeVersionString := builds.Builds[1]
+	var upgradeVersionString string
+	for _, buildID := range resp.Builds[1:] {
+		details, err := aac.GetBuildDetails(ctx, preReleaseVersion, buildID)
+		require.NoError(t, err)
+		if details.Build.Projects[artifactElasticAgentProject].CommitHash != startVersion.Binary.Commit {
+			upgradeVersionString = buildID
+			break
+		}
+	}
+
+	if upgradeVersionString == "" {
+		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", latestSnapshotVersion.VersionWithPrerelease())
+		return
+	}
+
 	buildFragments := strings.Split(upgradeVersionString, "-")
 	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
 	endParsedVersion := version.NewParsedSemVer(
@@ -69,11 +93,6 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 		latestSnapshotVersion.Prerelease(),
 		buildFragments[1],
 	)
-
-	// Start at the build version as we want to test the retry
-	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
-	require.NoError(t, err)
 
 	// Upgrade to the specific build.
 	endFixture, err := atesting.NewFixture(
@@ -85,6 +104,10 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), endParsedVersion.String())
 
-	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t)
+	// We pass the upgradetest.WithDisableUpgradeWatcherUpgradeDetailsCheck option here because the endFixture
+	// is fetched from the artifacts API and it may not contain changes in the Upgrade Watcher whose effects are
+	// being asserted upon in upgradetest.PerformUpgrade.
+	// TODO: Stop passing this option and remove these comments once 8.13.0 has been released.
+	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithDisableUpgradeWatcherUpgradeDetailsCheck())
 	assert.NoError(t, err)
 }

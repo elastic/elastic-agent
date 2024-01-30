@@ -16,6 +16,7 @@ import (
 	"github.com/otiai10/copy"
 	"github.com/schollz/progressbar/v3"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -30,7 +31,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.ProgressBar, streams *cli.IOStreams) (utils.FileOwner, error) {
+func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *progressbar.ProgressBar, streams *cli.IOStreams) (utils.FileOwner, error) {
 	dir, err := findDirectory()
 	if err != nil {
 		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
@@ -45,7 +46,7 @@ func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.Progres
 		// Uninstall will fail on protected agent.
 		// The protected Agent will need to be uninstalled first before it can be installed.
 		pt.Describe("Uninstalling current Elastic Agent")
-		err = Uninstall(cfgFile, topPath, "", pt)
+		err = Uninstall(cfgFile, topPath, "", log, pt)
 		if err != nil {
 			pt.Describe("Failed to uninstall current Elastic Agent")
 			return utils.FileOwner{}, errors.New(
@@ -185,6 +186,11 @@ func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.Progres
 		}
 	}
 
+	// create the install marker
+	if err := CreateInstallMarker(topPath, ownership); err != nil {
+		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
+	}
+
 	// post install (per platform)
 	err = postInstall(topPath)
 	if err != nil {
@@ -200,17 +206,6 @@ func Install(cfgFile, topPath string, unprivileged bool, pt *progressbar.Progres
 		err = FixPermissions(paths.ShellWrapperPath, ownership)
 		if err != nil {
 			return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath, err)
-		}
-	}
-
-	// create socket path when installing as non-root
-	// now is the only time to do it while root is available (without doing this it will not be possible
-	// for the service to create the control socket)
-	// windows: uses npipe and doesn't need a directory created
-	if unprivileged {
-		err = createSocketDir(ownership)
-		if err != nil {
-			return ownership, fmt.Errorf("failed to create socket directory: %w", err)
 		}
 	}
 
@@ -359,4 +354,12 @@ func hasAllSSDs(block ghw.BlockInfo) bool {
 	}
 
 	return true
+}
+
+func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
+	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
+	if _, err := os.Create(markerFilePath); err != nil {
+		return err
+	}
+	return fixInstallMarkerPermissions(markerFilePath, ownership)
 }

@@ -42,6 +42,10 @@ shared:
         source: 'elastic-agent.yml'
         mode: 0600
         config: true
+      /etc/{{.BeatName}}/otel.yml:
+        source: 'otel.yml'
+        mode: 0600
+        config: true
       /etc/{{.BeatName}}/.elastic-agent.active.commit:
         content: >
           {{ commit }}
@@ -70,6 +74,10 @@ shared:
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ commit_short }}/manifest.yaml:
+        mode: 0644
+        content: >
+          {{ manifest }}
 
   # MacOS pkg spec for community beats.
   - &macos_agent_pkg_spec
@@ -109,6 +117,10 @@ shared:
         source: 'elastic-agent.yml'
         mode: 0600
         config: true
+      /etc/{{.BeatName}}/otel.yml:
+        source: 'otel.yml'
+        mode: 0600
+        config: true
       /etc/{{.BeatName}}/.elastic-agent.active.commit:
         content: >
           {{ commit }}
@@ -143,10 +155,18 @@ shared:
       source: 'elastic-agent.yml'
       mode: 0600
       config: true
+    'otel.yml':
+      source: 'otel.yml'
+      mode: 0600
+      config: true
     '.elastic-agent.active.commit':
       content: >
         {{ commit }}
       mode: 0644
+    'manifest.yaml':
+      mode: 0644
+      content: >
+        {{ manifest }}
 
   - &agent_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
@@ -229,6 +249,10 @@ shared:
     files:
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
+      'otel.yml':
+        source: 'otel.yml'
         mode: 0600
         config: true
       '.elastic-agent.active.commit':

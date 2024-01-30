@@ -42,7 +42,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	}
 
 	// Init version information contained in package version file
-	err := version.InitVersionInformation()
+	err := version.InitVersionError()
 	if err != nil {
 		cmd.PrintErrf("Error initializing version information: %v\n", err)
 	}
@@ -54,9 +54,11 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.PersistentFlags().MarkHidden("path.home.unversioned") //nolint:errcheck // it's hidden
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.config"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("c"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("config"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.logs"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.downloads"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.install"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.socket"))
 
 	// logging flags
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("v"))

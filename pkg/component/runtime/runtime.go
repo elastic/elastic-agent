@@ -100,7 +100,7 @@ type componentRuntimeState struct {
 }
 
 func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor MonitoringManager, comp component.Component) (*componentRuntimeState, error) {
-	comm, err := newRuntimeComm(logger, m.getListenAddr(), m.ca, m.agentInfo)
+	comm, err := newRuntimeComm(logger, m.getListenAddr(), m.ca, m.agentInfo, m.grpcConfig.MaxMsgSize)
 	if err != nil {
 		return nil, err
 	}
