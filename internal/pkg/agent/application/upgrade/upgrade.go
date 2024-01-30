@@ -445,8 +445,11 @@ func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHo
 
 		oldHome := homePath
 		for _, processDir := range processDirs {
-			newDir := strings.ReplaceAll(processDir, prevVersion, newVersion)
-			newDir = strings.ReplaceAll(newDir, oldHome, newHome)
+			relPath, _ := filepath.Rel(oldHome, processDir)
+
+			newRelPath := strings.ReplaceAll(relPath, prevVersion, newVersion)
+			newRelPath = strings.ReplaceAll(newRelPath, oldHome, newHome)
+			newDir := filepath.Join(newHome, newRelPath)
 			l.Debugf("copying %q -> %q", processDir, newDir)
 			if err := copyDir(l, processDir, newDir, true); err != nil {
 				return err
