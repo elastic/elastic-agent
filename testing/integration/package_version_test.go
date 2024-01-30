@@ -131,13 +131,15 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 	stateYAML, err := os.Open(filepath.Join(diag, "state.yaml"))
 	require.NoError(t, err, "could not open diagnostics state.yaml")
+	t.Fail()
 
 	state := struct {
 		Components []struct {
 			ID    string `yaml:"id"`
 			State struct {
 				VersionInfo struct {
-					Meta struct {
+					BuildHash string `yaml:"build_hash"`
+					Meta      struct {
 						BuildTime string `yaml:"build_time"`
 						Commit    string `yaml:"commit"`
 					} `yaml:"meta"`
@@ -150,8 +152,8 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	require.NoError(t, err, "could not parse state.yaml (%s)", stateYAML.Name())
 
 	for _, c := range state.Components {
-		t.Errorf("need to assert BuildHash, not commit. beats have been updated already, a new state struct needs to be generated")
-		_ = c
+		assert.Equal(t, wantCommitHash, c.State.VersionInfo.BuildHash)
+		assert.Equal(t, wantCommitHash, c.State.VersionInfo.Meta.Commit)
 	}
 }
 
