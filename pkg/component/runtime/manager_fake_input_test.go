@@ -24,6 +24,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	gproto "google.golang.org/protobuf/proto"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
 
 	"github.com/gofrs/uuid"
@@ -74,15 +75,21 @@ type FakeInputSuite struct {
 	suite.Suite
 }
 
-func (suite *FakeInputSuite) SetupTest() {
+func (suite *FakeInputSuite) SetupSuite() {
 	// Tests using the fake input / shipper need to override the
-	// versionedHome and topPath globals to reference the temporary directory
-	// the test is running in.
+	// versionedHome, topPath and configPath globals to reference the temporary
+	// directory the test is running in.
 	// That's why these tests run in their own suite: it's hard to properly
 	// clean up these global changes after a test without setting off the
 	// data race detector, so they all run together and reset at the start of
 	// each test.
 	suite.setupTestPaths()
+
+	// CreateAgentSecret will create the encryption key for the disk store which
+	// is used later on during the tests.
+	err := secret.CreateAgentSecret(
+		context.Background(), secret.WithVaultPath(paths.AgentVaultPath()))
+	require.NoError(suite.T(), err, "failed creating agent secret")
 }
 
 func TestFakeInputSuite(t *testing.T) {
@@ -93,16 +100,10 @@ func (suite *FakeInputSuite) setupTestPaths() {
 	t := suite.T()
 	t.Helper()
 
-	tmpDir, err := os.MkdirTemp("", "at-*")
-	if err != nil {
-		t.Fatalf("failed to create temp directory: %s", err)
-	}
-	paths.SetVersionHome(false)
+	tmpDir := t.TempDir()
 	paths.SetTop(tmpDir)
-
-	t.Cleanup(func() {
-		_ = os.RemoveAll(tmpDir)
-	})
+	paths.SetConfig(tmpDir)
+	paths.SetVersionHome(false)
 }
 
 func (suite *FakeInputSuite) TestManager_StartStop() {
