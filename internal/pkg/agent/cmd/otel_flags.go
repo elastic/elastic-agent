@@ -23,7 +23,12 @@ func getConfigFiles(cmd *cobra.Command) ([]string, error) {
 		configFiles = append(configFiles, paths.OtelConfigFile())
 	}
 
-	sets, err := getSets(cmd)
+	setVals, err := cmd.Flags().GetStringArray(setFlagName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve set flags: %w", err)
+	}
+
+	sets, err := getSets(setVals)
 	if err != nil {
 		return nil, err
 	}
@@ -32,20 +37,21 @@ func getConfigFiles(cmd *cobra.Command) ([]string, error) {
 	return configFiles, nil
 }
 
-func getSets(cmd *cobra.Command) ([]string, error) {
+func getSets(setVals []string) ([]string, error) {
 	var sets []string
-	setVals, err := cmd.Flags().GetStringArray(setFlagName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve set flags: %w", err)
-	}
-
 	for _, s := range setVals {
 		idx := strings.Index(s, "=")
 		if idx == -1 {
-			// No need for more context, see TestSetFlag/invalid_set.
 			return nil, fmt.Errorf("missing equal sign for set value %q", s)
 		}
-		sets = append(sets, "yaml:"+strings.TrimSpace(strings.ReplaceAll(s[:idx], ".", "::"))+": "+strings.TrimSpace(s[idx+1:]))
+		sets = append(sets, setToYaml(s, idx))
 	}
 	return sets, nil
+}
+
+func setToYaml(set string, eqIdx int) string {
+	if len(set) == 0 {
+		return set
+	}
+	return "yaml:" + strings.TrimSpace(strings.ReplaceAll(set[:eqIdx], ".", "::")) + ": " + strings.TrimSpace(set[eqIdx+1:])
 }

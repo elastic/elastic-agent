@@ -375,7 +375,8 @@ LOOP:
 func loadConfig(ctx context.Context, override cfgOverrider, runAsOtel bool) (*configuration.Configuration, error) {
 	if runAsOtel {
 		defaultCfg := configuration.DefaultConfiguration()
-		// disable monitoring to avoid injection
+		// disable monitoring to avoid injection of monitoring components
+		// in case inputs are not empty
 		defaultCfg.Settings.MonitoringConfig.Enabled = false
 		defaultCfg.Settings.V1MonitoringEnabled = false
 		return defaultCfg, nil

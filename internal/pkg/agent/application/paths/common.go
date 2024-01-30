@@ -20,7 +20,7 @@ import (
 const (
 	// DefaultConfigName is the default name of the configuration file.
 	DefaultConfigName = "elastic-agent.yml"
-	// DefaultConfigName is the default name of the configuration file.
+	// DefaultOtelConfigName is the default name of the otel configuration file.
 	DefaultOtelConfigName = "otel.yml"
 
 	// AgentLockFileName is the name of the overall Elastic Agent file lock.
@@ -152,12 +152,12 @@ func ConfigFile() string {
 	return configFileWithDefaultOverride(DefaultConfigName)
 }
 
-// ConfigFile returns the path to the configuration file.
+// OtelConfigFile returns the path to the otel configuration file.
 func OtelConfigFile() string {
 	return configFileWithDefaultOverride(DefaultOtelConfigName)
 }
 
-// ConfigFile returns the path to the configuration file.
+// configFileWithDefaultOverride returns the path to the configuration file overriding default value.
 func configFileWithDefaultOverride(defaultConfig string) string {
 	if configFilePath == "" || configFilePath == DefaultConfigName {
 		return filepath.Join(Config(), defaultConfig)

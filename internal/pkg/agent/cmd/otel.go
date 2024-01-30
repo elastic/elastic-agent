@@ -36,19 +36,15 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 			return runCollector(cmd.Context(), cfgFiles)
 		},
 		PreRun: func(c *cobra.Command, args []string) {
-			c.InheritedFlags().VisitAll(func(f *pflag.Flag) {
-				f.Hidden = true
-			})
+			// hide inherited flags not to bloat help with flags not related to otel
+			hideInheritedFlags(c)
 		},
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
 
 	cmd.SetHelpFunc(func(c *cobra.Command, s []string) {
-		c.InheritedFlags().VisitAll(func(f *pflag.Flag) {
-			f.Hidden = true
-		})
-
+		hideInheritedFlags(c)
 		c.Parent().HelpFunc()(c, s)
 	})
 
@@ -58,6 +54,12 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	cmd.Flags().StringArray(setFlagName, []string{}, "Set arbitrary component config property. The component has to be defined in the config file and the flag"+
 		" has a higher precedence. Array config properties are overridden and maps are joined. Example --set=processors.batch.timeout=2s")
 	return cmd
+}
+
+func hideInheritedFlags(c *cobra.Command) {
+	c.InheritedFlags().VisitAll(func(f *pflag.Flag) {
+		f.Hidden = true
+	})
 }
 
 func runCollector(cmdCtx context.Context, configFiles []string) error {
