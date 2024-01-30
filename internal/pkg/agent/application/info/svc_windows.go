@@ -57,8 +57,8 @@ func allocSid(subAuth0 uint32) (*windows.SID, error) {
 func nativeArchitecture() string {
 	var nativeMachineStr string
 	var processMachine, nativeMachine uint16
-	var currentProcessHandle = windows.CurrentProcess()
-	defer windows.CloseHandle(currentProcessHandle)
+	// the pseudo handle doesn't need to be closed, err is always nil
+	var currentProcessHandle, _ = windows.GetCurrentProcess()
 
 	err := windows.IsWow64Process2(currentProcessHandle, &processMachine, &nativeMachine)
 	if err != nil {
