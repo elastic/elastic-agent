@@ -31,19 +31,23 @@ var (
 // packageArchMap provides a mapping for the endings of the builds of Elastic Agent based on the
 // operating system and architecture.
 var packageArchMap = map[string]string{
-	"linux-amd64":   "linux-x86_64.tar.gz",
-	"linux-arm64":   "linux-arm64.tar.gz",
-	"windows-amd64": "windows-x86_64.zip",
-	"darwin-amd64":  "darwin-x86_64.tar.gz",
-	"darwin-arm64":  "darwin-aarch64.tar.gz",
+	"linux-amd64-targz":  "linux-x86_64.tar.gz",
+	"linux-amd64-deb":    "amd64.deb",
+	"linux-amd64-rpm":    "x86_64.rpm",
+	"linux-arm64-targz":  "linux-arm64.tar.gz",
+	"linux-arm64-deb":    "arm64.deb",
+	"linux-arm64-rpm":    "aarch64.rpm",
+	"windows-amd64-zip":  "windows-x86_64.zip",
+	"darwin-amd64-targz": "darwin-x86_64.tar.gz",
+	"darwin-arm64-targz": "darwin-aarch64.tar.gz",
 }
 
 // GetPackageSuffix returns the suffix ending for the builds of Elastic Agent based on the
 // operating system and architecture.
-func GetPackageSuffix(operatingSystem string, architecture string) (string, error) {
-	suffix, ok := packageArchMap[fmt.Sprintf("%s-%s", operatingSystem, architecture)]
+func GetPackageSuffix(operatingSystem string, architecture string, packageFormat string) (string, error) {
+	suffix, ok := packageArchMap[fmt.Sprintf("%s-%s-%s", operatingSystem, architecture, packageFormat)]
 	if !ok {
-		return "", fmt.Errorf("%w: %s/%s", ErrUnsupportedPlatform, operatingSystem, architecture)
+		return "", fmt.Errorf("%w: %s/%s/%s", ErrUnsupportedPlatform, operatingSystem, architecture, packageFormat)
 	}
 	return suffix, nil
 }
@@ -68,7 +72,7 @@ type Fetcher interface {
 	//
 	// The extraction is handled by the caller. This should only download the file
 	// and place it into the directory.
-	Fetch(ctx context.Context, operatingSystem string, architecture string, version string) (FetcherResult, error)
+	Fetch(ctx context.Context, operatingSystem string, architecture string, version string, packageFormat string) (FetcherResult, error)
 }
 
 // fetchCache is global to all tests, reducing the time required to fetch the needed artifacts
@@ -104,6 +108,12 @@ func splitFileType(name string) (string, string, error) {
 	}
 	if strings.HasSuffix(name, ".zip") {
 		return strings.TrimSuffix(name, ".zip"), ".zip", nil
+	}
+	if strings.HasSuffix(name, ".deb") {
+		return strings.TrimSuffix(name, ".deb"), ".deb", nil
+	}
+	if strings.HasSuffix(name, ".rpm") {
+		return strings.TrimSuffix(name, ".rpm"), ".rpm", nil
 	}
 	return "", "", fmt.Errorf("unknown file extension type: %s", filepath.Ext(name))
 }
