@@ -719,6 +719,12 @@ func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (A
 	return inspect, err
 }
 
+// Returns the version the fixture was created for.
+// This includes all build metadata, e.g. 8.13.0-SNAPSHOT+tj5ksxdm
+func (f *Fixture) Version() string {
+	return f.version
+}
+
 // ExecVersion executes the version subcommand on the prepared Elastic Agent binary
 // with '--binary-only'. It returns the parsed YAML output.
 func (f *Fixture) ExecVersion(ctx context.Context, opts ...process.CmdOption) (AgentVersionOutput, error) {
