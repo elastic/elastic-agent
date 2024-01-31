@@ -23,9 +23,10 @@ func RunningUnderSupervisor() bool {
 	if err != nil {
 		return false
 	}
-	defer windows.FreeSid(serviceSid)
+	defer func() { _ = windows.FreeSid(serviceSid) }()
 
-	t, err := windows.OpenCurrentProcessToken()
+	var t windows.Token
+	err = windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY|windows.TOKEN_QUERY_SOURCE, &t)
 	if err != nil {
 		return false
 	}
