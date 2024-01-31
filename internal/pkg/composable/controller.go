@@ -65,7 +65,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	contextProviders := map[string]*contextProviderState{}
 	for name, builder := range Providers.contextProviders {
 		pCfg, ok := providersCfg.Providers[name]
-		if ok && !pCfg.Enabled() {
+		if (ok && !pCfg.Enabled()) || (!ok && providersCfg.ProvidersDefaultDisable) {
 			// explicitly disabled; skipping
 			continue
 		}
@@ -84,7 +84,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	dynamicProviders := map[string]*dynamicProviderState{}
 	for name, builder := range Providers.dynamicProviders {
 		pCfg, ok := providersCfg.Providers[name]
-		if ok && !pCfg.Enabled() {
+		if (ok && !pCfg.Enabled()) || (!ok && providersCfg.ProvidersDefaultDisable) {
 			// explicitly disabled; skipping
 			continue
 		}
