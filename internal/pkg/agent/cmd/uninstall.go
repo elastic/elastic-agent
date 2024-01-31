@@ -56,7 +56,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	if status == install.Installed && !paths.InstallMarkerExists() {
-		return fmt.Errorf("cannot find %s file relative to running elastic agent; agent should be run from %s, or the install may be corrupt. If the install is corrupt, re-run with --force", paths.MarkerFileName, install.ExecutablePath(paths.Top()))
+		return fmt.Errorf("cannot find %s file relative to running elastic agent; agent should be run from %s, or the install may be corrupt", paths.MarkerFileName, install.ExecutablePath(paths.Top()))
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
