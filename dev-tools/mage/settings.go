@@ -255,6 +255,7 @@ repo.RootDir                 = {{ repo.RootDir }}
 repo.ImportPath              = {{ repo.ImportPath }}
 repo.SubDir                  = {{ repo.SubDir }}
 agent_package_version        = {{ agent_package_version}}
+snapshot_suffix              = {{ snapshot_suffix }}
 `
 
 	return Expand(dumpTemplate)
