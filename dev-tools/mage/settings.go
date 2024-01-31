@@ -312,6 +312,13 @@ func PackageManifest() (string, error) {
 		return "", fmt.Errorf("retrieving agent package version: %w", err)
 	}
 	m.Package.Version = packageVersion
+
+	hash, err := CommitHash()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
+	}
+	m.Package.Hash = hash
+
 	commitHashShort, err := CommitHashShort()
 	if err != nil {
 		return "", fmt.Errorf("retrieving agent commit hash: %w", err)

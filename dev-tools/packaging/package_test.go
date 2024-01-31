@@ -219,6 +219,9 @@ func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
 	assert.Equal(t, v1.ManifestKind, m.Kind, "manifest specifies wrong kind")
 	assert.Equal(t, v1.VERSION, m.Version, "manifest specifies wrong api version")
 
+	assert.NotEmpty(t, m.Package.Version, "manifest version must not be empty")
+	assert.NotEmpty(t, m.Package.Hash, "manifest hash must not be empty")
+
 	if assert.NotEmpty(t, m.Package.PathMappings, "path mappings in manifest are empty") {
 		versionedHome := m.Package.VersionedHome
 		assert.DirExistsf(t, filepath.Join(extractedPackageDir, versionedHome), "versionedHome directory %q not found in %q", versionedHome, extractedPackageDir)
