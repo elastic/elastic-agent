@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -169,7 +168,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 				BuildOriginal: release.Info().String(),
 				// only upgradeable if running from Agent installer and running under the
 				// control of the system supervisor (or built specifically with upgrading enabled)
-				Upgradeable: release.Upgradeable() || (paths.InstallMarkerExists() && RunningUnderSupervisor()),
+				Upgradeable: release.Upgradeable() || RunningUnderSupervisor(),
 				LogLevel:    i.LogLevel(),
 			},
 		},
