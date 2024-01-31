@@ -17,6 +17,7 @@ const ManifestFileName = "manifest.yaml"
 type PackageDesc struct {
 	Version       string              `yaml:"version,omitempty" json:"version,omitempty"`
 	Snapshot      bool                `yaml:"snapshot,omitempty" json:"snapshot,omitempty"`
+	Hash          string              `yaml:"hash,omitempty" json:"hash,omitempty"`
 	VersionedHome string              `yaml:"versioned-home,omitempty" json:"versionedHome,omitempty"`
 	PathMappings  []map[string]string `yaml:"path-mappings,omitempty" json:"pathMappings,omitempty"`
 }
