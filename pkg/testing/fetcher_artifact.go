@@ -64,28 +64,29 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 	}
 
 	var uri string
-	var prevErr error
-	if !f.snapshotOnly {
-		uri, prevErr = findURI(ctx, f.doer, version)
-	}
-	preVersion := version
-	version, _ = splitBuildID(version)
-	if uri == "" {
-		if !strings.HasSuffix(version, "-SNAPSHOT") {
-			version += "-SNAPSHOT"
-		}
-		uri, err = findURI(ctx, f.doer, version)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find snapshot URI for version %s: %w (previous error: %w)", preVersion, err, prevErr)
-		}
+
+	noBuildVersion, _ := splitBuildID(version)
+
+	if f.snapshotOnly && !strings.HasSuffix(noBuildVersion, "-SNAPSHOT") {
+		noBuildVersion += "-SNAPSHOT"
+		version = noBuildVersion
 	}
 
-	path := fmt.Sprintf("elastic-agent-%s-%s", version, suffix)
-	downloadSrc := fmt.Sprintf("%s%s", uri, path)
+	// using the full version here to include the possible build ID
+	uri, err = findURI(ctx, f.doer, version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find snapshot URI for version %s: %w", version, err)
+	}
+
+	// this remote path cannot have the build ID in it
+	srcPath := fmt.Sprintf("elastic-agent-%s-%s", noBuildVersion, suffix)
+	downloadSrc := fmt.Sprintf("%s%s", uri, srcPath)
+
 	return &artifactResult{
 		doer: f.doer,
 		src:  downloadSrc,
-		path: path,
+		// this path must have the full version, so the filename contains the build ID
+		path: fmt.Sprintf("elastic-agent-%s-%s", version, suffix),
 	}, nil
 }
 
@@ -102,19 +103,21 @@ func (r *artifactResult) Name() string {
 
 // Fetch performs the actual fetch into the provided directory.
 func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error {
-	err := DownloadPackage(ctx, l, r.doer, r.src, filepath.Join(dir, r.path))
+	dst := filepath.Join(dir, r.Name())
+
+	err := DownloadPackage(ctx, l, r.doer, r.src, dst)
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
 
 	// fetch package hash
-	err = DownloadPackage(ctx, l, r.doer, r.src+extHash, filepath.Join(dir, r.path+extHash))
+	err = DownloadPackage(ctx, l, r.doer, r.src+extHash, dst+extHash)
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
 
 	// fetch package asc
-	err = DownloadPackage(ctx, l, r.doer, r.src+extAsc, filepath.Join(dir, r.path+extAsc))
+	err = DownloadPackage(ctx, l, r.doer, r.src+extAsc, dst+extAsc)
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
@@ -122,36 +125,93 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 	return nil
 }
 
-func findURI(ctx context.Context, doer httpDoer, version string) (string, error) {
-	version, buildID := splitBuildID(version)
-	artifactsURI := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/elastic-agent", version)
-	req, err := http.NewRequestWithContext(ctx, "GET", artifactsURI, nil)
+type projectResponse struct {
+	Packages map[string]interface{} `json:"packages"`
+}
+
+type projectsResponse struct {
+	ElasticPackage projectResponse `json:"elastic-agent-package"`
+}
+
+type manifestResponse struct {
+	Projects projectsResponse `json:"projects"`
+}
+
+func findBuild(ctx context.Context, doer httpDoer, version, buildID string) (*projectResponse, error) {
+	version = stripSnapshot(version)
+
+	// e.g. https://snapshots.elastic.co/8.13.0-l5snflwr/manifest-8.13.0-SNAPSHOT.json
+	manifestURI := fmt.Sprintf("https://snapshots.elastic.co/%s-%s/manifest-%s-SNAPSHOT.json", version, buildID, version)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, manifestURI, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	resp, err := doer.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("%s; bad status: %s", artifactsURI, resp.Status)
+		return nil, fmt.Errorf("%s; bad status: %s", manifestURI, resp.Status)
 	}
 
-	body := struct {
-		Packages map[string]interface{} `json:"packages"`
-	}{}
+	var body manifestResponse
 
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(&body); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if len(body.Packages) == 0 {
+	return &body.Projects.ElasticPackage, nil
+}
+
+func findVersion(ctx context.Context, doer httpDoer, version string) (*projectResponse, error) {
+	artifactsURI := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/elastic-agent", version)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, artifactsURI, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := doer.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s; bad status: %s", artifactsURI, resp.Status)
+	}
+
+	var body projectResponse
+
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&body); err != nil {
+		return nil, err
+	}
+
+	return &body, nil
+}
+
+func findURI(ctx context.Context, doer httpDoer, version string) (string, error) {
+	version, buildID := splitBuildID(version)
+	var (
+		project *projectResponse
+		err     error
+	)
+
+	if buildID != "" {
+		project, err = findBuild(ctx, doer, version, buildID)
+	} else {
+		project, err = findVersion(ctx, doer, version)
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("failed to find package URL: %w", err)
+	}
+
+	if len(project.Packages) == 0 {
 		return "", fmt.Errorf("no packages found in repo")
 	}
 
-	for k, pkg := range body.Packages {
+	for k, pkg := range project.Packages {
 		pkgMap, ok := pkg.(map[string]interface{})
 		if !ok {
 			return "", fmt.Errorf("content of '%s' is not a map", k)
@@ -188,9 +248,9 @@ func findURI(ctx context.Context, doer httpDoer, version string) (string, error)
 	}
 
 	if buildID == "" {
-		return "", fmt.Errorf("uri not detected")
+		return "", fmt.Errorf("uri for version %q not detected", version)
 	}
-	return "", fmt.Errorf("uri not detected with specific buildid %s", buildID)
+	return "", fmt.Errorf("uri not detected with specific build ID %q", buildID)
 }
 
 func splitBuildID(version string) (string, string) {
@@ -203,10 +263,7 @@ func splitBuildID(version string) (string, string) {
 }
 
 func stripSnapshot(version string) string {
-	if strings.HasSuffix(version, "-SNAPSHOT") {
-		return strings.TrimSuffix(version, "-SNAPSHOT")
-	}
-	return version
+	return strings.TrimSuffix(version, "-SNAPSHOT")
 }
 
 func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {
