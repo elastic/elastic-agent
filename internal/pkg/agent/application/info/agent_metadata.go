@@ -169,7 +169,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 				BuildOriginal: release.Info().String(),
 				// only upgradeable if running from Agent installer and running under the
 				// control of the system supervisor (or built specifically with upgrading enabled)
-				Upgradeable: release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
+				Upgradeable: release.Upgradeable() || (paths.InstallMarkerExists() && RunningUnderSupervisor()),
 				LogLevel:    i.LogLevel(),
 			},
 		},

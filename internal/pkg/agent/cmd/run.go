@@ -324,7 +324,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// option during installation
 	//
 	// Windows `paths.ControlSocketRunSymlink` is `""` so this is always skipped on Windows.
-	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink != "" {
+	if isRoot && paths.InstallMarkerExists() && paths.ControlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
 		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
 		// ensure it doesn't exist before creating the symlink
@@ -686,7 +686,7 @@ func ensureInstallMarkerPresent() error {
 
 	// Only an installed Elastic Agent can be self-upgraded. So, if the
 	// installation marker file is already present, we're all set.
-	if paths.RunningInstalled() {
+	if paths.InstallMarkerExists() {
 		return nil
 	}
 

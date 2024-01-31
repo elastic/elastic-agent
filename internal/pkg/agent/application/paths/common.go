@@ -310,8 +310,8 @@ func TopBinaryPath() string {
 	return filepath.Join(Top(), BinaryName)
 }
 
-// RunningInstalled returns true when executing Agent is the installed Agent.
-func RunningInstalled() bool {
+// InstallMarkerExists returns true if the .installed file marker exists relative to the top path
+func InstallMarkerExists() bool {
 	// Check if install marker created by `elastic-agent install` exists
 	markerFilePath := filepath.Join(Top(), MarkerFileName)
 	if _, err := os.Stat(markerFilePath); err != nil {
