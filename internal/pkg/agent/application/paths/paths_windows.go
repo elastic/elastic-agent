@@ -48,7 +48,7 @@ func AgentVaultPath() string {
 
 func initialControlSocketPath(topPath string) string {
 	// when installed the control address is fixed
-	if RunningInstalled() {
+	if InstallMarkerExists() {
 		return WindowsControlSocketInstalledPath
 	}
 	return ControlSocketFromPath(runtime.GOOS, topPath)
