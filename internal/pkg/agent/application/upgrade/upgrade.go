@@ -302,10 +302,10 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	var watcherExecutable string
 	if parsedVersion.Less(*minParsedVersionForNewUpdateMarker) {
 		// use the current agent executable for watch
-		watcherExecutable = filepath.Join(paths.VersionedHome(paths.Top()), agentName)
+		watcherExecutable = paths.BinaryPath(paths.VersionedHome(paths.Top()), agentName)
 	} else {
 		// use the new agent executable as it should be able to parse the new update marker
-		watcherExecutable = filepath.Join(paths.Top(), unpackRes.VersionedHome, agentName)
+		watcherExecutable = paths.BinaryPath(filepath.Join(paths.Top(), unpackRes.VersionedHome), agentName)
 	}
 	if err := InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
