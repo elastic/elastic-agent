@@ -46,7 +46,7 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 		symlinkTarget = paths.BinaryPath(filepath.Join(paths.DataFrom(topDirPath), hashedDir), agentName)
 	}
 	// change symlink
-	if err := changeSymlinkInternal(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
+	if err := ChangeSymlink(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
 		return err
 	}
 

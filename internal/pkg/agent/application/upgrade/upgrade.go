@@ -251,15 +251,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
 
-	if err := changeSymlinkInternal(u.log, paths.Top(), symlinkPath, newPath); err != nil {
-		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
-		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
-		return nil, err
-	}
-
 	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
 	if err != nil {
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
+
+	if err := ChangeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
+		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
+		rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		return nil, err
 	}
 
 	current := agentInstall{
@@ -280,7 +280,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		previous,     // old agent version data
 		action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
+		rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, err
 	}
 
@@ -295,7 +295,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 	if err := InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
+		rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, err
 	}
 
@@ -375,14 +375,18 @@ func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMet
 	return current == newVersion, newVersion
 }
 
-func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome string) {
-	err := os.RemoveAll(filepath.Join(topDirPath, versionedHome))
+func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) {
+	newAgentInstallPath := filepath.Join(topDirPath, versionedHome)
+	err := os.RemoveAll(newAgentInstallPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		// TODO should this be a warning or an error ?
-		log.Warnw("error rolling back install", "error.message", err)
+		log.Warnw(fmt.Sprintf("rolling back install: removing new agent install at %q failed", newAgentInstallPath), "error.message", err)
 	}
-	// FIXME update
-	_ = ChangeSymlink(ctx, log, topDirPath, release.ShortCommit())
+
+	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
+	err = ChangeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		log.Warnw(fmt.Sprintf("rolling back install: restoring symlink to %q failed", oldAgentPath), "error.message", err)
+	}
 }
 
 func copyActionStore(log *logger.Logger, newHome string) error {
