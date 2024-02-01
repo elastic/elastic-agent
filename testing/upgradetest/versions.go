@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
@@ -29,6 +30,8 @@ var (
 	Version_8_10_0_SNAPSHOT = version.NewParsedSemVer(8, 10, 0, "SNAPSHOT", "")
 	// Version_8_11_0_SNAPSHOT is the minimum version for uninstall command to kill the watcher upon uninstall
 	Version_8_11_0_SNAPSHOT = version.NewParsedSemVer(8, 11, 0, "SNAPSHOT", "")
+	// Version_8_13_0 is the minimum version for proper unprivileged execution
+	Version_8_13_0 = version.NewParsedSemVer(8, 13, 0, "", "")
 )
 
 // GetUpgradableVersions returns the version that the upgradeToVersion can upgrade from.
@@ -134,4 +137,12 @@ func PreviousMinor(ctx context.Context, version string) (string, error) {
 		return "", fmt.Errorf("no previous minor")
 	}
 	return versions[0].String(), nil
+}
+
+// EnsureSnapshot ensures that the version string is a snapshot version.
+func EnsureSnapshot(version string) string {
+	if !strings.HasSuffix(version, "-SNAPSHOT") {
+		version += "-SNAPSHOT"
+	}
+	return version
 }

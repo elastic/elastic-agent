@@ -51,7 +51,7 @@ func New(
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
-	err := version.InitVersionInformation()
+	err := version.InitVersionError()
 	if err != nil {
 		// non-fatal error, log a warning and move on
 		log.With("error.message", err).Warnf("Error initializing version information: falling back to %s", release.Version())

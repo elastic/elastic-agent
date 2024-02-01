@@ -445,7 +445,7 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					ID:         "endpoint-default",
 					InputSpec:  &InputRuntimeSpec{},
-					Err:        NewErrInputRuntimeCheckFail("No support for RHEL7 on arm64"),
+					Err:        NewErrInputRuntimeCheckFail("Elastic Defend doesn't support RHEL7 on arm64"),
 					Units: []Unit{
 						{
 							ID:       "endpoint-default",
