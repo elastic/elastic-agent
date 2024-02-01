@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
 // OtelModeConfigManager serves as a config manager for OTel use cases
@@ -28,6 +29,11 @@ func NewOtelModeConfigManager() *OtelModeConfigManager {
 }
 
 func (t *OtelModeConfigManager) Run(ctx context.Context) error {
+	// send config to transition from STARTING to HEALTHY
+	select {
+	case t.ch <- &otelConfigChange{}:
+	case <-ctx.Done():
+	}
 	<-ctx.Done()
 	return ctx.Err()
 }
@@ -44,4 +50,20 @@ func (t *OtelModeConfigManager) ActionErrors() <-chan error {
 
 func (t *OtelModeConfigManager) Watch() <-chan coordinator.ConfigChange {
 	return t.ch
+}
+
+type otelConfigChange struct {
+}
+
+func (l *otelConfigChange) Config() *config.Config {
+	return config.New()
+}
+
+func (l *otelConfigChange) Ack() error {
+	// do nothing
+	return nil
+}
+
+func (l *otelConfigChange) Fail(_ error) {
+	// do nothing
 }
