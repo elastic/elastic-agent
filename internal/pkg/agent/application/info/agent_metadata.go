@@ -155,7 +155,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 
-		fqdn, err := sysInfo.FQDN(ctx)
+		fqdn, err := sysInfo.FQDNWithContext(ctx)
 		if err != nil {
 			l.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
 		} else {
@@ -214,7 +214,7 @@ func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 
-		fqdn, err := sysInfo.FQDN(ctx)
+		fqdn, err := sysInfo.FQDNWithContext(ctx)
 		if err != nil {
 			l.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
 		} else {
