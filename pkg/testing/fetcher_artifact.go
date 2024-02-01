@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	semver "github.com/elastic/elastic-agent/pkg/version"
 )
 
 type httpDoer interface {
@@ -63,31 +65,34 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 		return nil, err
 	}
 
-	var uri string
-
-	noBuildVersion, buildID := splitBuildID(version)
-
-	if f.snapshotOnly && !strings.HasSuffix(noBuildVersion, "-SNAPSHOT") {
-		noBuildVersion += "-SNAPSHOT"
-		version = noBuildVersion
-	}
-
-	// using the full version here to include the possible build ID
-	uri, err = findURI(ctx, f.doer, version)
+	ver, err := semver.ParseVersion(version)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find snapshot URI for version %s: %w", version, err)
+		return nil, fmt.Errorf("invalid version: %q: %w", ver, err)
 	}
 
-	// this remote path cannot have the build ID in it
-	srcPath := fmt.Sprintf("elastic-agent-%s-%s", noBuildVersion, suffix)
+	if f.snapshotOnly && !ver.IsSnapshot() {
+		if ver.Prerelease() == "" {
+			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "SNAPSHOT", ver.BuildMetadata())
+		} else {
+			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), ver.Prerelease()+"-SNAPSHOT", ver.BuildMetadata())
+		}
+	}
+
+	uri, err := findURI(ctx, f.doer, ver)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find snapshot URI for version %s: %w", ver, err)
+	}
+
+	// this remote path cannot have the build metadata in it
+	srcPath := fmt.Sprintf("elastic-agent-%s-%s", ver.VersionWithPrerelease(), suffix)
 	downloadSrc := fmt.Sprintf("%s%s", uri, srcPath)
 
 	return &artifactResult{
 		doer: f.doer,
 		src:  downloadSrc,
-		// this path must have the build ID in it, so we don't mix such files with
-		// no build-specific snapshots. If `buildID` is empty, it's just `srcPath`.
-		path: filepath.Join(buildID, srcPath),
+		// this path must have the build metadata in it, so we don't mix such files with
+		// no build-specific snapshots. If build metadata is empty, it's just `srcPath`.
+		path: filepath.Join(ver.BuildMetadata(), srcPath),
 	}, nil
 }
 
@@ -143,11 +148,9 @@ type manifestResponse struct {
 	Projects projectsResponse `json:"projects"`
 }
 
-func findBuild(ctx context.Context, doer httpDoer, version, buildID string) (*projectResponse, error) {
-	version = stripSnapshot(version)
-
+func findBuild(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (*projectResponse, error) {
 	// e.g. https://snapshots.elastic.co/8.13.0-l5snflwr/manifest-8.13.0-SNAPSHOT.json
-	manifestURI := fmt.Sprintf("https://snapshots.elastic.co/%s-%s/manifest-%s-SNAPSHOT.json", version, buildID, version)
+	manifestURI := fmt.Sprintf("https://snapshots.elastic.co/%s-%s/manifest-%s-SNAPSHOT.json", version.CoreVersion(), version.BuildMetadata(), version.CoreVersion())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, manifestURI, nil)
 	if err != nil {
 		return nil, err
@@ -171,8 +174,8 @@ func findBuild(ctx context.Context, doer httpDoer, version, buildID string) (*pr
 	return &body.Projects.ElasticPackage, nil
 }
 
-func findVersion(ctx context.Context, doer httpDoer, version string) (*projectResponse, error) {
-	artifactsURI := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/elastic-agent", version)
+func findVersion(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (*projectResponse, error) {
+	artifactsURI := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/elastic-agent", version.VersionWithPrerelease())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, artifactsURI, nil)
 	if err != nil {
 		return nil, err
@@ -196,15 +199,14 @@ func findVersion(ctx context.Context, doer httpDoer, version string) (*projectRe
 	return &body, nil
 }
 
-func findURI(ctx context.Context, doer httpDoer, version string) (string, error) {
-	version, buildID := splitBuildID(version)
+func findURI(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (string, error) {
 	var (
 		project *projectResponse
 		err     error
 	)
 
-	if buildID != "" {
-		project, err = findBuild(ctx, doer, version, buildID)
+	if version.BuildMetadata() != "" {
+		project, err = findBuild(ctx, doer, version)
 	} else {
 		project, err = findVersion(ctx, doer, version)
 	}
@@ -243,33 +245,20 @@ func findURI(ctx context.Context, doer httpDoer, version string) (string, error)
 		// https://snapshots.elastic.co/8.7.0-d050210c/downloads/elastic-agent-shipper/elastic-agent-shipper-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
 		index := strings.Index(uri, "/beats/elastic-agent/")
 		if index != -1 {
-			if buildID == "" {
+			if version.BuildMetadata() == "" {
 				// no build id, first is selected
 				return fmt.Sprintf("%s/beats/elastic-agent/", uri[:index]), nil
 			}
-			if strings.Contains(uri, fmt.Sprintf("%s-%s", stripSnapshot(version), buildID)) {
+			if strings.Contains(uri, fmt.Sprintf("%s-%s", version.CoreVersion(), version.BuildMetadata())) {
 				return fmt.Sprintf("%s/beats/elastic-agent/", uri[:index]), nil
 			}
 		}
 	}
 
-	if buildID == "" {
+	if version.BuildMetadata() == "" {
 		return "", fmt.Errorf("uri for version %q not detected", version)
 	}
-	return "", fmt.Errorf("uri not detected with specific build ID %q", buildID)
-}
-
-func splitBuildID(version string) (string, string) {
-	split := strings.SplitN(version, "+", 2)
-	if len(split) == 1 {
-		// no build ID
-		return split[0], ""
-	}
-	return split[0], split[1]
-}
-
-func stripSnapshot(version string) string {
-	return strings.TrimSuffix(version, "-SNAPSHOT")
+	return "", fmt.Errorf("uri not detected with specific build ID %q", version.BuildMetadata())
 }
 
 func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {
