@@ -162,7 +162,7 @@ func getHostName(hostInfo types.HostInfo, host types.Host, log *logger.Logger) s
 	fqdn, err := host.FQDNWithContext(ctx)
 	if err != nil {
 		log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostInfo.Hostname)
-		return ""
+		return hostInfo.Hostname
 	}
 
 	return fqdn
