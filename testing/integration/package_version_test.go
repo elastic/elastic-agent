@@ -123,7 +123,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		strings.Join(splits, "|"))
 	wantBuildHash := splits[0]
 
-	diagZip, err := collectDiagnostics(ctx, t, f)
+	diagZip, err := f.ExecDiagnostics(ctx)
 	require.NoError(t, err, "failed collecting diagnostics")
 
 	diag := t.TempDir()
