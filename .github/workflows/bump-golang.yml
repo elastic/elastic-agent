@@ -4,10 +4,13 @@ name: bump-golang
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 20 * * 6"
+    - cron: "0 20 * * 1-6"
 
 permissions:
   contents: read
+
+env:
+  JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
 jobs:
   bump:
@@ -21,3 +24,5 @@ jobs:
           vaultRoleId: ${{ secrets.VAULT_ROLE_ID }}
           vaultSecretId: ${{ secrets.VAULT_SECRET_ID }}
           pipeline: ./.github/updatecli-bump-golang.yml
+          notifySlackChannel: "#ingest-notifications"
+          messageIfFailure: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"
