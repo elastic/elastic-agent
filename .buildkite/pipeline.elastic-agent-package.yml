@@ -49,6 +49,15 @@ steps:
           - label: "False"
             value: ""
         hint: "If the DRA release manager script would actually publish anything or just print"
+      - select: "DRA Upload"
+        key: "DRA_UPLOAD"
+        required: "false"
+        options:
+          - label: "True"
+            value: "true"
+          - label: "False"
+            value: "false"
+        hint: "If True, use the normal DRA upload, otherwise use BK API upload for Independent Agent Release"
 
   - wait: ~
     if: build.env("ManifestURL") == null
@@ -101,6 +110,7 @@ steps:
           - "build/distributions/**/*"
 
   - label: ":elastic-stack: Publishing to DRA"
+    if: build.env("DRA_UPLOAD") == null || build.env("DRA_UPLOAD") == "true"
     key: dra-publish
     depends_on: package
     agents:
@@ -126,3 +136,19 @@ steps:
         export DRA_VERSION
       fi
       .buildkite/scripts/steps/dra-publish.sh
+
+  - label: "Publishing via BK API for Independent Agent Release"
+    if: build.env("DRA_UPLOAD") == "false"
+    key: bk-api-publish-independent-agent
+    depends_on: package
+    agents:
+      provider: "gcp"
+    env:
+      DRA_PROJECT_ID: "elastic-agent-package"
+      DRA_PROJECT_ARTIFACT_ID: "agent-package"
+    command: |
+      echo "+++ Restoring Artifacts"
+      buildkite-agent artifact download "build/**/*" .
+      echo "+++ Changing permissions for the BK API commands"
+      sudo chown -R :1000 build/distributions/
+      echo "--- Probably run a script here for the upload"
