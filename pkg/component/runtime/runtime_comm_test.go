@@ -76,5 +76,5 @@ func TestRuntimeComm_WriteStartUpInfo_packageVersion(t *testing.T) {
 	require.NoError(t, err, "failed creating V2 client")
 
 	assert.Equal(t, &want, clientv2.AgentInfo(),
-		"package version does not match")
+		"agent info returned by client must match what has been written on command input")
 }

@@ -101,7 +101,7 @@ func (v *Vault) Set(ctx context.Context, key string, data []byte) (err error) {
 
 	err = v.tryLock(ctx)
 	if err != nil {
-		return fmt.Errorf("vault Set: could aqquire lock: %w", err)
+		return fmt.Errorf("vault Set: could acquire lock: %w", err)
 	}
 	defer func() {
 		err = v.unlockAndJoinErrors(err)
@@ -112,7 +112,7 @@ func (v *Vault) Set(ctx context.Context, key string, data []byte) (err error) {
 
 	err = writeFile(v.filepathFromKey(key), enc)
 	if err != nil {
-
+		return fmt.Errorf("vaukt: could not write key to file: %w", err)
 	}
 	return nil
 }
