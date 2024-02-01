@@ -284,7 +284,7 @@
             },
             "vars": {
               "period": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "core.metrics": {
@@ -311,7 +311,7 @@
             },
             "vars": {
               "period": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "cpu.metrics": {
@@ -338,7 +338,7 @@
                 "percentages",
                 "normalized_percentages"
               ],
-              "period": "10s"
+              "period": "1s"
             }
           },
           {
@@ -349,7 +349,7 @@
             },
             "vars": {
               "period": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "diskio.include_devices": {
@@ -367,7 +367,7 @@
                 "diskio"
               ],
               "diskio.include_devices": null,
-              "period": "10s"
+              "period": "1s"
             }
           },
           {
@@ -378,7 +378,7 @@
             },
             "vars": {
               "period": {
-                "value": "1m",
+                "value": "1s",
                 "type": "text"
               },
               "filesystem.ignore_types": {
@@ -399,7 +399,7 @@
               "metricsets": [
                 "filesystem"
               ],
-              "period": "1m",
+              "period": "1s",
               "processors": [
                 {
                   "drop_event.when.regexp": {
@@ -417,7 +417,7 @@
             },
             "vars": {
               "period": {
-                "value": "1m",
+                "value": "1s",
                 "type": "text"
               },
               "tags": {
@@ -434,7 +434,7 @@
               "metricsets": [
                 "fsstat"
               ],
-              "period": "1m",
+              "period": "1s",
               "processors": [
                 {
                   "drop_event.when.regexp": {
@@ -452,7 +452,7 @@
             },
             "vars": {
               "period": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "tags": {
@@ -469,7 +469,7 @@
                 "load"
               ],
               "condition": "${host.platform} != 'windows'",
-              "period": "10s"
+              "period": "1s"
             }
           },
           {
@@ -480,7 +480,7 @@
             },
             "vars": {
               "period": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "tags": {
@@ -496,7 +496,7 @@
               "metricsets": [
                 "memory"
               ],
-              "period": "10s"
+              "period": "1s"
             }
           },
           {
@@ -507,7 +507,7 @@
             },
             "vars": {
               "period": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "network.interfaces": {
@@ -527,7 +527,7 @@
               "metricsets": [
                 "network"
               ],
-              "period": "10s",
+              "period": "1s",
               "network.interfaces": null
             }
           },
@@ -539,7 +539,7 @@
             },
             "vars": {
               "period": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "process.include_top_n.by_cpu": {
@@ -585,7 +585,7 @@
               "metricsets": [
                 "process"
               ],
-              "period": "10s",
+              "period": "1s",
               "process.include_top_n.by_cpu": 5,
               "process.include_top_n.by_memory": 5,
               "process.cmdline.cache.enabled": true,
@@ -604,7 +604,7 @@
             },
             "vars": {
               "period": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "tags": {
@@ -620,7 +620,7 @@
               "metricsets": [
                 "process_summary"
               ],
-              "period": "10s"
+              "period": "1s"
             }
           },
           {
@@ -631,7 +631,7 @@
             },
             "vars": {
               "period": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "tags": {
@@ -647,7 +647,7 @@
               "metricsets": [
                 "socket_summary"
               ],
-              "period": "10s"
+              "period": "1s"
             }
           },
           {
@@ -658,7 +658,7 @@
             },
             "vars": {
               "period": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "tags": {
@@ -674,7 +674,7 @@
               "metricsets": [
                 "uptime"
               ],
-              "period": "10s"
+              "period": "1s"
             }
           }
         ],
@@ -697,7 +697,7 @@
             },
             "vars": {
               "interval": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "search": {
@@ -721,7 +721,7 @@
             },
             "vars": {
               "interval": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "search": {
@@ -745,7 +745,7 @@
             },
             "vars": {
               "interval": {
-                "value": "10s",
+                "value": "1s",
                 "type": "text"
               },
               "search": {
