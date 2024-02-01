@@ -462,13 +462,17 @@ func (c *enrollCmd) prepareFleetTLS() error {
 	return nil
 }
 
+const (
+	daemonReloadInitBackoff = time.Second
+	daemonReloadMaxBackoff  = time.Minute
+	daemonReloadRetries     = 5
+)
+
 func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
-	signal := make(chan struct{})
-	defer close(signal)
-	backExp := backoff.NewExpBackoff(signal, 1*time.Second, 1*time.Minute)
+	backExp := backoff.NewExpBackoff(ctx.Done(), daemonReloadInitBackoff, daemonReloadMaxBackoff)
 
 	var lastErr error
-	for i := 0; i < 5; i++ {
+	for i := 0; i < daemonReloadRetries; i++ {
 		attempt := i
 
 		c.log.Infof("Restarting agent daemon, attempt %d", attempt)
@@ -486,8 +490,10 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 		lastErr = err
 
 		c.log.Errorf("Restart attempt %d failed: '%s'. Waiting for %s", attempt, err, backExp.NextWait().String())
-		backExp.Wait()
-
+		// backoff Wait returns false if context.Done()
+		if !backExp.Wait() {
+			return ctx.Err()
+		}
 	}
 
 	return fmt.Errorf("could not reload agent's daemon, all retries failed. Last error: %w", lastErr)
