@@ -178,16 +178,19 @@ func PerformUpgrade(
 	if err != nil {
 		return fmt.Errorf("failed to get start agent build version info: %w", err)
 	}
-	startVersion, err := version.ParseVersion(startFixture.Version())
+	startParsedVersion, err := version.ParseVersion(startVersionInfo.Binary.String())
+	if err != nil {
+		return fmt.Errorf("failed to get parsed start agent build version (%s): %w", startVersionInfo.Binary.String(), err)
+	}
+	startVersion, err := version.ParseVersion(startVersionInfo.Binary.Version)
 	if err != nil {
 		return fmt.Errorf("failed to parse version of starting Agent binary: %w", err)
 	}
-
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get end agent build version info: %w", err)
 	}
-	endVersion, err := version.ParseVersion(endFixture.Version())
+	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
 	if err != nil {
 		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
 	}
@@ -229,7 +232,7 @@ func PerformUpgrade(
 	// watcher version never executes and the upgrade details are never populated.
 	upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck = upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck ||
 		endVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) ||
-		startVersion.Less(*version.NewParsedSemVer(8, 10, 0, "", ""))
+		startParsedVersion.Less(*version.NewParsedSemVer(8, 10, 0, "", ""))
 
 	if upgradeOpts.preInstallHook != nil {
 		if err := upgradeOpts.preInstallHook(); err != nil {
@@ -237,11 +240,11 @@ func PerformUpgrade(
 		}
 	}
 
-	logger.Logf("Installing version %q", startVersion.VersionWithPrerelease())
+	logger.Logf("Installing version %q", startParsedVersion.VersionWithPrerelease())
 
 	// install the start agent
 	var nonInteractiveFlag bool
-	if Version_8_2_0.Less(*startVersion) {
+	if Version_8_2_0.Less(*startParsedVersion) {
 		nonInteractiveFlag = true
 	}
 	installOpts := atesting.InstallOpts{
@@ -273,9 +276,9 @@ func PerformUpgrade(
 		}
 	}
 
-	logger.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"", startVersion, startVersionInfo.Binary.Commit, endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
+	logger.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"", startParsedVersion, startVersionInfo.Binary.Commit, endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
 
-	upgradeCmdArgs := []string{"upgrade", endFixture.Version()}
+	upgradeCmdArgs := []string{"upgrade", endVersionInfo.Binary.String()}
 	if upgradeOpts.sourceURI == nil {
 		// no --source-uri set so it comes from the endFixture
 		sourceURI, err := getSourceURI(ctx, endFixture, *upgradeOpts.unprivileged)
@@ -306,7 +309,7 @@ func PerformUpgrade(
 		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-verify")
 	}
 
-	if upgradeOpts.skipDefaultPgp && !startVersion.Less(*Version_8_10_0_SNAPSHOT) {
+	if upgradeOpts.skipDefaultPgp && !startParsedVersion.Less(*Version_8_10_0_SNAPSHOT) {
 		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-default-pgp")
 	}
 

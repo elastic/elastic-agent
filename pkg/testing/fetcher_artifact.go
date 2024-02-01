@@ -65,7 +65,7 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 
 	var uri string
 
-	noBuildVersion, _ := splitBuildID(version)
+	noBuildVersion, buildID := splitBuildID(version)
 
 	if f.snapshotOnly && !strings.HasSuffix(noBuildVersion, "-SNAPSHOT") {
 		noBuildVersion += "-SNAPSHOT"
@@ -85,8 +85,9 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 	return &artifactResult{
 		doer: f.doer,
 		src:  downloadSrc,
-		// this path must have the full version, so the filename contains the build ID
-		path: fmt.Sprintf("elastic-agent-%s-%s", version, suffix),
+		// this path must have the build ID in it, so we don't mix such files with
+		// no build-specific snapshots. If `buildID` is empty, it's just `srcPath`.
+		path: filepath.Join(buildID, srcPath),
 	}, nil
 }
 
@@ -104,8 +105,13 @@ func (r *artifactResult) Name() string {
 // Fetch performs the actual fetch into the provided directory.
 func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error {
 	dst := filepath.Join(dir, r.Name())
+	// the artifact name can contain a subfolder that needs to be created
+	err := os.MkdirAll(filepath.Dir(dst), 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create path %q: %w", dst, err)
+	}
 
-	err := DownloadPackage(ctx, l, r.doer, r.src, dst)
+	err = DownloadPackage(ctx, l, r.doer, r.src, dst)
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}

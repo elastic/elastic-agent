@@ -20,7 +20,6 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/otiai10/copy"
-	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -186,19 +185,17 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 		return err
 	}
 	f.srcPackage = src
+	filename := filepath.Base(src)
+	name, _, err := splitFileType(filename)
+	if err != nil {
+		return err
+	}
 	workDir := f.t.TempDir()
+	finalDir := filepath.Join(workDir, name)
 	err = ExtractArtifact(f.t, src, workDir)
 	if err != nil {
 		return fmt.Errorf("extracting artifact %q in %q: %w", src, workDir, err)
 	}
-
-	// extracted artifact is a directory, we need to know its path to access the binary
-	entries, err := os.ReadDir(workDir)
-	require.NoError(f.t, err)
-	require.Len(f.t, entries, 1, "extracted artifact must be a single directory")
-	require.True(f.t, entries[0].IsDir(), "extracted artifact is not a directory")
-	finalDir := filepath.Join(workDir, entries[0].Name())
-
 	err = f.prepareComponents(finalDir, components...)
 	if err != nil {
 		return err
@@ -717,12 +714,6 @@ func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (A
 	}
 
 	return inspect, err
-}
-
-// Returns the version the fixture was created for.
-// This includes all build metadata, e.g. 8.13.0-SNAPSHOT+tj5ksxdm
-func (f *Fixture) Version() string {
-	return f.version
 }
 
 // ExecVersion executes the version subcommand on the prepared Elastic Agent binary

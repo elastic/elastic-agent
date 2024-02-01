@@ -44,9 +44,10 @@ func TestLocalFetcher(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPathHash), noSnapshotContentHash, 0644))
 
 	buildID := "l5snflwr"
-	buildSnapshotPath := fmt.Sprintf("elastic-agent-%s-SNAPSHOT+%s-%s", baseVersion, buildID, suffix)
+	require.NoError(t, os.MkdirAll(filepath.Join(testdata, buildID), 0755))
+	buildSnapshotPath := filepath.Join(buildID, fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s", baseVersion, suffix))
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, buildSnapshotPath), snapshotContent, 0644))
-	buildSnapshotPathHash := fmt.Sprintf("elastic-agent-%s-SNAPSHOT+%s-%s%s", baseVersion, buildID, suffix, extHash)
+	buildSnapshotPathHash := buildSnapshotPath + extHash
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, buildSnapshotPathHash), snapshotContentHash, 0644))
 
 	tcs := []struct {
