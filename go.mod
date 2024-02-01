@@ -273,8 +273,5 @@ replace (
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
 
-// TODO: remove once https://github.com/elastic/go-sysinfo/pull/199 and new version of library is released.
-replace github.com/elastic/go-sysinfo => github.com/ycombinator/go-sysinfo v0.0.0-20240125195429-01b75c6787f0
-
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
