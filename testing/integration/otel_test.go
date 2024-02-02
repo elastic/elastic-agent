@@ -112,7 +112,7 @@ func TestOtelFileProcessing(t *testing.T) {
 	cfgFilePath := filepath.Join(tempDir, "otel.yml")
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileProcessingConfig), 0600))
 
-	fixture, err := define.NewFixture(t, define.Version(), aTesting.WithAdditionalArgs([]string{"-c", cfgFilePath}))
+	fixture, err := define.NewFixture(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -124,7 +124,7 @@ func TestOtelFileProcessing(t *testing.T) {
 	fixtureWg.Add(1)
 	go func() {
 		defer fixtureWg.Done()
-		err = fixture.RunWithClient(ctx, false, false)
+		err = fixture.RunOtelWithClient(ctx, false, false)
 	}()
 
 	var content []byte
@@ -141,7 +141,7 @@ func TestOtelFileProcessing(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err := fixture.IsHealthy(ctx)
+		err = fixture.IsHealthy(ctx)
 		return err == nil
 	},
 		2*time.Minute, time.Second,
@@ -203,7 +203,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(apmConfig), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, fileName), []byte{}, 0600))
 
-	fixture, err := define.NewFixture(t, define.Version(), aTesting.WithAdditionalArgs([]string{"-c", cfgFilePath}))
+	fixture, err := define.NewFixture(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -257,7 +257,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	var fixtureWg sync.WaitGroup
 	fixtureWg.Add(1)
 	go func() {
-		fixture.RunWithClient(ctx, false, false)
+		fixture.RunOtelWithClient(ctx, false, false)
 		fixtureWg.Done()
 	}()
 
