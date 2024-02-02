@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/elastic/elastic-agent/pkg/features"
+
 	"runtime"
 	"strings"
 
@@ -149,7 +151,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 	}
 
 	info := sysInfo.Info()
-	hostname := util.GetHostName(info, sysInfo, l)
+	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
 	return &ECSMeta{
 		Elastic: &ElasticECSMeta{
@@ -197,7 +199,7 @@ func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}
 	}
 
 	info := sysInfo.Info()
-	hostname := util.GetHostName(info, sysInfo, l)
+	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
 	// Agent
 	meta[agentIDKey] = i.agentID

@@ -9,14 +9,13 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo/types"
 )
 
 // GetHostName returns the host's FQDN if the FDQN feature flag is enabled; otherwise, it
 // returns the OS-provided hostname.
-func GetHostName(hostInfo types.HostInfo, host types.Host, log *logger.Logger) string {
-	if !features.FQDN() {
+func GetHostName(isFqdnFeatureEnabled bool, hostInfo types.HostInfo, host types.Host, log *logger.Logger) string {
+	if !isFqdnFeatureEnabled {
 		return hostInfo.Hostname
 	}
 

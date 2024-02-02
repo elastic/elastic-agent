@@ -137,7 +137,7 @@ func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
 		}
 
 		info := sysInfo.Info()
-		name := util.GetHostName(info, sysInfo, log)
+		name := util.GetHostName(features.FQDN(), info, sysInfo, log)
 
 		return map[string]interface{}{
 			"id":           info.UniqueID,
