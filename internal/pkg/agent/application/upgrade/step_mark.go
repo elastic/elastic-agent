@@ -39,7 +39,7 @@ type UpdateMarker struct {
 	PrevVersion string `json:"prev_version" yaml:"prev_version"`
 	// PrevHash is a hash agent is updated from
 	PrevHash string `json:"prev_hash" yaml:"prev_hash"`
-	// PrevVersionedHome represents the path where the new agent is located relative to top path
+	// PrevVersionedHome represents the path where the old agent is located relative to top path
 	PrevVersionedHome string `json:"prev_versioned_home" yaml:"prev_versioned_home"`
 
 	// Acked is a flag marking whether or not action was acked

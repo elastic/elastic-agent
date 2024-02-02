@@ -102,7 +102,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 	}
 	hash = string(hashBytes[:hashLen])
 	if versionedHome == "" {
-		// if at this point we didn't load the manifest et the versioned to the backup value
+		// if at this point we didn't load the manifest, set the versioned to the backup value
 		versionedHome = createVersionedHomeFromHash(hash)
 	}
 
