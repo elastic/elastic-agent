@@ -44,6 +44,22 @@ service:
       exporters:
         - file`)
 
+var fileInvalidOtelConfig = []byte(`receivers:
+  filelog:
+    include: [ "/var/log/system.log", "/var/log/syslog"  ]
+    start_at: beginning
+
+exporters:
+  file:
+    path: ` + fileProcessingFilename + `
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [nonexistingprocessor]
+      exporters:
+        - file`)
+
 const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error message
 2023-06-20 12:50:00 DEBUG This is a test debug message 2
 2023-06-20 12:51:00 DEBUG This is a test debug message 3
@@ -133,10 +149,7 @@ func TestOtelFileProcessing(t *testing.T) {
 		`"stringValue":"system.log"`, // system.log is being processed
 	})
 
-	// check `elastic-agent otel validate` command works for otel config
-	out, err := fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath})
-	require.NoError(t, err)
-	require.Equal(t, 0, len(out)) // no error printed out
+	validateCommandIsWorking(t, ctx, fixture, tempDir)
 
 	// check `elastic-agent status` returns successfully
 	require.Eventuallyf(t, func() bool {
@@ -179,6 +192,25 @@ func TestOtelFileProcessing(t *testing.T) {
 	cancel()
 	fixtureWg.Wait()
 	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
+}
+
+func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesting.Fixture, tempDir string) {
+	cfgFilePath := filepath.Join(tempDir, "otel-valid.yml")
+	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileProcessingConfig), 0600))
+
+	// check `elastic-agent otel validate` command works for otel config
+	out, err := fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath})
+	require.NoError(t, err)
+	require.Equal(t, 0, len(out)) // no error printed out
+
+	// check `elastic-agent otel validate` command works for invalid otel config
+	cfgFilePath = filepath.Join(tempDir, "otel-invalid.yml")
+	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileInvalidOtelConfig), 0600))
+
+	out, err = fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath})
+	require.Error(t, err)
+	require.False(t, len(out) == 0)
+	require.Contains(t, string(out), `service::pipelines::logs: references processor "nonexistingprocessor" which is not configured`)
 }
 
 func TestOtelAPMIngestion(t *testing.T) {
