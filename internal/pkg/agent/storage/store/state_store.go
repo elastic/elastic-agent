@@ -43,19 +43,19 @@ type StateStore struct {
 	log   *logger.Logger
 	store storeLoad
 	dirty bool
-	state stateT
+	state state
 
 	mx sync.RWMutex
 }
 
-type stateT struct {
+type state struct {
 	action   action
 	ackToken string
 	queue    []action
 }
 
 // actionSerializer is a combined yml serializer for the ActionPolicyChange and ActionUnenroll
-// it is used to read the yaml file and assign the action to stateT.action as we must provide the
+// it is used to read the yaml file and assign the action to state.action as we must provide the
 // underlying struct that provides the action interface.
 type actionSerializer struct {
 	ID         string                 `yaml:"action_id"`
@@ -115,20 +115,20 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 		return nil, err
 	}
 
-	state := stateT{
+	st := state{
 		ackToken: sr.AckToken,
 		queue:    sr.Queue,
 	}
 
 	if sr.Action != nil {
 		if sr.Action.IsDetected != nil {
-			state.action = &fleetapi.ActionUnenroll{
+			st.action = &fleetapi.ActionUnenroll{
 				ActionID:   sr.Action.ID,
 				ActionType: sr.Action.Type,
 				IsDetected: *sr.Action.IsDetected,
 			}
 		} else {
-			state.action = &fleetapi.ActionPolicyChange{
+			st.action = &fleetapi.ActionPolicyChange{
 				ActionID:   sr.Action.ID,
 				ActionType: sr.Action.Type,
 				Policy:     conv.YAMLMapToJSONMap(sr.Action.Policy), // Fix Policy, in order to make it consistent with the policy received from the fleet gateway as nested map[string]interface{}
@@ -139,7 +139,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	return &StateStore{
 		log:   log,
 		store: store,
-		state: state,
+		state: st,
 	}, nil
 }
 

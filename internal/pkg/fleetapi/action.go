@@ -99,10 +99,10 @@ type FleetAction struct {
 	Timeout          int64           `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	Data             json.RawMessage `yaml:"data,omitempty" json:"data,omitempty"`
 	Retry            int             `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty"` // used internally for serialization by elastic-agent.
-	//Agents []string // disabled, fleet-server uses this to generate each agent's actions
-	//Timestamp string // disabled, agent does not care when the document was created
-	//UserID string // disabled, agent does not care
-	//MinimumExecutionDuration int64 // disabled, used by fleet-server for scheduling
+	// Agents []string // disabled, fleet-server uses this to generate each agent's actions
+	// Timestamp string // disabled, agent does not care when the document was created
+	// UserID string // disabled, agent does not care
+	// MinimumExecutionDuration int64 // disabled, used by fleet-server for scheduling
 	Signed *Signed `yaml:"signed,omitempty" json:"signed,omitempty"`
 }
 
@@ -235,6 +235,43 @@ type ActionUpgrade struct {
 	Err              error   `json:"-" yaml:"-" mapstructure:"-"`
 }
 
+type ActionUpgradeYAML struct {
+	ActionID         string  `yaml:"action_id" mapstructure:"id"`
+	ActionType       string  `yaml:"type" mapstructure:"type"`
+	ActionStartTime  string  `json:"start_time" yaml:"start_time,omitempty" mapstructure:"-"` // TODO change to time.Time in unmarshal
+	ActionExpiration string  `json:"expiration" yaml:"expiration,omitempty" mapstructure:"-"`
+	Data             []byte  `json:"data" yaml:"data,omitempty" mapstructure:"-"`
+	Retry            int     `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
+	Signed           *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+	Err              error   `json:"-" yaml:"-" mapstructure:"-"`
+}
+
+type ActionUpgradeData struct {
+	Version   string `json:"version" yaml:"version,omitempty" mapstructure:"-"`
+	SourceURI string `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
+}
+
+func (a *ActionUpgrade) toActionUpgradeYAML() (ActionUpgradeYAML, error) {
+	bs, err := yaml.Marshal(struct {
+		Version   string `json:"version" yaml:"version,omitempty" mapstructure:"-"`
+		SourceURI string `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
+	}{Version: a.Version, SourceURI: a.SourceURI})
+	if err != nil {
+		return ActionUpgradeYAML{}, err
+	}
+
+	return ActionUpgradeYAML{
+		ActionID:         a.ActionID,
+		ActionType:       a.ActionType,
+		ActionStartTime:  a.ActionStartTime,
+		ActionExpiration: a.ActionExpiration,
+		Data:             bs,
+		Retry:            a.Retry,
+		Signed:           a.Signed,
+		Err:              a.Err,
+	}, nil
+}
+
 func (a *ActionUpgrade) String() string {
 	var s strings.Builder
 	s.WriteString("action_id: ")
@@ -328,6 +365,10 @@ func (a *ActionUpgrade) MarshalMap() (map[string]interface{}, error) {
 	var res map[string]interface{}
 	err := mapstructure.Decode(a, &res)
 	return res, err
+}
+
+func (a *ActionUpgrade) MarshalYAML() (interface{}, error) {
+	return a.toActionUpgradeYAML()
 }
 
 // ActionUnenroll is a request for agent to unhook from fleet.
@@ -683,17 +724,25 @@ func (a *Actions) UnmarshalYAML(unmarshal func(interface{}) error) error {
 				Signed:     n.Signed,
 			}
 		case ActionTypeUpgrade:
+
+			data := struct {
+				Version   string `json:"version" yaml:"version,omitempty" mapstructure:"-"`
+				SourceURI string `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
+			}{}
+			if err := yaml.Unmarshal(n.Data, &data); err != nil {
+				return errors.New(err,
+					"fail to decode UPGRADE_ACTION action",
+					errors.TypeConfig)
+			}
+
 			action = &ActionUpgrade{
 				ActionID:         n.ActionID,
 				ActionType:       n.ActionType,
 				ActionStartTime:  n.ActionStartTime,
 				ActionExpiration: n.ActionExpiration,
 				Retry:            n.Retry,
-			}
-			if err := yaml.Unmarshal(n.Data, &action); err != nil {
-				return errors.New(err,
-					"fail to decode UPGRADE_ACTION action",
-					errors.TypeConfig)
+				Version:          data.Version,
+				SourceURI:        data.SourceURI,
 			}
 		case ActionTypeSettings:
 			action = &ActionSettings{
