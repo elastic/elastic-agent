@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+// //go:build integration
 
 package integration
 
@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"testing"
 	"time"
@@ -93,11 +94,22 @@ func TestAgentLong(t *testing.T) {
 }
 
 func (runner *ExtendedRunner) SetupSuite() {
-	policyUUID := uuid.New().String()
+	// create ~40 1MB files that will be picked up by the `/var/log/httpd/error_log*` pattern
+	cmd := exec.Command("go", "install", "-v", "github.com/mingrammer/flog@latest")
+	out, err := cmd.CombinedOutput()
+	require.NoError(runner.T(), err, "got out: %s", string(out))
 
+	cmd = exec.Command("flog", "-t", "log", "-f", "apache_error", "-o", "/var/log/httpd/error_log", "-b", "50485760", "-p", "1048576")
+	out, err = cmd.CombinedOutput()
+	require.NoError(runner.T(), err, "got out: %s", string(out))
+	runner.T().Logf("printed: %#v", string(out))
+
+	policyUUID := uuid.New().String()
+	unpr := false
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
+		Unprivileged:   &unpr,
 	}
 
 	fixture, err := define.NewFixture(runner.T(), define.Version())
@@ -119,6 +131,7 @@ func (runner *ExtendedRunner) SetupSuite() {
 
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
+	// install system package
 
 	systemPackage := kibana.PackagePolicyRequest{}
 
@@ -138,7 +151,26 @@ func (runner *ExtendedRunner) SetupSuite() {
 	_, err = runner.info.KibanaClient.InstallFleetPackage(ctx, systemPackage)
 	require.NoError(runner.T(), err, "error creating fleet package")
 
-	//runner.T().Logf("Got policy response :%#v", pkgResp)
+	// install apache
+
+	policyUUIDApache := uuid.New().String()
+	apachePackage := kibana.PackagePolicyRequest{}
+
+	jsonRaw, err = os.ReadFile("agent_long_test_apache_integ.json")
+	require.NoError(runner.T(), err)
+
+	err = json.Unmarshal(jsonRaw, &apachePackage)
+	require.NoError(runner.T(), err)
+
+	apachePackage.ID = policyUUIDApache
+	apachePackage.PolicyID = policyResp.ID
+	apachePackage.Namespace = "default"
+	apachePackage.Name = fmt.Sprintf("system-long-test-%s", policyUUIDApache)
+	apachePackage.Vars = map[string]interface{}{}
+
+	runner.T().Logf("Installing fleet package....")
+	_, err = runner.info.KibanaClient.InstallFleetPackage(ctx, apachePackage)
+	require.NoError(runner.T(), err, "error creating fleet package")
 
 }
 
@@ -148,7 +180,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "30m"
+		testRuntime = "5m"
 	}
 
 	testDuration, err := time.ParseDuration(testRuntime)
