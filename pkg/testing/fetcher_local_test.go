@@ -37,10 +37,18 @@ func TestLocalFetcher(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, snapshotPath), snapshotContent, 0644))
 	snapshotPathHash := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s%s", baseVersion, suffix, extHash)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, snapshotPathHash), snapshotContentHash, 0644))
+
 	notSnapshotPath := fmt.Sprintf("elastic-agent-%s-%s", baseVersion, suffix)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPath), noSnapshotContent, 0644))
 	notSnapshotPathHash := fmt.Sprintf("elastic-agent-%s-%s%s", baseVersion, suffix, extHash)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPathHash), noSnapshotContentHash, 0644))
+
+	buildID := "l5snflwr"
+	require.NoError(t, os.MkdirAll(filepath.Join(testdata, buildID), 0755))
+	buildSnapshotPath := filepath.Join(buildID, fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s", baseVersion, suffix))
+	require.NoError(t, os.WriteFile(filepath.Join(testdata, buildSnapshotPath), snapshotContent, 0644))
+	buildSnapshotPathHash := buildSnapshotPath + extHash
+	require.NoError(t, os.WriteFile(filepath.Join(testdata, buildSnapshotPathHash), snapshotContentHash, 0644))
 
 	tcs := []struct {
 		name     string
@@ -69,6 +77,12 @@ func TestLocalFetcher(t *testing.T) {
 			name:     "version with snapshot and SnapshotOnly",
 			version:  baseVersion + "-SNAPSHOT",
 			opts:     []localFetcherOpt{WithLocalSnapshotOnly()},
+			want:     snapshotContent,
+			wantHash: snapshotContentHash,
+		}, {
+			name:     "version with snapshot and build ID",
+			version:  baseVersion + "-SNAPSHOT+l5snflwr",
+			opts:     []localFetcherOpt{},
 			want:     snapshotContent,
 			wantHash: snapshotContentHash,
 		},

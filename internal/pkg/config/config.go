@@ -7,7 +7,6 @@ package config
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"gopkg.in/yaml.v2"
@@ -74,7 +73,7 @@ func NewConfigFrom(from interface{}, opts ...interface{}) (*Config, error) {
 		if closer, ok := from.(io.Closer); ok {
 			defer closer.Close()
 		}
-		fData, err := ioutil.ReadAll(in)
+		fData, err := io.ReadAll(in)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +155,7 @@ func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 	}
 	ucfgOpts, local, err := getOptions(opts...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error unpacking logs: %w", err)
 	}
 
 	// remove and unpack each skip keys into its own map with no resolve
@@ -167,21 +166,21 @@ func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 		if c.access().HasField(skip) {
 			subCfg, err := c.access().Child(skip, -1)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error accessing skip key %s: %w", skip, err)
 			}
 			var subUnpacked interface{}
 			if subCfg.IsDict() {
 				var subDict map[string]interface{}
 				err = subCfg.Unpack(&subDict, ucfg.ResolveNOOP)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("error unpacking subdict object in config for skip key %s: %w", skip, err)
 				}
 				subUnpacked = subDict
 			} else if subCfg.IsArray() {
 				var subArr []interface{}
 				err = subCfg.Unpack(&subArr, ucfg.ResolveNOOP)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("error unpacking subarray in config for skip key %s: %w ", skip, err)
 				}
 				subUnpacked = subArr
 			} else {
@@ -189,7 +188,7 @@ func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 			}
 			_, err = c.access().Remove(skip, -1)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error removing skip key %s: %w", skip, err)
 			}
 			skippedKeys[skip] = subUnpacked
 			skippedKeysOrig[skip] = subCfg
@@ -199,7 +198,7 @@ func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 	// perform unpack with the skip keys removed
 	var m map[string]interface{}
 	if err := c.access().Unpack(&m, ucfgOpts...); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error unpacking config to MapStr object: %w", err)
 	}
 
 	// add the skipped keys into the map and back into the config
@@ -209,7 +208,7 @@ func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 	if len(skippedKeysOrig) > 0 {
 		err := c.access().Merge(skippedKeysOrig, ucfg.ResolveNOOP)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error merging config with skipped key config: %w", err)
 		}
 	}
 	return m, nil

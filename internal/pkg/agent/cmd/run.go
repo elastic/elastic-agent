@@ -46,7 +46,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
@@ -61,6 +60,7 @@ const (
 )
 
 type cfgOverrider func(cfg *configuration.Configuration)
+type awaiters []<-chan struct{}
 
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -135,18 +135,11 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
 
-	// detect otel
-	if runAsOtel := otel.IsOtelConfig(ctx, paths.ConfigFile()); runAsOtel {
-		return otel.Run(ctx, cancel, stop, testingMode)
-	}
-
-	// not otel continue as usual
-	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, modifiers...)
-
+	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, false, nil, modifiers...)
 }
 
-func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
-	cfg, err := loadConfig(ctx, override)
+func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, runAsOtel bool, awaiters awaiters, modifiers ...component.PlatformModifier) error {
+	cfg, err := loadConfig(ctx, override, runAsOtel)
 	if err != nil {
 		return err
 	}
@@ -184,7 +177,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	}
 
 	// agent ID needs to stay empty in bootstrap mode
-	createAgentID := true
+	createAgentID := !runAsOtel
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
 		createAgentID = false
 	}
@@ -259,7 +252,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), runAsOtel, modifiers...)
 	if err != nil {
 		return err
 	}
@@ -366,6 +359,9 @@ LOOP:
 	}
 	cancel()
 	err = <-appErr
+	for _, a := range awaiters {
+		<-a // wait for awaiter to be done
+	}
 
 	if logShutdown {
 		l.Info("Shutting down completed.")
@@ -376,7 +372,16 @@ LOOP:
 	return err
 }
 
-func loadConfig(ctx context.Context, override cfgOverrider) (*configuration.Configuration, error) {
+func loadConfig(ctx context.Context, override cfgOverrider, runAsOtel bool) (*configuration.Configuration, error) {
+	if runAsOtel {
+		defaultCfg := configuration.DefaultConfiguration()
+		// disable monitoring to avoid injection of monitoring components
+		// in case inputs are not empty
+		defaultCfg.Settings.MonitoringConfig.Enabled = false
+		defaultCfg.Settings.V1MonitoringEnabled = false
+		return defaultCfg, nil
+	}
+
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
@@ -527,7 +532,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 			errors.M("path", enrollPath)))
 	}
 	logger.Info("Successfully performed delayed enrollment of this Elastic Agent.")
-	return loadConfig(ctx, override)
+	return loadConfig(ctx, override, false)
 }
 
 func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig) (*apm.Tracer, error) {

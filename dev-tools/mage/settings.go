@@ -8,9 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"go/build"
-	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -20,11 +20,13 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"gopkg.in/yaml.v3"
 
 	"github.com/magefile/mage/sh"
 	"golang.org/x/tools/go/vcs"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
 
 const (
@@ -44,7 +46,8 @@ const (
 	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
 
 	// Mapped functions
-	agentPackageVersionMappedFunc = "agent_package_version"
+	agentPackageVersionMappedFunc    = "agent_package_version"
+	agentManifestGeneratorMappedFunc = "manifest"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -92,18 +95,19 @@ var (
 	ManifestURL string
 
 	FuncMap = map[string]interface{}{
-		"beat_doc_branch":             BeatDocBranch,
-		"beat_version":                BeatQualifiedVersion,
-		"commit":                      CommitHash,
-		"commit_short":                CommitHashShort,
-		"date":                        BuildDate,
-		"elastic_beats_dir":           ElasticBeatsDir,
-		"go_version":                  GoVersion,
-		"repo":                        GetProjectRepoInfo,
-		"title":                       func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
-		"tolower":                     strings.ToLower,
-		"contains":                    strings.Contains,
-		agentPackageVersionMappedFunc: AgentPackageVersion,
+		"beat_doc_branch":                BeatDocBranch,
+		"beat_version":                   BeatQualifiedVersion,
+		"commit":                         CommitHash,
+		"commit_short":                   CommitHashShort,
+		"date":                           BuildDate,
+		"elastic_beats_dir":              ElasticBeatsDir,
+		"go_version":                     GoVersion,
+		"repo":                           GetProjectRepoInfo,
+		"title":                          func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
+		"tolower":                        strings.ToLower,
+		"contains":                       strings.Contains,
+		agentPackageVersionMappedFunc:    AgentPackageVersion,
+		agentManifestGeneratorMappedFunc: PackageManifest,
 	}
 )
 
@@ -295,6 +299,40 @@ func AgentPackageVersion() (string, error) {
 	}
 
 	return BeatQualifiedVersion()
+}
+
+func PackageManifest() (string, error) {
+	m := v1.NewManifest()
+	m.Package.Snapshot = Snapshot
+	packageVersion, err := AgentPackageVersion()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent package version: %w", err)
+	}
+	m.Package.Version = packageVersion
+	commitHashShort, err := CommitHashShort()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
+	}
+
+	versionedHomePath := path.Join("data", fmt.Sprintf("%s-%s", BeatName, commitHashShort))
+	m.Package.VersionedHome = versionedHomePath
+	m.Package.PathMappings = []map[string]string{{}}
+	m.Package.PathMappings[0][versionedHomePath] = fmt.Sprintf("data/elastic-agent-%s%s-%s", m.Package.Version, SnapshotSuffix(), commitHashShort)
+	m.Package.PathMappings[0]["manifest.yaml"] = fmt.Sprintf("data/elastic-agent-%s%s-%s/manifest.yaml", m.Package.Version, SnapshotSuffix(), commitHashShort)
+	yamlBytes, err := yaml.Marshal(m)
+	if err != nil {
+		return "", fmt.Errorf("marshaling manifest: %w", err)
+
+	}
+	return string(yamlBytes), nil
+}
+
+func SnapshotSuffix() string {
+	if !Snapshot {
+		return ""
+	}
+
+	return "-SNAPSHOT"
 }
 
 var (
@@ -516,7 +554,7 @@ func (s *BuildVariableSources) GetBeatVersion() (string, error) {
 		return "", err
 	}
 
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return "", fmt.Errorf("failed to read beat version file=%v: %w", file, err)
 	}
@@ -534,7 +572,7 @@ func (s *BuildVariableSources) GetGoVersion() (string, error) {
 		return "", err
 	}
 
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return "", fmt.Errorf("failed to read go version file=%v: %w", file, err)
 	}
@@ -552,7 +590,7 @@ func (s *BuildVariableSources) GetDocBranch() (string, error) {
 		return "", err
 	}
 
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return "", fmt.Errorf("failed to read doc branch file=%v: %w", file, err)
 	}

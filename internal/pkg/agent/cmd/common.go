@@ -42,7 +42,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	}
 
 	// Init version information contained in package version file
-	err := version.InitVersionInformation()
+	err := version.InitVersionError()
 	if err != nil {
 		cmd.PrintErrf("Error initializing version information: %v\n", err)
 	}
@@ -82,6 +82,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
 	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
 	cmd.AddCommand(newValidateCommandWithArgs(args, streams))
+	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)

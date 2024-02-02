@@ -6,7 +6,7 @@ package kubernetes
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,8 +53,8 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 	}
 
 	clusterName := kubernetesClusterName()
-	stdOut := ioutil.Discard
-	stdErr := ioutil.Discard
+	stdOut := io.Discard
+	stdErr := io.Discard
 	if mg.Verbose() {
 		stdOut = os.Stdout
 		stdErr = os.Stderr
@@ -103,8 +103,8 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 
 // Teardown destroys the kubernetes cluster.
 func (m *KindIntegrationTestStep) Teardown(env map[string]string) error {
-	stdOut := ioutil.Discard
-	stdErr := ioutil.Discard
+	stdOut := io.Discard
+	stdErr := io.Discard
 	if mg.Verbose() {
 		stdOut = os.Stdout
 		stdErr = os.Stderr

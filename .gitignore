@@ -58,3 +58,4 @@ fleet.yml.lock
 fleet.yml.old
 pkg/component/fake/component/component
 pkg/component/fake/shipper/shipper
+internal/pkg/agent/install/testblocking/testblocking

@@ -6,7 +6,6 @@ package packer
 
 import (
 	"crypto/rand"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -25,13 +24,13 @@ func TestPacker(t *testing.T) {
 
 	withFiles := func(test tt, fn func(pattern []string, t *testing.T)) func(t *testing.T) {
 		return func(t *testing.T) {
-			d, err := ioutil.TempDir("", "packer")
+			d, err := os.MkdirTemp("", "packer")
 			require.NoError(t, err)
 			defer os.RemoveAll(d)
 
 			for f, v := range test.content {
 				path := filepath.Join(d, f)
-				err := ioutil.WriteFile(path, []byte(v), 0666)
+				err := os.WriteFile(path, []byte(v), 0666)
 				require.NoError(t, err)
 			}
 

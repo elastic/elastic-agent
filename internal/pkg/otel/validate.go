@@ -12,8 +12,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
-func Validate(ctx context.Context, configPath string) error {
-	settings, err := newSettings(configPath, release.Version())
+func Validate(ctx context.Context, configPaths []string) error {
+	settings, err := newSettings(release.Version(), configPaths)
 	if err != nil {
 		return err
 	}
