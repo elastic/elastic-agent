@@ -5,6 +5,7 @@
 package install
 
 import (
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -249,6 +250,8 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir 
 	// collect any symlink we found that need remapping
 	symlinks := map[string]string{}
 
+	var copyErrors []error
+
 	// Start copying the remapped paths first
 	for _, pathMapping := range pathMappings {
 		for packagePath, installedPath := range pathMapping {
@@ -277,8 +280,9 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir 
 		OnSymlink: func(source string) copy.SymlinkAction {
 			target, err := os.Readlink(source)
 			if err != nil {
-				// error reading the link, not much choice to leave it unchanged and hope for the best
-				return copy.Shallow
+				// error reading the link, not much choice to leave it unchanged and collect the error
+				copyErrors = append(copyErrors, fmt.Errorf("unable to read link %q for remapping", source))
+				return copy.Skip
 			}
 
 			// if we find a link, check if its target need to be remapped, in which case skip it for now and save it for
@@ -289,7 +293,8 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir 
 						newTarget := strings.Replace(target, srcPath, dstPath, 1)
 						rel, err := filepath.Rel(srcDir, source)
 						if err != nil {
-							panic(err)
+							copyErrors = append(copyErrors, fmt.Errorf("extracting relative path for %q using %q as base: %w", source, srcDir, err))
+							return copy.Skip
 						}
 						symlinks[rel] = newTarget
 						return copy.Skip
@@ -317,6 +322,10 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir 
 			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", srcDir, topPath),
 			errors.M("source", srcDir), errors.M("destination", topPath),
 		)
+	}
+
+	if len(copyErrors) > 0 {
+		return fmt.Errorf("errors encountered during copy from %q to %q: %w", srcDir, topPath, goerrors.Join(copyErrors...))
 	}
 
 	// Create the remapped symlinks
