@@ -14,8 +14,12 @@ go version
 
 $GOPATH = $(go env GOPATH)
 $env:Path = "$GOPATH\bin;" + $env:Path
+$env:GOTMPDIR = "$GOPATH\tmp"
+New-Item -ItemType Directory -Force -Path $env:GOTMPDIR
 [Environment]::SetEnvironmentVariable("GOPATH", "$GOPATH", [EnvironmentVariableTarget]::Machine)
+[Environment]::SetEnvironmentVariable("GOTMPDIR", "$GOPATH\tmp", [EnvironmentVariableTarget]::Machine)
 [Environment]::SetEnvironmentVariable("Path", "$GOPATH\bin;$env:Path", [EnvironmentVariableTarget]::Machine)
+go env
 
 # Install tools
 go install github.com/magefile/mage
