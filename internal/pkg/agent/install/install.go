@@ -265,7 +265,6 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir 
 				NumOfWorkers: int64(copyConcurrency),
 			})
 			if err != nil {
-
 				return errors.New(
 					err,
 					fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", packagePath, installedPath),
