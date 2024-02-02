@@ -29,7 +29,7 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 		Short: "Start the Elastic Agent in otel mode",
 		Long:  "This command starts the Elastic Agent in otel mode.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfgFiles, err := getConfigFiles(cmd)
+			cfgFiles, err := getConfigFiles(cmd, true)
 			if err != nil {
 				return err
 			}
