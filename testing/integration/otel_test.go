@@ -298,12 +298,30 @@ func TestOtelAPMIngestion(t *testing.T) {
 		fixtureWg.Done()
 	}()
 
+	// wait for apm to start
 	err = logWatcher.WaitForKeys(context.Background(),
 		10*time.Minute,
 		500*time.Millisecond,
 		apmReadyLog,
 	)
 	require.NoError(t, err, "APM not initialized")
+
+	// wait for otel collector to start
+	require.Eventuallyf(t, func() bool {
+		// This will return errors until it connects to the agent,
+		// they're mostly noise because until the agent starts running
+		// we will get connection errors. If the test fails
+		// the agent logs will be present in the error message
+		// which should help to explain why the agent was not
+		// healthy.
+		err = fixture.IsHealthy(ctx)
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
+		err,
+	)
+
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, fileName), []byte(apmProcessingContent), 0600))
 
 	// check index
