@@ -23,7 +23,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/magefile/mage/sh"
-	"golang.org/x/tools/go/vcs"
+	"golang.org/x/tools/go/vcs" //nolint:staticcheck // this deprecation will be handled in https://github.com/elastic/elastic-agent/issues/4138
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
