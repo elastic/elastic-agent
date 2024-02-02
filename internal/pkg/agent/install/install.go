@@ -110,21 +110,11 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 			errors.M("directory", filepath.Dir(topPath)))
 	}
 
-	manifestFile, err := os.Open("manifest.yaml")
+	manifest, err := readPackageManifest(dir)
 	if err != nil {
-		return utils.FileOwner{}, errors.New(
-			err,
-			fmt.Sprintf("failed to open package manifest file (%s)", "manifest.yaml"),
-			errors.M("file", "manifest.yaml"))
+		return utils.FileOwner{}, fmt.Errorf("reading package manifest: %w", err)
 	}
-	defer manifestFile.Close()
-	manifest, err := v1.ParseManifest(manifestFile)
-	if err != nil {
-		return utils.FileOwner{}, errors.New(
-			err,
-			fmt.Sprintf("failed to parse package manifest file contents (%s)", "manifest.yaml"),
-			errors.M("file", "manifest.yaml"))
-	}
+
 	pathMappings := manifest.Package.PathMappings
 
 	pt.Describe("Copying install files")
@@ -223,6 +213,21 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	pt.Describe("Installed service")
 
 	return ownership, nil
+}
+
+func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error) {
+	manifestFilePath := filepath.Join(extractedPackageDir, "manifest.yaml")
+	manifestFile, err := os.Open(manifestFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open package manifest file (%s): %w", manifestFilePath, err)
+	}
+	defer manifestFile.Close()
+	manifest, err := v1.ParseManifest(manifestFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse package manifest file %q contents: %w", manifestFilePath, err)
+	}
+
+	return manifest, nil
 }
 
 func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, dir string, topPath string) error {
