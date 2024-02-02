@@ -24,6 +24,7 @@ func GetHostName(isFqdnFeatureEnabled bool, hostInfo types.HostInfo, host types.
 
 	fqdn, err := host.FQDNWithContext(ctx)
 	if err != nil {
+		// If we are unable to lookup the FQDN, we fallback to the OS-provided hostname
 		log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostInfo.Hostname)
 		return hostInfo.Hostname
 	}
