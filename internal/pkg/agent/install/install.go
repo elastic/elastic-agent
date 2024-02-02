@@ -230,7 +230,7 @@ func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error
 	return manifest, nil
 }
 
-func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, dir string, topPath string) error {
+func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir string, topPath string) error {
 	// copy source into install path
 	//
 	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
@@ -244,13 +244,17 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, dir str
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 
+	// these are needed to keep track of what we already copied
 	copiedFiles := map[string]struct{}{}
+	// collect any symlink we found that need remapping
 	symlinks := map[string]string{}
 
+	// Start copying the remapped paths first
 	for _, pathMapping := range pathMappings {
 		for packagePath, installedPath := range pathMapping {
+			// flag the original path as handled
 			copiedFiles[packagePath] = struct{}{}
-			err := copy.Copy(filepath.Join(dir, packagePath), filepath.Join(topPath, installedPath), copy.Options{
+			err := copy.Copy(filepath.Join(srcDir, packagePath), filepath.Join(topPath, installedPath), copy.Options{
 				OnSymlink: func(_ string) copy.SymlinkAction {
 					return copy.Shallow
 				},
@@ -268,20 +272,22 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, dir str
 		}
 	}
 
-	err := copy.Copy(dir, topPath, copy.Options{
+	// copy the remaining files excluding overlaps with the mapped paths
+	err := copy.Copy(srcDir, topPath, copy.Options{
 		OnSymlink: func(source string) copy.SymlinkAction {
-
 			target, err := os.Readlink(source)
 			if err != nil {
 				// error reading the link, not much choice to leave it unchanged and hope for the best
 				return copy.Shallow
 			}
 
+			// if we find a link, check if its target need to be remapped, in which case skip it for now and save it for
+			// later creation with the remapped target
 			for _, pathMapping := range pathMappings {
 				for srcPath, dstPath := range pathMapping {
 					if strings.HasPrefix(target, srcPath) {
 						newTarget := strings.Replace(target, srcPath, dstPath, 1)
-						rel, err := filepath.Rel(dir, source)
+						rel, err := filepath.Rel(srcDir, source)
 						if err != nil {
 							panic(err)
 						}
@@ -294,11 +300,11 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, dir str
 			return copy.Shallow
 		},
 		Skip: func(srcinfo os.FileInfo, src, dest string) (bool, error) {
-			relPath, err := filepath.Rel(dir, src)
+			relPath, err := filepath.Rel(srcDir, src)
 			if err != nil {
 				return false, fmt.Errorf("calculating relative path for %s: %w", src, err)
 			}
-
+			// check if we already handled this path as part of the mappings: if we did, skip it
 			_, ok := copiedFiles[relPath]
 			return ok, nil
 		},
@@ -308,12 +314,12 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, dir str
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
-			errors.M("source", dir), errors.M("destination", topPath),
+			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", srcDir, topPath),
+			errors.M("source", srcDir), errors.M("destination", topPath),
 		)
 	}
 
-	//Fix the symlinks
+	// Create the remapped symlinks
 	for src, target := range symlinks {
 		absSrcPath := filepath.Join(topPath, src)
 		err := os.Symlink(target, absSrcPath)
