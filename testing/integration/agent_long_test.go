@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sajari/regression"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/exp/slices"
@@ -39,8 +40,9 @@ type ExtendedRunner struct {
 }
 
 type ComponentMetrics struct {
-	Memory  MemoryMetrics  `mapstructure:"memstats"`
-	Handles HandlesMetrics `mapstructure:"handles"`
+	Memory        MemoryMetrics  `mapstructure:"memstats"`
+	Handles       HandlesMetrics `mapstructure:"handles"`
+	UnixTimestamp int64
 }
 
 // TestComponent is used as a key in our map of component metrics
@@ -180,7 +182,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "5m"
+		testRuntime = "6m"
 	}
 
 	testDuration, err := time.ParseDuration(testRuntime)
@@ -235,24 +237,37 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 			metrics.Handles.Open = systemData.Handles.Open
 		}
 
+		timestamp, err := time.Parse(time.RFC3339Nano, doc.Source["@timestamp"].(string))
+		require.NoError(runner.T(), err)
+
+		metrics.UnixTimestamp = timestamp.UnixMicro()
+
 		if foundComp, ok := componentCollection[toComponent]; ok {
 			updated := append(foundComp, metrics)
 			componentCollection[toComponent] = updated
 		} else {
 			componentCollection[toComponent] = []ComponentMetrics{metrics}
 		}
+
 	}
 
 	handleLimit := 500
-	// after we get all the metrics, sort by memory/handles to see if we've passed a threshhold
+	// after we get all the metrics, sort by memory/handles to see if we've passed a threshold
 	for comp, metrics := range componentCollection {
+
+		runner.T().Logf("===============================")
+
+		reg := new(regression.Regression)
+		reg.SetObserved(fmt.Sprintf("%s handle usage", comp.Dataset))
+		reg.SetVar(0, "open handles")
+		points := regression.DataPoints{}
 		// we're using Sys from `runtime.ReadMemStats` for this. From the `runtime` godoc:
 		//
 		//Sys is the sum of the XSys fields below.
 		//Sys measures the virtual address space reserved by the Go runtime for the heap, stacks, and other internal data structures.
 		//It's likely that not all of the virtual address space is backed by physical memory at any given moment, though in general it all was at some point.
 
-		// At some point in the future, this is where we'll fail the test if our metrics go over a given threshhold.
+		// At some point in the future, this is where we'll fail the test if our metrics go over a given threshold.
 		slices.SortFunc(metrics, func(a, b ComponentMetrics) int { return cmp.Compare(a.Memory.MemorySys, b.Memory.MemorySys) })
 		highestMem := metrics[len(metrics)-1].Memory.MemorySys
 		runner.T().Logf("Top memory usage for %s: %d bytes", comp.Dataset, highestMem)
@@ -268,6 +283,20 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 			limitPct := (float64(highestHandleOpen) / float64(softLimit)) * 100
 			runner.T().Logf("Percent of handle soft limit: %f", limitPct)
 		}
+
+		for _, metric := range metrics {
+			points = append(points, regression.DataPoint(float64(metric.Handles.Open), []float64{float64(metric.UnixTimestamp)}))
+		}
+
+		reg.Train(points...)
+		err = reg.Run()
+		require.NoError(runner.T(), err)
+
+		runner.T().Logf("formula: %v", reg.Formula)
+		runner.T().Logf("regression: %s", reg)
+		runner.T().Logf("Coeff: %#v", reg.GetCoeffs())
+
+		runner.T().Logf("===============================")
 	}
 
 }
