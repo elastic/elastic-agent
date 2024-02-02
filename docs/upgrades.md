@@ -90,3 +90,21 @@ has been built from and where to find the versioned home of the elastic agent wi
 Another section lists the path mappings that must be applied by an elastic-agent that is aware of the package manifest
 (version >8.13.0): these path mappings allow the incoming agent version to have some control over where the files in
 package will be stored on disk.
+
+#### Upgrading without the manifest
+
+Legacy elastic-agent upgrade is a pretty straightforward affair:
+- Download the agent package to use for upgrade
+- Open the .zip or .tar.gz archive and iterate over the files
+  - Look for the elastic-agent commit file to retrieve the actual hash of the agent version we want to install
+  - Extract any package file under `/data` under the installed agent `/data` directory
+- After extraction check if the hash we read from the package matches with the one from the current agent:
+  - if it's the same hash the upgrade fails because we are trying to upgrade to the same version
+  - if we extracted a package with a different hash, the upgrade keeps going
+- Copy the elastic agent action store and components run directory into the new agent directories
+- Rotate the symlink in the top directory to point to the new agent executable
+- Write the update marker containing the information about the new and old agent versions in `data` directory
+- Invoke the watcher `elastic-agent watch` command to ensure that the new version of agent works correctly after restart
+- Shutdown current agent and its command components, copy components state once again and restart
+
+#### Upgrading using the manifest
