@@ -101,10 +101,28 @@ Legacy elastic-agent upgrade is a pretty straightforward affair:
 - After extraction check if the hash we read from the package matches with the one from the current agent:
   - if it's the same hash the upgrade fails because we are trying to upgrade to the same version
   - if we extracted a package with a different hash, the upgrade keeps going
-- Copy the elastic agent action store and components run directory into the new agent directories
-- Rotate the symlink in the top directory to point to the new agent executable
-- Write the update marker containing the information about the new and old agent versions in `data` directory
+- Copy the elastic agent action store and components run directory into the new agent directories `elastic-agent-<hash>`
+- Rotate the symlink in the top directory to point to the new agent executable `data/elastic-agent-<hash>/elastic-agent`
+- Write the update marker containing the information about the new and old agent versions/hashes in `data` directory
 - Invoke the watcher `elastic-agent watch` command to ensure that the new version of agent works correctly after restart
 - Shutdown current agent and its command components, copy components state once again and restart
 
 #### Upgrading using the manifest
+
+Upgrading using the manifest allows for the new version to pass along some information about the package to the upgrading agent.
+The new process looks like this:
+- Download the elastic-agent package to use for upgrade
+- Extract package metadata from the new elastic-agent package (manifest and hash):
+  - if the package has a manifest we extract `version` and `snapshot` flag as declared by the package
+  - if there is no manifest for the package we extract the version and snapshot for the version passed to the upgrade
+  - hash from the agent commit file (always present in the package)
+- compare the tuple of new `(version, snapshot, hash)` to the current `(version, snapshot, hash)`: if they are the same
+  the upgrade fails because we are trying to upgrade to the same version as current
+- Extract any package file (after mapping it using file mappings in manifest if present) that should go under `/data`.
+  Return the new versionedHome (where the new version of agent has its files, returned as path relative to the top directory)
+- Copy the elastic agent action store and components run directory into the new agent in `<versionedHome>/run`
+- Write the update marker containing the information about the new and old agent version, hash and home in `data` directory
+- Invoke the watcher `elastic-agent watch` command to ensure that the new version of agent works correctly after restart:
+  - we invoke the current agent binary if the new version < 8.13.0 (needed to make sure it supports the paths written in the update marker)
+  - we invoke the new agent binary if the new version > 8.13.0
+- Shutdown current agent and its command components, copy components state once again and restart
