@@ -133,6 +133,11 @@ func TestOtelFileProcessing(t *testing.T) {
 		`"stringValue":"system.log"`, // system.log is being processed
 	})
 
+	// check `elastic-agent otel validate` command works for otel config
+	out, err := fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath})
+	require.NoError(t, err)
+	require.Equal(t, 0, len(out)) // no error printed out
+
 	// check `elastic-agent status` returns successfully
 	require.Eventuallyf(t, func() bool {
 		// This will return errors until it connects to the agent,
