@@ -7,7 +7,6 @@ package info
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"runtime"
 	"strings"
@@ -15,8 +14,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/features"
 
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
@@ -150,18 +149,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 	}
 
 	info := sysInfo.Info()
-	hostname := info.Hostname
-	if features.FQDN() {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-		defer cancel()
-
-		fqdn, err := sysInfo.FQDNWithContext(ctx)
-		if err != nil {
-			l.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
-		} else {
-			hostname = fqdn
-		}
-	}
+	hostname := util.GetHostName(info, sysInfo, l)
 
 	return &ECSMeta{
 		Elastic: &ElasticECSMeta{
@@ -209,18 +197,7 @@ func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}
 	}
 
 	info := sysInfo.Info()
-	hostname := info.Hostname
-	if features.FQDN() {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-		defer cancel()
-
-		fqdn, err := sysInfo.FQDNWithContext(ctx)
-		if err != nil {
-			l.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
-		} else {
-			hostname = fqdn
-		}
-	}
+	hostname := util.GetHostName(info, sysInfo, l)
 
 	// Agent
 	meta[agentIDKey] = i.agentID

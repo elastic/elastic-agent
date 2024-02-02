@@ -11,15 +11,14 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/elastic/go-sysinfo"
-	"github.com/elastic/go-sysinfo/types"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/go-sysinfo"
 )
 
 const (
@@ -138,7 +137,7 @@ func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
 		}
 
 		info := sysInfo.Info()
-		name := getHostName(info, sysInfo, log)
+		name := util.GetHostName(info, sysInfo, log)
 
 		return map[string]interface{}{
 			"id":           info.UniqueID,
@@ -149,21 +148,4 @@ func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
 			"mac":          info.MACs,
 		}, nil
 	}
-}
-
-func getHostName(hostInfo types.HostInfo, host types.Host, log *logger.Logger) string {
-	if !features.FQDN() {
-		return hostInfo.Hostname
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-
-	fqdn, err := host.FQDNWithContext(ctx)
-	if err != nil {
-		log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostInfo.Hostname)
-		return hostInfo.Hostname
-	}
-
-	return fqdn
 }
