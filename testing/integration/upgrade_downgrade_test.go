@@ -54,12 +54,52 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	// working correctly and agent is not only picking the latest build.
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
 	require.NoError(t, err)
+<<<<<<< HEAD
 	if len(builds.Builds) < 2 {
 		t.Skipf("not enough SNAPSHOT builds exist for version %s. Found %d", latestSnapshotVersion.VersionWithPrerelease(), len(builds.Builds))
 	}
 
 	// find the specific build to use for the test
 	upgradeVersionString := builds.Builds[1]
+=======
+	startVersion, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+
+	// We need to find a build which is not the latest (so, we can make sure we address it by a build ID
+	// in the version prefix, e.g. x.y.z-SNAPSHOT-<buildid>) and does not have the same commit hash
+	// as the currently running binary (so, we don't have a file system collision).
+	// Multiple builds can have different IDs but the same commit hash.
+	preReleaseVersion := latestSnapshotVersion.VersionWithPrerelease()
+	resp, err := aac.GetBuildsForVersion(ctx, preReleaseVersion)
+	require.NoError(t, err)
+
+	if len(resp.Builds) < 2 {
+		t.Skipf("need at least 2 builds in the version %s", latestSnapshotVersion.VersionWithPrerelease())
+		return
+	}
+
+	t.Logf("found %d builds for version %q", len(resp.Builds), preReleaseVersion)
+
+	t.Logf("looking for a build that does not match the current commit hash %q", startVersion.Binary.Commit)
+	var upgradeVersionString string
+	for _, buildID := range resp.Builds[1:] {
+		details, err := aac.GetBuildDetails(ctx, preReleaseVersion, buildID)
+		require.NoError(t, err)
+		if details.Build.Projects[artifactElasticAgentProject].CommitHash != startVersion.Binary.Commit {
+			upgradeVersionString = buildID
+			break
+		}
+		t.Logf("build %q matches the current commit hash %q, skipping...", buildID, startVersion.Binary.Commit)
+	}
+
+	if upgradeVersionString == "" {
+		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", latestSnapshotVersion.VersionWithPrerelease())
+		return
+	}
+
+	t.Logf("found build %q available for testing", upgradeVersionString)
+
+>>>>>>> 84e6bc1a64 (Add support fetching artefacts for a build ID (#4163))
 	buildFragments := strings.Split(upgradeVersionString, "-")
 	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
 	endParsedVersion := version.NewParsedSemVer(
