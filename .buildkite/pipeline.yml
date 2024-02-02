@@ -3,6 +3,8 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
+  ASDF_MAGE_VERSION: '1.14.0'
+
 steps:
   - label: "check-ci"
     key: "check-ci"
