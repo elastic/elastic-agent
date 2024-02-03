@@ -67,6 +67,12 @@ sequenceDiagram
 Starting from version 8.13.0 an additional file `manifest.yaml` is present in elastic-agent packages.
 The purpose of this file is to present some metadata and package information to be used during install/upgrade operations.
 
+The first enhancement that makes use of this package manifest is [#2579](https://github.com/elastic/elastic-agent/issues/2579)
+as we use the manifest to map the package directory structure (based on agent commit hash) into one that takes also the
+agent version into account. This allows releasing versions of the agent package where only the component versions change,
+with the agent commit unchanged.
+
+
 The [structure](../pkg/api/v1/manifest.go) of such manifest is defined in the [api/v1 package](../pkg/api/v1/).
 The manifest data is generated during packaging and the file is added to the package files. This is an example of a
 complete manifest:
