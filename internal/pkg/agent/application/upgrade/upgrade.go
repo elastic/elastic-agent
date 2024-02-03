@@ -7,6 +7,7 @@ package upgrade
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -169,46 +170,65 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	det.SetState(details.StateExtracting)
-
-	newHash, err := u.unpack(version, archivePath, paths.Data())
+	// TODO: add check that no archive files end up in the current versioned home
+	unpackRes, err := u.unpack(version, archivePath, paths.Data())
 	if err != nil {
 		return nil, err
 	}
 
+	newHash := unpackRes.Hash
 	if newHash == "" {
 		return nil, errors.New("unknown hash")
 	}
 
-	if strings.HasPrefix(release.Commit(), newHash) {
-		u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
-		return nil, nil
+	if unpackRes.VersionedHome == "" {
+		// FIXME this should be treated as an error
+		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
 	}
 
-	if err := copyActionStore(u.log, newHash); err != nil {
+	//if strings.HasPrefix(release.Commit(), newHash) {
+	//	u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
+	//	return nil, nil
+	//}
+
+	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
+
+	if err := copyActionStore(u.log, newHome); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
-	if err := copyRunDirectory(u.log, newHash); err != nil {
+	newRunPath := filepath.Join(newHome, "run")
+	oldRunPath := filepath.Join(paths.Home(), "run")
+
+	if err := copyRunDirectory(u.log, oldRunPath, newRunPath); err != nil {
 		return nil, errors.New(err, "failed to copy run directory")
 	}
 
 	det.SetState(details.StateReplacing)
 
-	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
+	// create symlink to the <new versioned-home>/elastic-agent
+	hashedDir := unpackRes.VersionedHome
+
+	symlinkPath := filepath.Join(paths.Top(), agentName)
+
+	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
+	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
+
+	if err := changeSymlinkInternal(u.log, symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
-		rollbackInstall(ctx, u.log, newHash)
+		rollbackInstall(ctx, u.log, hashedDir)
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, u.log, newHash, action, det); err != nil {
+	if err := u.markUpgrade(ctx, u.log, version, unpackRes.Hash, unpackRes.VersionedHome, action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackInstall(ctx, u.log, newHash)
+		rollbackInstall(ctx, u.log, hashedDir)
 		return nil, err
 	}
 
 	if err := InvokeWatcher(u.log); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackInstall(ctx, u.log, newHash)
+		rollbackInstall(ctx, u.log, hashedDir)
 		return nil, err
 	}
 
@@ -269,15 +289,19 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	return u.settings.SourceURI
 }
 
-func rollbackInstall(ctx context.Context, log *logger.Logger, hash string) {
-	os.RemoveAll(filepath.Join(paths.Data(), fmt.Sprintf("%s-%s", agentName, hash)))
+func rollbackInstall(ctx context.Context, log *logger.Logger, versionedHome string) {
+	err := os.RemoveAll(filepath.Join(paths.Top(), versionedHome))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		// TODO should this be a warning or an error ?
+		log.Warnw("error rolling back install", "error.message", err)
+	}
+	// FIXME update
 	_ = ChangeSymlink(ctx, log, release.ShortCommit())
 }
 
-func copyActionStore(log *logger.Logger, newHash string) error {
+func copyActionStore(log *logger.Logger, newHome string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
-	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
 	log.Infow("Copying action store", "new_home_path", newHome)
 
 	for _, currentActionStorePath := range storePaths {
@@ -300,9 +324,7 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 	return nil
 }
 
-func copyRunDirectory(log *logger.Logger, newHash string) error {
-	newRunPath := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash), "run")
-	oldRunPath := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, release.ShortCommit()), "run")
+func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 

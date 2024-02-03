@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -24,8 +25,13 @@ const markerFilename = ".update-marker"
 
 // UpdateMarker is a marker holding necessary information about ongoing upgrade.
 type UpdateMarker struct {
+	// Version represents the version the agent is upgraded to
+	Version string `json:"version" yaml:"version"`
 	// Hash agent is updated to
 	Hash string `json:"hash" yaml:"hash"`
+	// VersionedHome represents the path where the new agent is located relative to top path
+	VersionedHome string `json:"versioned_home" yaml:"versioned_home"`
+
 	//UpdatedOn marks a date when update happened
 	UpdatedOn time.Time `json:"updated_on" yaml:"updated_on"`
 
@@ -33,6 +39,8 @@ type UpdateMarker struct {
 	PrevVersion string `json:"prev_version" yaml:"prev_version"`
 	// PrevHash is a hash agent is updated from
 	PrevHash string `json:"prev_hash" yaml:"prev_hash"`
+	// PrevVersionedHome represents the path where the old agent is located relative to top path
+	PrevVersionedHome string `json:"prev_versioned_home" yaml:"prev_versioned_home"`
 
 	// Acked is a flag marking whether or not action was acked
 	Acked  bool                    `json:"acked" yaml:"acked"`
@@ -83,42 +91,55 @@ func convertToActionUpgrade(a *MarkerActionUpgrade) *fleetapi.ActionUpgrade {
 }
 
 type updateMarkerSerializer struct {
-	Hash        string               `yaml:"hash"`
-	UpdatedOn   time.Time            `yaml:"updated_on"`
-	PrevVersion string               `yaml:"prev_version"`
-	PrevHash    string               `yaml:"prev_hash"`
-	Acked       bool                 `yaml:"acked"`
-	Action      *MarkerActionUpgrade `yaml:"action"`
-	Details     *details.Details     `yaml:"details"`
+	Version           string               `yaml:"version"`
+	Hash              string               `yaml:"hash"`
+	VersionedHome     string               `yaml:"versioned_home"`
+	UpdatedOn         time.Time            `yaml:"updated_on"`
+	PrevVersion       string               `yaml:"prev_version"`
+	PrevHash          string               `yaml:"prev_hash"`
+	PrevVersionedHome string               `yaml:"prev_versioned_home"`
+	Acked             bool                 `yaml:"acked"`
+	Action            *MarkerActionUpgrade `yaml:"action"`
+	Details           *details.Details     `yaml:"details"`
 }
 
 func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 	return &updateMarkerSerializer{
-		Hash:        m.Hash,
-		UpdatedOn:   m.UpdatedOn,
-		PrevVersion: m.PrevVersion,
-		PrevHash:    m.PrevHash,
-		Acked:       m.Acked,
-		Action:      convertToMarkerAction(m.Action),
-		Details:     m.Details,
+		Version:           m.Version,
+		Hash:              m.Hash,
+		VersionedHome:     m.VersionedHome,
+		UpdatedOn:         m.UpdatedOn,
+		PrevVersion:       m.PrevVersion,
+		PrevHash:          m.PrevHash,
+		PrevVersionedHome: m.PrevVersionedHome,
+		Acked:             m.Acked,
+		Action:            convertToMarkerAction(m.Action),
+		Details:           m.Details,
 	}
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash string, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
-	prevVersion := release.Version()
+func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, version, hash, versionedHome string, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
+	prevVersion := release.VersionWithSnapshot()
 	prevHash := release.Commit()
+	prevVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+	if err != nil {
+		return fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
 	if len(prevHash) > hashLen {
 		prevHash = prevHash[:hashLen]
 	}
 
 	marker := &UpdateMarker{
-		Hash:        hash,
-		UpdatedOn:   time.Now(),
-		PrevVersion: prevVersion,
-		PrevHash:    prevHash,
-		Action:      action,
-		Details:     upgradeDetails,
+		Version:           version,
+		Hash:              hash,
+		VersionedHome:     versionedHome,
+		UpdatedOn:         time.Now(),
+		PrevVersion:       prevVersion,
+		PrevHash:          prevHash,
+		PrevVersionedHome: prevVersionedHome,
+		Action:            action,
+		Details:           upgradeDetails,
 	}
 
 	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
@@ -183,13 +204,16 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 	}
 
 	return &UpdateMarker{
-		Hash:        marker.Hash,
-		UpdatedOn:   marker.UpdatedOn,
-		PrevVersion: marker.PrevVersion,
-		PrevHash:    marker.PrevHash,
-		Acked:       marker.Acked,
-		Action:      convertToActionUpgrade(marker.Action),
-		Details:     marker.Details,
+		Version:           marker.Version,
+		Hash:              marker.Hash,
+		VersionedHome:     marker.VersionedHome,
+		UpdatedOn:         marker.UpdatedOn,
+		PrevVersion:       marker.PrevVersion,
+		PrevHash:          marker.PrevHash,
+		PrevVersionedHome: marker.PrevVersionedHome,
+		Acked:             marker.Acked,
+		Action:            convertToActionUpgrade(marker.Action),
+		Details:           marker.Details,
 	}, nil
 }
 
@@ -198,13 +222,16 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 // file is immediately flushed to persistent storage.
 func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
 	makerSerializer := &updateMarkerSerializer{
-		Hash:        marker.Hash,
-		UpdatedOn:   marker.UpdatedOn,
-		PrevVersion: marker.PrevVersion,
-		PrevHash:    marker.PrevHash,
-		Acked:       marker.Acked,
-		Action:      convertToMarkerAction(marker.Action),
-		Details:     marker.Details,
+		Version:           marker.Version,
+		Hash:              marker.Hash,
+		VersionedHome:     marker.VersionedHome,
+		UpdatedOn:         marker.UpdatedOn,
+		PrevVersion:       marker.PrevVersion,
+		PrevHash:          marker.PrevHash,
+		PrevVersionedHome: marker.PrevVersionedHome,
+		Acked:             marker.Acked,
+		Action:            convertToMarkerAction(marker.Action),
+		Details:           marker.Details,
 	}
 	markerBytes, err := yaml.Marshal(makerSerializer)
 	if err != nil {
