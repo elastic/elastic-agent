@@ -135,26 +135,28 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 
 		if f.FileInfo().IsDir() {
 			log.Debugw("Unpacking directory", "archive", "zip", "file.path", dstPath)
-			// remove any world permissions from the directory
+			// check if the directory already exists
 			_, err = os.Stat(dstPath)
 			if errors.Is(err, fs.ErrNotExist) {
+				// the directory does not exist, create it and any non-existing parent directory with the same permissions
 				if err := os.MkdirAll(dstPath, f.Mode().Perm()&0770); err != nil {
 					return fmt.Errorf("creating directory %q: %w", dstPath, err)
 				}
 			} else if err != nil {
 				return fmt.Errorf("stat() directory %q: %w", dstPath, err)
 			} else {
-				// set the appropriate permissions
-				err = os.Chmod(dstPath, f.Mode().Perm()&0o770)
+				// directory already exists, set the appropriate permissions
+				err = os.Chmod(dstPath, f.Mode().Perm()&0770)
 				if err != nil {
-					return fmt.Errorf("setting permissions %O for directory %q: %w", f.Mode().Perm()&0o770, dstPath, err)
+					return fmt.Errorf("setting permissions %O for directory %q: %w", f.Mode().Perm()&0770, dstPath, err)
 				}
 			}
 
 			_ = os.MkdirAll(dstPath, f.Mode()&0770)
 		} else {
 			log.Debugw("Unpacking file", "archive", "zip", "file.path", dstPath)
-			// remove any world permissions from the directory/file
+			// create non-existing containing folders with 0770 permissions right now, we'll fix the permission of each
+			// directory as we come across them while processing the other package entries
 			_ = os.MkdirAll(filepath.Dir(dstPath), 0770)
 			f, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()&0770)
 			if err != nil {
@@ -273,6 +275,7 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 		fileName := strings.TrimPrefix(f.Name, fileNamePrefix)
 
 		if fileName == agentCommitFile {
+			// we already loaded the hash, skip this one
 			continue
 		}
 
@@ -300,9 +303,9 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 		switch {
 		case mode.IsRegular():
 			log.Debugw("Unpacking file", "archive", "tar", "file.path", abs)
-			// just to be sure, it should already be created by Dir type
-			// remove any world permissions from the directory
-			if err = os.MkdirAll(filepath.Dir(abs), 0o750); err != nil {
+			// create non-existing containing folders with 0750 permissions right now, we'll fix the permission of each
+			// directory as we come across them while processing the other package entries
+			if err = os.MkdirAll(filepath.Dir(abs), 0750); err != nil {
 				return UnpackResult{}, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
@@ -322,19 +325,20 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 			}
 		case mode.IsDir():
 			log.Debugw("Unpacking directory", "archive", "tar", "file.path", abs)
-			// remove any world permissions from the directory
+			// check if the directory already exists
 			_, err = os.Stat(abs)
 			if errors.Is(err, fs.ErrNotExist) {
+				// the directory does not exist, create it and any non-existing parent directory with the same permissions
 				if err := os.MkdirAll(abs, mode.Perm()&0770); err != nil {
 					return UnpackResult{}, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 				}
 			} else if err != nil {
 				return UnpackResult{}, errors.New(err, "TarInstaller: stat() directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			} else {
-				// set the appropriate permissions
-				err = os.Chmod(abs, mode.Perm()&0o770)
+				// directory already exists, set the appropriate permissions
+				err = os.Chmod(abs, mode.Perm()&0770)
 				if err != nil {
-					return UnpackResult{}, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0o770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+					return UnpackResult{}, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 				}
 			}
 		default:
