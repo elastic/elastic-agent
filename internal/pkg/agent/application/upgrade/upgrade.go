@@ -287,7 +287,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	minParsedVersionForNewUpdateMarker := agtversion.NewParsedSemVer(8, 13, 0, "", "")
 	var watcherExecutable string
 	if parsedVersion.Less(*minParsedVersionForNewUpdateMarker) {
-		// use the current agent executable for watch
+		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
 		watcherExecutable = paths.BinaryPath(paths.VersionedHome(paths.Top()), agentName)
 	} else {
 		// use the new agent executable as it should be able to parse the new update marker
