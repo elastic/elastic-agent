@@ -9,6 +9,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -17,8 +18,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
@@ -113,7 +112,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 		}
 		defer func() {
 			if cerr := rc.Close(); cerr != nil {
-				err = multierror.Append(err, cerr)
+				err = goerrors.Join(err, cerr)
 			}
 		}()
 
@@ -164,7 +163,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 			}
 			defer func() {
 				if cerr := f.Close(); cerr != nil {
-					err = multierror.Append(err, cerr)
+					err = goerrors.Join(err, cerr)
 				}
 			}()
 
@@ -386,12 +385,12 @@ type tarCloser struct {
 func (tc *tarCloser) Close() error {
 	var err error
 	if tc.gzipReader != nil {
-		err = multierror.Append(err, tc.gzipReader.Close())
+		err = goerrors.Join(err, tc.gzipReader.Close())
 	}
 	// prevent double Close() call to fzip reader
 	tc.gzipReader = nil
 	if tc.tarFile != nil {
-		err = multierror.Append(err, tc.tarFile.Close())
+		err = goerrors.Join(err, tc.tarFile.Close())
 	}
 	// prevent double Close() call the underlying file
 	tc.tarFile = nil
