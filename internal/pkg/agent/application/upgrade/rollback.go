@@ -33,9 +33,20 @@ const (
 )
 
 // Rollback rollbacks to previous version which was functioning before upgrade.
-func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentHash string) error {
+func Rollback(ctx context.Context, log *logger.Logger, prevVersionedHome, prevHash string, currentHash string) error {
+	symlinkPath := filepath.Join(paths.Top(), agentName)
+
+	var symlinkTarget string
+	if prevVersionedHome != "" {
+		symlinkTarget = paths.BinaryPath(filepath.Join(paths.Top(), prevVersionedHome), agentName)
+	} else {
+		// fallback for upgrades that didn't use the manifest and path remapping
+		hashedDir := fmt.Sprintf("%s-%s", agentName, prevHash)
+		// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
+		symlinkTarget = paths.BinaryPath(filepath.Join(paths.Top(), "data", hashedDir), agentName)
+	}
 	// change symlink
-	if err := ChangeSymlink(ctx, log, prevHash); err != nil {
+	if err := changeSymlinkInternal(log, symlinkPath, symlinkTarget); err != nil {
 		return err
 	}
 
@@ -51,11 +62,11 @@ func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentH
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, prevHash, true, true)
+	return Cleanup(log, prevVersionedHome, prevHash, true, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
-func Cleanup(log *logger.Logger, currentHash string, removeMarker bool, keepLogs bool) error {
+func Cleanup(log *logger.Logger, currentVersionedHome, currentHash string, removeMarker bool, keepLogs bool) error {
 	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
 	<-time.After(afterRestartDelay)
 
@@ -83,7 +94,16 @@ func Cleanup(log *logger.Logger, currentHash string, removeMarker bool, keepLogs
 	_ = os.Remove(prevSymlink)
 
 	dirPrefix := fmt.Sprintf("%s-", agentName)
-	currentDir := fmt.Sprintf("%s-%s", agentName, currentHash)
+	var currentDir string
+	if currentVersionedHome != "" {
+		currentDir, err = filepath.Rel("data", currentVersionedHome)
+		if err != nil {
+			return fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", currentVersionedHome, err)
+		}
+	} else {
+		currentDir = fmt.Sprintf("%s-%s", agentName, currentHash)
+	}
+
 	for _, dir := range subdirs {
 		if dir == currentDir {
 			continue

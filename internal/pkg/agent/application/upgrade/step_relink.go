@@ -32,21 +32,26 @@ func ChangeSymlink(ctx context.Context, log *logger.Logger, targetHash string) e
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), "data", hashedDir), agentName)
 
+	return changeSymlinkInternal(log, symlinkPath, newPath)
+}
+
+func changeSymlinkInternal(log *logger.Logger, symlinkPath, newTarget string) error {
+
 	// handle windows suffixes
 	if runtime.GOOS == windows {
 		symlinkPath += exe
-		newPath += exe
+		newTarget += exe
 	}
 
 	prevNewPath := prevSymlinkPath()
-	log.Infow("Changing symlink", "symlink_path", symlinkPath, "new_path", newPath, "prev_path", prevNewPath)
+	log.Infow("Changing symlink", "symlink_path", symlinkPath, "new_path", newTarget, "prev_path", prevNewPath)
 
 	// remove symlink to avoid upgrade failures
 	if err := os.Remove(prevNewPath); !os.IsNotExist(err) {
 		return err
 	}
 
-	if err := os.Symlink(newPath, prevNewPath); err != nil {
+	if err := os.Symlink(newTarget, prevNewPath); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to update agent symlink")
 	}
 

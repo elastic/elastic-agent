@@ -97,7 +97,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
-		if err := upgrade.Cleanup(log, release.ShortCommit(), true, false); err != nil {
+		if err := upgrade.Cleanup(log, marker.VersionedHome, release.ShortCommit(), true, false); err != nil {
 			log.Error("clean up of prior watcher run failed", err)
 		}
 		// exit nicely
@@ -114,7 +114,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		upgradeDetails.SetState(details.StateRollback)
-		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
+		err = upgrade.Rollback(ctx, log, marker.PrevVersionedHome, marker.PrevHash, marker.Hash)
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)
@@ -132,7 +132,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	// Why is this being skipped on Windows? The comment above is not clear.
 	// issue: https://github.com/elastic/elastic-agent/issues/3027
 	removeMarker := !isWindows()
-	err = upgrade.Cleanup(log, marker.Hash, removeMarker, false)
+	err = upgrade.Cleanup(log, marker.VersionedHome, marker.Hash, removeMarker, false)
 	if err != nil {
 		log.Error("cleanup after successful watch failed", err)
 	}
