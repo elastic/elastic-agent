@@ -87,7 +87,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 	fileNamePrefix := strings.TrimSuffix(filepath.Base(archivePath), ".zip") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
 
 	pm := pathMapper{}
-	versionedHome := ""
+	var versionedHome string
 
 	metadata, err := getPackageMetadataFromZipReader(r, fileNamePrefix)
 	if err != nil {
