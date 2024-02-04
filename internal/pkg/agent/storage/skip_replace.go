@@ -1,9 +1,14 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package storage
 
 import (
+	"strings"
+
 	"github.com/google/go-cmp/cmp"
 	"gopkg.in/yaml.v3"
-	"strings"
 )
 
 // This is a temporary solution to avoid replacing the target file if the content of the replacement is contained in the target file.
