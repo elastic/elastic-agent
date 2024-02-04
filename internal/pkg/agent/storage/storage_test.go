@@ -6,6 +6,7 @@ package storage
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -203,7 +203,10 @@ func genFile(b []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	f.Write(b)
+	_, err = f.Write(b)
+	if err != nil {
+		return "", err
+	}
 	name := f.Name()
 	if err := f.Close(); err != nil {
 		return "", err
