@@ -262,6 +262,10 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
+	// We rotated the symlink successfully: prepare the current and previous agent installation details for the update marker
+	// In update marker the `current` agent install is the one where the symlink is pointing (the new one we didn't start yet)
+	// while the `previous` install is the currently executing elastic-agent that is no longer reachable via the symlink.
+	// After the restart at the end of the function, everything lines up correctly.
 	current := agentInstall{
 		version:       version,
 		hash:          unpackRes.Hash,
