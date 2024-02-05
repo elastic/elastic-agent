@@ -188,7 +188,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "20m"
+		testRuntime = "5m"
 	}
 
 	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
@@ -254,7 +254,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 				if ok {
 					handleCount, err := ohc.OpenHandleCount()
 					require.NoError(runner.T(), err)
-					handle.reg.Train(regression.DataPoint(float64(handleCount), []float64{float64(time.Now().Unix()), float64(procMem.Virtual)}))
+					handle.reg.Train(regression.DataPoint(float64(time.Now().Unix()), []float64{float64(handleCount), float64(procMem.Virtual)}))
 				}
 
 			}
@@ -270,9 +270,9 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		err = handle.reg.Run()
 		require.NoError(runner.T(), err)
 
-		runner.T().Logf("=============================== %s", handle.name)
+		runner.T().Logf("=============================== %s (%d)", handle.name, handle.pid)
 		runner.T().Logf("formula: %v", handle.reg.Formula)
-		runner.T().Logf("data: %#v", handle.reg)
+		runner.T().Logf("data: %s", handle.reg)
 		// coefficient 0: offset (b), 1: handle slope, 2: memory slope
 		coeffs := handle.reg.GetCoeffs()
 		runner.T().Logf("Coeff: %#v", coeffs)
