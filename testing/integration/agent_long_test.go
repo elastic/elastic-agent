@@ -7,28 +7,27 @@
 package integration
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/mitchellh/mapstructure"
 	"github.com/sajari/regression"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/exp/slices"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
+	"github.com/elastic/go-sysinfo"
+	"github.com/elastic/go-sysinfo/types"
 )
 
 type ExtendedRunner struct {
@@ -76,6 +75,13 @@ type MetricsSystem struct {
 	Handles HandlesMetrics `mapstructure:"handles"`
 }
 
+type processWatcher struct {
+	handle types.Process
+	pid    int
+	name   string
+	reg    *regression.Regression
+}
+
 func TestAgentLong(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: "fleet",
@@ -104,7 +110,6 @@ func (runner *ExtendedRunner) SetupSuite() {
 	cmd = exec.Command("flog", "-t", "log", "-f", "apache_error", "-o", "/var/log/httpd/error_log", "-b", "50485760", "-p", "1048576")
 	out, err = cmd.CombinedOutput()
 	require.NoError(runner.T(), err, "got out: %s", string(out))
-	runner.T().Logf("printed: %#v", string(out))
 
 	policyUUID := uuid.New().String()
 	unpr := false
@@ -182,7 +187,42 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "6m"
+		testRuntime = "5m"
+	}
+
+	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
+	require.Eventually(runner.T(), func() bool {
+		allHealthy := true
+		status, err := runner.agentFixture.ExecStatus(context.Background())
+		require.NoError(runner.T(), err)
+		for _, comp := range status.Components {
+			if comp.State != int(cproto.State_HEALTHY) {
+				allHealthy = false
+			}
+		}
+		return allHealthy
+	}, time.Minute*3, time.Second*20)
+
+	procs, err := sysinfo.Processes()
+	require.NoError(runner.T(), err)
+
+	handles := []processWatcher{}
+
+	// track running beats
+	// the `last 30s` metrics tend to report gauges, which we can't use for calculating a derivative.
+	// so separately fetch the PIDs
+	for _, proc := range procs {
+		info, err := proc.Info()
+		require.NoError(runner.T(), err)
+		if strings.Contains(info.Name, "beat") || strings.Contains(info.Name, "elastic-agent") {
+			handle, err := sysinfo.Process(proc.PID())
+			require.NoError(runner.T(), err)
+			reg := new(regression.Regression)
+			reg.SetObserved(fmt.Sprintf("%s handle usage", info.Name))
+			reg.SetVar(0, "handles")
+			reg.SetVar(1, "memory")
+			handles = append(handles, processWatcher{handle: handle, pid: proc.PID(), name: info.Name, reg: reg})
+		}
 	}
 
 	testDuration, err := time.ParseDuration(testRuntime)
@@ -191,7 +231,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	timer := time.NewTimer(testDuration)
 
 	// time to perform a health check
-	ticker := time.Tick(time.Minute)
+	ticker := time.Tick(time.Second * 10)
 
 	done := false
 	for {
@@ -204,97 +244,38 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		case <-ticker:
 			err := runner.agentFixture.IsHealthy(ctx)
 			require.NoError(runner.T(), err)
+			for _, handle := range handles {
+				procMem, err := handle.handle.Memory()
+				require.NoError(runner.T(), err)
+				ohc, ok := handle.handle.(types.OpenHandleCounter)
+				if ok {
+					handleCount, err := ohc.OpenHandleCount()
+					require.NoError(runner.T(), err)
+					handle.reg.Train(regression.DataPoint(float64(handleCount), []float64{float64(time.Now().Unix()), float64(procMem.Virtual)}))
+				}
+
+			}
 		}
 	}
 
-	status, err := runner.agentFixture.ExecStatus(ctx)
-	require.NoError(runner.T(), err)
-	runner.T().Logf("Looking for logs matching agent ID %s", status.Info.ID)
+	// we're measuring the handle/memory usage as y=mx+b
+	// if the slope is increasing above a certain rate, fail the test
+	handleSlopeFailure := float64(2)
+	memorySlopeFailure := 2e-3
 
-	docs, err := estools.FindMatchingLogLinesForAgent(runner.info.ESClient, status.Info.ID, "last 30s")
-	require.NoError(runner.T(), err)
-
-	// iterate over hits, compile metrics based on the component
-	componentCollection := map[TestComponent][]ComponentMetrics{}
-	for _, doc := range docs.Hits.Hits {
-
-		componentData := doc.Source["component"].(map[string]interface{})
-		toComponent := TestComponent{}
-		err := mapstructure.Decode(componentData, &toComponent)
+	for _, handle := range handles {
+		err = handle.reg.Run()
 		require.NoError(runner.T(), err)
 
-		monitoringData := doc.Source["monitoring"].(map[string]interface{})["metrics"].(map[string]interface{})["beat"].(map[string]interface{})
-		metrics := ComponentMetrics{}
-		err = mapstructure.Decode(monitoringData, &metrics)
-		require.NoError(runner.T(), err)
-
-		// for whatever reason, the windows metrics are reported in a different location
-		systemDataSource := doc.Source["monitoring"].(map[string]interface{})["metrics"].(map[string]interface{})["system"]
-		systemData := MetricsSystem{}
-		err = mapstructure.Decode(systemDataSource, &systemData)
-		require.NoError(runner.T(), err)
-		if runtime.GOOS == "windows" {
-			metrics.Handles.Open = systemData.Handles.Open
-		}
-
-		timestamp, err := time.Parse(time.RFC3339Nano, doc.Source["@timestamp"].(string))
-		require.NoError(runner.T(), err)
-
-		metrics.UnixTimestamp = timestamp.UnixMicro()
-
-		if foundComp, ok := componentCollection[toComponent]; ok {
-			updated := append(foundComp, metrics)
-			componentCollection[toComponent] = updated
-		} else {
-			componentCollection[toComponent] = []ComponentMetrics{metrics}
-		}
-
-	}
-
-	handleLimit := 500
-	// after we get all the metrics, sort by memory/handles to see if we've passed a threshold
-	for comp, metrics := range componentCollection {
-
-		runner.T().Logf("===============================")
-
-		reg := new(regression.Regression)
-		reg.SetObserved(fmt.Sprintf("%s handle usage", comp.Dataset))
-		reg.SetVar(0, "open handles")
-		points := regression.DataPoints{}
-		// we're using Sys from `runtime.ReadMemStats` for this. From the `runtime` godoc:
-		//
-		//Sys is the sum of the XSys fields below.
-		//Sys measures the virtual address space reserved by the Go runtime for the heap, stacks, and other internal data structures.
-		//It's likely that not all of the virtual address space is backed by physical memory at any given moment, though in general it all was at some point.
-
-		// At some point in the future, this is where we'll fail the test if our metrics go over a given threshold.
-		slices.SortFunc(metrics, func(a, b ComponentMetrics) int { return cmp.Compare(a.Memory.MemorySys, b.Memory.MemorySys) })
-		highestMem := metrics[len(metrics)-1].Memory.MemorySys
-		runner.T().Logf("Top memory usage for %s: %d bytes", comp.Dataset, highestMem)
-
-		highestHandleOpen := metrics[len(metrics)-1].Handles.Open
-		slices.SortFunc(metrics, func(a, b ComponentMetrics) int { return cmp.Compare(a.Handles.Open, b.Handles.Open) })
-
-		runner.T().Logf("Top count of open handles for %s: %d", comp.Dataset, highestHandleOpen)
-		require.LessOrEqual(runner.T(), highestHandleOpen, handleLimit, "handle count is higher than %d after %s (count: %d), check for resource leaks", handleLimit, testDuration, highestHandleOpen)
-
-		// the limit seems to only exist on linux
-		if softLimit := metrics[len(metrics)-1].Handles.Limit.Soft; softLimit > 0 {
-			limitPct := (float64(highestHandleOpen) / float64(softLimit)) * 100
-			runner.T().Logf("Percent of handle soft limit: %f", limitPct)
-		}
-
-		for _, metric := range metrics {
-			points = append(points, regression.DataPoint(float64(metric.Handles.Open), []float64{float64(metric.UnixTimestamp)}))
-		}
-
-		reg.Train(points...)
-		err = reg.Run()
-		require.NoError(runner.T(), err)
-
-		runner.T().Logf("formula: %v", reg.Formula)
-		runner.T().Logf("regression: %s", reg)
-		runner.T().Logf("Coeff: %#v", reg.GetCoeffs())
+		runner.T().Logf("=============================== %s", handle.name)
+		runner.T().Logf("formula: %v", handle.reg.Formula)
+		// coefficient 0: offset (b), 1: handle slope, 2: memory slope
+		coeffs := handle.reg.GetCoeffs()
+		runner.T().Logf("Coeff: %#v", coeffs)
+		handleSlope := coeffs[1]
+		require.LessOrEqual(runner.T(), handleSlope, handleSlopeFailure, "increase in open handles exceeded threshold")
+		memorySlope := coeffs[2]
+		require.LessOrEqual(runner.T(), memorySlope, memorySlopeFailure, "increasin in memory usage exceeded threshold")
 
 		runner.T().Logf("===============================")
 	}
