@@ -29,8 +29,8 @@ import (
 	"unsafe"
 )
 
-// Vault represents encrypted storage using the Darwin keychain.
-type Vault struct {
+// DarwinKeychainVault represents encrypted storage using the Darwin keychain.
+type DarwinKeychainVault struct {
 	name     string
 	keychain C.SecKeychainRef
 	mx       sync.Mutex
@@ -38,7 +38,7 @@ type Vault struct {
 
 // New initializes the vault store
 // Call Close when done to release the resources
-func New(ctx context.Context, name string, opts ...OptionFunc) (*Vault, error) {
+func NewDarwinKeyChainVault(ctx context.Context, name string, opts ...OptionFunc) (*DarwinKeychainVault, error) {
 	var keychain C.SecKeychainRef
 
 	err := statusToError(C.OpenKeychain(keychain))
@@ -46,14 +46,14 @@ func New(ctx context.Context, name string, opts ...OptionFunc) (*Vault, error) {
 		return nil, fmt.Errorf("could not open keychain: %w", err)
 	}
 
-	return &Vault{
+	return &DarwinKeychainVault{
 		name:     name,
 		keychain: keychain,
 	}, nil
 }
 
 // Close closes the vault store
-func (v *Vault) Close() error {
+func (v *DarwinKeychainVault) Close() error {
 	v.mx.Lock()
 	defer v.mx.Unlock()
 
@@ -65,7 +65,7 @@ func (v *Vault) Close() error {
 }
 
 // Set sets the key in the vault store
-func (v *Vault) Set(ctx context.Context, key string, data []byte) error {
+func (v *DarwinKeychainVault) Set(ctx context.Context, key string, data []byte) error {
 	v.mx.Lock()
 	defer v.mx.Unlock()
 
@@ -82,7 +82,7 @@ func (v *Vault) Set(ctx context.Context, key string, data []byte) error {
 }
 
 // Get retrieves the key from the vault store
-func (v *Vault) Get(ctx context.Context, key string) ([]byte, error) {
+func (v *DarwinKeychainVault) Get(ctx context.Context, key string) ([]byte, error) {
 	var (
 		data unsafe.Pointer
 		len  C.size_t
@@ -107,7 +107,7 @@ func (v *Vault) Get(ctx context.Context, key string) ([]byte, error) {
 }
 
 // Exists checks if the key exists
-func (v *Vault) Exists(ctx context.Context, key string) (bool, error) {
+func (v *DarwinKeychainVault) Exists(ctx context.Context, key string) (bool, error) {
 	v.mx.Lock()
 	defer v.mx.Unlock()
 
@@ -129,7 +129,7 @@ func (v *Vault) Exists(ctx context.Context, key string) (bool, error) {
 }
 
 // Remove will remove a key from the keychain.
-func (v *Vault) Remove(ctx context.Context, key string) error {
+func (v *DarwinKeychainVault) Remove(ctx context.Context, key string) error {
 	v.mx.Lock()
 	defer v.mx.Unlock()
 

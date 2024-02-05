@@ -24,7 +24,7 @@ const (
 	saltSize = 8
 )
 
-func (v *Vault) encrypt(data []byte) ([]byte, error) {
+func (v *FileVault) encrypt(data []byte) ([]byte, error) {
 	key, salt, err := deriveKey(v.seed, nil)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (v *Vault) encrypt(data []byte) ([]byte, error) {
 	return append(salt, enc...), nil
 }
 
-func (v *Vault) decrypt(data []byte) ([]byte, error) {
+func (v *FileVault) decrypt(data []byte) ([]byte, error) {
 	if len(data) < saltSize {
 		return nil, syscall.EINVAL
 	}
