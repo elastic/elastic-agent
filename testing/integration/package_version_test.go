@@ -64,13 +64,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	f, err := atesting.NewFixture(
-		t,
-		define.Version(),
-		// TODO(AndersonQ) replace with ArtifactFetcher as soon as the beats
-		// with those changes are available in the API
-		atesting.WithFetcher(atesting.LocalFetcher("../../build/distributions/")),
-	)
+	f, err := atesting.NewFixture(t, define.Version())
 	require.NoError(t, err, "could not create new fixture")
 
 	err = f.Prepare(ctx)
