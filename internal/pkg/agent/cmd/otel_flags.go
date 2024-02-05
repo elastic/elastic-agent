@@ -13,13 +13,16 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
-func getConfigFiles(cmd *cobra.Command) ([]string, error) {
+func getConfigFiles(cmd *cobra.Command, useDefault bool) ([]string, error) {
 	configFiles, err := cmd.Flags().GetStringArray(configFlagName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve config flags: %w", err)
 	}
 
 	if len(configFiles) == 0 {
+		if !useDefault {
+			return nil, fmt.Errorf("at least one config flag must be provided")
+		}
 		configFiles = append(configFiles, paths.OtelConfigFile())
 	}
 
