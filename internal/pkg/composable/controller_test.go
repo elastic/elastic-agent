@@ -142,14 +142,14 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 		{
 			name: "default disabled",
 			cfg: map[string]interface{}{
-				"providers_default_disable": "true",
+				"agent.providers.initial_default": "false",
 			},
 			want: 0,
 		},
 		{
 			name: "default enabled",
 			cfg: map[string]interface{}{
-				"providers_default_disable": "false",
+				"agent.providers.initial_default": "true",
 			},
 			want: 1,
 		},

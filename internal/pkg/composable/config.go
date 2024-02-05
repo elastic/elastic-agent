@@ -9,5 +9,5 @@ import "github.com/elastic/elastic-agent/internal/pkg/config"
 // Config is config for multiple providers.
 type Config struct {
 	Providers               map[string]*config.Config `config:"providers"`
-	ProvidersDefaultDisable bool                      `config:"providers_default_disable"`
+	ProvidersInitialDefault bool                      `config:"agent.providers.initial_default"`
 }

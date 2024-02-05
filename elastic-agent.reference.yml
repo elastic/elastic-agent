@@ -274,7 +274,7 @@ agent.logging.to_stderr: true
 # All registered providers are enabled by default.
 
 # Disable all providers by default and only enable explicitly configured providers.
-# providers_default_disable: true
+# agent.providers.initial_default: false
 
 #providers:
 
