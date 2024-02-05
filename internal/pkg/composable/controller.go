@@ -53,8 +53,7 @@ type controller struct {
 func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error) {
 	l := log.Named("composable")
 
-	//  All registered providers are enabled by default
-	providersCfg := Config{ProvidersInitialDefault: true}
+	var providersCfg Config
 	if c != nil {
 		err := c.Unpack(&providersCfg)
 		if err != nil {
@@ -62,11 +61,17 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 		}
 	}
 
+	//  Unless explicitly configured otherwise, All registered providers are enabled by default
+	providersInitialDefault := true
+	if providersCfg.ProvidersInitialDefault != nil {
+		providersInitialDefault = *providersCfg.ProvidersInitialDefault
+	}
+
 	// build all the context providers
 	contextProviders := map[string]*contextProviderState{}
 	for name, builder := range Providers.contextProviders {
 		pCfg, ok := providersCfg.Providers[name]
-		if (ok && !pCfg.Enabled()) || (!ok && !providersCfg.ProvidersInitialDefault) {
+		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
 			// explicitly disabled; skipping
 			continue
 		}
@@ -85,7 +90,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	dynamicProviders := map[string]*dynamicProviderState{}
 	for name, builder := range Providers.dynamicProviders {
 		pCfg, ok := providersCfg.Providers[name]
-		if (ok && !pCfg.Enabled()) || (!ok && !providersCfg.ProvidersInitialDefault) {
+		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
 			// explicitly disabled; skipping
 			continue
 		}
