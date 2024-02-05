@@ -59,16 +59,14 @@ func TestCleanup(t *testing.T) {
 		keepLogs             bool
 	}
 
-	tests := []struct {
-		name               string
+	tests := map[string]struct {
 		args               args
 		agentInstallsSetup setupAgentInstallations
 		additionalSetup    hookFunc
 		wantErr            assert.ErrorAssertionFunc
 		checkAfterCleanup  hookFunc
 	}{
-		{
-			name: "cleanup without versionedHome (legacy upgrade process)",
+		"cleanup without versionedHome (legacy upgrade process)": {
 			args: args{
 				currentVersionedHome: "data/elastic-agent-ghijkl",
 				currentHash:          "ghijkl",
@@ -97,8 +95,7 @@ func TestCleanup(t *testing.T) {
 				checkFilesAfterCleanup(t, topDir, newAgentHome, oldAgentHome)
 			},
 		},
-		{
-			name: "cleanup with versionedHome (new upgrade process)",
+		"cleanup with versionedHome (new upgrade process)": {
 			args: args{
 				currentVersionedHome: "data/elastic-agent-4.5.6-SNAPSHOT-ghijkl",
 				currentHash:          "ghijkl",
@@ -127,8 +124,7 @@ func TestCleanup(t *testing.T) {
 				checkFilesAfterCleanup(t, topDir, newAgentHome, oldAgentHome)
 			},
 		},
-		{
-			name: "cleanup with versionedHome only on the new agent (new upgrade process from an old agent upgraded with legacy process)",
+		"cleanup with versionedHome only on the new agent (new upgrade process from an old agent upgraded with legacy process)": {
 			args: args{
 				currentVersionedHome: "data/elastic-agent-4.5.6-SNAPSHOT-ghijkl",
 				currentHash:          "ghijkl",
@@ -157,8 +153,7 @@ func TestCleanup(t *testing.T) {
 				checkFilesAfterCleanup(t, topDir, newAgentHome, oldAgentHome)
 			},
 		},
-		{
-			name: "cleanup with versionedHome only on the new agent + extra old agent installs",
+		"cleanup with versionedHome only on the new agent + extra old agent installs": {
 			args: args{
 				currentVersionedHome: "data/elastic-agent-4.5.6-SNAPSHOT-ghijkl",
 				currentHash:          "ghijkl",
@@ -207,8 +202,8 @@ func TestCleanup(t *testing.T) {
 			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			testLogger, _ := logger.NewTesting(t.Name())
 			testTop := t.TempDir()
 			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup)
@@ -226,15 +221,13 @@ func TestCleanup(t *testing.T) {
 }
 
 func TestRollback(t *testing.T) {
-	tests := []struct {
-		name               string
+	tests := map[string]struct {
 		agentInstallsSetup setupAgentInstallations
 		additionalSetup    hookFunc
 		wantErr            assert.ErrorAssertionFunc
 		checkAfterRollback hookFunc
 	}{
-		{
-			name: "rollback without versionedHome (legacy upgrade process)",
+		"rollback without versionedHome (legacy upgrade process)": {
 			agentInstallsSetup: setupAgentInstallations{
 				installedAgents: []agentInstall{
 					{
@@ -257,8 +250,7 @@ func TestRollback(t *testing.T) {
 				checkFilesAfterRollback(t, topDir, oldAgentHome, newAgentHome)
 			},
 		},
-		{
-			name: "rollback with versionedHome (new upgrade process)",
+		"rollback with versionedHome (new upgrade process)": {
 			agentInstallsSetup: setupAgentInstallations{
 				installedAgents: []agentInstall{
 					{
@@ -281,8 +273,7 @@ func TestRollback(t *testing.T) {
 				checkFilesAfterRollback(t, topDir, oldAgentHome, newAgentHome)
 			},
 		},
-		{
-			name: "rollback with versionedHome only on the new agent (new upgrade process from an old agent upgraded with legacy process)",
+		"rollback with versionedHome only on the new agent (new upgrade process from an old agent upgraded with legacy process)": {
 			agentInstallsSetup: setupAgentInstallations{
 				installedAgents: []agentInstall{
 					{
@@ -306,8 +297,8 @@ func TestRollback(t *testing.T) {
 			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			testLogger, _ := logger.NewTesting(t.Name())
 			testTop := t.TempDir()
 			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup)
