@@ -221,6 +221,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 			reg.SetObserved(fmt.Sprintf("%s handle usage", info.Name))
 			reg.SetVar(0, "handles")
 			reg.SetVar(1, "memory")
+			runner.T().Logf("created handle watcher for %s (%d)", info.Name, proc.PID())
 			handles = append(handles, processWatcher{handle: handle, pid: proc.PID(), name: info.Name, reg: reg})
 		}
 	}
