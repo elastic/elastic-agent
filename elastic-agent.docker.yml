@@ -18,17 +18,17 @@ inputs:
     data_stream.namespace: default
     use_output: default
     streams:
-      - metricsets:
+      - metricsets: 
         - cpu
         # Dataset name must conform to the naming conventions for Elasticsearch indices, cannot contain dashes (-), and cannot exceed 100 bytes
         data_stream.dataset: system.cpu
-      - metricsets:
+      - metricsets: 
         - memory
         data_stream.dataset: system.memory
-      - metricsets:
+      - metricsets: 
         - network
         data_stream.dataset: system.network
-      - metricsets:
+      - metricsets: 
         - filesystem
         data_stream.dataset: system.filesystem
 
