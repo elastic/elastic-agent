@@ -9,6 +9,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -39,20 +41,43 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	// Start on a snapshot build, we want this test to upgrade to our
-	// build to ensure that the uninstall will kill the watcher.
-	startFixture, err := atesting.NewFixture(
-		t,
-		define.Version(),
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
-	)
-	require.NoError(t, err)
-
 	// Upgrades to build under test.
+	endVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
 	endFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get end agent build version info")
+
+	// Start on a snapshot build, we want this test to upgrade to our
+	// build to ensure that the uninstall will kill the watcher.
+	// We need a snapshot with a non-matching commit hash to perform the upgrade
+	aac := tools.NewArtifactAPIClient()
+	buildInfo, err := aac.FindBuild(ctx, endVersion.VersionWithPrerelease(), endVersionInfo.Binary.Commit, 0)
+	if errors.Is(err, tools.ErrBuildNotFound) {
+		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", endVersion.VersionWithPrerelease())
+		return
+	}
+	require.NoError(t, err)
+
+	upgradeVersionString := buildInfo.Build.BuildID
+	t.Logf("found build %q available for testing", upgradeVersionString)
+
+	buildFragments := strings.Split(upgradeVersionString, "-")
+	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
+	startVersion := version.NewParsedSemVer(
+		endVersion.Major(),
+		endVersion.Minor(),
+		endVersion.Patch(),
+		endVersion.Prerelease(),
+		buildFragments[1],
+	)
+	startFixture, err := atesting.NewFixture(
+		t,
+		startVersion.String(),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
+	require.NoError(t, err)
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.

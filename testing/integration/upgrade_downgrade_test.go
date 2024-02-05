@@ -8,6 +8,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -21,10 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
-)
-
-const (
-	artifactElasticAgentProject = "elastic-agent-package"
 )
 
 func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
@@ -61,33 +58,13 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	// as the currently running binary (so, we don't have a file system collision).
 	// Multiple builds can have different IDs but the same commit hash.
 	preReleaseVersion := latestSnapshotVersion.VersionWithPrerelease()
-	resp, err := aac.GetBuildsForVersion(ctx, preReleaseVersion)
-	require.NoError(t, err)
-
-	if len(resp.Builds) < 2 {
-		t.Skipf("need at least 2 builds in the version %s", latestSnapshotVersion.VersionWithPrerelease())
-		return
-	}
-
-	t.Logf("found %d builds for version %q", len(resp.Builds), preReleaseVersion)
-
-	t.Logf("looking for a build that does not match the current commit hash %q", startVersion.Binary.Commit)
-	var upgradeVersionString string
-	for _, buildID := range resp.Builds[1:] {
-		details, err := aac.GetBuildDetails(ctx, preReleaseVersion, buildID)
-		require.NoError(t, err)
-		if details.Build.Projects[artifactElasticAgentProject].CommitHash != startVersion.Binary.Commit {
-			upgradeVersionString = buildID
-			break
-		}
-		t.Logf("build %q matches the current commit hash %q, skipping...", buildID, startVersion.Binary.Commit)
-	}
-
-	if upgradeVersionString == "" {
+	buildInfo, err := aac.FindBuild(ctx, preReleaseVersion, startVersion.Binary.Commit, 1)
+	if errors.Is(err, tools.ErrBuildNotFound) {
 		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", latestSnapshotVersion.VersionWithPrerelease())
 		return
 	}
-
+	require.NoError(t, err)
+	upgradeVersionString := buildInfo.Build.BuildID
 	t.Logf("found build %q available for testing", upgradeVersionString)
 
 	buildFragments := strings.Split(upgradeVersionString, "-")

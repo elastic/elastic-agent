@@ -8,6 +8,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -22,7 +23,9 @@ import (
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -38,13 +41,37 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
+	startVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
 	startFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
+	startVersionInfo, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get end agent build version info")
 
-	// Upgrade to an older snapshot build of same version.
+	// Upgrade to an older snapshot build of same version but with a different commit hash
+	aac := tools.NewArtifactAPIClient()
+	buildInfo, err := aac.FindBuild(ctx, startVersion.VersionWithPrerelease(), startVersionInfo.Binary.Commit, 0)
+	if errors.Is(err, tools.ErrBuildNotFound) {
+		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", define.Version())
+		return
+	}
+	require.NoError(t, err)
+
+	upgradeVersionString := buildInfo.Build.BuildID
+	t.Logf("found build %q available for testing", upgradeVersionString)
+
+	buildFragments := strings.Split(upgradeVersionString, "-")
+	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
+	endVersion := version.NewParsedSemVer(
+		startVersion.Major(),
+		startVersion.Minor(),
+		startVersion.Patch(),
+		startVersion.Prerelease(),
+		buildFragments[1],
+	)
 	endFixture, err := atesting.NewFixture(
 		t,
-		define.Version(),
+		endVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)

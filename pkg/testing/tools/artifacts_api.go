@@ -24,12 +24,15 @@ const (
 	artifactsAPIV1VersionBuildsEndpoint = "v1/versions/%s/builds/"
 	artifactAPIV1BuildDetailsEndpoint   = "v1/versions/%s/builds/%s"
 	// artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
+
+	artifactElasticAgentProject = "elastic-agent-package"
 )
 
 var (
 	ErrLatestVersionNil        = errors.New("latest version is nil")
 	ErrSnapshotVersionsEmpty   = errors.New("snapshot list is nil")
 	ErrInvalidVersionRetrieved = errors.New("invalid version retrieved from artifact API")
+	ErrBuildNotFound           = errors.New("there are no build that satisfy given conditions")
 
 	ErrBadHTTPStatusCode = errors.New("bad http status code")
 )
@@ -176,6 +179,27 @@ func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version st
 
 	defer resp.Body.Close()
 	return checkResponseAndUnmarshal[VersionBuilds](resp)
+}
+
+func (aac ArtifactAPIClient) FindBuild(ctx context.Context, version, excludeHash string, offset int) (buildDetails *BuildDetails, err error) {
+	resp, err := aac.GetBuildsForVersion(ctx, version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get a list of builds: %w", err)
+	}
+	if len(resp.Builds) < offset+1 {
+		return nil, ErrBuildNotFound
+	}
+	for _, buildID := range resp.Builds[offset:] {
+		details, err := aac.GetBuildDetails(ctx, version, buildID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get build information for %q: %w", buildID, err)
+		}
+		if details.Build.Projects[artifactElasticAgentProject].CommitHash != excludeHash {
+			return details, nil
+		}
+	}
+
+	return nil, ErrBuildNotFound
 }
 
 // GetBuildDetails returns the list of project and artifacts related to a specific build.
