@@ -72,6 +72,9 @@ type enrollCmd struct {
 	remoteConfig remote.Config
 	agentProc    *process.Info
 	configPath   string
+
+	// For testability
+	daemonReloadFunc func(context.Context) error
 }
 
 // enrollCmdFleetServerOption define all the supported enrollment options for bootstrapping with Fleet Server.
@@ -192,10 +195,11 @@ func newEnrollCmdWithStore(
 	store saver,
 ) (*enrollCmd, error) {
 	return &enrollCmd{
-		log:         log,
-		options:     options,
-		configStore: store,
-		configPath:  configPath,
+		log:              log,
+		options:          options,
+		configStore:      store,
+		configPath:       configPath,
+		daemonReloadFunc: daemonReload,
 	}, nil
 }
 
@@ -476,7 +480,7 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 		attempt := i
 
 		c.log.Infof("Restarting agent daemon, attempt %d", attempt)
-		err := c.daemonReload(ctx)
+		err := c.daemonReloadFunc(ctx)
 		if err == nil {
 			return nil
 		}
@@ -499,7 +503,7 @@ func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
 	return fmt.Errorf("could not reload agent's daemon, all retries failed. Last error: %w", lastErr)
 }
 
-func (c *enrollCmd) daemonReload(ctx context.Context) error {
+func daemonReload(ctx context.Context) error {
 	daemon := client.New()
 	err := daemon.Connect(ctx)
 	if err != nil {
