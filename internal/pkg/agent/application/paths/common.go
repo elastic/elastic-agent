@@ -266,3 +266,17 @@ func InstallPath(basePath string) string {
 func TopBinaryPath() string {
 	return filepath.Join(Top(), BinaryName)
 }
+
+func pathSplit(path string) []string {
+	dir, file := filepath.Split(path)
+	if dir == "" && file == "" {
+		return []string{}
+	}
+	if dir == "" && file != "" {
+		return []string{file}
+	}
+	if dir == path {
+		return []string{}
+	}
+	return append(pathSplit(filepath.Clean(dir)), file)
+}
