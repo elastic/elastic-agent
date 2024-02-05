@@ -23,29 +23,29 @@ import (
 
 type hookFunc func(t *testing.T, topDir string)
 
-type agentVersion struct {
+type testAgentVersion struct {
 	version string
 	hash    string
 }
 
 type agentInstall struct {
-	version          agentVersion
+	version          testAgentVersion
 	useVersionInPath bool
 }
 
 type setupAgentInstallations struct {
 	installedAgents []agentInstall
-	upgradeFrom     agentVersion
-	upgradeTo       agentVersion
-	currentAgent    agentVersion
+	upgradeFrom     testAgentVersion
+	upgradeTo       testAgentVersion
+	currentAgent    testAgentVersion
 }
 
 var (
-	version123Snapshot = agentVersion{
+	version123Snapshot = testAgentVersion{
 		version: "1.2.3-SNAPSHOT",
 		hash:    "abcdef",
 	}
-	version456Snapshot = agentVersion{
+	version456Snapshot = testAgentVersion{
 		version: "4.5.6-SNAPSHOT",
 		hash:    "ghijkl",
 	}
@@ -163,14 +163,14 @@ func TestCleanup(t *testing.T) {
 			agentInstallsSetup: setupAgentInstallations{
 				installedAgents: []agentInstall{
 					{
-						version: agentVersion{
+						version: testAgentVersion{
 							version: "0.9.9",
 							hash:    "aaaaaa",
 						},
 						useVersionInPath: false,
 					},
 					{
-						version: agentVersion{
+						version: testAgentVersion{
 							version: "1.1.1",
 							hash:    "aaabbb",
 						},
@@ -396,9 +396,9 @@ func checkFilesAfterRollback(t *testing.T, topDir, oldAgentHome, newAgentHome st
 func setupAgents(t *testing.T, log *logger.Logger, topDir string, installations setupAgentInstallations) {
 
 	var (
-		oldAgentVersion       agentVersion
+		oldAgentVersion       testAgentVersion
 		oldAgentVersionedHome string
-		newAgentVersion       agentVersion
+		newAgentVersion       testAgentVersion
 		newAgentVersionedHome string
 		useNewMarker          bool
 	)

@@ -189,7 +189,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")
 
-			got, err := untar(log, tt.args.version, archiveFile, testDataDir)
+			got, err := untar(log, archiveFile, testDataDir)
 			if !tt.wantErr(t, err, fmt.Sprintf("untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)) {
 				return
 			}
