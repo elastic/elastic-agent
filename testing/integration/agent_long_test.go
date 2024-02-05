@@ -187,7 +187,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "5m"
+		testRuntime = "20m"
 	}
 
 	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
