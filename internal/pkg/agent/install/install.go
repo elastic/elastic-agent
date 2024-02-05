@@ -101,18 +101,14 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	}
 
 	// ensure parent directory exists
-	err = os.MkdirAll(topPath, 0755)
+	err = os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
 		return utils.FileOwner{}, errors.New(
 			err,
-			fmt.Sprintf("failed to create installation parent directory (%s)", topPath),
-			errors.M("directory", topPath))
+			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)),
+			errors.M("directory", filepath.Dir(topPath)))
 	}
 
-	// create the install marker
-	if err := CreateInstallMarker(topPath, ownership); err != nil {
-		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
-	}
 	// copy source into install path
 	//
 	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
@@ -144,6 +140,11 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		)
 	}
 	pt.Describe("Successfully copied files")
+
+	// create the install marker
+	if err := CreateInstallMarker(topPath, ownership); err != nil {
+		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
+	}
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
