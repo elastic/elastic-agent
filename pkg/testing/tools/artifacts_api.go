@@ -179,10 +179,11 @@ func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version st
 	return checkResponseAndUnmarshal[VersionBuilds](resp)
 }
 
-// FindBuild returns a build of the given `version` that does not match the `excludeHash` commit hash
-// and starts with the `offset` index on the current list of builds.
+// FindBuild returns a build of the given `version` that does not match the
+// `excludeHash` commit hash. It searches for a matching build from the latest
+// to the oldest, starting the search at the `offset` index in the list of builds.
+// Setting `offset` to 0 includes all builds, 1 skips the latest, and so forth.
 // If there are no builds matching these conditions, returns `ErrBuildNotFound`.
-// `offset` value is used when the consumer does not wish to request the latest build.
 func (aac ArtifactAPIClient) FindBuild(ctx context.Context, version, excludeHash string, offset int) (buildDetails *BuildDetails, err error) {
 	resp, err := aac.GetBuildsForVersion(ctx, version)
 	if err != nil {
