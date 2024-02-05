@@ -74,7 +74,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.
 		settings:      settings,
 		agentInfo:     agentInfo,
 		upgradeable:   IsUpgradeable(),
-		markerWatcher: newMarkerFileWatcher(markerFilePath(), log),
+		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
 	}, nil
 }
 
@@ -186,6 +186,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
 	}
 
+	// TODO reintroduce the version check
 	//if strings.HasPrefix(release.Commit(), newHash) {
 	//	u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
 	//	return nil, nil
@@ -214,21 +215,30 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
 
-	if err := changeSymlinkInternal(u.log, symlinkPath, newPath); err != nil {
+	if err := changeSymlinkInternal(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
-		rollbackInstall(ctx, u.log, hashedDir)
+		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, u.log, version, unpackRes.Hash, unpackRes.VersionedHome, action, det); err != nil {
+	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+	if err != nil {
+		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
+	if err := markUpgrade(
+		u.log,
+		paths.Data(),                                     //data dir to place the marker in
+		version, unpackRes.Hash, unpackRes.VersionedHome, //new agent version data
+		release.VersionWithSnapshot(), release.Commit(), currentVersionedHome, // old agent version data
+		action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackInstall(ctx, u.log, hashedDir)
+		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
 		return nil, err
 	}
 
 	if err := InvokeWatcher(u.log); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackInstall(ctx, u.log, hashedDir)
+		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
 		return nil, err
 	}
 
@@ -247,7 +257,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 // Ack acks last upgrade action
 func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	// get upgrade action
-	marker, err := LoadMarker()
+	marker, err := LoadMarker(paths.Data())
 	if err != nil {
 		return err
 	}
@@ -289,14 +299,14 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	return u.settings.SourceURI
 }
 
-func rollbackInstall(ctx context.Context, log *logger.Logger, versionedHome string) {
-	err := os.RemoveAll(filepath.Join(paths.Top(), versionedHome))
+func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome string) {
+	err := os.RemoveAll(filepath.Join(topDirPath, versionedHome))
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		// TODO should this be a warning or an error ?
 		log.Warnw("error rolling back install", "error.message", err)
 	}
 	// FIXME update
-	_ = ChangeSymlink(ctx, log, release.ShortCommit())
+	_ = ChangeSymlink(ctx, log, topDirPath, release.ShortCommit())
 }
 
 func copyActionStore(log *logger.Logger, newHome string) error {
