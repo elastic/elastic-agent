@@ -69,6 +69,9 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 		return
 	}
 
+	t.Logf("found %d builds for version %q", len(resp.Builds), preReleaseVersion)
+
+	t.Logf("looking for a build that does not match the current commit hash %q", startVersion.Binary.Commit)
 	var upgradeVersionString string
 	for _, buildID := range resp.Builds[1:] {
 		details, err := aac.GetBuildDetails(ctx, preReleaseVersion, buildID)
@@ -77,12 +80,15 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 			upgradeVersionString = buildID
 			break
 		}
+		t.Logf("build %q matches the current commit hash %q, skipping...", buildID, startVersion.Binary.Commit)
 	}
 
 	if upgradeVersionString == "" {
 		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", latestSnapshotVersion.VersionWithPrerelease())
 		return
 	}
+
+	t.Logf("found build %q available for testing", upgradeVersionString)
 
 	buildFragments := strings.Split(upgradeVersionString, "-")
 	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
