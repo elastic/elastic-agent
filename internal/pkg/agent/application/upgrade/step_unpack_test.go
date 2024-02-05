@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -57,6 +58,33 @@ inputs:
         - bar
         - baz
 `
+
+var archiveFilesWithManifestNoSymlink = []files{
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/manifest.yaml", content: ea_123_manifest, mode: fs.ModePerm & 0o640},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1.spec.yml", content: foo_component_spec, mode: fs.ModePerm & 0o640},
+}
+
+var outOfOrderArchiveFilesNoManifestNoSymlink = []files{
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o700)},
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1.spec.yml", content: foo_component_spec, mode: fs.ModePerm & 0o640},
+}
+
+var agentArchiveSymLink = files{fType: SYMLINK, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + agentName, content: "data/elastic-agent-abcdef/" + agentName, mode: fs.ModeSymlink | (fs.ModePerm & 0o750)}
 
 type fileType uint
 
@@ -117,21 +145,10 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 		{
 			name: "file before containing folder",
 			args: args{
-				version: "1.2.3",
-				archiveFiles: []files{
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o700)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/components/comp1", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/components/comp1.spec.yml", content: foo_component_spec, mode: fs.ModePerm & 0o640},
-					{fType: SYMLINK, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/" + agentName, content: "data/elastic-agent-abcdef/" + agentName, mode: fs.ModeSymlink | (fs.ModePerm & 0o750)},
-				},
+				version:      "1.2.3",
+				archiveFiles: append(outOfOrderArchiveFilesNoManifestNoSymlink, agentArchiveSymLink),
 				archiveGenerator: func(t *testing.T, i []files) (string, error) {
-					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz", i)
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
 				},
 			},
 			want: UnpackResult{
@@ -141,58 +158,24 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			wantErr: assert.NoError,
 			checkFiles: func(t *testing.T, testDataDir string) {
 				versionedHome := filepath.Join(testDataDir, "elastic-agent-abcdef")
-				require.DirExists(t, versionedHome, "directory for package.version does not exists")
-				stat, err := os.Stat(versionedHome)
-				require.NoErrorf(t, err, "error calling Stat() for versionedHome %q", versionedHome)
-				expectedPermissions := fs.ModePerm & 0o700
-				actualPermissions := fs.ModePerm & stat.Mode()
-				assert.Equalf(t, expectedPermissions, actualPermissions, "Wrong permissions set on versioned home %q: expected %O, got %O", versionedHome, expectedPermissions, actualPermissions)
+				checkExtractedFilesOutOfOrder(t, versionedHome)
 			},
 		},
 		{
 			name: "package with manifest file",
 			args: args{
-				version: "1.2.3",
-				archiveFiles: []files{
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/manifest.yaml", content: ea_123_manifest, mode: fs.ModePerm & 0o640},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/components/comp1", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/data/elastic-agent-abcdef/components/comp1.spec.yml", content: foo_component_spec, mode: fs.ModePerm & 0o640},
-					{fType: SYMLINK, path: "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64/" + agentName, content: "data/elastic-agent-abcdef/" + agentName, mode: fs.ModeSymlink | (fs.ModePerm & 0o750)},
-				},
+				version:      "1.2.3",
+				archiveFiles: append(archiveFilesWithManifestNoSymlink, agentArchiveSymLink),
 				archiveGenerator: func(t *testing.T, i []files) (string, error) {
-					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz", i)
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
 				},
 			},
 			want: UnpackResult{
 				Hash:          "abcdef",
-				VersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.NoError,
-			checkFiles: func(t *testing.T, testDataDir string) {
-				versionedHome := filepath.Join(testDataDir, "elastic-agent-1.2.3-SNAPSHOT-abcdef")
-				require.DirExists(t, versionedHome, "mapped versioned home directory does not exists")
-				mappedAgentExecutable := filepath.Join(versionedHome, agentName)
-				if assert.FileExistsf(t, mappedAgentExecutable, "agent executable %q is not found in mapped versioned home directory %q", mappedAgentExecutable, versionedHome) {
-					fileBytes, err := os.ReadFile(mappedAgentExecutable)
-					if assert.NoErrorf(t, err, "error reading elastic-agent executable %q", mappedAgentExecutable) {
-						assert.Equal(t, agentBinaryPlaceholderContent, string(fileBytes), "agent binary placeholder content does not match")
-					}
-				}
-				mappedPackageManifest := filepath.Join(versionedHome, "manifest.yaml")
-				if assert.FileExistsf(t, mappedPackageManifest, "package manifest %q is not found in mapped versioned home directory %q", mappedPackageManifest, versionedHome) {
-					fileBytes, err := os.ReadFile(mappedPackageManifest)
-					if assert.NoErrorf(t, err, "error reading package manifest %q", mappedPackageManifest) {
-						assert.Equal(t, ea_123_manifest, string(fileBytes), "package manifest content does not match")
-					}
-				}
-			},
+			wantErr:    assert.NoError,
+			checkFiles: checkExtractedFilesWithManifest,
 		},
 	}
 	for _, tt := range tests {
@@ -234,19 +217,9 @@ func TestUpgrader_unpackZip(t *testing.T) {
 		{
 			name: "file before containing folder",
 			args: args{
-				archiveFiles: []files{
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o700)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef/components/comp1", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef/components/comp1.spec.yml", content: foo_component_spec, mode: fs.ModePerm & 0o640},
-				},
+				archiveFiles: outOfOrderArchiveFilesNoManifestNoSymlink,
 				archiveGenerator: func(t *testing.T, i []files) (string, error) {
-					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64.zip", i)
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
 				},
 			},
 			want: UnpackResult{
@@ -256,63 +229,23 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			wantErr: assert.NoError,
 			checkFiles: func(t *testing.T, testDataDir string) {
 				versionedHome := filepath.Join(testDataDir, "elastic-agent-abcdef")
-				require.DirExists(t, versionedHome, "directory for package.version does not exists")
-				stat, err := os.Stat(versionedHome)
-				require.NoErrorf(t, err, "error calling Stat() for versionedHome %q", versionedHome)
-				expectedPermissions := fs.ModePerm & 0o700
-				actualPermissions := fs.ModePerm & stat.Mode()
-				assert.Equalf(t, expectedPermissions, actualPermissions, "Wrong permissions set on versioned home %q: expected %O, got %O", versionedHome, expectedPermissions, actualPermissions)
-				agentExecutable := filepath.Join(versionedHome, agentName)
-				if assert.FileExistsf(t, agentExecutable, "agent executable %q is not found in versioned home directory %q", agentExecutable, versionedHome) {
-					fileBytes, err := os.ReadFile(agentExecutable)
-					if assert.NoErrorf(t, err, "error reading elastic-agent executable %q", agentExecutable) {
-						assert.Equal(t, agentBinaryPlaceholderContent, string(fileBytes), "agent binary placeholder content does not match")
-					}
-				}
+				checkExtractedFilesOutOfOrder(t, versionedHome)
 			},
 		},
 		{
 			name: "package with manifest file",
 			args: args{
-				archiveFiles: []files{
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/manifest.yaml", content: ea_123_manifest, mode: fs.ModePerm & 0o640},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
-					{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef/components/comp1", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
-					{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64/data/elastic-agent-abcdef/components/comp1.spec.yml", content: foo_component_spec, mode: fs.ModePerm & 0o640},
-				},
+				archiveFiles: archiveFilesWithManifestNoSymlink,
 				archiveGenerator: func(t *testing.T, i []files) (string, error) {
-					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64.zip", i)
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
 				},
 			},
 			want: UnpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.NoError,
-			checkFiles: func(t *testing.T, testDataDir string) {
-				versionedHome := filepath.Join(testDataDir, "elastic-agent-1.2.3-SNAPSHOT-abcdef")
-				require.DirExists(t, versionedHome, "mapped versioned home directory does not exists")
-				mappedAgentExecutable := filepath.Join(versionedHome, agentName)
-				if assert.FileExistsf(t, mappedAgentExecutable, "agent executable %q is not found in mapped versioned home directory %q", mappedAgentExecutable, versionedHome) {
-					fileBytes, err := os.ReadFile(mappedAgentExecutable)
-					if assert.NoErrorf(t, err, "error reading elastic-agent executable %q", mappedAgentExecutable) {
-						assert.Equal(t, agentBinaryPlaceholderContent, string(fileBytes), "agent binary placeholder content does not match")
-					}
-				}
-				mappedPackageManifest := filepath.Join(versionedHome, "manifest.yaml")
-				if assert.FileExistsf(t, mappedPackageManifest, "package manifest %q is not found in mapped versioned home directory %q", mappedPackageManifest, versionedHome) {
-					fileBytes, err := os.ReadFile(mappedPackageManifest)
-					if assert.NoErrorf(t, err, "error reading package manifest %q", mappedPackageManifest) {
-						assert.Equal(t, ea_123_manifest, string(fileBytes), "package manifest content does not match")
-					}
-				}
-			},
+			wantErr:    assert.NoError,
+			checkFiles: checkExtractedFilesWithManifest,
 		},
 	}
 	for _, tt := range tests {
@@ -339,8 +272,46 @@ func TestUpgrader_unpackZip(t *testing.T) {
 	}
 }
 
+func checkExtractedFilesOutOfOrder(t *testing.T, versionedHome string) {
+	require.DirExists(t, versionedHome, "directory for package.version does not exists")
+	stat, err := os.Stat(versionedHome)
+	require.NoErrorf(t, err, "error calling Stat() for versionedHome %q", versionedHome)
+	expectedPermissions := fs.ModePerm & 0o700
+	if runtime.GOOS == "windows" {
+		// windows permissions are not very fine grained  :/
+		expectedPermissions = fs.ModePerm & 0o777
+	}
+	actualPermissions := fs.ModePerm & stat.Mode()
+	assert.Equalf(t, expectedPermissions, actualPermissions, "Wrong permissions set on versioned home %q: expected %O, got %O", versionedHome, expectedPermissions, actualPermissions)
+	agentExecutable := filepath.Join(versionedHome, agentName)
+	if assert.FileExistsf(t, agentExecutable, "agent executable %q is not found in versioned home directory %q", agentExecutable, versionedHome) {
+		fileBytes, err := os.ReadFile(agentExecutable)
+		if assert.NoErrorf(t, err, "error reading elastic-agent executable %q", agentExecutable) {
+			assert.Equal(t, agentBinaryPlaceholderContent, string(fileBytes), "agent binary placeholder content does not match")
+		}
+	}
+}
+
+func checkExtractedFilesWithManifest(t *testing.T, testDataDir string) {
+	versionedHome := filepath.Join(testDataDir, "elastic-agent-1.2.3-SNAPSHOT-abcdef")
+	require.DirExists(t, versionedHome, "mapped versioned home directory does not exists")
+	mappedAgentExecutable := filepath.Join(versionedHome, agentName)
+	if assert.FileExistsf(t, mappedAgentExecutable, "agent executable %q is not found in mapped versioned home directory %q", mappedAgentExecutable, versionedHome) {
+		fileBytes, err := os.ReadFile(mappedAgentExecutable)
+		if assert.NoErrorf(t, err, "error reading elastic-agent executable %q", mappedAgentExecutable) {
+			assert.Equal(t, agentBinaryPlaceholderContent, string(fileBytes), "agent binary placeholder content does not match")
+		}
+	}
+	mappedPackageManifest := filepath.Join(versionedHome, "manifest.yaml")
+	if assert.FileExistsf(t, mappedPackageManifest, "package manifest %q is not found in mapped versioned home directory %q", mappedPackageManifest, versionedHome) {
+		fileBytes, err := os.ReadFile(mappedPackageManifest)
+		if assert.NoErrorf(t, err, "error reading package manifest %q", mappedPackageManifest) {
+			assert.Equal(t, ea_123_manifest, string(fileBytes), "package manifest content does not match")
+		}
+	}
+}
+
 func createTarArchive(t *testing.T, archiveName string, archiveFiles []files) (string, error) {
-	t.Helper()
 	outDir := t.TempDir()
 
 	outFilePath := filepath.Join(outDir, archiveName)
@@ -370,13 +341,13 @@ func createTarArchive(t *testing.T, archiveName string, archiveFiles []files) (s
 func addEntryToTarArchive(af files, writer *tar.Writer) error {
 	header, err := tar.FileInfoHeader(&af, af.content)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating header for %q: %w", af.path, err)
 	}
 
-	header.Name = af.path
+	header.Name = filepath.ToSlash(af.path)
 
 	if err := writer.WriteHeader(header); err != nil {
-		return err
+		return fmt.Errorf("writing header for %q: %w", af.path, err)
 	}
 
 	if af.IsDir() || af.fType == SYMLINK {
@@ -425,9 +396,9 @@ func addEntryToZipArchive(af files, writer *zip.Writer) error {
 	}
 
 	header.SetMode(af.Mode() & os.ModePerm)
-	header.Name = af.path
+	header.Name = filepath.ToSlash(af.path)
 	if af.IsDir() {
-		header.Name += string(filepath.Separator)
+		header.Name += "/"
 	} else {
 		header.Method = zip.Deflate
 	}
