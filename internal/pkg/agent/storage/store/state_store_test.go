@@ -306,6 +306,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				Retry:           1,
 			}}
 
+			t.Logf("state store: %q", file)
 			s := storage.NewDiskStore(file)
 			stateStore, err := NewStateStore(log, s)
 			require.NoError(t, err, "could not create disk store")

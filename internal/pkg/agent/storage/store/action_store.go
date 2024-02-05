@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -86,7 +86,7 @@ func (s *actionStore) save() error {
 	if apc, ok := s.action.(*fleetapi.ActionPolicyChange); ok {
 		serialize := actionPolicyChangeSerializer(*apc)
 
-		r, err := yamlToReader(&serialize)
+		r, err := jsonToReader(&serialize)
 		if err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ func (s *actionStore) save() error {
 	} else if aun, ok := s.action.(*fleetapi.ActionUnenroll); ok {
 		serialize := actionUnenrollSerializer(*aun)
 
-		r, err := yamlToReader(&serialize)
+		r, err := jsonToReader(&serialize)
 		if err != nil {
 			return err
 		}

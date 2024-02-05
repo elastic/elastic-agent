@@ -84,20 +84,22 @@ type RetryableAction interface {
 }
 
 type Signed struct {
-	Data      string `yaml:"data" json:"data" mapstructure:"data"`
-	Signature string `yaml:"signature" json:"signature" mapstructure:"signature"`
+	Data      string `json:"data" yaml:"data" mapstructure:"data"`
+	Signature string `json:"signature" yaml:"signature"  mapstructure:"signature"`
 }
+
+// TODO(AndersonQ): remove the yaml tags
 
 // FleetAction represents an action from fleet-server.
 // should copy the action definition in fleet-server/model/schema.json
 type FleetAction struct {
-	ActionID         string          `yaml:"action_id" json:"id"` // NOTE schema defines this as action_id, but fleet-server remaps it to id in the json response to agent check-in.
-	ActionType       string          `yaml:"type,omitempty" json:"type,omitempty"`
-	InputType        string          `yaml:"input_type,omitempty" json:"input_type,omitempty"`
-	ActionExpiration string          `yaml:"expiration,omitempty" json:"expiration,omitempty"`
-	ActionStartTime  string          `yaml:"start_time,omitempty" json:"start_time,omitempty"`
-	Timeout          int64           `yaml:"timeout,omitempty" json:"timeout,omitempty"`
-	Data             json.RawMessage `yaml:"data,omitempty" json:"data,omitempty"`
+	ActionID         string          ` json:"id" yaml:"action_id"` // NOTE schema defines this as action_id, but fleet-server remaps it to id in the json response to agent check-in.
+	ActionType       string          `json:"type,omitempty" yaml:"type,omitempty" `
+	InputType        string          `json:"input_type,omitempty" yaml:"input_type,omitempty" `
+	ActionExpiration string          `json:"expiration,omitempty" yaml:"expiration,omitempty" `
+	ActionStartTime  string          `json:"start_time,omitempty" yaml:"start_time,omitempty" `
+	Timeout          int64           `json:"timeout,omitempty" yaml:"timeout,omitempty" `
+	Data             json.RawMessage `json:"data,omitempty" yaml:"data,omitempty" `
 	Retry            int             `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty"` // used internally for serialization by elastic-agent.
 	// Agents []string // disabled, fleet-server uses this to generate each agent's actions
 	// Timestamp string // disabled, agent does not care when the document was created
@@ -165,8 +167,8 @@ func (a *ActionUnknown) AckEvent() AckEvent {
 
 // ActionPolicyReassign is a request to apply a new
 type ActionPolicyReassign struct {
-	ActionID   string `yaml:"action_id"`
-	ActionType string `yaml:"type"`
+	ActionID   string `json:"action_id" yaml:"action_id"`
+	ActionType string `json:"type" yaml:"type"`
 }
 
 func (a *ActionPolicyReassign) String() string {
@@ -194,8 +196,8 @@ func (a *ActionPolicyReassign) AckEvent() AckEvent {
 
 // ActionPolicyChange is a request to apply a new
 type ActionPolicyChange struct {
-	ActionID   string                 `yaml:"action_id"`
-	ActionType string                 `yaml:"type"`
+	ActionID   string                 `json:"action_id" yaml:"action_id"`
+	ActionType string                 `json:"type" yaml:"type"`
 	Policy     map[string]interface{} `json:"policy" yaml:"policy,omitempty"`
 }
 
@@ -224,20 +226,20 @@ func (a *ActionPolicyChange) AckEvent() AckEvent {
 
 // ActionUpgrade is a request for agent to upgrade.
 type ActionUpgrade struct {
-	ActionID         string  `yaml:"action_id" mapstructure:"id"`
-	ActionType       string  `yaml:"type" mapstructure:"type"`
+	ActionID         string  `json:"action_id" yaml:"action_id" mapstructure:"id"`
+	ActionType       string  `json:"type" yaml:"type" mapstructure:"type"`
 	ActionStartTime  string  `json:"start_time" yaml:"start_time,omitempty" mapstructure:"-"` // TODO change to time.Time in unmarshal
 	ActionExpiration string  `json:"expiration" yaml:"expiration,omitempty" mapstructure:"-"`
-	Version          string  `json:"version" yaml:"version,omitempty" mapstructure:"-"`
-	SourceURI        string  `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
+	Version          string  `json:"data.version" yaml:"version,omitempty" mapstructure:"-"`
+	SourceURI        string  `json:"data.source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
 	Retry            int     `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
 	Signed           *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
 	Err              error   `json:"-" yaml:"-" mapstructure:"-"`
 }
 
 type ActionUpgradeYAML struct {
-	ActionID         string  `yaml:"action_id" mapstructure:"id"`
-	ActionType       string  `yaml:"type" mapstructure:"type"`
+	ActionID         string  `json:"action_id" yaml:"action_id" mapstructure:"id"`
+	ActionType       string  `json:"type" yaml:"type" mapstructure:"type"`
 	ActionStartTime  string  `json:"start_time" yaml:"start_time,omitempty" mapstructure:"-"` // TODO change to time.Time in unmarshal
 	ActionExpiration string  `json:"expiration" yaml:"expiration,omitempty" mapstructure:"-"`
 	Data             []byte  `json:"data" yaml:"data,omitempty" mapstructure:"-"`
@@ -373,8 +375,8 @@ func (a *ActionUpgrade) MarshalYAML() (interface{}, error) {
 
 // ActionUnenroll is a request for agent to unhook from fleet.
 type ActionUnenroll struct {
-	ActionID   string  `yaml:"action_id" mapstructure:"id"`
-	ActionType string  `yaml:"type" mapstructure:"type"`
+	ActionID   string  `json:"action_id" yaml:"action_id" mapstructure:"id"`
+	ActionType string  `json:"type" yaml:"type" mapstructure:"type"`
 	IsDetected bool    `json:"is_detected,omitempty" yaml:"is_detected,omitempty" mapstructure:"-"`
 	Signed     *Signed `json:"signed,omitempty" mapstructure:"signed,omitempty"`
 }
@@ -411,8 +413,8 @@ func (a *ActionUnenroll) MarshalMap() (map[string]interface{}, error) {
 
 // ActionSettings is a request to change agent settings.
 type ActionSettings struct {
-	ActionID   string `yaml:"action_id"`
-	ActionType string `yaml:"type"`
+	ActionID   string `json:"action_id" yaml:"action_id"`
+	ActionType string `json:"type" yaml:"type"`
 	LogLevel   string `json:"log_level" yaml:"log_level,omitempty"`
 }
 
@@ -443,8 +445,8 @@ func (a *ActionSettings) AckEvent() AckEvent {
 
 // ActionCancel is a request to cancel an action.
 type ActionCancel struct {
-	ActionID   string `yaml:"action_id"`
-	ActionType string `yaml:"type"`
+	ActionID   string `json:"action_id" yaml:"action_id"`
+	ActionType string `json:"type" yaml:"type"`
 	TargetID   string `json:"target_id" yaml:"target_id,omitempty"`
 }
 
@@ -585,9 +587,15 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 			"fail to decode actions",
 			errors.TypeConfig)
 	}
+	raw := make([]json.RawMessage, len(responses))
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return errors.New(err,
+			"fail to decode actions",
+			errors.TypeConfig)
+	}
 
 	actions := make([]Action, 0, len(responses))
-	for _, response := range responses {
+	for i, response := range responses {
 		var action Action
 		switch response.ActionType {
 		case ActionTypePolicyChange:
@@ -630,7 +638,7 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 				Signed:           response.Signed,
 			}
 
-			if err := json.Unmarshal(response.Data, action); err != nil {
+			if err := json.Unmarshal(raw[i], action); err != nil {
 				return errors.New(err,
 					"fail to decode UPGRADE_ACTION action",
 					errors.TypeConfig)

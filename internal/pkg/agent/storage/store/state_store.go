@@ -7,12 +7,11 @@ package store
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"sync"
-
-	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/conv"
@@ -102,7 +101,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 
 	var sr stateSerializer
 
-	dec := yaml.NewDecoder(reader)
+	dec := json.NewDecoder(reader)
 	err = dec.Decode(&sr)
 	if errors.Is(err, io.EOF) {
 		return &StateStore{
@@ -273,7 +272,7 @@ func (s *StateStore) Save() error {
 		}
 	}
 
-	reader, err := yamlToReader(&serialize)
+	reader, err := jsonToReader(&serialize)
 	if err != nil {
 		return err
 	}
@@ -337,8 +336,8 @@ func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
 	return a.acker.Commit(ctx)
 }
 
-func yamlToReader(in interface{}) (io.Reader, error) {
-	data, err := yaml.Marshal(in)
+func jsonToReader(in interface{}) (io.Reader, error) {
+	data, err := json.Marshal(in)
 	if err != nil {
 		return nil, fmt.Errorf("could not marshal to YAML: %w", err)
 	}
