@@ -23,13 +23,13 @@ const (
 	setFlagName    = "set"
 )
 
-func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
+func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "otel",
 		Short: "Start the Elastic Agent in otel mode",
 		Long:  "This command starts the Elastic Agent in otel mode.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfgFiles, err := getConfigFiles(cmd)
+			cfgFiles, err := getConfigFiles(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -45,7 +45,7 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 
 	cmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		hideInheritedFlags(c)
-		c.Parent().HelpFunc()(c, s)
+		c.Root().HelpFunc()(c, s)
 	})
 
 	cmd.Flags().StringArray(configFlagName, []string{}, "Locations to the config file(s), note that only a"+
@@ -53,6 +53,9 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringArray(setFlagName, []string{}, "Set arbitrary component config property. The component has to be defined in the config file and the flag"+
 		" has a higher precedence. Array config properties are overridden and maps are joined. Example --set=processors.batch.timeout=2s")
+
+	cmd.AddCommand(newValidateCommandWithArgs(args, streams))
+
 	return cmd
 }
 
