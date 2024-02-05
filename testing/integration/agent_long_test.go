@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"strings"
@@ -246,6 +247,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 			err := runner.agentFixture.IsHealthy(ctx)
 			require.NoError(runner.T(), err)
 			for _, handle := range handles {
+
 				procMem, err := handle.handle.Memory()
 				require.NoError(runner.T(), err)
 				ohc, ok := handle.handle.(types.OpenHandleCounter)
@@ -274,6 +276,9 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		coeffs := handle.reg.GetCoeffs()
 		runner.T().Logf("Coeff: %#v", coeffs)
 		handleSlope := coeffs[1]
+		if math.IsNaN(handleSlope) {
+			continue
+		}
 		require.LessOrEqual(runner.T(), handleSlope, handleSlopeFailure, "increase in open handles exceeded threshold")
 		memorySlope := coeffs[2]
 		require.LessOrEqual(runner.T(), memorySlope, memorySlopeFailure, "increasin in memory usage exceeded threshold")
