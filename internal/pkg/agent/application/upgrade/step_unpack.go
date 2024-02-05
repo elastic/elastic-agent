@@ -42,7 +42,7 @@ func (u *Upgrader) unpack(version, archivePath, dataDir string) (UnpackResult, e
 	if runtime.GOOS == windows {
 		unpackRes, err = unzip(u.log, archivePath, dataDir)
 	} else {
-		unpackRes, err = untar(u.log, version, archivePath, dataDir)
+		unpackRes, err = untar(u.log, archivePath, dataDir)
 	}
 
 	if err != nil {
@@ -52,6 +52,28 @@ func (u *Upgrader) unpack(version, archivePath, dataDir string) (UnpackResult, e
 
 	u.log.Infow("Unpacked upgrade artifact", "version", version, "file.path", archivePath, "unpackResult", unpackRes)
 	return unpackRes, nil
+}
+
+type packageMetadata struct {
+	manifest *v1.PackageManifest
+	hash     string
+}
+
+func (u *Upgrader) getPackageMetadata(archivePath string) (packageMetadata, error) {
+	ext := filepath.Ext(archivePath)
+	if ext == ".gz" {
+		// if we got gzip extension we need another extension before last
+		ext = filepath.Ext(strings.TrimSuffix(archivePath, ext)) + ext
+	}
+
+	switch ext {
+	case ".zip":
+		return getPackageMetadataFromZip(archivePath)
+	case ".tar.gz":
+		return getPackageMetadataFromTar(archivePath)
+	default:
+		return packageMetadata{}, fmt.Errorf("unknown package format %q", ext)
+	}
 }
 
 func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error) {
@@ -65,42 +87,19 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 	fileNamePrefix := strings.TrimSuffix(filepath.Base(archivePath), ".zip") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
 
 	pm := pathMapper{}
-	versionedHome := ""
+	var versionedHome string
 
-	// Load manifest, the use of path.Join is intentional since in .zip file paths use slash ('/') as separator
-	manifestFile, err := r.Open(path.Join(fileNamePrefix, "manifest.yaml"))
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		// we got a real error looking up for the manifest
-		return UnpackResult{}, fmt.Errorf("looking up manifest in package: %w", err)
-	}
-	if err == nil {
-		// load manifest
-		defer manifestFile.Close()
-		manifest, err := v1.ParseManifest(manifestFile)
-		if err != nil {
-			return UnpackResult{}, fmt.Errorf("parsing package manifest: %w", err)
-		}
-		pm.mappings = manifest.Package.PathMappings
-		versionedHome = filepath.Clean(pm.Map(manifest.Package.VersionedHome))
-	}
-
-	// Load hash, the use of path.Join is intentional since in .zip file paths use slash ('/') as separator
-	hashFile, err := r.Open(path.Join(fileNamePrefix, agentCommitFile))
+	metadata, err := getPackageMetadataFromZipReader(r, fileNamePrefix)
 	if err != nil {
-		// we got a real error looking up for the manifest
-		return UnpackResult{}, fmt.Errorf("looking up %q in package: %w", agentCommitFile, err)
+		return UnpackResult{}, fmt.Errorf("retrieving package metadata from %q: %w", archivePath, err)
 	}
-	defer hashFile.Close()
 
-	hashBytes, err := io.ReadAll(hashFile)
-	if err != nil {
-		return UnpackResult{}, fmt.Errorf("reading elastic-agent hash file content: %w", err)
-	}
-	if len(hashBytes) < hashLen {
-		return UnpackResult{}, fmt.Errorf("elastic-agent hash %q is too short (minimum %d)", string(hashBytes), hashLen)
-	}
-	hash = string(hashBytes[:hashLen])
-	if versionedHome == "" {
+	hash = metadata.hash[:hashLen]
+
+	if metadata.manifest != nil {
+		pm.mappings = metadata.manifest.Package.PathMappings
+		versionedHome = filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
+	} else {
 		// if at this point we didn't load the manifest, set the versioned to the backup value
 		versionedHome = createVersionedHomeFromHash(hash)
 	}
@@ -195,7 +194,54 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 	}, nil
 }
 
-func untar(log *logger.Logger, version string, archivePath, dataDir string) (UnpackResult, error) {
+func getPackageMetadataFromZip(archivePath string) (packageMetadata, error) {
+	r, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return packageMetadata{}, fmt.Errorf("opening zip archive %q: %w", archivePath, err)
+	}
+	defer r.Close()
+	fileNamePrefix := strings.TrimSuffix(filepath.Base(archivePath), ".zip") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
+	return getPackageMetadataFromZipReader(r, fileNamePrefix)
+}
+
+func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (packageMetadata, error) {
+	ret := packageMetadata{}
+
+	// Load manifest, the use of path.Join is intentional since in .zip file paths use slash ('/') as separator
+	manifestFile, err := r.Open(path.Join(fileNamePrefix, "manifest.yaml"))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		// we got a real error looking up for the manifest
+		return packageMetadata{}, fmt.Errorf("looking up manifest in package: %w", err)
+	}
+
+	if err == nil {
+		// load manifest
+		defer manifestFile.Close()
+		ret.manifest, err = v1.ParseManifest(manifestFile)
+		if err != nil {
+			return packageMetadata{}, fmt.Errorf("parsing package manifest: %w", err)
+		}
+	}
+
+	// Load hash, the use of path.Join is intentional since in .zip file paths use slash ('/') as separator
+	hashFile, err := r.Open(path.Join(fileNamePrefix, agentCommitFile))
+	if err != nil {
+		// we got a real error looking up for the agent commit file
+		return packageMetadata{}, fmt.Errorf("looking up %q in package: %w", agentCommitFile, err)
+	}
+	defer hashFile.Close()
+
+	hash, err := readCommitHash(hashFile)
+	if err != nil {
+		return packageMetadata{}, err
+	}
+
+	ret.hash = hash
+
+	return ret, nil
+}
+
+func untar(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error) {
 
 	var versionedHome string
 	var rootDir string
@@ -204,44 +250,25 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 	// Look up manifest in the archive and prepare path mappings, if any
 	pm := pathMapper{}
 
-	// quickly open the archive and look up manifest.yaml file
-	fileContents, err := getFilesContentFromTar(archivePath, "manifest.yaml", agentCommitFile)
+	metadata, err := getPackageMetadataFromTar(archivePath)
 	if err != nil {
-		return UnpackResult{}, fmt.Errorf("looking for package metadata files: %w", err)
+		return UnpackResult{}, fmt.Errorf("retrieving package metadata from %q: %w", archivePath, err)
 	}
 
-	manifestReader, ok := fileContents["manifest.yaml"]
-	if ok && manifestReader != nil {
-		manifest, err := v1.ParseManifest(manifestReader)
-		if err != nil {
-			return UnpackResult{}, fmt.Errorf("parsing package manifest: %w", err)
-		}
+	hash = metadata.hash[:hashLen]
 
+	if metadata.manifest != nil {
 		// set the path mappings
-		pm.mappings = manifest.Package.PathMappings
-		versionedHome = path.Clean(pm.Map(manifest.Package.VersionedHome))
-	}
-
-	if agentCommitReader, ok := fileContents[agentCommitFile]; ok {
-		commitBytes, err := io.ReadAll(agentCommitReader)
-		if err != nil {
-			return UnpackResult{}, fmt.Errorf("reading agent commit hash file: %w", err)
-		}
-		if len(commitBytes) < hashLen {
-			return UnpackResult{}, fmt.Errorf("hash %q is shorter than minimum length %d", string(commitBytes), hashLen)
-		}
-
-		agentCommitHash := string(commitBytes)
-		hash = agentCommitHash[:hashLen]
-		if versionedHome == "" {
-			// set default value of versioned home if it wasn't set by reading the manifest
-			versionedHome = createVersionedHomeFromHash(agentCommitHash)
-		}
+		pm.mappings = metadata.manifest.Package.PathMappings
+		versionedHome = filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
+	} else {
+		// set default value of versioned home if it wasn't set by reading the manifest
+		versionedHome = createVersionedHomeFromHash(metadata.hash)
 	}
 
 	r, err := os.Open(archivePath)
 	if err != nil {
-		return UnpackResult{}, errors.New(fmt.Sprintf("artifact for 'elastic-agent' version '%s' could not be found at '%s'", version, archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
+		return UnpackResult{}, errors.New(fmt.Sprintf("artifact for 'elastic-agent' could not be found at '%s'", archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
 	}
 	defer r.Close()
 
@@ -351,6 +378,46 @@ func untar(log *logger.Logger, version string, archivePath, dataDir string) (Unp
 	}, nil
 }
 
+func getPackageMetadataFromTar(archivePath string) (packageMetadata, error) {
+	// quickly open the archive and look up manifest.yaml file
+	fileContents, err := getFilesContentFromTar(archivePath, "manifest.yaml", agentCommitFile)
+	if err != nil {
+		return packageMetadata{}, fmt.Errorf("looking for package metadata files: %w", err)
+	}
+
+	ret := packageMetadata{}
+
+	manifestReader, ok := fileContents["manifest.yaml"]
+	if ok && manifestReader != nil {
+		ret.manifest, err = v1.ParseManifest(manifestReader)
+		if err != nil {
+			return packageMetadata{}, fmt.Errorf("parsing package manifest: %w", err)
+		}
+	}
+
+	if agentCommitReader, ok := fileContents[agentCommitFile]; ok {
+		hash, err := readCommitHash(agentCommitReader)
+		if err != nil {
+			return packageMetadata{}, err
+		}
+		ret.hash = hash
+	}
+
+	return ret, nil
+}
+
+func readCommitHash(reader io.Reader) (string, error) {
+	commitBytes, err := io.ReadAll(reader)
+	if err != nil {
+		return "", fmt.Errorf("reading agent commit hash file: %w", err)
+	}
+	hash := strings.TrimSpace(string(commitBytes))
+	if len(hash) < hashLen {
+		return "", fmt.Errorf("hash %q is shorter than minimum length %d", string(commitBytes), hashLen)
+	}
+	return hash, nil
+}
+
 func getFileNamePrefix(archivePath string) string {
 	return strings.TrimSuffix(filepath.Base(archivePath), ".tar.gz") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
 }
@@ -366,15 +433,15 @@ type pathMapper struct {
 	mappings []map[string]string
 }
 
-func (pm pathMapper) Map(path string) string {
+func (pm pathMapper) Map(packagePath string) string {
 	for _, mapping := range pm.mappings {
 		for pkgPath, mappedPath := range mapping {
-			if strings.HasPrefix(path, pkgPath) {
-				return filepath.Join(mappedPath, path[len(pkgPath):])
+			if strings.HasPrefix(packagePath, pkgPath) {
+				return path.Join(mappedPath, packagePath[len(pkgPath):])
 			}
 		}
 	}
-	return path
+	return packagePath
 }
 
 type tarCloser struct {
@@ -465,6 +532,8 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 	return result, nil
 }
 
+// createVersionedHomeFromHash returns a versioned home path relative to topPath in the legacy format `elastic-agent-<hash>`
+// formatted using OS-dependent path separators
 func createVersionedHomeFromHash(hash string) string {
 	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:hashLen]))
 }
