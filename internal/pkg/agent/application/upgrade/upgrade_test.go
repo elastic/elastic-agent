@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/mocks"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -131,7 +132,7 @@ func TestShutdownCallback(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sourceDir, 0755))
 	require.NoError(t, os.MkdirAll(targetDir, 0755))
 
-	cb := shutdownCallback(l, homePath, sourceVersion, targetVersion, newCommit)
+	cb := shutdownCallback(l, homePath, sourceVersion, targetVersion, newHome)
 
 	oldFilename := filepath.Join(sourceDir, filename)
 	err = os.WriteFile(oldFilename, content, 0640)
@@ -495,6 +496,208 @@ agent.download:
 					"ProxyURI should not be nil, want %s", tc.proxyURL)
 				assert.Equal(t, tc.proxyURL, u.settings.Proxy.URL.String())
 			}
+		})
+	}
+}
+
+var agentVersion123SNAPSHOTabcdef = agentVersion{
+	version:  "1.2.3",
+	snapshot: true,
+	hash:     "abcdef",
+}
+
+var agentVersion123SNAPSHOTabcdefRepackaged = agentVersion{
+	version:  "1.2.3-repackaged",
+	snapshot: true,
+	hash:     "abcdef",
+}
+
+var agentVersion123abcdef = agentVersion{
+	version:  "1.2.3",
+	snapshot: false,
+	hash:     "abcdef",
+}
+
+var agentVersion123SNAPSHOTghijkl = agentVersion{
+	version:  "1.2.3",
+	snapshot: true,
+	hash:     "ghijkl",
+}
+
+func TestIsSameVersion(t *testing.T) {
+	type args struct {
+		current  agentVersion
+		metadata packageMetadata
+		version  string
+	}
+	type want struct {
+		same       bool
+		newVersion agentVersion
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "same version, snapshot flag and hash",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       true,
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3-repackaged",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag (SNAPSHOT promotion to release)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      false,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123abcdef,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "ghijkl",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+		},
+		{
+			name: "same version, snapshot flag and hash, no manifest",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				same:       true,
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version, no manifest",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3-repackaged-SNAPSHOT",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag, no manifest (SNAPSHOT promotion to release)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123abcdef,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "ghijkl",
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			log, _ := logger.NewTesting(test.name)
+			actualSame, actualNewVersion := isSameVersion(log, test.args.current, test.args.metadata, test.args.version)
+
+			assert.Equal(t, test.want.same, actualSame, "Unexpected boolean comparison result: isSameVersion(%v, %v, %v, %v) should be %v",
+				log, test.args.current, test.args.metadata, test.args.version, test.want.same)
+			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: isSameVersion(%v, %v, %v, %v) should be %v",
+				log, test.args.current, test.args.metadata, test.args.version, test.want.newVersion)
 		})
 	}
 }
