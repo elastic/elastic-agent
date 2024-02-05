@@ -198,22 +198,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		hash:     release.Commit(),
 	}
 
-	newVersion := agentVersion{}
-	if metadata.manifest != nil {
-		packageDesc := metadata.manifest.Package
-		newVersion.version = packageDesc.Version
-		newVersion.snapshot = packageDesc.Snapshot
-	} else {
-		// extract version info from the version string (we can ignore parsing errors as it would have never passed the download step)
-		parsedVersion, _ := agtversion.ParseVersion(version)
-		newVersion.version = strings.TrimSuffix(parsedVersion.VersionWithPrerelease(), "-SNAPSHOT")
-		newVersion.snapshot = parsedVersion.IsSnapshot()
-	}
-	newVersion.hash = metadata.hash
-
-	u.log.Debugw("Comparing current and new agent version", "current_version", currentVersion, "new_version", newVersion)
-
-	if currentVersion == newVersion {
+	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
+	if same {
 		return nil, fmt.Errorf("agent version is already %s", currentVersion)
 	}
 
@@ -340,6 +326,25 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	}
 
 	return u.settings.SourceURI
+}
+
+func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMetadata, upgradeVersion string) (bool, agentVersion) {
+	newVersion := agentVersion{}
+	if metadata.manifest != nil {
+		packageDesc := metadata.manifest.Package
+		newVersion.version = packageDesc.Version
+		newVersion.snapshot = packageDesc.Snapshot
+	} else {
+		// extract version info from the version string (we can ignore parsing errors as it would have never passed the download step)
+		parsedVersion, _ := agtversion.ParseVersion(upgradeVersion)
+		newVersion.version = strings.TrimSuffix(parsedVersion.VersionWithPrerelease(), "-SNAPSHOT")
+		newVersion.snapshot = parsedVersion.IsSnapshot()
+	}
+	newVersion.hash = metadata.hash
+
+	log.Debugw("Comparing current and new agent version", "current_version", current, "new_version", newVersion)
+
+	return current == newVersion, newVersion
 }
 
 func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome string) {
