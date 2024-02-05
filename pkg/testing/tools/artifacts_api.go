@@ -149,13 +149,12 @@ func NewArtifactAPIClient(opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
 func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList, err error) {
 	joinedURL, err := aac.composeURL(artifactsAPIV1VersionsEndpoint)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	resp, err := aac.createAndPerformRequest(ctx, joinedURL)
 	if err != nil {
-		err = fmt.Errorf("getting versions: %w", err)
-		return
+		return nil, fmt.Errorf("getting versions: %w", err)
 	}
 
 	defer resp.Body.Close()
@@ -168,19 +167,22 @@ func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList
 func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version string) (builds *VersionBuilds, err error) {
 	joinedURL, err := aac.composeURL(fmt.Sprintf(artifactsAPIV1VersionBuildsEndpoint, version))
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	resp, err := aac.createAndPerformRequest(ctx, joinedURL)
 	if err != nil {
-		err = fmt.Errorf("getting builds for version %s: %w", version, err)
-		return
+		return nil, fmt.Errorf("getting builds for version %s: %w", version, err)
 	}
 
 	defer resp.Body.Close()
 	return checkResponseAndUnmarshal[VersionBuilds](resp)
 }
 
+// FindBuild returns a build of the given `version` that does not match the `excludeHash` commit hash
+// and starts with the `offset` index on the current list of builds.
+// If there are no builds matching these conditions, returns `ErrBuildNotFound`.
+// `offset` value is used when the consumer does not wish to request the latest build.
 func (aac ArtifactAPIClient) FindBuild(ctx context.Context, version, excludeHash string, offset int) (buildDetails *BuildDetails, err error) {
 	resp, err := aac.GetBuildsForVersion(ctx, version)
 	if err != nil {
@@ -208,13 +210,12 @@ func (aac ArtifactAPIClient) FindBuild(ctx context.Context, version, excludeHash
 func (aac ArtifactAPIClient) GetBuildDetails(ctx context.Context, version string, buildID string) (buildDetails *BuildDetails, err error) {
 	joinedURL, err := aac.composeURL(fmt.Sprintf(artifactAPIV1BuildDetailsEndpoint, version, buildID))
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	resp, err := aac.createAndPerformRequest(ctx, joinedURL)
 	if err != nil {
-		err = fmt.Errorf("getting build details for version %s buildID %s: %w", version, buildID, err)
-		return
+		return nil, fmt.Errorf("getting build details for version %s buildID %s: %w", version, buildID, err)
 	}
 
 	defer resp.Body.Close()

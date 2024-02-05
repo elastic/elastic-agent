@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -60,21 +59,11 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	}
 	require.NoError(t, err)
 
-	upgradeVersionString := buildInfo.Build.BuildID
-	t.Logf("found build %q available for testing", upgradeVersionString)
-
-	buildFragments := strings.Split(upgradeVersionString, "-")
-	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
-	startVersion := version.NewParsedSemVer(
-		endVersion.Major(),
-		endVersion.Minor(),
-		endVersion.Patch(),
-		endVersion.Prerelease(),
-		buildFragments[1],
-	)
+	t.Logf("found build %q available for testing", buildInfo.Build.BuildID)
+	startVersion := versionWithBuildID(t, endVersion, buildInfo.Build.BuildID)
 	startFixture, err := atesting.NewFixture(
 		t,
-		startVersion.String(),
+		startVersion,
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)

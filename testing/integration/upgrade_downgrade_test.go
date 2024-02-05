@@ -64,28 +64,18 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 		return
 	}
 	require.NoError(t, err)
-	upgradeVersionString := buildInfo.Build.BuildID
-	t.Logf("found build %q available for testing", upgradeVersionString)
-
-	buildFragments := strings.Split(upgradeVersionString, "-")
-	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
-	endParsedVersion := version.NewParsedSemVer(
-		latestSnapshotVersion.Major(),
-		latestSnapshotVersion.Minor(),
-		latestSnapshotVersion.Patch(),
-		latestSnapshotVersion.Prerelease(),
-		buildFragments[1],
-	)
 
 	// Upgrade to the specific build.
+	t.Logf("found build %q available for testing", buildInfo.Build.BuildID)
+	endVersion := versionWithBuildID(t, latestSnapshotVersion, buildInfo.Build.BuildID)
 	endFixture, err := atesting.NewFixture(
 		t,
-		endParsedVersion.String(),
+		endVersion,
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
 
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), endParsedVersion.String())
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), endVersion)
 
 	// We pass the upgradetest.WithDisableUpgradeWatcherUpgradeDetailsCheck option here because the endFixture
 	// is fetched from the artifacts API and it may not contain changes in the Upgrade Watcher whose effects are
@@ -93,4 +83,20 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	// TODO: Stop passing this option and remove these comments once 8.13.0 has been released.
 	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithDisableUpgradeWatcherUpgradeDetailsCheck())
 	assert.NoError(t, err)
+}
+
+// versionWithBuildID creates a new parsed version created from the given `initialVersion` with the given `buildID` as build metadata.
+func versionWithBuildID(t *testing.T, initialVersion *version.ParsedSemVer, buildID string) string {
+	buildFragments := strings.Split(buildID, "-")
+	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", buildID)
+	result := version.NewParsedSemVer(
+		initialVersion.Major(),
+		initialVersion.Minor(),
+		initialVersion.Patch(),
+		initialVersion.Prerelease(),
+		buildFragments[1],
+	)
+
+	return result.String()
+
 }
