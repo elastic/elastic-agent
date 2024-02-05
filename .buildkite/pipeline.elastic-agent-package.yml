@@ -49,15 +49,6 @@ steps:
           - label: "False"
             value: ""
         hint: "If the DRA release manager script would actually publish anything or just print"
-      - select: "DRA Upload"
-        key: "DRA_UPLOAD"
-        required: "false"
-        options:
-          - label: "True"
-            value: "true"
-          - label: "False"
-            value: "false"
-        hint: "If True, use the normal DRA upload, otherwise use BK API upload for Independent Agent Release"
 
   - wait: ~
     if: build.env("ManifestURL") == null
