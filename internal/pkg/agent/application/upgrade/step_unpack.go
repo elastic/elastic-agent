@@ -101,7 +101,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 		versionedHome = filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
 	} else {
 		// if at this point we didn't load the manifest, set the versioned to the backup value
-		versionedHome = filepath.FromSlash(createVersionedHomeFromHash(hash))
+		versionedHome = createVersionedHomeFromHash(hash)
 	}
 
 	unpackFile := func(f *zip.File) (err error) {
@@ -226,7 +226,7 @@ func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (
 	// Load hash, the use of path.Join is intentional since in .zip file paths use slash ('/') as separator
 	hashFile, err := r.Open(path.Join(fileNamePrefix, agentCommitFile))
 	if err != nil {
-		// we got a real error looking up for the manifest
+		// we got a real error looking up for the agent commit file
 		return packageMetadata{}, fmt.Errorf("looking up %q in package: %w", agentCommitFile, err)
 	}
 	defer hashFile.Close()
@@ -263,7 +263,7 @@ func untar(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 		versionedHome = filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
 	} else {
 		// set default value of versioned home if it wasn't set by reading the manifest
-		versionedHome = filepath.FromSlash(createVersionedHomeFromHash(metadata.hash))
+		versionedHome = createVersionedHomeFromHash(metadata.hash)
 	}
 
 	r, err := os.Open(archivePath)
@@ -532,6 +532,8 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 	return result, nil
 }
 
+// createVersionedHomeFromHash returns a versioned home path relative to topPath in the legacy format `elastic-agent-<hash>`
+// formatted using OS-dependent path separators
 func createVersionedHomeFromHash(hash string) string {
-	return fmt.Sprintf("data/elastic-agent-%s", hash[:hashLen])
+	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:hashLen]))
 }
