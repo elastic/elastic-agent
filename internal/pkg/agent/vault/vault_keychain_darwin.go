@@ -36,7 +36,7 @@ type DarwinKeychainVault struct {
 	mx       sync.Mutex
 }
 
-// New initializes the vault store
+// NewDarwinKeyChainVault initializes the keychain vault store
 // Call Close when done to release the resources
 func NewDarwinKeyChainVault(ctx context.Context, name string, opts ...OptionFunc) (*DarwinKeychainVault, error) {
 	var keychain C.SecKeychainRef

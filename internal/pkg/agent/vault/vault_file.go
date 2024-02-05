@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build !darwin
-
 package vault
 
 import (
@@ -20,14 +18,6 @@ import (
 	"github.com/gofrs/flock"
 )
 
-const (
-	// defaultFlockRetryDelay default file lock retry delay
-	defaultFlockRetryDelay = 10 * time.Millisecond
-
-	// lock file name
-	lockFile = `.lock`
-)
-
 type FileVault struct {
 	path string
 	seed []byte
@@ -36,9 +26,9 @@ type FileVault struct {
 	lock           *flock.Flock
 }
 
-// New creates the vault store
-func New(ctx context.Context, path string, opts ...OptionFunc) (v *FileVault, err error) {
-	options := applyOptions(opts...)
+// NewFileVault creates the file-based vault store
+func NewFileVault(ctx context.Context, options Options) (v *FileVault, err error) {
+	path := options.vaultPath
 	dir := filepath.Dir(path)
 
 	// If there is no specific path then get the executable directory

@@ -4,7 +4,14 @@
 
 package vault
 
+import "time"
+
 type OptionFunc func(o *Options)
+
+type Options struct {
+	readonly       bool
+	lockRetryDelay time.Duration
+}
 
 // WithReadonly opens storage for read-only access only, noop for Darwin
 func WithReadonly(readonly bool) OptionFunc {

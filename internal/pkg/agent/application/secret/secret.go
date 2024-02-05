@@ -128,7 +128,7 @@ func Set(ctx context.Context, key string, secret Secret, opts ...OptionFunc) err
 	return set(ctx, v, key, secret)
 }
 
-func set(ctx context.Context, v *vault.Vault, key string, secret Secret) error {
+func set(ctx context.Context, v vault.Vault, key string, secret Secret) error {
 	b, err := json.Marshal(secret)
 	if err != nil {
 		return fmt.Errorf("could not marshal secret: %w", err)
