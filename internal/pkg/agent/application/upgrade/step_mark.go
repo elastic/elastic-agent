@@ -5,8 +5,6 @@
 package upgrade
 
 import (
-	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,7 +15,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -119,13 +116,8 @@ func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, version, hash, versionedHome string, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
-	prevVersion := release.VersionWithSnapshot()
-	prevHash := release.Commit()
-	prevVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
-	if err != nil {
-		return fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
-	}
+func markUpgrade(log *logger.Logger, dataDirPath, version, hash, versionedHome, prevVersion, prevHash, prevVersionedHome string, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
+
 	if len(prevHash) > hashLen {
 		prevHash = prevHash[:hashLen]
 	}
@@ -147,13 +139,13 @@ func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, version, h
 		return errors.New(err, errors.TypeConfig, "failed to parse marker file")
 	}
 
-	markerPath := markerFilePath()
+	markerPath := markerFilePath(dataDirPath)
 	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", prevHash)
 	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
 	}
 
-	if err := UpdateActiveCommit(log, hash); err != nil {
+	if err := UpdateActiveCommit(log, paths.Top(), hash); err != nil {
 		return err
 	}
 
@@ -161,8 +153,8 @@ func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, version, h
 }
 
 // UpdateActiveCommit updates active.commit file to point to active version.
-func UpdateActiveCommit(log *logger.Logger, hash string) error {
-	activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
+func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string) error {
+	activeCommitPath := filepath.Join(topDirPath, agentCommitFile)
 	log.Infow("Updating active commit", "file.path", activeCommitPath, "hash", hash)
 	if err := os.WriteFile(activeCommitPath, []byte(hash), 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath))
@@ -172,8 +164,8 @@ func UpdateActiveCommit(log *logger.Logger, hash string) error {
 }
 
 // CleanMarker removes a marker from disk.
-func CleanMarker(log *logger.Logger) error {
-	markerFile := markerFilePath()
+func CleanMarker(log *logger.Logger, dataDirPath string) error {
+	markerFile := markerFilePath(dataDirPath)
 	log.Infow("Removing marker file", "file.path", markerFile)
 	if err := os.Remove(markerFile); !os.IsNotExist(err) {
 		return err
@@ -184,8 +176,8 @@ func CleanMarker(log *logger.Logger) error {
 
 // LoadMarker loads the update marker. If the file does not exist it returns nil
 // and no error.
-func LoadMarker() (*UpdateMarker, error) {
-	return loadMarker(markerFilePath())
+func LoadMarker(dataDirPath string) (*UpdateMarker, error) {
+	return loadMarker(markerFilePath(dataDirPath))
 }
 
 func loadMarker(markerFile string) (*UpdateMarker, error) {
@@ -238,9 +230,9 @@ func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
 		return err
 	}
 
-	return writeMarkerFile(markerFilePath(), markerBytes, shouldFsync)
+	return writeMarkerFile(markerFilePath(paths.Data()), markerBytes, shouldFsync)
 }
 
-func markerFilePath() string {
-	return filepath.Join(paths.Data(), markerFilename)
+func markerFilePath(dataDirPath string) string {
+	return filepath.Join(dataDirPath, markerFilename)
 }
