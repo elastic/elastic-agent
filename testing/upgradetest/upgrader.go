@@ -237,11 +237,7 @@ func PerformUpgrade(
 		}
 	}
 
-<<<<<<< HEAD
-	logger.Logf("Upgrading from version %q to version %q", startParsedVersion, endVersionInfo.Binary.String())
-=======
 	logger.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"", startParsedVersion, startVersionInfo.Binary.Commit, endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
->>>>>>> d9c4c9f6a8 (Check for non-matching commit hash while testing upgrades (#4095))
 
 	upgradeCmdArgs := []string{"upgrade", endVersionInfo.Binary.String()}
 	if upgradeOpts.sourceURI == nil {
