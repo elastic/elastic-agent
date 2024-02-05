@@ -6,6 +6,7 @@ package storage
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -101,6 +101,33 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 
 	})
 
+	t.Run("when replace is skipped due to target already containing source content", func(t *testing.T) {
+		yamlTarget := []byte("fleet:\n  enabled: true\nother: value\n")
+		yamlReplaceWith := []byte("#This comment is left out\nfleet:\n  enabled: true\n")
+		target, err := genFile(yamlTarget)
+
+		require.NoError(t, err)
+		dir := filepath.Dir(target)
+		defer os.RemoveAll(dir)
+
+		requireFilesCount(t, dir, 1)
+
+		s := NewReplaceOnSuccessStore(
+			target,
+			yamlReplaceWith,
+			failure,
+		)
+
+		err = s.Save(in)
+		require.Error(t, err)
+
+		writtenContent, err := os.ReadFile(target)
+		require.NoError(t, err)
+
+		require.True(t, bytes.Equal(writtenContent, yamlTarget))
+		requireFilesCount(t, dir, 1)
+	})
+
 	t.Run("when target file do not exist", func(t *testing.T) {
 		s := NewReplaceOnSuccessStore(
 			fmt.Sprintf("%s/%d", os.TempDir(), time.Now().Unix()),
@@ -176,7 +203,10 @@ func genFile(b []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	f.Write(b)
+	_, err = f.Write(b)
+	if err != nil {
+		return "", err
+	}
 	name := f.Name()
 	if err := f.Close(); err != nil {
 		return "", err
