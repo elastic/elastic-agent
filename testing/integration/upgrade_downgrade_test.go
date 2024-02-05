@@ -23,6 +23,10 @@ import (
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
+const (
+	artifactElasticAgentProject = "elastic-agent-package"
+)
+
 func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Upgrade,
@@ -41,27 +45,14 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	// retrieve all the versions of agent from the artifact API
 	aac := tools.NewArtifactAPIClient()
 	latestSnapshotVersion, err := aac.GetLatestSnapshotVersion(ctx, t)
 	require.NoError(t, err)
 
-	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
-	// 2 builds are required to be available for the test to work. This is because
-	// if we upgrade to the latest build there would be no difference then passing the version
-	// string without the buildid, being agent would pick that build anyway.
-	// We pick the build that is 2 builds back to upgrade to, to ensure that the buildid is
-	// working correctly and agent is not only picking the latest build.
-	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
+	// start at the build version as we want to test the retry
+	// logic that is in the build.
+	startFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
-<<<<<<< HEAD
-	if len(builds.Builds) < 2 {
-		t.Skipf("not enough SNAPSHOT builds exist for version %s. Found %d", latestSnapshotVersion.VersionWithPrerelease(), len(builds.Builds))
-	}
-
-	// find the specific build to use for the test
-	upgradeVersionString := builds.Builds[1]
-=======
 	startVersion, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err)
 
@@ -99,7 +90,6 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 
 	t.Logf("found build %q available for testing", upgradeVersionString)
 
->>>>>>> 84e6bc1a64 (Add support fetching artefacts for a build ID (#4163))
 	buildFragments := strings.Split(upgradeVersionString, "-")
 	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
 	endParsedVersion := version.NewParsedSemVer(
@@ -109,11 +99,6 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 		latestSnapshotVersion.Prerelease(),
 		buildFragments[1],
 	)
-
-	// Start at the build version as we want to test the retry
-	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
-	require.NoError(t, err)
 
 	// Upgrade to the specific build.
 	endFixture, err := atesting.NewFixture(
