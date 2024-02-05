@@ -272,6 +272,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 		runner.T().Logf("=============================== %s", handle.name)
 		runner.T().Logf("formula: %v", handle.reg.Formula)
+		runner.T().Logf("data: %#v", handle.reg)
 		// coefficient 0: offset (b), 1: handle slope, 2: memory slope
 		coeffs := handle.reg.GetCoeffs()
 		runner.T().Logf("Coeff: %#v", coeffs)
