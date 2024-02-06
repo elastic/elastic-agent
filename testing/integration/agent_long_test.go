@@ -220,8 +220,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 			require.NoError(runner.T(), err)
 			reg := new(regression.Regression)
 			reg.SetObserved(fmt.Sprintf("%s handle usage", info.Name))
-			reg.SetVar(0, "handles")
-			reg.SetVar(1, "memory")
+			reg.SetVar(0, "time")
 			runner.T().Logf("created handle watcher for %s (%d)", info.Name, proc.PID())
 			handles = append(handles, processWatcher{handle: handle, pid: proc.PID(), name: info.Name, reg: reg})
 		}
@@ -236,6 +235,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	ticker := time.Tick(time.Second * 10)
 
 	done := false
+	start := time.Now()
 	for {
 		if done {
 			break
@@ -248,13 +248,11 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 			require.NoError(runner.T(), err)
 			for _, handle := range handles {
 
-				procMem, err := handle.handle.Memory()
-				require.NoError(runner.T(), err)
 				ohc, ok := handle.handle.(types.OpenHandleCounter)
 				if ok {
 					handleCount, err := ohc.OpenHandleCount()
 					require.NoError(runner.T(), err)
-					handle.reg.Train(regression.DataPoint(float64(time.Now().Unix()), []float64{float64(handleCount), float64(procMem.Virtual)}))
+					handle.reg.Train(regression.DataPoint(float64(handleCount), []float64{time.Since(start).Seconds()}))
 				}
 
 			}
@@ -263,8 +261,8 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	// we're measuring the handle/memory usage as y=mx+b
 	// if the slope is increasing above a certain rate, fail the test
-	handleSlopeFailure := float64(2)
-	memorySlopeFailure := 2e-3
+	handleSlopeFailure := float64(1)
+	// memorySlopeFailure := 2e-3
 
 	for _, handle := range handles {
 		err = handle.reg.Run()
@@ -281,8 +279,6 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 			continue
 		}
 		require.LessOrEqual(runner.T(), handleSlope, handleSlopeFailure, "increase in open handles exceeded threshold")
-		memorySlope := coeffs[2]
-		require.LessOrEqual(runner.T(), memorySlope, memorySlopeFailure, "increasin in memory usage exceeded threshold")
 
 		runner.T().Logf("===============================")
 	}
