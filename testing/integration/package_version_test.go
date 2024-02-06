@@ -117,7 +117,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	compPaths, err := filepath.Glob(glob)
 	require.NoErrorf(t, err, "failed to glob filebeat path pattern %q", glob)
 	require.Lenf(t, compPaths, 1,
-		"glob pattern %q. Found %d paths to filebeat, can only have 1",
+		"glob pattern \"%s\": found %d paths to filebeat, can only have 1",
 		glob, len(compPaths))
 
 	cmdVer := exec.Command(compPaths[0], "version")
