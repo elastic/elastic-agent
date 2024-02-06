@@ -256,7 +256,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
 	}
 
-	if err := ChangeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
+	if err := changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
 		rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, err
@@ -387,7 +387,7 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versio
 	}
 
 	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
-	err = ChangeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
+	err = changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		log.Warnw(fmt.Sprintf("rolling back install: restoring symlink to %q failed", oldAgentPath), "error.message", err)
 	}

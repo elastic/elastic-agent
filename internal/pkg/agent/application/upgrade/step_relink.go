@@ -19,7 +19,7 @@ const (
 	exe     = ".exe"
 )
 
-func ChangeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
+func changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 
 	// handle windows suffixes
 	if runtime.GOOS == windows {
