@@ -28,13 +28,13 @@ type testAgentVersion struct {
 	hash    string
 }
 
-type agentInstall struct {
+type testAgentInstall struct {
 	version          testAgentVersion
 	useVersionInPath bool
 }
 
 type setupAgentInstallations struct {
-	installedAgents []agentInstall
+	installedAgents []testAgentInstall
 	upgradeFrom     testAgentVersion
 	upgradeTo       testAgentVersion
 	currentAgent    testAgentVersion
@@ -74,7 +74,7 @@ func TestCleanup(t *testing.T) {
 				keepLogs:             false,
 			},
 			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []agentInstall{
+				installedAgents: []testAgentInstall{
 					{
 						version:          version123Snapshot,
 						useVersionInPath: false,
@@ -103,7 +103,7 @@ func TestCleanup(t *testing.T) {
 				keepLogs:             false,
 			},
 			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []agentInstall{
+				installedAgents: []testAgentInstall{
 					{
 						version:          version123Snapshot,
 						useVersionInPath: true,
@@ -132,7 +132,7 @@ func TestCleanup(t *testing.T) {
 				keepLogs:             false,
 			},
 			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []agentInstall{
+				installedAgents: []testAgentInstall{
 					{
 						version:          version123Snapshot,
 						useVersionInPath: false,
@@ -161,7 +161,7 @@ func TestCleanup(t *testing.T) {
 				keepLogs:             false,
 			},
 			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []agentInstall{
+				installedAgents: []testAgentInstall{
 					{
 						version: testAgentVersion{
 							version: "0.9.9",
@@ -229,7 +229,7 @@ func TestRollback(t *testing.T) {
 	}{
 		"rollback without versionedHome (legacy upgrade process)": {
 			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []agentInstall{
+				installedAgents: []testAgentInstall{
 					{
 						version:          version123Snapshot,
 						useVersionInPath: false,
@@ -252,7 +252,7 @@ func TestRollback(t *testing.T) {
 		},
 		"rollback with versionedHome (new upgrade process)": {
 			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []agentInstall{
+				installedAgents: []testAgentInstall{
 					{
 						version:          version123Snapshot,
 						useVersionInPath: true,
@@ -275,7 +275,7 @@ func TestRollback(t *testing.T) {
 		},
 		"rollback with versionedHome only on the new agent (new upgrade process from an old agent upgraded with legacy process)": {
 			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []agentInstall{
+				installedAgents: []testAgentInstall{
 					{
 						version:          version123Snapshot,
 						useVersionInPath: false,
@@ -493,6 +493,20 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		oldAgentVersionedHome = ""
 	}
 
-	err := markUpgrade(log, paths.DataFrom(topDir), newAgentVersion, newAgentHash, newAgentVersionedHome, oldAgentVersion, oldAgentHash, oldAgentVersionedHome, nil, nil)
+	newAgentInstall := agentInstall{
+		version:       newAgentVersion,
+		hash:          newAgentHash,
+		versionedHome: newAgentVersionedHome,
+	}
+	oldAgentInstall := agentInstall{
+		version:       oldAgentVersion,
+		hash:          oldAgentHash,
+		versionedHome: oldAgentVersionedHome,
+	}
+	err := markUpgrade(log,
+		paths.DataFrom(topDir),
+		newAgentInstall,
+		oldAgentInstall,
+		nil, nil)
 	require.NoError(t, err, "error writing fake update marker")
 }

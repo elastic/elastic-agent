@@ -217,7 +217,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 }
 
 func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error) {
-	manifestFilePath := filepath.Join(extractedPackageDir, "manifest.yaml")
+	manifestFilePath := filepath.Join(extractedPackageDir, v1.ManifestFileName)
 	manifestFile, err := os.Open(manifestFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open package manifest file (%s): %w", manifestFilePath, err)
