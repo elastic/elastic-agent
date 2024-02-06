@@ -463,6 +463,44 @@ func TestValidateEnrollFlags(t *testing.T) {
 	})
 }
 
+func TestDaemonReloadWithBackoff(t *testing.T) {
+	log, _ := logger.New("tst", false)
+
+	ctx, cn := context.WithCancel(context.Background())
+	// Cancel context
+	cn()
+
+	tests := []struct {
+		name             string
+		daemonReloadFunc func(ctx context.Context) error
+		wantErr          error
+	}{
+		{
+			name:             "daemonReloadSucceeded",
+			daemonReloadFunc: func(ctx context.Context) error { return nil },
+		},
+		{
+			name: "retryWithContextCancelled",
+			daemonReloadFunc: func(ctx context.Context) error {
+				return errors.New("failed") // Return some (not context's) error so it retries
+			},
+			wantErr: context.Canceled,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := enrollCmd{
+				log:              log,
+				daemonReloadFunc: tc.daemonReloadFunc,
+			}
+
+			err := cmd.daemonReloadWithBackoff(ctx)
+			assert.ErrorIs(t, err, tc.wantErr)
+		})
+	}
+}
+
 func withServer(
 	m func(t *testing.T) *http.ServeMux,
 	test func(t *testing.T, host string),

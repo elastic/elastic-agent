@@ -24,12 +24,15 @@ const (
 	artifactsAPIV1VersionBuildsEndpoint = "v1/versions/%s/builds/"
 	artifactAPIV1BuildDetailsEndpoint   = "v1/versions/%s/builds/%s"
 	// artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
+
+	artifactElasticAgentProject = "elastic-agent-package"
 )
 
 var (
 	ErrLatestVersionNil        = errors.New("latest version is nil")
 	ErrSnapshotVersionsEmpty   = errors.New("snapshot list is nil")
 	ErrInvalidVersionRetrieved = errors.New("invalid version retrieved from artifact API")
+	ErrBuildNotFound           = errors.New("there are no build that satisfy given conditions")
 
 	ErrBadHTTPStatusCode = errors.New("bad http status code")
 )
@@ -146,13 +149,12 @@ func NewArtifactAPIClient(opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
 func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList, err error) {
 	joinedURL, err := aac.composeURL(artifactsAPIV1VersionsEndpoint)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	resp, err := aac.createAndPerformRequest(ctx, joinedURL)
 	if err != nil {
-		err = fmt.Errorf("getting versions: %w", err)
-		return
+		return nil, fmt.Errorf("getting versions: %w", err)
 	}
 
 	defer resp.Body.Close()
@@ -165,17 +167,42 @@ func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList
 func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version string) (builds *VersionBuilds, err error) {
 	joinedURL, err := aac.composeURL(fmt.Sprintf(artifactsAPIV1VersionBuildsEndpoint, version))
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	resp, err := aac.createAndPerformRequest(ctx, joinedURL)
 	if err != nil {
-		err = fmt.Errorf("getting builds for version %s: %w", version, err)
-		return
+		return nil, fmt.Errorf("getting builds for version %s: %w", version, err)
 	}
 
 	defer resp.Body.Close()
 	return checkResponseAndUnmarshal[VersionBuilds](resp)
+}
+
+// FindBuild returns a build of the given `version` that does not match the
+// `excludeHash` commit hash. It searches for a matching build from the latest
+// to the oldest, starting the search at the `offset` index in the list of builds.
+// Setting `offset` to 0 includes all builds, 1 skips the latest, and so forth.
+// If there are no builds matching these conditions, returns `ErrBuildNotFound`.
+func (aac ArtifactAPIClient) FindBuild(ctx context.Context, version, excludeHash string, offset int) (buildDetails *BuildDetails, err error) {
+	resp, err := aac.GetBuildsForVersion(ctx, version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get a list of builds: %w", err)
+	}
+	if len(resp.Builds) < offset+1 {
+		return nil, ErrBuildNotFound
+	}
+	for _, buildID := range resp.Builds[offset:] {
+		details, err := aac.GetBuildDetails(ctx, version, buildID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get build information for %q: %w", buildID, err)
+		}
+		if details.Build.Projects[artifactElasticAgentProject].CommitHash != excludeHash {
+			return details, nil
+		}
+	}
+
+	return nil, ErrBuildNotFound
 }
 
 // GetBuildDetails returns the list of project and artifacts related to a specific build.
@@ -184,13 +211,12 @@ func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version st
 func (aac ArtifactAPIClient) GetBuildDetails(ctx context.Context, version string, buildID string) (buildDetails *BuildDetails, err error) {
 	joinedURL, err := aac.composeURL(fmt.Sprintf(artifactAPIV1BuildDetailsEndpoint, version, buildID))
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	resp, err := aac.createAndPerformRequest(ctx, joinedURL)
 	if err != nil {
-		err = fmt.Errorf("getting build details for version %s buildID %s: %w", version, buildID, err)
-		return
+		return nil, fmt.Errorf("getting build details for version %s buildID %s: %w", version, buildID, err)
 	}
 
 	defer resp.Body.Close()
