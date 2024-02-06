@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -112,8 +113,12 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		1*time.Minute, 10*time.Second,
 		"agent did not became health. Last status: %v", &stateBuff)
 
+	filebeat := "filebeat"
+	if runtime.GOOS == "windows" {
+		filebeat += ".exe"
+	}
 	wd := f.WorkDir()
-	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", "filebeat")
+	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", filebeat)
 	compPaths, err := filepath.Glob(glob)
 	require.NoErrorf(t, err, "failed to glob filebeat path pattern %q", glob)
 	require.Lenf(t, compPaths, 1,
