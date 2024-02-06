@@ -98,7 +98,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	stateBuff := bytes.Buffer{}
 	isHealth := func() bool {
 		stateBuff.Reset()
-		
+
 		err := f.IsHealthy(ctx)
 		if err != nil {
 			stateBuff.WriteString(err.Error())
