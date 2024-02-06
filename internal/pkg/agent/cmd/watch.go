@@ -77,6 +77,8 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		return nil
 	}
 
+	log.Infof("Loaded update marker %+v", marker)
+
 	locker := filelock.NewAppLocker(paths.Top(), watcherLockFile)
 	if err := locker.TryLock(); err != nil {
 		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
@@ -98,7 +100,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
-		if err := upgrade.Cleanup(log, paths.Top(), marker.VersionedHome, release.ShortCommit(), true, false); err != nil {
+		if err := upgrade.Cleanup(log, paths.Top(), paths.VersionedHome(paths.Top()), release.ShortCommit(), true, false); err != nil {
 			log.Error("clean up of prior watcher run failed", err)
 		}
 		// exit nicely

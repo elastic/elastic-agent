@@ -208,7 +208,7 @@ func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (
 	ret := packageMetadata{}
 
 	// Load manifest, the use of path.Join is intentional since in .zip file paths use slash ('/') as separator
-	manifestFile, err := r.Open(path.Join(fileNamePrefix, "manifest.yaml"))
+	manifestFile, err := r.Open(path.Join(fileNamePrefix, v1.ManifestFileName))
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		// we got a real error looking up for the manifest
 		return packageMetadata{}, fmt.Errorf("looking up manifest in package: %w", err)
@@ -380,14 +380,14 @@ func untar(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 
 func getPackageMetadataFromTar(archivePath string) (packageMetadata, error) {
 	// quickly open the archive and look up manifest.yaml file
-	fileContents, err := getFilesContentFromTar(archivePath, "manifest.yaml", agentCommitFile)
+	fileContents, err := getFilesContentFromTar(archivePath, v1.ManifestFileName, agentCommitFile)
 	if err != nil {
 		return packageMetadata{}, fmt.Errorf("looking for package metadata files: %w", err)
 	}
 
 	ret := packageMetadata{}
 
-	manifestReader, ok := fileContents["manifest.yaml"]
+	manifestReader, ok := fileContents[v1.ManifestFileName]
 	if ok && manifestReader != nil {
 		ret.manifest, err = v1.ParseManifest(manifestReader)
 		if err != nil {

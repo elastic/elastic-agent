@@ -40,6 +40,7 @@ const (
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
 	runDirMod       = 0770
+	snapshotSuffix  = "-SNAPSHOT"
 )
 
 var agentArtifact = artifact.Artifact{
@@ -142,7 +143,7 @@ func (av agentVersion) String() string {
 	buf := strings.Builder{}
 	buf.WriteString(av.version)
 	if av.snapshot {
-		buf.WriteString("-SNAPSHOT")
+		buf.WriteString(snapshotSuffix)
 	}
 	buf.WriteString(" (hash: ")
 	buf.WriteString(av.hash)
@@ -174,7 +175,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	det.SetState(details.StateDownloading)
 
 	sourceURI = u.sourceURI(sourceURI)
-	archivePath, err := u.downloadArtifact(ctx, version, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+
+	parsedVersion, err := agtversion.ParseVersion(version)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
+	}
+
+	archivePath, err := u.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
@@ -244,30 +251,55 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
 
-	if err := changeSymlinkInternal(u.log, paths.Top(), symlinkPath, newPath); err != nil {
-		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
-		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
-		return nil, err
-	}
-
 	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
 	if err != nil {
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
 	}
-	if err := markUpgrade(
-		u.log,
-		paths.Data(),                                     //data dir to place the marker in
-		version, unpackRes.Hash, unpackRes.VersionedHome, //new agent version data
-		release.VersionWithSnapshot(), release.Commit(), currentVersionedHome, // old agent version data
-		action, det); err != nil {
-		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
+
+	if err := changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
+		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
+		rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, err
 	}
 
-	if err := InvokeWatcher(u.log); err != nil {
+	// We rotated the symlink successfully: prepare the current and previous agent installation details for the update marker
+	// In update marker the `current` agent install is the one where the symlink is pointing (the new one we didn't start yet)
+	// while the `previous` install is the currently executing elastic-agent that is no longer reachable via the symlink.
+	// After the restart at the end of the function, everything lines up correctly.
+	current := agentInstall{
+		version:       version,
+		hash:          unpackRes.Hash,
+		versionedHome: unpackRes.VersionedHome,
+	}
+
+	previous := agentInstall{
+		version:       release.VersionWithSnapshot(),
+		hash:          release.Commit(),
+		versionedHome: currentVersionedHome,
+	}
+
+	if err := markUpgrade(u.log,
+		paths.Data(), //data dir to place the marker in
+		current,      //new agent version data
+		previous,     // old agent version data
+		action, det); err != nil {
+		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
+		rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		return nil, err
+	}
+
+	minParsedVersionForNewUpdateMarker := agtversion.NewParsedSemVer(8, 13, 0, "", "")
+	var watcherExecutable string
+	if parsedVersion.Less(*minParsedVersionForNewUpdateMarker) {
+		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
+		watcherExecutable = paths.BinaryPath(paths.VersionedHome(paths.Top()), agentName)
+	} else {
+		// use the new agent executable as it should be able to parse the new update marker
+		watcherExecutable = paths.BinaryPath(filepath.Join(paths.Top(), unpackRes.VersionedHome), agentName)
+	}
+	if err := InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackInstall(ctx, u.log, paths.Top(), hashedDir)
+		rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, err
 	}
 
@@ -337,7 +369,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMet
 	} else {
 		// extract version info from the version string (we can ignore parsing errors as it would have never passed the download step)
 		parsedVersion, _ := agtversion.ParseVersion(upgradeVersion)
-		newVersion.version = strings.TrimSuffix(parsedVersion.VersionWithPrerelease(), "-SNAPSHOT")
+		newVersion.version = strings.TrimSuffix(parsedVersion.VersionWithPrerelease(), snapshotSuffix)
 		newVersion.snapshot = parsedVersion.IsSnapshot()
 	}
 	newVersion.hash = metadata.hash
@@ -347,14 +379,18 @@ func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMet
 	return current == newVersion, newVersion
 }
 
-func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome string) {
-	err := os.RemoveAll(filepath.Join(topDirPath, versionedHome))
+func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) {
+	newAgentInstallPath := filepath.Join(topDirPath, versionedHome)
+	err := os.RemoveAll(newAgentInstallPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		// TODO should this be a warning or an error ?
-		log.Warnw("error rolling back install", "error.message", err)
+		log.Warnw(fmt.Sprintf("rolling back install: removing new agent install at %q failed", newAgentInstallPath), "error.message", err)
 	}
-	// FIXME update
-	_ = ChangeSymlink(ctx, log, topDirPath, release.ShortCommit())
+
+	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
+	err = changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		log.Warnw(fmt.Sprintf("rolling back install: restoring symlink to %q failed", oldAgentPath), "error.message", err)
+	}
 }
 
 func copyActionStore(log *logger.Logger, newHome string) error {
@@ -409,11 +445,12 @@ func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHome string) reexec.ShutdownCallbackFn {
 	if release.Snapshot() {
 		// SNAPSHOT is part of newVersion
-		prevVersion += "-SNAPSHOT"
+		prevVersion += snapshotSuffix
 	}
 
 	return func() error {
 		runtimeDir := filepath.Join(homePath, "run")
+		l.Debugf("starting copy of run directories from %q to %q", homePath, newHome)
 		processDirs, err := readProcessDirs(runtimeDir)
 		if err != nil {
 			return err
@@ -421,8 +458,12 @@ func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHo
 
 		oldHome := homePath
 		for _, processDir := range processDirs {
-			newDir := strings.ReplaceAll(processDir, prevVersion, newVersion)
-			newDir = strings.ReplaceAll(newDir, oldHome, newHome)
+			relPath, _ := filepath.Rel(oldHome, processDir)
+
+			newRelPath := strings.ReplaceAll(relPath, prevVersion, newVersion)
+			newRelPath = strings.ReplaceAll(newRelPath, oldHome, newHome)
+			newDir := filepath.Join(newHome, newRelPath)
+			l.Debugf("copying %q -> %q", processDir, newDir)
 			if err := copyDir(l, processDir, newDir, true); err != nil {
 				return err
 			}
