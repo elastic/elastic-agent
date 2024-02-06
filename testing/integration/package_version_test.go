@@ -64,7 +64,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	f, err := atesting.NewFixture(t, define.Version())
+	f, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err, "could not create new fixture")
 
 	err = f.Prepare(ctx)
