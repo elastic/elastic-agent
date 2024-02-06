@@ -72,14 +72,6 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	err = f.Prepare(ctx)
 	require.NoError(t, err, "could not prepare fixture")
 
-	// Set package version
-	pkgVersionFiles := findPkgVersionFiles(t, f.WorkDir())
-	pkgVersion := "8.13.0+build20131123"
-	for _, pkgVerFile := range pkgVersionFiles {
-		err := os.WriteFile(pkgVerFile, []byte(pkgVersion), 0o644)
-		require.NoError(t, err)
-	}
-
 	enrollParams, err := fleettools.NewEnrollParams(ctx, info.KibanaClient)
 	require.NoError(t, err, "failed preparing Agent enrollment")
 
