@@ -250,7 +250,7 @@ func TestNoOneIsLeftBehind(t *testing.T) {
 
 			if reflect.DeepEqual(got, zeroValue) {
 				t.Errorf("action %s: field %s is empty.",
-					action.Type(), fieldName)
+					actionValue.Type().String(), fieldName)
 				once.Do(
 					func() {
 						failures = append(failures, actionValue.Type().String())
