@@ -133,6 +133,127 @@ func TestController(t *testing.T) {
 	assert.Equal(t, "value2", localMap["key1"])
 }
 
+func TestProvidersDefaultDisabled(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  map[string]interface{}
+		want int
+	}{
+		{
+			name: "default disabled",
+			cfg: map[string]interface{}{
+				"agent.providers.initial_default": "false",
+			},
+			want: 0,
+		},
+		{
+			name: "default enabled",
+			cfg: map[string]interface{}{
+				"agent.providers.initial_default": "true",
+			},
+			want: 1,
+		},
+		{
+			name: "default enabled - no config",
+			cfg:  map[string]interface{}{},
+			want: 1,
+		},
+		{
+			name: "default enabled - explicit config",
+			cfg: map[string]interface{}{
+				"providers": map[string]interface{}{
+					"env": map[string]interface{}{
+						"enabled": "false",
+					},
+					"local": map[string]interface{}{
+						"vars": map[string]interface{}{
+							"key1": "value1",
+						},
+					},
+					"local_dynamic": map[string]interface{}{
+						"items": []map[string]interface{}{
+							{
+								"vars": map[string]interface{}{
+									"key1": "value1",
+								},
+								"processors": []map[string]interface{}{
+									{
+										"add_fields": map[string]interface{}{
+											"fields": map[string]interface{}{
+												"add": "value1",
+											},
+											"to": "dynamic",
+										},
+									},
+								},
+							},
+							{
+								"vars": map[string]interface{}{
+									"key1": "value2",
+								},
+								"processors": []map[string]interface{}{
+									{
+										"add_fields": map[string]interface{}{
+											"fields": map[string]interface{}{
+												"add": "value2",
+											},
+											"to": "dynamic",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := config.NewConfigFrom(tt.cfg)
+			require.NoError(t, err)
+
+			log, err := logger.New("", false)
+			require.NoError(t, err)
+			c, err := composable.New(log, cfg, false)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 1*time.Second)
+			defer timeoutCancel()
+
+			var setVars []*transpiler.Vars
+			go func() {
+				defer cancel()
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						return
+					case vars := <-c.Watch():
+						setVars = vars
+					}
+				}
+			}()
+
+			errCh := make(chan error)
+			go func() {
+				errCh <- c.Run(ctx)
+			}()
+			err = <-errCh
+			if errors.Is(err, context.Canceled) {
+				err = nil
+			}
+			require.NoError(t, err)
+
+			assert.Len(t, setVars, tt.want)
+		})
+	}
+}
+
 func TestCancellation(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]interface{}{
 		"providers": map[string]interface{}{
