@@ -100,7 +100,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	require.NoErrorf(t, err, "failed to glob filebeat path pattern %q", glob)
 	require.Lenf(t, compPaths, 1,
 		"glob pattern %q. Found %d paths to filebeat, can only have 1",
-		len(compPaths))
+		glob, len(compPaths))
 
 	cmdVer := exec.Command(compPaths[0], "version")
 	output, err = cmdVer.CombinedOutput()
@@ -148,8 +148,10 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	require.NoError(t, err, "could not parse state.yaml (%s)", stateYAML.Name())
 
 	for _, c := range state.Components {
-		assert.Equal(t, wantBuildHash, c.State.VersionInfo.BuildHash)
-		assert.Equal(t, wantBuildHash, c.State.VersionInfo.Meta.Commit)
+		assert.Equalf(t, wantBuildHash, c.State.VersionInfo.BuildHash,
+			"component %s: VersionInfo.BuildHash mismatch", c.ID)
+		assert.Equalf(t, wantBuildHash, c.State.VersionInfo.Meta.Commit,
+			"component %s: VersionInfo.Meta.Commit mismatch", c.ID)
 	}
 }
 
