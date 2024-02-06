@@ -1953,7 +1953,7 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 func (Integration) TestExtendedRuntime(ctx context.Context) error {
 	err := os.Setenv("TEST_EXTENDED", "true")
 	if err != nil {
-		return fmt.Errorf("error setting binary name: %w", err)
+		return fmt.Errorf("error setting TEST_EXTENDED: %w", err)
 	}
 	return integRunner(ctx, false, "TestAgentLong")
 }

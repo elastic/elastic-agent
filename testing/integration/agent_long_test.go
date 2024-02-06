@@ -77,10 +77,10 @@ type MetricsSystem struct {
 }
 
 type processWatcher struct {
-	handle types.Process
-	pid    int
-	name   string
-	reg    *regression.Regression
+	handle     types.Process
+	pid        int
+	name       string
+	regHandles *regression.Regression
 }
 
 func TestAgentLong(t *testing.T) {
@@ -218,11 +218,12 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		if strings.Contains(info.Name, "beat") || strings.Contains(info.Name, "elastic-agent") {
 			handle, err := sysinfo.Process(proc.PID())
 			require.NoError(runner.T(), err)
-			reg := new(regression.Regression)
-			reg.SetObserved(fmt.Sprintf("%s handle usage", info.Name))
-			reg.SetVar(0, "time")
+			handlesReg := new(regression.Regression)
+			handlesReg.SetObserved(fmt.Sprintf("%s handle usage", info.Name))
+			handlesReg.SetVar(0, "time")
+
 			runner.T().Logf("created handle watcher for %s (%d)", info.Name, proc.PID())
-			handles = append(handles, processWatcher{handle: handle, pid: proc.PID(), name: info.Name, reg: reg})
+			handles = append(handles, processWatcher{handle: handle, pid: proc.PID(), name: info.Name, regHandles: handlesReg})
 		}
 	}
 
@@ -236,45 +237,40 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	done := false
 	start := time.Now()
-	for {
-		if done {
-			break
-		}
+	for !done {
 		select {
 		case <-timer.C:
 			done = true
 		case <-ticker:
 			err := runner.agentFixture.IsHealthy(ctx)
 			require.NoError(runner.T(), err)
+			// for each running process, collect memory and handles
 			for _, handle := range handles {
 
 				ohc, ok := handle.handle.(types.OpenHandleCounter)
 				if ok {
 					handleCount, err := ohc.OpenHandleCount()
 					require.NoError(runner.T(), err)
-					handle.reg.Train(regression.DataPoint(float64(handleCount), []float64{time.Since(start).Seconds()}))
+					handle.regHandles.Train(regression.DataPoint(float64(handleCount), []float64{time.Since(start).Seconds()}))
 				}
 
 			}
 		}
 	}
 
-	// we're measuring the handle/memory usage as y=mx+b
+	// we're measuring the handle usage as y=mx+b
 	// if the slope is increasing above a certain rate, fail the test
 	handleSlopeFailure := float64(1)
-	// memorySlopeFailure := 2e-3
 
 	for _, handle := range handles {
-		err = handle.reg.Run()
+		err = handle.regHandles.Run()
 		require.NoError(runner.T(), err)
 
 		runner.T().Logf("=============================== %s (%d)", handle.name, handle.pid)
-		runner.T().Logf("formula: %v", handle.reg.Formula)
-		runner.T().Logf("data: %s", handle.reg)
-		// coefficient 0: offset (b), 1: handle slope, 2: memory slope
-		coeffs := handle.reg.GetCoeffs()
-		runner.T().Logf("Coeff: %#v", coeffs)
+		runner.T().Logf("handle formula: %v", handle.regHandles.Formula)
+		coeffs := handle.regHandles.GetCoeffs()
 		handleSlope := coeffs[1]
+		// This is a hack to deal with the fact that we'll pick up zombie processes that seem to happen when agent restarts
 		if math.IsNaN(handleSlope) {
 			continue
 		}
