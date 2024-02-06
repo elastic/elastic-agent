@@ -7,6 +7,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -93,6 +94,18 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	output, err := f.Install(ctx, &installOpts)
 	require.NoError(t, err,
 		"failed to install start agent [output: %s]", string(output))
+
+	state := bytes.Buffer{}
+	isHealth := func() bool {
+		state.Reset()
+		err := f.IsHealthy(ctx)
+		state.WriteString(err.Error())
+		return err != nil
+	}
+	require.Eventuallyf(t,
+		isHealth,
+		1*time.Minute, 10*time.Second,
+		"agent did not became health. Last status: %v", &state)
 
 	wd := f.WorkDir()
 	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", "filebeat")
