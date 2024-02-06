@@ -7,6 +7,8 @@ package fleetapi
 
 import (
 	"encoding/json"
+	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -208,5 +210,59 @@ func TestActionUpgradeMarshalMap(t *testing.T) {
 
 	if diff != "" {
 		t.Fatal(diff)
+	}
+}
+
+func TestNoOneIsLeftBehind(t *testing.T) {
+	actions := []Action{
+		&ActionApp{
+			ActionID: "action123",
+			// ActionType: "type",
+			// InputType:   "input",
+			Timeout:     10,
+			Data:        json.RawMessage(`{"key": "value"}`),
+			Response:    map[string]interface{}{"key": "value"},
+			StartedAt:   "2024-02-06T12:00:00",
+			CompletedAt: "2024-02-06T12:01:00",
+			Error:       "error message",
+			Signed: &Signed{
+				Data:      "data",
+				Signature: "signature",
+			},
+		},
+	}
+
+	var failures []string
+	for _, action := range actions {
+		var actionValue reflect.Value
+		actionValue = reflect.ValueOf(action)
+		if actionValue.Kind() == reflect.Pointer {
+			actionValue = actionValue.Elem()
+		}
+
+		once := sync.Once{}
+		for i := 0; i < actionValue.NumField(); i++ {
+			field := actionValue.Field(i)
+			fieldName := actionValue.Type().Field(i).Name
+
+			got := field.Interface()
+			zeroValue := reflect.Zero(field.Type()).Interface()
+
+			if reflect.DeepEqual(got, zeroValue) {
+				t.Errorf("action %s: field %s is empty.",
+					action.Type(), fieldName)
+				once.Do(
+					func() {
+						failures = append(failures, actionValue.Type().String())
+					})
+			}
+		}
+	}
+
+	if t.Failed() {
+		t.Errorf("failed to marshalJSON and unmarshalJSON %v."+
+			" The MarshalJSON and UnmarshalJSON methods were edited and are not"+
+			" covering all fieds in each action",
+			failures)
 	}
 }

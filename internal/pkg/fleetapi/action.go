@@ -88,24 +88,25 @@ type Signed struct {
 	Signature string `json:"signature" yaml:"signature"  mapstructure:"signature"`
 }
 
-// TODO(AndersonQ): remove the yaml tags
+// TODO(AndersonQ): remove the yaml tags?
 
 // FleetAction represents an action from fleet-server.
 // should copy the action definition in fleet-server/model/schema.json
 type FleetAction struct {
-	ActionID         string          ` json:"id" yaml:"action_id"` // NOTE schema defines this as action_id, but fleet-server remaps it to id in the json response to agent check-in.
-	ActionType       string          `json:"type,omitempty" yaml:"type,omitempty" `
-	InputType        string          `json:"input_type,omitempty" yaml:"input_type,omitempty" `
-	ActionExpiration string          `json:"expiration,omitempty" yaml:"expiration,omitempty" `
-	ActionStartTime  string          `json:"start_time,omitempty" yaml:"start_time,omitempty" `
-	Timeout          int64           `json:"timeout,omitempty" yaml:"timeout,omitempty" `
-	Data             json.RawMessage `json:"data,omitempty" yaml:"data,omitempty" `
+	ActionID         string          `json:"id" yaml:"action_id"` // NOTE schema defines this as action_id, but fleet-server remaps it to id in the json response to agent check-in.
+	ActionType       string          `json:"type,omitempty" yaml:"type,omitempty"`
+	InputType        string          `json:"input_type,omitempty" yaml:"input_type,omitempty"`
+	ActionExpiration string          `json:"expiration,omitempty" yaml:"expiration,omitempty"`
+	ActionStartTime  string          `json:"start_time,omitempty" yaml:"start_time,omitempty"`
+	Timeout          int64           `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Data             json.RawMessage `json:"data,omitempty" yaml:"data,omitempty"`
 	Retry            int             `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty"` // used internally for serialization by elastic-agent.
+	Signed           *Signed         `yaml:"signed,omitempty" json:"signed,omitempty"`
+
 	// Agents []string // disabled, fleet-server uses this to generate each agent's actions
 	// Timestamp string // disabled, agent does not care when the document was created
 	// UserID string // disabled, agent does not care
 	// MinimumExecutionDuration int64 // disabled, used by fleet-server for scheduling
-	Signed *Signed `yaml:"signed,omitempty" json:"signed,omitempty"`
 }
 
 func newAckEvent(id, aType string) AckEvent {
@@ -581,7 +582,10 @@ type Actions []Action
 
 // UnmarshalJSON takes every raw representation of an action and try to decode them.
 func (a *Actions) UnmarshalJSON(data []byte) error {
-	var responses []FleetAction
+	var responses []struct {
+		ActionType string          `json:"type,omitempty" yaml:"type,omitempty"`
+		Data       json.RawMessage `json:"data,omitempty" yaml:"data,omitempty"`
+	}
 	if err := json.Unmarshal(data, &responses); err != nil {
 		return errors.New(err,
 			"fail to decode actions",
@@ -599,86 +603,56 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 		var action Action
 		switch response.ActionType {
 		case ActionTypePolicyChange:
-			action = &ActionPolicyChange{
-				ActionID:   response.ActionID,
-				ActionType: response.ActionType,
-			}
-			if err := json.Unmarshal(response.Data, action); err != nil {
-				return errors.New(err,
-					"fail to decode POLICY_CHANGE action",
-					errors.TypeConfig)
-			}
+			action = &ActionPolicyChange{}
 		case ActionTypePolicyReassign:
-			action = &ActionPolicyReassign{
-				ActionID:   response.ActionID,
-				ActionType: response.ActionType,
-			}
+			action = &ActionPolicyReassign{}
 		case ActionTypeInputAction:
 			// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
-			action = &ActionApp{
-				ActionID:   response.ActionID,
-				ActionType: response.ActionType,
-				InputType:  response.InputType,
-				Timeout:    response.Timeout,
-				Data:       response.Data,
-				Signed:     response.Signed,
-			}
+			action = &ActionApp{}
 		case ActionTypeUnenroll:
-			action = &ActionUnenroll{
-				ActionID:   response.ActionID,
-				ActionType: response.ActionType,
-				Signed:     response.Signed,
-			}
+			action = &ActionUnenroll{}
 		case ActionTypeUpgrade:
-			action = &ActionUpgrade{
-				ActionID:         response.ActionID,
-				ActionType:       response.ActionType,
-				ActionStartTime:  response.ActionStartTime,
-				ActionExpiration: response.ActionExpiration,
-				Signed:           response.Signed,
-			}
-
-			if err := json.Unmarshal(raw[i], action); err != nil {
-				return errors.New(err,
-					"fail to decode UPGRADE_ACTION action",
-					errors.TypeConfig)
-			}
+			action = &ActionUpgrade{}
 		case ActionTypeSettings:
-			action = &ActionSettings{
-				ActionID:   response.ActionID,
-				ActionType: response.ActionType,
-			}
-
-			if err := json.Unmarshal(response.Data, action); err != nil {
-				return errors.New(err,
-					"fail to decode SETTINGS_ACTION action",
-					errors.TypeConfig)
-			}
+			action = &ActionSettings{}
 		case ActionTypeCancel:
-			action = &ActionCancel{
-				ActionID:   response.ActionID,
-				ActionType: response.ActionType,
-			}
-			if err := json.Unmarshal(response.Data, action); err != nil {
-				return errors.New(err,
-					"fail to decode CANCEL_ACTION action",
-					errors.TypeConfig)
-			}
+			action = &ActionCancel{}
 		case ActionTypeDiagnostics:
-			action = &ActionDiagnostics{
-				ActionID:   response.ActionID,
-				ActionType: response.ActionType,
-			}
+			action = &ActionDiagnostics{}
+		default:
+			action = &ActionUnknown{}
+		}
+
+		// We unmarshal actions from two different sources: fleet-server and
+		// store.StateStore.
+		// The actions coming from fleet-server, FleetAction, have a `data`
+		// field for fields specific to each action.
+		// However, the specific types (e.g., ActionUpgrade, ActionCancel) use
+		// a flat structure without the `data` field.
+		// Therefore, if a concrete ActionTYPE is marshalled, it cannot be
+		// correctly unmarshalled into a FleetAction.
+		// In order to support both structures, each action must be unmarshalled
+		// twice:
+		//   - Once into a FleetAction to read the `data` field,
+		//   - And also into the specific action type (e.g., ActionUpgrade,
+		//   ActionCancel).
+		// If there is data in FleetAction.Data, it also needs to be unmarshalled
+		// into the specific action type, what happens in the second call to
+		// json.Unmarshal below.
+		if err := json.Unmarshal(raw[i], action); err != nil {
+			return errors.New(err,
+				fmt.Sprintf("fail to decode %s action", action.Type()),
+				errors.TypeConfig)
+		}
+
+		// If response.Data contains data, the action came from fleet-server and
+		// the date must be unmarshalled into `action` as well.
+		if len(response.Data) > 0 {
 			if err := json.Unmarshal(response.Data, action); err != nil {
 				return errors.New(err,
-					"fail to decode REQUEST_DIAGNOSTICS_ACTION action",
+					fmt.Sprintf(
+						"fail to decode data field of %s action", action.Type()),
 					errors.TypeConfig)
-			}
-		default:
-			action = &ActionUnknown{
-				ActionID:     response.ActionID,
-				ActionType:   ActionTypeUnknown,
-				originalType: response.ActionType,
 			}
 		}
 		actions = append(actions, action)
@@ -688,109 +662,13 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// UnmarshalYAML attempts to decode yaml actions.
-func (a *Actions) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var nodes []FleetAction
-	if err := unmarshal(&nodes); err != nil {
-		return errors.New(err,
-			"fail to decode action",
-			errors.TypeConfig)
-	}
-	actions := make([]Action, 0, len(nodes))
-	for i := range nodes {
-		var action Action
-		n := nodes[i]
-		switch n.ActionType {
-		case ActionTypePolicyChange:
-			action = &ActionPolicyChange{
-				ActionID:   n.ActionID,
-				ActionType: n.ActionType,
-			}
-			if err := yaml.Unmarshal(n.Data, action); err != nil {
-				return errors.New(err,
-					"fail to decode POLICY_CHANGE action",
-					errors.TypeConfig)
-			}
-		case ActionTypePolicyReassign:
-			action = &ActionPolicyReassign{
-				ActionID:   n.ActionID,
-				ActionType: n.ActionType,
-			}
-		case ActionTypeInputAction:
-			action = &ActionApp{
-				ActionID:   n.ActionID,
-				ActionType: n.ActionType,
-				InputType:  n.InputType,
-				Timeout:    n.Timeout,
-				Data:       n.Data,
-				Signed:     n.Signed,
-			}
-		case ActionTypeUnenroll:
-			action = &ActionUnenroll{
-				ActionID:   n.ActionID,
-				ActionType: n.ActionType,
-				Signed:     n.Signed,
-			}
-		case ActionTypeUpgrade:
+// UnmarshalYAML prevents to decode actions from .
+func (a *Actions) UnmarshalYAML(_ func(interface{}) error) error {
+	// TODO(AndersonQ): we need this to migrate the store from YAML to JSON
+	return errors.New("Actions cannot be Unmarshaled from YAML")
+}
 
-			data := struct {
-				Version   string `json:"version" yaml:"version,omitempty" mapstructure:"-"`
-				SourceURI string `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
-			}{}
-			if err := yaml.Unmarshal(n.Data, &data); err != nil {
-				return errors.New(err,
-					"fail to decode UPGRADE_ACTION action",
-					errors.TypeConfig)
-			}
-
-			action = &ActionUpgrade{
-				ActionID:         n.ActionID,
-				ActionType:       n.ActionType,
-				ActionStartTime:  n.ActionStartTime,
-				ActionExpiration: n.ActionExpiration,
-				Retry:            n.Retry,
-				Version:          data.Version,
-				SourceURI:        data.SourceURI,
-			}
-		case ActionTypeSettings:
-			action = &ActionSettings{
-				ActionID:   n.ActionID,
-				ActionType: n.ActionType,
-			}
-			if err := yaml.Unmarshal(n.Data, action); err != nil {
-				return errors.New(err,
-					"fail to decode SETTINGS_ACTION action",
-					errors.TypeConfig)
-			}
-		case ActionTypeCancel:
-			action = &ActionCancel{
-				ActionID:   n.ActionID,
-				ActionType: n.ActionType,
-			}
-			if err := yaml.Unmarshal(n.Data, action); err != nil {
-				return errors.New(err,
-					"fail to decode CANCEL_ACTION action",
-					errors.TypeConfig)
-			}
-		case ActionTypeDiagnostics:
-			action = &ActionDiagnostics{
-				ActionID:   n.ActionID,
-				ActionType: n.ActionType,
-			}
-			if err := yaml.Unmarshal(n.Data, action); err != nil {
-				return errors.New(err,
-					"fail to decode REQUEST_DIAGNOSTICS_ACTION action",
-					errors.TypeConfig)
-			}
-		default:
-			action = &ActionUnknown{
-				ActionID:     n.ActionID,
-				ActionType:   ActionTypeUnknown,
-				originalType: n.ActionType,
-			}
-		}
-		actions = append(actions, action)
-	}
-	*a = actions
-	return nil
+// MarshalYAML attempts to decode yaml actions.
+func (a *Actions) MarshalYAML() (interface{}, error) {
+	return nil, errors.New("Actions cannot be Marshaled to YAML")
 }
