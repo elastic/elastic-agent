@@ -98,9 +98,14 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	stateBuff := bytes.Buffer{}
 	isHealth := func() bool {
 		stateBuff.Reset()
+		
 		err := f.IsHealthy(ctx)
-		stateBuff.WriteString(err.Error())
-		return err != nil
+		if err != nil {
+			stateBuff.WriteString(err.Error())
+			return false
+		}
+
+		return true
 	}
 	require.Eventuallyf(t,
 		isHealth,
