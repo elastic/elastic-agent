@@ -95,10 +95,13 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		"failed to install start agent [output: %s]", string(output))
 
 	wd := f.WorkDir()
-	compPaths, err := filepath.Glob(filepath.Join(wd, "data", "elastic-agent-*", "components", "filebeat"))
-	require.NoError(t, err, "failed to glob filebeat path")
-	require.Lenf(t, compPaths, 1, "got %d filebeat paths, can only have 1",
+	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", "filebeat")
+	compPaths, err := filepath.Glob(glob)
+	require.NoErrorf(t, err, "failed to glob filebeat path pattern %q", glob)
+	require.Lenf(t, compPaths, 1,
+		"glob pattern %q. Found %d paths to filebeat, can only have 1",
 		len(compPaths))
+
 	cmdVer := exec.Command(compPaths[0], "version")
 	output, err = cmdVer.CombinedOutput()
 	require.NoError(t, err, "failed to get filebeat version")
