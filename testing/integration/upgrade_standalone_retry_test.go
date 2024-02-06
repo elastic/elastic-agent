@@ -48,14 +48,6 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get end agent build version info")
 
-<<<<<<< HEAD
-	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
-	require.NoError(t, err)
-	endFixture, err := atesting.NewFixture(
-		t,
-		upgradeToVersion,
-=======
 	// Upgrade to an older snapshot build of same version but with a different commit hash
 	aac := tools.NewArtifactAPIClient()
 	buildInfo, err := aac.FindBuild(ctx, startVersion.VersionWithPrerelease(), startVersionInfo.Binary.Commit, 0)
@@ -70,7 +62,6 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	endFixture, err := atesting.NewFixture(
 		t,
 		endVersion,
->>>>>>> ff0b7b5793 (Fix upgrade tests, so they use correct snapshots (#4191))
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
