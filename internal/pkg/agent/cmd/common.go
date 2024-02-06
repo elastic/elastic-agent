@@ -43,7 +43,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 
 	// Init version information contained in package version file
 	err := version.InitVersionError()
-	if err != nil {
+	if isOtel := len(args) > 1 && args[1] == "otel"; !isOtel && err != nil {
 		cmd.PrintErrf("Error initializing version information: %v\n", err)
 	}
 
