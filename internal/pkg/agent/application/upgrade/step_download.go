@@ -122,7 +122,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 	return path, nil
 }
 
-func (u *Upgrader) appendFallbackPGP(tpv *agtversion.ParsedSemVer, pgpBytes []string) []string {
+func (u *Upgrader) appendFallbackPGP(targetVersion *agtversion.ParsedSemVer, pgpBytes []string) []string {
 	if pgpBytes == nil {
 		pgpBytes = make([]string, 0, 1)
 	}
@@ -135,7 +135,7 @@ func (u *Upgrader) appendFallbackPGP(tpv *agtversion.ParsedSemVer, pgpBytes []st
 	if u.fleetServerURI != "" {
 		secondaryPath, err := url.JoinPath(
 			u.fleetServerURI,
-			fmt.Sprintf(fleetUpgradeFallbackPGPFormat, tpv.Major(), tpv.Minor(), tpv.Patch()),
+			fmt.Sprintf(fleetUpgradeFallbackPGPFormat, targetVersion.Major(), targetVersion.Minor(), targetVersion.Patch()),
 		)
 		if err != nil {
 			u.log.Warnf("failed to compose Fleet Server URI: %v", err)
