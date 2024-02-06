@@ -216,7 +216,6 @@ func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesti
 	require.Error(t, err)
 	require.False(t, len(out) == 0)
 	require.Contains(t, string(out), `service::pipelines::logs: references processor "nonexistingprocessor" which is not configured`)
-
 }
 
 func TestOtelAPMIngestion(t *testing.T) {
