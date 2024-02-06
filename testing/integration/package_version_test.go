@@ -95,17 +95,17 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	require.NoError(t, err,
 		"failed to install start agent [output: %s]", string(output))
 
-	state := bytes.Buffer{}
+	stateBuff := bytes.Buffer{}
 	isHealth := func() bool {
-		state.Reset()
+		stateBuff.Reset()
 		err := f.IsHealthy(ctx)
-		state.WriteString(err.Error())
+		stateBuff.WriteString(err.Error())
 		return err != nil
 	}
 	require.Eventuallyf(t,
 		isHealth,
 		1*time.Minute, 10*time.Second,
-		"agent did not became health. Last status: %v", &state)
+		"agent did not became health. Last status: %v", &stateBuff)
 
 	wd := f.WorkDir()
 	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", "filebeat")
