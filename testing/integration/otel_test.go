@@ -203,6 +203,11 @@ func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesti
 	require.NoError(t, err)
 	require.Equal(t, 0, len(out)) // no error printed out
 
+	// check feature gate works
+	out, err = fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath, "--feature-gates", "foo.bar"})
+	require.Error(t, err)
+	require.Contains(t, string(out), `no such feature gate "foo.bar"`)
+
 	// check `elastic-agent otel validate` command works for invalid otel config
 	cfgFilePath = filepath.Join(tempDir, "otel-invalid.yml")
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileInvalidOtelConfig), 0600))
