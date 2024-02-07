@@ -16,10 +16,13 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	gotesting "testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	eamprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -123,6 +126,9 @@ func NewBool(value bool) *bool {
 //   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
+
+	assertNoRogueAgentProcesses(f.t, "there should be no running agent at beginning of Install()")
+
 	installArgs := []string{"install"}
 	if installOpts == nil {
 		// default options when not provided
@@ -162,7 +168,12 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
+		assertNoRogueAgentProcesses(f.t, "there should be no running agent at the end of the test")
+	})
+
+	f.t.Cleanup(func() {
 		f.t.Logf("[test %s] Inside fixture cleanup function", f.t.Name())
+
 		if !f.installed {
 			f.t.Logf("skipping uninstall; agent not installed (fixture.installed is false)")
 			// not installed; no need to clean up or collect diagnostics
@@ -216,6 +227,27 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	})
 
 	return out, nil
+}
+
+func assertNoRogueAgentProcesses(t *gotesting.T, message string) {
+
+	procStats := eamprocess.Stats{
+		Procs: []string{`.*elastic\-agent.*`},
+	}
+
+	err := procStats.Init()
+	if !assert.NoError(t, err, "error initializing process.Stats") {
+		// we failed
+		return
+	}
+
+	pidMap, _, err := procStats.FetchPids()
+	if !assert.NoError(t, err, "error fetching process information") {
+		// we failed a bit further
+		return
+	}
+
+	assert.Empty(t, pidMap, message)
 }
 
 type UninstallOpts struct {
