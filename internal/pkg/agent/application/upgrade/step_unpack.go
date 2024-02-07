@@ -46,11 +46,11 @@ func (u *Upgrader) unpack(version, archivePath, dataDir string) (UnpackResult, e
 	}
 
 	if err != nil {
-		u.log.Errorw("Failed to unpack upgrade artifact", "error.message", err, "version", version, "file.path", archivePath, "unpackResult", unpackRes)
+		u.log.Errorw("Failed to unpack upgrade artifact", "error.message", err, "version", version, "file.path", archivePath, "unpack_result", unpackRes)
 		return UnpackResult{}, err
 	}
 
-	u.log.Infow("Unpacked upgrade artifact", "version", version, "file.path", archivePath, "unpackResult", unpackRes)
+	u.log.Infow("Unpacked upgrade artifact", "version", version, "file.path", archivePath, "unpack_result", unpackRes)
 	return unpackRes, nil
 }
 

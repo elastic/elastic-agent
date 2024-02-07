@@ -224,7 +224,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	if unpackRes.VersionedHome == "" {
-		// FIXME this should be treated as an error
 		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
 	}
 
@@ -279,8 +278,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	if err := markUpgrade(u.log,
-		paths.Data(), //data dir to place the marker in
-		current,      //new agent version data
+		paths.Data(), // data dir to place the marker in
+		current,      // new agent version data
 		previous,     // old agent version data
 		action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
