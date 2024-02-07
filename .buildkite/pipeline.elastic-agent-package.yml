@@ -101,6 +101,7 @@ steps:
           - "build/distributions/**/*"
 
   - label: ":elastic-stack: Publishing to DRA"
+    if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
     key: dra-publish
     depends_on: package
     agents:
@@ -126,3 +127,26 @@ steps:
         export DRA_VERSION
       fi
       .buildkite/scripts/steps/dra-publish.sh
+
+  - label: "Publishing via BK API for Independent Agent Release"
+    if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "independent-agent-release-staging"
+    key: bk-api-publish-independent-agent
+    depends_on: package
+    agents:
+      provider: "gcp"
+    env:
+      DRA_PROJECT_ID: "elastic-agent-package"
+      DRA_PROJECT_ARTIFACT_ID: "agent-package"
+    command: |
+      echo "+++ Restoring Artifacts"
+      buildkite-agent artifact download "build/**/*" .
+      echo "+++ Changing permissions for the BK API commands"
+      sudo chown -R :1000 build/distributions/
+      echo "+++ Call buildkite-agent upload to save artifacts for job that triggered us"
+      buildkite-agent upload "build/distributions/*"
+      echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
+      if [[ -z "${TRIGGER_JOB_ID}" ]]; then
+        echo "TRIGGER_JOB_ID is not set, so not setting metadata"
+      else
+        buildkite-agent meta-data set "triggered_build_id" "$BUILDKITE_BUILD_ID" --job $TRIGGER_JOB_ID
+      fi
