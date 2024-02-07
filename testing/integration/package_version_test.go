@@ -64,6 +64,10 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+	if runtime.GOOS == "windows" {
+		t.Skip("flaky on windows: https://github.com/elastic/elastic-agent/issues/4215")
+	}
+
 	ctx := context.Background()
 
 	f, err := define.NewFixture(t, define.Version())
