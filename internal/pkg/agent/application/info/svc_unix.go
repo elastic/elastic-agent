@@ -11,5 +11,5 @@ import "os"
 // RunningUnderSupervisor returns true when executing Agent is running under
 // the supervisor processes of the OS.
 func RunningUnderSupervisor() bool {
-	return os.Getppid() == 1
+	return os.Getppid() == SupervisorPid
 }
