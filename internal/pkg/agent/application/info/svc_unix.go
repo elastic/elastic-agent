@@ -8,11 +8,6 @@ package info
 
 import "os"
 
-// I'm trying to test sonarqube
-func wrapper() bool {
-	return RunningUnderSupervisor()
-}
-
 // RunningUnderSupervisor returns true when executing Agent is running under
 // the supervisor processes of the OS.
 func RunningUnderSupervisor() bool {
