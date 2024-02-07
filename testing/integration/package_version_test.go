@@ -122,7 +122,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	require.Eventuallyf(t,
 		allHealthy,
 		5*time.Minute, 10*time.Second,
-		"agent did not became health. Last status: %v", &stateBuff)
+		"agent never became healthy. Last status: %v", &stateBuff)
 
 	filebeat := "filebeat"
 	if runtime.GOOS == "windows" {
