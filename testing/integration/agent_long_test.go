@@ -83,7 +83,7 @@ type processWatcher struct {
 	regHandles *regression.Regression
 }
 
-func TestAgentLong(t *testing.T) {
+func TestLongRunningAgentForLeaks(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: "fleet",
 		Stack: &define.Stack{},
@@ -95,8 +95,8 @@ func TestAgentLong(t *testing.T) {
 		},
 	})
 
-	if os.Getenv("TEST_EXTENDED") == "" {
-		t.Skipf("not running extended test unless TEST_EXTENDED is set")
+	if os.Getenv("TEST_LONG_RUNNING") == "" {
+		t.Skipf("not running extended test unless TEST_LONG_RUNNING is set")
 	}
 
 	suite.Run(t, &ExtendedRunner{info: info})
@@ -188,7 +188,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "5m"
+		testRuntime = "20m"
 	}
 
 	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
@@ -260,7 +260,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	// we're measuring the handle usage as y=mx+b
 	// if the slope is increasing above a certain rate, fail the test
-	handleSlopeFailure := float64(1)
+	handleSlopeFailure := 0.001
 
 	for _, handle := range handles {
 		err = handle.regHandles.Run()

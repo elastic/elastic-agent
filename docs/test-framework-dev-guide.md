@@ -117,6 +117,10 @@ We pass a `-test.count` flag along with the name match
 We pass a `-test.run` flag along with the names of the tests we want to run in OR
 `GOTEST_FLAGS="-test.run ^(TestStandaloneUpgrade|TestFleetManagedUpgrade)$" mage integration:test`
 
+##### Run Extended Runtime test
+The test framework includes a "long running" test to check for resource leaks and stability.
+The runtime of the test can be set via the `LONG_TEST_RUNTIME` environment variable.
+
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
 is split on space, so not all combination of flags and their values may be correctly split.

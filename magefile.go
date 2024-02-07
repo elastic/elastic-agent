@@ -1951,11 +1951,11 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 }
 
 func (Integration) TestExtendedRuntime(ctx context.Context) error {
-	err := os.Setenv("TEST_EXTENDED", "true")
+	err := os.Setenv("TEST_LONG_RUNNING", "true")
 	if err != nil {
-		return fmt.Errorf("error setting TEST_EXTENDED: %w", err)
+		return fmt.Errorf("error setting TEST_LONG_RUNNING: %w", err)
 	}
-	return integRunner(ctx, false, "TestAgentLong")
+	return integRunner(ctx, false, "TestLongRunningAgentForLeaks")
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
@@ -2184,7 +2184,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
 	}
 
-	extraEnv["TEST_EXTENDED"] = os.Getenv("TEST_EXTENDED")
+	extraEnv["TEST_LONG_RUNNING"] = os.Getenv("TEST_LONG_RUNNING")
 	extraEnv["LONG_TEST_RUNTIME"] = os.Getenv("LONG_TEST_RUNTIME")
 
 	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
