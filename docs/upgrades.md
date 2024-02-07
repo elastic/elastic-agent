@@ -118,10 +118,10 @@ Legacy elastic-agent upgrade is a pretty straightforward affair:
 Upgrading using the manifest allows for the new version to pass along some information about the package to the upgrading agent.
 The new process looks like this:
 - Download the elastic-agent package to use for upgrade
-- Extract package metadata from the new elastic-agent package (manifest and hash):
-  - if the package has a manifest we extract `version` and `snapshot` flag as declared by the package
-  - if there is no manifest for the package we extract the version and snapshot for the version passed to the upgrade
-  - hash from the agent commit file (always present in the package)
+- Extract package metadata from the new elastic-agent package (`version`, `snapshot` and `hash`):
+  - if the package has a manifest we extract `version` and `snapshot` flag as declared by the package manifest
+  - if there is no manifest for the package we extract `version` and `snapshot` from the version string passed to the upgrader
+  - the `hash` is always retrieved from the agent commit file (this is always present in the package)
 - compare the tuple of new `(version, snapshot, hash)` to the current `(version, snapshot, hash)`: if they are the same
   the upgrade fails because we are trying to upgrade to the same version as current
 - Extract any package file (after mapping it using file mappings in manifest if present) that should go under `/data`.
