@@ -7,6 +7,7 @@ package info
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,6 +17,9 @@ import (
 )
 
 func TestIsUpgradeable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("can't mock supervisor under windows")
+	}
 	//default behavior is to return false, since the `allowUpgradable` build flag isn't set
 	upgradable := IsUpgradeable()
 	require.False(t, upgradable)
