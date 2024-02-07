@@ -36,6 +36,9 @@ func TestIsUpgradeable(t *testing.T) {
 }
 
 func TestRunningUnderSupervisor(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("can't mock supervisor under windows")
+	}
 	SupervisorPid = os.Getppid()
 	under := RunningUnderSupervisor()
 	require.True(t, under)
