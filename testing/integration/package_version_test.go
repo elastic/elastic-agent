@@ -9,6 +9,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -100,17 +101,23 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			return false
 		}
 
-		allHealthy := true
 		for _, c := range status.Components {
 			state := client.State(c.State)
 			if state != client.Healthy {
-				allHealthy = false
-				stateBuff.WriteString(fmt.Sprintf("%s not health, state: %s",
-					c.Name, state))
+				bs, err := json.MarshalIndent(status, "", "  ")
+				if err != nil {
+					stateBuff.WriteString(fmt.Sprintf("%s not health, could not marshal status outptu: %v",
+						c.Name, err))
+					return false
+				}
+
+				stateBuff.WriteString(fmt.Sprintf("%s not health, agent status output: %s",
+					c.Name, bs))
+				return false
 			}
 		}
 
-		return allHealthy
+		return true
 	}
 	require.Eventuallyf(t,
 		allHealthy,
