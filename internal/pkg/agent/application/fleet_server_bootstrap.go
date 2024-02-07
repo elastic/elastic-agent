@@ -102,7 +102,7 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 
 // InjectFleetConfigComponentModifier The modifier that injects the fleet configuration for the components
 // that need to be able to connect to fleet server.
-func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig, agentInfo *info.AgentInfo) coordinator.ComponentsModifier {
+func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig, agentInfo info.Agent) coordinator.ComponentsModifier {
 	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		hostsStr := fleetCfg.Client.GetHosts()
 		fleetHosts := make([]interface{}, 0, len(hostsStr))

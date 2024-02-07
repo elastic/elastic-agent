@@ -53,7 +53,7 @@ var ErrSameVersion = errors.New("upgrade did not occur because its the same vers
 type Upgrader struct {
 	log            *logger.Logger
 	settings       *artifact.Config
-	agentInfo      *info.AgentInfo
+	agentInfo      info.Agent
 	upgradeable    bool
 	fleetServerURI string
 	markerWatcher  MarkerWatcher
@@ -67,7 +67,7 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent) (*Upgrader, error) {
 	return &Upgrader{
 		log:           log,
 		settings:      settings,

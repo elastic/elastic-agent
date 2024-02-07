@@ -41,7 +41,7 @@ const dispatchFlushInterval = time.Minute * 5
 
 type managedConfigManager struct {
 	log                  *logger.Logger
-	agentInfo            *info.AgentInfo
+	agentInfo            info.Agent
 	cfg                  *configuration.Configuration
 	client               *remote.Client
 	store                storage.Store
@@ -60,7 +60,7 @@ type managedConfigManager struct {
 func newManagedConfigManager(
 	ctx context.Context,
 	log *logger.Logger,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	cfg *configuration.Configuration,
 	storeSaver storage.Store,
 	runtime *runtime.Manager,

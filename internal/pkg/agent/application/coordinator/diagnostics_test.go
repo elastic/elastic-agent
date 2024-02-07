@@ -409,10 +409,9 @@ components:
 	assert.YAMLEq(t, expected, string(result), "components-actual diagnostic returned unexpected value")
 }
 
+// TestDiagnosticState creates a coordinator with a test state and verify that
+// the state diagnostic reports it.
 func TestDiagnosticState(t *testing.T) {
-	// Create a coordinator with a test state and verify that the state
-	// diagnostic reports it
-
 	now := time.Now().UTC()
 	state := State{
 		State:        agentclient.Starting,
@@ -427,7 +426,8 @@ func TestDiagnosticState(t *testing.T) {
 					State:   client.UnitStateDegraded,
 					Message: "degraded message",
 					VersionInfo: runtime.ComponentVersionInfo{
-						Name: "version name",
+						Name:      "version name",
+						BuildHash: "a-build-hash",
 					},
 				},
 			},
@@ -461,6 +461,7 @@ components:
       units: {}
       version_info:
         name: "version name"
+        build_hash: "a-build-hash"
 upgrade_details:
   target_version: 8.12.0
   state: UPG_DOWNLOADING
@@ -503,7 +504,8 @@ func TestDiagnosticStateForAPM(t *testing.T) {
 					State:   client.UnitStateDegraded,
 					Message: "degraded message",
 					VersionInfo: runtime.ComponentVersionInfo{
-						Name: "version name",
+						Name:      "version name",
+						BuildHash: "a-build-hash",
 					},
 					Component: &proto.Component{
 						ApmConfig: &proto.APMConfig{
@@ -540,6 +542,7 @@ components:
       units: {}
       version_info:
         name: "version name"
+        build_hash: "a-build-hash"
       component:
         apmconfig:
           elastic:

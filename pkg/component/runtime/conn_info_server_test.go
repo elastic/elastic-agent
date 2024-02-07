@@ -44,7 +44,7 @@ func newMockCommunicator() *mockCommunicator {
 	}
 }
 
-func (c *mockCommunicator) WriteConnInfo(w io.Writer, services ...client.Service) error {
+func (c *mockCommunicator) WriteStartUpInfo(w io.Writer, services ...client.Service) error {
 	infoBytes, err := protobuf.Marshal(c.startupInfo)
 	if err != nil {
 		return fmt.Errorf("failed to marshal connection information: %w", err)

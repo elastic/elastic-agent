@@ -11,8 +11,16 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/elastic/elastic-agent-libs/kibana"
 )
+
+type EnrollParams struct {
+	EnrollmentToken string `json:"api_key"`
+	FleetURL        string `json:"fleet_url"`
+	PolicyID        string `json:"policy_id"`
+}
 
 // GetAgentByPolicyIDAndHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
 func GetAgentByPolicyIDAndHostnameFromList(ctx context.Context, client *kibana.Client, policyID, hostname string) (*kibana.AgentExisting, error) {
@@ -143,4 +151,44 @@ func DefaultURL(ctx context.Context, client *kibana.Client) (string, error) {
 	}
 
 	return "", errors.New("unable to determine default fleet server URL")
+}
+
+// NewEnrollParams creates a new policy with monitoring logs and metrics,
+// an enrollment token and returns an EnrollParams with the information to enroll
+// an agent. If an error happens, it returns nil and a non-nil error.
+func NewEnrollParams(ctx context.Context, client *kibana.Client) (*EnrollParams, error) {
+	policyUUID := uuid.New().String()
+	policy := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+
+	policyResp, err := client.CreatePolicy(ctx, policy)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating policy: %w", err)
+	}
+
+	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policyResp.ID,
+	}
+	enrollmentToken, err := client.CreateEnrollmentAPIKey(ctx, createEnrollmentApiKeyReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating enrollment API key: %w", err)
+	}
+
+	fleetServerURL, err := DefaultURL(ctx, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed getting Fleet Server URL: %w", err)
+	}
+
+	return &EnrollParams{
+		EnrollmentToken: enrollmentToken.APIKey,
+		FleetURL:        fleetServerURL,
+		PolicyID:        policyResp.ID,
+	}, nil
 }
