@@ -40,7 +40,7 @@ func TestRunningUnderSupervisor(t *testing.T) {
 		t.Skip("can't mock supervisor under windows")
 	}
 	SupervisorPid = os.Getppid()
-	under := RunningUnderSupervisor()
+	under := wrapper()
 	require.True(t, under)
 }
 
