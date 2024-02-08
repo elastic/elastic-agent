@@ -1,0 +1,187 @@
+{
+      "id": "5c4458d3-591f-4d91-a3a9-db315402ec71",
+      "version": "WzEyMjAsMV0=",
+      "name": "cef-1",
+      "namespace": "",
+      "description": "",
+      "package": {
+        "name": "cef",
+        "title": "Common Event Format (CEF)",
+        "version": "2.16.2"
+      },
+      "enabled": true,
+      "policy_id": "041881f2-146e-4f6a-a69c-bcadfaf4b0a0",
+      "inputs": [
+        {
+          "type": "logfile",
+          "policy_template": "cef",
+          "enabled": true,
+          "streams": [
+            {
+              "enabled": true,
+              "data_stream": {
+                "type": "logs",
+                "dataset": "cef.log"
+              },
+              "vars": {
+                "paths": {
+                  "value": [
+                    "/var/log/cef.log"
+                  ],
+                  "type": "text"
+                },
+                "decode_cef_timezone": {
+                  "type": "text"
+                },
+                "tags": {
+                  "value": [
+                    "cef",
+                    "forwarded"
+                  ],
+                  "type": "text"
+                },
+                "preserve_original_event": {
+                  "value": false,
+                  "type": "bool"
+                },
+                "processors": {
+                  "type": "yaml"
+                }
+              },
+              "id": "logfile-cef.log-5c4458d3-591f-4d91-a3a9-db315402ec71",
+              "compiled_stream": {
+                "paths": [
+                  "/var/log/cef.log"
+                ],
+                "exclude_files": [
+                  ".gz$"
+                ],
+                "tags": [
+                  "cef",
+                  "forwarded"
+                ],
+                "publisher_pipeline.disable_host": true,
+                "processors": [
+                  {
+                    "rename": {
+                      "fields": [
+                        {
+                          "from": "message",
+                          "to": "event.original"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "decode_cef": {
+                      "field": "event.original"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "type": "udp",
+          "policy_template": "cef",
+          "enabled": false,
+          "streams": [
+            {
+              "enabled": false,
+              "data_stream": {
+                "type": "logs",
+                "dataset": "cef.log"
+              },
+              "vars": {
+                "syslog_host": {
+                  "value": "localhost",
+                  "type": "text"
+                },
+                "syslog_port": {
+                  "value": 9003,
+                  "type": "integer"
+                },
+                "decode_cef_timezone": {
+                  "type": "text"
+                },
+                "tags": {
+                  "value": [
+                    "cef",
+                    "forwarded"
+                  ],
+                  "type": "text"
+                },
+                "preserve_original_event": {
+                  "value": false,
+                  "type": "bool"
+                },
+                "udp_options": {
+                  "value": "",
+                  "type": "yaml"
+                },
+                "processors": {
+                  "type": "yaml"
+                }
+              },
+              "id": "udp-cef.log-5c4458d3-591f-4d91-a3a9-db315402ec71"
+            }
+          ]
+        },
+        {
+          "type": "tcp",
+          "policy_template": "cef",
+          "enabled": false,
+          "streams": [
+            {
+              "enabled": false,
+              "data_stream": {
+                "type": "logs",
+                "dataset": "cef.log"
+              },
+              "vars": {
+                "syslog_host": {
+                  "value": "localhost",
+                  "type": "text"
+                },
+                "syslog_port": {
+                  "value": 9004,
+                  "type": "integer"
+                },
+                "decode_cef_timezone": {
+                  "type": "text"
+                },
+                "tags": {
+                  "value": [
+                    "cef",
+                    "forwarded"
+                  ],
+                  "type": "text"
+                },
+                "preserve_original_event": {
+                  "value": false,
+                  "type": "bool"
+                },
+                "ssl": {
+                  "value": "",
+                  "type": "yaml"
+                },
+                "tcp_options": {
+                  "value": "",
+                  "type": "yaml"
+                },
+                "processors": {
+                  "type": "yaml"
+                }
+              },
+              "id": "tcp-cef.log-5c4458d3-591f-4d91-a3a9-db315402ec71"
+            }
+          ]
+        }
+      ],
+      "revision": 1,
+      "created_at": "2024-02-08T00:00:33.294Z",
+      "created_by": "system",
+      "updated_at": "2024-02-08T00:00:33.294Z",
+      "updated_by": "system"
+}

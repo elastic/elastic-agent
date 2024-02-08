@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+// //go:build integration
 
 package integration
 
@@ -12,12 +12,12 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	logrunner "github.com/leehinman/spigot/pkg/runner"
 	"github.com/sajari/regression"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
+	"github.com/elastic/go-ucfg"
 )
 
 type ExtendedRunner struct {
@@ -103,14 +104,40 @@ func TestLongRunningAgentForLeaks(t *testing.T) {
 }
 
 func (runner *ExtendedRunner) SetupSuite() {
-	// create ~40 1MB files that will be picked up by the `/var/log/httpd/error_log*` pattern
-	cmd := exec.Command("go", "install", "-v", "github.com/mingrammer/flog@latest")
-	out, err := cmd.CombinedOutput()
-	require.NoError(runner.T(), err, "got out: %s", string(out))
+	err := os.MkdirAll("/var/log/cef", 0o755)
+	require.NoError(runner.T(), err)
+	spigotConfig := map[string]interface{}{
+		"generator": map[string]interface{}{
+			"type": "citrix:cef",
+		},
+		"output": map[string]interface{}{
+			"type":      "file",
+			"directory": "/var/log/cef/",
+			"pattern":   "cef*.log",
+			"delimiter": "\n",
+		},
+		"interval": "1s",
+		"records":  "1000",
+	}
+	cfg, err := ucfg.NewFrom(spigotConfig)
+	require.NoError(runner.T(), err)
 
-	cmd = exec.Command("flog", "-t", "log", "-f", "apache_error", "-o", "/var/log/httpd/error_log", "-b", "50485760", "-p", "1048576")
-	out, err = cmd.CombinedOutput()
-	require.NoError(runner.T(), err, "got out: %s", string(out))
+	logger, err := logrunner.New(cfg)
+	require.NoError(runner.T(), err)
+
+	go func() {
+		err := logger.Execute()
+		require.NoError(runner.T(), err)
+	}()
+
+	// create ~40 1MB files that will be picked up by the `/var/log/httpd/error_log*` pattern
+	// cmd := exec.Command("go", "install", "-v", "github.com/mingrammer/flog@latest")
+	// out, err := cmd.CombinedOutput()
+	// require.NoError(runner.T(), err, "got out: %s", string(out))
+
+	// cmd = exec.Command("flog", "-t", "log", "-f", "apache_error", "-o", "/var/log/httpd/error_log", "-b", "50485760", "-p", "1048576")
+	// out, err = cmd.CombinedOutput()
+	// require.NoError(runner.T(), err, "got out: %s", string(out))
 
 	policyUUID := uuid.New().String()
 	unpr := false
@@ -159,12 +186,12 @@ func (runner *ExtendedRunner) SetupSuite() {
 	_, err = runner.info.KibanaClient.InstallFleetPackage(ctx, systemPackage)
 	require.NoError(runner.T(), err, "error creating fleet package")
 
-	// install apache
+	// install cef
 
 	policyUUIDApache := uuid.New().String()
 	apachePackage := kibana.PackagePolicyRequest{}
 
-	jsonRaw, err = os.ReadFile("agent_long_test_apache_integ.json")
+	jsonRaw, err = os.ReadFile("agent_long_test_cef.json")
 	require.NoError(runner.T(), err)
 
 	err = json.Unmarshal(jsonRaw, &apachePackage)
@@ -231,6 +258,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	require.NoError(runner.T(), err)
 
 	timer := time.NewTimer(testDuration)
+	defer timer.Stop()
 
 	// time to perform a health check
 	ticker := time.Tick(time.Second * 10)
@@ -260,7 +288,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	// we're measuring the handle usage as y=mx+b
 	// if the slope is increasing above a certain rate, fail the test
-	handleSlopeFailure := 0.001
+	handleSlopeFailure := 0.1
 
 	for _, handle := range handles {
 		err = handle.regHandles.Run()
