@@ -11,6 +11,29 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+type Agent interface {
+	// AgentID returns an agent identifier.
+	AgentID() string
+
+	// Headers returns custom headers used to communicate with elasticsearch.
+	Headers() map[string]string
+
+	// LogLevel retrieves a log level.
+	LogLevel() string
+
+	// ReloadID reloads agent info ID from configuration file.
+	ReloadID(ctx context.Context) error
+
+	// SetLogLevel updates log level of agent.
+	SetLogLevel(ctx context.Context, level string) error
+
+	// Snapshot returns if this version is a snapshot.
+	Snapshot() bool
+
+	// Version returns the version for this Agent.
+	Version() string
+}
+
 // AgentInfo is a collection of information about agent.
 type AgentInfo struct {
 	agentID  string
