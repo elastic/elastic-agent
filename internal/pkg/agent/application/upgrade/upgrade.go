@@ -39,11 +39,12 @@ import (
 )
 
 const (
-	agentName       = "elastic-agent"
-	hashLen         = 6
-	agentCommitFile = ".elastic-agent.active.commit"
-	runDirMod       = 0770
-	snapshotSuffix  = "-SNAPSHOT"
+	agentName          = "elastic-agent"
+	hashLen            = 6
+	agentCommitFile    = ".elastic-agent.active.commit"
+	runDirMod          = 0770
+	snapshotSuffix     = "-SNAPSHOT"
+	watcherMaxWaitTime = 30 * time.Second
 )
 
 var agentArtifact = artifact.Artifact{
@@ -52,7 +53,7 @@ var agentArtifact = artifact.Artifact{
 	Artifact: "beats/" + agentName,
 }
 
-var ErrWatcherNotStarted = errors.New("watcher did not start in time")
+var ErrWatcherNotStarted = errors.New(fmt.Sprintf("watcher did not start within %s or context expired", watcherMaxWaitTime))
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -308,7 +309,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
-	watcherWaitErr := waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), 30*time.Second)
+	watcherWaitErr := waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
 	if watcherWaitErr != nil {
 		killWatcherErr := watcherCmd.Process.Kill()
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
@@ -338,15 +339,19 @@ func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath stri
 		return fmt.Errorf("error starting update marker watcher: %w", err)
 	}
 
+	log.Info("waiting for upgrade watcher to set %s state in upgrade marker", details.StateWatching)
+
 	for {
 		select {
 		case updMarker := <-markerWatcher.Watch():
 			if updMarker.Details != nil && updMarker.Details.State == details.StateWatching {
 				// watcher started and it is watching, all good
+				log.Info("upgrade watcher set %s state in upgrade marker: exiting wait loop", details.StateWatching)
 				return nil
 			}
 
 		case <-watcherContext.Done():
+			log.Error("upgrade watcher did not start watching within %s or context has expired", waitTime)
 			return ErrWatcherNotStarted
 		}
 	}
