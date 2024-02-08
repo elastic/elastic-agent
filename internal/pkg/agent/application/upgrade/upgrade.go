@@ -53,7 +53,7 @@ var agentArtifact = artifact.Artifact{
 	Artifact: "beats/" + agentName,
 }
 
-var ErrWatcherNotStarted = errors.New(fmt.Sprintf("watcher did not start within %s or context expired", watcherMaxWaitTime))
+var ErrWatcherNotStarted = errors.New("watcher did not start in time or context expired")
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -339,7 +339,7 @@ func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath stri
 		return fmt.Errorf("error starting update marker watcher: %w", err)
 	}
 
-	log.Info("waiting for upgrade watcher to set %s state in upgrade marker", details.StateWatching)
+	log.Info("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
 
 	for {
 		select {
