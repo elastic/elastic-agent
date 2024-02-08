@@ -20,6 +20,7 @@ import (
 // last good action on disk, we assume that the action is added to the store after it was ACK with
 // Fleet. The store is not threadsafe.
 // ATTN!!!: THE actionStore is deprecated, please use and extend the stateStore instead. The actionStore will be eventually removed.
+// Deprecated.
 type actionStore struct {
 	log    *logger.Logger
 	store  storeLoad
@@ -145,10 +146,10 @@ var _ = actionPolicyChangeSerializer(fleetapi.ActionPolicyChange{})
 
 // actionUnenrollSerializer is a struct that adds a YAML serialization,
 type actionUnenrollSerializer struct {
-	ActionID   string           `yaml:"action_id"`
-	ActionType string           `yaml:"action_type"`
-	IsDetected bool             `yaml:"is_detected"`
-	Signed     *fleetapi.Signed `yaml:"signed,omitempty"`
+	ActionID   string           `json:"action_id"`
+	ActionType string           `json:"action_type"`
+	IsDetected bool             `json:"is_detected"`
+	Signed     *fleetapi.Signed `json:"signed,omitempty"`
 }
 
 // add a guards between the serializer structs and the original struct.

@@ -57,10 +57,10 @@ type state struct {
 // it is used to read the yaml file and assign the action to state.action as we must provide the
 // underlying struct that provides the action interface.
 type actionSerializer struct {
-	ID         string                 `yaml:"action_id"`
-	Type       string                 `yaml:"action_type"`
-	Policy     map[string]interface{} `yaml:"policy,omitempty"`
-	IsDetected *bool                  `yaml:"is_detected,omitempty"`
+	ID         string                 `json:"action_id"`
+	Type       string                 `json:"action_type"`
+	Policy     map[string]interface{} `json:"policy,omitempty"`
+	IsDetected *bool                  `json:"is_detected,omitempty"`
 }
 
 // stateSerializer is used to serialize the state to yaml.
@@ -68,9 +68,9 @@ type actionSerializer struct {
 // queue serialization is handled through yaml struct tags or the actions unmarshaller defined in fleetapi
 // TODO clean up action serialization (have it be part of the fleetapi?)
 type stateSerializer struct {
-	Action   *actionSerializer `yaml:"action,omitempty"`
-	AckToken string            `yaml:"ack_token,omitempty"`
-	Queue    fleetapi.Actions  `yaml:"action_queue,omitempty"`
+	Action   *actionSerializer `json:"action,omitempty"`
+	AckToken string            `json:"ack_token,omitempty"`
+	Queue    fleetapi.Actions  `json:"action_queue,omitempty"`
 }
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.

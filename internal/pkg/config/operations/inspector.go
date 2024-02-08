@@ -124,7 +124,7 @@ func loadFleetConfig(ctx context.Context, l *logger.Logger) (map[string]interfac
 			continue
 		}
 
-		return cfgChange.Policy, nil
+		return cfgChange.Data.Policy, nil
 	}
 	return nil, nil
 }
