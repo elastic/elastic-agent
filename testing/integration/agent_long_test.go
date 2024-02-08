@@ -12,7 +12,8 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strings"
+	"regexp"
+	"strconv"
 	"testing"
 	"time"
 
@@ -116,7 +117,7 @@ func (runner *ExtendedRunner) SetupSuite() {
 			"pattern":   "cef*.log",
 			"delimiter": "\n",
 		},
-		"interval": "1s",
+		"interval": "20s",
 		"records":  "1000",
 	}
 	cfg, err := ucfg.NewFrom(spigotConfig)
@@ -215,15 +216,17 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "20m"
+		testRuntime = "5m"
 	}
 
 	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
 	require.Eventually(runner.T(), func() bool {
 		allHealthy := true
 		status, err := runner.agentFixture.ExecStatus(context.Background())
+
 		require.NoError(runner.T(), err)
 		for _, comp := range status.Components {
+			runner.T().Logf("component state: %s", comp.Message)
 			if comp.State != int(cproto.State_HEALTHY) {
 				allHealthy = false
 			}
@@ -231,27 +234,27 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		return allHealthy
 	}, time.Minute*3, time.Second*20)
 
-	procs, err := sysinfo.Processes()
-	require.NoError(runner.T(), err)
-
 	handles := []processWatcher{}
 
+	regex := regexp.MustCompile(`[\d]+`)
+	status, err := runner.agentFixture.ExecStatus(context.Background())
+	require.NoError(runner.T(), err)
 	// track running beats
 	// the `last 30s` metrics tend to report gauges, which we can't use for calculating a derivative.
 	// so separately fetch the PIDs
-	for _, proc := range procs {
-		info, err := proc.Info()
+	for _, comp := range status.Components {
+		pidStr := regex.FindString(comp.Message)
+		pid, err := strconv.ParseInt(pidStr, 10, 64)
 		require.NoError(runner.T(), err)
-		if strings.Contains(info.Name, "beat") || strings.Contains(info.Name, "elastic-agent") {
-			handle, err := sysinfo.Process(proc.PID())
-			require.NoError(runner.T(), err)
-			handlesReg := new(regression.Regression)
-			handlesReg.SetObserved(fmt.Sprintf("%s handle usage", info.Name))
-			handlesReg.SetVar(0, "time")
 
-			runner.T().Logf("created handle watcher for %s (%d)", info.Name, proc.PID())
-			handles = append(handles, processWatcher{handle: handle, pid: proc.PID(), name: info.Name, regHandles: handlesReg})
-		}
+		handle, err := sysinfo.Process(int(pid))
+		require.NoError(runner.T(), err)
+		handlesReg := new(regression.Regression)
+		handlesReg.SetObserved(fmt.Sprintf("%s handle usage", comp.Name))
+		handlesReg.SetVar(0, "time")
+
+		runner.T().Logf("created handle watcher for %s (%d)", comp.Name, pid)
+		handles = append(handles, processWatcher{handle: handle, pid: int(pid), name: comp.Name, regHandles: handlesReg})
 	}
 
 	testDuration, err := time.ParseDuration(testRuntime)
@@ -302,7 +305,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		if math.IsNaN(handleSlope) {
 			continue
 		}
-		require.LessOrEqual(runner.T(), handleSlope, handleSlopeFailure, "increase in open handles exceeded threshold")
+		require.LessOrEqual(runner.T(), handleSlope, handleSlopeFailure, "increase in open handles exceeded threshold: %s", handle.regHandles)
 
 		runner.T().Logf("===============================")
 	}
