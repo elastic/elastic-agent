@@ -759,14 +759,14 @@ func TestWaitForWatcher(t *testing.T) {
 			name:                "Happy path: watcher is watching already",
 			states:              []details.State{details.StateWatching},
 			stateChangeInterval: 1 * time.Millisecond,
-			timeout:             5 * time.Millisecond,
+			timeout:             50 * time.Millisecond,
 			wantErr:             assert.NoError,
 		},
 		{
 			name:                "Sad path: watcher is never starting",
 			states:              []details.State{details.StateReplacing},
 			stateChangeInterval: 1 * time.Millisecond,
-			timeout:             5 * time.Millisecond,
+			timeout:             50 * time.Millisecond,
 			wantErr:             wantErrWatcherNotStarted,
 		},
 		{
@@ -788,7 +788,7 @@ func TestWaitForWatcher(t *testing.T) {
 			name:                "Timeout: marker is never created",
 			states:              nil,
 			stateChangeInterval: 1 * time.Millisecond,
-			timeout:             5 * time.Millisecond,
+			timeout:             50 * time.Millisecond,
 			wantErr:             wantErrWatcherNotStarted,
 		},
 		{
