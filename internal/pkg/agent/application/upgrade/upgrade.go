@@ -10,9 +10,11 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
@@ -49,6 +51,8 @@ var agentArtifact = artifact.Artifact{
 	Cmd:      agentName,
 	Artifact: "beats/" + agentName,
 }
+
+var ErrWatcherNotStarted = errors.New("watcher did not start in time")
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -297,10 +301,18 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		// use the new agent executable as it should be able to parse the new update marker
 		watcherExecutable = paths.BinaryPath(filepath.Join(paths.Top(), unpackRes.VersionedHome), agentName)
 	}
-	if err := InvokeWatcher(u.log, watcherExecutable); err != nil {
+	var watcherCmd *exec.Cmd
+	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
-		return nil, err
+		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(err, rollbackErr)
+	}
+
+	watcherWaitErr := waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), 30*time.Second)
+	if watcherWaitErr != nil {
+		killWatcherErr := watcherCmd.Process.Kill()
+		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, rollbackErr)
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, filepath.Join(paths.Top(), unpackRes.VersionedHome))
@@ -313,6 +325,31 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	return cb, nil
+}
+
+func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
+	//Wait for the watcher to be up and running
+	watcherContext, cancel := context.WithTimeout(ctx, waitTime)
+	defer cancel()
+
+	markerWatcher := newMarkerFileWatcher(markerFilePath, log)
+	err := markerWatcher.Run(watcherContext)
+	if err != nil {
+		return fmt.Errorf("error starting update marker watcher: %w", err)
+	}
+
+	for {
+		select {
+		case updMarker := <-markerWatcher.Watch():
+			if updMarker.Details != nil && updMarker.Details.State == details.StateWatching {
+				// watcher started and it is watching, all good
+				return nil
+			}
+
+		case <-watcherContext.Done():
+			return ErrWatcherNotStarted
+		}
+	}
 }
 
 // Ack acks last upgrade action
