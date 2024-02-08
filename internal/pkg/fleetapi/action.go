@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
-	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
@@ -65,19 +64,19 @@ type ScheduledAction interface {
 type RetryableAction interface {
 	ScheduledAction
 	// RetryAttempt returns the retry-attempt number of the action
-	// the retry_attempt number is meant to be an interal counter for the elastic-agent and not communicated to fleet-server or ES.
+	// the retry_attempt number is meant to be an internal counter for the elastic-agent and not communicated to fleet-server or ES.
 	// If RetryAttempt returns > 1, and GetError is not nil the acker should signal that the action is being retried.
 	// If RetryAttempt returns < 1, and GetError is not nil the acker should signal that the action has failed.
 	RetryAttempt() int
 	// SetRetryAttempt sets the retry-attempt number of the action
-	// the retry_attempt number is meant to be an interal counter for the elastic-agent and not communicated to fleet-server or ES.
+	// the retry_attempt number is meant to be an internal counter for the elastic-agent and not communicated to fleet-server or ES.
 	SetRetryAttempt(int)
 	// SetStartTime sets the start_time of the action to the specified value.
 	// this is used by the action-retry mechanism.
 	SetStartTime(t time.Time)
 	// GetError returns the error that is associated with the retry.
 	// If it is a retryable action fleet-server should mark it as such.
-	// Otherwise fleet-server should mark the action as failed.
+	// Otherwise, fleet-server should mark the action as failed.
 	GetError() error
 	// SetError sets the retryable action error
 	SetError(error)
@@ -90,24 +89,28 @@ type Signed struct {
 
 // TODO(AndersonQ): remove the yaml tags?
 
-// FleetAction represents an action from fleet-server.
-// should copy the action definition in fleet-server/model/schema.json
-type FleetAction struct {
-	ActionID         string          `json:"id" yaml:"action_id"` // NOTE schema defines this as action_id, but fleet-server remaps it to id in the json response to agent check-in.
-	ActionType       string          `json:"type,omitempty" yaml:"type,omitempty"`
-	InputType        string          `json:"input_type,omitempty" yaml:"input_type,omitempty"`
-	ActionExpiration string          `json:"expiration,omitempty" yaml:"expiration,omitempty"`
-	ActionStartTime  string          `json:"start_time,omitempty" yaml:"start_time,omitempty"`
-	Timeout          int64           `json:"timeout,omitempty" yaml:"timeout,omitempty"`
-	Data             json.RawMessage `json:"data,omitempty" yaml:"data,omitempty"`
-	Retry            int             `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty"` // used internally for serialization by elastic-agent.
-	Signed           *Signed         `yaml:"signed,omitempty" json:"signed,omitempty"`
-
-	// Agents []string // disabled, fleet-server uses this to generate each agent's actions
-	// Timestamp string // disabled, agent does not care when the document was created
-	// UserID string // disabled, agent does not care
-	// MinimumExecutionDuration int64 // disabled, used by fleet-server for scheduling
-}
+// // FleetAction represents an action from fleet-server.
+// // should copy the action definition in fleet-server/model/schema.json
+// type FleetAction struct {
+// 	ActionID         string          `json:"id" yaml:"id"` // NOTE schema defines this as action_id, but fleet-server remaps it to id in the json response to agent check-in.
+// 	Type             string          `json:"type,omitempty" yaml:"type,omitempty"`
+// 	InputType        string          `json:"input_type,omitempty" yaml:"input_type,omitempty"`
+// 	ActionExpiration string          `json:"expiration,omitempty" yaml:"expiration,omitempty"`
+// 	ActionStartTime  string          `json:"start_time,omitempty" yaml:"start_time,omitempty"`
+// 	Timeout          int64           `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+// 	Signed           *Signed         `yaml:"signed,omitempty" json:"signed,omitempty"`
+// 	// Data is specific for each action
+// 	Data             json.RawMessage `json:"data,omitempty" yaml:"data,omitempty"`
+//
+// 	// Agents                   []string `json:"agents,omitempty"`                     // disabled, fleet-server uses this to generate each agent's actions
+// 	// Expiration               string   `json:"expiration,omitempty"`                 // disabled, used by fleet-server
+// 	// MinimumExecutionDuration int64    `json:"minimum_execution_duration,omitempty"` // disabled, used by fleet-server for scheduling
+// 	// RolloutDurationSeconds   int64    `json:"rollout_duration_seconds,omitempty"`   // disabled, used by fleet-server
+// 	// StartTime                string   `json:"start_time,omitempty"`                 // disabled, used by fleet-server
+// 	// Timestamp                string   `json:"@timestamp,omitempty"`                 // disabled, agent does not care when the document was created
+// 	// Traceparent              string   `json:"traceparent,omitempty"`                // disabled, used by fleet-server
+// 	// UserID                   string   `json:"user_id,omitempty"`                    // disabled, agent does not care
+// }
 
 func newAckEvent(id, aType string) AckEvent {
 	return AckEvent{
@@ -124,9 +127,10 @@ func newAckEvent(id, aType string) AckEvent {
 // NOTE: We only keep the original type and the action id, the payload of the event is dropped, we
 // do this to make sure we do not leak any unwanted information.
 type ActionUnknown struct {
-	originalType string
-	ActionID     string
-	ActionType   string
+	// OriginalType returns the original type of the action as returned by the API.
+	OriginalType string
+	ActionID     string `json:"id" yaml:"id" mapstructure:"id"`
+	ActionType   string `json:"type,omitempty" yaml:"type,omitempty" mapstructure:"type"`
 }
 
 // Type returns the type of the Action.
@@ -146,14 +150,9 @@ func (a *ActionUnknown) String() string {
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
 	s.WriteString(" (original type: ")
-	s.WriteString(a.OriginalType())
+	s.WriteString(a.OriginalType)
 	s.WriteString(")")
 	return s.String()
-}
-
-// OriginalType returns the original type of the action as returned by the API.
-func (a *ActionUnknown) OriginalType() string {
-	return a.originalType
 }
 
 func (a *ActionUnknown) AckEvent() AckEvent {
@@ -162,14 +161,19 @@ func (a *ActionUnknown) AckEvent() AckEvent {
 		SubType:   "ACKNOWLEDGED",
 		ActionID:  a.ActionID,
 		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
-		Error:     fmt.Sprintf("Action %q of type %q is unknown to the elastic-agent", a.ActionID, a.originalType),
+		Error:     fmt.Sprintf("Action %q of type %q is unknown to the elastic-agent", a.ActionID, a.OriginalType),
 	}
 }
 
-// ActionPolicyReassign is a request to apply a new
+// ActionPolicyReassign is a request to apply a new policy
 type ActionPolicyReassign struct {
-	ActionID   string `json:"action_id" yaml:"action_id"`
-	ActionType string `json:"type" yaml:"type"`
+	Data       ActionPolicyReassignData `json:"data,omitempty"`
+	ActionID   string                   `json:"id" yaml:"id"`
+	ActionType string                   `json:"type" yaml:"type"`
+}
+
+type ActionPolicyReassignData struct {
+	PolicyID string `json:"policy_id"`
 }
 
 func (a *ActionPolicyReassign) String() string {
@@ -197,9 +201,13 @@ func (a *ActionPolicyReassign) AckEvent() AckEvent {
 
 // ActionPolicyChange is a request to apply a new
 type ActionPolicyChange struct {
-	ActionID   string                 `json:"action_id" yaml:"action_id"`
+	ActionID   string                 `json:"id" yaml:"id"`
 	ActionType string                 `json:"type" yaml:"type"`
-	Policy     map[string]interface{} `json:"policy" yaml:"policy,omitempty"`
+	Data       ActionPolicyChangeData `json:"data,omitempty" yaml:"data,omitempty"`
+}
+
+type ActionPolicyChangeData struct {
+	Policy map[string]interface{} `json:"policy" yaml:"policy,omitempty"`
 }
 
 func (a *ActionPolicyChange) String() string {
@@ -227,52 +235,21 @@ func (a *ActionPolicyChange) AckEvent() AckEvent {
 
 // ActionUpgrade is a request for agent to upgrade.
 type ActionUpgrade struct {
-	ActionID         string  `json:"action_id" yaml:"action_id" mapstructure:"id"`
-	ActionType       string  `json:"type" yaml:"type" mapstructure:"type"`
-	ActionStartTime  string  `json:"start_time" yaml:"start_time,omitempty" mapstructure:"-"` // TODO change to time.Time in unmarshal
-	ActionExpiration string  `json:"expiration" yaml:"expiration,omitempty" mapstructure:"-"`
-	Version          string  `json:"data.version" yaml:"version,omitempty" mapstructure:"-"`
-	SourceURI        string  `json:"data.source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
-	Retry            int     `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
-	Signed           *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
-	Err              error   `json:"-" yaml:"-" mapstructure:"-"`
-}
-
-type ActionUpgradeYAML struct {
-	ActionID         string  `json:"action_id" yaml:"action_id" mapstructure:"id"`
-	ActionType       string  `json:"type" yaml:"type" mapstructure:"type"`
-	ActionStartTime  string  `json:"start_time" yaml:"start_time,omitempty" mapstructure:"-"` // TODO change to time.Time in unmarshal
-	ActionExpiration string  `json:"expiration" yaml:"expiration,omitempty" mapstructure:"-"`
-	Data             []byte  `json:"data" yaml:"data,omitempty" mapstructure:"-"`
-	Retry            int     `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
-	Signed           *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
-	Err              error   `json:"-" yaml:"-" mapstructure:"-"`
+	ActionID         string `json:"id" yaml:"id" mapstructure:"id"`
+	ActionType       string `json:"type" yaml:"type" mapstructure:"type"`
+	ActionStartTime  string `json:"start_time" yaml:"start_time,omitempty" mapstructure:"-"` // TODO change to time.Time in unmarshal
+	ActionExpiration string `json:"expiration" yaml:"expiration,omitempty" mapstructure:"-"`
+	// does anyone know why those aren't mapped to mapstructure?
+	Data   ActionUpgradeData `json:"data,omitempty" mapstructure:"-"`
+	Signed *Signed           `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+	Err    error             `json:"-" yaml:"-" mapstructure:"-"`
 }
 
 type ActionUpgradeData struct {
 	Version   string `json:"version" yaml:"version,omitempty" mapstructure:"-"`
 	SourceURI string `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
-}
-
-func (a *ActionUpgrade) toActionUpgradeYAML() (ActionUpgradeYAML, error) {
-	bs, err := yaml.Marshal(struct {
-		Version   string `json:"version" yaml:"version,omitempty" mapstructure:"-"`
-		SourceURI string `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
-	}{Version: a.Version, SourceURI: a.SourceURI})
-	if err != nil {
-		return ActionUpgradeYAML{}, err
-	}
-
-	return ActionUpgradeYAML{
-		ActionID:         a.ActionID,
-		ActionType:       a.ActionType,
-		ActionStartTime:  a.ActionStartTime,
-		ActionExpiration: a.ActionExpiration,
-		Data:             bs,
-		Retry:            a.Retry,
-		Signed:           a.Signed,
-		Err:              a.Err,
-	}, nil
+	// TODO: update fleet open api schema
+	Retry int `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
 }
 
 func (a *ActionUpgrade) String() string {
@@ -294,8 +271,8 @@ func (a *ActionUpgrade) AckEvent() AckEvent {
 			Attempt int  `json:"retry_attempt,omitempty"`
 		}
 		payload.Retry = true
-		payload.Attempt = a.Retry
-		if a.Retry < 1 { // retry is set to -1 if it will not re attempt
+		payload.Attempt = a.Data.Retry
+		if a.Data.Retry < 1 { // retry is set to -1 if it will not re attempt
 			payload.Retry = false
 		}
 		p, _ := json.Marshal(payload)
@@ -340,12 +317,12 @@ func (a *ActionUpgrade) Expiration() (time.Time, error) {
 
 // RetryAttempt will return the retry_attempt of the action
 func (a *ActionUpgrade) RetryAttempt() int {
-	return a.Retry
+	return a.Data.Retry
 }
 
 // SetRetryAttempt sets the retry_attempt of the action
 func (a *ActionUpgrade) SetRetryAttempt(n int) {
-	a.Retry = n
+	a.Data.Retry = n
 }
 
 // GetError returns the error associated with the attempt to run the action.
@@ -370,13 +347,9 @@ func (a *ActionUpgrade) MarshalMap() (map[string]interface{}, error) {
 	return res, err
 }
 
-func (a *ActionUpgrade) MarshalYAML() (interface{}, error) {
-	return a.toActionUpgradeYAML()
-}
-
 // ActionUnenroll is a request for agent to unhook from fleet.
 type ActionUnenroll struct {
-	ActionID   string  `json:"action_id" yaml:"action_id" mapstructure:"id"`
+	ActionID   string  `json:"id" yaml:"id" mapstructure:"id"`
 	ActionType string  `json:"type" yaml:"type" mapstructure:"type"`
 	IsDetected bool    `json:"is_detected,omitempty" yaml:"is_detected,omitempty" mapstructure:"-"`
 	Signed     *Signed `json:"signed,omitempty" mapstructure:"signed,omitempty"`
@@ -414,9 +387,15 @@ func (a *ActionUnenroll) MarshalMap() (map[string]interface{}, error) {
 
 // ActionSettings is a request to change agent settings.
 type ActionSettings struct {
-	ActionID   string `json:"action_id" yaml:"action_id"`
-	ActionType string `json:"type" yaml:"type"`
-	LogLevel   string `json:"log_level" yaml:"log_level,omitempty"`
+	ActionID   string             `json:"id" yaml:"id"`
+	ActionType string             `json:"type" yaml:"type"`
+	Data       ActionSettingsData `json:"data,omitempty"`
+}
+
+type ActionSettingsData struct {
+	// LogLevel can only be one of "debug", "info", "warning", "error"
+	// TODO: add validation
+	LogLevel string `json:"log_level" yaml:"log_level,omitempty"`
 }
 
 // ID returns the ID of the Action.
@@ -436,7 +415,7 @@ func (a *ActionSettings) String() string {
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
 	s.WriteString(", log_level: ")
-	s.WriteString(a.LogLevel)
+	s.WriteString(a.Data.LogLevel)
 	return s.String()
 }
 
@@ -446,9 +425,13 @@ func (a *ActionSettings) AckEvent() AckEvent {
 
 // ActionCancel is a request to cancel an action.
 type ActionCancel struct {
-	ActionID   string `json:"action_id" yaml:"action_id"`
-	ActionType string `json:"type" yaml:"type"`
-	TargetID   string `json:"target_id" yaml:"target_id,omitempty"`
+	ActionID   string           `json:"id" yaml:"id"`
+	ActionType string           `json:"type" yaml:"type"`
+	Data       ActionCancelData `json:"data,omitempty"`
+}
+
+type ActionCancelData struct {
+	TargetID string `json:"target_id" yaml:"target_id,omitempty"`
 }
 
 // ID returns the ID of the Action.
@@ -468,7 +451,7 @@ func (a *ActionCancel) String() string {
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
 	s.WriteString(", target_id: ")
-	s.WriteString(a.TargetID)
+	s.WriteString(a.Data.TargetID)
 	return s.String()
 }
 
@@ -478,7 +461,7 @@ func (a *ActionCancel) AckEvent() AckEvent {
 
 // ActionDiagnostics is a request to gather and upload a diagnostics bundle.
 type ActionDiagnostics struct {
-	ActionID   string `json:"action_id"`
+	ActionID   string `json:"id"`
 	ActionType string `json:"type"`
 	UploadID   string `json:"-"`
 	Err        error  `json:"-"`
@@ -582,78 +565,54 @@ type Actions []Action
 
 // UnmarshalJSON takes every raw representation of an action and try to decode them.
 func (a *Actions) UnmarshalJSON(data []byte) error {
-	var responses []struct {
-		ActionType string          `json:"type,omitempty" yaml:"type,omitempty"`
-		Data       json.RawMessage `json:"data,omitempty" yaml:"data,omitempty"`
+	var typeUnmarshaler []struct {
+		ActionType string `json:"type,omitempty" yaml:"type,omitempty"`
 	}
-	if err := json.Unmarshal(data, &responses); err != nil {
+
+	if err := json.Unmarshal(data, &typeUnmarshaler); err != nil {
 		return errors.New(err,
-			"fail to decode actions",
+			"fail to decode actions to read their types",
 			errors.TypeConfig)
 	}
-	raw := make([]json.RawMessage, len(responses))
-	if err := json.Unmarshal(data, &raw); err != nil {
+
+	rawActions := make([]json.RawMessage, len(typeUnmarshaler))
+	if err := json.Unmarshal(data, &rawActions); err != nil {
 		return errors.New(err,
 			"fail to decode actions",
 			errors.TypeConfig)
 	}
 
-	actions := make([]Action, 0, len(responses))
-	for i, response := range responses {
+	actions := make([]Action, 0, len(typeUnmarshaler))
+	for i, response := range typeUnmarshaler {
 		var action Action
+
+		// keep the case alphabetically sorted
 		switch response.ActionType {
-		case ActionTypePolicyChange:
-			action = &ActionPolicyChange{}
-		case ActionTypePolicyReassign:
-			action = &ActionPolicyReassign{}
-		case ActionTypeInputAction:
-			// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
-			action = &ActionApp{}
-		case ActionTypeUnenroll:
-			action = &ActionUnenroll{}
-		case ActionTypeUpgrade:
-			action = &ActionUpgrade{}
-		case ActionTypeSettings:
-			action = &ActionSettings{}
 		case ActionTypeCancel:
 			action = &ActionCancel{}
 		case ActionTypeDiagnostics:
 			action = &ActionDiagnostics{}
+		case ActionTypeInputAction:
+			// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
+			action = &ActionApp{}
+		case ActionTypePolicyChange:
+			action = &ActionPolicyChange{}
+		case ActionTypePolicyReassign:
+			action = &ActionPolicyReassign{}
+		case ActionTypeSettings:
+			action = &ActionSettings{}
+		case ActionTypeUnenroll:
+			action = &ActionUnenroll{}
+		case ActionTypeUpgrade:
+			action = &ActionUpgrade{}
 		default:
-			action = &ActionUnknown{}
+			action = &ActionUnknown{OriginalType: response.ActionType}
 		}
 
-		// We unmarshal actions from two different sources: fleet-server and
-		// store.StateStore.
-		// The actions coming from fleet-server, FleetAction, have a `data`
-		// field for fields specific to each action.
-		// However, the specific types (e.g., ActionUpgrade, ActionCancel) use
-		// a flat structure without the `data` field.
-		// Therefore, if a concrete ActionTYPE is marshalled, it cannot be
-		// correctly unmarshalled into a FleetAction.
-		// In order to support both structures, each action must be unmarshalled
-		// twice:
-		//   - Once into a FleetAction to read the `data` field,
-		//   - And also into the specific action type (e.g., ActionUpgrade,
-		//   ActionCancel).
-		// If there is data in FleetAction.Data, it also needs to be unmarshalled
-		// into the specific action type, what happens in the second call to
-		// json.Unmarshal below.
-		if err := json.Unmarshal(raw[i], action); err != nil {
+		if err := json.Unmarshal(rawActions[i], action); err != nil {
 			return errors.New(err,
 				fmt.Sprintf("fail to decode %s action", action.Type()),
 				errors.TypeConfig)
-		}
-
-		// If response.Data contains data, the action came from fleet-server and
-		// the date must be unmarshalled into `action` as well.
-		if len(response.Data) > 0 {
-			if err := json.Unmarshal(response.Data, action); err != nil {
-				return errors.New(err,
-					fmt.Sprintf(
-						"fail to decode data field of %s action", action.Type()),
-					errors.TypeConfig)
-			}
 		}
 		actions = append(actions, action)
 	}
@@ -665,7 +624,7 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 // UnmarshalYAML prevents to decode actions from .
 func (a *Actions) UnmarshalYAML(_ func(interface{}) error) error {
 	// TODO(AndersonQ): we need this to migrate the store from YAML to JSON
-	return errors.New("Actions cannot be Unmarshaled from YAML")
+	return errors.New("Actions cannot be Unmarshalled from YAML")
 }
 
 // MarshalYAML attempts to decode yaml actions.
