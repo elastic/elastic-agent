@@ -23,10 +23,7 @@ func isStopped(timeout time.Duration, interval time.Duration, service string) er
 		return fmt.Errorf("failed to connect to service manager: %w", err)
 	}
 	defer func() {
-		err := m.Disconnect()
-		if err != nil {
-			return fmt.Errorf("failed to disconnect from service manager: %w", err)
-		}
+		_ = m.Disconnect()
 	}()
 
 	s, err := m.OpenService(service)
