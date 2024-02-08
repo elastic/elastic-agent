@@ -130,7 +130,11 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 			st.action = &fleetapi.ActionPolicyChange{
 				ActionID:   sr.Action.ID,
 				ActionType: sr.Action.Type,
-				Policy:     conv.YAMLMapToJSONMap(sr.Action.Policy), // Fix Policy, in order to make it consistent with the policy received from the fleet gateway as nested map[string]interface{}
+				Data: fleetapi.ActionPolicyChangeData{
+					// Fix Policy, in order to make it consistent with the policy
+					// received from the fleet gateway as nested map[string]interface{}
+					Policy: conv.YAMLMapToJSONMap(sr.Action.Policy),
+				},
 			}
 		}
 	}
@@ -264,7 +268,7 @@ func (s *StateStore) Save() error {
 
 	if s.state.action != nil {
 		if apc, ok := s.state.action.(*fleetapi.ActionPolicyChange); ok {
-			serialize.Action = &actionSerializer{apc.ActionID, apc.ActionType, apc.Policy, nil}
+			serialize.Action = &actionSerializer{apc.ActionID, apc.ActionType, apc.Data.Policy, nil}
 		} else if aun, ok := s.state.action.(*fleetapi.ActionUnenroll); ok {
 			serialize.Action = &actionSerializer{aun.ActionID, aun.ActionType, nil, &aun.IsDetected}
 		} else {

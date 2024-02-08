@@ -130,18 +130,18 @@ func (s *actionStore) actions() []action {
 // There are four ways to achieve the same results:
 // 1. We create a second struct that map the existing field.
 // 2. We add the serialization in the fleetapi.
-// 3. We move the actual action type outside of the actual fleetapi package.
+// 3. We move the actual action type outside the actual fleetapi package.
 // 4. We have two sets of type.
 //
 // This could be done in a refactoring.
 type actionPolicyChangeSerializer struct {
-	ActionID   string                 `yaml:"action_id"`
-	ActionType string                 `yaml:"action_type"`
-	Policy     map[string]interface{} `yaml:"policy"`
+	ActionID   string                          `json:"id" yaml:"id"`
+	ActionType string                          `json:"type" yaml:"type"`
+	Data       fleetapi.ActionPolicyChangeData `json:"data,omitempty" yaml:"data,omitempty"`
 }
 
 // add a guards between the serializer structs and the original struct.
-var _ actionPolicyChangeSerializer = actionPolicyChangeSerializer(fleetapi.ActionPolicyChange{})
+var _ = actionPolicyChangeSerializer(fleetapi.ActionPolicyChange{})
 
 // actionUnenrollSerializer is a struct that adds a YAML serialization,
 type actionUnenrollSerializer struct {
@@ -152,4 +152,4 @@ type actionUnenrollSerializer struct {
 }
 
 // add a guards between the serializer structs and the original struct.
-var _ actionUnenrollSerializer = actionUnenrollSerializer(fleetapi.ActionUnenroll{})
+var _ = actionUnenrollSerializer(fleetapi.ActionUnenroll{})

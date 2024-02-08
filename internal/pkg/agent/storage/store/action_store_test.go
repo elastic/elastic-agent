@@ -58,9 +58,8 @@ func TestActionStore(t *testing.T) {
 			ActionPolicyChange := &fleetapi.ActionPolicyChange{
 				ActionID:   "abc123",
 				ActionType: "POLICY_CHANGE",
-				Policy: map[string]interface{}{
-					"hello": "world",
-				},
+				Data: fleetapi.ActionPolicyChangeData{
+					Policy: map[string]interface{}{"hello": "world"}},
 			}
 
 			s := storage.NewDiskStore(file)
