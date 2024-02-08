@@ -22,7 +22,12 @@ func isStopped(timeout time.Duration, interval time.Duration, service string) er
 	if err != nil {
 		return fmt.Errorf("failed to connect to service manager: %w", err)
 	}
-	defer m.Disconnect()
+	defer func() {
+		err := m.Disconnect()
+		if err != nil {
+			return fmt.Errorf("failed to disconnect from service manager: %w", err)
+		}
+	}()
 
 	s, err := m.OpenService(service)
 	if err != nil {
@@ -40,7 +45,7 @@ func isStopped(timeout time.Duration, interval time.Duration, service string) er
 		case <-ticker.C:
 			status, err := s.Query()
 			if err != nil {
-				return fmt.Errorf("error querying service (%s): %w", err)
+				return fmt.Errorf("error querying service (%s): %w", service, err)
 			}
 			if status.State == svc.Stopped {
 				return nil
