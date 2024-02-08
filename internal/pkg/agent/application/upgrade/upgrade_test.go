@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -825,11 +826,17 @@ func TestWaitForWatcher(t *testing.T) {
 				writeState(t, updMarkerFilePath, initialState)
 			}
 
+			wg := new(sync.WaitGroup)
+
 			var furtherStates []details.State
 			if len(tt.states) > 1 {
 				// we have more states to produce
 				furtherStates = tt.states[1:]
+
+				wg.Add(1)
+
 				go func() {
+					defer wg.Done()
 					tick := time.NewTicker(tt.stateChangeInterval)
 					defer tick.Stop()
 					for _, state := range furtherStates {
@@ -847,6 +854,12 @@ func TestWaitForWatcher(t *testing.T) {
 			log, _ := logger.NewTesting(tt.name)
 
 			tt.wantErr(t, waitForWatcher(ctx, log, updMarkerFilePath, tt.timeout), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, tt.timeout))
+
+			// cancel context
+			cancel()
+
+			//wait for goroutines to finish
+			wg.Wait()
 		})
 	}
 }
