@@ -22,6 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent-libs/opt"
 	eamprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -229,8 +231,50 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	return out, nil
 }
 
-func assertNoRogueAgentProcesses(t *gotesting.T, message string) {
+type runningProcess struct {
+	// Basic Process data
+	Name     string
+	State    eamprocess.PidState
+	Username string
+	Pid      opt.Int
+	Ppid     opt.Int
+	Pgid     opt.Int
 
+	// Extended Process Data
+	Args    []string
+	Cmdline string
+	Cwd     string
+	Exe     string
+	Env     mapstr.M
+}
+
+func (p runningProcess) String() string {
+	return fmt.Sprintf("{PID:%v, PPID: %v, Cwd: %s, Exe: %s, Cmdline: %s, Args: %v}",
+		p.Pid, p.Ppid, p.Cwd, p.Exe, p.Cmdline, p.Args)
+}
+
+func mapProcess(p eamprocess.ProcState) runningProcess {
+	mappedProcess := runningProcess{
+		Name:     p.Name,
+		State:    p.State,
+		Username: p.Username,
+		Pid:      p.Pid,
+		Ppid:     p.Ppid,
+		Pgid:     p.Pgid,
+		Cmdline:  p.Cmdline,
+		Cwd:      p.Cwd,
+		Exe:      p.Exe,
+		Args:     make([]string, len(p.Args)),
+		Env:      make(mapstr.M),
+	}
+	copy(mappedProcess.Args, p.Args)
+	for k, v := range p.Env {
+		mappedProcess.Env[k] = v
+	}
+	return mappedProcess
+}
+
+func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
 	procStats := eamprocess.Stats{
 		Procs: []string{`.*elastic\-agent.*`},
 	}
@@ -238,16 +282,26 @@ func assertNoRogueAgentProcesses(t *gotesting.T, message string) {
 	err := procStats.Init()
 	if !assert.NoError(t, err, "error initializing process.Stats") {
 		// we failed
-		return
+		return nil
 	}
 
-	pidMap, _, err := procStats.FetchPids()
+	_, pids, err := procStats.FetchPids()
 	if !assert.NoError(t, err, "error fetching process information") {
 		// we failed a bit further
-		return
+		return nil
 	}
 
-	assert.Empty(t, pidMap, message)
+	processes := make([]runningProcess, 0, len(pids))
+
+	for _, p := range pids {
+		processes = append(processes, mapProcess(p))
+	}
+
+	return processes
+}
+
+func assertNoRogueAgentProcesses(t *gotesting.T, message string) {
+	assert.Empty(t, getElasticAgentProcesses(t), message)
 }
 
 type UninstallOpts struct {
