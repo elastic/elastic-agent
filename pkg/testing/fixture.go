@@ -20,6 +20,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/otiai10/copy"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -741,6 +742,34 @@ func (f *Fixture) ExecVersion(ctx context.Context, opts ...process.CmdOption) (A
 	}
 
 	return version, err
+}
+
+// ExecDiagnostics executes the agent diagnostic and returns the path to the
+// zip file. If no cmd is provided, `diagnostics` will be used as the default.
+// The working directory of the command will be set to a temporary directory.
+// Use extractZipArchive to extract the diagnostics archive.
+func (f *Fixture) ExecDiagnostics(ctx context.Context, cmd ...string) (string, error) {
+	t := f.t
+	t.Helper()
+
+	if len(cmd) == 0 {
+		cmd = []string{"diagnostics"}
+	}
+
+	wd := t.TempDir()
+	diagnosticCmdOutput, err := f.Exec(ctx, cmd, process.WithWorkDir(wd))
+
+	t.Logf("diagnostic command completed with output \n%q\n", diagnosticCmdOutput)
+	require.NoErrorf(t, err, "error running diagnostic command: %v", err)
+
+	t.Logf("checking directory %q for the generated diagnostics archive", wd)
+	files, err := filepath.Glob(filepath.Join(wd, "elastic-agent-diagnostics-*.zip"))
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	t.Logf("Found %q diagnostic archive.", files[0])
+
+	return files[0], err
 }
 
 // IsHealthy checks whether the prepared Elastic Agent reports itself as healthy.

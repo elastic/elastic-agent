@@ -1,0 +1,25 @@
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+    api_key: "example-key"  
+    preset: balanced
+inputs:
+  - type: system/metrics
+    id: unique-system-metrics-input
+    data_stream.namespace: default
+    use_output: default
+    streams:
+      - metricsets:
+        - cpu
+        data_stream.dataset: system.cpu
+      - metricsets:
+        - memory
+        data_stream.dataset: system.memory
+      - metricsets:
+        - network
+        data_stream.dataset: system.network
+      - metricsets:
+        - filesystem
+        data_stream.dataset: system.filesystem
+agent.logging.to_stderr: true

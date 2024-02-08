@@ -59,6 +59,10 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 		return nil
 	}
 
+	if shouldSkipReplace(target, r.replaceWith) {
+		return nil
+	}
+
 	// Windows is tricky with the characters permitted for the path and filename, so we have
 	// to remove any colon from the string. We are using nanosec precision here because of automated
 	// tools.

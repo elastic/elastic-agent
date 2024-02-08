@@ -46,7 +46,7 @@ func newConnInfoServer(log *logger.Logger, comm Communicator, port int) (*connIn
 				break
 			}
 			log.Debugf("client connected, sending connection info")
-			err = comm.WriteConnInfo(conn)
+			err = comm.WriteStartUpInfo(conn)
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
 					log.Errorf("failed write conn info: %v", err)

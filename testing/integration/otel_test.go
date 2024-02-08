@@ -44,6 +44,22 @@ service:
       exporters:
         - file`)
 
+var fileInvalidOtelConfig = []byte(`receivers:
+  filelog:
+    include: [ "/var/log/system.log", "/var/log/syslog"  ]
+    start_at: beginning
+
+exporters:
+  file:
+    path: ` + fileProcessingFilename + `
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [nonexistingprocessor]
+      exporters:
+        - file`)
+
 const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error message
 2023-06-20 12:50:00 DEBUG This is a test debug message 2
 2023-06-20 12:51:00 DEBUG This is a test debug message 3
@@ -133,6 +149,8 @@ func TestOtelFileProcessing(t *testing.T) {
 		`"stringValue":"system.log"`, // system.log is being processed
 	})
 
+	validateCommandIsWorking(t, ctx, fixture, tempDir)
+
 	// check `elastic-agent status` returns successfully
 	require.Eventuallyf(t, func() bool {
 		// This will return errors until it connects to the agent,
@@ -174,6 +192,30 @@ func TestOtelFileProcessing(t *testing.T) {
 	cancel()
 	fixtureWg.Wait()
 	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
+}
+
+func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesting.Fixture, tempDir string) {
+	cfgFilePath := filepath.Join(tempDir, "otel-valid.yml")
+	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileProcessingConfig), 0600))
+
+	// check `elastic-agent otel validate` command works for otel config
+	out, err := fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath})
+	require.NoError(t, err)
+	require.Equal(t, 0, len(out)) // no error printed out
+
+	// check feature gate works
+	out, err = fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath, "--feature-gates", "foo.bar"})
+	require.Error(t, err)
+	require.Contains(t, string(out), `no such feature gate "foo.bar"`)
+
+	// check `elastic-agent otel validate` command works for invalid otel config
+	cfgFilePath = filepath.Join(tempDir, "otel-invalid.yml")
+	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileInvalidOtelConfig), 0600))
+
+	out, err = fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath})
+	require.Error(t, err)
+	require.False(t, len(out) == 0)
+	require.Contains(t, string(out), `service::pipelines::logs: references processor "nonexistingprocessor" which is not configured`)
 }
 
 func TestOtelAPMIngestion(t *testing.T) {
@@ -261,12 +303,30 @@ func TestOtelAPMIngestion(t *testing.T) {
 		fixtureWg.Done()
 	}()
 
+	// wait for apm to start
 	err = logWatcher.WaitForKeys(context.Background(),
 		10*time.Minute,
 		500*time.Millisecond,
 		apmReadyLog,
 	)
 	require.NoError(t, err, "APM not initialized")
+
+	// wait for otel collector to start
+	require.Eventuallyf(t, func() bool {
+		// This will return errors until it connects to the agent,
+		// they're mostly noise because until the agent starts running
+		// we will get connection errors. If the test fails
+		// the agent logs will be present in the error message
+		// which should help to explain why the agent was not
+		// healthy.
+		err = fixture.IsHealthy(ctx)
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
+		err,
+	)
+
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, fileName), []byte(apmProcessingContent), 0600))
 
 	// check index
