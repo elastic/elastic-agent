@@ -301,7 +301,25 @@ func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
 }
 
 func assertNoRogueAgentProcesses(t *gotesting.T, message string) {
-	assert.Empty(t, getElasticAgentProcesses(t), message)
+	agentProcesses := getElasticAgentProcesses(t)
+	assert.Empty(t, agentProcesses, message)
+
+	// try to cleanup
+	for _, p := range agentProcesses {
+		if p.Pid.Exists() {
+			t.Logf("killing process %v", p.Pid)
+			pid := p.Pid.ValueOr(0)
+			rogueAgentProcess, err := os.FindProcess(pid)
+			if err != nil {
+				t.Logf("error getting process with pid %d: %v", pid, err)
+				continue
+			}
+			err = rogueAgentProcess.Kill()
+			if err != nil {
+				t.Logf("error killing process with pid %d: %v", pid, err)
+			}
+		}
+	}
 }
 
 type UninstallOpts struct {
