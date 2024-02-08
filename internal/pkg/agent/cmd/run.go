@@ -226,7 +226,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	}
 
 	// initiate agent watcher
-	if err := upgrade.InvokeWatcher(l, paths.TopBinaryPath()); err != nil {
+	if _, err := upgrade.InvokeWatcher(l, paths.TopBinaryPath()); err != nil {
 		// we should not fail because watcher is not working
 		l.Error(errors.New(err, "failed to invoke rollback watcher"))
 	}
