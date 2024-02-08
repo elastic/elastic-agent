@@ -26,7 +26,7 @@ import (
 const (
 	darwin = "darwin"
 
-	elasticUsername  = "elastic-agent"
+	elasticUsername  = "elastic-agent-user"
 	elasticGroupName = "elastic-agent"
 )
 
