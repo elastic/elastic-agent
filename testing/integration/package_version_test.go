@@ -9,6 +9,8 @@ package integration
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,7 +50,7 @@ func TestPackageVersion(t *testing.T) {
 	// run the agent and check the daemon version as well
 	t.Run("check package version while the agent is running", testVersionWithRunningAgent(ctx, f))
 
-	// Destructive/mutating tests ahead! If you need to do a normal test on a healthy install of agent, put it before the tests below
+	// Destructive/mutating tests ahead! If you need to do a normal test on a healthy installation of agent, put it before the tests below
 
 	// change the version in the version file and verify that the agent returns the new value
 	t.Run("check package version after updating file", testVersionAfterUpdatingFile(ctx, f))
@@ -64,10 +66,6 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-	if runtime.GOOS == "windows" {
-		t.Skip("flaky on windows: https://github.com/elastic/elastic-agent/issues/4215")
-	}
-
 	ctx := context.Background()
 
 	f, err := define.NewFixture(t, define.Version())
@@ -93,21 +91,38 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		"failed to install start agent [output: %s]", string(output))
 
 	stateBuff := bytes.Buffer{}
-	isHealth := func() bool {
+	allHealthy := func() bool {
 		stateBuff.Reset()
 
-		err := f.IsHealthy(ctx)
+		status, err := f.ExecStatus(ctx)
 		if err != nil {
-			stateBuff.WriteString(err.Error())
+			stateBuff.WriteString(fmt.Sprintf("failed to get agent status: %v",
+				err))
 			return false
+		}
+
+		for _, c := range status.Components {
+			state := client.State(c.State)
+			if state != client.Healthy {
+				bs, err := json.MarshalIndent(status, "", "  ")
+				if err != nil {
+					stateBuff.WriteString(fmt.Sprintf("%s not health, could not marshal status outptu: %v",
+						c.Name, err))
+					return false
+				}
+
+				stateBuff.WriteString(fmt.Sprintf("%s not health, agent status output: %s",
+					c.Name, bs))
+				return false
+			}
 		}
 
 		return true
 	}
 	require.Eventuallyf(t,
-		isHealth,
-		1*time.Minute, 10*time.Second,
-		"agent did not became health. Last status: %v", &stateBuff)
+		allHealthy,
+		5*time.Minute, 10*time.Second,
+		"agent never became healthy. Last status: %v", &stateBuff)
 
 	filebeat := "filebeat"
 	if runtime.GOOS == "windows" {
