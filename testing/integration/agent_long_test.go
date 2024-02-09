@@ -131,15 +131,6 @@ func (runner *ExtendedRunner) SetupSuite() {
 		require.NoError(runner.T(), err)
 	}()
 
-	// create ~40 1MB files that will be picked up by the `/var/log/httpd/error_log*` pattern
-	// cmd := exec.Command("go", "install", "-v", "github.com/mingrammer/flog@latest")
-	// out, err := cmd.CombinedOutput()
-	// require.NoError(runner.T(), err, "got out: %s", string(out))
-
-	// cmd = exec.Command("flog", "-t", "log", "-f", "apache_error", "-o", "/var/log/httpd/error_log", "-b", "50485760", "-p", "1048576")
-	// out, err = cmd.CombinedOutput()
-	// require.NoError(runner.T(), err, "got out: %s", string(out))
-
 	policyUUID := uuid.New().String()
 	unpr := false
 	installOpts := atesting.InstallOpts{
@@ -216,7 +207,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "5m"
+		testRuntime = "20m"
 	}
 
 	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
@@ -264,7 +255,8 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	defer timer.Stop()
 
 	// time to perform a health check
-	ticker := time.Tick(time.Second * 10)
+	ticker := time.NewTicker(time.Second * 10)
+	defer ticker.Stop()
 
 	done := false
 	start := time.Now()
@@ -272,7 +264,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		select {
 		case <-timer.C:
 			done = true
-		case <-ticker:
+		case <-ticker.C:
 			err := runner.agentFixture.IsHealthy(ctx)
 			require.NoError(runner.T(), err)
 			// for each running process, collect memory and handles
