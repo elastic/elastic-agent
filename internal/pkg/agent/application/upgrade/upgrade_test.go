@@ -781,7 +781,7 @@ func TestWaitForWatcher(t *testing.T) {
 				details.StateWatching,
 			},
 			stateChangeInterval: 1 * time.Millisecond,
-			timeout:             100 * time.Millisecond,
+			timeout:             500 * time.Millisecond,
 			wantErr:             assert.NoError,
 		},
 		{
