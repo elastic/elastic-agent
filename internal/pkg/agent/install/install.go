@@ -54,7 +54,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
-		err = placeShellWrapper(topPath)
+		err = placeShellWrapper(topPath, paths.ShellWrapperPath)
 		if err != nil {
 			return utils.FileOwner{}, fmt.Errorf("error creating shell wrapper %w", err)
 		}
@@ -98,13 +98,13 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	return ownership, nil
 }
 
-func placeShellWrapper(topPath string) error {
+func placeShellWrapper(topPath string, wrapperPath string) error {
 	pathDir := filepath.Dir(paths.ShellWrapperPath)
 	err := os.MkdirAll(pathDir, 0755)
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, paths.ShellWrapperPath),
+			fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, wrapperPath),
 			errors.M("directory", pathDir))
 	}
 	// Install symlink for darwin instead of the wrapper script.
@@ -113,32 +113,32 @@ func placeShellWrapper(topPath string) error {
 	// This is specifically important for osquery FDA permissions at the moment.
 	if runtime.GOOS == darwin {
 		// Check if previous shell wrapper or symlink exists and remove it so it can be overwritten
-		if _, err := os.Lstat(paths.ShellWrapperPath); err == nil {
-			if err := os.Remove(paths.ShellWrapperPath); err != nil {
+		if _, err := os.Lstat(wrapperPath); err == nil {
+			if err := os.Remove(wrapperPath); err != nil {
 				return errors.New(
 					err,
-					fmt.Sprintf("failed to remove (%s)", paths.ShellWrapperPath),
-					errors.M("destination", paths.ShellWrapperPath))
+					fmt.Sprintf("failed to remove (%s)", wrapperPath),
+					errors.M("destination", wrapperPath))
 			}
 		}
-		err = os.Symlink(filepath.Join(topPath, paths.BinaryName), paths.ShellWrapperPath)
+		err = os.Symlink(filepath.Join(topPath, paths.BinaryName), wrapperPath)
 		if err != nil {
 			return errors.New(
 				err,
-				fmt.Sprintf("failed to create elastic-agent symlink (%s)", paths.ShellWrapperPath),
-				errors.M("destination", paths.ShellWrapperPath))
+				fmt.Sprintf("failed to create elastic-agent symlink (%s)", wrapperPath),
+				errors.M("destination", wrapperPath))
 		}
 	} else {
 		// We use strings.Replace instead of fmt.Sprintf here because, with the
 		// latter, govet throws a false positive error here: "fmt.Sprintf call has
 		// arguments but no formatting directives".
-		shellWrapper := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
-		err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
+		shellWrapperFormatted := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
+		err = os.WriteFile(wrapperPath, []byte(shellWrapperFormatted), 0755)
 		if err != nil {
 			return errors.New(
 				err,
-				fmt.Sprintf("failed to write shell wrapper (%s)", paths.ShellWrapperPath),
-				errors.M("destination", paths.ShellWrapperPath))
+				fmt.Sprintf("failed to write shell wrapper (%s)", wrapperPath),
+				errors.M("destination", wrapperPath))
 		}
 	}
 	return nil

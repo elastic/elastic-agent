@@ -7,6 +7,8 @@ package install
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/jaypipes/ghw"
@@ -20,18 +22,35 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+func TestWrapper(t *testing.T) {
+	topPath := t.TempDir()
+	wrapperPath := t.TempDir()
+	esPath := filepath.Join(wrapperPath, "elastic-agent")
+	err := placeShellWrapper(topPath, esPath)
+	require.NoError(t, err)
+
+	res, err := os.ReadFile(esPath)
+	require.NoError(t, err)
+	expected := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
+	require.Equal(t, expected, string(res))
+}
+
 func TestPreInstall(t *testing.T) {
 	pt := progressbar.DefaultSilent(0)
 	topPath := t.TempDir()
 
-	//fakeout path verification in setupInstall()
 	exe, err := os.Executable()
 	require.NoError(t, err)
 	t.Logf("got: %s", exe)
 
 	base := filepath.Dir(exe)
 
-	_, err = os.Create(filepath.Join(base, "elastic-agent"))
+	//fakeout path verification in setupInstall()
+	name := "elastic-agent"
+	if runtime.GOOS == "windows" {
+		name = "elastic-agent.exe"
+	}
+	_, err = os.Create(filepath.Join(base, name))
 	require.NoError(t, err)
 
 	sourceDir, err := setupInstall(pt, topPath, "", logp.L())
