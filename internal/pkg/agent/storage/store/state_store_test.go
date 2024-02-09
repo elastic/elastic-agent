@@ -6,12 +6,14 @@ package store
 
 import (
 	"context"
+	"io"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -259,40 +261,48 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			})
 		}))
 
-	t.Run("migrate",
-		withFile(func(t *testing.T, actionStorePath string) {
-			ActionPolicyChange := &fleetapi.ActionPolicyChange{
-				ActionID:   "abc123",
-				ActionType: "POLICY_CHANGE",
-				Policy: map[string]interface{}{
-					"hello": "world",
-				},
-			}
+	t.Run("migrate", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		want := &fleetapi.ActionPolicyChange{
+			ActionID:   "abc123",
+			ActionType: "POLICY_CHANGE",
+			Policy: map[string]interface{}{
+				"hello":  "world",
+				"phi":    1.618,
+				"answer": 42,
+			},
+		}
 
-			actionStore, err := newActionStore(log, storage.NewDiskStore(actionStorePath))
-			require.NoError(t, err)
+		// Copy the golden file as the migration deletes the old store.
+		goldenActionStoreFile, err := os.Open(
+			filepath.Join("testdata", "7.17.18-action_store.yml"))
+		require.NoError(t, err, "could not open action store golden file")
+		defer goldenActionStoreFile.Close()
 
-			require.Empty(t, actionStore.actions())
-			actionStore.add(ActionPolicyChange)
-			err = actionStore.save()
-			require.NoError(t, err)
-			require.Len(t, actionStore.actions(), 1)
+		oldActionStorePath := filepath.Join(tmpDir, "action_store.yml")
+		storeFile, err := os.Create(oldActionStorePath)
+		require.NoError(t, err, "could not create action store file")
 
-			withFile(func(t *testing.T, stateStorePath string) {
-				err = migrateStateStore(ctx, log, actionStorePath, stateStorePath)
-				require.NoError(t, err)
+		_, err = io.Copy(storeFile, goldenActionStoreFile)
+		require.NoError(t, err, "could not copy action store golden file")
 
-				stateStore, err := NewStateStore(log, storage.NewDiskStore(stateStorePath))
-				require.NoError(t, err)
-				stateStore.SetAckToken(ackToken)
-				diff := cmp.Diff(actionStore.actions(), stateStore.Actions())
-				if diff != "" {
-					t.Error(diff)
-				}
-				require.Equal(t, ackToken, stateStore.AckToken())
-				require.Empty(t, stateStore.Queue())
-			})
-		}))
+		newStateStorePath := filepath.Join(tmpDir, "state_store.yaml")
+		err = migrateStateStore(ctx, log, oldActionStorePath, newStateStorePath)
+		require.NoError(t, err, "migration action store -> state store failed")
+
+		stateDiskStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath)
+		stateStore, err := NewStateStore(log, stateDiskStore)
+		require.NoError(t, err, "could not create state store")
+
+		actions := stateStore.Actions()
+		require.Len(t, actions, 1, "state store should load exactly 1 action")
+		got := actions[0]
+
+		assert.Equalf(t, want, got,
+			"loaded action differs from action on the old action store")
+		assert.Empty(t, stateStore.Queue(),
+			"queue should be empty, old action store did not have a queue")
+	})
 
 }
 

@@ -1,0 +1,6 @@
+action_id: abc123
+action_type: POLICY_CHANGE
+policy:
+  answer: 42
+  hello: world
+  phi: 1.618
