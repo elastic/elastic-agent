@@ -25,14 +25,23 @@ import (
 func TestWrapper(t *testing.T) {
 	topPath := t.TempDir()
 	wrapperPath := t.TempDir()
-	esPath := filepath.Join(wrapperPath, "elastic-agent")
-	err := placeShellWrapper(topPath, esPath)
+	// create file for darwin, which uses a symlink
+	_, err := os.Create(filepath.Join(topPath, "elastic-agent"))
 	require.NoError(t, err)
 
-	res, err := os.ReadFile(esPath)
+	esPath := filepath.Join(wrapperPath, "elastic-agent")
+	err = placeShellWrapper(topPath, esPath)
 	require.NoError(t, err)
-	expected := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
-	require.Equal(t, expected, string(res))
+
+	if runtime.GOOS == "linux" {
+		res, err := os.ReadFile(esPath)
+		require.NoError(t, err)
+		expected := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
+		require.Equal(t, expected, string(res))
+	}
+	if runtime.GOOS == "darwin" {
+		require.FileExists(t, esPath)
+	}
 }
 
 func TestPreInstall(t *testing.T) {
