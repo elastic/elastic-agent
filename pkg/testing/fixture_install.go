@@ -24,7 +24,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/opt"
-	eamprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
+	agentsystemprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -129,7 +129,8 @@ func NewBool(value bool) *bool {
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 
-	assertNoRogueAgentProcesses(f.t, "there should be no running agent at beginning of Install()")
+	// check for running agents before installing
+	assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
 
 	installArgs := []string{"install"}
 	if installOpts == nil {
@@ -170,7 +171,8 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
-		assertNoRogueAgentProcesses(f.t, "there should be no running agent at the end of the test")
+		// check for running agents after uninstall had a chance to run
+		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at the end of the test")
 	})
 
 	f.t.Cleanup(func() {
@@ -234,7 +236,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 type runningProcess struct {
 	// Basic Process data
 	Name     string
-	State    eamprocess.PidState
+	State    agentsystemprocess.PidState
 	Username string
 	Pid      opt.Int
 	Ppid     opt.Int
@@ -253,7 +255,7 @@ func (p runningProcess) String() string {
 		p.Pid, p.Ppid, p.Cwd, p.Exe, p.Cmdline, p.Args)
 }
 
-func mapProcess(p eamprocess.ProcState) runningProcess {
+func mapProcess(p agentsystemprocess.ProcState) runningProcess {
 	mappedProcess := runningProcess{
 		Name:     p.Name,
 		State:    p.State,
@@ -275,7 +277,7 @@ func mapProcess(p eamprocess.ProcState) runningProcess {
 }
 
 func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
-	procStats := eamprocess.Stats{
+	procStats := agentsystemprocess.Stats{
 		Procs: []string{`.*elastic\-agent.*`},
 	}
 
@@ -298,10 +300,6 @@ func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
 	}
 
 	return processes
-}
-
-func assertNoRogueAgentProcesses(t *gotesting.T, message string) {
-	assert.Empty(t, getElasticAgentProcesses(t), message)
 }
 
 type UninstallOpts struct {
