@@ -48,7 +48,7 @@ var internalLevelEnabler *zap.AtomicLevel
 // New returns a configured ECS Logger
 func New(name string, logInternal bool) (*Logger, error) {
 	defaultCfg := DefaultLoggingConfig()
-	return new(name, defaultCfg, logInternal)
+	return new(name, defaultCfg, nil, logInternal)
 }
 
 // NewWithLogpLevel returns a configured logp Logger with specified level.
@@ -56,13 +56,19 @@ func NewWithLogpLevel(name string, level logp.Level, logInternal bool) (*Logger,
 	defaultCfg := DefaultLoggingConfig()
 	defaultCfg.Level = level
 
-	return new(name, defaultCfg, logInternal)
+	sensitiveConfig := DefaultSensitiveLoggingConfig()
+	sensitiveConfig.Level = level
+
+	return new(name, defaultCfg, sensitiveConfig, logInternal)
 }
 
 // NewFromConfig takes the user configuration and generate the right logger.
-// We should finish implementation, need support on the library that we use.
-func NewFromConfig(name string, cfg *Config, logInternal bool) (*Logger, error) {
-	return new(name, cfg, logInternal)
+// The returned logger will have two outputs:
+//   - One output following the settings from `loggerCfg`
+//   - An internal file output that uses the defaults from `logp.DefaultConfig`
+//     and cannot be configured. This outputs logs to `data/elastic-agent-<hash>/logs`
+func NewFromConfig(name string, loggerCfg, sensitiveLoggerCfg *Config, logInternal bool) (*Logger, error) {
+	return new(name, loggerCfg, sensitiveLoggerCfg, logInternal)
 }
 
 // NewWithoutConfig returns a new logger without having a configuration.
@@ -79,25 +85,36 @@ func AddCallerSkip(l *Logger, skip int) *Logger {
 	return l.WithOptions(zap.AddCallerSkip(skip))
 }
 
-func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
-	commonCfg, err := ToCommonConfig(cfg)
+// new creates a new logger from the provided configurations.
+//
+// If `sensitiveLoggerCfg` is not nil, a core is created from it and added to
+// to the logger. If `logInternal` is true, a core logging to
+// `data/elastic-agent-<hash>/logs` is also created and added to the logger.
+// This core uses the defaults from logp.DefaultConfig and cannot be configured.
+func new(name string, LoggerCfg, sensitiveLoggerCfg *Config, logInternal bool) (*Logger, error) {
+	commonCfg, err := ToCommonConfig(LoggerCfg)
 	if err != nil {
 		return nil, err
 	}
 
 	var outputs []zapcore.Core
 	if logInternal {
-		internal, err := MakeInternalFileOutput(cfg)
+		internal, err := MakeInternalFileOutput(LoggerCfg.Beat, LoggerCfg.Level)
 		if err != nil {
 			return nil, err
 		}
-
 		outputs = append(outputs, internal)
 	}
 
-	if err := configure.LoggingWithOutputs("", commonCfg, outputs...); err != nil {
+	sensitiveCfg, err := ToCommonConfig(sensitiveLoggerCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert sensitive logger config: %w", err)
+	}
+
+	if err := configure.LoggingWithTypedOutputs("", commonCfg, sensitiveCfg, "log.type", "sensitive", outputs...); err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
+
 	return logp.NewLogger(name), nil
 }
 
@@ -147,15 +164,37 @@ func DefaultLoggingConfig() *Config {
 	return &cfg
 }
 
+// DefaultLoggingConfig returns default configuration for agent logging.
+func DefaultSensitiveLoggingConfig() *Config {
+	cfg := logp.DefaultConfig(logp.DefaultEnvironment)
+	cfg.Beat = agentName
+	cfg.Level = DefaultLogLevel
+	cfg.ToFiles = true
+	// That's the same path useb by MakeInternalFileOutput
+	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory, "sensitive")
+	cfg.Files.Name = agentName + "-sensitive"
+	cfg.Files.MaxSize = 5 * 1024 * 1024
+	cfg.Files.MaxBackups = 2
+	cfg.Files.Permissions = 0600 // default user only
+	cfg.Files.RedirectStderr = false
+	root, _ := utils.HasRoot() // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		cfg.Files.Permissions = 0660
+	}
+
+	return &cfg
+}
+
 // makeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
 //
 // This is the logger that the spawned filebeat expects to read the log file from and ship to ES.
-func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
+func MakeInternalFileOutput(beatName string, level logp.Level) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
-	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
+	filename := filepath.Join(paths.Home(), DefaultLogDirectory, beatName)
+	al := zap.NewAtomicLevelAt(level.ZapLevel())
 	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
 	permissions := 0600        // default user only
 	root, _ := utils.HasRoot() // error ignored
@@ -173,6 +212,36 @@ func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	)
 	if err != nil {
 		return nil, errors.New("failed to create internal file rotator")
+	}
+
+	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())
+	encoderConfig.EncodeTime = UtcTimestampEncode
+	encoder := zapcore.NewJSONEncoder(encoderConfig)
+	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, internalLevelEnabler)), nil
+}
+
+// MakeFileOutput creates a new file output from the provided configuration.
+// The created output writes logs in JSON compatible with ECS
+func MakeFileOutput(cfg logp.Config) (zapcore.Core, error) {
+	filename := filepath.Join(cfg.Files.Path, cfg.Files.Name)
+	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
+	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
+	permissions := 0600        // default user only
+	root, _ := utils.HasRoot() // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		permissions = 0660
+	}
+	rotator, err := file.NewFileRotator(filename,
+		file.MaxSizeBytes(cfg.Files.MaxSize),
+		file.MaxBackups(cfg.Files.MaxBackups),
+		file.Permissions(os.FileMode(permissions)),
+		file.Interval(cfg.Files.Interval),
+		file.RotateOnStartup(cfg.Files.RotateOnStartup),
+		file.RedirectStderr(false),
+	)
+	if err != nil {
+		return nil, errors.New("failed to create file rotator")
 	}
 
 	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())

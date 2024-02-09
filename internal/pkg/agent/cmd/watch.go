@@ -200,7 +200,7 @@ func gracePeriod(marker *upgrade.UpdateMarker, gracePeriodDuration time.Duration
 func configuredLogger(cfg *configuration.Configuration) (*logger.Logger, error) {
 	cfg.Settings.LoggingConfig.Beat = watcherName
 	cfg.Settings.LoggingConfig.Level = logp.DebugLevel
-	internal, err := logger.MakeInternalFileOutput(cfg.Settings.LoggingConfig)
+	internal, err := logger.MakeInternalFileOutput(cfg.Settings.LoggingConfig.Beat, cfg.Settings.LoggingConfig.Level)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func configuredLogger(cfg *configuration.Configuration) (*logger.Logger, error) 
 		return nil, err
 	}
 
-	if err := configure.LoggingWithOutputs("", libC, internal); err != nil {
+	if err := configure.LoggingWithOutputs("", libC, nil, internal); err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
 	return logp.NewLogger(""), nil

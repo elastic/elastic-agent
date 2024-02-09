@@ -543,7 +543,7 @@ func attachOutErr(stdOut *logWriter, stdErr *logWriter) process.CmdOption {
 
 func createLogWriter(comp component.Component, baseLog *logger.Logger, cmdSpec *component.CommandSpec, typeStr string, binaryName string, ll zapcore.Level, unitLevels map[string]zapcore.Level, src logSource) *logWriter {
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
-	logger := baseLog.With(
+	newLogger := baseLog.With(
 		"component", map[string]interface{}{
 			"id":      comp.ID,
 			"type":    typeStr,
@@ -554,7 +554,7 @@ func createLogWriter(comp component.Component, baseLog *logger.Logger, cmdSpec *
 			"source": comp.ID,
 		},
 	)
-	return newLogWriter(logger.Core(), cmdSpec.Log, ll, unitLevels, src)
+	return newLogWriter(newLogger.Core(), cmdSpec.Log, ll, unitLevels, src)
 }
 
 // getLogLevels returns the lowest log level and a mapping between each unit and its defined log level.
