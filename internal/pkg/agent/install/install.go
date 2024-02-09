@@ -88,10 +88,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	err = svc.Install()
 	if err != nil {
 		pt.Describe("Failed to install service")
-		return ownership, errors.New(
-			err,
-			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+		return ownership, errors.New(err, fmt.Sprintf("failed to install service (%s)", paths.ServiceName), errors.M("service", paths.ServiceName))
 	}
 	pt.Describe("Installed service")
 
@@ -102,10 +99,7 @@ func placeShellWrapper(topPath string, wrapperPath string) error {
 	pathDir := filepath.Dir(paths.ShellWrapperPath)
 	err := os.MkdirAll(pathDir, 0755)
 	if err != nil {
-		return errors.New(
-			err,
-			fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, wrapperPath),
-			errors.M("directory", pathDir))
+		return errors.New(err, fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, wrapperPath), errors.M("directory", pathDir))
 	}
 	// Install symlink for darwin instead of the wrapper script.
 	// Elastic-agent should be first process that launchd starts in order to be able to grant
@@ -115,18 +109,12 @@ func placeShellWrapper(topPath string, wrapperPath string) error {
 		// Check if previous shell wrapper or symlink exists and remove it so it can be overwritten
 		if _, err := os.Lstat(wrapperPath); err == nil {
 			if err := os.Remove(wrapperPath); err != nil {
-				return errors.New(
-					err,
-					fmt.Sprintf("failed to remove (%s)", wrapperPath),
-					errors.M("destination", wrapperPath))
+				return errors.New(err, fmt.Sprintf("failed to remove (%s)", wrapperPath), errors.M("destination", wrapperPath))
 			}
 		}
 		err = os.Symlink(filepath.Join(topPath, paths.BinaryName), wrapperPath)
 		if err != nil {
-			return errors.New(
-				err,
-				fmt.Sprintf("failed to create elastic-agent symlink (%s)", wrapperPath),
-				errors.M("destination", wrapperPath))
+			return errors.New(err, fmt.Sprintf("failed to create elastic-agent symlink (%s)", wrapperPath), errors.M("destination", wrapperPath))
 		}
 	} else {
 		// We use strings.Replace instead of fmt.Sprintf here because, with the
@@ -135,10 +123,7 @@ func placeShellWrapper(topPath string, wrapperPath string) error {
 		shellWrapperFormatted := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
 		err = os.WriteFile(wrapperPath, []byte(shellWrapperFormatted), 0755)
 		if err != nil {
-			return errors.New(
-				err,
-				fmt.Sprintf("failed to write shell wrapper (%s)", wrapperPath),
-				errors.M("destination", wrapperPath))
+			return errors.New(err, fmt.Sprintf("failed to write shell wrapper (%s)", wrapperPath), errors.M("destination", wrapperPath))
 		}
 	}
 	return nil
@@ -163,10 +148,7 @@ func setupInstall(pt *progressbar.ProgressBar, topPath string, cfgFile string, l
 		err = Uninstall(cfgFile, topPath, "", log, pt)
 		if err != nil {
 			pt.Describe("Failed to uninstall current Elastic Agent")
-			return "", errors.New(
-				err,
-				fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
-				errors.M("directory", filepath.Dir(topPath)))
+			return "", errors.New(err, fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)), errors.M("directory", filepath.Dir(topPath)))
 		}
 		pt.Describe("Successfully uninstalled current Elastic Agent")
 	}
@@ -178,10 +160,7 @@ func copyFiles(pt *progressbar.ProgressBar, topPath string, streams *cli.IOStrea
 	// ensure parent directory exists
 	err := os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
-		return errors.New(
-			err,
-			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)),
-			errors.M("directory", filepath.Dir(topPath)))
+		return errors.New(err, fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)), errors.M("directory", filepath.Dir(topPath)))
 	}
 
 	// copy source into install path
@@ -208,11 +187,7 @@ func copyFiles(pt *progressbar.ProgressBar, topPath string, streams *cli.IOStrea
 
 	if err != nil {
 		pt.Describe("Error copying files")
-		return errors.New(
-			err,
-			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", sourceDir, topPath),
-			errors.M("source", sourceDir), errors.M("destination", topPath),
-		)
+		return errors.New(err, fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", sourceDir, topPath), errors.M("source", sourceDir), errors.M("destination", topPath))
 	}
 	pt.Describe("Successfully copied files")
 
