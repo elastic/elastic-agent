@@ -26,12 +26,10 @@ func FixPermissions(topPath string, ownership utils.FileOwner) error {
 	if err != nil {
 		return fmt.Errorf("failed to get SYSTEM SID: %w", err)
 	}
-	defer windows.FreeSid(systemSID)
 	administratorsSID, err := windows.StringToSid(utils.AdministratorSID)
 	if err != nil {
 		return fmt.Errorf("failed to get Administrators SID: %w", err)
 	}
-	defer windows.FreeSid(administratorsSID)
 
 	// https://docs.microsoft.com/en-us/windows/win32/secauthz/access-mask
 	grants := make([]api.ExplicitAccess, 0, 4)
@@ -45,7 +43,6 @@ func FixPermissions(topPath string, ownership utils.FileOwner) error {
 		if err != nil {
 			return fmt.Errorf("failed to get user %s: %w", ownership.UID, err)
 		}
-		defer windows.FreeSid(userSID)
 		grants = append(grants, acl.GrantSid(0xF10F0000, userSID)) // full control of all acl's
 	}
 
@@ -56,7 +53,6 @@ func FixPermissions(topPath string, ownership utils.FileOwner) error {
 		if err != nil {
 			return fmt.Errorf("failed to get group %s: %w", ownership.GID, err)
 		}
-		defer windows.FreeSid(groupSID)
 		grants = append(grants, acl.GrantSid(windows.READ_CONTROL, groupSID))
 	}
 

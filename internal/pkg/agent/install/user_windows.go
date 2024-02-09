@@ -42,7 +42,6 @@ func FindGID(name string) (string, error) {
 		}
 		return "", fmt.Errorf("failed to lookup SID for group %s: %w", name, err)
 	}
-	defer windows.FreeSid(sid)
 	if t != windows.SidTypeGroup && t != windows.SidTypeWellKnownGroup && t != windows.SidTypeAlias {
 		return "", fmt.Errorf("invalid SID type for group %s; should be group account type, not %d", name, t)
 	}
@@ -80,7 +79,6 @@ func FindUID(name string) (string, error) {
 		}
 		return "", fmt.Errorf("failed to lookup SID for user %s: %w", name, err)
 	}
-	defer windows.FreeSid(sid)
 	if t != windows.SidTypeUser && t != windows.SidTypeAlias {
 		return "", fmt.Errorf("invalid SID type for user %s; should be user account type, not %d", name, t)
 	}
@@ -128,7 +126,6 @@ func AddUserToGroup(username string, groupName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to lookup SID for user %s: %w", username, err)
 	}
-	defer windows.FreeSid(userSid)
 	if t != windows.SidTypeUser && t != windows.SidTypeAlias {
 		return fmt.Errorf("invalid SID type for user %s; should be user account type, not %d", username, t)
 	}
