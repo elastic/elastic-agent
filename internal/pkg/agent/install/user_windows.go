@@ -38,7 +38,7 @@ func FindGID(name string) (string, error) {
 	if err != nil {
 		if errors.Is(err, windows.ERROR_NONE_MAPPED) {
 			// no account exists with that name
-			return "", nil
+			return "", ErrGroupNotFound
 		}
 		return "", fmt.Errorf("failed to lookup SID for group %s: %w", name, err)
 	}
@@ -75,7 +75,7 @@ func FindUID(name string) (string, error) {
 	if err != nil {
 		if errors.Is(err, windows.ERROR_NONE_MAPPED) {
 			// no account exists with that name
-			return "", nil
+			return "", ErrUserNotFound
 		}
 		return "", fmt.Errorf("failed to lookup SID for user %s: %w", name, err)
 	}
