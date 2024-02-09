@@ -7,10 +7,12 @@
 package install
 
 import (
+	"errors"
 	"fmt"
-	"golang.org/x/sys/windows"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 var (
@@ -34,6 +36,10 @@ const (
 func FindGID(name string) (string, error) {
 	sid, _, t, err := windows.LookupSID("", name)
 	if err != nil {
+		if errors.Is(err, windows.ERROR_NONE_MAPPED) {
+			// no account exists with that name
+			return "", nil
+		}
 		return "", fmt.Errorf("failed to lookup SID for group %s: %w", name, err)
 	}
 	defer windows.FreeSid(sid)
@@ -68,6 +74,10 @@ func CreateGroup(name string) (string, error) {
 func FindUID(name string) (string, error) {
 	sid, _, t, err := windows.LookupSID("", name)
 	if err != nil {
+		if errors.Is(err, windows.ERROR_NONE_MAPPED) {
+			// no account exists with that name
+			return "", nil
+		}
 		return "", fmt.Errorf("failed to lookup SID for user %s: %w", name, err)
 	}
 	defer windows.FreeSid(sid)
