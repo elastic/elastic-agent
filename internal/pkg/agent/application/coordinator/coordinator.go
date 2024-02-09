@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -172,7 +173,7 @@ type configReloader interface {
 // All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
 type Coordinator struct {
 	logger    *logger.Logger
-	agentInfo *info.AgentInfo
+	agentInfo info.Agent
 	isManaged bool
 
 	cfg   *configuration.Configuration
@@ -298,8 +299,30 @@ type managerChans struct {
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 }
 
+// diffCheck is a container used by checkAndLogUpdate()
+type diffCheck struct {
+	inNew   bool
+	inLast  bool
+	updated bool
+}
+
+// UpdateStats reports the diff of a component update.
+// This is primarily used as a log message, and exported in case it's needed elsewhere.
+type UpdateStats struct {
+	Components UpdateComponentChange `json:"components"`
+	Outputs    UpdateComponentChange `json:"outputs"`
+}
+
+// UpdateComponentChange reports stats for changes to a particular part of a config.
+type UpdateComponentChange struct {
+	Added   []string `json:"added,omitempty"`
+	Removed []string `json:"removed,omitempty"`
+	Updated []string `json:"updated,omitempty"`
+	Count   int      `json:"count,omitempty"`
+}
+
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -1216,8 +1239,147 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	// If we made it this far, update our internal derived values and
 	// return with no error
 	c.derivedConfig = cfg
+
+	lastComponentModel := c.componentModel
 	c.componentModel = comps
+
+	c.checkAndLogUpdate(lastComponentModel)
+
 	return nil
+}
+
+// compares the last component model with an updated model,
+// logging any differences.
+func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component) {
+	if lastComponentModel == nil {
+		c.logger.Debugf("Received initial component update; total of %d components", len(c.componentModel))
+		return
+	}
+
+	type compCheck struct {
+		inCurrent bool
+		inLast    bool
+
+		diffUnits map[string]diffCheck
+	}
+
+	lastCompMap := convertComponentListToMap(lastComponentModel)
+	currentCompMap := convertComponentListToMap(c.componentModel)
+
+	compDiffMap := map[string]compCheck{}
+	outDiffMap := map[string]diffCheck{}
+	// kinda-callbacks for dealing with output logic
+	foundInLast := func(outName string) {
+		if outDiff, ok := outDiffMap[outName]; ok {
+			outDiff.inLast = true
+			outDiffMap[outName] = outDiff
+		} else {
+			outDiffMap[outName] = diffCheck{inLast: true}
+		}
+	}
+
+	foundInUpdated := func(outName string) {
+		if outDiff, ok := outDiffMap[outName]; ok {
+			outDiff.inNew = true
+			outDiffMap[outName] = outDiff
+		} else {
+			outDiffMap[outName] = diffCheck{inNew: true}
+		}
+	}
+
+	// diff the maps
+
+	// find added & updated components
+	for id, comp := range currentCompMap {
+		// check output
+		foundInUpdated(comp.OutputType)
+		// compare with last state
+		diff := compCheck{inCurrent: true}
+		if lastComp, ok := lastCompMap[id]; ok {
+			diff.inLast = true
+			// if the unit is in both the past and previous, check for updated units
+			diff.diffUnits = diffUnitList(lastComp.Units, comp.Units)
+			foundInLast(lastComp.OutputType)
+			// a bit of optimization: after we're done, we'll need to iterate over lastCompMap to fetch removed units,
+			// so delete items we don't need to iterate over
+			delete(lastCompMap, id)
+		}
+		compDiffMap[id] = diff
+	}
+
+	// find removed components
+	// if something is still in this map, that means it's only in this map
+	for id, comp := range lastCompMap {
+		compDiffMap[id] = compCheck{inLast: true}
+		foundInLast(comp.OutputType)
+	}
+
+	addedList := []string{}
+	removedList := []string{}
+
+	formattedUpdated := []string{}
+
+	// reduced to list of added/removed outputs
+	addedOutputs := []string{}
+	removedOutputs := []string{}
+
+	// take our diff map and format everything for output
+	for id, diff := range compDiffMap {
+		if diff.inLast && !diff.inCurrent {
+			removedList = append(removedList, id)
+		}
+		if !diff.inLast && diff.inCurrent {
+			addedList = append(addedList, id)
+		}
+		// format a user-readable list of diffs
+		if diff.inLast && diff.inCurrent {
+			units := []string{}
+			for unitId, state := range diff.diffUnits {
+				action := ""
+				if state.inLast && !state.inNew {
+					action = "removed"
+				}
+				if state.inNew && !state.inLast {
+					action = "added"
+				}
+				if state.updated {
+					action = "updated"
+				}
+				if action != "" {
+					units = append(units, fmt.Sprintf("(%s: %s)", unitId, action))
+				}
+			}
+			if len(units) > 0 {
+				formatted := fmt.Sprintf("%s: %v", id, units)
+				formattedUpdated = append(formattedUpdated, formatted)
+			}
+		}
+	}
+
+	// format outputs
+	for output, comp := range outDiffMap {
+		if comp.inLast && !comp.inNew {
+			removedOutputs = append(removedOutputs, output)
+		}
+		if !comp.inLast && comp.inNew {
+			addedOutputs = append(addedOutputs, output)
+		}
+	}
+
+	logStruct := UpdateStats{
+		Components: UpdateComponentChange{
+			Added:   addedList,
+			Removed: removedList,
+			Count:   len(c.componentModel),
+			Updated: formattedUpdated,
+		},
+		Outputs: UpdateComponentChange{
+			Added:   addedOutputs,
+			Removed: removedOutputs,
+		},
+	}
+
+	c.logger.Infow("component model updated", "changes", logStruct)
 }
 
 // Filter any inputs and outputs in the generated component model
@@ -1241,6 +1403,48 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 		result = append(result, component)
 	}
 	return result
+}
+
+// helpers for checkAndLogUpdate
+
+func convertUnitListToMap(unitList []component.Unit) map[string]component.Unit {
+	unitMap := map[string]component.Unit{}
+	for _, c := range unitList {
+		unitMap[c.ID] = c
+	}
+	return unitMap
+}
+
+func convertComponentListToMap(compList []component.Component) map[string]component.Component {
+	compMap := map[string]component.Component{}
+	for _, c := range compList {
+		compMap[c.ID] = c
+	}
+	return compMap
+}
+
+func diffUnitList(old, new []component.Unit) map[string]diffCheck {
+	oldMap := convertUnitListToMap(old)
+	newMap := convertUnitListToMap(new)
+
+	diffMap := map[string]diffCheck{}
+	// find new and updated units
+	for id, newUnits := range newMap {
+		diff := diffCheck{inNew: true}
+		if oldUnit, ok := oldMap[id]; ok {
+			diff.inLast = true
+			if newUnits.Config != nil && oldUnit.Config != nil && newUnits.Config.GetSource() != nil && oldUnit.Config.GetSource() != nil {
+				diff.updated = !reflect.DeepEqual(newUnits.Config.GetSource().AsMap(), oldUnit.Config.GetSource().AsMap())
+			}
+			delete(oldMap, id)
+		}
+		diffMap[id] = diff
+	}
+	// find removed units
+	for id := range oldMap {
+		diffMap[id] = diffCheck{inLast: true}
+	}
+	return diffMap
 }
 
 // collectManagerErrors listens on the shutdown channels for the

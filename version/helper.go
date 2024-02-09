@@ -31,6 +31,17 @@ var (
 
 const PackageVersionFileName = "package.version"
 
+var versionInitError error
+
+func init() {
+	versionInitError = InitVersionInformation()
+}
+
+// InitVersionError returns any error that might have occurred during package init
+func InitVersionError() error {
+	return versionInitError
+}
+
 // InitVersionInformation initialize the package version string reading from the
 // corresponding file. This function is not thread-safe and should be called once
 // before any calls to Version() has been done

@@ -20,6 +20,7 @@ import (
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -39,22 +40,33 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	// Start at old version, we want this test to upgrade to our
-	// build to ensure that the uninstall will kill the watcher.
-	startVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	// Upgrades to build under test.
+	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
+	endFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get end agent build version info")
+
+	// Start on a snapshot build, we want this test to upgrade to our
+	// build to ensure that the uninstall will kill the watcher.
+	// We need a snapshot with a non-matching commit hash to perform the upgrade
+	aac := tools.NewArtifactAPIClient()
+	buildInfo, err := aac.FindBuild(ctx, endVersion.VersionWithPrerelease(), endVersionInfo.Binary.Commit, 0)
+	if errors.Is(err, tools.ErrBuildNotFound) {
+		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", endVersion.VersionWithPrerelease())
+		return
+	}
+	require.NoError(t, err)
+
+	t.Logf("found build %q available for testing", buildInfo.Build.BuildID)
+	startVersion := versionWithBuildID(t, endVersion, buildInfo.Build.BuildID)
 	startFixture, err := atesting.NewFixture(
 		t,
 		startVersion,
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
-
-	// Upgrades to build under test.
-	endFixture, err := define.NewFixture(t, define.Version())
-	require.NoError(t, err)
-	endVersionInfo, err := endFixture.ExecVersion(ctx)
-	require.NoError(t, err, "failed to get end agent build version info")
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
@@ -64,8 +76,7 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	}
 
 	err = upgradetest.PerformUpgrade(
-		ctx, startFixture, endFixture, t,
-		upgradetest.WithPostUpgradeHook(postUpgradeHook))
+		ctx, startFixture, endFixture, t, upgradetest.WithPostUpgradeHook(postUpgradeHook))
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}
@@ -82,6 +93,14 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 		}
 	}
 	require.NoError(t, err)
+
+	// watcher needs to start before uninstall, otherwise you can
+	// get a race condition where watcher hasn't started before
+	// uninstall does it's PID check to find the watcher.
+	watcherErr := upgradetest.WaitForWatcher(ctx, 1*time.Minute, time.Second)
+	if watcherErr != nil {
+		t.Logf("watcher failed to start: %s", watcherErr)
+	}
 
 	// call uninstall now, do not wait for the watcher to finish running
 	// 8.11+ should always kill the running watcher (if it doesn't uninstall will fail)

@@ -1,0 +1,290 @@
+{
+  "packages": {
+    "elastic-agent-8.13.0-SNAPSHOT-amd64.deb": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-amd64.deb",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-amd64.deb.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-amd64.deb.asc",
+      "type": "deb",
+      "architecture": "amd64",
+      "attributes": {
+        "include_in_repo": "true",
+        "oss": "false"
+      }
+    },
+    "elastic-agent-core-8.13.0-SNAPSHOT-darwin-x86_64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-darwin-x86_64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-darwin-x86_64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-darwin-x86_64.tar.gz.asc",
+      "type": "tar",
+      "architecture": "x86_64",
+      "os": [
+        "darwin"
+      ]
+    },
+    "elastic-agent-ubi-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-ubi-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-ubi-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-ubi-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.asc",
+      "type": "docker",
+      "architecture": "amd64",
+      "os": [
+        "linux"
+      ],
+      "classifier": "docker-image",
+      "attributes": {
+        "artifactNoKpi": "true",
+        "internal": "false",
+        "org": "beats",
+        "url": "docker.elastic.co/beats/elastic-agent-ubi",
+        "repo": "docker.elastic.co"
+      }
+    },
+    "elastic-agent-8.13.0-SNAPSHOT-darwin-aarch64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-darwin-aarch64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-darwin-aarch64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-darwin-aarch64.tar.gz.asc",
+      "type": "tar",
+      "architecture": "aarch64",
+      "os": [
+        "darwin"
+      ]
+    },
+    "elastic-agent-8.13.0-SNAPSHOT-linux-x86_64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-linux-x86_64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-linux-x86_64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-linux-x86_64.tar.gz.asc",
+      "type": "tar",
+      "architecture": "x86_64",
+      "os": [
+        "linux"
+      ]
+    },
+    "elastic-agent-core-8.13.0-SNAPSHOT-linux-arm64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-linux-arm64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-linux-arm64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-linux-arm64.tar.gz.asc",
+      "type": "tar",
+      "architecture": "arm64",
+      "os": [
+        "linux"
+      ]
+    },
+    "elastic-agent-ironbank-8.13.0-SNAPSHOT-docker-build-context.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-ironbank-8.13.0-SNAPSHOT-docker-build-context.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-ironbank-8.13.0-SNAPSHOT-docker-build-context.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-ironbank-8.13.0-SNAPSHOT-docker-build-context.tar.gz.asc",
+      "type": "docker",
+      "classifier": "docker-build-context",
+      "attributes": {
+        "artifactNoKpi": "true",
+        "internal": "false",
+        "url": "null/null/elastic-agent-ironbank"
+      }
+    },
+    "elastic-agent-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz.asc",
+      "type": "docker",
+      "architecture": "arm64",
+      "os": [
+        "linux"
+      ],
+      "classifier": "docker-image",
+      "attributes": {
+        "artifactNoKpi": "true",
+        "internal": "false",
+        "org": "beats",
+        "url": "docker.elastic.co/beats/elastic-agent",
+        "repo": "docker.elastic.co"
+      }
+    },
+    "elastic-agent-8.13.0-SNAPSHOT-x86_64.rpm": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-x86_64.rpm",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-x86_64.rpm.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-x86_64.rpm.asc",
+      "type": "rpm",
+      "architecture": "x86_64",
+      "attributes": {
+        "include_in_repo": "true",
+        "oss": "false"
+      }
+    },
+    "elastic-agent-complete-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-complete-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-complete-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-complete-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.asc",
+      "type": "docker",
+      "architecture": "amd64",
+      "os": [
+        "linux"
+      ],
+      "classifier": "docker-image",
+      "attributes": {
+        "artifactNoKpi": "true",
+        "internal": "false",
+        "org": "beats",
+        "url": "docker.elastic.co/beats/elastic-agent-complete",
+        "repo": "docker.elastic.co"
+      }
+    },
+    "elastic-agent-core-8.13.0-SNAPSHOT-linux-x86_64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-linux-x86_64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-linux-x86_64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-linux-x86_64.tar.gz.asc",
+      "type": "tar",
+      "architecture": "x86_64",
+      "os": [
+        "linux"
+      ]
+    },
+    "elastic-agent-cloud-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-cloud-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-cloud-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-cloud-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.asc",
+      "type": "docker",
+      "architecture": "amd64",
+      "os": [
+        "linux"
+      ],
+      "classifier": "docker-image",
+      "attributes": {
+        "artifactNoKpi": "true",
+        "internal": "false",
+        "org": "beats-ci",
+        "url": "docker.elastic.co/beats-ci/elastic-agent-cloud",
+        "repo": "docker.elastic.co"
+      }
+    },
+    "elastic-agent-8.13.0-SNAPSHOT-linux-arm64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-linux-arm64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-linux-arm64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-linux-arm64.tar.gz.asc",
+      "type": "tar",
+      "architecture": "arm64",
+      "os": [
+        "linux"
+      ]
+    },
+    "elastic-agent-cloud-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-cloud-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-cloud-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-cloud-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz.asc",
+      "type": "docker",
+      "architecture": "arm64",
+      "os": [
+        "linux"
+      ],
+      "classifier": "docker-image",
+      "attributes": {
+        "artifactNoKpi": "true",
+        "internal": "false",
+        "org": "beats-ci",
+        "url": "docker.elastic.co/beats-ci/elastic-agent-cloud",
+        "repo": "docker.elastic.co"
+      }
+    },
+    "elastic-agent-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.asc",
+      "type": "docker",
+      "architecture": "amd64",
+      "os": [
+        "linux"
+      ],
+      "classifier": "docker-image",
+      "attributes": {
+        "artifactNoKpi": "true",
+        "internal": "false",
+        "org": "beats",
+        "url": "docker.elastic.co/beats/elastic-agent",
+        "repo": "docker.elastic.co"
+      }
+    },
+    "elastic-agent-core-8.13.0-SNAPSHOT-windows-x86_64.zip": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-windows-x86_64.zip",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-windows-x86_64.zip.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-windows-x86_64.zip.asc",
+      "type": "zip",
+      "architecture": "x86_64",
+      "os": [
+        "windows"
+      ]
+    },
+    "elastic-agent-8.13.0-SNAPSHOT-windows-x86_64.zip": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-windows-x86_64.zip",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-windows-x86_64.zip.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-windows-x86_64.zip.asc",
+      "type": "zip",
+      "architecture": "x86_64",
+      "os": [
+        "windows"
+      ]
+    },
+    "elastic-agent-core-8.13.0-SNAPSHOT-darwin-aarch64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-darwin-aarch64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-darwin-aarch64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/elastic-agent-core/elastic-agent-core-8.13.0-SNAPSHOT-darwin-aarch64.tar.gz.asc",
+      "type": "tar",
+      "architecture": "aarch64",
+      "os": [
+        "darwin"
+      ]
+    },
+    "elastic-agent-8.13.0-SNAPSHOT-arm64.deb": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-arm64.deb",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-arm64.deb.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-arm64.deb.asc",
+      "type": "deb",
+      "architecture": "arm64",
+      "attributes": {
+        "include_in_repo": "true",
+        "oss": "false"
+      }
+    },
+    "elastic-agent-8.13.0-SNAPSHOT-darwin-x86_64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-darwin-x86_64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-darwin-x86_64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-darwin-x86_64.tar.gz.asc",
+      "type": "tar",
+      "architecture": "x86_64",
+      "os": [
+        "darwin"
+      ]
+    },
+    "elastic-agent-complete-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-complete-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-complete-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-complete-8.13.0-SNAPSHOT-docker-image-linux-arm64.tar.gz.asc",
+      "type": "docker",
+      "architecture": "arm64",
+      "os": [
+        "linux"
+      ],
+      "classifier": "docker-image",
+      "attributes": {
+        "artifactNoKpi": "true",
+        "internal": "false",
+        "org": "beats",
+        "url": "docker.elastic.co/beats/elastic-agent-complete",
+        "repo": "docker.elastic.co"
+      }
+    },
+    "elastic-agent-8.13.0-SNAPSHOT-aarch64.rpm": {
+      "url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-aarch64.rpm",
+      "sha_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-aarch64.rpm.sha512",
+      "asc_url": "https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-aarch64.rpm.asc",
+      "type": "rpm",
+      "architecture": "aarch64",
+      "attributes": {
+        "include_in_repo": "true",
+        "oss": "false"
+      }
+    }
+  },
+  "manifests": {
+    "last-update-time": "Wed, 31 Jan 2024 09:12:14 UTC",
+    "seconds-since-last-update": 81
+  }
+}

@@ -97,7 +97,7 @@ type Manager struct {
 	ca         *authority.CertificateAuthority
 	listenAddr string
 	listenPort int
-	agentInfo  *info.AgentInfo
+	agentInfo  info.Agent
 	tracer     *apm.Tracer
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
@@ -150,7 +150,7 @@ func NewManager(
 	logger,
 	baseLogger *logger.Logger,
 	listenAddr string,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
 	grpcConfig *configuration.GRPCConfig,
@@ -158,6 +158,10 @@ func NewManager(
 	ca, err := authority.NewCA()
 	if err != nil {
 		return nil, err
+	}
+
+	if agentInfo == nil {
+		return nil, errors.New("agentInfo cannot be nil")
 	}
 	m := &Manager{
 		logger:         logger,

@@ -54,6 +54,8 @@ type ComponentVersionInfo struct {
 	Name string `yaml:"name"`
 	// Additional metadata about the binary.
 	Meta map[string]string `yaml:"meta,omitempty"`
+	// BuildHash is the VCS commit hash the program was built from.
+	BuildHash string `yaml:"build_hash"`
 }
 
 // ComponentState is the overall state of the component.
@@ -343,6 +345,10 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 	if checkin.VersionInfo != nil {
 		if checkin.VersionInfo.Name != "" && s.VersionInfo.Name != checkin.VersionInfo.Name {
 			s.VersionInfo.Name = checkin.VersionInfo.Name
+			changed = true
+		}
+		if checkin.VersionInfo.BuildHash != "" && s.VersionInfo.BuildHash != checkin.VersionInfo.BuildHash {
+			s.VersionInfo.BuildHash = checkin.VersionInfo.BuildHash
 			changed = true
 		}
 		if checkin.VersionInfo.Meta != nil && diffMeta(s.VersionInfo.Meta, checkin.VersionInfo.Meta) {

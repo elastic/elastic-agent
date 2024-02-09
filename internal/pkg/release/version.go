@@ -56,6 +56,15 @@ func Version() string {
 	return version.GetAgentPackageVersion()
 }
 
+// VersionWithSnapshot returns the version of the application.
+func VersionWithSnapshot() string {
+	agentPackageVersion := version.GetAgentPackageVersion()
+	if Snapshot() {
+		agentPackageVersion += "-SNAPSHOT"
+	}
+	return agentPackageVersion
+}
+
 // Snapshot returns true if binary was built as snapshot.
 func Snapshot() bool {
 	val, err := strconv.ParseBool(snapshot)

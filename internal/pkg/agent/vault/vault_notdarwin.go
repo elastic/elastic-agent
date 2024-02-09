@@ -96,18 +96,25 @@ func New(ctx context.Context, path string, opts ...OptionFunc) (v *Vault, err er
 func (v *Vault) Set(ctx context.Context, key string, data []byte) (err error) {
 	enc, err := v.encrypt(data)
 	if err != nil {
-		return err
+		return fmt.Errorf("vault Set: could not encrypt key: %w", err)
 	}
 
 	err = v.tryLock(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("vault Set: could acquire lock: %w", err)
 	}
 	defer func() {
 		err = v.unlockAndJoinErrors(err)
+		if err != nil {
+			err = fmt.Errorf("vault Set: unlockAndJoinErrors failed: %w", err)
+		}
 	}()
 
-	return writeFile(v.filepathFromKey(key), enc)
+	err = writeFile(v.filepathFromKey(key), enc)
+	if err != nil {
+		return fmt.Errorf("vaukt: could not write key to file: %w", err)
+	}
+	return nil
 }
 
 // Get retrieves the key from the vault store
