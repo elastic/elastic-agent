@@ -44,7 +44,9 @@ func TestPolicyChange(t *testing.T) {
 		action := &fleetapi.ActionPolicyChange{
 			ActionID:   "abc123",
 			ActionType: "POLICY_CHANGE",
-			Policy:     conf,
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: conf,
+			},
 		}
 
 		cfg := configuration.DefaultConfiguration()
@@ -73,7 +75,9 @@ func TestPolicyAcked(t *testing.T) {
 		action := &fleetapi.ActionPolicyChange{
 			ActionID:   actionID,
 			ActionType: "POLICY_CHANGE",
-			Policy:     config,
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: config,
+			},
 		}
 
 		cfg := configuration.DefaultConfiguration()
