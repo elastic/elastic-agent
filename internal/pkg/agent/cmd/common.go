@@ -42,9 +42,11 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	}
 
 	// Init version information contained in package version file
-	err := version.InitVersionError()
-	if err != nil {
-		cmd.PrintErrf("Error initializing version information: %v\n", err)
+	if isOtel := len(args) > 1 && args[1] == "otel"; !isOtel {
+		err := version.InitVersionError()
+		if err != nil {
+			cmd.PrintErrf("Error initializing version information: %v\n", err)
+		}
 	}
 
 	// path flags
@@ -81,6 +83,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newDiagnosticsCommand(args, streams))
 	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
 	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
+	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)

@@ -173,7 +173,7 @@ type configReloader interface {
 // All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
 type Coordinator struct {
 	logger    *logger.Logger
-	agentInfo *info.AgentInfo
+	agentInfo info.Agent
 	isManaged bool
 
 	cfg   *configuration.Configuration
@@ -322,7 +322,7 @@ type UpdateComponentChange struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {

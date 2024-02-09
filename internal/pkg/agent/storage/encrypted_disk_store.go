@@ -164,7 +164,7 @@ func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
 	fd, err := os.OpenFile(d.target, os.O_RDONLY, perms)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			// If file doesn't exists, return empty reader closer
+			// If file doesn't exist, return empty reader closer
 			return io.NopCloser(bytes.NewReader([]byte{})), nil
 		}
 		return nil, errors.New(err,
