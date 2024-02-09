@@ -312,6 +312,12 @@ func runTestStateStore(t *testing.T, ackToken string) {
 	})
 
 	t.Run("upgrade action is correctly loaded from disk", func(t *testing.T) {
+		// TODO: use one instance of every possible action so we'll know all of
+		// them are correctly serialised to disk. Also ensure after that loading
+		// them from disk, there is no filed with a zero value. It'll guarantee
+		// if the models ever change, this test will fail if it isn't updated.
+		// Also USE A GOLDEN FILE to catch change in the serialisation that would
+		// require a migration.
 		storePath := filepath.Join(t.TempDir(), "state.yaml")
 		now := time.Now().UTC().Round(time.Second)
 		queue := []action{&fleetapi.ActionUpgrade{
