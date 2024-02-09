@@ -858,7 +858,7 @@ func TestWaitForWatcher(t *testing.T) {
 			// cancel context
 			cancel()
 
-			//wait for goroutines to finish
+			// wait for goroutines to finish
 			wg.Wait()
 		})
 	}
@@ -884,7 +884,8 @@ func writeState(t *testing.T, path string, state details.State) {
 	})
 
 	bytes, err := yaml.Marshal(ms)
-	require.NoError(t, err, "error marshaling the test upgrade marker")
-	err = os.WriteFile(path, bytes, 0770)
-	require.NoError(t, err, "error writing out the test upgrade marker")
+	if assert.NoError(t, err, "error marshaling the test upgrade marker") {
+		err = os.WriteFile(path, bytes, 0770)
+		assert.NoError(t, err, "error writing out the test upgrade marker")
+	}
 }

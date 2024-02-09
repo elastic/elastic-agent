@@ -53,7 +53,7 @@ var agentArtifact = artifact.Artifact{
 	Artifact: "beats/" + agentName,
 }
 
-var ErrWatcherNotStarted = errors.New("watcher did not start in time or context expired")
+var ErrWatcherNotStarted = errors.New("watcher did not start in time")
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -329,7 +329,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 }
 
 func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
-	//Wait for the watcher to be up and running
+	// Wait for the watcher to be up and running
 	watcherContext, cancel := context.WithTimeout(ctx, waitTime)
 	defer cancel()
 
@@ -352,7 +352,7 @@ func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath stri
 
 		case <-watcherContext.Done():
 			log.Error("upgrade watcher did not start watching within %s or context has expired", waitTime)
-			return ErrWatcherNotStarted
+			return goerrors.Join(ErrWatcherNotStarted, watcherContext.Err())
 		}
 	}
 }
