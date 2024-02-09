@@ -5,21 +5,40 @@
 package cmd
 
 import (
+	"flag"
 	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"go.opentelemetry.io/collector/featuregate"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
-func getConfigFiles(cmd *cobra.Command) ([]string, error) {
+func setupOtelFlags(flags *pflag.FlagSet) {
+	flags.StringArray(configFlagName, []string{}, "Locations to the config file(s), note that only a"+
+		" single location can be set per flag entry e.g. `--config=file:/path/to/first --config=file:path/to/second`.")
+
+	flags.StringArray(setFlagName, []string{}, "Set arbitrary component config property. The component has to be defined in the config file and the flag"+
+		" has a higher precedence. Array config properties are overridden and maps are joined. Example --set=processors.batch.timeout=2s")
+
+	goFlags := new(flag.FlagSet)
+	featuregate.GlobalRegistry().RegisterFlags(goFlags)
+
+	flags.AddGoFlagSet(goFlags)
+}
+
+func getConfigFiles(cmd *cobra.Command, useDefault bool) ([]string, error) {
 	configFiles, err := cmd.Flags().GetStringArray(configFlagName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve config flags: %w", err)
 	}
 
 	if len(configFiles) == 0 {
+		if !useDefault {
+			return nil, fmt.Errorf("at least one config flag must be provided")
+		}
 		configFiles = append(configFiles, paths.OtelConfigFile())
 	}
 

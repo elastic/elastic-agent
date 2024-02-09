@@ -41,7 +41,7 @@ func New(
 	log *logger.Logger,
 	baseLogger *logger.Logger,
 	logLevel logp.Level,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
 	testingMode bool,
@@ -52,7 +52,8 @@ func New(
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
 	err := version.InitVersionError()
-	if err != nil {
+	if err != nil && !runAsOtel {
+		// ignore this error when running in otel mode
 		// non-fatal error, log a warning and move on
 		log.With("error.message", err).Warnf("Error initializing version information: falling back to %s", release.Version())
 	}

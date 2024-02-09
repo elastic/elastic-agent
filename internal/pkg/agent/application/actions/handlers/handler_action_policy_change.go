@@ -37,7 +37,7 @@ const (
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
 	log       *logger.Logger
-	agentInfo *info.AgentInfo
+	agentInfo info.Agent
 	config    *configuration.Configuration
 	store     storage.Store
 	ch        chan coordinator.ConfigChange
@@ -52,7 +52,7 @@ type PolicyChangeHandler struct {
 // NewPolicyChangeHandler creates a new PolicyChange handler.
 func NewPolicyChangeHandler(
 	log *logger.Logger,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	config *configuration.Configuration,
 	store storage.Store,
 	ch chan coordinator.ConfigChange,
@@ -264,7 +264,7 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	return true
 }
 
-func fleetToReader(agentInfo *info.AgentInfo, cfg *configuration.Configuration) (io.Reader, error) {
+func fleetToReader(agentInfo info.Agent, cfg *configuration.Configuration) (io.Reader, error) {
 	configToStore := map[string]interface{}{
 		"fleet": cfg.Fleet,
 		"agent": map[string]interface{}{

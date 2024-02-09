@@ -69,7 +69,7 @@ type BeatsMonitor struct {
 	enabled         bool // feature flag disabling whole v1 monitoring story
 	config          *monitoringConfig
 	operatingSystem string
-	agentInfo       *info.AgentInfo
+	agentInfo       info.Agent
 }
 
 type monitoringConfig struct {
@@ -77,7 +77,7 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo *info.AgentInfo) *BeatsMonitor {
+func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
@@ -914,7 +914,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 	return nil
 }
 
-func createProcessorsForJSONInput(name string, compID, monitoringNamespace string, agentInfo *info.AgentInfo) []interface{} {
+func createProcessorsForJSONInput(name string, compID, monitoringNamespace string, agentInfo info.Agent) []interface{} {
 	return []interface{}{
 		map[string]interface{}{
 			"add_fields": map[string]interface{}{
