@@ -370,8 +370,11 @@ func hasAllSSDs(block ghw.BlockInfo) bool {
 
 func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
 	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
-	if _, err := os.Create(markerFilePath); err != nil {
-		return err
+	handle, err := os.Create(markerFilePath)
+	if err != nil {
+		return fmt.Errorf("error creating installed marker: %w", err)
 	}
+	_ = handle.Close()
+
 	return fixInstallMarkerPermissions(markerFilePath, ownership)
 }
