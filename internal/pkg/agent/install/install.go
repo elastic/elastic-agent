@@ -138,16 +138,15 @@ func setupInstall(pt *progressbar.ProgressBar, topPath string, cfgFile string, l
 
 	// We only uninstall Agent if it is currently installed.
 	status, _ := Status(topPath)
+	// Uninstall current installation
+	//
+	// There is no uninstall token for "install" command.
+	// Uninstall will fail on protected agent.
+	// The protected Agent will need to be uninstalled first before it can be installed.
 	if status == Installed {
-		// Uninstall current installation
-		//
-		// There is no uninstall token for "install" command.
-		// Uninstall will fail on protected agent.
-		// The protected Agent will need to be uninstalled first before it can be installed.
 		pt.Describe("Uninstalling current Elastic Agent")
 		err = Uninstall(cfgFile, topPath, "", log, pt)
 		if err != nil {
-			pt.Describe("Failed to uninstall current Elastic Agent")
 			return "", errors.New(err, fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)), errors.M("directory", filepath.Dir(topPath)))
 		}
 		pt.Describe("Successfully uninstalled current Elastic Agent")
@@ -186,7 +185,6 @@ func copyFiles(pt *progressbar.ProgressBar, topPath string, streams *cli.IOStrea
 	})
 
 	if err != nil {
-		pt.Describe("Error copying files")
 		return errors.New(err, fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", sourceDir, topPath), errors.M("source", sourceDir), errors.M("destination", topPath))
 	}
 	pt.Describe("Successfully copied files")

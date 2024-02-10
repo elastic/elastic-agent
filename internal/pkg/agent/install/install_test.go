@@ -26,7 +26,8 @@ func TestWrapper(t *testing.T) {
 	topPath := t.TempDir()
 	wrapperPath := t.TempDir()
 	// create file for darwin, which uses a symlink
-	_, err := os.Create(filepath.Join(topPath, "elastic-agent"))
+	h, err := os.Create(filepath.Join(topPath, "elastic-agent"))
+	defer func() { _ = h.Close() }()
 	require.NoError(t, err)
 
 	esPath := filepath.Join(wrapperPath, "elastic-agent")
@@ -71,7 +72,8 @@ func TestFileCopy(t *testing.T) {
 	inputDir := t.TempDir()
 	outputDir := t.TempDir()
 	// create some example files
-	_, err := os.Create(filepath.Join(inputDir, "elastic-agent"))
+	h, err := os.Create(filepath.Join(inputDir, "elastic-agent"))
+	defer func() { _ = h.Close() }()
 	require.NoError(t, err)
 	pt := progressbar.DefaultSilent(0)
 
