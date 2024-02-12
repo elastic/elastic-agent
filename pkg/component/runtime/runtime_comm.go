@@ -29,7 +29,7 @@ import (
 type Communicator interface {
 	// WriteConnInfo writes the connection information to the writer, informing the component it has access
 	// to the provided services.
-	WriteConnInfo(w io.Writer, services ...client.Service) error
+	WriteStartUpInfo(w io.Writer, services ...client.Service) error
 	// CheckinExpected sends the expected state to the component.
 	//
 	// observed is the observed message received from the component and what was used to compute the provided
@@ -44,7 +44,7 @@ type runtimeComm struct {
 	logger     *logger.Logger
 	listenAddr string
 	ca         *authority.CertificateAuthority
-	agentInfo  *info.AgentInfo
+	agentInfo  info.Agent
 
 	name  string
 	token string
@@ -71,7 +71,7 @@ type runtimeComm struct {
 	actionsResponse chan *proto.ActionResponse
 }
 
-func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.CertificateAuthority, agentInfo *info.AgentInfo, maxMessageSize int) (*runtimeComm, error) {
+func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.CertificateAuthority, agentInfo info.Agent, maxMessageSize int) (*runtimeComm, error) {
 	token, err := uuid.NewV4()
 	if err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.Cert
 	}, nil
 }
 
-func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) error {
+func (c *runtimeComm) WriteStartUpInfo(w io.Writer, services ...client.Service) error {
 	hasV2 := false
 	srvs := make([]proto.ConnInfoServices, 0, len(services))
 	for _, srv := range services {
@@ -129,6 +129,11 @@ func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) err
 		// chunking is always allowed if the client supports it
 		Supports:       []proto.ConnectionSupports{proto.ConnectionSupports_CheckinChunking},
 		MaxMessageSize: uint32(c.maxMessageSize),
+		AgentInfo: &proto.AgentInfo{
+			Id:       c.agentInfo.AgentID(),
+			Version:  c.agentInfo.Version(),
+			Snapshot: c.agentInfo.Snapshot(),
+		},
 	}
 	infoBytes, err := protobuf.Marshal(startupInfo)
 	if err != nil {

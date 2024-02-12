@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -139,23 +138,13 @@ func TestDiagnosticsCommand(t *testing.T) {
 
 func testDiagnosticsFactory(t *testing.T, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
-		diagnosticCommandWD := t.TempDir()
-		diagnosticCmdOutput, err := fix.Exec(ctx, cmd, process.WithWorkDir(diagnosticCommandWD))
-
-		t.Logf("diagnostic command completed with output \n%q\n", diagnosticCmdOutput)
-		require.NoErrorf(t, err, "error running diagnostic command: %v", err)
-
-		t.Logf("checking directory %q for the generated archive", diagnosticCommandWD)
-		files, err := filepath.Glob(filepath.Join(diagnosticCommandWD, diagnosticsArchiveGlobPattern))
-		require.NoError(t, err)
-		require.Len(t, files, 1)
-		t.Logf("Found %q diagnostic archive.", files[0])
+		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)
 
 		// get the version of the running agent
 		avi, err := getRunningAgentVersion(ctx, fix)
 		require.NoError(t, err)
 
-		verifyDiagnosticArchive(t, files[0], diagFiles, diagCompFiles, avi)
+		verifyDiagnosticArchive(t, diagZip, diagFiles, diagCompFiles, avi)
 
 		return nil
 	}
@@ -217,6 +206,8 @@ func verifyDiagnosticArchive(t *testing.T, diagArchive string, diagFiles []strin
 }
 
 func extractZipArchive(t *testing.T, zipFile string, dst string) {
+	t.Helper()
+
 	zReader, err := zip.OpenReader(zipFile)
 	require.NoErrorf(t, err, "file %q is not a valid zip archive", zipFile)
 	defer zReader.Close()

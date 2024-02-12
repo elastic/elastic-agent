@@ -109,7 +109,7 @@ func unmarshalVersionOutput(t *testing.T, cmdOutput []byte, binaryOrDaemonKey st
 // findPkgVersionFiles scans recursively a root directory and returns all the package version files encountered
 func findPkgVersionFiles(t *testing.T, rootDir string) []string {
 	t.Helper()
-	//find the package version file
+	// find the package version file
 	installFS := os.DirFS(rootDir)
 	matches := []string{}
 	err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
@@ -122,7 +122,7 @@ func findPkgVersionFiles(t *testing.T, rootDir string) []string {
 		}
 		return nil
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "could not find package version files, fs.WalkDir failed")
 
 	t.Logf("package version files found: %v", matches)
 	return matches

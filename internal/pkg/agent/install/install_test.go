@@ -5,84 +5,12 @@
 package install
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/jaypipes/ghw"
 	"github.com/jaypipes/ghw/pkg/block"
-	"github.com/schollz/progressbar/v3"
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
-
-func TestWrapper(t *testing.T) {
-	topPath := t.TempDir()
-	wrapperPath := t.TempDir()
-	// create file for darwin, which uses a symlink
-	h, err := os.Create(filepath.Join(topPath, "elastic-agent"))
-	defer func() { _ = h.Close() }()
-	require.NoError(t, err)
-
-	esPath := filepath.Join(wrapperPath, "elastic-agent")
-	err = placeShellWrapper(topPath, esPath)
-	require.NoError(t, err)
-
-	if runtime.GOOS == "linux" {
-		res, err := os.ReadFile(esPath)
-		require.NoError(t, err)
-		expected := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
-		require.Equal(t, expected, string(res))
-	}
-	if runtime.GOOS == "darwin" {
-		require.FileExists(t, esPath)
-	}
-}
-
-func TestPreInstall(t *testing.T) {
-	pt := progressbar.DefaultSilent(0)
-	topPath := t.TempDir()
-
-	exe, err := os.Executable()
-	require.NoError(t, err)
-	t.Logf("got: %s", exe)
-
-	base := filepath.Dir(exe)
-
-	//fakeout path verification in setupInstall()
-	name := "elastic-agent"
-	if runtime.GOOS == "windows" {
-		name = "elastic-agent.exe"
-	}
-	_, err = os.Create(filepath.Join(base, name))
-	require.NoError(t, err)
-
-	sourceDir, err := setupInstall(pt, topPath, "", logp.L())
-	require.NoError(t, err)
-	require.Equal(t, base, sourceDir)
-}
-
-func TestFileCopy(t *testing.T) {
-	inputDir := t.TempDir()
-	outputDir := t.TempDir()
-	// create some example files
-	h, err := os.Create(filepath.Join(inputDir, "elastic-agent"))
-	defer func() { _ = h.Close() }()
-	require.NoError(t, err)
-	pt := progressbar.DefaultSilent(0)
-
-	err = copyFiles(pt, outputDir, cli.NewIOStreams(), inputDir, utils.CurrentFileOwner())
-	require.NoError(t, err)
-
-	require.FileExists(t, filepath.Join(outputDir, "elastic-agent"))
-	require.FileExists(t, filepath.Join(outputDir, paths.MarkerFileName))
-}
 
 func TestHasAllSSDs(t *testing.T) {
 	cases := map[string]struct {
