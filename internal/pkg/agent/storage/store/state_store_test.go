@@ -267,8 +267,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 	t.Run("migrate", func(t *testing.T) {
 		// TODO: DO NOT MERGE TO MAIN WITHOUT REMOVING THIS SKIP
 		t.Skip("this test is broken because the migration haven't been" +
-			" implemented yet. It'll implemented on another PR")
-            
+			" implemented yet. It'll implemented on another PR as part of" +
+			"https://github.com/elastic/elastic-agent/issues/3912")
+
 		if runtime.GOOS == "darwin" {
 			// the original migrate never actually run, so with this at least
 			// there is coverage for linux and windows.
