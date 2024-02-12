@@ -95,6 +95,12 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command: *command
+  - name: etw
+    description: "Event Tracing for Windows"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
   - name: gcp-pubsub
     description: "GCP Pub-Sub"
     platforms: *platforms
