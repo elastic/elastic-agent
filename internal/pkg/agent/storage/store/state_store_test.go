@@ -242,7 +242,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 	t.Run("migrate actions file does not exists", func(t *testing.T) {
 		if runtime.GOOS == "darwin" {
-			// the original migrate never actually run, so with this at least
+			// the original test never actually run, so with this at least
 			// there is coverage for linux and windows.
 			t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
 				"to be merged so this test can work on darwin")
