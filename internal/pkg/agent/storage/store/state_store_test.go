@@ -309,6 +309,10 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 		_, err = io.Copy(storeFile, goldenActionStoreFile)
 		require.NoError(t, err, "could not copy action store golden file")
+		err = storeFile.Close()
+		// It needs to be closed now otherwise on windows the store will fail to
+		// open the file.
+		require.NoError(t, err, "could not close store file")
 
 		newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
 		newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
