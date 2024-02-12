@@ -26,7 +26,7 @@ const markerFilename = ".update-marker"
 type UpdateMarker struct {
 	// Hash agent is updated to
 	Hash string `json:"hash" yaml:"hash"`
-	//UpdatedOn marks a date when update happened
+	// UpdatedOn marks a date when update happened
 	UpdatedOn time.Time `json:"updated_on" yaml:"updated_on"`
 
 	// PrevVersion is a version agent is updated from
@@ -65,8 +65,8 @@ func convertToMarkerAction(a *fleetapi.ActionUpgrade) *MarkerActionUpgrade {
 	return &MarkerActionUpgrade{
 		ActionID:   a.ActionID,
 		ActionType: a.ActionType,
-		Version:    a.Version,
-		SourceURI:  a.SourceURI,
+		Version:    a.Data.Version,
+		SourceURI:  a.Data.SourceURI,
 	}
 }
 
@@ -77,8 +77,10 @@ func convertToActionUpgrade(a *MarkerActionUpgrade) *fleetapi.ActionUpgrade {
 	return &fleetapi.ActionUpgrade{
 		ActionID:   a.ActionID,
 		ActionType: a.ActionType,
-		Version:    a.Version,
-		SourceURI:  a.SourceURI,
+		Data: fleetapi.ActionUpgradeData{
+			Version:   a.Version,
+			SourceURI: a.SourceURI,
+		},
 	}
 }
 

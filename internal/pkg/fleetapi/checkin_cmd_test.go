@@ -175,7 +175,7 @@ func TestCheckin(t *testing.T) {
 			// UnknownAction
 			require.Equal(t, "id2", r.Actions[1].ID())
 			require.Equal(t, "UNKNOWN", r.Actions[1].Type())
-			require.Equal(t, "WHAT_TO_DO_WITH_IT", r.Actions[1].(*ActionUnknown).OriginalType())
+			require.Equal(t, "WHAT_TO_DO_WITH_IT", r.Actions[1].(*ActionUnknown).OriginalType)
 		},
 	))
 
