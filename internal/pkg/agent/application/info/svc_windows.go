@@ -7,8 +7,6 @@
 package info
 
 import (
-	"fmt"
-
 	"golang.org/x/sys/windows"
 )
 
@@ -23,10 +21,9 @@ func RunningUnderSupervisor() bool {
 	if err != nil {
 		return false
 	}
-	defer func() { _ = windows.FreeSid(serviceSid) }()
+	defer windows.FreeSid(serviceSid)
 
-	var t windows.Token
-	err = windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &t)
+	t, err := windows.OpenCurrentProcessToken()
 	if err != nil {
 		return false
 	}
@@ -53,36 +50,4 @@ func allocSid(subAuth0 uint32) (*windows.SID, error) {
 		return nil, err
 	}
 	return sid, nil
-}
-
-func nativeArchitecture() string {
-	var processMachine, nativeMachine uint16
-	// the pseudo handle doesn't need to be closed
-	var currentProcessHandle = windows.CurrentProcess()
-
-	err := windows.IsWow64Process2(currentProcessHandle, &processMachine, &nativeMachine)
-	if err != nil {
-		// unknown native architecture
-		return ""
-	}
-
-	// https://learn.microsoft.com/en-us/windows/win32/sysinfo/image-file-machine-constants
-	const (
-		IMAGE_FILE_MACHINE_AMD64 = 0x8664
-		IMAGE_FILE_MACHINE_ARM64 = 0xAA64
-	)
-
-	var nativeMachineStr string
-
-	switch nativeMachine {
-	case IMAGE_FILE_MACHINE_AMD64:
-		nativeMachineStr = "amd64"
-	case IMAGE_FILE_MACHINE_ARM64:
-		nativeMachineStr = "arm64"
-	default:
-		// other unknown or unsupported by Elastic architectures
-		nativeMachineStr = fmt.Sprintf("0x%x", nativeMachine)
-	}
-
-	return nativeMachineStr
 }

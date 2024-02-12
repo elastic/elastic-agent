@@ -3,6 +3,7 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !windows
+// +build !windows
 
 package info
 
@@ -12,9 +13,4 @@ import "os"
 // the supervisor processes of the OS.
 func RunningUnderSupervisor() bool {
 	return os.Getppid() == 1
-}
-
-func nativeArchitecture() string {
-	// unknown native architecture
-	return ""
 }

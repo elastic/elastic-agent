@@ -47,7 +47,7 @@ func agentGlobalConfig() (map[string]interface{}, error) {
 		},
 		"runtime.os":             runtime.GOOS,
 		"runtime.arch":           runtime.GOARCH,
-		"runtime.native_arch":    nativeArchitecture(),
+		"runtime.native_arch":    hostInfo.Info().NativeArchitecture,
 		"runtime.osinfo.type":    hostInfo.Info().OS.Type,
 		"runtime.osinfo.family":  hostInfo.Info().OS.Family,
 		"runtime.osinfo.version": hostInfo.Info().OS.Version,
