@@ -21,9 +21,9 @@ const (
 	afterRestartDelay = 2 * time.Second
 )
 
-func invokeCmd() *exec.Cmd {
+func invokeCmd(agentExecutable string) *exec.Cmd {
 	// #nosec G204 -- user cannot inject any parameters to this command
-	cmd := exec.Command(paths.TopBinaryPath(), watcherSubcommand,
+	cmd := exec.Command(agentExecutable, watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),
 	)

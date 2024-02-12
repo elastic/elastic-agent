@@ -201,9 +201,9 @@ func checkZip(t *testing.T, file string) {
 
 func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
 	t.Log("Checking file manifest.yaml")
-	manifestReadCloser, err := os.Open(filepath.Join(extractedPackageDir, "manifest.yaml"))
+	manifestReadCloser, err := os.Open(filepath.Join(extractedPackageDir, v1.ManifestFileName))
 	if err != nil {
-		t.Errorf("opening manifest %s : %v", "manifest.yaml", err)
+		t.Errorf("opening manifest %s : %v", v1.ManifestFileName, err)
 	}
 	defer func(closer io.ReadCloser) {
 		err := closer.Close()
@@ -218,6 +218,9 @@ func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
 
 	assert.Equal(t, v1.ManifestKind, m.Kind, "manifest specifies wrong kind")
 	assert.Equal(t, v1.VERSION, m.Version, "manifest specifies wrong api version")
+
+	assert.NotEmpty(t, m.Package.Version, "manifest version must not be empty")
+	assert.NotEmpty(t, m.Package.Hash, "manifest hash must not be empty")
 
 	if assert.NotEmpty(t, m.Package.PathMappings, "path mappings in manifest are empty") {
 		versionedHome := m.Package.VersionedHome
