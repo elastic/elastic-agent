@@ -103,9 +103,10 @@ func (p Platforms) Exists(platform string) bool {
 type PlatformDetail struct {
 	Platform
 
-	Family string
-	Major  string
-	Minor  string
+	NativeArch string
+	Family     string
+	Major      string
+	Minor      string
 }
 
 // PlatformModifier can modify the platform details before the runtime specifications are loaded.
@@ -124,9 +125,10 @@ func LoadPlatformDetail(modifiers ...PlatformModifier) (PlatformDetail, error) {
 			Arch: goruntime.GOARCH,
 			GOOS: goruntime.GOOS,
 		},
-		Family: os.Family,
-		Major:  strconv.Itoa(os.Major),
-		Minor:  strconv.Itoa(os.Minor),
+		NativeArch: info.Info().NativeArchitecture,
+		Family:     os.Family,
+		Major:      strconv.Itoa(os.Major),
+		Minor:      strconv.Itoa(os.Minor),
 	}
 	for _, modifier := range modifiers {
 		detail = modifier(detail)
