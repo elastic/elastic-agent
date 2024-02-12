@@ -283,6 +283,8 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	// we're measuring the handle usage as y=mx+b
 	// if the slope is increasing above a certain rate, fail the test
+	// A number of factors can change the slope during a test; shortened runtime (lots of handles allocated in the first few seconds, producing an upward slope),
+	// filebeat trying to open a large number of log files, etc
 	handleSlopeFailure := 0.1
 
 	for _, handle := range handles {
