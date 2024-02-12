@@ -120,6 +120,7 @@ We pass a `-test.run` flag along with the names of the tests we want to run in O
 ##### Run Extended Runtime test
 The test framework includes a "long running" test to check for resource leaks and stability.
 The runtime of the test can be set via the `LONG_TEST_RUNTIME` environment variable.
+The test itself can be run via the `integration:TestExtendedRuntime` mage target.
 
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
