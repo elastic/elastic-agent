@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -109,10 +110,14 @@ func Cleanup(log *logger.Logger, currentHash string, removeMarker bool, keepLogs
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
 // agent during upgrade period.
+<<<<<<< HEAD
 func InvokeWatcher(log *logger.Logger) error {
+=======
+func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error) {
+>>>>>>> 2813e1f31e (Add wait for watcher (#4229))
 	if !IsUpgradeable() {
 		log.Info("agent is not upgradable, not starting watcher")
-		return nil
+		return nil, nil
 	}
 
 	cmd := invokeCmd()
@@ -125,14 +130,14 @@ func InvokeWatcher(log *logger.Logger) error {
 
 	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start Upgrade Watcher: %w", err)
+		return nil, fmt.Errorf("failed to start Upgrade Watcher: %w", err)
 	}
 
 	upgradeWatcherPID := cmd.Process.Pid
 	agentPID := os.Getpid()
 	log.Infow("Upgrade Watcher invoked", "agent.upgrade.watcher.process.pid", upgradeWatcherPID, "agent.process.pid", agentPID)
 
-	return nil
+	return cmd, nil
 }
 
 func restartAgent(ctx context.Context, log *logger.Logger) error {

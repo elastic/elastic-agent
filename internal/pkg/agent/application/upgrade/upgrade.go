@@ -6,11 +6,14 @@ package upgrade
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
@@ -34,10 +37,19 @@ import (
 )
 
 const (
+<<<<<<< HEAD
 	agentName       = "elastic-agent"
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
 	runDirMod       = 0770
+=======
+	agentName          = "elastic-agent"
+	hashLen            = 6
+	agentCommitFile    = ".elastic-agent.active.commit"
+	runDirMod          = 0770
+	snapshotSuffix     = "-SNAPSHOT"
+	watcherMaxWaitTime = 30 * time.Second
+>>>>>>> 2813e1f31e (Add wait for watcher (#4229))
 )
 
 var agentArtifact = artifact.Artifact{
@@ -46,8 +58,12 @@ var agentArtifact = artifact.Artifact{
 	Artifact: "beats/" + agentName,
 }
 
+<<<<<<< HEAD
 // ErrSameVersion error is returned when the upgrade results in the same installed version.
 var ErrSameVersion = errors.New("upgrade did not occur because its the same version")
+=======
+var ErrWatcherNotStarted = errors.New("watcher did not start in time")
+>>>>>>> 2813e1f31e (Add wait for watcher (#4229))
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -196,12 +212,18 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
+<<<<<<< HEAD
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
+=======
+		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(err, rollbackErr)
+>>>>>>> 2813e1f31e (Add wait for watcher (#4229))
 	}
 
 	if err := u.markUpgrade(ctx, u.log, newHash, action, det); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
+<<<<<<< HEAD
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
@@ -210,6 +232,33 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
+=======
+		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(err, rollbackErr)
+	}
+
+	minParsedVersionForNewUpdateMarker := agtversion.NewParsedSemVer(8, 13, 0, "", "")
+	var watcherExecutable string
+	if parsedVersion.Less(*minParsedVersionForNewUpdateMarker) {
+		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
+		watcherExecutable = paths.BinaryPath(paths.VersionedHome(paths.Top()), agentName)
+	} else {
+		// use the new agent executable as it should be able to parse the new update marker
+		watcherExecutable = paths.BinaryPath(filepath.Join(paths.Top(), unpackRes.VersionedHome), agentName)
+	}
+	var watcherCmd *exec.Cmd
+	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable); err != nil {
+		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
+		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(err, rollbackErr)
+	}
+
+	watcherWaitErr := waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
+	if watcherWaitErr != nil {
+		killWatcherErr := watcherCmd.Process.Kill()
+		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, rollbackErr)
+>>>>>>> 2813e1f31e (Add wait for watcher (#4229))
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, release.TrimCommit(newHash))
@@ -222,6 +271,35 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	return cb, nil
+}
+
+func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
+	// Wait for the watcher to be up and running
+	watcherContext, cancel := context.WithTimeout(ctx, waitTime)
+	defer cancel()
+
+	markerWatcher := newMarkerFileWatcher(markerFilePath, log)
+	err := markerWatcher.Run(watcherContext)
+	if err != nil {
+		return fmt.Errorf("error starting update marker watcher: %w", err)
+	}
+
+	log.Info("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
+
+	for {
+		select {
+		case updMarker := <-markerWatcher.Watch():
+			if updMarker.Details != nil && updMarker.Details.State == details.StateWatching {
+				// watcher started and it is watching, all good
+				log.Info("upgrade watcher set %s state in upgrade marker: exiting wait loop", details.StateWatching)
+				return nil
+			}
+
+		case <-watcherContext.Done():
+			log.Error("upgrade watcher did not start watching within %s or context has expired", waitTime)
+			return goerrors.Join(ErrWatcherNotStarted, watcherContext.Err())
+		}
+	}
 }
 
 // Ack acks last upgrade action
@@ -274,7 +352,26 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, hash string) {
 	_ = ChangeSymlink(ctx, log, release.ShortCommit())
 }
 
+<<<<<<< HEAD
 func copyActionStore(log *logger.Logger, newHash string) error {
+=======
+func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
+	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("rolling back install: restoring symlink to %q failed: %w", oldAgentPath, err)
+	}
+
+	newAgentInstallPath := filepath.Join(topDirPath, versionedHome)
+	err = os.RemoveAll(newAgentInstallPath)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("rolling back install: removing new agent install at %q failed: %w", newAgentInstallPath, err)
+	}
+	return nil
+}
+
+func copyActionStore(log *logger.Logger, newHome string) error {
+>>>>>>> 2813e1f31e (Add wait for watcher (#4229))
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
 	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))

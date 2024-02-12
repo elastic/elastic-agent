@@ -11,17 +11,23 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+<<<<<<< HEAD
 	"strings"
+=======
+	"sync"
+>>>>>>> 2813e1f31e (Add wait for watcher (#4229))
 	"testing"
 	"time"
 
 	"github.com/gofrs/flock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -498,3 +504,354 @@ agent.download:
 		})
 	}
 }
+<<<<<<< HEAD
+=======
+
+var agentVersion123SNAPSHOTabcdef = agentVersion{
+	version:  "1.2.3",
+	snapshot: true,
+	hash:     "abcdef",
+}
+
+var agentVersion123SNAPSHOTabcdefRepackaged = agentVersion{
+	version:  "1.2.3-repackaged",
+	snapshot: true,
+	hash:     "abcdef",
+}
+
+var agentVersion123abcdef = agentVersion{
+	version:  "1.2.3",
+	snapshot: false,
+	hash:     "abcdef",
+}
+
+var agentVersion123SNAPSHOTghijkl = agentVersion{
+	version:  "1.2.3",
+	snapshot: true,
+	hash:     "ghijkl",
+}
+
+func TestIsSameVersion(t *testing.T) {
+	type args struct {
+		current  agentVersion
+		metadata packageMetadata
+		version  string
+	}
+	type want struct {
+		same       bool
+		newVersion agentVersion
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "same version, snapshot flag and hash",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       true,
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3-repackaged",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag (SNAPSHOT promotion to release)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      false,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123abcdef,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "ghijkl",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+		},
+		{
+			name: "same version, snapshot flag and hash, no manifest",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				same:       true,
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version, no manifest",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3-repackaged-SNAPSHOT",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag, no manifest (SNAPSHOT promotion to release)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123abcdef,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "ghijkl",
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			log, _ := logger.NewTesting(test.name)
+			actualSame, actualNewVersion := isSameVersion(log, test.args.current, test.args.metadata, test.args.version)
+
+			assert.Equal(t, test.want.same, actualSame, "Unexpected boolean comparison result: isSameVersion(%v, %v, %v, %v) should be %v",
+				log, test.args.current, test.args.metadata, test.args.version, test.want.same)
+			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: isSameVersion(%v, %v, %v, %v) should be %v",
+				log, test.args.current, test.args.metadata, test.args.version, test.want.newVersion)
+		})
+	}
+}
+
+func TestWaitForWatcher(t *testing.T) {
+	wantErrWatcherNotStarted := func(t assert.TestingT, err error, i ...interface{}) bool {
+		return assert.ErrorIs(t, err, ErrWatcherNotStarted, i)
+	}
+	tests := []struct {
+		name                string
+		states              []details.State
+		stateChangeInterval time.Duration
+		timeout             time.Duration
+		wantErr             assert.ErrorAssertionFunc
+	}{
+		{
+			name:                "Happy path: watcher is watching already",
+			states:              []details.State{details.StateWatching},
+			stateChangeInterval: 1 * time.Millisecond,
+			timeout:             50 * time.Millisecond,
+			wantErr:             assert.NoError,
+		},
+		{
+			name:                "Sad path: watcher is never starting",
+			states:              []details.State{details.StateReplacing},
+			stateChangeInterval: 1 * time.Millisecond,
+			timeout:             50 * time.Millisecond,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+		{
+			name: "Runaround path: marker is jumping around and landing on watching",
+			states: []details.State{
+				details.StateRequested,
+				details.StateScheduled,
+				details.StateDownloading,
+				details.StateExtracting,
+				details.StateReplacing,
+				details.StateRestarting,
+				details.StateWatching,
+			},
+			stateChangeInterval: 1 * time.Millisecond,
+			timeout:             500 * time.Millisecond,
+			wantErr:             assert.NoError,
+		},
+		{
+			name:                "Timeout: marker is never created",
+			states:              nil,
+			stateChangeInterval: 1 * time.Millisecond,
+			timeout:             50 * time.Millisecond,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+		{
+			name: "Timeout2: state doesn't get there in time",
+			states: []details.State{
+				details.StateRequested,
+				details.StateScheduled,
+				details.StateDownloading,
+				details.StateExtracting,
+				details.StateReplacing,
+				details.StateRestarting,
+				details.StateWatching,
+			},
+
+			stateChangeInterval: 5 * time.Millisecond,
+			timeout:             20 * time.Millisecond,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			deadline, ok := t.Deadline()
+			if !ok {
+				deadline = time.Now().Add(5 * time.Second)
+			}
+			ctx, cancel := context.WithDeadline(context.TODO(), deadline)
+			defer cancel()
+
+			tmpDir := t.TempDir()
+			updMarkerFilePath := filepath.Join(tmpDir, markerFilename)
+
+			if len(tt.states) > 0 {
+				initialState := tt.states[0]
+				writeState(t, updMarkerFilePath, initialState)
+			}
+
+			wg := new(sync.WaitGroup)
+
+			var furtherStates []details.State
+			if len(tt.states) > 1 {
+				// we have more states to produce
+				furtherStates = tt.states[1:]
+
+				wg.Add(1)
+
+				go func() {
+					defer wg.Done()
+					tick := time.NewTicker(tt.stateChangeInterval)
+					defer tick.Stop()
+					for _, state := range furtherStates {
+						select {
+						case <-ctx.Done():
+							return
+						case <-tick.C:
+							writeState(t, updMarkerFilePath, state)
+						}
+					}
+
+				}()
+			}
+
+			log, _ := logger.NewTesting(tt.name)
+
+			tt.wantErr(t, waitForWatcher(ctx, log, updMarkerFilePath, tt.timeout), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, tt.timeout))
+
+			// cancel context
+			cancel()
+
+			// wait for goroutines to finish
+			wg.Wait()
+		})
+	}
+}
+
+func writeState(t *testing.T, path string, state details.State) {
+	ms := newMarkerSerializer(&UpdateMarker{
+		Version:           "version",
+		Hash:              "hash",
+		VersionedHome:     "versionedHome",
+		UpdatedOn:         time.Now(),
+		PrevVersion:       "prev_version",
+		PrevHash:          "prev_hash",
+		PrevVersionedHome: "prev_versionedhome",
+		Acked:             false,
+		Action:            nil,
+		Details: &details.Details{
+			TargetVersion: "version",
+			State:         state,
+			ActionID:      "",
+			Metadata:      details.Metadata{},
+		},
+	})
+
+	bytes, err := yaml.Marshal(ms)
+	if assert.NoError(t, err, "error marshaling the test upgrade marker") {
+		err = os.WriteFile(path, bytes, 0770)
+		assert.NoError(t, err, "error writing out the test upgrade marker")
+	}
+}
+>>>>>>> 2813e1f31e (Add wait for watcher (#4229))
