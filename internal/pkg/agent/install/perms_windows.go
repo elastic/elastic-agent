@@ -9,11 +9,13 @@ package install
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"path/filepath"
+
+	"github.com/Microsoft/go-winio"
 	"github.com/hectane/go-acl"
 	"github.com/hectane/go-acl/api"
 	"golang.org/x/sys/windows"
-	"io/fs"
-	"path/filepath"
 
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
@@ -56,24 +58,28 @@ func FixPermissions(topPath string, ownership utils.FileOwner) error {
 		grants = append(grants, acl.GrantSid(windows.READ_CONTROL, groupSID))
 	}
 
-	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
-		if err == nil {
-			// first level doesn't inherit
-			inherit := true
-			if topPath == name {
-				inherit = false
+	// call to `takeOwnership` which sets the ownership information requires the current process
+	// token to have the 'SeRestorePrivilege' or it's unable to adjust the ownership
+	return winio.RunWithPrivileges([]string{winio.SeRestorePrivilege}, func() error {
+		return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
+			if err == nil {
+				// first level doesn't inherit
+				inherit := true
+				if topPath == name {
+					inherit = false
+				}
+				err = acl.Apply(name, true, inherit, grants...)
+				if err != nil {
+					return err
+				}
+				if userSID != nil && groupSID != nil {
+					err = takeOwnership(name, userSID, groupSID)
+				}
+			} else if errors.Is(err, fs.ErrNotExist) {
+				return nil
 			}
-			err = acl.Apply(name, true, inherit, grants...)
-			if err != nil {
-				return err
-			}
-			if userSID != nil && groupSID != nil {
-				err = takeOwnership(name, userSID, groupSID)
-			}
-		} else if errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
-		return err
+			return err
+		})
 	})
 }
 
