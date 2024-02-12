@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -267,6 +268,14 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		// TODO: DO NOT MERGE TO MAIN WITHOUT REMOVING THIS SKIP
 		t.Skip("this test is broken because the migration haven't been" +
 			" implemented yet. It'll implemented on another PR")
+            
+		if runtime.GOOS == "darwin" {
+			// the original migrate never actually run, so with this at least
+			// there is coverage for linux and windows.
+			t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
+				"to be merged so this test can work on darwin")
+		}
+
 		tmpDir := t.TempDir()
 		want := &fleetapi.ActionPolicyChange{
 			ActionID:   "abc123",
