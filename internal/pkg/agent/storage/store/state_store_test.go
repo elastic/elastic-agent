@@ -38,231 +38,229 @@ func runTestStateStore(t *testing.T, ackToken string) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	withFile := func(fn func(t *testing.T, file string)) func(*testing.T) {
-		return func(t *testing.T) {
-			dir := t.TempDir()
-			file := filepath.Join(dir, "state.yml")
-			fn(t, file)
+	t.Run("action returns empty when no action is saved on disk", func(t *testing.T) {
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
+		require.Empty(t, store.Actions())
+		require.Empty(t, store.Queue())
+	})
+
+	t.Run("will discard silently unknown action", func(t *testing.T) {
+		actionPolicyChange := &fleetapi.ActionUnknown{
+			ActionID: "abc123",
 		}
-	}
 
-	t.Run("action returns empty when no action is saved on disk",
-		withFile(func(t *testing.T, file string) {
-			s := storage.NewDiskStore(file)
-			store, err := NewStateStore(log, s)
-			require.NoError(t, err)
-			require.Empty(t, store.Actions())
-			require.Empty(t, store.Queue())
-		}))
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
 
-	t.Run("will discard silently unknown action",
-		withFile(func(t *testing.T, file string) {
-			actionPolicyChange := &fleetapi.ActionUnknown{
-				ActionID: "abc123",
-			}
+		require.Equal(t, 0, len(store.Actions()))
+		store.Add(actionPolicyChange)
+		store.SetAckToken(ackToken)
+		err = store.Save()
+		require.NoError(t, err)
+		require.Empty(t, store.Actions())
+		require.Empty(t, store.Queue())
+		require.Equal(t, ackToken, store.AckToken())
+	})
 
-			s := storage.NewDiskStore(file)
-			store, err := NewStateStore(log, s)
-			require.NoError(t, err)
+	t.Run("can save to disk known action type", func(t *testing.T) {
+		ActionPolicyChange := &fleetapi.ActionPolicyChange{
+			ActionID:   "abc123",
+			ActionType: "POLICY_CHANGE",
+			Policy: map[string]interface{}{
+				"hello": "world",
+			},
+		}
 
-			require.Equal(t, 0, len(store.Actions()))
-			store.Add(actionPolicyChange)
-			store.SetAckToken(ackToken)
-			err = store.Save()
-			require.NoError(t, err)
-			require.Empty(t, store.Actions())
-			require.Empty(t, store.Queue())
-			require.Equal(t, ackToken, store.AckToken())
-		}))
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
 
-	t.Run("can save to disk known action type",
-		withFile(func(t *testing.T, file string) {
-			ActionPolicyChange := &fleetapi.ActionPolicyChange{
-				ActionID:   "abc123",
-				ActionType: "POLICY_CHANGE",
-				Data: fleetapi.ActionPolicyChangeData{
-					Policy: map[string]interface{}{"hello": "world"}},
-			}
+		require.Empty(t, store.Actions())
+		require.Empty(t, store.Queue())
+		store.Add(ActionPolicyChange)
+		store.SetAckToken(ackToken)
+		err = store.Save()
+		require.NoError(t, err)
+		require.Len(t, store.Actions(), 1)
+		require.Empty(t, store.Queue())
+		require.Equal(t, ackToken, store.AckToken())
 
-			s := storage.NewDiskStore(file)
-			store, err := NewStateStore(log, s)
-			require.NoError(t, err)
+		s = storage.NewDiskStore(storePath)
+		store1, err := NewStateStore(log, s)
+		require.NoError(t, err)
 
-			require.Empty(t, store.Actions())
-			require.Empty(t, store.Queue())
-			store.Add(ActionPolicyChange)
-			store.SetAckToken(ackToken)
-			err = store.Save()
-			require.NoError(t, err)
-			require.Len(t, store.Actions(), 1)
-			require.Empty(t, store.Queue())
-			require.Equal(t, ackToken, store.AckToken())
+		actions := store1.Actions()
+		require.Len(t, actions, 1)
+		require.Empty(t, store1.Queue())
 
-			s = storage.NewDiskStore(file)
-			store1, err := NewStateStore(log, s)
-			require.NoError(t, err)
+		require.Equal(t, ActionPolicyChange, actions[0])
+		require.Equal(t, ackToken, store.AckToken())
+	})
 
-			actions := store1.Actions()
-			require.Len(t, actions, 1)
-			require.Empty(t, store1.Queue())
+	t.Run("can save a queue with one upgrade action", func(t *testing.T) {
+		ts := time.Now().UTC().Round(time.Second)
+		queue := []action{&fleetapi.ActionUpgrade{
+			ActionID:        "test",
+			ActionType:      fleetapi.ActionTypeUpgrade,
+			ActionStartTime: ts.Format(time.RFC3339),
+			Version:         "1.2.3",
+			SourceURI:       "https://example.com",
+		}}
 
-			require.Equal(t, ActionPolicyChange, actions[0])
-			require.Equal(t, ackToken, store.AckToken())
-		}))
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
 
-	t.Run("can save a queue with one upgrade action",
-		withFile(func(t *testing.T, file string) {
-			ts := time.Now().UTC().Round(time.Second)
-			queue := []action{&fleetapi.ActionUpgrade{
-				ActionID:        "test",
-				ActionType:      fleetapi.ActionTypeUpgrade,
-				ActionStartTime: ts.Format(time.RFC3339),
-				Data: fleetapi.ActionUpgradeData{
-					Version:   "1.2.3",
-					SourceURI: "https://example.com",
-				},
-			}}
+		require.Empty(t, store.Actions())
+		store.SetQueue(queue)
+		err = store.Save()
+		require.NoError(t, err)
+		require.Empty(t, store.Actions())
+		require.Len(t, store.Queue(), 1)
 
-			s := storage.NewDiskStore(file)
-			store, err := NewStateStore(log, s)
-			require.NoError(t, err)
+		s = storage.NewDiskStore(storePath)
+		store1, err := NewStateStore(log, s)
+		require.NoError(t, err)
+		require.Empty(t, store1.Actions())
+		require.Len(t, store1.Queue(), 1)
+		require.Equal(t, "test", store1.Queue()[0].ID())
+		scheduledAction, ok := store1.Queue()[0].(fleetapi.ScheduledAction)
+		require.True(t, ok, "expected to be able to cast Action as ScheduledAction")
+		start, err := scheduledAction.StartTime()
+		require.NoError(t, err)
+		require.Equal(t, ts, start)
+	})
 
-			require.Empty(t, store.Actions())
-			store.SetQueue(queue)
-			err = store.Save()
-			require.NoError(t, err)
-			require.Empty(t, store.Actions())
-			require.Len(t, store.Queue(), 1)
+	t.Run("can save a queue with two actions", func(t *testing.T) {
+		ts := time.Now().UTC().Round(time.Second)
+		queue := []action{&fleetapi.ActionUpgrade{
+			ActionID:        "test",
+			ActionType:      fleetapi.ActionTypeUpgrade,
+			ActionStartTime: ts.Format(time.RFC3339),
+			Version:         "1.2.3",
+			SourceURI:       "https://example.com",
+			Retry:           1,
+		}, &fleetapi.ActionPolicyChange{
+			ActionID:   "abc123",
+			ActionType: "POLICY_CHANGE",
+			Policy: map[string]interface{}{
+				"hello": "world",
+			},
+		}}
 
-			s = storage.NewDiskStore(file)
-			store1, err := NewStateStore(log, s)
-			require.NoError(t, err)
-			require.Empty(t, store1.Actions())
-			require.Len(t, store1.Queue(), 1)
-			require.Equal(t, "test", store1.Queue()[0].ID())
-			scheduledAction, ok := store1.Queue()[0].(fleetapi.ScheduledAction)
-			require.True(t, ok, "expected to be able to cast Action as ScheduledAction")
-			start, err := scheduledAction.StartTime()
-			require.NoError(t, err)
-			require.Equal(t, ts, start)
-		}))
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
 
-	t.Run("can save a queue with two actions",
-		withFile(func(t *testing.T, file string) {
-			ts := time.Now().UTC().Round(time.Second)
-			queue := []action{&fleetapi.ActionUpgrade{
-				ActionID:        "test",
-				ActionType:      fleetapi.ActionTypeUpgrade,
-				ActionStartTime: ts.Format(time.RFC3339),
-				Data: fleetapi.ActionUpgradeData{
-					Version:   "1.2.3",
-					SourceURI: "https://example.com",
-					Retry:     1,
-				},
-			}, &fleetapi.ActionPolicyChange{
-				ActionID:   "abc123",
-				ActionType: "POLICY_CHANGE",
-				Data: fleetapi.ActionPolicyChangeData{
-					Policy: map[string]interface{}{"hello": "world"}},
-			}}
+		require.Empty(t, store.Actions())
+		store.SetQueue(queue)
+		err = store.Save()
+		require.NoError(t, err)
+		require.Empty(t, store.Actions())
+		require.Len(t, store.Queue(), 2)
 
-			s := storage.NewDiskStore(file)
-			store, err := NewStateStore(log, s)
-			require.NoError(t, err)
+		s = storage.NewDiskStore(storePath)
+		store1, err := NewStateStore(log, s)
+		require.NoError(t, err)
+		require.Empty(t, store1.Actions())
+		require.Len(t, store1.Queue(), 2)
 
-			require.Empty(t, store.Actions())
-			store.SetQueue(queue)
-			err = store.Save()
-			require.NoError(t, err)
-			require.Empty(t, store.Actions())
-			require.Len(t, store.Queue(), 2)
+		require.Equal(t, "test", store1.Queue()[0].ID())
+		scheduledAction, ok := store1.Queue()[0].(fleetapi.ScheduledAction)
+		require.True(t, ok, "expected to be able to cast Action as ScheduledAction")
+		start, err := scheduledAction.StartTime()
+		require.NoError(t, err)
+		require.Equal(t, ts, start)
+		retryableAction, ok := store1.Queue()[0].(fleetapi.RetryableAction)
+		require.True(t, ok, "expected to be able to cast Action as RetryableAction")
+		require.Equal(t, 1, retryableAction.RetryAttempt())
 
-			s = storage.NewDiskStore(file)
-			store1, err := NewStateStore(log, s)
-			require.NoError(t, err)
-			require.Empty(t, store1.Actions())
-			require.Len(t, store1.Queue(), 2)
+		require.Equal(t, "abc123", store1.Queue()[1].ID())
+		_, ok = store1.Queue()[1].(fleetapi.ScheduledAction)
+		require.False(t, ok, "expected cast to ScheduledAction to fail")
+	})
 
-			require.Equal(t, "test", store1.Queue()[0].ID())
-			scheduledAction, ok := store1.Queue()[0].(fleetapi.ScheduledAction)
-			require.True(t, ok, "expected to be able to cast Action as ScheduledAction")
-			start, err := scheduledAction.StartTime()
-			require.NoError(t, err)
-			require.Equal(t, ts, start)
-			retryableAction, ok := store1.Queue()[0].(fleetapi.RetryableAction)
-			require.True(t, ok, "expected to be able to cast Action as RetryableAction")
-			require.Equal(t, 1, retryableAction.RetryAttempt())
+	t.Run("can save to disk unenroll action type", func(t *testing.T) {
+		action := &fleetapi.ActionUnenroll{
+			ActionID:   "abc123",
+			ActionType: "UNENROLL",
+		}
 
-			require.Equal(t, "abc123", store1.Queue()[1].ID())
-			_, ok = store1.Queue()[1].(fleetapi.ScheduledAction)
-			require.False(t, ok, "expected cast to ScheduledAction to fail")
-		}))
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
 
-	t.Run("can save to disk unenroll action type",
-		withFile(func(t *testing.T, file string) {
-			action := &fleetapi.ActionUnenroll{
-				ActionID:   "abc123",
-				ActionType: "UNENROLL",
-			}
+		require.Empty(t, store.Actions())
+		require.Empty(t, store.Queue())
+		store.Add(action)
+		store.SetAckToken(ackToken)
+		err = store.Save()
+		require.NoError(t, err)
+		require.Len(t, store.Actions(), 1)
+		require.Empty(t, store.Queue())
+		require.Equal(t, ackToken, store.AckToken())
 
-			s := storage.NewDiskStore(file)
-			store, err := NewStateStore(log, s)
-			require.NoError(t, err)
+		s = storage.NewDiskStore(storePath)
+		store1, err := NewStateStore(log, s)
+		require.NoError(t, err)
 
-			require.Empty(t, store.Actions())
-			require.Empty(t, store.Queue())
-			store.Add(action)
-			store.SetAckToken(ackToken)
-			err = store.Save()
-			require.NoError(t, err)
-			require.Len(t, store.Actions(), 1)
-			require.Empty(t, store.Queue())
-			require.Equal(t, ackToken, store.AckToken())
+		actions := store1.Actions()
+		require.Len(t, actions, 1)
+		require.Empty(t, store1.Queue())
+		require.Equal(t, action, actions[0])
+		require.Equal(t, ackToken, store.AckToken())
+	})
 
-			s = storage.NewDiskStore(file)
-			store1, err := NewStateStore(log, s)
-			require.NoError(t, err)
+	t.Run("when we ACK we save to disk", func(t *testing.T) {
+		ActionPolicyChange := &fleetapi.ActionPolicyChange{
+			ActionID: "abc123",
+		}
 
-			actions := store1.Actions()
-			require.Len(t, actions, 1)
-			require.Empty(t, store1.Queue())
-			require.Equal(t, action, actions[0])
-			require.Equal(t, ackToken, store.AckToken())
-		}))
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
+		store.SetAckToken(ackToken)
 
-	t.Run("when we ACK we save to disk",
-		withFile(func(t *testing.T, file string) {
-			ActionPolicyChange := &fleetapi.ActionPolicyChange{
-				ActionID: "abc123",
-			}
+		acker := NewStateStoreActionAcker(&testAcker{}, store)
+		require.Empty(t, store.Actions())
 
-			s := storage.NewDiskStore(file)
-			store, err := NewStateStore(log, s)
-			require.NoError(t, err)
-			store.SetAckToken(ackToken)
+		require.NoError(t, acker.Ack(context.Background(), ActionPolicyChange))
+		require.Len(t, store.Actions(), 1)
+		require.Empty(t, store.Queue())
+		require.Equal(t, ackToken, store.AckToken())
+	})
 
-			acker := NewStateStoreActionAcker(&testAcker{}, store)
-			require.Empty(t, store.Actions())
+	t.Run("migrate actions file does not exists", func(t *testing.T) {
+		if runtime.GOOS == "darwin" {
+			// the original migrate never actually run, so with this at least
+			// there is coverage for linux and windows.
+			t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
+				"to be merged so this test can work on darwin")
+		}
 
-			require.NoError(t, acker.Ack(context.Background(), ActionPolicyChange))
-			require.Len(t, store.Actions(), 1)
-			require.Empty(t, store.Queue())
-			require.Equal(t, ackToken, store.AckToken())
-		}))
+		tempDir := t.TempDir()
+		actionStorePath := filepath.Join(tempDir, "action_store.yml")
+		stateStorePath := filepath.Join(tempDir, "state_store.yml")
 
-	t.Run("migrate actions file does not exists",
-		withFile(func(t *testing.T, actionStorePath string) {
-			withFile(func(t *testing.T, stateStorePath string) {
-				err := migrateStateStore(ctx, log, actionStorePath, stateStorePath)
-				require.NoError(t, err)
-				stateStore, err := NewStateStore(log, storage.NewDiskStore(stateStorePath))
-				require.NoError(t, err)
-				stateStore.SetAckToken(ackToken)
-				require.Empty(t, stateStore.Actions())
-				require.Equal(t, ackToken, stateStore.AckToken())
-				require.Empty(t, stateStore.Queue())
-			})
-		}))
+		err := migrateStateStore(ctx, log, actionStorePath, stateStorePath)
+		require.NoError(t, err)
+		stateStore, err := NewStateStore(log, storage.NewDiskStore(stateStorePath))
+		require.NoError(t, err)
+		stateStore.SetAckToken(ackToken)
+		require.Empty(t, stateStore.Actions())
+		require.Equal(t, ackToken, stateStore.AckToken())
+		require.Empty(t, stateStore.Queue())
+	})
 
 	t.Run("migrate", func(t *testing.T) {
 		// TODO: DO NOT MERGE TO MAIN WITHOUT REMOVING THIS SKIP
