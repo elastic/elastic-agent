@@ -34,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
 const (
@@ -97,6 +98,7 @@ type Manager struct {
 	ca         *authority.CertificateAuthority
 	listenAddr string
 	listenPort int
+	isLocal    bool
 	agentInfo  info.Agent
 	tracer     *apm.Tracer
 	monitor    MonitoringManager
@@ -168,6 +170,7 @@ func NewManager(
 		baseLogger:     baseLogger,
 		ca:             ca,
 		listenAddr:     listenAddr,
+		isLocal:        ipc.IsLocal(listenAddr),
 		agentInfo:      agentInfo,
 		tracer:         tracer,
 		current:        make(map[string]*componentRuntimeState),
@@ -192,11 +195,25 @@ func NewManager(
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
-	listener, err := net.Listen("tcp", m.listenAddr)
+	var (
+		listener net.Listener
+		err      error
+	)
+	if m.isLocal {
+		listener, err = ipc.CreateListener(m.logger, m.listenAddr)
+	} else {
+		listener, err = net.Listen("tcp", m.listenAddr)
+	}
+
 	if err != nil {
 		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
 	}
-	m.listenPort = listener.Addr().(*net.TCPAddr).Port
+
+	if m.isLocal {
+		defer ipc.CleanupListener(m.logger, m.listenAddr)
+	} else {
+		m.listenPort = listener.Addr().(*net.TCPAddr).Port
+	}
 
 	certPool := x509.NewCertPool()
 	if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
@@ -960,6 +977,9 @@ func (m *Manager) getRuntimeFromComponent(comp component.Component) *componentRu
 }
 
 func (m *Manager) getListenAddr() string {
+	if m.isLocal {
+		return m.listenAddr
+	}
 	addr := strings.SplitN(m.listenAddr, ":", 2)
 	if len(addr) == 2 && addr[1] == "0" {
 		return fmt.Sprintf("%s:%d", addr[0], m.listenPort)

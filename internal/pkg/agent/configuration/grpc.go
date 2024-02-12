@@ -4,7 +4,9 @@
 
 package configuration
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // GRPCConfig is a configuration of GRPC server.
 type GRPCConfig struct {
@@ -12,6 +14,7 @@ type GRPCConfig struct {
 	Port                    uint16 `config:"port"`
 	MaxMsgSize              int    `config:"max_message_size"`
 	CheckinChunkingDisabled bool   `config:"checkin_chunking_disabled"`
+	Local                   bool   `config:"local"` // Enables RPC via domain socker/named pipe
 }
 
 // DefaultGRPCConfig creates a default server configuration.
@@ -21,6 +24,7 @@ func DefaultGRPCConfig() *GRPCConfig {
 		Port:                    6789,
 		MaxMsgSize:              1024 * 1024 * 100, // grpc default 4MB is unsufficient for diagnostics
 		CheckinChunkingDisabled: false,             // on by default
+		Local:                   false,             // Use IP port grpc by default
 	}
 }
 

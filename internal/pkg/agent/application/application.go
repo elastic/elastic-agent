@@ -7,10 +7,15 @@ package application
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"path"
+	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 
 	"go.elastic.co/apm"
@@ -111,10 +116,18 @@ func New(
 	}
 	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
 
+	controlAddress := control.Address()
+	log.Debugf("Control address: %s", controlAddress)
+	address, err := deriveCommsAddress(controlAddress, cfg.Settings.GRPC)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to dervice comms GRPC: %w", err)
+	}
+	log.Debugf("Comms GRPS address: %s", address)
+
 	runtime, err := runtime.NewManager(
 		log,
 		baseLogger,
-		cfg.Settings.GRPC.String(),
+		address,
 		agentInfo,
 		tracer,
 		monitor,
@@ -207,6 +220,35 @@ func New(
 	}
 
 	return coord, configMgr, composable, nil
+}
+
+// deriveCommsAddress derives the comms socket/pipe path/name from given control address and GRPC config
+func deriveCommsAddress(controlAddress string, grpc *configuration.GRPCConfig) (string, error) {
+	if grpc.Local {
+		return deriveCommsSocketName(controlAddress)
+	}
+	return grpc.String(), nil
+}
+
+var errInvalidUri = errors.New("invalid uri")
+
+// deriveCommsSocketName derives the agent communication unix/npipe path
+// currently from the control socket path, since it's already set properly
+// matching the socket path length to meet the system limits of the platform
+func deriveCommsSocketName(uri string) (string, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return "", err
+	}
+
+	if len(u.Path) == 0 || (u.Scheme != "unix" && u.Scheme != "npipe") {
+		return "", fmt.Errorf("%w %s", errInvalidUri, uri)
+	}
+
+	// The base name without extension and use it as id argument for SocketURLWithFallback call
+	// THe idea it to use the same logic for the comms path as for the control socket/pipe path
+	base := strings.TrimSuffix(path.Base(u.Path), path.Ext(u.Path))
+	return utils.SocketURLWithFallback(base, path.Dir(u.Path)), nil
 }
 
 func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
