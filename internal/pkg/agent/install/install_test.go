@@ -14,8 +14,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func TestHasAllSSDs(t *testing.T) {
@@ -184,4 +186,11 @@ func TestCopyFiles(t *testing.T) {
 		})
 	}
 
+}
+
+func TestInstallMarker(t *testing.T) {
+	tmpdir := t.TempDir()
+	err := CreateInstallMarker(tmpdir, utils.CurrentFileOwner())
+	require.NoError(t, err)
+	require.FileExists(t, filepath.Join(tmpdir, paths.MarkerFileName))
 }
