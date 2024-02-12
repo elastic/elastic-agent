@@ -13,10 +13,13 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 	"path"
@@ -174,6 +177,8 @@ func checkTar(t *testing.T, file string) {
 		containingDir := strings.TrimSuffix(path.Base(file), ".tar.gz")
 		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
 	})
+
+	checkSha512PackageHash(t, file)
 }
 
 func checkZip(t *testing.T, file string) {
@@ -197,6 +202,8 @@ func checkZip(t *testing.T, file string) {
 		containingDir := strings.TrimSuffix(path.Base(file), ".zip")
 		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
 	})
+
+	checkSha512PackageHash(t, file)
 }
 
 func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
@@ -938,4 +945,70 @@ func readDockerManifest(r io.Reader) (*dockerManifest, error) {
 	}
 
 	return manifests[0], nil
+}
+
+func checkSha512PackageHash(t *testing.T, packageFile string) {
+	t.Run("check hash file", func(t *testing.T) {
+		expectedHashFile := packageFile + ".sha512"
+		require.FileExists(t, expectedHashFile, "hash file for package %q should exist with name %q", packageFile, expectedHashFile)
+
+		// calculate SHA512 hash for the file
+		hashFile, err := os.Open(expectedHashFile)
+		require.NoError(t, err, "hash file should be readable")
+
+		checksumsMap := readHashFile(t, hashFile)
+
+		packageBaseName := filepath.Base(packageFile)
+		require.Containsf(t, checksumsMap, packageBaseName, "checksum file should contain an entry for %q", packageBaseName)
+
+		// compare checksum entry with actual package hash
+		checksum := calculateChecksum(t, packageFile, sha512.New())
+
+		assert.Equalf(t, checksum, checksumsMap[packageBaseName], "checksum for file %q does not match", packageFile)
+	})
+
+}
+
+func calculateChecksum(t *testing.T, file string, hasher hash.Hash) string {
+
+	input, err := os.Open(file)
+	require.NoErrorf(t, err, "error opening input file %q", file)
+
+	defer func(input *os.File) {
+		errClose := input.Close()
+		assert.NoErrorf(t, errClose, "error closing input file %q", file)
+	}(input)
+
+	_, err = io.Copy(hasher, input)
+	require.NoError(t, err, "error reading file to calculate hash")
+
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+// readHashFile return a map of {filename, hash} reading a .sha512 file.
+// If any line has not exactly 2 tokens separated by whitespaces, it will fail the test
+// When it's done reading it will close the reader
+func readHashFile(t *testing.T, reader io.ReadCloser) map[string]string {
+
+	defer func(reader io.ReadCloser) {
+		err := reader.Close()
+		assert.NoError(t, err, "error closing hash file reader")
+	}(reader)
+
+	checksums := map[string]string{}
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Fields(line)
+		if len(parts) != 2 {
+			// Fail test because it's malformed.
+			assert.Failf(t, "malformed line %q in hash file", line)
+			continue
+		}
+		filename := strings.TrimLeft(parts[1], "*")
+		checksum := parts[0]
+		checksums[filename] = checksum
+	}
+
+	return checksums
 }
