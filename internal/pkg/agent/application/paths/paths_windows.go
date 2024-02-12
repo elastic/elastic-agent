@@ -48,7 +48,7 @@ func AgentVaultPath() string {
 
 func initialControlSocketPath(topPath string) string {
 	// when installed the control address is fixed
-	if InstallMarkerExists() {
+	if RunningInstalled() {
 		return WindowsControlSocketInstalledPath
 	}
 	return ControlSocketFromPath(runtime.GOOS, topPath)
@@ -57,11 +57,11 @@ func initialControlSocketPath(topPath string) string {
 // ResolveControlSocket updates the control socket path.
 //
 // Called during the upgrade process from pre-8.8 versions. In pre-8.8 versions the
-// InstallMarkerExists will always be false, even when it is an installed version. Once
+// RunningInstalled will always be false, even when it is an installed version. Once
 // that is fixed from the upgrade process the control socket path needs to be updated.
 func ResolveControlSocket() {
 	currentPath := ControlSocket()
-	if currentPath == ControlSocketFromPath(runtime.GOOS, topPath) && InstallMarkerExists() {
+	if currentPath == ControlSocketFromPath(runtime.GOOS, topPath) && RunningInstalled() {
 		// path is not correct being that it's installed
 		// reset the control socket path to be the installed path
 		SetControlSocket(WindowsControlSocketInstalledPath)

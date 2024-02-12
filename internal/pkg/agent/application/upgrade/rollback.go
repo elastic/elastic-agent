@@ -16,7 +16,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/grpc"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -141,7 +140,7 @@ func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
 // agent during upgrade period.
 func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error) {
-	if !info.IsUpgradeable() {
+	if !IsUpgradeable() {
 		log.Info("agent is not upgradable, not starting watcher")
 		return nil, nil
 	}

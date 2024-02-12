@@ -65,13 +65,20 @@ type Upgrader struct {
 	markerWatcher  MarkerWatcher
 }
 
+// IsUpgradeable when agent is installed and running as a service or flag was provided.
+func IsUpgradeable() bool {
+	// only upgradeable if running from Agent installer and running under the
+	// control of the system supervisor (or built specifically with upgrading enabled)
+	return release.Upgradeable() || (paths.RunningInstalled() && info.RunningUnderSupervisor())
+}
+
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
 func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent) (*Upgrader, error) {
 	return &Upgrader{
 		log:           log,
 		settings:      settings,
 		agentInfo:     agentInfo,
-		upgradeable:   info.IsUpgradeable(),
+		upgradeable:   IsUpgradeable(),
 		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
 	}, nil
 }

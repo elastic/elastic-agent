@@ -23,10 +23,6 @@ import (
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 )
 
-// SupervisorPid is the expected PID for a supervisor process, used by RunningUnderSupervisor
-// exported to make testing easier
-var SupervisorPid = 1
-
 // defaultAgentConfigFile is a name of file used to store agent information
 const agentInfoKey = "agent"
 const defaultLogLevel = "info"

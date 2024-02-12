@@ -126,14 +126,6 @@ const (
 	hostMACKey = "host.mac"
 )
 
-// IsUpgradeable when agent is installed and running as a service or flag was provided.
-func IsUpgradeable() bool {
-	// only upgradeable if running from Agent installer and running under the
-	// control of the system supervisor (or built specifically with upgrading enabled)
-	// InstallMarkerExists also prevents upgrades on an install that was created with DEB/RPM, which is currently not supported.
-	return release.Upgradeable() || (paths.InstallMarkerExists() && RunningUnderSupervisor())
-}
-
 // Metadata loads metadata from disk.
 func Metadata(ctx context.Context, l *logger.Logger) (*ECSMeta, error) {
 	agentInfo, err := NewAgentInfo(ctx, false)
@@ -177,7 +169,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 				BuildOriginal: release.Info().String(),
 				// only upgradeable if running from Agent installer and running under the
 				// control of the system supervisor (or built specifically with upgrading enabled)
-				Upgradeable: IsUpgradeable(),
+				Upgradeable: release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
 				LogLevel:    i.LogLevel(),
 			},
 		},

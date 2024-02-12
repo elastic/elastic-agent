@@ -54,9 +54,8 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if status == install.NotInstalled {
 		return fmt.Errorf("not installed")
 	}
-
-	if status == install.Installed && !paths.InstallMarkerExists() {
-		return fmt.Errorf("cannot find %s file relative to running elastic agent; agent uninstall should be run from %s, or the install may be corrupt", paths.MarkerFileName, install.ExecutablePath(paths.Top()))
+	if status == install.Installed && !paths.RunningInstalled() {
+		return fmt.Errorf("can only be uninstalled by executing the installed Elastic Agent at: %s", install.ExecutablePath(paths.Top()))
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
