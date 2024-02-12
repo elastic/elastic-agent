@@ -17,18 +17,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestStateStore(t *testing.T) {
 	t.Run("ack token", func(t *testing.T) {
-		runTestStateStore(t, "")
+		runTestStateStore(t, "czlV93YBwdkt5lYhBY7S")
 	})
 
 	t.Run("no ack token", func(t *testing.T) {
-		runTestStateStore(t, "czlV93YBwdkt5lYhBY7S")
+		runTestStateStore(t, "")
 	})
 }
 
@@ -249,12 +251,16 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		}
 
 		tempDir := t.TempDir()
-		actionStorePath := filepath.Join(tempDir, "action_store.yml")
-		stateStorePath := filepath.Join(tempDir, "state_store.yml")
+		oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
+		newStateStorePath := filepath.Join(tempDir, "state_store.yml")
 
-		err := migrateStateStore(ctx, log, actionStorePath, stateStorePath)
-		require.NoError(t, err)
-		stateStore, err := NewStateStore(log, storage.NewDiskStore(stateStorePath))
+		newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath)
+		err := migrateStateStore(log, oldActionStorePath, newStateStore)
+		require.NoError(t, err, "migration action store -> state store failed")
+
+		// to load from disk a new store needs to be created, it loads the file
+		// to memory during the store creation.
+		stateStore, err := NewStateStore(log, storage.NewDiskStore(newStateStorePath))
 		require.NoError(t, err)
 		stateStore.SetAckToken(ackToken)
 		require.Empty(t, stateStore.Actions())
@@ -270,7 +276,6 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				"to be merged so this test can work on darwin")
 		}
 
-		tmpDir := t.TempDir()
 		want := &fleetapi.ActionPolicyChange{
 			ActionID:   "abc123",
 			ActionType: "POLICY_CHANGE",
@@ -281,25 +286,41 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			},
 		}
 
+		tempDir := t.TempDir()
+		vaultPath := filepath.Join(tempDir, "vault")
+		err := os.MkdirAll(vaultPath, 0o750)
+		require.NoError(t, err,
+			"could not create directory for the agent's vault")
+		_, err = vault.New(ctx, vaultPath)
+		require.NoError(t, err, "could not create agent's vault")
+		err = secret.CreateAgentSecret(
+			context.Background(), secret.WithVaultPath(vaultPath))
+		require.NoError(t, err, "could not create agent secret")
+
 		// Copy the golden file as the migration deletes the old store.
 		goldenActionStoreFile, err := os.Open(
 			filepath.Join("testdata", "7.17.18-action_store.yml"))
 		require.NoError(t, err, "could not open action store golden file")
 		defer goldenActionStoreFile.Close()
 
-		oldActionStorePath := filepath.Join(tmpDir, "action_store.yml")
+		oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
 		storeFile, err := os.Create(oldActionStorePath)
 		require.NoError(t, err, "could not create action store file")
 
 		_, err = io.Copy(storeFile, goldenActionStoreFile)
 		require.NoError(t, err, "could not copy action store golden file")
 
-		newStateStorePath := filepath.Join(tmpDir, "state_store.yaml")
-		err = migrateStateStore(ctx, log, oldActionStorePath, newStateStorePath)
+		newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
+		newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
+			storage.WithVaultPath(vaultPath))
+		err = migrateStateStore(log, oldActionStorePath, newStateStore)
 		require.NoError(t, err, "migration action store -> state store failed")
 
-		stateDiskStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath)
-		stateStore, err := NewStateStore(log, stateDiskStore)
+		// to load from disk a new store needs to be created, it loads the file
+		// to memory during the store creation.
+		newStateStore = storage.NewEncryptedDiskStore(ctx, newStateStorePath,
+			storage.WithVaultPath(vaultPath))
+		stateStore, err := NewStateStore(log, newStateStore)
 		require.NoError(t, err, "could not create state store")
 
 		actions := stateStore.Actions()
