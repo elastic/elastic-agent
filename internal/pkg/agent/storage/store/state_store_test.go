@@ -73,9 +73,10 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		ActionPolicyChange := &fleetapi.ActionPolicyChange{
 			ActionID:   "abc123",
 			ActionType: "POLICY_CHANGE",
-			Policy: map[string]interface{}{
-				"hello": "world",
-			},
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: map[string]interface{}{
+					"hello": "world",
+				}},
 		}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
@@ -111,9 +112,10 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			ActionID:        "test",
 			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: ts.Format(time.RFC3339),
-			Version:         "1.2.3",
-			SourceURI:       "https://example.com",
-		}}
+			Data: fleetapi.ActionUpgradeData{
+				Version:   "1.2.3",
+				SourceURI: "https://example.com",
+			}}}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
 		s := storage.NewDiskStore(storePath)
@@ -146,15 +148,17 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			ActionID:        "test",
 			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: ts.Format(time.RFC3339),
-			Version:         "1.2.3",
-			SourceURI:       "https://example.com",
-			Retry:           1,
-		}, &fleetapi.ActionPolicyChange{
+			Data: fleetapi.ActionUpgradeData{
+				Version:   "1.2.3",
+				SourceURI: "https://example.com",
+				Retry:     1,
+			}}, &fleetapi.ActionPolicyChange{
 			ActionID:   "abc123",
 			ActionType: "POLICY_CHANGE",
-			Policy: map[string]interface{}{
-				"hello": "world",
-			},
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: map[string]interface{}{
+					"hello": "world",
+				}},
 		}}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
