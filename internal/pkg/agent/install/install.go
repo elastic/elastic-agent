@@ -139,6 +139,10 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		)
 	}
 	pt.Describe("Successfully copied files")
+	// create the install marker after files are copied
+	if err := CreateInstallMarker(topPath, ownership); err != nil {
+		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
+	}
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
@@ -184,11 +188,6 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 					errors.M("destination", paths.ShellWrapperPath))
 			}
 		}
-	}
-
-	// create the install marker
-	if err := CreateInstallMarker(topPath, ownership); err != nil {
-		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
 	}
 
 	// post install (per platform)
