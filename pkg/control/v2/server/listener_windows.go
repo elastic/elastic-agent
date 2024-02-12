@@ -31,8 +31,9 @@ func createListener(log *logger.Logger) (net.Listener, error) {
 	return lis, nil
 }
 
-func cleanupListener(_ *logger.Logger) {
+func cleanupListener() error {
 	// nothing to do on windows
+	return nil
 }
 
 func securityDescriptor(log *logger.Logger) (string, error) {

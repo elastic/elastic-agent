@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -22,7 +21,8 @@ import (
 func createListener(log *logger.Logger) (net.Listener, error) {
 	path := strings.TrimPrefix(control.Address(), "unix://")
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		cleanupListener(log)
+		errCleanup := cleanupListener()
+		log.Warnw(fmt.Sprintf("error cleaning up already existing socket at %q", path), "error", errCleanup)
 	}
 	dir := filepath.Dir(path)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -50,9 +50,10 @@ func createListener(log *logger.Logger) (net.Listener, error) {
 	return lis, nil
 }
 
-func cleanupListener(log *logger.Logger) {
+func cleanupListener() error {
 	path := strings.TrimPrefix(control.Address(), "unix://")
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		log.Debug("%s", errors.New(err, fmt.Sprintf("Failed to cleanup %s", path), errors.TypeFilesystem, errors.M("path", path)))
+		return err
 	}
+	return nil
 }

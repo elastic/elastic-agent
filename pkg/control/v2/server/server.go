@@ -112,10 +112,16 @@ func (s *Server) Start() error {
 // Stop stops the GRPC endpoint.
 func (s *Server) Stop() {
 	if s.server != nil {
-		s.server.Stop()
+		s.logger.Info("Stopping GRPC server...")
+		s.server.GracefulStop()
+		s.logger.Info("GRPC server stopped.")
 		s.server = nil
 		s.listener = nil
-		cleanupListener(s.logger)
+		err := cleanupListener()
+		if err != nil {
+			s.logger.Errorf("Error cleaning up listener: %v", err)
+		}
+		s.logger.Info("GRPC server stopped")
 	}
 }
 
