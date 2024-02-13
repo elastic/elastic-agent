@@ -126,6 +126,9 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	}
 
 	// create the install marker
+	// do this after the file copy but before installing service files, etc
+	// That way if the service install process fails, a user can still run `elastic-agent uninstall`
+	// to clean up.
 	if err := CreateInstallMarker(topPath, ownership); err != nil {
 		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
 	}
@@ -473,6 +476,8 @@ func hasAllSSDs(block ghw.BlockInfo) bool {
 	return true
 }
 
+// CreateInstallMarker creates a `.installed` file at the given install path,
+// and then calls fixInstallMarkerPermissions to set the ownership provided by `ownership`
 func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
 	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
 	handle, err := os.Create(markerFilePath)
