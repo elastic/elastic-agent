@@ -16,10 +16,15 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	gotesting "testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent-libs/opt"
+	agentsystemprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -101,6 +106,10 @@ func (i InstallOpts) toCmdArgs() []string {
 //   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
+
+	// check for running agents before installing
+	assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
+
 	installArgs := []string{"install"}
 	if installOpts != nil {
 		installArgs = append(installArgs, installOpts.toCmdArgs()...)
@@ -128,7 +137,13 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
+		// check for running agents after uninstall had a chance to run
+		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at the end of the test")
+	})
+
+	f.t.Cleanup(func() {
 		f.t.Logf("[test %s] Inside fixture cleanup function", f.t.Name())
+
 		if !f.installed {
 			f.t.Logf("skipping uninstall; agent not installed (fixture.installed is false)")
 			// not installed; no need to clean up or collect diagnostics
@@ -182,6 +197,75 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	})
 
 	return out, nil
+}
+
+type runningProcess struct {
+	// Basic Process data
+	Name     string
+	State    agentsystemprocess.PidState
+	Username string
+	Pid      opt.Int
+	Ppid     opt.Int
+	Pgid     opt.Int
+
+	// Extended Process Data
+	Args    []string
+	Cmdline string
+	Cwd     string
+	Exe     string
+	Env     mapstr.M
+}
+
+func (p runningProcess) String() string {
+	return fmt.Sprintf("{PID:%v, PPID: %v, Cwd: %s, Exe: %s, Cmdline: %s, Args: %v}",
+		p.Pid, p.Ppid, p.Cwd, p.Exe, p.Cmdline, p.Args)
+}
+
+func mapProcess(p agentsystemprocess.ProcState) runningProcess {
+	mappedProcess := runningProcess{
+		Name:     p.Name,
+		State:    p.State,
+		Username: p.Username,
+		Pid:      p.Pid,
+		Ppid:     p.Ppid,
+		Pgid:     p.Pgid,
+		Cmdline:  p.Cmdline,
+		Cwd:      p.Cwd,
+		Exe:      p.Exe,
+		Args:     make([]string, len(p.Args)),
+		Env:      make(mapstr.M),
+	}
+	copy(mappedProcess.Args, p.Args)
+	for k, v := range p.Env {
+		mappedProcess.Env[k] = v
+	}
+	return mappedProcess
+}
+
+func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
+	procStats := agentsystemprocess.Stats{
+		Procs: []string{`.*elastic\-agent.*`},
+	}
+
+	err := procStats.Init()
+	if !assert.NoError(t, err, "error initializing process.Stats") {
+		// we failed
+		return nil
+	}
+
+	_, pids, err := procStats.FetchPids()
+	if !assert.NoError(t, err, "error fetching process information") {
+		// we failed a bit further
+		return nil
+	}
+
+	processes := make([]runningProcess, 0, len(pids))
+
+	for _, p := range pids {
+		processes = append(processes, mapProcess(p))
+	}
+
+	return processes
 }
 
 type UninstallOpts struct {
