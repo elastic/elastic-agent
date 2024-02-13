@@ -6,6 +6,9 @@ set -e
 symlink="/Library/Elastic/Agent/elastic-agent"
 
 if test -L "$symlink"; then
-    ln -sfn "data/elastic-agent-{{ commit_short }}/elastic-agent.app/Contents/MacOS/elastic-agent" "$symlink"
+    symlinkTarget="data/elastic-agent-{{ commit_short }}/elastic-agent.app/Contents/MacOS/elastic-agent"
+    if test -f "data/elastic-agent-{{ agent_package_version }}{{ snapshot_suffix }}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/elastic-agent"; then
+        symlinkTarget="data/elastic-agent-{{ agent_package_version }}{{ snapshot_suffix }}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/elastic-agent"
+    ln -sfn "$symlinkTarget" "$symlink"
 fi
 
