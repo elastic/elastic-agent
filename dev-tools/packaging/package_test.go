@@ -966,7 +966,6 @@ func checkSha512PackageHash(t *testing.T, packageFile string) {
 
 		assert.Equalf(t, checksum, checksumsMap[packageBaseName], "checksum for file %q does not match", packageFile)
 	})
-
 }
 
 func calculateChecksum(t *testing.T, file string, hasher hash.Hash) string {
@@ -986,7 +985,7 @@ func calculateChecksum(t *testing.T, file string, hasher hash.Hash) string {
 }
 
 // readHashFile return a map of {filename, hash} reading a .sha512 file.
-// If any line has not exactly 2 tokens separated by whitespaces, it will fail the test
+// If any line has not exactly 2 tokens separated by white spaces, it will fail the test.
 // When it's done reading it will close the reader
 func readHashFile(t *testing.T, reader io.ReadCloser) map[string]string {
 
