@@ -175,22 +175,20 @@ func AddUserToGroup(username string, groupName string) error {
 func SetUserPassword(name string, password string) error {
 	var parmErr uint32
 	var err error
-	info := USER_INFO_1{
-		Usri1_priv:  USER_PRIV_USER,
-		Usri1_flags: USER_UF_SCRIPT | USER_UF_NORMAL_ACCOUNT | USER_UF_DONT_EXPIRE_PASSWD,
-	}
-	info.Usri1_name, err = syscall.UTF16PtrFromString(name)
+	var info USER_INFO_1003
+
+	namePtr, err := syscall.UTF16PtrFromString(name)
 	if err != nil {
 		return fmt.Errorf("failed to encode username %s to UTF16: %s", name, err)
 	}
-	info.Usri1_password, err = syscall.UTF16PtrFromString(password)
+	info.Usri1003_password, err = syscall.UTF16PtrFromString(password)
 	if err != nil {
 		return fmt.Errorf("failed to encode password to UTF16: %s", err)
 	}
 	ret, _, _ := procNetUserSetInfo.Call(
 		uintptr(0),
-		uintptr(unsafe.Pointer(info.Usri1_name)),
-		uintptr(uint32(1)),
+		uintptr(unsafe.Pointer(namePtr)),
+		uintptr(uint32(1003)),
 		uintptr(unsafe.Pointer(&info)),
 		uintptr(unsafe.Pointer(&parmErr)),
 	)
@@ -218,6 +216,12 @@ type USER_INFO_1 struct {
 	Usri1_comment      *uint16
 	Usri1_flags        uint32
 	Usri1_script_path  *uint16
+}
+
+// USER_INFO_1003 structure contains a user password.
+// https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/ns-lmaccess-user_info_1003
+type USER_INFO_1003 struct {
+	Usri1003_password *uint16
 }
 
 // LOCALGROUP_MEMBERS_INFO_0 structure contains the security identifier (SID) associated with a local group member.
