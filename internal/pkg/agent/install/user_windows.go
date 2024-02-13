@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/winlabs/gowin32"
 	"golang.org/x/sys/windows"
 )
 
@@ -87,6 +88,8 @@ func FindUID(name string) (string, error) {
 }
 
 // CreateUser creates a user on the machine.
+//
+// User is created with about interactive rights, no logon rights, and only service rights.
 func CreateUser(name string, _ string) (string, error) {
 	var parmErr uint32
 	var err error
@@ -106,6 +109,33 @@ func CreateUser(name string, _ string) (string, error) {
 	)
 	if ret != 0 {
 		return "", fmt.Errorf("call to NetUserAdd failed: status=%d error=%d", ret, parmErr)
+	}
+
+	// adjust the local security policy to ensure that the created user is scoped to a service only
+	sid, _, _, err := gowin32.GetLocalAccountByName(name)
+	if err != nil {
+		return "", fmt.Errorf("failed to get SID for %s: %w", name, err)
+	}
+	sp, err := gowin32.OpenLocalSecurityPolicy()
+	if err != nil {
+		return "", fmt.Errorf("failed to open local security policy: %w", err)
+	}
+	defer sp.Close()
+	err = sp.AddAccountRight(sid, gowin32.AccountRightDenyInteractiveLogon)
+	if err != nil {
+		return "", fmt.Errorf("failed to set deny interactive logon: %w", err)
+	}
+	err = sp.AddAccountRight(sid, gowin32.AccountRightDenyNetworkLogon)
+	if err != nil {
+		return "", fmt.Errorf("failed to set deny network logon: %w", err)
+	}
+	err = sp.AddAccountRight(sid, gowin32.AccountRightDenyRemoteInteractiveLogon)
+	if err != nil {
+		return "", fmt.Errorf("failed to set deny remote interactive logon: %w", err)
+	}
+	err = sp.AddAccountRight(sid, gowin32.AccountRightServiceLogon)
+	if err != nil {
+		return "", fmt.Errorf("failed to set service logon: %w", err)
 	}
 
 	return FindUID(name)
