@@ -12,7 +12,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/e2e-testing v1.1.0
-	github.com/elastic/elastic-agent-autodiscover v0.6.6
+	github.com/elastic/elastic-agent-autodiscover v0.6.7
 	github.com/elastic/elastic-agent-client/v7 v7.8.0
 	github.com/elastic/elastic-agent-libs v0.7.5
 	github.com/elastic/elastic-agent-system-metrics v0.9.1
@@ -134,7 +134,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/licenseclassifier v0.0.0-20200402202327-879cb1424de0 // indirect
+	github.com/google/licenseclassifier v0.0.0-20221004142553-c1ed8fcf4bab // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect

@@ -138,12 +138,12 @@ func NewPodEventer(
 	watcher.AddEventHandler(p)
 
 	if nodeWatcher != nil && metaConf.Node.Enabled() {
-		updater := kubernetes.NewNodePodUpdater(p.unlockedUpdate, watcher.Store(), &p.crossUpdate)
+		updater := kubernetes.NewNodePodUpdater(p.unlockedUpdate, watcher.Store(), p.nodeWatcher, &p.crossUpdate)
 		nodeWatcher.AddEventHandler(updater)
 	}
 
 	if namespaceWatcher != nil && metaConf.Namespace.Enabled() {
-		updater := kubernetes.NewNamespacePodUpdater(p.unlockedUpdate, watcher.Store(), &p.crossUpdate)
+		updater := kubernetes.NewNamespacePodUpdater(p.unlockedUpdate, watcher.Store(), p.namespaceWatcher, &p.crossUpdate)
 		namespaceWatcher.AddEventHandler(updater)
 	}
 
