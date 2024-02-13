@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -189,6 +190,105 @@ func TestVerifySHA512HashWithCleanup_failure(t *testing.T) {
 		}
 
 		t.Errorf("there should be no files on %q. Found %v", dir, files)
+	}
+}
+
+func TestVerifySHA512HashWithCleanup_BrokenHashFile(t *testing.T) {
+
+	const data = "" +
+		"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. " +
+		"Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. " +
+		"Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. " +
+		"Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+	// if you change data, the constant below should be updated
+	const correct_data_hash = "8ba760cac29cb2b2ce66858ead169174057aa1298ccd581514e6db6dee3285280ee6e3a54c9319071dc8165ff061d77783100d449c937ff1fb4cd1bb516a69b9"
+
+	const filename = "lorem_ipsum.txt"
+	const hashFileName = filename + ".sha512"
+
+	type testcase struct {
+		name            string
+		hash            []byte
+		hashPermissions fs.FileMode
+		wantErr         assert.ErrorAssertionFunc
+		wantLogSnippets []string
+	}
+
+	testcases := []testcase{
+		{
+			name:            "happy path - correct hash and format",
+			hash:            []byte(correct_data_hash + "  " + filename),
+			hashPermissions: 0o640,
+			wantErr:         assert.NoError,
+		},
+		{
+			name:            "happy path - broken lines before correct hash and format",
+			hash:            []byte("this_is just_filler\n" + "some_more_filler\n" + correct_data_hash + "  " + filename),
+			hashPermissions: 0o640,
+			wantErr:         assert.NoError,
+		},
+		{
+			name:            "truncated hash line - no filename",
+			hash:            []byte(correct_data_hash),
+			hashPermissions: 0o640,
+			wantErr:         assert.Error,
+			wantLogSnippets: []string{`contents: "` + correct_data_hash + `"`},
+		},
+		{
+			name:            "truncated hash",
+			hash:            []byte(correct_data_hash[:8] + "  " + filename),
+			hashPermissions: 0o640,
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				target := new(ChecksumMismatchError)
+				return assert.ErrorAs(t, err, &target, "mismatched hash has a specific error type", i)
+			},
+		},
+		{
+			name:            "empty hash file",
+			hash:            []byte{},
+			hashPermissions: 0o640,
+			wantErr:         assert.Error,
+			wantLogSnippets: []string{`contents: ""`},
+		},
+		{
+			name: "non-existing hash file",
+			hash: nil,
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, fs.ErrNotExist, i)
+			},
+		},
+		{
+			name:            "unreadable hash file",
+			hash:            []byte(correct_data_hash + "  " + filename),
+			hashPermissions: 0o222,
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, fs.ErrPermission, i)
+			},
+			wantLogSnippets: []string{hashFileName + `", unable do read contents for logging:`},
+		},
+	}
+
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			dataFilePath := filepath.Join(dir, filename)
+			err := os.WriteFile(dataFilePath, []byte(data), 0o750)
+			require.NoError(t, err, "could not write sample data file")
+
+			if tt.hash != nil {
+				hashFilePath := filepath.Join(dir, hashFileName)
+				err = os.WriteFile(hashFilePath, tt.hash, tt.hashPermissions)
+				require.NoError(t, err, "could not write test hash file")
+			}
+
+			testLogger, obsLogs := logger.NewTesting(tt.name)
+			err = VerifySHA512HashWithCleanup(testLogger, dataFilePath)
+			tt.wantErr(t, err)
+			for _, log := range tt.wantLogSnippets {
+				filteredLogs := obsLogs.FilterMessageSnippet(log)
+				assert.NotEmptyf(t, filteredLogs, "there should be logs matching snippet %q", log)
+			}
+		})
 	}
 }
 
