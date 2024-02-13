@@ -8,6 +8,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -164,6 +165,68 @@ func TestInstallWithBasePath(t *testing.T) {
 		out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
+	}
+}
+
+// TestRepeatedInstallUninstall will install then uninstall the agent
+// repeatedly.  This test exists because of a number of race
+// conditions that have occurred in the uninstall process.  Current
+// testing shows each iteration takes around 16 seconds.
+func TestRepeatedInstallUninstall(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: Default,
+		// We require sudo for this test to run
+		// `elastic-agent install` (even though it will
+		// be installed as non-root).
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	maxRunTime := 2 * time.Minute
+	iterations := 100
+	for i := 0; i < iterations; i++ {
+		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
+
+			var defaultBasePath string
+			switch runtime.GOOS {
+			case "darwin":
+				defaultBasePath = `/Library`
+			case "linux":
+				defaultBasePath = `/opt`
+			case "windows":
+				defaultBasePath = `C:\Program Files`
+			}
+
+			topPath := filepath.Join(defaultBasePath, "Elastic", "Agent")
+			// Get path to Elastic Agent executable
+			fixture, err := define.NewFixture(t, define.Version())
+			require.NoError(t, err)
+
+			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(maxRunTime))
+			defer cancel()
+
+			// Prepare the Elastic Agent so the binary is extracted and ready to use.
+			err = fixture.Prepare(ctx)
+			require.NoError(t, err)
+
+			// Run `elastic-agent install`.  We use `--force` to prevent interactive
+			// execution.
+			opts := &atesting.InstallOpts{Force: true}
+			out, err := fixture.Install(ctx, opts)
+			if err != nil {
+				t.Logf("install output: %s", out)
+				require.NoError(t, err)
+			}
+
+			// Check that Agent was installed in default base path
+			checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+			t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+			require.NoErrorf(t, err, "uninstall failed: %s", err)
+		})
 	}
 }
 
