@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -206,8 +207,11 @@ func TestVerifySHA512HashWithCleanup_BrokenHashFile(t *testing.T) {
 	const filename = "lorem_ipsum.txt"
 	const hashFileName = filename + ".sha512"
 
+	type skipFunc func(t *testing.T)
+
 	type testcase struct {
 		name            string
+		skip            skipFunc
 		hash            []byte
 		hashPermissions fs.FileMode
 		wantErr         assert.ErrorAssertionFunc
@@ -258,7 +262,12 @@ func TestVerifySHA512HashWithCleanup_BrokenHashFile(t *testing.T) {
 			},
 		},
 		{
-			name:            "unreadable hash file",
+			name: "unreadable hash file",
+			skip: func(t *testing.T) {
+				if runtime.GOOS == "windows" {
+					t.Skip("permissions are not really testable on windows")
+				}
+			},
 			hash:            []byte(correct_data_hash + "  " + filename),
 			hashPermissions: 0o222,
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
@@ -270,6 +279,10 @@ func TestVerifySHA512HashWithCleanup_BrokenHashFile(t *testing.T) {
 
 	for _, tt := range testcases {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.skip != nil {
+				tt.skip(t)
+			}
+
 			dir := t.TempDir()
 			dataFilePath := filepath.Join(dir, filename)
 			err := os.WriteFile(dataFilePath, []byte(data), 0o750)
