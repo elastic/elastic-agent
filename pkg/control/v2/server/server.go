@@ -117,11 +117,13 @@ func (s *Server) Stop() {
 		s.logger.Info("GRPC server stopped.")
 		s.server = nil
 		s.listener = nil
+		s.logger.Info("GRPC server stopped")
 		err := cleanupListener()
 		if err != nil {
 			s.logger.Errorf("Error cleaning up listener: %v", err)
+		} else {
+			s.logger.Info("Listener cleaned up.")
 		}
-		s.logger.Info("GRPC server stopped")
 	}
 }
 
