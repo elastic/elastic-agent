@@ -77,7 +77,7 @@ inputs:
           message: "Elastic Defend requires Elastic Agent be running as Administrator or SYSTEM"
         - condition: ${install.in_default} == false
           message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
-        - condition: ${runtime.native_arch} != 'x86_64'
+        - condition: ${runtime.native_arch} != 'amd64'
           message: "Elastic Defend cannot be installed on Windows running on non-AMD64 CPU"
     service:
       cport: 6788
