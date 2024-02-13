@@ -265,7 +265,7 @@ func TestVerifySHA512HashWithCleanup_BrokenHashFile(t *testing.T) {
 			name: "unreadable hash file",
 			skip: func(t *testing.T) {
 				if runtime.GOOS == "windows" {
-					t.Skip("permissions are not really testable on windows")
+					t.Skip("write-only permissions cannot be set on windows")
 				}
 			},
 			hash:            []byte(correct_data_hash + "  " + filename),
