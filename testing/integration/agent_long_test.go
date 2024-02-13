@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// //go:build integration
+//go:build integration
 
 package integration
 
@@ -168,7 +168,7 @@ func (runner *ExtendedRunner) SetupSuite() {
 }
 
 func (runner *ExtendedRunner) InstallPackage(ctx context.Context, name string, cfgFile string, policyUUID string, policyID string) {
-	systemLatest, err := tools.GetLatestPackageRelease(name)
+	systemLatest, err := tools.GetLatestPackageRelease(ctx, name)
 	require.NoError(runner.T(), err)
 	runner.T().Logf("using %s version %s", name, systemLatest)
 
@@ -198,7 +198,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "5m"
+		testRuntime = "20m"
 	}
 
 	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats

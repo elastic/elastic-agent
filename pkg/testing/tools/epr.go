@@ -5,6 +5,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,9 +23,13 @@ type PackageSearchResult struct {
 }
 
 // GetLatestPackageRelease returns the version string of the latest package release
-func GetLatestPackageRelease(packageName string) (string, error) {
+func GetLatestPackageRelease(ctx context.Context, packageName string) (string, error) {
 	endpoint := fmt.Sprintf("%s/search?package=%s&all=false", eprProd, packageName)
-	resp, err := http.Get(endpoint) //nolint:gosec,nolintlint // it's a test
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("error creating HTTP request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec,nolintlint // it's a test
 	//create body before we check for errors, easier to format error strings that way
 	body, errRead := io.ReadAll(resp.Body)
 	if errRead != nil {
