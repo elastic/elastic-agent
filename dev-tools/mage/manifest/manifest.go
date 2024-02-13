@@ -61,13 +61,14 @@ func DownloadManifest(manifest string) (tools.Build, error) {
 	}
 	if mg.Verbose() {
 		log.Printf(">>>> Downloaded manifest %s", manifest)
-		log.Printf(">>>> Packaing version: %s, build_id: %s, manifest_version:%s", manifestResponse.Version, manifestResponse.BuildID, manifestResponse.ManifestVersion)
+		log.Printf(">>>> Packaging version: %s, build_id: %s, manifest_version:%s", manifestResponse.Version, manifestResponse.BuildID, manifestResponse.ManifestVersion)
 	}
 	return manifestResponse, nil
 }
 
 func resolveManifestPackage(project tools.Project, pkg string, reqPackage string, version string) []string {
 	packageName := fmt.Sprintf("%s-%s-%s", pkg, version, reqPackage)
+	log.Printf(">>>>>>!!! packageName: [%s]", packageName)
 	val, ok := project.Packages[packageName]
 	if !ok {
 		return nil
@@ -99,6 +100,13 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	}
 	projects := manifestResponse.Projects
 
+	// If using new Independent Agent version, just use the first X.Y.Z part
+	majorMinorPatchVersion = manifestResponse.Version
+	if manifestResponse.Version.Contains("+build") {
+		splitVersion := strings.Split(manifestResponse.Version, "+build")
+		majorMinorPatchVersion = splitVersion[0]
+	}
+
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
 	for component, pkgs := range componentSpec {
 		for _, platform := range platforms {
@@ -111,7 +119,8 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 
 			for _, pkg := range pkgs {
 				reqPackage := platformPackages[platform]
-				pkgURL := resolveManifestPackage(projects[component], pkg, reqPackage, manifestResponse.Version)
+				log.Printf(">>>>>!!! majorMinorPatchVersion [%s]", majorMinorPatchVersion)
+				pkgURL := resolveManifestPackage(projects[component], pkg, reqPackage, majorMinorPatchVersion)
 				if pkgURL != nil {
 					for _, p := range pkgURL {
 						log.Printf(">>>>>>>>> Downloading [%s] [%s] ", pkg, p)
