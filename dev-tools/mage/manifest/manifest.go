@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/magefile/mage/mg"
@@ -101,8 +102,8 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	projects := manifestResponse.Projects
 
 	// If using new Independent Agent version, just use the first X.Y.Z part
-	majorMinorPatchVersion = manifestResponse.Version
-	if manifestResponse.Version.Contains("+build") {
+	majorMinorPatchVersion := manifestResponse.Version
+	if strings.Contains(manifestResponse.Version, "+build") {
 		splitVersion := strings.Split(manifestResponse.Version, "+build")
 		majorMinorPatchVersion = splitVersion[0]
 	}
