@@ -39,6 +39,9 @@ func agentGlobalConfig() (map[string]interface{}, error) {
 	if "x86_64" == nativeArch {
 		nativeArch = "amd64"
 	}
+	if "aarch64" == nativeArch {
+		nativeArch = "arm64"
+	}
 
 	return map[string]interface{}{
 		"path": map[string]interface{}{
