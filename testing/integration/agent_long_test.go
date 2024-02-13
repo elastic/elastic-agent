@@ -160,18 +160,14 @@ func (runner *ExtendedRunner) SetupSuite() {
 	require.NoError(runner.T(), err)
 
 	// install system package
-	runner.InstallPackage(ctx, "system", "agent_long_test_base_system_integ.json", uuid.New().String(), policyResp.ID)
+	runner.InstallPackage(ctx, "system", "1.53.1", "agent_long_test_base_system_integ.json", uuid.New().String(), policyResp.ID)
 
 	// install cef
-	runner.InstallPackage(ctx, "cef", "agent_long_test_cef.json", uuid.New().String(), policyResp.ID)
+	runner.InstallPackage(ctx, "cef", "2.16.2", "agent_long_test_cef.json", uuid.New().String(), policyResp.ID)
 
 }
 
-func (runner *ExtendedRunner) InstallPackage(ctx context.Context, name string, cfgFile string, policyUUID string, policyID string) {
-	systemLatest, err := tools.GetLatestPackageRelease(ctx, name)
-	require.NoError(runner.T(), err)
-	runner.T().Logf("using %s version %s", name, systemLatest)
-
+func (runner *ExtendedRunner) InstallPackage(ctx context.Context, name string, version string, cfgFile string, policyUUID string, policyID string) {
 	installPackage := kibana.PackagePolicyRequest{}
 
 	jsonRaw, err := os.ReadFile(cfgFile)
@@ -180,7 +176,7 @@ func (runner *ExtendedRunner) InstallPackage(ctx context.Context, name string, c
 	err = json.Unmarshal(jsonRaw, &installPackage)
 	require.NoError(runner.T(), err)
 
-	installPackage.Package.Version = systemLatest
+	installPackage.Package.Version = version
 	installPackage.ID = policyUUID
 	installPackage.PolicyID = policyID
 	installPackage.Namespace = "default"
