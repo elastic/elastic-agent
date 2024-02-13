@@ -227,13 +227,13 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 		defer func() {
 			if err != nil {
-				//progBar.Describe("Uninstalling")
-				//innerErr := install.Uninstall(cfgFile, topPath, "", log, progBar)
-				//if innerErr != nil {
-				//	progBar.Describe("Failed to Uninstall")
-				//} else {
-				//	progBar.Describe("Uninstalled")
-				//}
+				progBar.Describe("Uninstalling")
+				innerErr := install.Uninstall(cfgFile, topPath, "", log, progBar)
+				if innerErr != nil {
+					progBar.Describe("Failed to Uninstall")
+				} else {
+					progBar.Describe("Uninstalled")
+				}
 			}
 		}()
 
