@@ -120,12 +120,12 @@ func LoadPlatformDetail(modifiers ...PlatformModifier) (PlatformDetail, error) {
 	}
 	os := info.Info().OS
 	nativeArch := info.Info().NativeArchitecture
-	if "x86_64" == nativeArch {
+	if nativeArch == "x86_64" {
 		// go-sysinfo Architecture and NativeArchitecture prefer x64_64
 		// but GOARCH prefers amd64
 		nativeArch = "amd64"
 	}
-	if "aarch64" == nativeArch {
+	if nativeArch == "aarch64" {
 		// go-sysinfo Architecture and NativeArchitecture prefer aarch64
 		// but GOARCH prefers arm64
 		nativeArch = "arm64"

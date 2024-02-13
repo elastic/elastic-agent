@@ -36,10 +36,10 @@ func agentGlobalConfig() (map[string]interface{}, error) {
 	}
 
 	nativeArch := hostInfo.Info().NativeArchitecture
-	if "x86_64" == nativeArch {
+	if nativeArch == "x86_64" {
 		nativeArch = "amd64"
 	}
-	if "aarch64" == nativeArch {
+	if nativeArch == "aarch64" {
 		nativeArch = "arm64"
 	}
 
