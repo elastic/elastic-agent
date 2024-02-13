@@ -111,6 +111,21 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 			errors.M("directory", filepath.Dir(topPath)))
 	}
 
+	// create agent directory with more locked-down permissions
+	err = os.MkdirAll(topPath, 0750)
+	if err != nil {
+		return utils.FileOwner{}, errors.New(
+			err,
+			fmt.Sprintf("failed to create installation parent directory (%s)", topPath),
+			errors.M("directory", topPath))
+	}
+
+	// create the install marker
+	// do this before we create the service files
+	if err := CreateInstallMarker(topPath, ownership); err != nil {
+		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
+	}
+
 	manifest, err := readPackageManifest(dir)
 	if err != nil {
 		return utils.FileOwner{}, fmt.Errorf("reading package manifest: %w", err)
@@ -123,14 +138,6 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	if err != nil {
 		pt.Describe("Error copying files")
 		return utils.FileOwner{}, err
-	}
-
-	// create the install marker
-	// do this after the file copy but before installing service files, etc
-	// That way if the service install process fails, a user can still run `elastic-agent uninstall`
-	// to clean up.
-	if err := CreateInstallMarker(topPath, ownership); err != nil {
-		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
 	}
 
 	pt.Describe("Successfully copied files")
