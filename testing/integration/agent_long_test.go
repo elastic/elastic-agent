@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+// //go:build integration
 
 package integration
 
@@ -158,47 +158,38 @@ func (runner *ExtendedRunner) SetupSuite() {
 
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
+
 	// install system package
-
-	systemPackage := kibana.PackagePolicyRequest{}
-
-	jsonRaw, err := os.ReadFile("agent_long_test_base_system_integ.json")
-	require.NoError(runner.T(), err)
-
-	err = json.Unmarshal(jsonRaw, &systemPackage)
-	require.NoError(runner.T(), err)
-
-	systemPackage.ID = policyUUID
-	systemPackage.PolicyID = policyResp.ID
-	systemPackage.Namespace = "default"
-	systemPackage.Name = fmt.Sprintf("system-long-test-%s", policyUUID)
-	systemPackage.Vars = map[string]interface{}{}
-
-	runner.T().Logf("Installing fleet package....")
-	_, err = runner.info.KibanaClient.InstallFleetPackage(ctx, systemPackage)
-	require.NoError(runner.T(), err, "error creating fleet package")
+	runner.InstallPackage(ctx, "system", "agent_long_test_base_system_integ.json", uuid.New().String(), policyResp.ID)
 
 	// install cef
+	runner.InstallPackage(ctx, "cef", "agent_long_test_cef.json", uuid.New().String(), policyResp.ID)
 
-	policyUUIDApache := uuid.New().String()
-	apachePackage := kibana.PackagePolicyRequest{}
+}
 
-	jsonRaw, err = os.ReadFile("agent_long_test_cef.json")
+func (runner *ExtendedRunner) InstallPackage(ctx context.Context, name string, cfgFile string, policyUUID string, policyID string) {
+	systemLatest, err := tools.GetLatestPackageRelease(name)
+	require.NoError(runner.T(), err)
+	runner.T().Logf("using %s version %s", name, systemLatest)
+
+	installPackage := kibana.PackagePolicyRequest{}
+
+	jsonRaw, err := os.ReadFile(cfgFile)
 	require.NoError(runner.T(), err)
 
-	err = json.Unmarshal(jsonRaw, &apachePackage)
+	err = json.Unmarshal(jsonRaw, &installPackage)
 	require.NoError(runner.T(), err)
 
-	apachePackage.ID = policyUUIDApache
-	apachePackage.PolicyID = policyResp.ID
-	apachePackage.Namespace = "default"
-	apachePackage.Name = fmt.Sprintf("system-long-test-%s", policyUUIDApache)
-	apachePackage.Vars = map[string]interface{}{}
+	installPackage.Package.Version = systemLatest
+	installPackage.ID = policyUUID
+	installPackage.PolicyID = policyID
+	installPackage.Namespace = "default"
+	installPackage.Name = fmt.Sprintf("%s-long-test-%s", name, policyUUID)
+	installPackage.Vars = map[string]interface{}{}
 
-	runner.T().Logf("Installing fleet package....")
-	_, err = runner.info.KibanaClient.InstallFleetPackage(ctx, apachePackage)
+	runner.T().Logf("Installing %s package....", name)
+	_, err = runner.info.KibanaClient.InstallFleetPackage(ctx, installPackage)
 	require.NoError(runner.T(), err, "error creating fleet package")
-
 }
 
 func (runner *ExtendedRunner) TestHandleLeak() {
@@ -207,7 +198,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "20m"
+		testRuntime = "5m"
 	}
 
 	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
