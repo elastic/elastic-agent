@@ -7,8 +7,9 @@ package info
 import (
 	"testing"
 
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
 func TestInjectAgentConfig(t *testing.T) {
