@@ -26,3 +26,8 @@ func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwne
 	}
 	return nil
 }
+
+// withServiceOptions just sets the user/group for the service.
+func withServiceOptions(username string, groupName string) ([]serviceOpt, error) {
+	return []serviceOpt{withUserGroup(username, groupName)}, nil
+}

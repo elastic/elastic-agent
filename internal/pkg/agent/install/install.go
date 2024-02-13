@@ -211,7 +211,12 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	// install service
 	pt.Describe("Installing service")
-	svc, err := newService(topPath, withUserGroup(username, groupName))
+	opts, err := withServiceOptions(username, groupName)
+	if err != nil {
+		pt.Describe("Failed to install service")
+		return ownership, fmt.Errorf("error getting service installation options: %w", err)
+	}
+	svc, err := newService(topPath, opts...)
 	if err != nil {
 		pt.Describe("Failed to install service")
 		return ownership, fmt.Errorf("error installing new service: %w", err)

@@ -40,6 +40,7 @@ func ExecutablePath(topPath string) string {
 type serviceOpts struct {
 	Username string
 	Group    string
+	Password string
 }
 
 type serviceOpt func(opts *serviceOpts)
@@ -51,10 +52,32 @@ func withUserGroup(username string, group string) serviceOpt {
 	}
 }
 
+func withPassword(password string) serviceOpt {
+	return func(opts *serviceOpts) {
+		opts.Password = password
+	}
+}
+
 func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	var opts serviceOpts
 	for _, o := range opt {
 		o(&opts)
+	}
+
+	option := map[string]interface{}{
+		// GroupName
+		"GroupName": opts.Group,
+
+		// Linux (systemd) always restart on failure
+		"Restart": "always",
+
+		// Windows setup restart on failure
+		"OnFailure":              "restart",
+		"OnFailureDelayDuration": "15s", // Matches the value used by endpoint-security.
+		"OnFailureResetPeriod":   10,
+	}
+	if opts.Password != "" {
+		option["Password"] = opts.Password
 	}
 
 	cfg := &service.Config{
@@ -64,18 +87,7 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 		Executable:       ExecutablePath(topPath),
 		WorkingDirectory: topPath,
 		UserName:         opts.Username,
-		Option: map[string]interface{}{
-			// GroupName
-			"GroupName": opts.Group,
-
-			// Linux (systemd) always restart on failure
-			"Restart": "always",
-
-			// Windows setup restart on failure
-			"OnFailure":              "restart",
-			"OnFailureDelayDuration": "15s", // Matches the value used by endpoint-security.
-			"OnFailureResetPeriod":   10,
-		},
+		Option:           option,
 	}
 
 	if runtime.GOOS == "linux" {

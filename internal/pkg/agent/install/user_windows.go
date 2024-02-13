@@ -20,6 +20,7 @@ var (
 	procNetLocalGroupAdd        = modnetapi32.NewProc("NetLocalGroupAdd")
 	procNetLocalGroupAddMembers = modnetapi32.NewProc("NetLocalGroupAddMembers")
 	procNetUserAdd              = modnetapi32.NewProc("NetUserAdd")
+	procNetUserSetInfo          = modnetapi32.NewProc("NetUserSetInfo")
 )
 
 const (
@@ -97,10 +98,6 @@ func CreateUser(name string, _ string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to encode username %s to UTF16: %s", name, err)
 	}
-	//uInfo.Usri1_password, err = syscall.UTF16PtrFromString(opts.Password)
-	//if err != nil {
-	//	return false, fmt.Errorf("Unable to encode password to UTF16: %s", err)
-	//}
 	ret, _, _ := procNetUserAdd.Call(
 		uintptr(0),
 		uintptr(uint32(1)),
@@ -111,12 +108,6 @@ func CreateUser(name string, _ string) (string, error) {
 		return "", fmt.Errorf("call to NetUserAdd failed: status=%d error=%d", ret, parmErr)
 	}
 
-	// must be manually added to the Users group when its created
-	err = AddUserToGroup(name, "Users")
-	if err != nil {
-		// error information from AddUserToGroup is enough
-		return "", err
-	}
 	return FindUID(name)
 }
 
@@ -146,6 +137,35 @@ func AddUserToGroup(username string, groupName string) error {
 	)
 	if ret != 0 {
 		return fmt.Errorf("call to NetLocalGroupAddMembers failed: status=%d", ret)
+	}
+	return nil
+}
+
+// SetUserPassword sets the password for a user.
+func SetUserPassword(name string, password string) error {
+	var parmErr uint32
+	var err error
+	info := USER_INFO_1{
+		Usri1_priv:  USER_PRIV_USER,
+		Usri1_flags: USER_UF_SCRIPT | USER_UF_NORMAL_ACCOUNT | USER_UF_DONT_EXPIRE_PASSWD,
+	}
+	info.Usri1_name, err = syscall.UTF16PtrFromString(name)
+	if err != nil {
+		return fmt.Errorf("failed to encode username %s to UTF16: %s", name, err)
+	}
+	info.Usri1_password, err = syscall.UTF16PtrFromString(password)
+	if err != nil {
+		return fmt.Errorf("failed to encode password to UTF16: %s", err)
+	}
+	ret, _, _ := procNetUserSetInfo.Call(
+		uintptr(0),
+		uintptr(unsafe.Pointer(info.Usri1_name)),
+		uintptr(uint32(1)),
+		uintptr(unsafe.Pointer(&info)),
+		uintptr(unsafe.Pointer(&parmErr)),
+	)
+	if ret != 0 {
+		return fmt.Errorf("call to NetUserSetInfo failed: status=%d error=%d", ret, parmErr)
 	}
 	return nil
 }

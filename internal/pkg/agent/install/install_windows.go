@@ -8,13 +8,19 @@ package install
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
+)
+
+const (
+	passwordLength = 127 // maximum length allowed by Windows
 )
 
 // postInstall performs post installation for Windows systems.
@@ -48,4 +54,38 @@ func postInstall(topPath string) error {
 
 func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
 	return FixPermissions(markerFilePath, ownership)
+}
+
+// withServiceOptions just sets the user/group for the service.
+func withServiceOptions(username string, groupName string) ([]serviceOpt, error) {
+	if username == "" {
+		// not installed with --unprivileged; nothing to do
+		return []serviceOpt{}, nil
+	}
+
+	// service requires a password to launch as the user
+	// this sets it to a random password that is only known by the service
+	password := randomPassword(passwordLength)
+	err := SetUserPassword(username, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set user %s password for service: %w", username, err)
+	}
+
+	// username must be prefixed with the domain for the CreateServiceW call to work
+	// we are always working on the local machine so the hostname of the machine is used
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get hostname: %w", err)
+	}
+	username = fmt.Sprintf(`%s\%s`, hostname, username)
+	return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
+}
+
+func randomPassword(length int) string {
+	runes := []rune("abcdefghijklmnopqrstuvwxyz1234567890!@#$%^&*ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	var sb strings.Builder
+	for i := 0; i < length; i++ {
+		sb.WriteRune(runes[rand.Intn(len(runes))])
+	}
+	return sb.String()
 }
