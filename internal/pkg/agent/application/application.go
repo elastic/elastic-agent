@@ -120,7 +120,7 @@ func New(
 	log.Debugf("Control address: %s", controlAddress)
 	address, err := deriveCommsAddress(controlAddress, cfg.Settings.GRPC)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to dervice comms GRPC: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to derive comms GRPC: %w", err)
 	}
 	log.Debugf("Comms GRPS address: %s", address)
 
