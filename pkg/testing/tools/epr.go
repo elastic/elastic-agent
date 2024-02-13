@@ -23,8 +23,8 @@ type PackageSearchResult struct {
 
 // GetLatestPackageRelease returns the version string of the latest package release
 func GetLatestPackageRelease(packageName string) (string, error) {
-	endpoint := fmt.Sprintf("%s/search?package=%s&all=false", eprProd, packageName) //nolint:gosec,nolintlint // it's a test
-	resp, err := http.Get(endpoint)
+	endpoint := fmt.Sprintf("%s/search?package=%s&all=false", eprProd, packageName)
+	resp, err := http.Get(endpoint) //nolint:gosec,nolintlint // it's a test
 	//create body before we check for errors, easier to format error strings that way
 	body, errRead := io.ReadAll(resp.Body)
 	if errRead != nil {
