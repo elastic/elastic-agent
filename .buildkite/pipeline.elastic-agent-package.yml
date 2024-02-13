@@ -143,7 +143,7 @@ steps:
       echo "+++ Changing permissions for the BK API commands"
       sudo chown -R :1000 build/distributions/
       echo "+++ Call buildkite-agent upload to save artifacts for job that triggered us"
-      buildkite-agent upload "build/distributions/*"
+      buildkite-agent artifact upload "build/distributions/*"
       echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
       if [[ -z "${TRIGGER_JOB_ID}" ]]; then
         echo "TRIGGER_JOB_ID is not set, so not setting metadata"
