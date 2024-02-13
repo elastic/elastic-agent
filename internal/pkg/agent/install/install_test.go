@@ -7,6 +7,7 @@ package install
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/jaypipes/ghw"
@@ -196,5 +197,11 @@ func TestInstallMarker(t *testing.T) {
 	fileInfo, err := os.Stat(filepath.Join(tmpdir, paths.MarkerFileName))
 	require.NoError(t, err)
 	perms := fileInfo.Mode().Perm()
-	require.Equal(t, uint32(0o644), uint32(perms))
+	if runtime.GOOS != "windows" {
+		require.Equal(t, uint32(0o644), uint32(perms))
+	}
+	if runtime.GOOS == "windows" {
+		require.Equal(t, uint32(0o666), uint32(perms))
+	}
+
 }
