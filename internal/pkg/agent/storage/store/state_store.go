@@ -230,6 +230,8 @@ func (s *StateStore) SetAckToken(ackToken string) {
 }
 
 // SetQueue sets the action_queue to agent state
+// TODO: receive only scheduled actions. It might break something. Needs to
+// investigate it better.
 func (s *StateStore) SetQueue(q fleetapi.Actions) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
