@@ -101,7 +101,7 @@ steps:
           - "build/distributions/**/*"
 
   - label: ":elastic-stack: Publishing to DRA"
-    if: build.env("TEST_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("TEST_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
+    if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
     key: dra-publish
     depends_on: package
     agents:
@@ -129,7 +129,7 @@ steps:
       .buildkite/scripts/steps/dra-publish.sh
 
   - label: "Publishing via BK API for Independent Agent Release"
-    if: build.env("TEST_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "independent-agent-release-staging"
+    if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "independent-agent-release-staging"
     key: bk-api-publish-independent-agent
     depends_on: package
     agents:
