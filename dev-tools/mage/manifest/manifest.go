@@ -13,13 +13,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/magefile/mage/mg"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 // A backoff schedule for when and how often to retry failed HTTP
@@ -101,12 +101,13 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	}
 	projects := manifestResponse.Projects
 
-	// If using new Independent Agent version, just use the first X.Y.Z part
-	majorMinorPatchVersion := manifestResponse.Version
-	if strings.Contains(manifestResponse.Version, "+build") {
-		splitVersion := strings.Split(manifestResponse.Version, "+build")
-		majorMinorPatchVersion = splitVersion[0]
+	parsedManifestVersion, err := version.ParseVersion(manifestResponse.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse manifest version: [%s]", manifestResponse.Version)
 	}
+
+	// For resolving manifest package name and version, just use the Major.Minor.Patch part of the version
+	majorMinorPatchVersion := fmt.Sprintf("%d.%d.%d", parsedManifestVersion.Major(), parsedManifestVersion.Minor(), parsedManifestVersion.Patch())
 
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
 	for component, pkgs := range componentSpec {
