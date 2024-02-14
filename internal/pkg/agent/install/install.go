@@ -114,14 +114,10 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	// create agent directory with more locked-down permissions
 	err = os.MkdirAll(topPath, 0750)
 	if err != nil {
-		return utils.FileOwner{}, errors.New(
-			err,
-			fmt.Sprintf("failed to create installation parent directory (%s)", topPath),
-			errors.M("directory", topPath))
+		return utils.FileOwner{}, errors.New(err, fmt.Sprintf("failed to create top path (%s)", topPath), errors.M("directory", topPath))
 	}
 
 	// create the install marker
-	// do this before we create the service files
 	if err := CreateInstallMarker(topPath, ownership); err != nil {
 		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
 	}
