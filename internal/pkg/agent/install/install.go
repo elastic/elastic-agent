@@ -102,24 +102,9 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		}
 	}
 
-	// ensure parent directory exists
-	err = os.MkdirAll(filepath.Dir(topPath), 0755)
+	err = setupInstallPath(topPath, ownership)
 	if err != nil {
-		return utils.FileOwner{}, errors.New(
-			err,
-			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)),
-			errors.M("directory", filepath.Dir(topPath)))
-	}
-
-	// create agent directory with more locked-down permissions
-	err = os.MkdirAll(topPath, 0750)
-	if err != nil {
-		return utils.FileOwner{}, errors.New(err, fmt.Sprintf("failed to create top path (%s)", topPath), errors.M("directory", topPath))
-	}
-
-	// create the install marker
-	if err := CreateInstallMarker(topPath, ownership); err != nil {
-		return utils.FileOwner{}, fmt.Errorf("failed to create install marker: %w", err)
+		return utils.FileOwner{}, fmt.Errorf("error setting up install path: %w", err)
 	}
 
 	manifest, err := readPackageManifest(dir)
@@ -220,6 +205,27 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	pt.Describe("Installed service")
 
 	return ownership, nil
+}
+
+// setup the basic topPath, and the .installed file
+func setupInstallPath(topPath string, ownership utils.FileOwner) error {
+	// ensure parent directory exists
+	err := os.MkdirAll(filepath.Dir(topPath), 0755)
+	if err != nil {
+		return errors.New(err, fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)), errors.M("directory", filepath.Dir(topPath)))
+	}
+
+	// create Agent/ directory with more locked-down permissions
+	err = os.MkdirAll(topPath, 0750)
+	if err != nil {
+		return errors.New(err, fmt.Sprintf("failed to create top path (%s)", topPath), errors.M("directory", topPath))
+	}
+
+	// create the install marker
+	if err := CreateInstallMarker(topPath, ownership); err != nil {
+		return fmt.Errorf("failed to create install marker: %w", err)
+	}
+	return nil
 }
 
 func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error) {
