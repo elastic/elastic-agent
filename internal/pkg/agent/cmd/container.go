@@ -458,7 +458,7 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		if cfg.FleetServer.PassphrasePath != "" {
 			args = append(args, "--fleet-server-cert-key-passphrase", cfg.FleetServer.PassphrasePath)
 		}
-		if cfg.FleetServer.ClientAuth != nil {
+		if cfg.FleetServer.ClientAuth != "" {
 			args = append(args, "--fleet-server-client-auth", cfg.FleetServer.ClientAuth)
 		}
 
