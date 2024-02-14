@@ -178,7 +178,7 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 
 func (b *dockerBuilder) dockerBuild() (string, error) {
 	tag := fmt.Sprintf("%s:%s", b.imageName, b.Version)
-	tag = strings.Replace(tag, "+", "_", 1)
+	tag = strings.Replace(tag, "+", "-", 1)
 	if b.Snapshot {
 		tag = tag + "-SNAPSHOT"
 	}
