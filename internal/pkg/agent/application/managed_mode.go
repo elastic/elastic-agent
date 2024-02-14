@@ -159,7 +159,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 
 	action := m.stateStore.Action()
 	stateRestored := false
-	if action == nil && !m.wasUnenrolled() {
+	if action != nil && !m.wasUnenrolled() {
 		// TODO(ph) We will need an improvement on fleet, if there is an error while dispatching a
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
