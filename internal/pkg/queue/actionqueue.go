@@ -11,9 +11,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
-// saver is an the minimal interface needed for state storage.
+// saver is the minimal interface needed for state storage.
 type saver interface {
-	SetQueue(a []fleetapi.Action)
+	SetQueue(a fleetapi.Actions)
 	Save() error
 }
 
@@ -95,7 +95,7 @@ func newQueue(actions []fleetapi.Action) (*queue, error) {
 	return &q, nil
 }
 
-// NewActionQueue creates a new queue with the passed actions using the persistor for state storage.
+// NewActionQueue creates a new queue with the passed actions using the saver for state storage.
 func NewActionQueue(actions []fleetapi.Action, s saver) (*ActionQueue, error) {
 	q, err := newQueue(actions)
 	if err != nil {

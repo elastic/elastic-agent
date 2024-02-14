@@ -56,7 +56,7 @@ type mockSaver struct {
 	mock.Mock
 }
 
-func (m *mockSaver) SetQueue(a []fleetapi.Action) {
+func (m *mockSaver) SetQueue(a fleetapi.Actions) {
 	m.Called(a)
 }
 

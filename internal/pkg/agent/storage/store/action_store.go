@@ -23,13 +23,13 @@ import (
 // Deprecated.
 type actionStore struct {
 	log    *logger.Logger
-	store  storeLoad
+	store  saveLoader
 	dirty  bool
-	action action
+	action fleetapi.Action
 }
 
 // newActionStore creates a new action store.
-func newActionStore(log *logger.Logger, store storeLoad) (*actionStore, error) {
+func newActionStore(log *logger.Logger, store saveLoader) (*actionStore, error) {
 	// If the store exists we will read it, if an error is returned we log it
 	// and return an empty store.
 	reader, err := store.Load()
@@ -64,7 +64,7 @@ func newActionStore(log *logger.Logger, store storeLoad) (*actionStore, error) {
 
 // add is only taking care of ActionPolicyChange for now and will only keep the last one it receive,
 // any other type of action will be silently ignored.
-func (s *actionStore) add(a action) {
+func (s *actionStore) add(a fleetapi.Action) {
 	switch v := a.(type) {
 	case *fleetapi.ActionPolicyChange, *fleetapi.ActionUnenroll:
 		// Only persist the action if the action is different.
@@ -117,12 +117,12 @@ func (s *actionStore) save() error {
 
 // actions returns a slice of action to execute in order, currently only a action policy change is
 // persisted.
-func (s *actionStore) actions() []action {
+func (s *actionStore) actions() fleetapi.Actions {
 	if s.action == nil {
-		return []action{}
+		return fleetapi.Actions{}
 	}
 
-	return []action{s.action}
+	return fleetapi.Actions{s.action}
 }
 
 // actionPolicyChangeSerializer is a struct that adds a YAML serialization, I don't think serialization

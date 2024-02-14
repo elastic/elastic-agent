@@ -58,11 +58,11 @@ type agentInfo interface {
 }
 
 type stateStore interface {
-	Add(fleetapi.Action)
+	SetAction(fleetapi.Action)
 	AckToken() string
 	SetAckToken(ackToken string)
 	Save() error
-	Actions() []fleetapi.Action
+	Action() fleetapi.Action
 }
 
 type FleetGateway struct {

@@ -19,16 +19,14 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type store interface {
+type saver interface {
 	Save(io.Reader) error
 }
 
-type storeLoad interface {
-	store
+type saveLoader interface {
+	saver
 	Load() (io.ReadCloser, error)
 }
-
-type action = fleetapi.Action
 
 // StateStore is a combined agent state storage initially derived from the former actionStore
 // and modified to allow persistence of additional agent specific state information.
@@ -39,7 +37,7 @@ type action = fleetapi.Action
 // Fleet. The store is not thread safe.
 type StateStore struct {
 	log   *logger.Logger
-	store storeLoad
+	store saveLoader
 	dirty bool
 	state state
 
@@ -78,6 +76,7 @@ func (as *actionSerializer) UnmarshalJSON(data []byte) error {
 type actionSerializer struct {
 	json.Marshaler
 	json.Unmarshaler
+
 	Action fleetapi.Action
 }
 
@@ -85,7 +84,7 @@ type actionSerializer struct {
 func NewStateStoreWithMigration(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string) (*StateStore, error) {
 
 	stateDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath)
-	err := migrateStateStore(log, actionStorePath, stateDiskStore)
+	err := migrateActionStoreToStateStore(log, actionStorePath, stateDiskStore)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +98,7 @@ func NewStateStoreActionAcker(acker acker.Acker, store *StateStore) *StateStoreA
 }
 
 // NewStateStore creates a new state store.
-func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
+func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 	// If the store exists we will read it, if an error is returned we log it
 	// and return an empty store.
 	reader, err := store.Load()
@@ -131,7 +130,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	}, nil
 }
 
-func migrateStateStore(
+func migrateActionStoreToStateStore(
 	log *logger.Logger,
 	actionStorePath string,
 	stateDiskStore storage.Storage) (err error) {
@@ -191,7 +190,7 @@ func migrateStateStore(
 	}
 
 	// set actions from the action store to the state store
-	stateStore.Add(actionStore.actions()[0])
+	stateStore.SetAction(actionStore.actions()[0])
 
 	err = stateStore.Save()
 	if err != nil {
@@ -200,21 +199,17 @@ func migrateStateStore(
 	return err
 }
 
-// Add is only taking care of ActionPolicyChange for now and will only keep the last one it receive,
-// any other type of action will be silently ignored.
-// TODO: fix docs: state:
-//   - the valid actions,
-//   - it silently discard invalid actions
-//   - perhaps rename it as it does not add to the queue, but sets the current
-//     action
-func (s *StateStore) Add(a action) {
+// SetAction sets the current action. It accepts ActionPolicyChange or
+// ActionUnenroll. Any other type will be silently discarded.
+func (s *StateStore) SetAction(a fleetapi.Action) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
 	switch v := a.(type) {
 	case *fleetapi.ActionPolicyChange, *fleetapi.ActionUnenroll:
 		// Only persist the action if the action is different.
-		if s.state.ActionSerializer.Action != nil && s.state.ActionSerializer.Action.ID() == v.ID() {
+		if s.state.ActionSerializer.Action != nil &&
+			s.state.ActionSerializer.Action.ID() == v.ID() {
 			return
 		}
 		s.dirty = true
@@ -235,12 +230,11 @@ func (s *StateStore) SetAckToken(ackToken string) {
 }
 
 // SetQueue sets the action_queue to agent state
-func (s *StateStore) SetQueue(q []action) {
+func (s *StateStore) SetQueue(q fleetapi.Actions) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 	s.state.Queue = q
 	s.dirty = true
-
 }
 
 // Save saves the actions into a state store.
@@ -278,25 +272,24 @@ func (s *StateStore) Save() error {
 }
 
 // Queue returns a copy of the queue
-func (s *StateStore) Queue() []action {
+func (s *StateStore) Queue() fleetapi.Actions {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
-	q := make([]action, len(s.state.Queue))
+	q := make([]fleetapi.Action, len(s.state.Queue))
 	copy(q, s.state.Queue)
 	return q
 }
 
-// Actions returns a slice of action to execute in order, currently only a action policy change is
-// persisted.
-func (s *StateStore) Actions() []action {
+// Action the action to execute. See SetAction for the possible action types.
+func (s *StateStore) Action() fleetapi.Action {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
 
 	if s.state.ActionSerializer.Action == nil {
-		return []action{}
+		return nil
 	}
 
-	return []action{s.state.ActionSerializer.Action}
+	return s.state.ActionSerializer.Action
 }
 
 // AckToken return the agent state persisted ack_token
@@ -306,21 +299,21 @@ func (s *StateStore) AckToken() string {
 	return s.state.AckToken
 }
 
-// StateStoreActionAcker wraps an existing acker and will send any acked event to the action store,
-// its up to the action store to decide if we need to persist the event for future replay or just
-// discard the event.
+// StateStoreActionAcker wraps an existing acker and will set any acked event
+// in the state store. It's up to the state store to decide if we need to
+// persist the event for future replay or just discard the event.
 type StateStoreActionAcker struct {
 	acker acker.Acker
 	store *StateStore
 }
 
-// Ack acks action using underlying acker.
-// After action is acked it is stored to backing store.
+// Ack acks the action using underlying acker.
+// After the action is acked it is stored to backing store.
 func (a *StateStoreActionAcker) Ack(ctx context.Context, action fleetapi.Action) error {
 	if err := a.acker.Ack(ctx, action); err != nil {
 		return err
 	}
-	a.store.Add(action)
+	a.store.SetAction(action)
 	return a.store.Save()
 }
 

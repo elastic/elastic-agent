@@ -157,14 +157,14 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		close(retrierRun)
 	}()
 
-	actions := m.stateStore.Actions()
+	action := m.stateStore.Action()
 	stateRestored := false
-	if len(actions) > 0 && !m.wasUnenrolled() {
+	if action == nil && !m.wasUnenrolled() {
 		// TODO(ph) We will need an improvement on fleet, if there is an error while dispatching a
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
 		m.log.Info("restoring current policy from disk")
-		m.dispatcher.Dispatch(ctx, m.coord.SetUpgradeDetails, actionAcker, actions...)
+		m.dispatcher.Dispatch(ctx, m.coord.SetUpgradeDetails, actionAcker, action)
 		stateRestored = true
 	}
 
@@ -268,13 +268,7 @@ func (m *managedConfigManager) Watch() <-chan coordinator.ConfigChange {
 }
 
 func (m *managedConfigManager) wasUnenrolled() bool {
-	actions := m.stateStore.Actions()
-	for _, a := range actions {
-		if a.Type() == "UNENROLL" {
-			return true
-		}
-	}
-	return false
+	return m.stateStore.Action().Type() == fleetapi.ActionTypeUnenroll
 }
 
 func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
