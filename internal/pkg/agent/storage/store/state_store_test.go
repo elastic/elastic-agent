@@ -25,6 +25,54 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+func TestMyTest(t *testing.T) {
+	log, _ := logger.NewTesting("TestMyTest")
+	ackToken := "ackToken"
+	t.Run("ActionPolicyChange", func(t *testing.T) {
+		storePath := filepath.Join(t.TempDir(), "state.yaml")
+		want := &fleetapi.ActionPolicyChange{
+			ActionID:   "abc123",
+			ActionType: "POLICY_CHANGE",
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: map[string]interface{}{
+					"hello":  "world",
+					"phi":    1.618,
+					"answer": 42.0,
+				},
+			},
+		}
+
+		s := storage.NewDiskStore(storePath)
+		stateStore, err := NewStateStore(log, s)
+		require.NoError(t, err, "could not create disk store")
+
+		stateStore.SetAckToken(ackToken)
+		stateStore.Add(want)
+		err = stateStore.Save()
+		require.NoError(t, err, "failed saving state store")
+
+		// to load from disk a new store needs to be created
+		s = storage.NewDiskStore(storePath)
+		stateStore, err = NewStateStore(log, s)
+		require.NoError(t, err, "could not create disk store")
+
+		actions := stateStore.Actions()
+		require.Len(t, actions, 1,
+			"should have loaded exactly 1 action")
+		got, ok := actions[0].(*fleetapi.ActionPolicyChange)
+		require.True(t, ok, "could not cast action to fleetapi.ActionPolicyChange")
+		assert.Equal(t, want, got)
+
+		emptyFields := hasEmptyFields(got)
+		if len(emptyFields) > 0 {
+			t.Errorf("the following fields of %T are serialized and are empty: %s."+
+				" All serialised fields must have a value. Perhaps the action was"+
+				" updated but this test was not. Ensure the test covers all"+
+				"JSON serialized fields for this action.",
+				got, emptyFields)
+		}
+	})
+}
 func TestStateStore(t *testing.T) {
 	t.Run("ack token", func(t *testing.T) {
 		runTestStateStore(t, "czlV93YBwdkt5lYhBY7S")

@@ -87,6 +87,35 @@ type Signed struct {
 	Signature string `json:"signature" yaml:"signature"  mapstructure:"signature"`
 }
 
+func NewAction(actionType string) Action {
+	var action Action
+
+	// keep the case statements alphabetically sorted
+	switch actionType {
+	case ActionTypeCancel:
+		action = &ActionCancel{}
+	case ActionTypeDiagnostics:
+		action = &ActionDiagnostics{}
+	case ActionTypeInputAction:
+		// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
+		action = &ActionApp{}
+	case ActionTypePolicyChange:
+		action = &ActionPolicyChange{}
+	case ActionTypePolicyReassign:
+		action = &ActionPolicyReassign{}
+	case ActionTypeSettings:
+		action = &ActionSettings{}
+	case ActionTypeUnenroll:
+		action = &ActionUnenroll{}
+	case ActionTypeUpgrade:
+		action = &ActionUpgrade{}
+	default:
+		action = &ActionUnknown{OriginalType: actionType}
+	}
+
+	return action
+}
+
 func newAckEvent(id, aType string) AckEvent {
 	return AckEvent{
 		EventType: "ACTION_RESULT",
@@ -559,30 +588,7 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 
 	actions := make([]Action, 0, len(typeUnmarshaler))
 	for i, response := range typeUnmarshaler {
-		var action Action
-
-		// keep the case statements alphabetically sorted
-		switch response.ActionType {
-		case ActionTypeCancel:
-			action = &ActionCancel{}
-		case ActionTypeDiagnostics:
-			action = &ActionDiagnostics{}
-		case ActionTypeInputAction:
-			// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
-			action = &ActionApp{}
-		case ActionTypePolicyChange:
-			action = &ActionPolicyChange{}
-		case ActionTypePolicyReassign:
-			action = &ActionPolicyReassign{}
-		case ActionTypeSettings:
-			action = &ActionSettings{}
-		case ActionTypeUnenroll:
-			action = &ActionUnenroll{}
-		case ActionTypeUpgrade:
-			action = &ActionUpgrade{}
-		default:
-			action = &ActionUnknown{OriginalType: response.ActionType}
-		}
+		action := NewAction(response.ActionType)
 
 		if err := json.Unmarshal(rawActions[i], action); err != nil {
 			return errors.New(err,

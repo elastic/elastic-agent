@@ -14,7 +14,6 @@ import (
 	"sync"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent/internal/pkg/conv"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -48,36 +47,38 @@ type StateStore struct {
 }
 
 type state struct {
-	action   action
-	ackToken string
-	// TODO: the queue is for scheduled actions. Set its type accordingly.
-	queue []action
+	ActionSerializer actionSerializer `json:"action,omitempty"`
+	AckToken         string           `json:"ack_token,omitempty"`
+	Queue            fleetapi.Actions `json:"action_queue,omitempty"`
 }
 
-// actionSerializer is a combined yml serializer for the ActionPolicyChange and ActionUnenroll
-// it is used to read the yaml file and assign the action to state.action as we must provide the
-// underlying struct that provides the action interface.
-// TODO: get rid of this type
+func (as *actionSerializer) MarshalJSON() ([]byte, error) {
+	return json.Marshal(as.Action)
+}
+
+func (as *actionSerializer) UnmarshalJSON(data []byte) error {
+	var typeUnmarshaler struct {
+		Type string `json:"type,omitempty" yaml:"type,omitempty"`
+	}
+	err := json.Unmarshal(data, &typeUnmarshaler)
+	if err != nil {
+		return err
+	}
+
+	as.Action = fleetapi.NewAction(typeUnmarshaler.Type)
+	err = json.Unmarshal(data, &as.Action)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// actionSerializer is JSON Marshaler/Unmarshaler for fleetapi.Action.
 type actionSerializer struct {
-	ID         string               `json:"action_id"`
-	Type       string               `json:"action_type"`
-	Data       actionDataSerializer `json:"data,omitempty"`
-	IsDetected *bool                `json:"is_detected,omitempty"`
-	Signed     *fleetapi.Signed     `json:"signed,omitempty"`
-}
-
-type actionDataSerializer struct {
-	Policy map[string]interface{} `json:"policy" yaml:"policy,omitempty"`
-}
-
-// stateSerializer is used to serialize the state to yaml.
-// action serialization is handled through the actionSerializer struct
-// queue serialization is handled through yaml struct tags or the actions unmarshaller defined in fleetapi
-// TODO clean up action serialization (have it be part of the fleetapi?)
-type stateSerializer struct {
-	Action   *actionSerializer `json:"action,omitempty"`
-	AckToken string            `json:"ack_token,omitempty"`
-	Queue    fleetapi.Actions  `json:"action_queue,omitempty"`
+	json.Marshaler
+	json.Unmarshaler
+	Action fleetapi.Action
 }
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.
@@ -108,10 +109,10 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	}
 	defer reader.Close()
 
-	var serializer stateSerializer
+	st := state{}
 
 	dec := json.NewDecoder(reader)
-	err = dec.Decode(&serializer)
+	err = dec.Decode(&st)
 	if errors.Is(err, io.EOF) {
 		return &StateStore{
 			log:   log,
@@ -121,33 +122,6 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 
 	if err != nil {
 		return nil, err
-	}
-
-	st := state{
-		ackToken: serializer.AckToken,
-		queue:    serializer.Queue,
-	}
-
-	if serializer.Action != nil {
-		// TODO: use ActionType instead
-		if serializer.Action.IsDetected != nil {
-			st.action = &fleetapi.ActionUnenroll{
-				ActionID:   serializer.Action.ID,
-				ActionType: serializer.Action.Type,
-				IsDetected: *serializer.Action.IsDetected,
-				Signed:     serializer.Action.Signed,
-			}
-		} else {
-			st.action = &fleetapi.ActionPolicyChange{
-				ActionID:   serializer.Action.ID,
-				ActionType: serializer.Action.Type,
-				Data: fleetapi.ActionPolicyChangeData{
-					// Fix Policy, in order to make it consistent with the policy
-					// received from the fleet gateway as nested map[string]interface{}
-					Policy: conv.YAMLMapToJSONMap(serializer.Action.Data.Policy),
-				},
-			}
-		}
 	}
 
 	return &StateStore{
@@ -240,11 +214,11 @@ func (s *StateStore) Add(a action) {
 	switch v := a.(type) {
 	case *fleetapi.ActionPolicyChange, *fleetapi.ActionUnenroll:
 		// Only persist the action if the action is different.
-		if s.state.action != nil && s.state.action.ID() == v.ID() {
+		if s.state.ActionSerializer.Action != nil && s.state.ActionSerializer.Action.ID() == v.ID() {
 			return
 		}
 		s.dirty = true
-		s.state.action = a
+		s.state.ActionSerializer.Action = a
 	}
 }
 
@@ -253,18 +227,18 @@ func (s *StateStore) SetAckToken(ackToken string) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
-	if s.state.ackToken == ackToken {
+	if s.state.AckToken == ackToken {
 		return
 	}
 	s.dirty = true
-	s.state.ackToken = ackToken
+	s.state.AckToken = ackToken
 }
 
 // SetQueue sets the action_queue to agent state
 func (s *StateStore) SetQueue(q []action) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
-	s.state.queue = q
+	s.state.Queue = q
 	s.dirty = true
 
 }
@@ -280,34 +254,18 @@ func (s *StateStore) Save() error {
 	}
 
 	var reader io.Reader
-	serialize := stateSerializer{
-		AckToken: s.state.ackToken,
-		Queue:    s.state.queue,
+
+	switch a := s.state.ActionSerializer.Action.(type) {
+	case *fleetapi.ActionPolicyChange,
+		*fleetapi.ActionUnenroll,
+		nil:
+		// ok
+	default:
+		return fmt.Errorf("incompatible type, expected ActionPolicyChange, "+
+			"ActionUnenroll or nil, but received %T", a)
 	}
 
-	if s.state.action != nil {
-		switch a := s.state.action.(type) {
-		case *fleetapi.ActionPolicyChange:
-			serialize.Action = &actionSerializer{
-				ID:   a.ActionID,
-				Type: a.ActionType,
-				Data: actionDataSerializer{
-					Policy: a.Data.Policy,
-				}}
-		case *fleetapi.ActionUnenroll:
-			serialize.Action = &actionSerializer{
-				ID:         a.ActionID,
-				Type:       a.ActionType,
-				IsDetected: &a.IsDetected,
-				Signed:     a.Signed,
-			}
-		default:
-			return fmt.Errorf("incompatible type, expected ActionPolicyChange "+
-				"or ActionUnenroll but received %T", s.state.action)
-		}
-	}
-
-	reader, err := jsonToReader(&serialize)
+	reader, err := jsonToReader(&s.state)
 	if err != nil {
 		return err
 	}
@@ -323,8 +281,8 @@ func (s *StateStore) Save() error {
 func (s *StateStore) Queue() []action {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
-	q := make([]action, len(s.state.queue))
-	copy(q, s.state.queue)
+	q := make([]action, len(s.state.Queue))
+	copy(q, s.state.Queue)
 	return q
 }
 
@@ -334,18 +292,18 @@ func (s *StateStore) Actions() []action {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
 
-	if s.state.action == nil {
+	if s.state.ActionSerializer.Action == nil {
 		return []action{}
 	}
 
-	return []action{s.state.action}
+	return []action{s.state.ActionSerializer.Action}
 }
 
 // AckToken return the agent state persisted ack_token
 func (s *StateStore) AckToken() string {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
-	return s.state.ackToken
+	return s.state.AckToken
 }
 
 // StateStoreActionAcker wraps an existing acker and will send any acked event to the action store,
