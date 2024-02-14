@@ -45,9 +45,9 @@ type StateStore struct {
 }
 
 type state struct {
-	ActionSerializer actionSerializer `json:"action,omitempty"`
-	AckToken         string           `json:"ack_token,omitempty"`
-	Queue            fleetapi.Actions `json:"action_queue,omitempty"`
+	ActionSerializer actionSerializer           `json:"action,omitempty"`
+	AckToken         string                     `json:"ack_token,omitempty"`
+	Queue            []fleetapi.ScheduledAction `json:"action_queue,omitempty"`
 }
 
 func (as *actionSerializer) MarshalJSON() ([]byte, error) {
@@ -232,7 +232,7 @@ func (s *StateStore) SetAckToken(ackToken string) {
 // SetQueue sets the action_queue to agent state
 // TODO: receive only scheduled actions. It might break something. Needs to
 // investigate it better.
-func (s *StateStore) SetQueue(q fleetapi.Actions) {
+func (s *StateStore) SetQueue(q []fleetapi.ScheduledAction) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 	s.state.Queue = q
@@ -274,10 +274,10 @@ func (s *StateStore) Save() error {
 }
 
 // Queue returns a copy of the queue
-func (s *StateStore) Queue() fleetapi.Actions {
+func (s *StateStore) Queue() []fleetapi.ScheduledAction {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
-	q := make([]fleetapi.Action, len(s.state.Queue))
+	q := make([]fleetapi.ScheduledAction, len(s.state.Queue))
 	copy(q, s.state.Queue)
 	return q
 }

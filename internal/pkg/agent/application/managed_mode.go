@@ -268,7 +268,8 @@ func (m *managedConfigManager) Watch() <-chan coordinator.ConfigChange {
 }
 
 func (m *managedConfigManager) wasUnenrolled() bool {
-	return m.stateStore.Action().Type() == fleetapi.ActionTypeUnenroll
+	return m.stateStore.Action() != nil &&
+		m.stateStore.Action().Type() == fleetapi.ActionTypeUnenroll
 }
 
 func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {

@@ -13,7 +13,7 @@ import (
 
 // saver is the minimal interface needed for state storage.
 type saver interface {
-	SetQueue(a fleetapi.Actions)
+	SetQueue(a []fleetapi.ScheduledAction)
 	Save() error
 }
 
@@ -74,13 +74,9 @@ func (q *queue) Pop() interface{} {
 
 // newQueue creates a new priority queue using container/heap.
 // Will return an error if StartTime fails for any action.
-func newQueue(actions []fleetapi.Action) (*queue, error) {
+func newQueue(actions []fleetapi.ScheduledAction) (*queue, error) {
 	q := make(queue, len(actions))
-	for i, a := range actions {
-		action, ok := a.(fleetapi.ScheduledAction)
-		if !ok {
-			continue
-		}
+	for i, action := range actions {
 		ts, err := action.StartTime()
 		if err != nil {
 			return nil, err
@@ -96,7 +92,7 @@ func newQueue(actions []fleetapi.Action) (*queue, error) {
 }
 
 // NewActionQueue creates a new queue with the passed actions using the saver for state storage.
-func NewActionQueue(actions []fleetapi.Action, s saver) (*ActionQueue, error) {
+func NewActionQueue(actions []fleetapi.ScheduledAction, s saver) (*ActionQueue, error) {
 	q, err := newQueue(actions)
 	if err != nil {
 		return nil, err
@@ -149,8 +145,8 @@ func (q *ActionQueue) Cancel(actionID string) int {
 }
 
 // Actions returns all actions in the queue, item 0 is garunteed to be the min, the rest may not be in sorted order.
-func (q *ActionQueue) Actions() []fleetapi.Action {
-	actions := make([]fleetapi.Action, q.q.Len())
+func (q *ActionQueue) Actions() []fleetapi.ScheduledAction {
+	actions := make([]fleetapi.ScheduledAction, q.q.Len())
 	for i, item := range *q.q {
 		actions[i] = item.action
 	}
