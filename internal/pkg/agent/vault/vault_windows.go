@@ -11,6 +11,7 @@ import (
 
 	"github.com/billgraziano/dpapi"
 	"github.com/hectane/go-acl"
+	"github.com/hectane/go-acl/api"
 	"golang.org/x/sys/windows"
 
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -25,11 +26,6 @@ func (v *Vault) decrypt(data []byte) ([]byte, error) {
 }
 
 func tightenPermissions(path string) error {
-	return systemAdministratorsOnly(path, false)
-}
-
-func systemAdministratorsOnly(path string, inherit bool) error {
-	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
 	systemSID, err := windows.StringToSid(utils.SystemSID)
 	if err != nil {
 		return err
@@ -38,12 +34,23 @@ func systemAdministratorsOnly(path string, inherit bool) error {
 	if err != nil {
 		return err
 	}
+	acls := []api.ExplicitAccess{
+		acl.GrantSid(0xF10F0000, systemSID),         // full control of all acl's
+		acl.GrantSid(0xF10F0000, administratorsSID), // full control of all acl's
+	}
 
-	// https://docs.microsoft.com/en-us/windows/win32/secauthz/access-mask
-	return acl.Apply(
-		path, true, inherit,
-		acl.GrantSid(0xF10F0000, systemSID), // full control of all acl's
-		acl.GrantSid(0xF10F0000, administratorsSID))
+	hasRoot, err := utils.HasRoot()
+	if err == nil && !hasRoot {
+		// ensure that the executing user also has rights
+		ownership := utils.CurrentFileOwner()
+		userSID, err := windows.StringToSid(ownership.UID)
+		if err != nil {
+			return err
+		}
+		acls = append(acls, acl.GrantSid(0xF10F0000, userSID))
+	}
+
+	return acl.Apply(path, true, false, acls...)
 }
 
 func writeFile(fp string, data []byte) error {
