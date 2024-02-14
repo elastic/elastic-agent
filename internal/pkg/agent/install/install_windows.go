@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
@@ -43,7 +42,7 @@ func postInstall(topPath string) error {
 	}
 
 	// create top-level symlink to nested binary
-	realBinary := filepath.Join(topPath, "data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()), paths.BinaryName)
+	realBinary := paths.BinaryPath(paths.VersionedHome(topPath), paths.BinaryName)
 	err = os.Symlink(realBinary, binary)
 	if err != nil {
 		return err

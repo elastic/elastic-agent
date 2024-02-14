@@ -226,7 +226,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	}
 
 	// initiate agent watcher
-	if err := upgrade.InvokeWatcher(l); err != nil {
+	if _, err := upgrade.InvokeWatcher(l, paths.TopBinaryPath()); err != nil {
 		// we should not fail because watcher is not working
 		l.Error(errors.New(err, "failed to invoke rollback watcher"))
 	}
@@ -629,7 +629,7 @@ func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
 // ongoing upgrade operation, i.e. being re-exec'd and performs
 // any upgrade-specific work, if needed.
 func handleUpgrade() error {
-	upgradeMarker, err := upgrade.LoadMarker()
+	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
 	if err != nil {
 		return fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
 	}

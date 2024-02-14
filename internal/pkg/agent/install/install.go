@@ -5,6 +5,7 @@
 package install
 
 import (
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -109,35 +111,20 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 			errors.M("directory", filepath.Dir(topPath)))
 	}
 
-	// copy source into install path
-	//
-	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
-	// otherwise fall back to the default.
-	copyConcurrency := 1
-	hasSSDs, detectHWErr := HasAllSSDs()
-	if detectHWErr != nil {
-		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling copy concurrency: %s\n", detectHWErr)
-	}
-	if hasSSDs {
-		copyConcurrency = runtime.NumCPU() * 4
+	manifest, err := readPackageManifest(dir)
+	if err != nil {
+		return utils.FileOwner{}, fmt.Errorf("reading package manifest: %w", err)
 	}
 
+	pathMappings := manifest.Package.PathMappings
+
 	pt.Describe("Copying install files")
-	err = copy.Copy(dir, topPath, copy.Options{
-		OnSymlink: func(_ string) copy.SymlinkAction {
-			return copy.Shallow
-		},
-		Sync:         true,
-		NumOfWorkers: int64(copyConcurrency),
-	})
+	err = copyFiles(streams, pathMappings, dir, topPath)
 	if err != nil {
 		pt.Describe("Error copying files")
-		return utils.FileOwner{}, errors.New(
-			err,
-			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
-			errors.M("source", dir), errors.M("destination", topPath),
-		)
+		return utils.FileOwner{}, err
 	}
+
 	pt.Describe("Successfully copied files")
 
 	// place shell wrapper, if present on platform
@@ -232,6 +219,136 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	pt.Describe("Installed service")
 
 	return ownership, nil
+}
+
+func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error) {
+	manifestFilePath := filepath.Join(extractedPackageDir, v1.ManifestFileName)
+	manifestFile, err := os.Open(manifestFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open package manifest file (%s): %w", manifestFilePath, err)
+	}
+	defer manifestFile.Close()
+	manifest, err := v1.ParseManifest(manifestFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse package manifest file %q contents: %w", manifestFilePath, err)
+	}
+
+	return manifest, nil
+}
+
+func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir string, topPath string) error {
+	// copy source into install path
+	//
+	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
+	// otherwise fall back to the default.
+	copyConcurrency := 1
+	hasSSDs, detectHWErr := HasAllSSDs()
+	if detectHWErr != nil {
+		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling copy concurrency: %s\n", detectHWErr)
+	}
+	if hasSSDs {
+		copyConcurrency = runtime.NumCPU() * 4
+	}
+
+	// these are needed to keep track of what we already copied
+	copiedFiles := map[string]struct{}{}
+	// collect any symlink we found that need remapping
+	symlinks := map[string]string{}
+
+	var copyErrors []error
+
+	// Start copying the remapped paths first
+	for _, pathMapping := range pathMappings {
+		for packagePath, installedPath := range pathMapping {
+			// flag the original path as handled
+			copiedFiles[packagePath] = struct{}{}
+			srcPath := filepath.Join(srcDir, packagePath)
+			dstPath := filepath.Join(topPath, installedPath)
+			err := copy.Copy(srcPath, dstPath, copy.Options{
+				OnSymlink: func(_ string) copy.SymlinkAction {
+					return copy.Shallow
+				},
+				Sync:         true,
+				NumOfWorkers: int64(copyConcurrency),
+			})
+			if err != nil {
+				return errors.New(
+					err,
+					fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", packagePath, installedPath),
+					errors.M("source", packagePath), errors.M("destination", installedPath),
+				)
+			}
+		}
+	}
+
+	// copy the remaining files excluding overlaps with the mapped paths
+	err := copy.Copy(srcDir, topPath, copy.Options{
+		OnSymlink: func(source string) copy.SymlinkAction {
+			target, err := os.Readlink(source)
+			if err != nil {
+				// error reading the link, not much choice to leave it unchanged and collect the error
+				copyErrors = append(copyErrors, fmt.Errorf("unable to read link %q for remapping", source))
+				return copy.Skip
+			}
+
+			// if we find a link, check if its target need to be remapped, in which case skip it for now and save it for
+			// later creation with the remapped target
+			for _, pathMapping := range pathMappings {
+				for srcPath, dstPath := range pathMapping {
+					srcPathLocal := filepath.FromSlash(srcPath)
+					dstPathLocal := filepath.FromSlash(dstPath)
+					if strings.HasPrefix(target, srcPathLocal) {
+						newTarget := strings.Replace(target, srcPathLocal, dstPathLocal, 1)
+						rel, err := filepath.Rel(srcDir, source)
+						if err != nil {
+							copyErrors = append(copyErrors, fmt.Errorf("extracting relative path for %q using %q as base: %w", source, srcDir, err))
+							return copy.Skip
+						}
+						symlinks[rel] = newTarget
+						return copy.Skip
+					}
+				}
+			}
+
+			return copy.Shallow
+		},
+		Skip: func(srcinfo os.FileInfo, src, dest string) (bool, error) {
+			relPath, err := filepath.Rel(srcDir, src)
+			if err != nil {
+				return false, fmt.Errorf("calculating relative path for %s: %w", src, err)
+			}
+			// check if we already handled this path as part of the mappings: if we did, skip it
+			relPath = filepath.ToSlash(relPath)
+			_, ok := copiedFiles[relPath]
+			return ok, nil
+		},
+		Sync:         true,
+		NumOfWorkers: int64(copyConcurrency),
+	})
+	if err != nil {
+		return errors.New(
+			err,
+			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", srcDir, topPath),
+			errors.M("source", srcDir), errors.M("destination", topPath),
+		)
+	}
+
+	if len(copyErrors) > 0 {
+		return fmt.Errorf("errors encountered during copy from %q to %q: %w", srcDir, topPath, goerrors.Join(copyErrors...))
+	}
+
+	// Create the remapped symlinks
+	for src, target := range symlinks {
+		absSrcPath := filepath.Join(topPath, src)
+		err := os.Symlink(target, absSrcPath)
+		if err != nil {
+			return errors.New(
+				err,
+				fmt.Sprintf("failed to link source %q to destination %q", absSrcPath, target),
+			)
+		}
+	}
+	return nil
 }
 
 // StartService starts the installed service.

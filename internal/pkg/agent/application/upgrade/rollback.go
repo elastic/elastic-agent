@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -33,44 +34,64 @@ const (
 )
 
 // Rollback rollbacks to previous version which was functioning before upgrade.
-func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentHash string) error {
+func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
+	symlinkPath := filepath.Join(topDirPath, agentName)
+
+	var symlinkTarget string
+	if prevVersionedHome != "" {
+		symlinkTarget = paths.BinaryPath(filepath.Join(topDirPath, prevVersionedHome), agentName)
+	} else {
+		// fallback for upgrades that didn't use the manifest and path remapping
+		hashedDir := fmt.Sprintf("%s-%s", agentName, prevHash)
+		// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
+		symlinkTarget = paths.BinaryPath(filepath.Join(paths.DataFrom(topDirPath), hashedDir), agentName)
+	}
 	// change symlink
-	if err := ChangeSymlink(ctx, log, prevHash); err != nil {
+	if err := changeSymlink(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
 		return err
 	}
 
 	// revert active commit
-	if err := UpdateActiveCommit(log, prevHash); err != nil {
+	if err := UpdateActiveCommit(log, topDirPath, prevHash); err != nil {
 		return err
 	}
 
 	// Restart
 	log.Info("Restarting the agent after rollback")
-	if err := restartAgent(ctx, log); err != nil {
+	if err := restartAgent(ctx, log, c); err != nil {
 		return err
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, prevHash, true, true)
+	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, true, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
-func Cleanup(log *logger.Logger, currentHash string, removeMarker bool, keepLogs bool) error {
+func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
 	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
 	<-time.After(afterRestartDelay)
 
+	// data directory path
+	dataDirPath := paths.DataFrom(topDirPath)
+
 	// remove upgrade marker
 	if removeMarker {
-		if err := CleanMarker(log); err != nil {
+		if err := CleanMarker(log, dataDirPath); err != nil {
 			return err
 		}
 	}
 
 	// remove data/elastic-agent-{hash}
-	dataDir, err := os.Open(paths.Data())
+	dataDir, err := os.Open(dataDirPath)
 	if err != nil {
 		return err
 	}
+	defer func(dataDir *os.File) {
+		err := dataDir.Close()
+		if err != nil {
+			log.Errorw("Error closing data directory", "file.directory", dataDirPath)
+		}
+	}(dataDir)
 
 	subdirs, err := dataDir.Readdirnames(0)
 	if err != nil {
@@ -78,12 +99,21 @@ func Cleanup(log *logger.Logger, currentHash string, removeMarker bool, keepLogs
 	}
 
 	// remove symlink to avoid upgrade failures, ignore error
-	prevSymlink := prevSymlinkPath()
-	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath())
+	prevSymlink := prevSymlinkPath(topDirPath)
+	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(topDirPath))
 	_ = os.Remove(prevSymlink)
 
 	dirPrefix := fmt.Sprintf("%s-", agentName)
-	currentDir := fmt.Sprintf("%s-%s", agentName, currentHash)
+	var currentDir string
+	if currentVersionedHome != "" {
+		currentDir, err = filepath.Rel("data", currentVersionedHome)
+		if err != nil {
+			return fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", currentVersionedHome, err)
+		}
+	} else {
+		currentDir = fmt.Sprintf("%s-%s", agentName, currentHash)
+	}
+
 	for _, dir := range subdirs {
 		if dir == currentDir {
 			continue
@@ -93,7 +123,7 @@ func Cleanup(log *logger.Logger, currentHash string, removeMarker bool, keepLogs
 			continue
 		}
 
-		hashedDir := filepath.Join(paths.Data(), dir)
+		hashedDir := filepath.Join(dataDirPath, dir)
 		log.Infow("Removing hashed data directory", "file.path", hashedDir)
 		var ignoredDirs []string
 		if keepLogs {
@@ -109,13 +139,13 @@ func Cleanup(log *logger.Logger, currentHash string, removeMarker bool, keepLogs
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
 // agent during upgrade period.
-func InvokeWatcher(log *logger.Logger) error {
+func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error) {
 	if !IsUpgradeable() {
 		log.Info("agent is not upgradable, not starting watcher")
-		return nil
+		return nil, nil
 	}
 
-	cmd := invokeCmd()
+	cmd := invokeCmd(agentExecutable)
 	defer func() {
 		if cmd.Process != nil {
 			log.Infof("releasing watcher %v", cmd.Process.Pid)
@@ -125,19 +155,18 @@ func InvokeWatcher(log *logger.Logger) error {
 
 	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start Upgrade Watcher: %w", err)
+		return nil, fmt.Errorf("failed to start Upgrade Watcher: %w", err)
 	}
 
 	upgradeWatcherPID := cmd.Process.Pid
 	agentPID := os.Getpid()
 	log.Infow("Upgrade Watcher invoked", "agent.upgrade.watcher.process.pid", upgradeWatcherPID, "agent.process.pid", agentPID)
 
-	return nil
+	return cmd, nil
 }
 
-func restartAgent(ctx context.Context, log *logger.Logger) error {
+func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) error {
 	restartViaDaemonFn := func(ctx context.Context) error {
-		c := client.New()
 		connectCtx, connectCancel := context.WithTimeout(ctx, 3*time.Second)
 		defer connectCancel()
 		err := c.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry())
