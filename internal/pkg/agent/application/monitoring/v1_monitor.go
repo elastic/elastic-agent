@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
@@ -522,7 +523,6 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 }
 
 func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component) error {
-
 	metricsCollectionIntervalString := metricsCollectionInterval.String()
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
@@ -606,12 +606,21 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			},
 		},
 	}
-	for unit, binaryName := range componentIDToBinary {
+	logger := logp.L()
+
+	//create a new map with the monitoring instances
+	componentListWithMonitoring := map[string]string{"beat/metrics-monitoring": "metricbeat", "http/metrics-monitoring": "metricbeat", "filestream-monitoring": "filebeat"}
+	for k, v := range componentIDToBinary {
+		componentListWithMonitoring[k] = v
+	}
+
+	for unit, binaryName := range componentListWithMonitoring {
 		if !isSupportedMetricsBinary(binaryName) {
 			continue
 		}
 
 		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(unit, paths.TempDir()))}
+		logger.Infof("Injecting config for binary name %s and unit %s for endpoint %v", binaryName, unit, endpoints)
 		name := strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_") // conform with index naming policy
 
 		if isSupportedBeatsBinary(binaryName) {
