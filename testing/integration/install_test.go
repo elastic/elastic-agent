@@ -147,9 +147,6 @@ func TestInstallWithBasePath(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-func checkInstallSuccess(t *testing.T, topPath string) {
-=======
 // TestRepeatedInstallUninstall will install then uninstall the agent
 // repeatedly.  This test exists because of a number of race
 // conditions that have occurred in the uninstall process.  Current
@@ -204,7 +201,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 			}
 
 			// Check that Agent was installed in default base path
-			checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+			checkInstallSuccess(t, topPath)
 			t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 			require.NoErrorf(t, err, "uninstall failed: %s", err)
@@ -212,8 +209,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 	}
 }
 
-func checkInstallSuccess(t *testing.T, topPath string, unprivileged bool) {
->>>>>>> 82efe133d0 ([uninstall] ensure service is stopped on windows (#4224))
+func checkInstallSuccess(t *testing.T, topPath string) {
 	t.Helper()
 	_, err := os.Stat(topPath)
 	require.NoError(t, err)
