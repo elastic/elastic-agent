@@ -2,7 +2,16 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package version
+package component
 
-const defaultBeatVersion = "8.14.0"
-const Agent = defaultBeatVersion
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestLoadPlatformDetail(t *testing.T) {
+	platformDetail, err := LoadPlatformDetail()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, platformDetail)
+}
