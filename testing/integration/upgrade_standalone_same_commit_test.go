@@ -96,7 +96,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		require.NoError(t, err, "error creating start agent fixture")
 
 		// modify the version with the "+buildYYYYMMDDHHMMSS"
-		newVersionBuildMetadata := time.Now().Format("20060102150405")
+		newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
 		parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
 
 		err = startFixture.EnsurePrepared(ctx)

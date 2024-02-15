@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	semver "github.com/elastic/elastic-agent/pkg/version"
 )
@@ -74,8 +75,22 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 		}
 	}
 
-	build := fmt.Sprintf(mainBuildfmt, f.binaryName, ver.VersionWithPrerelease(), suffix)
-	buildPath := filepath.Join(ver.BuildMetadata(), build)
+	var buildPath string
+
+	const earlyReleaseVersionSuffix = `build\d{14}`
+	// exclude non-snapshot and +buildYYYYMMDDHHMMSS from this path for local fetcher (I am not even sure that the build ID makes sense in the local fetcher)
+	matchesEarlyReleaseVersion, err := regexp.Match(earlyReleaseVersionSuffix, []byte(ver.BuildMetadata()))
+	if err != nil {
+		return nil, fmt.Errorf("error checking %q for early release version", ver.BuildMetadata())
+	}
+
+	if ver.IsSnapshot() && !matchesEarlyReleaseVersion {
+		build := fmt.Sprintf(mainBuildfmt, f.binaryName, ver.VersionWithPrerelease(), suffix)
+		buildPath = filepath.Join(ver.BuildMetadata(), build)
+	} else {
+		buildPath = fmt.Sprintf(mainBuildfmt, f.binaryName, ver.String(), suffix)
+	}
+
 	fullPath := filepath.Join(f.dir, buildPath)
 	_, err = os.Stat(fullPath)
 	if err != nil {
