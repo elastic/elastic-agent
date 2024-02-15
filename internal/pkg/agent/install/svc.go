@@ -52,12 +52,6 @@ func withUserGroup(username string, group string) serviceOpt {
 	}
 }
 
-func withPassword(password string) serviceOpt {
-	return func(opts *serviceOpts) {
-		opts.Password = password
-	}
-}
-
 func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	var opts serviceOpts
 	for _, o := range opt {
