@@ -2,7 +2,8 @@ package integration
 
 import (
 	"archive/tar"
-	"bufio"
+	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -135,7 +136,7 @@ func TestBogusRepackage(t *testing.T) {
 	switch ext {
 	case ".zip":
 		t.Logf("file %q is a .zip package", originalPackageFileName)
-		t.FailNow()
+		repackageZipArchive(t, srcPackage, newPackageFileName, parsedNewVersion)
 	case ".tar.gz":
 		t.Logf("file %q is a .tar.gz package", originalPackageFileName)
 		repackageTarArchive(t, srcPackage, newPackageFileName, parsedNewVersion)
@@ -214,20 +215,10 @@ func hackTarGzPackage(t *testing.T, reader *tar.Reader, writer *tar.Writer, oldT
 		// tar format uses forward slash as path separator, make sure we use only "path" package for checking and manipulation
 		switch path.Base(f.Name) {
 		case v1.ManifestFileName:
-			//read old content
-			manifestReader := bufio.NewReaderSize(reader, int(f.Size))
-			oldManifest, err := v1.ParseManifest(manifestReader)
-			require.NoError(t, err, "reading manifest content from tar source archive")
-
-			t.Logf("read old manifest: %+v", oldManifest)
-
-			// replace manifest content
-			newManifest, err := mage.GeneratePackageManifest("elastic-agent", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
-			require.NoErrorf(t, err, "GeneratePackageManifest(%v, %v, %v, %v) failed", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
-
-			t.Logf("generated new manifest:\n%s", newManifest)
-
+			//read old content and generate the new manifest based on that
+			newManifest := generateNewManifestContent(t, reader, newVersion)
 			newManifestBytes := []byte(newManifest)
+
 			// fix file length in header
 			writeModifiedTarHeader(t, writer, f, oldTopDirName, newTopDirName, int64(len(newManifestBytes)))
 
@@ -266,4 +257,109 @@ func writeModifiedTarHeader(t *testing.T, writer *tar.Writer, header *tar.Header
 
 	err := writer.WriteHeader(header)
 	require.NoErrorf(t, err, "error writing tar header %+v", header)
+}
+
+func repackageZipArchive(t *testing.T, srcPackagePath string, newPackagePath string, newVersion *version.ParsedSemVer) {
+	oldTopDirectoryName := strings.TrimRight(filepath.Base(srcPackagePath), ".zip")
+	newTopDirectoryName := strings.TrimRight(filepath.Base(newPackagePath), ".zip")
+
+	// Open the source package and create readers
+	zipReader, err := zip.OpenReader(srcPackagePath)
+	require.NoErrorf(t, err, "error opening source file %q", srcPackagePath)
+	defer func(zipReader *zip.ReadCloser) {
+		err := zipReader.Close()
+		if err != nil {
+			assert.Failf(t, "error closing source file %q: %v", srcPackagePath, err)
+		}
+	}(zipReader)
+
+	// Create the output file and its writers
+	newPackageFile, err := os.OpenFile(newPackagePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o750)
+	require.NoErrorf(t, err, "error opening output file %q", newPackageFile)
+	defer func(newPackageFile *os.File) {
+		err := newPackageFile.Close()
+		if err != nil {
+			assert.Failf(t, "error closing output file %q: %v", newPackagePath, err)
+		}
+	}(newPackageFile)
+
+	zipWriter := zip.NewWriter(newPackageFile)
+	defer func(zipWriter *zip.Writer) {
+		err := zipWriter.Close()
+		if err != nil {
+			assert.Failf(t, "error closing zip writer for output file %q: %v", newPackagePath, err)
+		}
+	}(zipWriter)
+
+	hackZipPackage(t, zipReader, zipWriter, oldTopDirectoryName, newTopDirectoryName, newVersion)
+}
+
+func hackZipPackage(t *testing.T, reader *zip.ReadCloser, writer *zip.Writer, oldTopDirName string, newTopDirName string, newVersion *version.ParsedSemVer) {
+	for _, zippedFile := range reader.File {
+		zippedFileHeader := zippedFile.FileHeader
+
+		// zip format uses forward slash as path separator, make sure we use only "path" package for checking and manipulation
+		switch path.Base(zippedFile.Name) {
+		case v1.ManifestFileName:
+			//read old content
+			manifestReader, err := zippedFile.Open()
+			require.NoError(t, err, "error opening manifest file in zipped package")
+
+			// generate new manifest based on the old manifest and the new version
+			newManifest := generateNewManifestContent(t, manifestReader, newVersion)
+
+			// we need to close the file content reader
+			err = manifestReader.Close()
+			require.NoError(t, err, "error closing manifest file in zipped package")
+
+			newManifestBytes := []byte(newManifest)
+			fileContentWriter := writeModifiedZipFileHeader(t, writer, zippedFileHeader, oldTopDirName, newTopDirName, uint64(len(newManifest)))
+
+			_, err = io.Copy(fileContentWriter, bytes.NewReader(newManifestBytes))
+			require.NoError(t, err, "error writing out modified manifest")
+
+		case agtversion.PackageVersionFileName:
+			t.Logf("writing new package version: %q", newVersion.String())
+			// new package version file contents
+			newPackageVersionBytes := []byte(newVersion.String())
+			fileContentWriter := writeModifiedZipFileHeader(t, writer, zippedFileHeader, oldTopDirName, newTopDirName, uint64(len(newPackageVersionBytes)))
+
+			_, err := io.Copy(fileContentWriter, bytes.NewReader(newPackageVersionBytes))
+			require.NoError(t, err, "error writing out modified package version")
+		default:
+			// write entry header with the size untouched
+			fileContentWriter := writeModifiedZipFileHeader(t, writer, zippedFileHeader, oldTopDirName, newTopDirName, zippedFile.UncompressedSize64)
+			fileContentReader, err := zippedFile.Open()
+			require.NoErrorf(t, err, "error opening zip file content reader for %+v", zippedFileHeader)
+			// copy body
+			_, err = io.Copy(fileContentWriter, fileContentReader)
+			require.NoErrorf(t, err, "error writing file content for %+v", zippedFileHeader)
+
+			// we need to close the file content reader
+			err = fileContentReader.Close()
+			require.NoError(t, err, "error closing zipped file writer for %+v", zippedFileHeader)
+		}
+	}
+}
+
+func writeModifiedZipFileHeader(t *testing.T, writer *zip.Writer, header zip.FileHeader, oldTopDirName, newTopDirName string, size uint64) io.Writer {
+	header.Name = strings.Replace(header.Name, oldTopDirName, newTopDirName, 1)
+	header.UncompressedSize64 = size
+	fileContentWriter, err := writer.CreateHeader(&header)
+	require.NoErrorf(t, err, "error creating header for %+v", header)
+	return fileContentWriter
+}
+
+func generateNewManifestContent(t *testing.T, manifestReader io.Reader, newVersion *version.ParsedSemVer) string {
+	oldManifest, err := v1.ParseManifest(manifestReader)
+	require.NoError(t, err, "reading manifest content from tar source archive")
+
+	t.Logf("read old manifest: %+v", oldManifest)
+
+	// replace manifest content
+	newManifest, err := mage.GeneratePackageManifest("elastic-agent", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
+	require.NoErrorf(t, err, "GeneratePackageManifest(%v, %v, %v, %v) failed", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
+
+	t.Logf("generated new manifest:\n%s", newManifest)
+	return newManifest
 }
