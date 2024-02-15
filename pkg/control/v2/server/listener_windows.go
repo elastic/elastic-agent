@@ -11,10 +11,10 @@ import (
 	"net"
 	"os/user"
 
-	"github.com/elastic/elastic-agent-libs/api/npipe"
 	"github.com/hectane/go-acl/api"
 	"golang.org/x/sys/windows"
 
+	"github.com/elastic/elastic-agent-libs/api/npipe"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -92,7 +92,9 @@ func pathGID(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("call to GetNamedSecurityInfo at %s failed: %w", path, err)
 	}
-	defer windows.LocalFree(secDesc)
+	defer func() {
+		_, _ = windows.LocalFree(secDesc)
+	}()
 	if group == nil {
 		return "", fmt.Errorf("failed to determine group using GetNamedSecurityInfo at %s", path)
 	}

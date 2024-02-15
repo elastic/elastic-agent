@@ -57,7 +57,7 @@ func CreateGroup(name string) (string, error) {
 	var info LOCALGROUP_INFO_0
 	info.Lgrpi0_name, err = syscall.UTF16PtrFromString(name)
 	if err != nil {
-		return "", fmt.Errorf("failed to encode group name %s to UTF16: %s", name, err)
+		return "", fmt.Errorf("failed to encode group name %s to UTF16: %w", name, err)
 	}
 	ret, _, _ := procNetLocalGroupAdd.Call(
 		uintptr(0),
@@ -99,7 +99,7 @@ func CreateUser(name string, _ string) (string, error) {
 	}
 	info.Usri1_name, err = syscall.UTF16PtrFromString(name)
 	if err != nil {
-		return "", fmt.Errorf("failed to encode username %s to UTF16: %s", name, err)
+		return "", fmt.Errorf("failed to encode username %s to UTF16: %w", name, err)
 	}
 	ret, _, _ := procNetUserAdd.Call(
 		uintptr(0),
@@ -152,7 +152,7 @@ func AddUserToGroup(username string, groupName string) error {
 	}
 	groupNamePtr, err := syscall.UTF16PtrFromString(groupName)
 	if err != nil {
-		return fmt.Errorf("failed to encode group name %s to UTF16: %s", groupName, err)
+		return fmt.Errorf("failed to encode group name %s to UTF16: %w", groupName, err)
 	}
 	entries := make([]LOCALGROUP_MEMBERS_INFO_0, 1)
 	entries[0] = LOCALGROUP_MEMBERS_INFO_0{
@@ -179,11 +179,11 @@ func SetUserPassword(name string, password string) error {
 
 	namePtr, err := syscall.UTF16PtrFromString(name)
 	if err != nil {
-		return fmt.Errorf("failed to encode username %s to UTF16: %s", name, err)
+		return fmt.Errorf("failed to encode username %s to UTF16: %w", name, err)
 	}
 	info.Usri1003_password, err = syscall.UTF16PtrFromString(password)
 	if err != nil {
-		return fmt.Errorf("failed to encode password to UTF16: %s", err)
+		return fmt.Errorf("failed to encode password to UTF16: %w", err)
 	}
 	ret, _, _ := procNetUserSetInfo.Call(
 		uintptr(0),
