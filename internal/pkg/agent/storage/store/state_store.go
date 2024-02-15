@@ -45,10 +45,22 @@ type StateStore struct {
 }
 
 type state struct {
-	ActionSerializer actionSerializer           `json:"action,omitempty"`
-	AckToken         string                     `json:"ack_token,omitempty"`
-	Queue            []fleetapi.ScheduledAction `json:"action_queue,omitempty"`
+	ActionSerializer actionSerializer `json:"action,omitempty"`
+	AckToken         string           `json:"ack_token,omitempty"`
+	Queue            actionQueue      `json:"action_queue,omitempty"`
 }
+
+// actionSerializer is JSON Marshaler/Unmarshaler for fleetapi.Action.
+type actionSerializer struct {
+	json.Marshaler
+	json.Unmarshaler
+
+	Action fleetapi.Action
+}
+
+// actionQueue is a slice of ScheduledActions to executes and allow to
+// unmarshal ScheduledActions.
+type actionQueue []fleetapi.ScheduledAction
 
 func (as *actionSerializer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(as.Action)
@@ -72,12 +84,26 @@ func (as *actionSerializer) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// actionSerializer is JSON Marshaler/Unmarshaler for fleetapi.Action.
-type actionSerializer struct {
-	json.Marshaler
-	json.Unmarshaler
+func (aq *actionQueue) UnmarshalJSON(data []byte) error {
+	actions := fleetapi.Actions{}
+	err := json.Unmarshal(data, &actions)
+	if err != nil {
+		return fmt.Errorf("actionQueue failed to unmarshal: %w", err)
+	}
 
-	Action fleetapi.Action
+	var scheduledActions []fleetapi.ScheduledAction
+	for _, a := range actions {
+		sa, ok := a.(fleetapi.ScheduledAction)
+		if !ok {
+			return fmt.Errorf("actionQueue: action %s isn't a ScheduledAction,"+
+				"cannot unmarshal it to actionQueue", a.Type())
+		}
+		scheduledActions = append(scheduledActions, sa)
+		_ = sa
+	}
+
+	*aq = scheduledActions
+	return nil
 }
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.
@@ -128,75 +154,6 @@ func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 		store: store,
 		state: st,
 	}, nil
-}
-
-func migrateActionStoreToStateStore(
-	log *logger.Logger,
-	actionStorePath string,
-	stateDiskStore storage.Storage) (err error) {
-
-	log = log.Named("state_migration")
-	actionDiskStore := storage.NewDiskStore(actionStorePath)
-
-	stateStoreExits, err := stateDiskStore.Exists()
-	if err != nil {
-		log.Errorf("failed to check if state store exists: %v", err)
-		return err
-	}
-
-	// do not migrate if the state store already exists
-	if stateStoreExits {
-		log.Debugf("state store already exists")
-		return nil
-	}
-
-	actionStoreExits, err := actionDiskStore.Exists()
-	if err != nil {
-		log.Errorf("failed to check if action store %s exists: %v", actionStorePath, err)
-		return err
-	}
-
-	// delete the actions store file upon successful migration
-	defer func() {
-		if err == nil && actionStoreExits {
-			err = actionDiskStore.Delete()
-			if err != nil {
-				log.Errorf("failed to delete action store %s exists: %v", actionStorePath, err)
-			}
-		}
-	}()
-
-	// nothing to migrate if the action store doesn't exists
-	if !actionStoreExits {
-		log.Debugf("action store %s doesn't exists, nothing to migrate", actionStorePath)
-		return nil
-	}
-
-	actionStore, err := newActionStore(log, actionDiskStore)
-	if err != nil {
-		log.Errorf("failed to create action store %s: %v", actionStorePath, err)
-		return err
-	}
-
-	// no actions stored nothing to migrate
-	if len(actionStore.actions()) == 0 {
-		log.Debugf("no actions stored in the action store %s, nothing to migrate", actionStorePath)
-		return nil
-	}
-
-	stateStore, err := NewStateStore(log, stateDiskStore)
-	if err != nil {
-		return err
-	}
-
-	// set actions from the action store to the state store
-	stateStore.SetAction(actionStore.actions()[0])
-
-	err = stateStore.Save()
-	if err != nil {
-		log.Debugf("failed to save agent state store, err: %v", err)
-	}
-	return err
 }
 
 // SetAction sets the current action. It accepts ActionPolicyChange or
@@ -322,6 +279,75 @@ func (a *StateStoreActionAcker) Ack(ctx context.Context, action fleetapi.Action)
 // Commit commits acks.
 func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
 	return a.acker.Commit(ctx)
+}
+
+func migrateActionStoreToStateStore(
+	log *logger.Logger,
+	actionStorePath string,
+	stateDiskStore storage.Storage) (err error) {
+
+	log = log.Named("state_migration")
+	actionDiskStore := storage.NewDiskStore(actionStorePath)
+
+	stateStoreExits, err := stateDiskStore.Exists()
+	if err != nil {
+		log.Errorf("failed to check if state store exists: %v", err)
+		return err
+	}
+
+	// do not migrate if the state store already exists
+	if stateStoreExits {
+		log.Debugf("state store already exists")
+		return nil
+	}
+
+	actionStoreExits, err := actionDiskStore.Exists()
+	if err != nil {
+		log.Errorf("failed to check if action store %s exists: %v", actionStorePath, err)
+		return err
+	}
+
+	// delete the actions store file upon successful migration
+	defer func() {
+		if err == nil && actionStoreExits {
+			err = actionDiskStore.Delete()
+			if err != nil {
+				log.Errorf("failed to delete action store %s exists: %v", actionStorePath, err)
+			}
+		}
+	}()
+
+	// nothing to migrate if the action store doesn't exists
+	if !actionStoreExits {
+		log.Debugf("action store %s doesn't exists, nothing to migrate", actionStorePath)
+		return nil
+	}
+
+	actionStore, err := newActionStore(log, actionDiskStore)
+	if err != nil {
+		log.Errorf("failed to create action store %s: %v", actionStorePath, err)
+		return err
+	}
+
+	// no actions stored nothing to migrate
+	if len(actionStore.actions()) == 0 {
+		log.Debugf("no actions stored in the action store %s, nothing to migrate", actionStorePath)
+		return nil
+	}
+
+	stateStore, err := NewStateStore(log, stateDiskStore)
+	if err != nil {
+		return err
+	}
+
+	// set actions from the action store to the state store
+	stateStore.SetAction(actionStore.actions()[0])
+
+	err = stateStore.Save()
+	if err != nil {
+		log.Debugf("failed to save agent state store, err: %v", err)
+	}
+	return err
 }
 
 func jsonToReader(in interface{}) (io.Reader, error) {

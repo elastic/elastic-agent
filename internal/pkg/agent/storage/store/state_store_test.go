@@ -27,49 +27,43 @@ import (
 
 func TestMyTest(t *testing.T) {
 	log, _ := logger.NewTesting("TestMyTest")
-	ackToken := "ackToken"
-	t.Run("ActionPolicyChange", func(t *testing.T) {
-		storePath := filepath.Join(t.TempDir(), "state.yaml")
-		want := &fleetapi.ActionPolicyChange{
-			ActionID:   "abc123",
-			ActionType: "POLICY_CHANGE",
-			Data: fleetapi.ActionPolicyChangeData{
-				Policy: map[string]interface{}{
-					"hello":  "world",
-					"phi":    1.618,
-					"answer": 42.0,
-				},
-			},
-		}
+	// ackToken := "ackToken"
+	t.Run("can save a queue with one upgrade action", func(t *testing.T) {
+		ts := time.Now().UTC().Round(time.Second)
+		queue := []fleetapi.ScheduledAction{&fleetapi.ActionUpgrade{
+			ActionID:        "test",
+			ActionType:      fleetapi.ActionTypeUpgrade,
+			ActionStartTime: ts.Format(time.RFC3339),
+			Data: fleetapi.ActionUpgradeData{
+				Version:   "1.2.3",
+				SourceURI: "https://example.com",
+			}}}
 
+		storePath := filepath.Join(t.TempDir(), "state.yml")
 		s := storage.NewDiskStore(storePath)
-		stateStore, err := NewStateStore(log, s)
-		require.NoError(t, err, "could not create disk store")
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
 
-		stateStore.SetAckToken(ackToken)
-		stateStore.SetAction(want)
-		err = stateStore.Save()
-		require.NoError(t, err, "failed saving state store")
+		require.Empty(t, store.Action())
+		store.SetQueue(queue)
+		err = store.Save()
+		require.NoError(t, err)
+		require.Empty(t, store.Action())
+		require.Len(t, store.Queue(), 1)
 
-		// to load from disk a new store needs to be created
 		s = storage.NewDiskStore(storePath)
-		stateStore, err = NewStateStore(log, s)
-		require.NoError(t, err, "could not create disk store")
+		store, err = NewStateStore(log, s)
+		require.NoError(t, err)
 
-		action := stateStore.Action()
-		require.NotNil(t, action, "should have loaded an action")
-		got, ok := action.(*fleetapi.ActionPolicyChange)
-		require.True(t, ok, "could not cast action to fleetapi.ActionPolicyChange")
-		assert.Equal(t, want, got)
+		assert.Nil(t, store.Action())
+		assert.Len(t, store.Queue(), 1)
+		assert.Equal(t, "test", store.Queue()[0].ID())
 
-		emptyFields := hasEmptyFields(got)
-		if len(emptyFields) > 0 {
-			t.Errorf("the following fields of %T are serialized and are empty: %s."+
-				" All serialised fields must have a value. Perhaps the action was"+
-				" updated but this test was not. Ensure the test covers all"+
-				"JSON serialized fields for this action.",
-				got, emptyFields)
-		}
+		scheduledAction, ok := store.Queue()[0].(fleetapi.ScheduledAction)
+		assert.True(t, ok, "expected to be able to cast Action as ScheduledAction")
+		start, err := scheduledAction.StartTime()
+		assert.NoError(t, err)
+		assert.Equal(t, ts, start)
 	})
 }
 func TestStateStore(t *testing.T) {
@@ -178,16 +172,18 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.Len(t, store.Queue(), 1)
 
 		s = storage.NewDiskStore(storePath)
-		store1, err := NewStateStore(log, s)
+		store, err = NewStateStore(log, s)
 		require.NoError(t, err)
-		require.Empty(t, store1.Action())
-		require.Len(t, store1.Queue(), 1)
-		require.Equal(t, "test", store1.Queue()[0].ID())
-		scheduledAction, ok := store1.Queue()[0].(fleetapi.ScheduledAction)
-		require.True(t, ok, "expected to be able to cast Action as ScheduledAction")
+
+		assert.Nil(t, store.Action())
+		assert.Len(t, store.Queue(), 1)
+		assert.Equal(t, "test", store.Queue()[0].ID())
+
+		scheduledAction, ok := store.Queue()[0].(fleetapi.ScheduledAction)
+		assert.True(t, ok, "expected to be able to cast Action as ScheduledAction")
 		start, err := scheduledAction.StartTime()
-		require.NoError(t, err)
-		require.Equal(t, ts, start)
+		assert.NoError(t, err)
+		assert.Equal(t, ts, start)
 	})
 	//
 	// t.Run("can save a queue with two actions", func(t *testing.T) {
@@ -224,7 +220,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 	// 	s = storage.NewDiskStore(storePath)
 	// 	store1, err := NewStateStore(log, s)
 	// 	require.NoError(t, err)
-	// 	require.Empty(t, store1.Action())
+	// 	require.Nil(t, store1.Action())
 	// 	require.Len(t, store1.Queue(), 2)
 	//
 	// 	require.Equal(t, "test", store1.Queue()[0].ID())

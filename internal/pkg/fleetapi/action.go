@@ -50,6 +50,10 @@ type Action interface {
 	AckEvent() AckEvent
 }
 
+// Actions is a slice of Actions to executes and allow to unmarshal
+// heterogeneous action types.
+type Actions []Action
+
 // ScheduledAction is an Action that may be executed at a later date
 // Only ActionUpgrade implements this at the moment
 type ScheduledAction interface {
@@ -563,9 +567,6 @@ func (a *ActionApp) MarshalMap() (map[string]interface{}, error) {
 	err := mapstructure.Decode(a, &res)
 	return res, err
 }
-
-// Actions is a list of Actions to executes and allow to unmarshal heterogenous action type.
-type Actions []Action
 
 // UnmarshalJSON takes every raw representation of an action and try to decode them.
 func (a *Actions) UnmarshalJSON(data []byte) error {
