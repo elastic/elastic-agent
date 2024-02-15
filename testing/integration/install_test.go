@@ -66,7 +66,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	opts := &atesting.InstallOpts{Force: true}
+	opts := &atesting.InstallOpts{Force: true, Privileged: false}
 	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
@@ -74,7 +74,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path
-	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+	checkInstallSuccess(t, topPath, true)
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -151,7 +151,7 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+	checkInstallSuccess(t, topPath, true)
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -222,7 +222,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 			}
 
 			// Check that Agent was installed in default base path
-			checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+			checkInstallSuccess(t, topPath, !opts.Privileged)
 			t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 			require.NoErrorf(t, err, "uninstall failed: %s", err)

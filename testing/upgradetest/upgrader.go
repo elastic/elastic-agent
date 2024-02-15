@@ -250,7 +250,7 @@ func PerformUpgrade(
 	installOpts := atesting.InstallOpts{
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
-		Unprivileged:   upgradeOpts.unprivileged,
+		Privileged:     !(*upgradeOpts.unprivileged),
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	if err != nil {
