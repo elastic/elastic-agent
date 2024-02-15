@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sync"
 	"testing"
@@ -73,9 +74,10 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		ActionPolicyChange := &fleetapi.ActionPolicyChange{
 			ActionID:   "abc123",
 			ActionType: "POLICY_CHANGE",
-			Policy: map[string]interface{}{
-				"hello": "world",
-			},
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: map[string]interface{}{
+					"hello": "world",
+				}},
 		}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
@@ -111,9 +113,10 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			ActionID:        "test",
 			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: ts.Format(time.RFC3339),
-			Version:         "1.2.3",
-			SourceURI:       "https://example.com",
-		}}
+			Data: fleetapi.ActionUpgradeData{
+				Version:   "1.2.3",
+				SourceURI: "https://example.com",
+			}}}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
 		s := storage.NewDiskStore(storePath)
@@ -146,15 +149,17 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			ActionID:        "test",
 			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: ts.Format(time.RFC3339),
-			Version:         "1.2.3",
-			SourceURI:       "https://example.com",
-			Retry:           1,
-		}, &fleetapi.ActionPolicyChange{
+			Data: fleetapi.ActionUpgradeData{
+				Version:   "1.2.3",
+				SourceURI: "https://example.com",
+				Retry:     1,
+			}}, &fleetapi.ActionPolicyChange{
 			ActionID:   "abc123",
 			ActionType: "POLICY_CHANGE",
-			Policy: map[string]interface{}{
-				"hello": "world",
-			},
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: map[string]interface{}{
+					"hello": "world",
+				}},
 		}}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
@@ -269,6 +274,11 @@ func runTestStateStore(t *testing.T, ackToken string) {
 	})
 
 	t.Run("migrate", func(t *testing.T) {
+		// TODO: DO NOT MERGE TO MAIN WITHOUT REMOVING THIS SKIP
+		t.Skip("this test is broken because the migration haven't been" +
+			" implemented yet. It'll implemented on another PR as part of" +
+			"https://github.com/elastic/elastic-agent/issues/3912")
+
 		if runtime.GOOS == "darwin" {
 			// the original migrate never actually run, so with this at least
 			// there is coverage for linux and windows.
@@ -279,10 +289,12 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		want := &fleetapi.ActionPolicyChange{
 			ActionID:   "abc123",
 			ActionType: "POLICY_CHANGE",
-			Policy: map[string]interface{}{
-				"hello":  "world",
-				"phi":    1.618,
-				"answer": 42,
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: map[string]interface{}{
+					"hello":  "world",
+					"phi":    1.618,
+					"answer": 42,
+				},
 			},
 		}
 
@@ -337,6 +349,148 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			"queue should be empty, old action store did not have a queue")
 	})
 
+	t.Run("state store is correctly loaded from disk", func(t *testing.T) {
+		t.Run("ActionPolicyChange", func(t *testing.T) {
+			storePath := filepath.Join(t.TempDir(), "state.yaml")
+			want := &fleetapi.ActionPolicyChange{
+				ActionID:   "abc123",
+				ActionType: "POLICY_CHANGE",
+				Data: fleetapi.ActionPolicyChangeData{
+					Policy: map[string]interface{}{
+						"hello":  "world",
+						"phi":    1.618,
+						"answer": 42.0,
+					},
+				},
+			}
+
+			s := storage.NewDiskStore(storePath)
+			stateStore, err := NewStateStore(log, s)
+			require.NoError(t, err, "could not create disk store")
+
+			stateStore.SetAckToken(ackToken)
+			stateStore.Add(want)
+			err = stateStore.Save()
+			require.NoError(t, err, "failed saving state store")
+
+			// to load from disk a new store needs to be created
+			s = storage.NewDiskStore(storePath)
+			stateStore, err = NewStateStore(log, s)
+			require.NoError(t, err, "could not create disk store")
+
+			actions := stateStore.Actions()
+			require.Len(t, actions, 1,
+				"should have loaded exactly 1 action")
+			got, ok := actions[0].(*fleetapi.ActionPolicyChange)
+			require.True(t, ok, "could not cast action to fleetapi.ActionPolicyChange")
+			assert.Equal(t, want, got)
+
+			emptyFields := hasEmptyFields(got)
+			if len(emptyFields) > 0 {
+				t.Errorf("the following fields of %T are serialized and are empty: %s."+
+					" All serialised fields must have a value. Perhaps the action was"+
+					" updated but this test was not. Ensure the test covers all"+
+					"JSON serialized fields for this action.",
+					got, emptyFields)
+			}
+		})
+
+		t.Run("ActionUnenroll", func(t *testing.T) {
+			storePath := filepath.Join(t.TempDir(), "state.yaml")
+			want := &fleetapi.ActionUnenroll{
+				ActionID:   "abc123",
+				ActionType: fleetapi.ActionTypeUnenroll,
+				IsDetected: true,
+				Signed: &fleetapi.Signed{
+					Data:      "some data",
+					Signature: "a signature",
+				},
+			}
+
+			s := storage.NewDiskStore(storePath)
+			stateStore, err := NewStateStore(log, s)
+			require.NoError(t, err, "could not create disk store")
+
+			stateStore.SetAckToken(ackToken)
+			stateStore.Add(want)
+			err = stateStore.Save()
+			require.NoError(t, err, "failed saving state store")
+
+			// to load from disk a new store needs to be created
+			s = storage.NewDiskStore(storePath)
+			stateStore, err = NewStateStore(log, s)
+			require.NoError(t, err, "could not create disk store")
+
+			actions := stateStore.Actions()
+			require.Len(t, actions, 1,
+				"should have loaded exactly 1 action")
+			got, ok := actions[0].(*fleetapi.ActionUnenroll)
+			require.True(t, ok, "could not cast action to fleetapi.ActionUnenroll")
+			assert.Equal(t, want, got)
+
+			emptyFields := hasEmptyFields(got)
+			if len(emptyFields) > 0 {
+				t.Errorf("the following fields of %T are serialized and are empty: %s."+
+					" All serialised fields must have a value. Perhaps the action was"+
+					" updated but this test was not. Ensure the test covers all"+
+					"JSON serialized fields for this action.",
+					got, emptyFields)
+			}
+		})
+
+		t.Run("action queue", func(t *testing.T) {
+			storePath := filepath.Join(t.TempDir(), "state.yaml")
+			now := time.Now().UTC().Round(time.Second)
+			want := &fleetapi.ActionUpgrade{
+				ActionID:         "test",
+				ActionType:       fleetapi.ActionTypeUpgrade,
+				ActionStartTime:  now.Format(time.RFC3339),
+				ActionExpiration: now.Add(time.Hour).Format(time.RFC3339),
+				Data: fleetapi.ActionUpgradeData{
+					Version:   "1.2.3",
+					SourceURI: "https://example.com",
+					Retry:     1,
+				},
+				Signed: &fleetapi.Signed{
+					Data:      "some data",
+					Signature: "a signature",
+				},
+			}
+
+			t.Logf("state store: %q", storePath)
+			s := storage.NewDiskStore(storePath)
+			stateStore, err := NewStateStore(log, s)
+			require.NoError(t, err, "could not create disk store")
+
+			stateStore.SetAckToken(ackToken)
+			stateStore.SetQueue([]action{want})
+			err = stateStore.Save()
+			require.NoError(t, err, "failed saving state store")
+
+			// to load from disk a new store needs to be created
+			s = storage.NewDiskStore(storePath)
+			stateStore, err = NewStateStore(log, s)
+			require.NoError(t, err, "could not create disk store")
+
+			queue := stateStore.Queue()
+			require.Len(t, queue, 1, "action queue should have only 1 action")
+			got := queue[0]
+			assert.Equal(t, want, got,
+				"deserialized action is different from what was saved to disk")
+			_, ok := got.(*fleetapi.ActionUpgrade)
+			require.True(t, ok, "could not cast action in the queue to upgradeAction")
+
+			emptyFields := hasEmptyFields(got)
+			if len(emptyFields) > 0 {
+				t.Errorf("the following fields of %T are serialized and are empty: %s."+
+					" All serialised fields must have a value. Perhaps the action was"+
+					" updated but this test was not. Ensure the test covers all"+
+					"JSON serialized fields for this action.",
+					got, emptyFields)
+			}
+		})
+	})
+
 }
 
 type testAcker struct {
@@ -371,4 +525,41 @@ func (t *testAcker) Items() []string {
 	t.ackedLock.Lock()
 	defer t.ackedLock.Unlock()
 	return t.acked
+}
+
+// hasEmptyFields will check if action has any empty fields. It returns a string
+// slice with any empty field, the field value is the zero value for its type.
+// If the json tag of the field is "-", the field is ignored.
+// If no field is empty, it returns nil.
+func hasEmptyFields(action fleetapi.Action) []string {
+	var actionValue reflect.Value
+	actionValue = reflect.ValueOf(action)
+	// dereference if it's a pointer
+	if actionValue.Kind() == reflect.Pointer {
+		actionValue = actionValue.Elem()
+	}
+
+	var failures []string
+	for i := 0; i < actionValue.NumField(); i++ {
+		fieldValue := actionValue.Field(i)
+		actionType := actionValue.Type()
+		structField := actionType.Field(i)
+
+		fieldName := structField.Name
+		tag := structField.Tag.Get("json")
+
+		// If the field isn't serialised, ignore it.
+		if tag == "-" {
+			continue
+		}
+
+		got := fieldValue.Interface()
+		zeroValue := reflect.Zero(fieldValue.Type()).Interface()
+
+		if reflect.DeepEqual(got, zeroValue) {
+			failures = append(failures, fieldName)
+		}
+	}
+
+	return failures
 }

@@ -98,7 +98,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	// // Cache signature validation key for the next policy handling
 	// h.signatureValidationKey = signatureValidationKey
 
-	c, err := config.NewConfigFrom(action.Policy)
+	c, err := config.NewConfigFrom(action.Data.Policy)
 	if err != nil {
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}

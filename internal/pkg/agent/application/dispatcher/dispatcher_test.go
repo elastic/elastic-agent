@@ -675,7 +675,9 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 			actions: []fleetapi.Action{
 				&fleetapi.ActionUpgrade{
 					ActionID: "action1",
-					Version:  "8.12.3",
+					Data: fleetapi.ActionUpgradeData{
+						Version: "8.12.3",
+					},
 				},
 			},
 			expectedErrLogMsg: "failed to get start time for scheduled upgrade action [id = action1]",
@@ -685,7 +687,9 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 				&fleetapi.ActionUpgrade{
 					ActionID:        "action2",
 					ActionStartTime: later.Format(time.RFC3339),
-					Version:         "8.13.0",
+					Data: fleetapi.ActionUpgradeData{
+						Version: "8.13.0",
+					},
 				},
 			},
 			expectedDetails: &details.Details{
@@ -702,12 +706,16 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 				&fleetapi.ActionUpgrade{
 					ActionID:        "action3",
 					ActionStartTime: muchLater.Format(time.RFC3339),
-					Version:         "8.14.1",
+					Data: fleetapi.ActionUpgradeData{
+						Version: "8.14.1",
+					},
 				},
 				&fleetapi.ActionUpgrade{
 					ActionID:        "action4",
 					ActionStartTime: later.Format(time.RFC3339),
-					Version:         "8.13.5",
+					Data: fleetapi.ActionUpgradeData{
+						Version: "8.13.5",
+					},
 				},
 			},
 			expectedDetails: &details.Details{
@@ -723,8 +731,10 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 			actions: []fleetapi.Action{
 				&fleetapi.ActionUpgrade{
 					ActionID:        "action1",
-					Version:         "8.13.2",
 					ActionStartTime: "invalid",
+					Data: fleetapi.ActionUpgradeData{
+						Version: "8.13.2",
+					},
 				},
 			},
 			expectedErrLogMsg: "failed to get start time for scheduled upgrade action [id = action1]",
