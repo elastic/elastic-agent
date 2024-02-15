@@ -108,8 +108,19 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 
 		originalPackageFileName := filepath.Base(srcPackage)
 
+		// integration test fixtures and package names treat the version as a string including the "-SNAPSHOT" suffix
+		// while the repackage functions below separate version from the snapshot flag.
+		// Normally the early release versions are not snapshots but this test runs on PRs and main branch when we test
+		// starting from SNAPSHOT packages, so we have to work around the fact that we cannot simply re-generate the packages
+		// by defining versions in 2 separate ways for repackage hack and for fixtures
+		buildMetadataForAgentFixture := newVersionBuildMetadata
+		if currentVersion.IsSnapshot() {
+			buildMetadataForAgentFixture += "-SNAPSHOT"
+		}
+		versionForFixture := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", buildMetadataForAgentFixture)
+
 		// calculate the new package name
-		newPackageFileName := strings.Replace(originalPackageFileName, currentVersion.String(), parsedNewVersion.String(), 1)
+		newPackageFileName := strings.Replace(originalPackageFileName, currentVersion.String(), versionForFixture.String(), 1)
 		t.Logf("originalPackageName: %q newPackageFileName: %q", originalPackageFileName, newPackageFileName)
 
 		newPackageContainingDir := t.TempDir()
@@ -138,11 +149,10 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		require.NoErrorf(t, err, "error creating .sha512 for file %q", newPackageAbsPath)
 
 		// I wish I could just pass the location of the package on disk to the whole upgrade tests/fixture/fetcher code
-		// but I would have to break too much code for that, when in Rome... add more inflexible code on top of inflexible code
-
+		// but I would have to break too much code for that, when in Rome... add more code on top of inflexible code
 		repackagedLocalFetcher := atesting.LocalFetcher(newPackageContainingDir)
 
-		endFixture, err := atesting.NewFixture(t, parsedNewVersion.String(), atesting.WithFetcher(repackagedLocalFetcher))
+		endFixture, err := atesting.NewFixture(t, versionForFixture.String(), atesting.WithFetcher(repackagedLocalFetcher))
 		require.NoErrorf(t, err, "error creating end fixture with LocalArtifactFetcher with dir %q", newPackageContainingDir)
 
 		err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t,
@@ -150,67 +160,10 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 			upgradetest.WithDisableHashCheck(true),
 		)
 
-		assert.ErrorContainsf(t, err, fmt.Sprintf("agent version is already %s", currentVersion), "upgrade should fail indicating we are already at the same version")
+		assert.NoError(t, err, "upgrade using version %s from the same commit should succeed")
 	})
 
 }
-
-//func TestBogusRepackage(t *testing.T) {
-//	define.Require(t, define.Requirements{
-//		Group: Upgrade,
-//		Local: true,
-//		Sudo:  false,
-//	})
-//
-//	startFixture, err := define.NewFixture(
-//		t,
-//		define.Version(),
-//	)
-//
-//	require.NoError(t, err)
-//	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Minute)
-//	defer cancel()
-//
-//	err = startFixture.EnsurePrepared(ctx)
-//	require.NoErrorf(t, err, "fixture should be prepared")
-//
-//	// the fixture must be prepared but NOT installed
-//	require.False(t, startFixture.IsInstalled(), "Fixture must not be installed to repackage the agent")
-//
-//	srcPackage, err := startFixture.SrcPackage(ctx)
-//	require.NoErrorf(t, err, "error retrieving start fixture source package")
-//
-//	originalPackageFileName := filepath.Base(srcPackage)
-//
-//	parsedCurrentVersion, err := version.ParseVersion(define.Version())
-//	require.NoErrorf(t, err, "define.Version() string %q must be a valid agent version", define.Version())
-//
-//	newVersionBuildMetadata := time.Now().Format("20060102150405")
-//	parsedNewVersion := version.NewParsedSemVer(parsedCurrentVersion.Major(), parsedCurrentVersion.Minor(), parsedCurrentVersion.Patch(), "", newVersionBuildMetadata)
-//
-//	newPackageFileName := strings.Replace(originalPackageFileName, parsedCurrentVersion.String(), parsedNewVersion.String(), 1)
-//	t.Logf("originalPackageName: %q newPackageFileName: %q", originalPackageFileName, newPackageFileName)
-//
-//	ext := filepath.Ext(originalPackageFileName)
-//	if ext == ".gz" {
-//		// fetch the next extension
-//		ext = filepath.Ext(strings.TrimRight(originalPackageFileName, ext)) + ext
-//	}
-//	switch ext {
-//	case ".zip":
-//		t.Logf("file %q is a .zip package", originalPackageFileName)
-//		repackageZipArchive(t, srcPackage, newPackageFileName, parsedNewVersion)
-//	case ".tar.gz":
-//		t.Logf("file %q is a .tar.gz package", originalPackageFileName)
-//		repackageTarArchive(t, srcPackage, newPackageFileName, parsedNewVersion)
-//	default:
-//		t.Logf("unknown extension %q for package file %q ", ext, originalPackageFileName)
-//		t.FailNow()
-//	}
-//
-//	// dump logs
-//	assert.True(t, false)
-//}
 
 func repackageTarArchive(t *testing.T, srcPackagePath string, newPackagePath string, newVersion *version.ParsedSemVer) {
 	oldTopDirectoryName := strings.TrimRight(filepath.Base(srcPackagePath), ".tar.gz")
