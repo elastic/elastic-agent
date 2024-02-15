@@ -1,18 +1,21 @@
 package integration
 
 import (
-	"bytes"
+	"archive/tar"
+	"bufio"
+	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
-	"io/fs"
+	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -121,80 +124,146 @@ func TestBogusRepackage(t *testing.T) {
 	newVersionBuildMetadata := time.Now().Format("20060102150405")
 	parsedNewVersion := version.NewParsedSemVer(parsedCurrentVersion.Major(), parsedCurrentVersion.Minor(), parsedCurrentVersion.Patch(), "", newVersionBuildMetadata)
 
-	repackageExtractedAgent(t, startFixture.WorkDir(), parsedCurrentVersion, parsedNewVersion)
+	newPackageFileName := strings.Replace(originalPackageFileName, parsedCurrentVersion.String(), parsedNewVersion.String(), 1)
+	t.Logf("originalPackageName: %q newPackageFileName: %q", originalPackageFileName, newPackageFileName)
 
-	t.Logf("srcPackage: %q originalPackageName: %q", srcPackage, originalPackageFileName)
+	ext := filepath.Ext(originalPackageFileName)
+	if ext == ".gz" {
+		// fetch the next extension
+		ext = filepath.Ext(strings.TrimRight(originalPackageFileName, ext)) + ext
+	}
+	switch ext {
+	case ".zip":
+		t.Logf("file %q is a .zip package", originalPackageFileName)
+		t.FailNow()
+	case ".tar.gz":
+		t.Logf("file %q is a .tar.gz package", originalPackageFileName)
+		repackageTarArchive(t, srcPackage, newPackageFileName, parsedNewVersion)
+	default:
+		t.Logf("unknown extension %q for package file %q ", ext, originalPackageFileName)
+		t.FailNow()
+	}
 
 	//dump logs
 	assert.True(t, false)
 }
-func repackageExtractedAgent(t *testing.T, extractedPackageDir string, parsedCurrentVersion, parsedNewVersion *version.ParsedSemVer) string {
-	workDir := extractedPackageDir
-	t.Logf("fixture workdir: %q", workDir)
-	topDir := filepath.Base(workDir)
-	modifiedTopDir := strings.Replace(topDir, parsedCurrentVersion.String(), parsedNewVersion.String(), 1)
-	modifiedTmp := t.TempDir()
-	absModifiedTopDir := filepath.Join(modifiedTmp, modifiedTopDir)
-	err := copy.Copy(workDir, absModifiedTopDir, copy.Options{NumOfWorkers: 4})
-	require.NoErrorf(t, err, "error copying source package from %q to %q", workDir, absModifiedTopDir)
 
-	modifyVersionForPackage(t, parsedNewVersion, absModifiedTopDir)
-	manifestBytes, err := os.ReadFile(filepath.Join(absModifiedTopDir, "manifest.yaml"))
-	require.NoError(t, err, "manifest file should be readable after modification")
-	t.Logf("manifest file after rewrite:\n%s\n", string(manifestBytes))
+func repackageTarArchive(t *testing.T, srcPackagePath string, newPackagePath string, newVersion *version.ParsedSemVer) {
+	oldTopDirectoryName := strings.TrimRight(filepath.Base(srcPackagePath), ".tar.gz")
+	newTopDirectoryName := strings.TrimRight(filepath.Base(newPackagePath), ".tar.gz")
 
-	// TODO compress the modified directory, regenerate SHA and return the package full path location
-	return absModifiedTopDir
-}
-
-func modifyVersionForPackage(t *testing.T, version *version.ParsedSemVer, extractedPackagePath string) {
-	rewriteManifestFile(t, version, extractedPackagePath)
-	err := rewritePackageVersionFile(version, extractedPackagePath)
-	require.NoError(t, err, "error modifying agent package version file")
-}
-
-func rewritePackageVersionFile(version *version.ParsedSemVer, extractedPackagePath string) error {
-	return filepath.WalkDir(extractedPackagePath, func(path string, d fs.DirEntry, err error) error {
+	// Open the source package and create readers
+	srcPackageFile, err := os.Open(srcPackagePath)
+	require.NoErrorf(t, err, "error opening source file %q", srcPackagePath)
+	defer func(srcPackageFile *os.File) {
+		err := srcPackageFile.Close()
 		if err != nil {
-			return err
+			assert.Failf(t, "error closing source file %q: %v", srcPackagePath, err)
 		}
+	}(srcPackageFile)
 
-		if d.Name() == agtversion.PackageVersionFileName {
-			info, err := d.Info()
-			if err != nil {
-				return fmt.Errorf("error getting info for agent package version file %q: %w", path, err)
-			}
-			err = os.WriteFile(path, []byte(version.String()), info.Mode())
-			if err != nil {
-				return fmt.Errorf("error writing new version in agent package version file %q: %w", path, err)
-			}
+	gzReader, err := gzip.NewReader(srcPackageFile)
+	require.NoErrorf(t, err, "error creating gzip reader for file %q", srcPackagePath)
+	defer func(gzReader *gzip.Reader) {
+		err := gzReader.Close()
+		if err != nil {
+			assert.Failf(t, "error closing gzip reader for source file %q: %v", srcPackagePath, err)
 		}
-		return nil
-	})
+	}(gzReader)
+
+	tarReader := tar.NewReader(gzReader)
+
+	// Create the output file and its writers
+	newPackageFile, err := os.OpenFile(newPackagePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o750)
+	require.NoErrorf(t, err, "error opening output file %q", newPackageFile)
+	defer func(newPackageFile *os.File) {
+		err := newPackageFile.Close()
+		if err != nil {
+			assert.Failf(t, "error closing output file %q: %v", newPackagePath, err)
+		}
+	}(newPackageFile)
+
+	gzWriter := gzip.NewWriter(newPackageFile)
+	defer func(gzWriter *gzip.Writer) {
+		err := gzWriter.Close()
+		if err != nil {
+			assert.Failf(t, "error closing gzip writer for file %q: %v", newPackagePath, err)
+		}
+	}(gzWriter)
+
+	tarWriter := tar.NewWriter(gzWriter)
+	defer func(tarWriter *tar.Writer) {
+		err := tarWriter.Close()
+		if err != nil {
+			assert.Failf(t, "error closing tar writer for file %q: %v", newPackagePath, err)
+		}
+	}(tarWriter)
+
+	hackTarGzPackage(t, tarReader, tarWriter, oldTopDirectoryName, newTopDirectoryName, newVersion)
 }
 
-func rewriteManifestFile(t *testing.T, version *version.ParsedSemVer, extractedPackagePath string) {
-	t.Logf("Start rewriting manifest for version %q", version)
+func hackTarGzPackage(t *testing.T, reader *tar.Reader, writer *tar.Writer, oldTopDirName string, newTopDirName string, newVersion *version.ParsedSemVer) {
 
-	manifestPath := filepath.Join(extractedPackagePath, v1.ManifestFileName)
-	require.FileExistsf(t, manifestPath, "%q manifest file should exist in the extracted package at %q", manifestPath, extractedPackagePath)
+	for {
+		f, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(t, err, "error reading source package")
 
-	// parse manifest, change version and snapshot flag and rewrite
-	manifestFileBytes, err := os.ReadFile(manifestPath)
-	require.NoErrorf(t, err, "reading file manifest %q for extracted package %q", manifestPath, extractedPackagePath)
-	manifest, err := v1.ParseManifest(bytes.NewReader(manifestFileBytes))
-	require.NoError(t, err, "parsing manifest file")
+		// tar format uses forward slash as path separator, make sure we use only "path" package for checking and manipulation
+		switch path.Base(f.Name) {
+		case v1.ManifestFileName:
+			//read old content
+			manifestReader := bufio.NewReaderSize(reader, int(f.Size))
+			oldManifest, err := v1.ParseManifest(manifestReader)
+			require.NoError(t, err, "reading manifest content from tar source archive")
 
-	packageDesc := manifest.Package
-	previousSnapshot := packageDesc.Snapshot
-	fullHash := packageDesc.Hash
+			t.Logf("read old manifest: %+v", oldManifest)
 
-	newManifest, err := mage.GeneratePackageManifest("elastic-agent", version.String(), previousSnapshot, fullHash, fullHash[:6])
-	require.NoErrorf(t, err, "GeneratePackageManifest(%v, %v, %v, %v) failed", version.String(), previousSnapshot, fullHash, fullHash[:6])
-	t.Logf("New manifest for repackaged version:\n%s", newManifest)
-	stat, err := os.Stat(manifestPath)
-	require.NoErrorf(t, err, "unable to Stat() manifest file %q", manifestPath)
+			// replace manifest content
+			newManifest, err := mage.GeneratePackageManifest("elastic-agent", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
+			require.NoErrorf(t, err, "GeneratePackageManifest(%v, %v, %v, %v) failed", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
 
-	err = os.WriteFile(manifestPath, []byte(newManifest), stat.Mode())
-	require.NoErrorf(t, err, "error writing manifest file %q", manifestPath)
+			t.Logf("generated new manifest:\n%s", newManifest)
+
+			newManifestBytes := []byte(newManifest)
+			// fix file length in header
+			writeModifiedTarHeader(t, writer, f, oldTopDirName, newTopDirName, int64(len(newManifestBytes)))
+
+			// write the new manifest body
+			_, err = writer.Write(newManifestBytes)
+			require.NoError(t, err, "error writing out modified manifest")
+
+		case agtversion.PackageVersionFileName:
+
+			t.Logf("writing new package version: %q", newVersion.String())
+
+			// new package version file contents
+			newPackageVersionBytes := []byte(newVersion.String())
+			// write new header
+			writeModifiedTarHeader(t, writer, f, oldTopDirName, newTopDirName, int64(len(newPackageVersionBytes)))
+			// write content
+			_, err := writer.Write(newPackageVersionBytes)
+			require.NoError(t, err, "error writing out modified package version")
+		default:
+			// write entry header with the size untouched
+			writeModifiedTarHeader(t, writer, f, oldTopDirName, newTopDirName, f.Size)
+
+			// copy body
+			_, err := io.Copy(writer, reader)
+			require.NoErrorf(t, err, "error writing file content for %+v", f)
+		}
+
+	}
+
+}
+
+func writeModifiedTarHeader(t *testing.T, writer *tar.Writer, header *tar.Header, oldTopDirName, newTopDirName string, size int64) {
+	// replace top dir in the path
+	header.Name = strings.Replace(header.Name, oldTopDirName, newTopDirName, 1)
+	header.Size = size
+
+	err := writer.WriteHeader(header)
+	require.NoErrorf(t, err, "error writing tar header %+v", header)
 }
