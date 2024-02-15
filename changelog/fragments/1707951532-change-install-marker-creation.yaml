@@ -16,7 +16,7 @@ summary: change-install-marker-creation
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: Create the .installed marker earlier on in the install process, allowing the user of `elastic-agent uninstall` in cases where the install fails.
+description: Create the .installed marker earlier on in the install process, allowing the use of `elastic-agent uninstall` to cleanup if the install fails.
 
 # Affected component; a word indicating the component this changeset affects.
 component: install
