@@ -116,33 +116,30 @@ func TestInstallWithBasePath(t *testing.T) {
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
-	// Set up random temporary directory to serve as base path for Elastic Agent
-	// installation.
-	tmpDir := t.TempDir()
-	basePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
+	var basePath string
+	switch runtime.GOOS {
+	case define.Linux:
+		// When installing with unprivileged using a base path the
+		// base needs to be accessible by the `elastic-agent` user that will be
+		// executing the process, but is not created yet. Using a base that exists
+		// and is known to be accessible by standard users, ensures this tests
+		// works correctly and will not hit a permission issue when spawning the
+		// elastic-agent service.
+		basePath = `/usr`
+	default:
+		// Set up random temporary directory to serve as base path for Elastic Agent
+		// installation.
+		tmpDir := t.TempDir()
+		basePath = filepath.Join(tmpDir, strings.ToLower(randStr(8)))
+	}
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	opts := &atesting.InstallOpts{
-		BasePath: basePath,
-		Force:    true,
+		BasePath:   basePath,
+		Force:      true,
+		Privileged: false,
 	}
-	if opts.IsUnprivileged(runtime.GOOS) {
-		switch runtime.GOOS {
-		case define.Linux:
-			// When installing with unprivileged using a base path the
-			// base needs to be accessible by the `elastic-agent` user that will be
-			// executing the process, but is not created yet. Using a base that exists
-			// and is known to be accessible by standard users, ensures this tests
-			// works correctly and will not hit a permission issue when spawning the
-			// elastic-agent service.
-			basePath = `/usr`
-		default:
-			t.Fatalf("only Linux supports unprivileged mode")
-		}
-		opts.BasePath = basePath
-	}
-
 	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
