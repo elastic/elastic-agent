@@ -76,7 +76,9 @@ type stateSerializer struct {
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.
 func NewStateStoreWithMigration(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string) (*StateStore, error) {
-	err := migrateStateStore(ctx, log, actionStorePath, stateStorePath)
+
+	stateDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath)
+	err := migrateStateStore(log, actionStorePath, stateDiskStore)
 	if err != nil {
 		return nil, err
 	}
@@ -143,20 +145,23 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	}, nil
 }
 
-func migrateStateStore(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string) (err error) {
+func migrateStateStore(
+	log *logger.Logger,
+	actionStorePath string,
+	stateDiskStore storage.Storage) (err error) {
+
 	log = log.Named("state_migration")
 	actionDiskStore := storage.NewDiskStore(actionStorePath)
-	stateDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath)
 
 	stateStoreExits, err := stateDiskStore.Exists()
 	if err != nil {
-		log.Errorf("failed to check if state store %s exists: %v", stateStorePath, err)
+		log.Errorf("failed to check if state store exists: %v", err)
 		return err
 	}
 
 	// do not migrate if the state store already exists
 	if stateStoreExits {
-		log.Debugf("state store %s already exists", stateStorePath)
+		log.Debugf("state store already exists")
 		return nil
 	}
 
@@ -204,7 +209,7 @@ func migrateStateStore(ctx context.Context, log *logger.Logger, actionStorePath,
 
 	err = stateStore.Save()
 	if err != nil {
-		log.Debugf("failed to save agent state store %s, err: %v", stateStorePath, err)
+		log.Debugf("failed to save agent state store, err: %v", err)
 	}
 	return err
 }
