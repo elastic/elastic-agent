@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+// //go:build integration
 
 package integration
 
@@ -197,10 +197,14 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		testRuntime = "20m"
 	}
 
+	regex := regexp.MustCompile(`[\d]+`)
+	status, err := runner.agentFixture.ExecStatus(ctx)
+	require.NoError(runner.T(), err)
+
 	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
 	require.Eventually(runner.T(), func() bool {
 		allHealthy := true
-		status, err := runner.agentFixture.ExecStatus(context.Background())
+		status, err := runner.agentFixture.ExecStatus(ctx)
 
 		require.NoError(runner.T(), err)
 		for _, comp := range status.Components {
@@ -214,9 +218,6 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	handles := []processWatcher{}
 
-	regex := regexp.MustCompile(`[\d]+`)
-	status, err := runner.agentFixture.ExecStatus(context.Background())
-	require.NoError(runner.T(), err)
 	// track running beats
 	// the `last 30s` metrics tend to report gauges, which we can't use for calculating a derivative.
 	// so separately fetch the PIDs
