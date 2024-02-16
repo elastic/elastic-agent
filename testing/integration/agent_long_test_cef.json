@@ -26,7 +26,7 @@
               "vars": {
                 "paths": {
                   "value": [
-                    "/var/log/cef/cef*.log"
+                    "/tmp/cef/cef*.log"
                   ],
                   "type": "text"
                 },
@@ -48,10 +48,10 @@
                   "type": "yaml"
                 }
               },
-              "id": "logfile-cef.log-5c4458d3-591f-4d91-a3a9-db315402ec71",
+              "id": "logfile-cef.log",
               "compiled_stream": {
                 "paths": [
-                  "/var/log/cef.log"
+                  "/tmp/cef/cef*.log"
                 ],
                 "exclude_files": [
                   ".gz$"

@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// //go:build integration
+//go:build integration
 
 package integration
 
@@ -14,6 +14,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -105,31 +106,6 @@ func TestLongRunningAgentForLeaks(t *testing.T) {
 }
 
 func (runner *ExtendedRunner) SetupSuite() {
-	err := os.MkdirAll("/var/log/cef", 0o755)
-	require.NoError(runner.T(), err)
-	spigotConfig := map[string]interface{}{
-		"generator": map[string]interface{}{
-			"type": "citrix:cef",
-		},
-		"output": map[string]interface{}{
-			"type":      "file",
-			"directory": "/var/log/cef/",
-			"pattern":   "cef*.log",
-			"delimiter": "\n",
-		},
-		"interval": "20s",
-		"records":  "1000",
-	}
-	cfg, err := ucfg.NewFrom(spigotConfig)
-	require.NoError(runner.T(), err)
-
-	logger, err := logrunner.New(cfg)
-	require.NoError(runner.T(), err)
-
-	go func() {
-		err := logger.Execute()
-		require.NoError(runner.T(), err)
-	}()
 
 	policyUUID := uuid.New().String()
 	unpr := false
@@ -194,7 +170,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "20m"
+		testRuntime = "5m"
 	}
 
 	regex := regexp.MustCompile(`[\d]+`)
@@ -206,14 +182,30 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		allHealthy := true
 		status, err := runner.agentFixture.ExecStatus(ctx)
 
+		cefMatch := "logfile-cef"
+		foundCef := false
+		systemMatch := "metrics-default"
+		foundSystem := false
+
 		require.NoError(runner.T(), err)
 		for _, comp := range status.Components {
+			// make sure the components include the expected integrations
+			for _, v := range comp.Units {
+				runner.T().Logf("unit ID: %s", v.UnitID)
+				// the full cef unit ID will be something like "log-default-logfile-cef-3f0764f0-4ade-4f46-9ead-f2f0f7865676"
+				if !foundCef && strings.Contains(v.UnitID, cefMatch) {
+					foundCef = true
+				}
+				if !foundSystem && strings.Contains(v.UnitID, systemMatch) {
+					foundSystem = true
+				}
+			}
 			runner.T().Logf("component state: %s", comp.Message)
 			if comp.State != int(cproto.State_HEALTHY) {
 				allHealthy = false
 			}
 		}
-		return allHealthy
+		return allHealthy && foundCef && foundSystem
 	}, time.Minute*3, time.Second*20)
 
 	handles := []processWatcher{}
@@ -221,6 +213,8 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	// track running beats
 	// the `last 30s` metrics tend to report gauges, which we can't use for calculating a derivative.
 	// so separately fetch the PIDs
+	status, err = runner.agentFixture.ExecStatus(ctx)
+	require.NoError(runner.T(), err)
 	for _, comp := range status.Components {
 		pidStr := regex.FindString(comp.Message)
 		pid, err := strconv.ParseInt(pidStr, 10, 64)
@@ -245,6 +239,33 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	// time to perform a health check
 	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
+
+	err = os.MkdirAll("/tmp/cef", 0o755)
+	require.NoError(runner.T(), err)
+	spigotConfig := map[string]interface{}{
+		"generator": map[string]interface{}{
+			"type": "citrix:cef",
+		},
+		"output": map[string]interface{}{
+			"type":      "file",
+			"directory": "/tmp/cef/",
+			"pattern":   "cef*.log",
+			"delimiter": "\n",
+		},
+		"interval": "20s",
+		"records":  "1000",
+	}
+
+	cfg, err := ucfg.NewFrom(spigotConfig)
+	require.NoError(runner.T(), err)
+
+	logger, err := logrunner.New(cfg)
+	require.NoError(runner.T(), err)
+
+	go func() {
+		err := logger.Execute()
+		require.NoError(runner.T(), err)
+	}()
 
 	done := false
 	start := time.Now()
