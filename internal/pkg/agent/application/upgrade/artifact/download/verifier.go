@@ -101,6 +101,15 @@ func VerifySHA512HashWithCleanup(log infoWarnLogger, filename string) error {
 				log.Warnf("failed clean up after sha512 check: failed to remove %q: %v",
 					filename+".sha512", err)
 			}
+		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+			// it's not a simple hash mismatch, probably something is wrong with the hash file
+			hashFileName := getHashFileName(filename)
+			hashFileBytes, readErr := os.ReadFile(hashFileName)
+			if readErr != nil {
+				log.Warnf("error verifying the package using hash file %q, unable do read contents for logging: %v", getHashFileName(filename), readErr)
+			} else {
+				log.Warnf("error verifying the package using hash file %q, contents: %q", getHashFileName(filename), string(hashFileBytes))
+			}
 		}
 
 		return err
@@ -109,12 +118,20 @@ func VerifySHA512HashWithCleanup(log infoWarnLogger, filename string) error {
 	return nil
 }
 
+func getHashFileName(filename string) string {
+	const hashFileExt = ".sha512"
+	if strings.HasSuffix(filename, hashFileExt) {
+		return filename
+	}
+	return filename + hashFileExt
+}
+
 // VerifySHA512Hash checks that a sidecar file containing a sha512 checksum
 // exists and that the checksum in the sidecar file matches the checksum of
 // the file. It returns an error if validation fails.
 func VerifySHA512Hash(filename string) error {
 	// Read expected checksum.
-	expectedHash, err := readChecksumFile(filename+".sha512", filepath.Base(filename))
+	expectedHash, err := readChecksumFile(getHashFileName(filename), filepath.Base(filename))
 	if err != nil {
 		return fmt.Errorf("could not read checksum file: %w", err)
 	}
