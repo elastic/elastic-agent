@@ -121,7 +121,6 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 
 			for _, pkg := range pkgs {
 				reqPackage := platformPackages[platform]
-				log.Printf(">>>>>!!! majorMinorPatchVersion [%s]", majorMinorPatchVersion)
 				pkgURL := resolveManifestPackage(projects[component], pkg, reqPackage, majorMinorPatchVersion)
 				if pkgURL != nil {
 					for _, p := range pkgURL {
