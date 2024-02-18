@@ -178,6 +178,9 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 
 func (b *dockerBuilder) dockerBuild() (string, error) {
 	tag := fmt.Sprintf("%s:%s", b.imageName, b.Version)
+	// For Independent Agent releases, replace the "+" with a "-" since the "+" character
+	// currently isn't allowed in a tag in Docker
+	// E.g., 8.13.0+build202402191057 -> 8.13.0-build202402191057
 	tag = strings.Replace(tag, "+", "-", 1)
 	if b.Snapshot {
 		tag = tag + "-SNAPSHOT"
