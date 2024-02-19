@@ -59,8 +59,11 @@ type actionSerializer struct {
 	Action fleetapi.Action
 }
 
-// actionQueue is a slice of ScheduledActions to executes and allow to
-// unmarshal ScheduledActions.
+// actionQueue stores scheduled actions to be executed and the type is needed
+// to make it possible to marshal and unmarshal fleetapi.ScheduledActions.
+// The fleetapi package marshal/unmarshal fleetapi.Actions, therefore it does
+// not need to handle fleetapi.ScheduledAction separately. However, the store does,
+// therefore the need for this type to do so.
 type actionQueue []fleetapi.ScheduledAction
 
 func (as *actionSerializer) MarshalJSON() ([]byte, error) {
@@ -136,7 +139,6 @@ func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 	defer reader.Close()
 
 	st := state{}
-
 	dec := json.NewDecoder(reader)
 	err = dec.Decode(&st)
 	if errors.Is(err, io.EOF) {
@@ -273,7 +275,8 @@ type StateStoreActionAcker struct {
 }
 
 // Ack acks the action using underlying acker.
-// After the action is acked it is stored to backing store.
+// After the action is acked it is stored in the StateStore. The StateStore
+// decides if the action needs to be persisted or not.
 func (a *StateStoreActionAcker) Ack(ctx context.Context, action fleetapi.Action) error {
 	if err := a.acker.Ack(ctx, action); err != nil {
 		return err

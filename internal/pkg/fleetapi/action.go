@@ -91,6 +91,9 @@ type Signed struct {
 	Signature string `json:"signature" yaml:"signature"  mapstructure:"signature"`
 }
 
+// NewAction returns a new, zero-value, action of the type defined by 'actionType'
+// or an ActionUnknown with the 'OriginalType' field set to 'actionType' if the
+// type is not valid.
 func NewAction(actionType string) Action {
 	var action Action
 
