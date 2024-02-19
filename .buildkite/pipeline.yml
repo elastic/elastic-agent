@@ -11,7 +11,7 @@ steps:
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
-      image: family/platform-ingest-eng-prod-base-ubuntu-2204
+      image: family/platform-ingest-beats-ubuntu-2204
     retry:
       manual:
         allowed: true
@@ -28,7 +28,7 @@ steps:
           - "coverage.out"
         agents:
           provider: "gcp"
-          image: family/platform-ingest-eng-prod-base-ubuntu-2204
+          image: family/platform-ingest-beats-ubuntu-2204
         retry:
           manual:
             allowed: true
