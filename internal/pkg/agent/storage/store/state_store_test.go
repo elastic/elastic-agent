@@ -25,47 +25,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func TestMyTest(t *testing.T) {
-	log, _ := logger.NewTesting("TestMyTest")
-	// ackToken := "ackToken"
-	t.Run("can save a queue with one upgrade action", func(t *testing.T) {
-		ts := time.Now().UTC().Round(time.Second)
-		queue := []fleetapi.ScheduledAction{&fleetapi.ActionUpgrade{
-			ActionID:        "test",
-			ActionType:      fleetapi.ActionTypeUpgrade,
-			ActionStartTime: ts.Format(time.RFC3339),
-			Data: fleetapi.ActionUpgradeData{
-				Version:   "1.2.3",
-				SourceURI: "https://example.com",
-			}}}
-
-		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
-		store, err := NewStateStore(log, s)
-		require.NoError(t, err)
-
-		require.Empty(t, store.Action())
-		store.SetQueue(queue)
-		err = store.Save()
-		require.NoError(t, err)
-		require.Empty(t, store.Action())
-		require.Len(t, store.Queue(), 1)
-
-		s = storage.NewDiskStore(storePath)
-		store, err = NewStateStore(log, s)
-		require.NoError(t, err)
-
-		assert.Nil(t, store.Action())
-		assert.Len(t, store.Queue(), 1)
-		assert.Equal(t, "test", store.Queue()[0].ID())
-
-		scheduledAction, ok := store.Queue()[0].(fleetapi.ScheduledAction)
-		assert.True(t, ok, "expected to be able to cast Action as ScheduledAction")
-		start, err := scheduledAction.StartTime()
-		assert.NoError(t, err)
-		assert.Equal(t, ts, start)
-	})
-}
 func TestStateStore(t *testing.T) {
 	t.Run("ack token", func(t *testing.T) {
 		runTestStateStore(t, "czlV93YBwdkt5lYhBY7S")
@@ -185,58 +144,61 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		assert.NoError(t, err)
 		assert.Equal(t, ts, start)
 	})
-	//
-	// t.Run("can save a queue with two actions", func(t *testing.T) {
-	// 	ts := time.Now().UTC().Round(time.Second)
-	// 	queue := []fleetapi.ScheduledAction{&fleetapi.ActionUpgrade{
-	// 		ActionID:        "test",
-	// 		ActionType:      fleetapi.ActionTypeUpgrade,
-	// 		ActionStartTime: ts.Format(time.RFC3339),
-	// 		Data: fleetapi.ActionUpgradeData{
-	// 			Version:   "1.2.3",
-	// 			SourceURI: "https://example.com",
-	// 			Retry:     1,
-	// 		}}, &fleetapi.ActionPolicyChange{
-	// 		ActionID:   "abc123",
-	// 		ActionType: "POLICY_CHANGE",
-	// 		Data: fleetapi.ActionPolicyChangeData{
-	// 			Policy: map[string]interface{}{
-	// 				"hello": "world",
-	// 			}},
-	// 	}}
-	//
-	// 	storePath := filepath.Join(t.TempDir(), "state.yml")
-	// 	s := storage.NewDiskStore(storePath)
-	// 	store, err := NewStateStore(log, s)
-	// 	require.NoError(t, err)
-	//
-	// 	require.Empty(t, store.Action())
-	// 	store.SetQueue(queue)
-	// 	err = store.Save()
-	// 	require.NoError(t, err)
-	// 	require.Empty(t, store.Action())
-	// 	require.Len(t, store.Queue(), 2)
-	//
-	// 	s = storage.NewDiskStore(storePath)
-	// 	store1, err := NewStateStore(log, s)
-	// 	require.NoError(t, err)
-	// 	require.Nil(t, store1.Action())
-	// 	require.Len(t, store1.Queue(), 2)
-	//
-	// 	require.Equal(t, "test", store1.Queue()[0].ID())
-	// 	scheduledAction, ok := store1.Queue()[0].(fleetapi.ScheduledAction)
-	// 	require.True(t, ok, "expected to be able to cast Action as ScheduledAction")
-	// 	start, err := scheduledAction.StartTime()
-	// 	require.NoError(t, err)
-	// 	require.Equal(t, ts, start)
-	// 	retryableAction, ok := store1.Queue()[0].(fleetapi.RetryableAction)
-	// 	require.True(t, ok, "expected to be able to cast Action as RetryableAction")
-	// 	require.Equal(t, 1, retryableAction.RetryAttempt())
-	//
-	// 	require.Equal(t, "abc123", store1.Queue()[1].ID())
-	// 	_, ok = store1.Queue()[1].(fleetapi.ScheduledAction)
-	// 	require.False(t, ok, "expected cast to ScheduledAction to fail")
-	// })
+
+	t.Run("can save a queue with two actions", func(t *testing.T) {
+		ts := time.Now().UTC().Round(time.Second)
+		queue := []fleetapi.ScheduledAction{&fleetapi.ActionUpgrade{
+			ActionID:        "test",
+			ActionType:      fleetapi.ActionTypeUpgrade,
+			ActionStartTime: ts.Format(time.RFC3339),
+			Data: fleetapi.ActionUpgradeData{
+				Version:   "1.2.3",
+				SourceURI: "https://example.com",
+				Retry:     1,
+			}},
+			// only the latest upgrade action is kept, however it's not the store
+			// which handled that. Besides upgrade actions are the only
+			// ScheduledAction right now, so it'll use 2 of them for this test.
+			&fleetapi.ActionUpgrade{
+				ActionID:        "test2",
+				ActionType:      fleetapi.ActionTypeUpgrade,
+				ActionStartTime: ts.Format(time.RFC3339),
+				Data: fleetapi.ActionUpgradeData{
+					Version:   "1.2.4",
+					SourceURI: "https://example.com",
+					Retry:     1,
+				}}}
+
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
+
+		require.Empty(t, store.Action())
+		store.SetQueue(queue)
+		err = store.Save()
+		require.NoError(t, err)
+		require.Empty(t, store.Action())
+		require.Len(t, store.Queue(), 2)
+
+		// Load state store from disk
+		s = storage.NewDiskStore(storePath)
+		store, err = NewStateStore(log, s)
+		require.NoError(t, err, "could not load store from disk")
+
+		got := store.Queue()
+		for i, want := range queue {
+			_, ok := got[i].(fleetapi.ScheduledAction)
+			assert.True(t, ok,
+				"expected to be able to cast Action as ScheduledAction")
+
+			upgradeAction := got[i].(*fleetapi.ActionUpgrade)
+			assert.True(t, ok,
+				"expected to be able to cast Action as ActionUpgrade")
+
+			assert.Equal(t, want, upgradeAction, "saved action is different from expected")
+		}
+	})
 
 	t.Run("can save to disk unenroll action type", func(t *testing.T) {
 		want := &fleetapi.ActionUnenroll{
