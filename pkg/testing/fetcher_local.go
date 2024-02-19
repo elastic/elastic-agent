@@ -72,18 +72,16 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 		} else {
 			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), ver.Prerelease()+"-SNAPSHOT", ver.BuildMetadata())
 		}
-
 	}
 
-	mainBuild := fmt.Sprintf(mainBuildfmt, f.binaryName, ver, suffix)
-	mainBuildPath := filepath.Join(f.dir, mainBuild)
-	build := mainBuild
-	buildPath := mainBuildPath
-	_, err = os.Stat(buildPath)
+	build := fmt.Sprintf(mainBuildfmt, f.binaryName, ver.VersionWithPrerelease(), suffix)
+	buildPath := filepath.Join(ver.BuildMetadata(), build)
+	fullPath := filepath.Join(f.dir, buildPath)
+	_, err = os.Stat(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find build at %s: %w", f.dir, err)
 	}
-	return &localFetcherResult{src: f.dir, path: build}, nil
+	return &localFetcherResult{src: f.dir, path: buildPath}, nil
 }
 
 type localFetcherResult struct {
@@ -98,16 +96,20 @@ func (r *localFetcherResult) Name() string {
 
 // Fetch performs the actual fetch into the provided directory.
 func (r *localFetcherResult) Fetch(_ context.Context, _ Logger, dir string) error {
-	fullPath := filepath.Join(r.src, r.path)
-	path := filepath.Join(dir, r.path)
-
-	err := copyFile(fullPath, path)
+	src := filepath.Join(r.src, r.path)
+	dst := filepath.Join(dir, r.path)
+	// the artifact name can contain a subfolder that needs to be created
+	err := os.MkdirAll(filepath.Dir(dst), 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create path %q: %w", dst, err)
+	}
+	err = copyFile(src, dst)
 	if err != nil {
 		return fmt.Errorf("error copying file: %w", err)
 	}
 
 	// fetch artifact hash
-	err = copyFile(fullPath+extHash, path+extHash)
+	err = copyFile(src+extHash, dst+extHash)
 	if err != nil {
 		return fmt.Errorf("error copying file: %w", err)
 	}
