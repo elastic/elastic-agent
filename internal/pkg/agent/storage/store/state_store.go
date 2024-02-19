@@ -45,6 +45,7 @@ type StateStore struct {
 }
 
 type state struct {
+	Version          string           `json:"version"`
 	ActionSerializer actionSerializer `json:"action,omitempty"`
 	AckToken         string           `json:"ack_token,omitempty"`
 	Queue            actionQueue      `json:"action_queue,omitempty"`
@@ -142,11 +143,16 @@ func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 		return &StateStore{
 			log:   log,
 			store: store,
+			state: state{Version: "1"},
 		}, nil
 	}
-
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not JSON unmarshal state store: %w", err)
+	}
+
+	if st.Version != "1" {
+		return nil, fmt.Errorf("invalid state store version, got \"%s\" isntead of 1",
+			st.Version)
 	}
 
 	return &StateStore{
@@ -353,7 +359,7 @@ func migrateActionStoreToStateStore(
 func jsonToReader(in interface{}) (io.Reader, error) {
 	data, err := json.Marshal(in)
 	if err != nil {
-		return nil, fmt.Errorf("could not marshal to YAML: %w", err)
+		return nil, fmt.Errorf("could not marshal to JSON: %w", err)
 	}
 	return bytes.NewReader(data), nil
 }
