@@ -103,7 +103,6 @@ func (aq *actionQueue) UnmarshalJSON(data []byte) error {
 				"cannot unmarshal it to actionQueue", a.Type())
 		}
 		scheduledActions = append(scheduledActions, sa)
-		_ = sa
 	}
 
 	*aq = scheduledActions
