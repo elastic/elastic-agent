@@ -194,7 +194,8 @@ func (aac ArtifactAPIClient) RemoveUnreleasedVersions(ctx context.Context, vList
 			continue
 		}
 		url := fmt.Sprintf("%s/elastic-agent-%s-%s", aac.cdnURL, versionItem, suffix)
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		// using method `HEAD` to avoid downloading the file
+		req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create an HTTP request to %q: %w", url, err)
 		}
@@ -203,8 +204,13 @@ func (aac ArtifactAPIClient) RemoveUnreleasedVersions(ctx context.Context, vList
 		if err != nil {
 			return fmt.Errorf("failed to request %q: %w", url, err)
 		}
-		// we don't read the response, we just need the status code
-		resp.Body.Close()
+
+		// we don't read the response. However, we must drain when it's present,
+		// so the connection can be re-used later, see:
+		// https://cs.opensource.google/go/go/+/refs/tags/go1.22.0:src/net/http/response.go;l=62-64
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+
 		switch resp.StatusCode {
 		case http.StatusNotFound:
 			continue
