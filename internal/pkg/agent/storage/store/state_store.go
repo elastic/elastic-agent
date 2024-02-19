@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store/internal/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -336,15 +337,15 @@ func migrateActionStoreToStateStore(
 		return nil
 	}
 
-	actionStore, err := newActionStore(log, actionDiskStore)
+	action, err := migration.LoadActionStore(actionDiskStore)
 	if err != nil {
 		log.Errorf("failed to create action store %s: %v", actionStorePath, err)
 		return err
 	}
 
 	// no actions stored nothing to migrate
-	if len(actionStore.actions()) == 0 {
-		log.Debugf("no actions stored in the action store %s, nothing to migrate", actionStorePath)
+	if action == nil {
+		log.Debugf("no action stored in the action store %s, nothing to migrate", actionStorePath)
 		return nil
 	}
 
@@ -354,7 +355,11 @@ func migrateActionStoreToStateStore(
 	}
 
 	// set actions from the action store to the state store
-	stateStore.SetAction(actionStore.actions()[0])
+	stateStore.SetAction(&fleetapi.ActionPolicyChange{
+		ActionID:   action.ActionID,
+		ActionType: action.ActionType,
+		Data:       fleetapi.ActionPolicyChangeData{Policy: action.Policy},
+	})
 
 	err = stateStore.Save()
 	if err != nil {

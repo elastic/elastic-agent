@@ -25,6 +25,83 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+func TestMine(t *testing.T) {
+	t.Run("migrate", func(t *testing.T) {
+		t.Run("action store to state store", func(t *testing.T) {
+			ctx := context.Background()
+			log, _ := logger.NewTesting("")
+
+			if runtime.GOOS == "darwin" {
+				// the original migrate never actually run, so with this at least
+				// there is coverage for linux and windows.
+				t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
+					"to be merged so this test can work on darwin")
+			}
+
+			want := &fleetapi.ActionPolicyChange{
+				ActionID:   "abc123",
+				ActionType: "POLICY_CHANGE",
+				Data: fleetapi.ActionPolicyChangeData{
+					Policy: map[string]interface{}{
+						"hello":  "world",
+						"phi":    1.618,
+						"answer": 42.0, // YAML unmarshaller unmarshals int as float
+					},
+				},
+			}
+
+			tempDir := t.TempDir()
+			vaultPath := filepath.Join(tempDir, "vault")
+			err := os.MkdirAll(vaultPath, 0o750)
+			require.NoError(t, err,
+				"could not create directory for the agent's vault")
+			_, err = vault.New(ctx, vaultPath)
+			require.NoError(t, err, "could not create agent's vault")
+			err = secret.CreateAgentSecret(
+				context.Background(), secret.WithVaultPath(vaultPath))
+			require.NoError(t, err, "could not create agent secret")
+
+			// Copy the golden file as the migration deletes the old store.
+			goldenActionStoreFile, err := os.Open(
+				filepath.Join("testdata", "7.17.18-action_store.yml"))
+			require.NoError(t, err, "could not open action store golden file")
+			defer goldenActionStoreFile.Close()
+
+			oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
+			storeFile, err := os.Create(oldActionStorePath)
+			require.NoError(t, err, "could not create action store file")
+
+			_, err = io.Copy(storeFile, goldenActionStoreFile)
+			require.NoError(t, err, "could not copy action store golden file")
+			err = storeFile.Close()
+			// It needs to be closed now otherwise on windows the store will fail to
+			// open the file.
+			require.NoError(t, err, "could not close store file")
+
+			newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
+			newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
+				storage.WithVaultPath(vaultPath))
+
+			err = migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
+			require.NoError(t, err, "migration action store -> state store failed")
+
+			// to load from disk a new store needs to be created, it loads the file
+			// to memory during the store creation.
+			newStateStore = storage.NewEncryptedDiskStore(ctx, newStateStorePath,
+				storage.WithVaultPath(vaultPath))
+			stateStore, err := NewStateStore(log, newStateStore)
+			require.NoError(t, err, "could not create state store")
+
+			got := stateStore.Action()
+			require.NotNil(t, got, "should have loaded an action")
+
+			assert.Equalf(t, want, got,
+				"loaded action differs from action on the old action store")
+			assert.Empty(t, stateStore.Queue(),
+				"queue should be empty, old action store did not have a queue")
+		})
+	})
+}
 func TestStateStore(t *testing.T) {
 	t.Run("ack token", func(t *testing.T) {
 		runTestStateStore(t, "czlV93YBwdkt5lYhBY7S")
@@ -272,80 +349,77 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.Empty(t, stateStore.Queue())
 	})
 
-	t.Run("migrate", func(t *testing.T) {
-		// TODO: DO NOT MERGE TO MAIN WITHOUT REMOVING THIS SKIP
-		t.Skip("this test is broken because the migration haven't been" +
-			" implemented yet. It'll implemented on another PR as part of" +
-			"https://github.com/elastic/elastic-agent/issues/3912")
-
-		if runtime.GOOS == "darwin" {
-			// the original migrate never actually run, so with this at least
-			// there is coverage for linux and windows.
-			t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
-				"to be merged so this test can work on darwin")
-		}
-
-		want := &fleetapi.ActionPolicyChange{
-			ActionID:   "abc123",
-			ActionType: "POLICY_CHANGE",
-			Data: fleetapi.ActionPolicyChangeData{
-				Policy: map[string]interface{}{
-					"hello":  "world",
-					"phi":    1.618,
-					"answer": 42,
-				},
-			},
-		}
-
-		tempDir := t.TempDir()
-		vaultPath := filepath.Join(tempDir, "vault")
-		err := os.MkdirAll(vaultPath, 0o750)
-		require.NoError(t, err,
-			"could not create directory for the agent's vault")
-		_, err = vault.New(ctx, vaultPath)
-		require.NoError(t, err, "could not create agent's vault")
-		err = secret.CreateAgentSecret(
-			context.Background(), secret.WithVaultPath(vaultPath))
-		require.NoError(t, err, "could not create agent secret")
-
-		// Copy the golden file as the migration deletes the old store.
-		goldenActionStoreFile, err := os.Open(
-			filepath.Join("testdata", "7.17.18-action_store.yml"))
-		require.NoError(t, err, "could not open action store golden file")
-		defer goldenActionStoreFile.Close()
-
-		oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
-		storeFile, err := os.Create(oldActionStorePath)
-		require.NoError(t, err, "could not create action store file")
-
-		_, err = io.Copy(storeFile, goldenActionStoreFile)
-		require.NoError(t, err, "could not copy action store golden file")
-		err = storeFile.Close()
-		// It needs to be closed now otherwise on windows the store will fail to
-		// open the file.
-		require.NoError(t, err, "could not close store file")
-
-		newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
-		newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
-			storage.WithVaultPath(vaultPath))
-		err = migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
-		require.NoError(t, err, "migration action store -> state store failed")
-
-		// to load from disk a new store needs to be created, it loads the file
-		// to memory during the store creation.
-		newStateStore = storage.NewEncryptedDiskStore(ctx, newStateStorePath,
-			storage.WithVaultPath(vaultPath))
-		stateStore, err := NewStateStore(log, newStateStore)
-		require.NoError(t, err, "could not create state store")
-
-		got := stateStore.Action()
-		require.NotNil(t, got, "should have loaded an action")
-
-		assert.Equalf(t, want, got,
-			"loaded action differs from action on the old action store")
-		assert.Empty(t, stateStore.Queue(),
-			"queue should be empty, old action store did not have a queue")
-	})
+	// t.Run("migrate", func(t *testing.T) {
+	// 	t.Run("action store -> state store", func(t *testing.T) {
+	// 		if runtime.GOOS == "darwin" {
+	// 			// the original migrate never actually run, so with this at least
+	// 			// there is coverage for linux and windows.
+	// 			t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
+	// 				"to be merged so this test can work on darwin")
+	// 		}
+	//
+	// 		want := &fleetapi.ActionPolicyChange{
+	// 			ActionID:   "abc123",
+	// 			ActionType: "POLICY_CHANGE",
+	// 			Data: fleetapi.ActionPolicyChangeData{
+	// 				Policy: map[string]interface{}{
+	// 					"hello":  "world",
+	// 					"phi":    1.618,
+	// 					"answer": 42,
+	// 				},
+	// 			},
+	// 		}
+	//
+	// 		tempDir := t.TempDir()
+	// 		vaultPath := filepath.Join(tempDir, "vault")
+	// 		err := os.MkdirAll(vaultPath, 0o750)
+	// 		require.NoError(t, err,
+	// 			"could not create directory for the agent's vault")
+	// 		_, err = vault.New(ctx, vaultPath)
+	// 		require.NoError(t, err, "could not create agent's vault")
+	// 		err = secret.CreateAgentSecret(
+	// 			context.Background(), secret.WithVaultPath(vaultPath))
+	// 		require.NoError(t, err, "could not create agent secret")
+	//
+	// 		// Copy the golden file as the migration deletes the old store.
+	// 		goldenActionStoreFile, err := os.Open(
+	// 			filepath.Join("testdata", "7.17.18-action_store.yml"))
+	// 		require.NoError(t, err, "could not open action store golden file")
+	// 		defer goldenActionStoreFile.Close()
+	//
+	// 		oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
+	// 		storeFile, err := os.Create(oldActionStorePath)
+	// 		require.NoError(t, err, "could not create action store file")
+	//
+	// 		_, err = io.Copy(storeFile, goldenActionStoreFile)
+	// 		require.NoError(t, err, "could not copy action store golden file")
+	// 		err = storeFile.Close()
+	// 		// It needs to be closed now otherwise on windows the store will fail to
+	// 		// open the file.
+	// 		require.NoError(t, err, "could not close store file")
+	//
+	// 		newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
+	// 		newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
+	// 			storage.WithVaultPath(vaultPath))
+	// 		err = migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
+	// 		require.NoError(t, err, "migration action store -> state store failed")
+	//
+	// 		// to load from disk a new store needs to be created, it loads the file
+	// 		// to memory during the store creation.
+	// 		newStateStore = storage.NewEncryptedDiskStore(ctx, newStateStorePath,
+	// 			storage.WithVaultPath(vaultPath))
+	// 		stateStore, err := NewStateStore(log, newStateStore)
+	// 		require.NoError(t, err, "could not create state store")
+	//
+	// 		got := stateStore.Action()
+	// 		require.NotNil(t, got, "should have loaded an action")
+	//
+	// 		assert.Equalf(t, want, got,
+	// 			"loaded action differs from action on the old action store")
+	// 		assert.Empty(t, stateStore.Queue(),
+	// 			"queue should be empty, old action store did not have a queue")
+	// 	})
+	// })
 
 	t.Run("state store is correctly loaded from disk", func(t *testing.T) {
 		t.Run("ActionPolicyChange", func(t *testing.T) {
