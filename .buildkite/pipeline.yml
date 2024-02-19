@@ -11,6 +11,7 @@ steps:
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
+      imageProject: elastic-images-qa
       image: family/platform-ingest-beats-ubuntu-2204
     retry:
       manual:
@@ -28,6 +29,7 @@ steps:
           - "coverage.out"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: family/platform-ingest-beats-ubuntu-2204
         retry:
           manual:
