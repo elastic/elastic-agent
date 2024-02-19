@@ -69,7 +69,6 @@ func DownloadManifest(manifest string) (tools.Build, error) {
 
 func resolveManifestPackage(project tools.Project, pkg string, reqPackage string, version string) []string {
 	packageName := fmt.Sprintf("%s-%s-%s", pkg, version, reqPackage)
-	log.Printf(">>>>>>!!! packageName: [%s]", packageName)
 	val, ok := project.Packages[packageName]
 	if !ok {
 		return nil
