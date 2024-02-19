@@ -12,8 +12,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"runtime"
 	"sort"
 
+	"github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -26,6 +28,7 @@ const (
 	// artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
 
 	artifactElasticAgentProject = "elastic-agent-package"
+	artifactReleaseCDN          = "https://artifacts.elastic.co/downloads/beats/elastic-agent"
 )
 
 var (
@@ -119,6 +122,10 @@ func WithUrl(url string) ArtifactAPIClientOpt {
 	return func(aac *ArtifactAPIClient) { aac.url = url }
 }
 
+func WithCDNUrl(url string) ArtifactAPIClientOpt {
+	return func(aac *ArtifactAPIClient) { aac.cdnURL = url }
+}
+
 func WithHttpClient(client httpDoer) ArtifactAPIClientOpt {
 	return func(aac *ArtifactAPIClient) { aac.c = client }
 }
@@ -127,15 +134,17 @@ func WithHttpClient(client httpDoer) ArtifactAPIClientOpt {
 // More information about the API can be found at https://artifacts-api.elastic.co/v1
 // which will print a list of available operations
 type ArtifactAPIClient struct {
-	c   httpDoer
-	url string
+	c      httpDoer
+	url    string
+	cdnURL string
 }
 
 // NewArtifactAPIClient creates a new Artifact API client
 func NewArtifactAPIClient(opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
 	c := &ArtifactAPIClient{
-		url: defaultArtifactAPIURL,
-		c:   new(http.Client),
+		url:    defaultArtifactAPIURL,
+		cdnURL: artifactReleaseCDN,
+		c:      new(http.Client),
 	}
 
 	for _, opt := range opts {
@@ -159,6 +168,62 @@ func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList
 
 	defer resp.Body.Close()
 	return checkResponseAndUnmarshal[VersionList](resp)
+}
+
+// RemoveUnreleasedVersions from the list
+// There is a period of time when a version is already marked as released
+// but not published on the CDN. This happens when we already have build candidates.
+// This function checks if a version marked as released actually has published artifacts.
+// If there are no published artifacts, the version is removed from the list.
+func (aac ArtifactAPIClient) RemoveUnreleasedVersions(ctx context.Context, vList *VersionList) error {
+	suffix, err := testing.GetPackageSuffix(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		return fmt.Errorf("failed to generate the artifact suffix: %w", err)
+	}
+
+	results := make([]string, 0, len(vList.Versions))
+
+	for _, versionItem := range vList.Versions {
+		parsedVersion, err := version.ParseVersion(versionItem)
+		if err != nil {
+			return fmt.Errorf("failed to parse version %s: %w", versionItem, err)
+		}
+		// we check only release versions without `-SNAPSHOT`
+		if parsedVersion.Prerelease() != "" {
+			results = append(results, versionItem)
+			continue
+		}
+		url := fmt.Sprintf("%s/elastic-agent-%s-%s", aac.cdnURL, versionItem, suffix)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create an HTTP request to %q: %w", url, err)
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to request %q: %w", url, err)
+		}
+		// we don't read the response, we just need the status code
+		resp.Body.Close()
+		switch resp.StatusCode {
+		case http.StatusNotFound:
+			continue
+		case http.StatusOK:
+			results = append(results, versionItem)
+			continue
+		default:
+			return fmt.Errorf("unexpected status code from %s - %d", url, resp.StatusCode)
+		}
+	}
+
+	// nothing changed
+	if len(vList.Versions) == len(results) {
+		return nil
+	}
+
+	vList.Versions = results
+
+	return nil
 }
 
 // GetBuildsForVersion returns a list of builds for a specific version.
