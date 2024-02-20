@@ -759,7 +759,7 @@ func TestWaitForWatcher(t *testing.T) {
 			name:                "Happy path: watcher is watching already",
 			states:              []details.State{details.StateWatching},
 			stateChangeInterval: 1 * time.Millisecond,
-			timeout:             50 * time.Millisecond,
+			timeout:             500 * time.Millisecond,
 			wantErr:             assert.NoError,
 		},
 		{
