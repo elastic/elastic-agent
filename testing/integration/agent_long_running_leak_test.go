@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+// //go:build integration
 
 package integration
 
@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -106,6 +107,13 @@ func TestLongRunningAgentForLeaks(t *testing.T) {
 }
 
 func (runner *ExtendedRunner) SetupSuite() {
+	cmd := exec.Command("go", "install", "-v", "github.com/mingrammer/flog@latest")
+	out, err := cmd.CombinedOutput()
+	require.NoError(runner.T(), err, "got out: %s", string(out))
+
+	cmd = exec.Command("flog", "-t", "log", "-f", "apache_error", "-o", "/var/log/httpd/error_log", "-b", "50485760", "-p", "1048576")
+	out, err = cmd.CombinedOutput()
+	require.NoError(runner.T(), err, "got out: %s", string(out))
 
 	policyUUID := uuid.New().String()
 	unpr := false
@@ -139,7 +147,7 @@ func (runner *ExtendedRunner) SetupSuite() {
 	runner.InstallPackage(ctx, "system", "1.53.1", "agent_long_test_base_system_integ.json", uuid.New().String(), policyResp.ID)
 
 	// install cef
-	runner.InstallPackage(ctx, "cef", "2.16.2", "agent_long_test_cef.json", uuid.New().String(), policyResp.ID)
+	runner.InstallPackage(ctx, "apache", "1.17.0", "agent_long_test_apache.json", uuid.New().String(), policyResp.ID)
 
 }
 

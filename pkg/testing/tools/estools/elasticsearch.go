@@ -546,6 +546,37 @@ func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{
 	return handleDocsResponse(res)
 }
 
+func FindMatchingLogLinesForAgentWithContext(ctx context.Context, client elastictransport.Interface, agentID, line string) (Documents, error) {
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match_phrase": map[string]interface{}{
+							"message": line,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"agent.id": map[string]interface{}{
+								"value": agentID,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(queryRaw)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
+}
+
 // GetLogsForDatastream returns any logs associated with the datastream
 func GetLogsForDatastream(
 	ctx context.Context,
