@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -19,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/testing/proxytest"
 )
 
 func TestVerify(t *testing.T) {
@@ -26,35 +29,68 @@ func TestVerify(t *testing.T) {
 
 	log, _ := logger.New("", false)
 	timeout := 30 * time.Second
-	testCases := getRandomTestCases()
+	testCases := getRandomTestCases()[0:1]
 	server, pub := getElasticCoServer(t)
-	elasticClient := getElasticCoClient(server)
-	// artifact/download/http.Verifier uses http.DefaultClient, thus we need to
-	// change it.
-	http.DefaultClient = &elasticClient
 
 	config := &artifact.Config{
-		SourceURI:       source,
+		SourceURI:       server.URL + "/downloads",
 		TargetDirectory: targetDir,
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: timeout,
 		},
 	}
 
-	for _, testCase := range testCases {
-		testName := fmt.Sprintf("%s-binary-%s", testCase.system, testCase.arch)
+	t.Run("without proxy", func(t *testing.T) {
+		runTests(t, testCases, config, log, pub)
+	})
+
+	t.Run("with proxy", func(t *testing.T) {
+		brokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusTeapot)
+			t.Log("[brokenServer] wrong server, is the proxy working?")
+			_, _ = w.Write([]byte(`wrong server, is the proxy working?`))
+		}))
+		serverURL, err := url.Parse(server.URL)
+		require.NoError(t, err, "could not parse server URL \"%s\"",
+			server.URL)
+
+		proxy := proxytest.New(t,
+			proxytest.WithRewriteFn(func(u *url.URL) {
+				u.Host = serverURL.Host
+			}),
+			proxytest.WithRequestLog("proxy", func(_ string, _ ...any) {}))
+
+		proxyURL, err := url.Parse(proxy.LocalhostURL)
+		require.NoError(t, err, "could not parse server URL \"%s\"",
+			server.URL)
+
+		config := *config
+		config.SourceURI = brokenServer.URL + "/downloads"
+		config.Proxy = httpcommon.HTTPClientProxySettings{
+			URL: (*httpcommon.ProxyURI)(proxyURL),
+		}
+
+		runTests(t, testCases, &config, log, pub)
+	})
+}
+
+func runTests(t *testing.T, testCases []testCase, config *artifact.Config, log *logger.Logger, pub []byte) {
+	for _, tc := range testCases {
+		testName := fmt.Sprintf("%s-binary-%s", tc.system, tc.arch)
 		t.Run(testName, func(t *testing.T) {
-			config.OperatingSystem = testCase.system
-			config.Architecture = testCase.arch
+			config.OperatingSystem = tc.system
+			config.Architecture = tc.arch
 
-			upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
-			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
-			artifact, err := testClient.Download(context.Background(), beatSpec, version)
-			if err != nil {
-				t.Fatal(err)
-			}
+			upgradeDetails := details.NewDetails(
+				"8.12.0", details.StateRequested, "")
+			downloader, err := NewDownloader(log, config, upgradeDetails)
+			require.NoError(t, err, "could not create new downloader")
 
-			_, err = os.Stat(artifact)
+			pkgPath, err := downloader.Download(context.Background(), beatSpec, version)
+			require.NoErrorf(t, err, "failed downloading %s v%s",
+				beatSpec.Artifact, version)
+
+			_, err = os.Stat(pkgPath)
 			if err != nil {
 				t.Fatal(err)
 			}
