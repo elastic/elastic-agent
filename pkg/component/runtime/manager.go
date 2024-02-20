@@ -753,6 +753,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 		if ok {
 			// existing component; send runtime updated value
 			existing.setCurrent(comp)
+			m.logger.Debugf("Updating component %q", comp.ID)
 			if err := existing.runtime.Update(comp); err != nil {
 				return fmt.Errorf("failed to update component %s: %w", comp.ID, err)
 			}
@@ -800,6 +801,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 		m.currentMx.Lock()
 		m.current[comp.ID] = state
 		m.currentMx.Unlock()
+		m.logger.Debugf("Starting component %q", comp.ID)
 		if err = state.start(); err != nil {
 			return fmt.Errorf("failed to start component %s: %w", comp.ID, err)
 		}

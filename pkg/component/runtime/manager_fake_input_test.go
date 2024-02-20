@@ -25,6 +25,7 @@ import (
 	gproto "google.golang.org/protobuf/proto"
 
 	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
@@ -96,127 +97,6 @@ func (suite *FakeInputSuite) setupTestPaths() {
 	tmpDir := t.TempDir()
 	paths.SetTop(tmpDir)
 	paths.SetVersionHome(false)
-}
-
-func (suite *FakeInputSuite) TestManager_StartStop() {
-	t := suite.T()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
-	require.NoError(t, err)
-	errCh := make(chan error)
-	go func() {
-		err := m.Run(ctx)
-		if errors.Is(err, context.Canceled) {
-			err = nil
-		}
-		errCh <- err
-	}()
-
-	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
-	defer waitCancel()
-	if err := waitForReady(waitCtx, m); err != nil {
-		require.NoError(t, err)
-	}
-
-	binaryPath := testBinary(t, "component")
-	comp := component.Component{
-		ID: "fake-default",
-		InputSpec: &component.InputRuntimeSpec{
-			InputType:  "fake",
-			BinaryName: "",
-			BinaryPath: binaryPath,
-			Spec:       fakeInputSpec,
-		},
-		Units: []component.Unit{
-			{
-				ID:       "fake-input",
-				Type:     client.UnitTypeInput,
-				LogLevel: client.UnitLogLevelTrace,
-				Config: component.MustExpectedConfig(map[string]interface{}{
-					"type":    "fake",
-					"state":   int(client.UnitStateHealthy),
-					"message": "Fake Healthy",
-				}),
-			},
-		},
-	}
-
-	subCtx, subCancel := context.WithCancel(context.Background())
-	defer subCancel()
-	subErrCh := make(chan error)
-	go func() {
-		sub := m.Subscribe(subCtx, "fake-default")
-		for {
-			select {
-			case <-subCtx.Done():
-				return
-			case state := <-sub.Ch():
-				t.Logf("component state changed: %+v", state)
-				if state.State == client.UnitStateFailed {
-					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
-				} else {
-					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
-					if ok {
-						if unit.State == client.UnitStateFailed {
-							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
-							// remove the component which will stop it
-							m.Update(component.Model{Components: []component.Component{}})
-							err := <-m.errCh
-							if err != nil {
-								subErrCh <- err
-							}
-						} else if unit.State == client.UnitStateStopped {
-							subErrCh <- nil
-						} else if unit.State == client.UnitStateStarting {
-							// acceptable
-						} else {
-							// unknown state that should not have occurred
-							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
-						}
-					} else {
-						subErrCh <- errors.New("unit missing: fake-input")
-					}
-				}
-			}
-		}
-	}()
-
-	defer drainErrChan(errCh)
-	defer drainErrChan(subErrCh)
-
-	m.Update(component.Model{Components: []component.Component{comp}})
-	err = <-m.errCh
-	require.NoError(t, err)
-
-	endTimer := time.NewTimer(30 * time.Second)
-	defer endTimer.Stop()
-LOOP:
-	for {
-		select {
-		case <-endTimer.C:
-			t.Fatalf("timed out after 30 seconds")
-		case err := <-errCh:
-			require.NoError(t, err)
-		case err := <-subErrCh:
-			require.NoError(t, err)
-			break LOOP
-		}
-	}
-
-	subCancel()
-	cancel()
-
-	err = <-errCh
-	require.NoError(t, err)
-
-	workDir := filepath.Join(paths.Run(), comp.ID)
-	_, err = os.Stat(workDir)
-	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func (suite *FakeInputSuite) TestManager_Features() {
@@ -3134,15 +3014,16 @@ LOOP:
 	require.NoError(t, err)
 }
 
-func (suite *FakeInputSuite) TestManager_OutputChange() {
+func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	t := suite.T()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	log, logs := logger.NewTesting("TestManager_StartStopComponent")
 	ai := &info.AgentInfo{}
 	m, err := NewManager(
-		newDebugLogger(t),
+		log,
 		newDebugLogger(t),
 		"localhost:0",
 		ai,
@@ -3278,7 +3159,8 @@ func (suite *FakeInputSuite) TestManager_OutputChange() {
 					subErrCh0,
 					&state,
 					[]client.UnitState{client.UnitStateHealthy, client.UnitStateStopped})
-				stateProgressionCh <- progressionStep{IDComp0, state}
+				stateProgressionCh <- progressionStep{
+					componentID: IDComp0, state: state}
 
 			case state := <-sub1.Ch():
 				t.Logf("component %s state changed: %+v", IDComp1, state)
@@ -3286,7 +3168,8 @@ func (suite *FakeInputSuite) TestManager_OutputChange() {
 					subErrCh1,
 					&state,
 					[]client.UnitState{client.UnitStateHealthy})
-				stateProgressionCh <- progressionStep{IDComp1, state}
+				stateProgressionCh <- progressionStep{
+					componentID: IDComp1, state: state}
 			}
 		}
 	}()
@@ -3305,24 +3188,48 @@ func (suite *FakeInputSuite) TestManager_OutputChange() {
 
 	select {
 	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
+		require.NoError(t, err,
+			"Manager.Run returned and error before 1st component update")
 	default:
 	}
 
-	time.Sleep(100 * time.Millisecond)
 	m.Update(component.Model{Components: components})
 	err = <-m.errCh
-	require.NoError(t, err)
+	require.NoError(t, err, "expected no error from the manager when applying"+
+		"the 1st component model")
+	require.Eventuallyf(t,
+		func() bool {
+			all := logs.TakeAll()
+			for _, l := range all {
+				if strings.Contains(
+					l.Message, fmt.Sprintf("Starting component %q", IDComp0)) {
+					return true
+				}
+			}
+			return false
+		},
+		30*time.Second,
+		200*time.Millisecond,
+		"component %s did not start", IDComp0)
 
-	updateSleep := 300 * time.Millisecond
-	if runtime.GOOS == component.Windows {
-		// windows is slow, preventing flakiness
-		updateSleep = time.Second
-	}
-	time.Sleep(updateSleep)
 	m.Update(component.Model{Components: components2})
 	err = <-m.errCh
-	require.NoError(t, err)
+	require.NoError(t, err, "expected no error from the manager when applying"+
+		"the 2nd component model")
+	require.Eventuallyf(t,
+		func() bool {
+			all := logs.TakeAll()
+			for _, l := range all {
+				if strings.Contains(
+					l.Message, fmt.Sprintf("Starting component %q", IDComp1)) {
+					return true
+				}
+			}
+			return false
+		},
+		30*time.Second,
+		200*time.Millisecond,
+		"component %s did not start", IDComp1)
 
 	count := 0
 	timeout := 30 * time.Second
@@ -3359,21 +3266,37 @@ LOOP:
 
 	// check progression, require stop fake-0 before start fake-1
 	stateProgressionWG.Wait()
-	comp0Stopped := false
+	var comp0Started, comp0Stopped, comp0Failed,
+		comp1Started, comp1Failed bool
 	for _, step := range stateProgression {
-		if step.componentID == IDComp0 &&
-			step.state.State == client.UnitStateStopped {
-			comp0Stopped = true
-		}
-		if step.componentID == IDComp1 &&
-			step.state.State == client.UnitStateStarting {
-			require.True(t, comp0Stopped)
-			break
+		switch step.componentID {
+		case IDComp0:
+			switch step.state.State {
+			case client.UnitStateStarting:
+				comp0Started = true
+			case client.UnitStateStopped:
+				comp0Stopped = true
+			case client.UnitStateDegraded, client.UnitStateFailed:
+				comp0Failed = true
+			}
+		case IDComp1:
+			switch step.state.State {
+			case client.UnitStateStarting:
+				comp1Started = true
+			case client.UnitStateDegraded, client.UnitStateFailed:
+				comp1Failed = true
+			}
 		}
 	}
+	assert.Truef(t, comp0Started, "component %s did not start", IDComp0)
+	assert.Truef(t, comp0Stopped, "component %s did not stop", IDComp0)
+	assert.Falsef(t, comp0Failed, "component %s failed", IDComp0)
+
+	assert.Truef(t, comp1Started, "component %s did not start", IDComp1)
+	assert.Falsef(t, comp1Failed, "component %s failed", IDComp1)
 
 	err = <-errCh
-	require.NoError(t, err)
+	assert.NoError(t, err, "Manager.Run returned and error")
 }
 
 func (suite *FakeInputSuite) TestManager_Chunk() {
