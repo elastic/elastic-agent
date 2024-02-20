@@ -225,7 +225,7 @@ steps:
 
   - label: "Extended runtime leak tests"
     key: "extended-integration-tests"
-    command: ".buildkite/scripts/steps/integration_tests.sh stateful integration:TestLongRunningAgentForLeaks"
+    command: ".buildkite/scripts/steps/integration_tests.sh stateful integration:TestExtendedRuntime"
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
