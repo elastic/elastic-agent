@@ -11,7 +11,7 @@ import (
 	"errors"
 )
 
-var ErrorImplementationNotAvailable = errors.New("vault implementation is not available")
+var ErrorImplementationNotAvailable = errors.New("vault keychain implementation is not available")
 
 // Empty DarwinKeyChainVault implementation for non-darwin OSes
 type DarwinKeyChainVault struct {
