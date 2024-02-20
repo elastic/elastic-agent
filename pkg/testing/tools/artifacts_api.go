@@ -200,7 +200,7 @@ func (aac ArtifactAPIClient) RemoveUnreleasedVersions(ctx context.Context, vList
 			return fmt.Errorf("failed to create an HTTP request to %q: %w", url, err)
 		}
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := aac.c.Do(req)
 		if err != nil {
 			return fmt.Errorf("failed to request %q: %w", url, err)
 		}
