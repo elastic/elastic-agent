@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// //go:build integration
+//go:build integration
 
 package integration
 
@@ -10,7 +10,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"os/exec"
 	"regexp"
@@ -21,7 +20,6 @@ import (
 
 	"github.com/google/uuid"
 	logrunner "github.com/leehinman/spigot/pkg/runner"
-	"github.com/sajari/regression"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -30,6 +28,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 	"github.com/elastic/go-ucfg"
@@ -84,7 +83,7 @@ type processWatcher struct {
 	handle     types.Process
 	pid        int
 	name       string
-	regHandles *regression.Regression
+	regHandles tools.Slope
 }
 
 func TestLongRunningAgentForLeaks(t *testing.T) {
@@ -178,7 +177,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
 	if testRuntime == "" {
-		testRuntime = "5m"
+		testRuntime = "15m"
 	}
 
 	regex := regexp.MustCompile(`[\d]+`)
@@ -190,7 +189,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		allHealthy := true
 		status, err := runner.agentFixture.ExecStatus(ctx)
 
-		cefMatch := "logfile-cef"
+		cefMatch := "logfile-apache"
 		foundCef := false
 		systemMatch := "metrics-default"
 		foundSystem := false
@@ -200,7 +199,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 			// make sure the components include the expected integrations
 			for _, v := range comp.Units {
 				runner.T().Logf("unit ID: %s", v.UnitID)
-				// the full cef unit ID will be something like "log-default-logfile-cef-3f0764f0-4ade-4f46-9ead-f2f0f7865676"
+				// the full unit ID will be something like "log-default-logfile-cef-3f0764f0-4ade-4f46-9ead-f2f0f7865676"
 				if !foundCef && strings.Contains(v.UnitID, cefMatch) {
 					foundCef = true
 				}
@@ -214,7 +213,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 			}
 		}
 		return allHealthy && foundCef && foundSystem
-	}, time.Minute*3, time.Second*20)
+	}, time.Minute*3, time.Second*20, "install never became healthy")
 
 	handles := []processWatcher{}
 
@@ -230,9 +229,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 		handle, err := sysinfo.Process(int(pid))
 		require.NoError(runner.T(), err)
-		handlesReg := new(regression.Regression)
-		handlesReg.SetObserved(fmt.Sprintf("%s handle usage", comp.Name))
-		handlesReg.SetVar(0, "time")
+		handlesReg := tools.NewSlope(fmt.Sprintf("%s handle usage", comp.Name))
 
 		runner.T().Logf("created handle watcher for %s (%d)", comp.Name, pid)
 		handles = append(handles, processWatcher{handle: handle, pid: int(pid), name: comp.Name, regHandles: handlesReg})
@@ -291,7 +288,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 				if ok {
 					handleCount, err := ohc.OpenHandleCount()
 					require.NoError(runner.T(), err)
-					handle.regHandles.Train(regression.DataPoint(float64(handleCount), []float64{time.Since(start).Seconds()}))
+					handle.regHandles.AddDatapoint(float64(handleCount), time.Since(start))
 				}
 
 			}
@@ -309,16 +306,20 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		require.NoError(runner.T(), err)
 
 		runner.T().Logf("=============================== %s (%d)", handle.name, handle.pid)
-		runner.T().Logf("handle formula: %v", handle.regHandles.Formula)
-		coeffs := handle.regHandles.GetCoeffs()
-		handleSlope := coeffs[1]
-		// This is a hack to deal with the fact that we'll pick up zombie processes that seem to happen when agent restarts
-		if math.IsNaN(handleSlope) {
-			continue
-		}
+		runner.T().Logf("handle formula: %s", handle.regHandles.Formula())
+		handleSlope := handle.regHandles.GetSlope()
 		require.LessOrEqual(runner.T(), handleSlope, handleSlopeFailure, "increase in open handles exceeded threshold: %s", handle.regHandles)
-
 		runner.T().Logf("===============================")
 	}
 
+	// post-test: make sure that we actually ingested logs.
+	docs, err := estools.GetResultsForAgentAndDatastream(ctx, runner.info.ESClient, "apache.error", status.Info.ID)
+	require.NoError(runner.T(), err, "error fetching apache logs")
+	require.Greater(runner.T(), docs.Hits.Total.Value, 0, "could not find any matching apache logs for agent ID %s", status.Info.ID)
+	runner.T().Logf("Generated %d apache logs", docs.Hits.Total.Value)
+
+	docs, err = estools.GetResultsForAgentAndDatastream(ctx, runner.info.ESClient, "system.cpu", status.Info.ID)
+	require.NoError(runner.T(), err, "error fetching system logs")
+	require.Greater(runner.T(), docs.Hits.Total.Value, 0, "could not find any matching system metrics for agent ID %s", status.Info.ID)
+	runner.T().Logf("Generated %d system events", docs.Hits.Total.Value)
 }
