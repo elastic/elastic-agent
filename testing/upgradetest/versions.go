@@ -44,6 +44,10 @@ func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, current
 	if len(vList.Versions) == 0 {
 		return nil, errors.New("retrieved versions list from Artifact API is empty")
 	}
+	err = aac.RemoveUnreleasedVersions(ctx, vList)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove unreleased versions: %w", err)
+	}
 
 	return getUpgradableVersions(ctx, vList, upgradeToVersion, currentMajorVersions, previousMajorVersions)
 }
