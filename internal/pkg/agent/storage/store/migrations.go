@@ -89,41 +89,40 @@ func migrateActionStoreToStateStore(
 // migrateYAMLStateStoreToStateStoreV1 migrates the YAML store to the new JSON
 // state store. If the contents of store is already a JSON, it returns the
 // parsed JSON.
-func migrateYAMLStateStoreToStateStoreV1(store storage.Storage) (*state, error) {
+func migrateYAMLStateStoreToStateStoreV1(store storage.Storage) error {
 	exists, err := store.Exists()
 	if err != nil {
-		return nil,
-			fmt.Errorf("migration YMAL to Store v1 failed: "+
-				"could not load store from disk: %w", err)
+		return fmt.Errorf("migration YMAL to Store v1 failed: "+
+			"could not load store from disk: %w", err)
 	}
 
 	// nothing to migrate, return empty store.
 	if !exists {
-		return &state{}, nil
+		return nil
 	}
 
 	// JSON is a subset of YAML, so first check if it's already a JSON store.
 	reader, err := store.Load()
 	if err != nil {
-		return nil, fmt.Errorf("could not read store content: %w", err)
+		return fmt.Errorf("could not read store content: %w", err)
 	}
 
 	st, err := readState(reader)
 	if err == nil {
 		// it's a valid JSON, therefore nothing to migrate
-		return &st, nil
+		return nil
 	}
 
 	// Try to read the store as YAML
 	yamlStore, err := migrations.LoadYAMLStateStore(store)
 	if err != nil {
 		// it isn't a YAML store
-		return nil, errors.Join(ErrInvalidYAML, err)
+		return errors.Join(ErrInvalidYAML, err)
 	}
 
 	// Store was empty, nothing to migrate
 	if yamlStore == nil {
-		return nil, nil
+		return nil
 	}
 
 	var action fleetapi.Action
@@ -159,10 +158,22 @@ func migrateYAMLStateStoreToStateStoreV1(store storage.Storage) (*state, error) 
 			})
 	}
 
-	return &state{
+	st = state{
 		Version:          "1",
 		ActionSerializer: actionSerializer{Action: action},
 		AckToken:         yamlStore.AckToken,
 		Queue:            queue,
-	}, nil
+	}
+
+	jsonReader, err := jsonToReader(&st)
+	if err != nil {
+		return fmt.Errorf("store state migrated from YAML failed: %w", err)
+	}
+
+	err = store.Save(jsonReader)
+	if err != nil {
+		return fmt.Errorf("failed to save store state migrated from YAML: %w", err)
+	}
+
+	return nil
 }

@@ -70,16 +70,34 @@ type actionSerializer struct {
 // therefore the need for this type to do so.
 type actionQueue []fleetapi.ScheduledAction
 
-// NewStateStoreWithMigration creates a new state store and migrates the old one.
-func NewStateStoreWithMigration(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string) (*StateStore, error) {
-
+// NewStateStoreWithMigration creates a new state store and migrates the old ones.
+func NewStateStoreWithMigration(
+	ctx context.Context,
+	log *logger.Logger,
+	actionStorePath,
+	stateStorePath string) (*StateStore, error) {
 	stateDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath)
-	err := migrateActionStoreToStateStore(log, actionStorePath, stateDiskStore)
+
+	return newStateStoreWithMigration(log, actionStorePath, stateDiskStore)
+}
+
+func newStateStoreWithMigration(
+	log *logger.Logger,
+	actionStorePath string,
+	stateStore storage.Storage) (*StateStore, error) {
+	err := migrateActionStoreToStateStore(log, actionStorePath, stateStore)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed migrating action store to YAML state store: %w",
+			err)
 	}
 
-	return NewStateStore(log, storage.NewEncryptedDiskStore(ctx, stateStorePath))
+	err = migrateYAMLStateStoreToStateStoreV1(stateStore)
+	if err != nil {
+		return nil, fmt.Errorf("failed dmigrating YAML store JSON store: %w",
+			err)
+	}
+
+	return NewStateStore(log, stateStore)
 }
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
