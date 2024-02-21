@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	logrunner "github.com/leehinman/spigot/pkg/runner"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -31,7 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
-	"github.com/elastic/go-ucfg"
 )
 
 type ExtendedRunner struct {
@@ -244,33 +242,6 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	// time to perform a health check
 	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
-
-	err = os.MkdirAll("/tmp/cef", 0o755)
-	require.NoError(runner.T(), err)
-	spigotConfig := map[string]interface{}{
-		"generator": map[string]interface{}{
-			"type": "citrix:cef",
-		},
-		"output": map[string]interface{}{
-			"type":      "file",
-			"directory": "/tmp/cef/",
-			"pattern":   "cef*.log",
-			"delimiter": "\n",
-		},
-		"interval": "20s",
-		"records":  "1000",
-	}
-
-	cfg, err := ucfg.NewFrom(spigotConfig)
-	require.NoError(runner.T(), err)
-
-	logger, err := logrunner.New(cfg)
-	require.NoError(runner.T(), err)
-
-	go func() {
-		err := logger.Execute()
-		require.NoError(runner.T(), err)
-	}()
 
 	done := false
 	start := time.Now()
