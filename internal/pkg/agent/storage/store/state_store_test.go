@@ -183,18 +183,18 @@ func TestStateStore(t *testing.T) {
 				filepath.Join("testdata", "8.0.0-action_policy_change.yml"))
 			require.NoError(t, err, "could not read action store golden file")
 
-			yamlStoreEncPath := filepath.Join(tempDir, "yaml_store.enc")
-			yamlStoreEnc := storage.NewEncryptedDiskStore(ctx, yamlStoreEncPath,
+			encDiskStorePath := filepath.Join(tempDir, "store.enc")
+			encDiskStore := storage.NewEncryptedDiskStore(ctx, encDiskStorePath,
 				storage.WithVaultPath(vaultPath))
-			err = yamlStoreEnc.Save(bytes.NewBuffer(yamlStorePlain))
+			err = encDiskStore.Save(bytes.NewBuffer(yamlStorePlain))
 			require.NoError(t, err,
 				"failed saving copy of golden files on an EncryptedDiskStore")
 
-			err = migrateYAMLStateStoreToStateStoreV1(yamlStoreEnc)
+			err = migrateYAMLStateStoreToStateStoreV1(encDiskStore)
 			require.NoError(t, err, "YAML state store -> JSON state store failed")
 
 			// Load migrated store from disk
-			stateStore, err := NewStateStore(log, yamlStoreEnc)
+			stateStore, err := NewStateStore(log, encDiskStore)
 			require.NoError(t, err, "could not load store from disk")
 
 			assert.Equal(t, want, stateStore.state)
