@@ -8,11 +8,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"io"
 	"io/fs"
 	"os"
 	"runtime"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
 	"github.com/hectane/go-acl"
 
