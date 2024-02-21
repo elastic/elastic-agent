@@ -3155,22 +3155,24 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 				close(stateProgressionCh)
 				return
 			case state := <-sub0.Ch():
+				now := time.Now()
 				t.Logf("component %s state changed: %+v", IDComp0, state)
 				signalState(
 					subErrCh0,
 					&state,
 					[]client.UnitState{client.UnitStateHealthy, client.UnitStateStopped})
 				stateProgressionCh <- progressionStep{
-					timestamp: time.Now(), componentID: IDComp0, state: state}
+					timestamp: now, componentID: IDComp0, state: state}
 
 			case state := <-sub1.Ch():
+				now := time.Now()
 				t.Logf("component %s state changed: %+v", IDComp1, state)
 				signalState(
 					subErrCh1,
 					&state,
 					[]client.UnitState{client.UnitStateHealthy})
 				stateProgressionCh <- progressionStep{
-					timestamp: time.Now(), componentID: IDComp1, state: state}
+					timestamp: now, componentID: IDComp1, state: state}
 			}
 		}
 	}()
@@ -3283,7 +3285,7 @@ LOOP:
 		"component %s did not stop", comp0Stopped.componentID)
 	assert.Falsef(t, comp1Started.timestamp.IsZero(),
 		"component %s did not start", comp1Started.componentID)
-	
+
 	assert.Truef(t, comp0Stopped.timestamp.Before(comp1Started.timestamp),
 		"component %s should stop before %s starts. "+
 			"%s stopped at %s, %s started at %s",
