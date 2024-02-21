@@ -10,7 +10,7 @@ PACKAGE_VERSION="${DRA_VERSION:="${BEAT_VERSION:=""}"}"
 RM_LIST_ONLY="${DRA_RM_LIST_ONLY:="false"}"
 
 # XXX Do Not Merge This
-BRANCH="8.12"
+BRANCH="main"
 
 # force main branch on PR's or it won't execute
 # because the PR branch does not have a project folder in release-manager
