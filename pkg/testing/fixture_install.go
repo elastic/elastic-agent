@@ -171,6 +171,13 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
+		if f.t.Failed() {
+			procs := getProcesses(f.t, `.*`)
+			f.t.Logf("Processes running:\n%v", procs)
+		}
+	})
+
+	f.t.Cleanup(func() {
 		// check for running agents after uninstall had a chance to run
 		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at the end of the test")
 	})
@@ -277,8 +284,12 @@ func mapProcess(p agentsystemprocess.ProcState) runningProcess {
 }
 
 func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
+	return getProcesses(t, `.*elastic\-agent.*`)
+}
+
+func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	procStats := agentsystemprocess.Stats{
-		Procs: []string{`.*elastic\-agent.*`},
+		Procs: []string{regex},
 	}
 
 	err := procStats.Init()
