@@ -142,11 +142,17 @@ steps:
       buildkite-agent artifact download "build/**/*" .
       echo "+++ Changing permissions for the BK API commands"
       sudo chown -R :1000 build/distributions/
+      echo "+++ Checking artifact validity with release-manager list"
+      DRA_RM_LIST_ONLY="true"
+      export DRA_RM_LIST_ONLY
+      .buildkite/script/steps/dra-publish.sh
       echo "+++ Call buildkite-agent upload to save artifacts for job that triggered us"
       buildkite-agent artifact upload "build/distributions/*"
       echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
       if [[ -z "${TRIGGER_JOB_ID}" ]]; then
         echo "TRIGGER_JOB_ID is not set, so not setting metadata"
       else
+        echo "Setting metadata for job that trigger this one"
         buildkite-agent meta-data set "triggered_build_id" "$BUILDKITE_BUILD_ID" --job $TRIGGER_JOB_ID
+        buildkite-agent meta-data set "triggered_commit_hash" "$BUILDKITE_COMMIT" --job $TRIGGER_JOB_ID
       fi
