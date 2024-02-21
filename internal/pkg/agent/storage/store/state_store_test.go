@@ -66,7 +66,7 @@ func TestStateStore(t *testing.T) {
 			assert.Empty(t, stateStore.Queue())
 		})
 
-		t.Run("action store to state store", func(t *testing.T) {
+		t.Run("action store to YAML state store", func(t *testing.T) {
 			ctx := context.Background()
 			log, _ := logger.NewTesting("")
 
@@ -125,6 +125,7 @@ func TestStateStore(t *testing.T) {
 
 		t.Run("YAML state store to JSON state store", func(t *testing.T) {
 			ctx := context.Background()
+			log, _ := logger.NewTesting("")
 
 			if runtime.GOOS == "darwin" {
 				// the original migrate never actually run, so with this at least
@@ -142,7 +143,7 @@ func TestStateStore(t *testing.T) {
 						Policy: map[string]interface{}{
 							"hello":  "world",
 							"phi":    1.618,
-							"answer": 42,
+							"answer": 42.0,
 						},
 					},
 				}},
@@ -189,13 +190,17 @@ func TestStateStore(t *testing.T) {
 			require.NoError(t, err,
 				"failed saving copy of golden files on an EncryptedDiskStore")
 
-			got, err := migrateYAMLStateStoreToStateStoreV1(yamlStoreEnc)
+			err = migrateYAMLStateStoreToStateStoreV1(yamlStoreEnc)
 			require.NoError(t, err, "YAML state store -> JSON state store failed")
 
-			assert.Equal(t, &want, got)
+			// Load migrated store from disk
+			stateStore, err := NewStateStore(log, yamlStoreEnc)
+			require.NoError(t, err, "could not load store from disk")
+
+			assert.Equal(t, want, stateStore.state)
 		})
 
-		t.Run("invoked to existing JSON state store", func(t *testing.T) {
+		t.Run("YAML state store when JSON state store exists", func(t *testing.T) {
 			log, _ := logger.NewTesting("")
 
 			ctx := context.Background()
@@ -265,10 +270,233 @@ func TestStateStore(t *testing.T) {
 			require.NoError(t, err, "state store save filed")
 
 			// Try to migrate an existing JSON store
-			got, err := migrateYAMLStateStoreToStateStoreV1(endDiskStore)
+			err = migrateYAMLStateStoreToStateStoreV1(endDiskStore)
 			require.NoError(t, err, "YAML state store -> JSON state store failed")
 
-			assert.Equal(t, &want, got)
+			// Load migrated store from disk
+			stateStore, err = NewStateStore(log, endDiskStore)
+			require.NoError(t, err, "could not load store from disk")
+
+			assert.Equal(t, want, stateStore.state)
+		})
+
+		t.Run("NewStateStoreWithMigration", func(t *testing.T) {
+			t.Run("action store exists", func(t *testing.T) {
+				ctx := context.Background()
+				log, _ := logger.NewTesting("")
+
+				if runtime.GOOS == "darwin" {
+					// the original migrate never actually run, so with this at least
+					// there is coverage for linux and windows.
+					t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
+						"to be merged so this test can work on darwin")
+				}
+
+				want := &fleetapi.ActionPolicyChange{
+					ActionID:   "abc123",
+					ActionType: "POLICY_CHANGE",
+					Data: fleetapi.ActionPolicyChangeData{
+						Policy: map[string]interface{}{
+							"hello":  "world",
+							"phi":    1.618,
+							"answer": 42.0, // YAML unmarshaller unmarshals int as float
+						},
+					},
+				}
+
+				tempDir := t.TempDir()
+				vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
+
+				goldenActionStore, err := os.ReadFile(
+					filepath.Join("testdata", "7.17.18-action_store.yml"))
+				require.NoError(t, err, "could not read action store golden file")
+
+				oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
+				err = os.WriteFile(oldActionStorePath, goldenActionStore, 0666)
+				require.NoError(t, err, "could not copy action store golden file")
+
+				newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
+				newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
+					storage.WithVaultPath(vaultPath))
+
+				stateStore, err := newStateStoreWithMigration(log, oldActionStorePath, newStateStore)
+				require.NoError(t, err, "newStateStoreWithMigration failed")
+
+				got := stateStore.Action()
+				assert.Equalf(t, want, got,
+					"loaded action differs from action on the old action store")
+				assert.Empty(t, stateStore.Queue(),
+					"queue should be empty, old action store did not have a queue")
+			})
+
+			t.Run("YAML state store to JSON state store", func(t *testing.T) {
+				ctx := context.Background()
+				log, _ := logger.NewTesting("")
+
+				if runtime.GOOS == "darwin" {
+					// the original migrate never actually run, so with this at least
+					// there is coverage for linux and windows.
+					t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
+						"to be merged so this test can work on darwin")
+				}
+
+				want := state{
+					Version: "1",
+					ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
+						ActionID:   "abc123",
+						ActionType: "POLICY_CHANGE",
+						Data: fleetapi.ActionPolicyChangeData{
+							Policy: map[string]interface{}{
+								"hello":  "world",
+								"phi":    1.618,
+								"answer": 42.0,
+							},
+						},
+					}},
+					AckToken: "czlV93YBwdkt5lYhBY7S",
+					Queue: actionQueue{&fleetapi.ActionUpgrade{
+						ActionID:         "action1",
+						ActionType:       "UPGRADE",
+						ActionStartTime:  "2024-02-19T17:48:40Z",
+						ActionExpiration: "2025-02-19T17:48:40Z",
+						Data: fleetapi.ActionUpgradeData{
+							Version:   "1.2.3",
+							SourceURI: "https://example.com",
+							Retry:     1,
+						},
+						Signed: nil,
+						Err:    nil,
+					},
+						&fleetapi.ActionUpgrade{
+							ActionID:         "action2",
+							ActionType:       "UPGRADE",
+							ActionStartTime:  "2024-02-19T17:48:40Z",
+							ActionExpiration: "2025-02-19T17:48:40Z",
+							Data: fleetapi.ActionUpgradeData{
+								Version:   "1.2.3",
+								SourceURI: "https://example.com",
+								Retry:     1,
+							},
+							Signed: nil,
+							Err:    nil,
+						}},
+				}
+
+				tempDir := t.TempDir()
+				vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
+
+				yamlStorePlain, err := os.ReadFile(
+					filepath.Join("testdata", "8.0.0-action_policy_change.yml"))
+				require.NoError(t, err, "could not read action store golden file")
+
+				yamlStoreEncPath := filepath.Join(tempDir, "yaml_store.enc")
+				yamlStoreEnc := storage.NewEncryptedDiskStore(ctx, yamlStoreEncPath,
+					storage.WithVaultPath(vaultPath))
+				err = yamlStoreEnc.Save(bytes.NewBuffer(yamlStorePlain))
+				require.NoError(t, err,
+					"failed saving copy of golden files on an EncryptedDiskStore")
+
+				stateStore, err := newStateStoreWithMigration(log, filepath.Join(tempDir, "non-existing-action-store.yaml"), yamlStoreEnc)
+				require.NoError(t, err, "newStateStoreWithMigration failed")
+
+				assert.Equal(t, want, stateStore.state)
+			})
+
+			t.Run("up to date store, no migration needed", func(t *testing.T) {
+				log, _ := logger.NewTesting("")
+
+				ctx := context.Background()
+				if runtime.GOOS == "darwin" {
+					// the original migrate never actually run, so with this at least
+					// there is coverage for linux and windows.
+					t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
+						"to be merged so this test can work on darwin")
+				}
+
+				want := state{
+					Version: "1",
+					ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
+						ActionID:   "abc123",
+						ActionType: "POLICY_CHANGE",
+						Data: fleetapi.ActionPolicyChangeData{
+							Policy: map[string]interface{}{
+								"hello":  "world",
+								"phi":    1.618,
+								"answer": 42.0,
+							},
+						},
+					}},
+					AckToken: "czlV93YBwdkt5lYhBY7S",
+					Queue: actionQueue{&fleetapi.ActionUpgrade{
+						ActionID:         "action1",
+						ActionType:       "UPGRADE",
+						ActionStartTime:  "2024-02-19T17:48:40Z",
+						ActionExpiration: "2025-02-19T17:48:40Z",
+						Data: fleetapi.ActionUpgradeData{
+							Version:   "1.2.3",
+							SourceURI: "https://example.com",
+							Retry:     1,
+						},
+						Signed: nil,
+						Err:    nil,
+					},
+						&fleetapi.ActionUpgrade{
+							ActionID:         "action2",
+							ActionType:       "UPGRADE",
+							ActionStartTime:  "2024-02-19T17:48:40Z",
+							ActionExpiration: "2025-02-19T17:48:40Z",
+							Data: fleetapi.ActionUpgradeData{
+								Version:   "1.2.3",
+								SourceURI: "https://example.com",
+								Retry:     1,
+							},
+							Signed: nil,
+							Err:    nil,
+						}},
+				}
+
+				tempDir := t.TempDir()
+				vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
+
+				stateStorePath := filepath.Join(tempDir, "store.enc")
+				endDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath,
+					storage.WithVaultPath(vaultPath))
+
+				// Create and save a JSON state store
+				stateStore, err := NewStateStore(log, endDiskStore)
+				require.NoError(t, err, "could not create state store")
+				stateStore.SetAckToken(want.AckToken)
+				stateStore.SetAction(want.ActionSerializer.Action)
+				stateStore.SetQueue(want.Queue)
+				err = stateStore.Save()
+				require.NoError(t, err, "state store save filed")
+
+				stateStore, err = newStateStoreWithMigration(log, filepath.Join(tempDir, "non-existing-action-store.yaml"), endDiskStore)
+				require.NoError(t, err, "newStateStoreWithMigration failed")
+
+				assert.Equal(t, want, stateStore.state)
+			})
+
+			t.Run("no store exists", func(t *testing.T) {
+				ctx := context.Background()
+				log, _ := logger.NewTesting("")
+
+				tempDir := t.TempDir()
+				vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
+
+				stateStorePath := filepath.Join(tempDir, "store.enc")
+				endDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath,
+					storage.WithVaultPath(vaultPath))
+
+				got, err := newStateStoreWithMigration(log, filepath.Join(tempDir, "non-existing-action-store.yaml"), endDiskStore)
+				require.NoError(t, err, "newStateStoreWithMigration failed")
+
+				assert.Nil(t, got.Action(),
+					"no action should have been loaded")
+				assert.Empty(t, got.Queue(), "action queue should be empty")
+				assert.Empty(t, got.AckToken(),
+					"no AckToken should have been loaded")
+			})
 		})
 	})
 }
