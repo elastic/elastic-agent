@@ -54,14 +54,18 @@ func LoadYAMLStateStore(loader interface{ Load() (io.ReadCloser, error) }) (*Sta
 	return LoadStore[StateStore](loader)
 }
 
-func LoadStore[Store any](loader interface{ Load() (io.ReadCloser, error) }) (*Store, error) {
+func LoadStore[Store any](loader interface{ Load() (io.ReadCloser, error) }) (store *Store, err error) {
 	reader, err := loader.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action store: %w", err)
 	}
-	defer reader.Close()
-
-	var store Store
+	defer func() {
+		err2 := reader.Close()
+		if err != nil {
+			err = errors.Join(err,
+				fmt.Errorf("migration storeLoad failed to close reader: %w", err2))
+		}
+	}()
 
 	data, err := io.ReadAll(reader)
 	if err != nil {
@@ -70,7 +74,7 @@ func LoadStore[Store any](loader interface{ Load() (io.ReadCloser, error) }) (*S
 	buff := bytes.NewReader(data)
 
 	dec := yaml.NewDecoder(buff)
-	err = dec.Decode(&store)
+	err = dec.Decode(store)
 	if errors.Is(err, io.EOF) {
 		return nil, nil
 	}
@@ -78,5 +82,5 @@ func LoadStore[Store any](loader interface{ Load() (io.ReadCloser, error) }) (*S
 		return nil, fmt.Errorf("could not YAML unmarshal action from action store: %w", err)
 	}
 
-	return &store, nil
+	return store, nil
 }

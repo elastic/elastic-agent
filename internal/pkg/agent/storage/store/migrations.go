@@ -113,6 +113,11 @@ func migrateYAMLStateStoreToStateStoreV1(store storage.Storage) error {
 		return nil
 	}
 
+	err = reader.Close()
+	if err != nil {
+		return fmt.Errorf("could not close store reader: %w", err)
+	}
+
 	// Try to read the store as YAML
 	yamlStore, err := migrations.LoadYAMLStateStore(store)
 	if err != nil {
