@@ -7,6 +7,7 @@ package testing
 import (
 	"archive/zip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -23,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent-libs/opt"
 	agentsystemprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -173,7 +173,27 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.t.Cleanup(func() {
 		if f.t.Failed() {
 			procs := getProcesses(f.t, `.*`)
-			f.t.Logf("Processes running:\n%v", procs)
+			dir, err := findProjectRoot(f.caller)
+			if err != nil {
+				f.t.Logf("failed to dump process; failed to find project root: %s", err)
+				return
+			}
+			filePath := filepath.Join(dir, "build", fmt.Sprintf("TEST-%s-processes.json", f.t.Name()))
+			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+			if err != nil {
+				f.t.Logf("failed to dump process; failed to create output file %s root: %s", file.Name(), err)
+				return
+			}
+			defer func(file *os.File) {
+				err := file.Close()
+				if err != nil {
+					f.t.Logf("error closing file %s: %s", file.Name(), err)
+				}
+			}(file)
+			err = json.NewEncoder(file).Encode(procs)
+			if err != nil {
+				f.t.Logf("error serializing processes: %s", err)
+			}
 		}
 	})
 
@@ -242,19 +262,19 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 
 type runningProcess struct {
 	// Basic Process data
-	Name     string
-	State    agentsystemprocess.PidState
-	Username string
-	Pid      opt.Int
-	Ppid     opt.Int
-	Pgid     opt.Int
+	Name     string                      `json:"name,omitempty"`
+	State    agentsystemprocess.PidState `json:"state,omitempty"`
+	Username string                      `json:"username,omitempty"`
+	Pid      int                         `json:"pid"`
+	Ppid     int                         `json:"ppid"`
+	Pgid     int                         `json:"pgid"`
 
 	// Extended Process Data
-	Args    []string
-	Cmdline string
-	Cwd     string
-	Exe     string
-	Env     mapstr.M
+	Args    []string `json:"args,omitempty"`
+	Cmdline string   `json:"cmdline,omitempty"`
+	Cwd     string   `json:"cwd,omitempty"`
+	Exe     string   `json:"exe,omitempty"`
+	Env     mapstr.M `json:"env,omitempty"`
 }
 
 func (p runningProcess) String() string {
@@ -267,14 +287,15 @@ func mapProcess(p agentsystemprocess.ProcState) runningProcess {
 		Name:     p.Name,
 		State:    p.State,
 		Username: p.Username,
-		Pid:      p.Pid,
-		Ppid:     p.Ppid,
-		Pgid:     p.Pgid,
-		Cmdline:  p.Cmdline,
-		Cwd:      p.Cwd,
-		Exe:      p.Exe,
-		Args:     make([]string, len(p.Args)),
-		Env:      make(mapstr.M),
+		// map pid/gid to int and default to an obvious impossible pid if we don't have a value
+		Pid:     p.Pid.ValueOr(-1),
+		Ppid:    p.Ppid.ValueOr(-1),
+		Pgid:    p.Pgid.ValueOr(-1),
+		Cmdline: p.Cmdline,
+		Cwd:     p.Cwd,
+		Exe:     p.Exe,
+		Args:    make([]string, len(p.Args)),
+		Env:     make(mapstr.M),
 	}
 	copy(mappedProcess.Args, p.Args)
 	for k, v := range p.Env {
