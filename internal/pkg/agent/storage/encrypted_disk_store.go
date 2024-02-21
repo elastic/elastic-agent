@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"io"
 	"io/fs"
 	"os"
@@ -79,7 +80,7 @@ func (d *EncryptedDiskStore) Exists() (bool, error) {
 
 func (d *EncryptedDiskStore) ensureKey(ctx context.Context) error {
 	if d.key == nil {
-		key, err := secret.GetAgentSecret(ctx, secret.WithVaultPath(d.vaultPath))
+		key, err := secret.GetAgentSecret(ctx, vault.WithVaultPath(d.vaultPath))
 		if err != nil {
 			return fmt.Errorf("could not get agent key: %w", err)
 		}

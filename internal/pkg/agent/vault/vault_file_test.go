@@ -33,7 +33,8 @@ func TestFileVaultRekey(t *testing.T) {
 	defer cn()
 
 	vaultPath := getTestFileVaultPath(t)
-	v, err := NewFileVault(ctx, vaultPath)
+	options := ApplyOptions(WithVaultPath(vaultPath))
+	v, err := NewFileVault(ctx, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +65,7 @@ func TestFileVaultRekey(t *testing.T) {
 	}
 
 	// The vault with the new seed
-	v2, err := NewFileVault(ctx, vaultPath)
+	v2, err := NewFileVault(ctx, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,8 +83,8 @@ func TestFileVault(t *testing.T) {
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
-
-	v, err := NewFileVault(ctx, vaultPath)
+	options := ApplyOptions(WithVaultPath(vaultPath))
+	v, err := NewFileVault(ctx, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +209,8 @@ func TestFileVaultConcurrent(t *testing.T) {
 }
 
 func doCrud(t *testing.T, ctx context.Context, vaultPath, key string) error {
-	v, err := NewFileVault(ctx, vaultPath)
+	options := ApplyOptions(WithVaultPath(vaultPath))
+	v, err := NewFileVault(ctx, options)
 	if err != nil {
 		return fmt.Errorf("could not create new vault: %w", err)
 	}

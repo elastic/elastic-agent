@@ -163,19 +163,6 @@ func (v *FileVault) Close() error {
 	return nil
 }
 
-// applyOptions applies options for windows and linux, not used for darwin implementation
-func applyOptions(opts ...OptionFunc) Options {
-	options := Options{
-		lockRetryDelay: defaultFlockRetryDelay,
-	}
-
-	for _, opt := range opts {
-		opt(&options)
-	}
-
-	return options
-}
-
 // fileNameFromKey returns the filename as a hash of the vault seed combined with the key
 // This ties the key with the vault seed eliminating the chance of attempting
 // to decrypt the key for the wrong vault seed value.

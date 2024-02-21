@@ -26,11 +26,13 @@ type Vault interface {
 	Close() error
 }
 
-func New(ctx context.Context, nameOrPath string, opts ...OptionFunc) (Vault, error) {
-	if runtime.GOOS == "darwin" {
+func New(ctx context.Context, opts ...OptionFunc) (Vault, error) {
+	options := ApplyOptions(opts...)
+
+	if runtime.GOOS == "darwin" && !options.unprivileged {
 		// TODO add checks for unprivileged and proper fallback
-		return NewDarwinKeyChainVault(ctx, nameOrPath, opts...)
+		return NewDarwinKeyChainVault(ctx, options)
 	}
 
-	return NewFileVault(ctx, nameOrPath, opts...)
+	return NewFileVault(ctx, options)
 }

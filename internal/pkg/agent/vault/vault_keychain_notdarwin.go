@@ -37,6 +37,6 @@ func (d DarwinKeyChainVault) Close() error {
 	return ErrorImplementationNotAvailable
 }
 
-func NewDarwinKeyChainVault(ctx context.Context, name string, opts ...OptionFunc) (v *DarwinKeyChainVault, err error) {
+func NewDarwinKeyChainVault(ctx context.Context, opts Options) (v *DarwinKeyChainVault, err error) {
 	return nil, ErrorImplementationNotAvailable
 }

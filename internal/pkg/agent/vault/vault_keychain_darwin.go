@@ -38,7 +38,7 @@ type DarwinKeychainVault struct {
 
 // NewDarwinKeyChainVault initializes the keychain vault store
 // Call Close when done to release the resources
-func NewDarwinKeyChainVault(ctx context.Context, name string, opts ...OptionFunc) (*DarwinKeychainVault, error) {
+func NewDarwinKeyChainVault(ctx context.Context, opts Options) (*DarwinKeychainVault, error) {
 	var keychain C.SecKeychainRef
 
 	err := statusToError(C.OpenKeychain(keychain))
@@ -47,7 +47,7 @@ func NewDarwinKeyChainVault(ctx context.Context, name string, opts ...OptionFunc
 	}
 
 	return &DarwinKeychainVault{
-		name:     name,
+		name:     opts.entryName,
 		keychain: keychain,
 	}, nil
 }
