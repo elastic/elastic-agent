@@ -178,7 +178,12 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 				f.t.Logf("failed to dump process; failed to find project root: %s", err)
 				return
 			}
-			filePath := filepath.Join(dir, "build", fmt.Sprintf("TEST-%s-processes.json", f.t.Name()))
+
+			// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
+			sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
+
+			filePath := filepath.Join(dir, "build", fmt.Sprintf("TEST-%s-ProcessDump.json", sanitizedTestName))
+			f.t.Logf("Dumping running processes in %s", filePath)
 			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 			if err != nil {
 				f.t.Logf("failed to dump process; failed to create output file %s root: %s", file.Name(), err)
