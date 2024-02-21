@@ -782,7 +782,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 		// otherwise new instance may be started and components
 		// may fight for resources (e.g. ports, files, locks)
 		go func(state *componentRuntimeState) {
-			err = m.waitForStopped(state)
+			err := m.waitForStopped(state)
 			if err != nil {
 				m.logger.Errorf("updating components: failed waiting %s stop",
 					state.id)
