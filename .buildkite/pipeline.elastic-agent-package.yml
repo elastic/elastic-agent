@@ -145,7 +145,7 @@ steps:
       echo "+++ Checking artifact validity with release-manager list"
       DRA_RM_LIST_ONLY="true"
       export DRA_RM_LIST_ONLY
-      .buildkite/script/steps/dra-publish.sh
+      .buildkite/scripts/steps/dra-publish.sh
       echo "+++ Call buildkite-agent upload to save artifacts for job that triggered us"
       buildkite-agent artifact upload "build/distributions/*"
       echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
