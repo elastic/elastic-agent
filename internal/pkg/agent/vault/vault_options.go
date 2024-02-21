@@ -5,8 +5,9 @@
 package vault
 
 import (
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 type OptionFunc func(o *Options)
