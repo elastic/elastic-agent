@@ -7,7 +7,6 @@ WORKFLOW="${DRA_WORKFLOW:=""}"
 COMMIT="${DRA_COMMIT:="${BUILDKITE_COMMIT:=""}"}"
 BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 PACKAGE_VERSION="${DRA_VERSION:="${BEAT_VERSION:=""}"}"
-RM_LIST_ONLY="${DRA_RM_LIST_ONLY:="false"}"
 
 # XXX Do Not Merge This
 BRANCH="main"
@@ -80,12 +79,6 @@ function run_release_manager_collect() {
 
 echo "+++ Release Manager ${WORKFLOW} / ${BRANCH} / ${COMMIT}";
 run_release_manager_list "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}"
-RM_LIST_EXIT_CODE=$?
-if [[ "${RM_LIST_ONLY}" == "true" ]]; then
-    echo "RM_LIST_ONLY is set, skipping the collect stage"
-    exit $RM_LIST_EXIT_CODE
-fi
-
 run_release_manager_collect "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}" "${DRY_RUN}"
 RM_EXIT_CODE=$?
 
