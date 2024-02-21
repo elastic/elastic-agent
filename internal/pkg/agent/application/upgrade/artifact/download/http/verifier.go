@@ -171,8 +171,7 @@ func (v *Verifier) getPublicAsc(sourceURI string) ([]byte, error) {
 		return nil, errors.New(err, "failed create request for loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
-	// TODO: receive a http.Client
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := v.client.Do(req)
 	if err != nil {
 		return nil, errors.New(err, "failed loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
