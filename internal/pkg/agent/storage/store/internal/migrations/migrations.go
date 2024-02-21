@@ -55,6 +55,10 @@ func LoadYAMLStateStore(loader interface{ Load() (io.ReadCloser, error) }) (*Sta
 }
 
 func LoadStore[Store any](loader interface{ Load() (io.ReadCloser, error) }) (store *Store, err error) {
+	// Store is a generic type, this might be needed.
+	var st Store
+	store = &st
+
 	reader, err := loader.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action store: %w", err)
@@ -74,7 +78,7 @@ func LoadStore[Store any](loader interface{ Load() (io.ReadCloser, error) }) (st
 	buff := bytes.NewReader(data)
 
 	dec := yaml.NewDecoder(buff)
-	err = dec.Decode(store)
+	err = dec.Decode(&store)
 	if errors.Is(err, io.EOF) {
 		return nil, nil
 	}
