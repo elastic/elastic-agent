@@ -143,7 +143,7 @@ steps:
       echo "+++ Changing permissions for the BK API commands"
       sudo chown -R :1000 build/distributions/
       echo "+++ Checking artifact validity with release-manager collect dry run"
-      DRA_DRY_RUN="true"
+      DRA_DRY_RUN="--dry-run"
       export DRA_DRY_RUN
       .buildkite/scripts/steps/dra-publish.sh
       echo "+++ Call buildkite-agent upload to save artifacts for job that triggered us"
