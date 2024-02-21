@@ -3131,6 +3131,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	}
 
 	type progressionStep struct {
+		timestamp   time.Time
 		componentID string
 		state       ComponentState
 	}
@@ -3160,7 +3161,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 					&state,
 					[]client.UnitState{client.UnitStateHealthy, client.UnitStateStopped})
 				stateProgressionCh <- progressionStep{
-					componentID: IDComp0, state: state}
+					timestamp: time.Now(), componentID: IDComp0, state: state}
 
 			case state := <-sub1.Ch():
 				t.Logf("component %s state changed: %+v", IDComp1, state)
@@ -3169,7 +3170,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 					&state,
 					[]client.UnitState{client.UnitStateHealthy})
 				stateProgressionCh <- progressionStep{
-					componentID: IDComp1, state: state}
+					timestamp: time.Now(), componentID: IDComp1, state: state}
 			}
 		}
 	}()
@@ -3264,36 +3265,27 @@ LOOP:
 	subCancel()
 	cancel()
 
-	// check progression, require stop fake-0 before start fake-1
+	// check progression: require fake-0 to stop before fake-1 starts
 	stateProgressionWG.Wait()
-	var comp0Started, comp0Stopped, comp0Failed,
-		comp1Started, comp1Failed bool
+	var comp0Stopped, comp1Started progressionStep
 	for _, step := range stateProgression {
-		switch step.componentID {
-		case IDComp0:
-			switch step.state.State {
-			case client.UnitStateStarting:
-				comp0Started = true
-			case client.UnitStateStopped:
-				comp0Stopped = true
-			case client.UnitStateDegraded, client.UnitStateFailed:
-				comp0Failed = true
-			}
-		case IDComp1:
-			switch step.state.State {
-			case client.UnitStateStarting:
-				comp1Started = true
-			case client.UnitStateDegraded, client.UnitStateFailed:
-				comp1Failed = true
-			}
+		if step.componentID == IDComp0 &&
+			step.state.State == client.UnitStateStopped {
+			comp0Stopped = step
+		}
+		if step.componentID == IDComp1 &&
+			step.state.State == client.UnitStateStarting {
+			comp1Started = step
 		}
 	}
-	assert.Truef(t, comp0Started, "component %s did not start", IDComp0)
-	assert.Truef(t, comp0Stopped, "component %s did not stop", IDComp0)
-	assert.Falsef(t, comp0Failed, "component %s failed", IDComp0)
 
-	assert.Truef(t, comp1Started, "component %s did not start", IDComp1)
-	assert.Falsef(t, comp1Failed, "component %s failed", IDComp1)
+	assert.Falsef(t, comp0Stopped.timestamp.IsZero(),
+		"component %s did not stop", comp0Stopped.componentID)
+	assert.Falsef(t, comp1Started.timestamp.IsZero(),
+		"component %s did not stop", comp1Started.componentID)
+	assert.Truef(t, comp0Stopped.timestamp.Before(comp1Started.timestamp),
+		"component %s should have stopped before %s",
+		comp0Stopped.componentID, comp1Started.componentID)
 
 	err = <-errCh
 	assert.NoError(t, err, "Manager.Run returned and error")
