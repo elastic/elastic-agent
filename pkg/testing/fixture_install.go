@@ -182,7 +182,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 			// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
 			sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
 
-			filePath := filepath.Join(dir, "build", fmt.Sprintf("TEST-%s-ProcessDump.json", sanitizedTestName))
+			filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-ProcessDump.json", sanitizedTestName))
 			f.t.Logf("Dumping running processes in %s", filePath)
 			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 			if err != nil {
