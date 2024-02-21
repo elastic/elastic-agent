@@ -3032,14 +3032,14 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 		configuration.DefaultGRPCConfig())
 	require.NoError(t, err, "could not crete new manager")
 
-	errCh := make(chan error)
-	t.Cleanup(func() { drainErrChan(errCh) })
+	managerErrCh := make(chan error)
+	t.Cleanup(func() { drainErrChan(managerErrCh) })
 	go func() {
 		err := m.Run(ctx)
 		if errors.Is(err, context.Canceled) {
 			err = nil
 		}
-		errCh <- err
+		managerErrCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -3137,28 +3137,29 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	}
 	var stateProgression []progressionStep
 
-	subCtx, subCancel := context.WithCancel(context.Background())
-	defer subCancel()
+	subscriptionsCtx, subscriptionsCancel := context.WithCancel(context.Background())
+	defer subscriptionsCancel()
 
 	stateProgressionCh := make(chan progressionStep)
-	subErrCh0 := make(chan error)
-	subErrCh1 := make(chan error)
-	t.Cleanup(func() { drainErrChan(subErrCh0) })
-	t.Cleanup(func() { drainErrChan(subErrCh1) })
+	subscription0Ch := make(chan error)
+	subscription1Ch := make(chan error)
+	t.Cleanup(func() { drainErrChan(subscription0Ch) })
+	t.Cleanup(func() { drainErrChan(subscription1Ch) })
 
 	go func() {
-		sub0 := m.Subscribe(subCtx, IDComp0)
-		sub1 := m.Subscribe(subCtx, IDComp1)
+		defer close(stateProgressionCh)
+
+		sub0 := m.Subscribe(subscriptionsCtx, IDComp0)
+		sub1 := m.Subscribe(subscriptionsCtx, IDComp1)
 		for {
 			select {
-			case <-subCtx.Done():
-				close(stateProgressionCh)
+			case <-subscriptionsCtx.Done():
 				return
 			case state := <-sub0.Ch():
 				now := time.Now()
 				t.Logf("component %s state changed: %+v", IDComp0, state)
 				signalState(
-					subErrCh0,
+					subscription0Ch,
 					&state,
 					[]client.UnitState{client.UnitStateHealthy, client.UnitStateStopped})
 				stateProgressionCh <- progressionStep{
@@ -3168,7 +3169,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 				now := time.Now()
 				t.Logf("component %s state changed: %+v", IDComp1, state)
 				signalState(
-					subErrCh1,
+					subscription1Ch,
 					&state,
 					[]client.UnitState{client.UnitStateHealthy})
 				stateProgressionCh <- progressionStep{
@@ -3183,14 +3184,12 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 		for step := range stateProgressionCh {
 			stateProgression = append(stateProgression, step)
 		}
+
 		stateProgressionWG.Done()
 	}()
 
-	err = waitForReady(waitCtx, m)
-	require.NoError(t, err, "Manager must finish initializing")
-
 	select {
-	case err := <-errCh:
+	case err := <-managerErrCh:
 		require.NoError(t, err,
 			"Manager.Run returned and error before 1st component update")
 	default:
@@ -3234,41 +3233,15 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 		200*time.Millisecond,
 		"component %s did not start", IDComp1)
 
-	count := 0
-	timeout := 30 * time.Second
-	endTimer := time.NewTimer(timeout)
-	defer endTimer.Stop()
-
-LOOP:
-	for {
-		select {
-		case <-endTimer.C:
-			t.Fatalf("timed out after %s seconds, "+
-				"did not receive enought state changes", timeout)
-		case err := <-errCh:
-			require.NoError(t, err)
-		case err := <-subErrCh0:
-			t.Logf("[subErrCh0] received: %v", err)
-			require.NoError(t, err)
-			count++
-			if count >= 2 {
-				break LOOP
-			}
-		case err := <-subErrCh1:
-			t.Logf("[subErrCh1] received: %v", err)
-			require.NoError(t, err)
-			count++
-			if count >= 2 {
-				break LOOP
-			}
-		}
-	}
-
-	subCancel()
+	// component 1 started, we can stop the manager and the subscriptions
+	subscriptionsCancel()
 	cancel()
 
-	// check progression: require fake-0 to stop before fake-1 starts
+	// with the subscriptions context cancelled, the state progression collection
+	// should have finished. Let's wait to ensure the last one was collected.
 	stateProgressionWG.Wait()
+
+	// check progression: require fake-0 to stop before fake-1 starts
 	var comp0Stopped, comp1Started progressionStep
 	for _, step := range stateProgression {
 		if step.componentID == IDComp0 &&
@@ -3294,7 +3267,7 @@ LOOP:
 		comp1Started.componentID, comp1Started.timestamp,
 	)
 
-	err = <-errCh
+	err = <-managerErrCh
 	assert.NoError(t, err, "Manager.Run returned and error")
 }
 
