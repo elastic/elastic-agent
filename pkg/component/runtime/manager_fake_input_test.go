@@ -3282,10 +3282,15 @@ LOOP:
 	assert.Falsef(t, comp0Stopped.timestamp.IsZero(),
 		"component %s did not stop", comp0Stopped.componentID)
 	assert.Falsef(t, comp1Started.timestamp.IsZero(),
-		"component %s did not stop", comp1Started.componentID)
+		"component %s did not start", comp1Started.componentID)
+	
 	assert.Truef(t, comp0Stopped.timestamp.Before(comp1Started.timestamp),
-		"component %s should have stopped before %s",
-		comp0Stopped.componentID, comp1Started.componentID)
+		"component %s should stop before %s starts. "+
+			"%s stopped at %s, %s started at %s",
+		comp0Stopped.componentID, comp1Started.componentID,
+		comp0Stopped.componentID, comp0Stopped.timestamp,
+		comp1Started.componentID, comp1Started.timestamp,
+	)
 
 	err = <-errCh
 	assert.NoError(t, err, "Manager.Run returned and error")
