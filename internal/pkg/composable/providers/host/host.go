@@ -11,14 +11,14 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/features"
-	"github.com/elastic/go-sysinfo"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/go-sysinfo"
 )
 
 const (
@@ -137,15 +137,7 @@ func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
 		}
 
 		info := sysInfo.Info()
-		name := info.Hostname
-		if features.FQDN() {
-			fqdn, err := sysInfo.FQDN()
-			if err != nil {
-				log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), name)
-			} else {
-				name = fqdn
-			}
-		}
+		name := util.GetHostName(features.FQDN(), info, sysInfo, log)
 
 		return map[string]interface{}{
 			"id":           info.UniqueID,

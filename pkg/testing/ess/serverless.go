@@ -250,7 +250,7 @@ func (srv *ServerlessClient) WaitForKibana(ctx context.Context) error {
 
 // ResetCredentials resets the credentials for the given ESS instance
 func (srv *ServerlessClient) ResetCredentials(ctx context.Context) (CredResetResponse, error) {
-	resetURL := fmt.Sprintf("%s/api/v1/serverless/projects/%s/%s/_reset-credentials", serverlessURL, srv.projectType, srv.proj.ID)
+	resetURL := fmt.Sprintf("%s/api/v1/serverless/projects/%s/%s/_reset-internal-credentials", serverlessURL, srv.projectType, srv.proj.ID)
 
 	resetHandler, err := http.NewRequestWithContext(ctx, "POST", resetURL, nil)
 	if err != nil {
