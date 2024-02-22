@@ -38,16 +38,16 @@ func TestStateStore(t *testing.T) {
 	})
 
 	t.Run("migrate", func(t *testing.T) {
+		if runtime.GOOS == "darwin" {
+			// the original test never actually run, so with this at least
+			// there is coverage for linux and windows.
+			t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
+				"to be merged so this test can work on darwin")
+		}
+
 		t.Run("action store file does not exists", func(t *testing.T) {
 			ctx := context.Background()
 			log, _ := logger.NewTesting("")
-
-			if runtime.GOOS == "darwin" {
-				// the original test never actually run, so with this at least
-				// there is coverage for linux and windows.
-				t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
-					"to be merged so this test can work on darwin")
-			}
 
 			tempDir := t.TempDir()
 			oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
@@ -69,13 +69,6 @@ func TestStateStore(t *testing.T) {
 		t.Run("action store to YAML state store", func(t *testing.T) {
 			ctx := context.Background()
 			log, _ := logger.NewTesting("")
-
-			if runtime.GOOS == "darwin" {
-				// the original migrate never actually run, so with this at least
-				// there is coverage for linux and windows.
-				t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
-					"to be merged so this test can work on darwin")
-			}
 
 			want := &fleetapi.ActionPolicyChange{
 				ActionID:   "abc123",
@@ -126,13 +119,6 @@ func TestStateStore(t *testing.T) {
 		t.Run("YAML state store to JSON state store", func(t *testing.T) {
 			ctx := context.Background()
 			log, _ := logger.NewTesting("")
-
-			if runtime.GOOS == "darwin" {
-				// the original migrate never actually run, so with this at least
-				// there is coverage for linux and windows.
-				t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
-					"to be merged so this test can work on darwin")
-			}
 
 			want := state{
 				Version: "1",
@@ -204,12 +190,6 @@ func TestStateStore(t *testing.T) {
 			log, _ := logger.NewTesting("")
 
 			ctx := context.Background()
-			if runtime.GOOS == "darwin" {
-				// the original migrate never actually run, so with this at least
-				// there is coverage for linux and windows.
-				t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
-					"to be merged so this test can work on darwin")
-			}
 
 			want := state{
 				Version: "1",
@@ -285,13 +265,6 @@ func TestStateStore(t *testing.T) {
 				ctx := context.Background()
 				log, _ := logger.NewTesting("")
 
-				if runtime.GOOS == "darwin" {
-					// the original migrate never actually run, so with this at least
-					// there is coverage for linux and windows.
-					t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
-						"to be merged so this test can work on darwin")
-				}
-
 				want := &fleetapi.ActionPolicyChange{
 					ActionID:   "abc123",
 					ActionType: "POLICY_CHANGE",
@@ -332,13 +305,6 @@ func TestStateStore(t *testing.T) {
 			t.Run("YAML state store to JSON state store", func(t *testing.T) {
 				ctx := context.Background()
 				log, _ := logger.NewTesting("")
-
-				if runtime.GOOS == "darwin" {
-					// the original migrate never actually run, so with this at least
-					// there is coverage for linux and windows.
-					t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
-						"to be merged so this test can work on darwin")
-				}
 
 				want := state{
 					Version: "1",
@@ -406,12 +372,6 @@ func TestStateStore(t *testing.T) {
 				log, _ := logger.NewTesting("")
 
 				ctx := context.Background()
-				if runtime.GOOS == "darwin" {
-					// the original migrate never actually run, so with this at least
-					// there is coverage for linux and windows.
-					t.Skipf("needs https://github.com/elastic/elastic-agent/issues/3866" +
-						"to be merged so this test can work on darwin")
-				}
 
 				want := state{
 					Version: "1",
