@@ -30,6 +30,8 @@ var (
 	Version_8_10_0_SNAPSHOT = version.NewParsedSemVer(8, 10, 0, "SNAPSHOT", "")
 	// Version_8_11_0_SNAPSHOT is the minimum version for uninstall command to kill the watcher upon uninstall
 	Version_8_11_0_SNAPSHOT = version.NewParsedSemVer(8, 11, 0, "SNAPSHOT", "")
+	// Version_8_13_0_SNAPSHOT is the minimum version for testing upgrading agent with the same hash
+	Version_8_13_0_SNAPSHOT = version.NewParsedSemVer(8, 13, 0, "SNAPSHOT", "")
 	// Version_8_13_0 is the minimum version for proper unprivileged execution
 	Version_8_13_0 = version.NewParsedSemVer(8, 13, 0, "", "")
 )

@@ -788,6 +788,11 @@ func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) erro
 	return nil
 }
 
+// IsInstalled returns true if this fixture has been installed
+func (f *Fixture) IsInstalled() bool {
+	return f.installed
+}
+
 // EnsurePrepared ensures that the fixture has been prepared.
 func (f *Fixture) EnsurePrepared(ctx context.Context) error {
 	if f.workDir == "" {
