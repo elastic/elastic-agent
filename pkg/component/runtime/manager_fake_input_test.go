@@ -3035,6 +3035,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	managerErrCh := make(chan error)
 	t.Cleanup(func() { drainErrChan(managerErrCh) })
 	go func() {
+		defer close(managerErrCh)
 		err := m.Run(ctx)
 		if errors.Is(err, context.Canceled) {
 			err = nil
@@ -3055,12 +3056,12 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 		BinaryPath: binaryPath,
 		Spec:       fakeInputSpec,
 	}
-	const IDComp0 = "fake-0"
-	const IDComp1 = "fake-1"
+	const comp0ID = "fake-0"
+	const comp1ID = "fake-1"
 
 	components := []component.Component{
 		{
-			ID:        IDComp0,
+			ID:        comp0ID,
 			InputSpec: &runtimeSpec,
 			Units: []component.Unit{
 				{
@@ -3096,7 +3097,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 
 	components2 := []component.Component{
 		{
-			ID:        IDComp1,
+			ID:        comp1ID,
 			InputSpec: &runtimeSpec,
 			Units: []component.Unit{
 				{
@@ -3130,64 +3131,6 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 		},
 	}
 
-	type progressionStep struct {
-		timestamp   time.Time
-		componentID string
-		state       ComponentState
-	}
-	var stateProgression []progressionStep
-
-	subscriptionsCtx, subscriptionsCancel := context.WithCancel(context.Background())
-	defer subscriptionsCancel()
-
-	stateProgressionCh := make(chan progressionStep)
-	subscription0Ch := make(chan error)
-	subscription1Ch := make(chan error)
-	t.Cleanup(func() { drainErrChan(subscription0Ch) })
-	t.Cleanup(func() { drainErrChan(subscription1Ch) })
-
-	go func() {
-		defer close(stateProgressionCh)
-
-		sub0 := m.Subscribe(subscriptionsCtx, IDComp0)
-		sub1 := m.Subscribe(subscriptionsCtx, IDComp1)
-		for {
-			select {
-			case <-subscriptionsCtx.Done():
-				return
-			case state := <-sub0.Ch():
-				now := time.Now()
-				t.Logf("component %s state changed: %+v", IDComp0, state)
-				signalState(
-					subscription0Ch,
-					&state,
-					[]client.UnitState{client.UnitStateHealthy, client.UnitStateStopped})
-				stateProgressionCh <- progressionStep{
-					timestamp: now, componentID: IDComp0, state: state}
-
-			case state := <-sub1.Ch():
-				now := time.Now()
-				t.Logf("component %s state changed: %+v", IDComp1, state)
-				signalState(
-					subscription1Ch,
-					&state,
-					[]client.UnitState{client.UnitStateHealthy})
-				stateProgressionCh <- progressionStep{
-					timestamp: now, componentID: IDComp1, state: state}
-			}
-		}
-	}()
-
-	var stateProgressionWG sync.WaitGroup
-	stateProgressionWG.Add(1)
-	go func() {
-		for step := range stateProgressionCh {
-			stateProgression = append(stateProgression, step)
-		}
-
-		stateProgressionWG.Done()
-	}()
-
 	select {
 	case err := <-managerErrCh:
 		require.NoError(t, err,
@@ -3199,76 +3142,65 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	err = <-m.errCh
 	require.NoError(t, err, "expected no error from the manager when applying"+
 		"the 1st component model")
+
+	// Wait the 1st config to be applied and the comp0ID to start
 	require.Eventuallyf(t,
 		func() bool {
-			all := logs.TakeAll()
-			for _, l := range all {
-				if strings.Contains(
-					l.Message, fmt.Sprintf("Starting component %q", IDComp0)) {
-					return true
-				}
-			}
-			return false
+			filtered := logs.FilterMessageSnippet(
+				fmt.Sprintf("Starting component %q", comp0ID)).
+				TakeAll()
+			return len(filtered) > 0
 		},
 		30*time.Second,
 		200*time.Millisecond,
-		"component %s did not start", IDComp0)
+		"component %s did not start", comp0ID)
 
 	m.Update(component.Model{Components: components2})
 	err = <-m.errCh
 	require.NoError(t, err, "expected no error from the manager when applying"+
 		"the 2nd component model")
+
+	// Wait the 2nd config to be applied and the comp1ID to start
 	require.Eventuallyf(t,
 		func() bool {
-			all := logs.TakeAll()
-			for _, l := range all {
-				if strings.Contains(
-					l.Message, fmt.Sprintf("Starting component %q", IDComp1)) {
-					return true
-				}
-			}
-			return false
+			filtered := logs.FilterMessageSnippet(
+				fmt.Sprintf("Starting component %q", comp1ID)).
+				TakeAll()
+			return len(filtered) > 0
 		},
 		30*time.Second,
 		200*time.Millisecond,
-		"component %s did not start", IDComp1)
+		"component %s did not start", comp1ID)
 
-	// component 1 started, we can stop the manager and the subscriptions
-	subscriptionsCancel()
+	// component 1 started, we can stop the manager
 	cancel()
 
-	// with the subscriptions context cancelled, the state progression collection
-	// should have finished. Let's wait to ensure the last one was collected.
-	stateProgressionWG.Wait()
+	comp0StartLogs := logs.FilterMessageSnippet(
+		fmt.Sprintf("Starting component %q", comp0ID)).TakeAll()
+	comp0StopLogs := logs.FilterMessageSnippet(
+		fmt.Sprintf("Stopping component %q", comp0ID)).TakeAll()
+	comp1StartLogs := logs.FilterMessageSnippet(
+		fmt.Sprintf("Starting component %q", comp1ID)).TakeAll()
 
-	// check progression: require fake-0 to stop before fake-1 starts
-	var comp0Stopped, comp1Started progressionStep
-	for _, step := range stateProgression {
-		if step.componentID == IDComp0 &&
-			step.state.State == client.UnitStateStopped {
-			comp0Stopped = step
-		}
-		if step.componentID == IDComp1 &&
-			step.state.State == client.UnitStateStarting {
-			comp1Started = step
-		}
-	}
+	assert.Len(t, comp0StartLogs, 1,
+		"component %d started more than once", comp0ID)
+	assert.Len(t, comp0StopLogs, 1,
+		"component %d stopped more than once", comp0ID)
+	assert.Len(t, comp1StartLogs, 1,
+		"component %d started more than once", comp1ID)
 
-	assert.Falsef(t, comp0Stopped.timestamp.IsZero(),
-		"component %s did not stop", comp0Stopped.componentID)
-	assert.Falsef(t, comp1Started.timestamp.IsZero(),
-		"component %s did not start", comp1Started.componentID)
-
-	assert.Truef(t, comp0Stopped.timestamp.Before(comp1Started.timestamp),
-		"component %s should stop before %s starts. "+
-			"%s stopped at %s, %s started at %s",
-		comp0Stopped.componentID, comp1Started.componentID,
-		comp0Stopped.componentID, comp0Stopped.timestamp,
-		comp1Started.componentID, comp1Started.timestamp,
-	)
+	assert.Truef(t, comp0StopLogs[0].Time.Before(comp1StartLogs[0].Time),
+		"component %s stopped after %s", comp0ID, comp1ID)
 
 	err = <-managerErrCh
 	assert.NoError(t, err, "Manager.Run returned and error")
+
+	if t.Failed() {
+		t.Logf("manager logs:")
+		for _, l := range logs.TakeAll() {
+			t.Log(l)
+		}
+	}
 }
 
 func (suite *FakeInputSuite) TestManager_Chunk() {
