@@ -11,32 +11,32 @@ import (
 	"errors"
 )
 
-var ErrorImplementationNotAvailable = errors.New("vault keychain implementation is not available")
+var ErrImplementationNotAvailable = errors.New("vault keychain implementation is not available")
 
 // Empty DarwinKeyChainVault implementation for non-darwin OSes
 type DarwinKeyChainVault struct {
 }
 
 func (d DarwinKeyChainVault) Exists(ctx context.Context, key string) (bool, error) {
-	return false, ErrorImplementationNotAvailable
+	return false, ErrImplementationNotAvailable
 }
 
 func (d DarwinKeyChainVault) Get(ctx context.Context, key string) (dec []byte, err error) {
-	return nil, ErrorImplementationNotAvailable
+	return nil, ErrImplementationNotAvailable
 }
 
 func (d DarwinKeyChainVault) Set(ctx context.Context, key string, data []byte) (err error) {
-	return ErrorImplementationNotAvailable
+	return ErrImplementationNotAvailable
 }
 
 func (d DarwinKeyChainVault) Remove(ctx context.Context, key string) (err error) {
-	return ErrorImplementationNotAvailable
+	return ErrImplementationNotAvailable
 }
 
 func (d DarwinKeyChainVault) Close() error {
-	return ErrorImplementationNotAvailable
+	return ErrImplementationNotAvailable
 }
 
 func NewDarwinKeyChainVault(ctx context.Context, opts Options) (v *DarwinKeyChainVault, err error) {
-	return nil, ErrorImplementationNotAvailable
+	return nil, ErrImplementationNotAvailable
 }

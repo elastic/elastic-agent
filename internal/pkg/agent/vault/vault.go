@@ -30,7 +30,6 @@ func New(ctx context.Context, opts ...OptionFunc) (Vault, error) {
 	options := ApplyOptions(opts...)
 
 	if runtime.GOOS == "darwin" && !options.unprivileged {
-		// TODO add checks for unprivileged and proper fallback
 		return NewDarwinKeyChainVault(ctx, options)
 	}
 

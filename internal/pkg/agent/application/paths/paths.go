@@ -11,7 +11,7 @@ const (
 	// defaultAgentVaultName is keychain item name for keychain based vault (available on MacOS at the moment)
 	defaultAgentVaultName = "co.elastic.elastic-agent"
 
-	// defaultAgentVaultPath is the directory name where the file-based vault store is located
+	// defaultAgentVaultPath is the directory name where the file-based vault is located
 	defaultAgentVaultPath = "vault"
 )
 
