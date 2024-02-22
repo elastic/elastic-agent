@@ -58,7 +58,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		unprivilegedAvailable = false
 	}
 	// This is probably redundant: see the skip statement above
-	if unprivilegedAvailable && (currentVersion.Less(*upgradetest.Version_8_13_0) || currentVersion.Less(*upgradetest.Version_8_13_0)) {
+	if unprivilegedAvailable && currentVersion.Less(*upgradetest.Version_8_13_0) {
 		// only available if both versions are 8.13+
 		unprivilegedAvailable = false
 	}
