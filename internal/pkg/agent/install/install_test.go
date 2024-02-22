@@ -14,8 +14,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func TestHasAllSSDs(t *testing.T) {
@@ -75,15 +76,6 @@ package:
         - data/elastic-agent-fb7370: data/elastic-agent-8.13.0-SNAPSHOT-fb7370
           manifest.yaml: data/elastic-agent-8.13.0-SNAPSHOT-fb7370/manifest.yaml
 `
-
-type testLogWriter struct {
-	t *testing.T
-}
-
-func (tlw testLogWriter) Write(b []byte) (n int, err error) {
-	tlw.t.Log(b)
-	return len(b), nil
-}
 
 func TestCopyFiles(t *testing.T) {
 	type fileType uint
@@ -150,13 +142,10 @@ func TestCopyFiles(t *testing.T) {
 					require.NoErrorf(t, err, "error creating symlink %s in tempDir %s", sf.path, tmpSrc)
 				}
 			}
-			outWriter := &testLogWriter{t: t}
-			ioStreams := &cli.IOStreams{
-				In:  nil,
-				Out: outWriter,
-				Err: outWriter,
-			}
-			err := copyFiles(ioStreams, tc.mappings, tmpSrc, tmpDst)
+
+			// not interested in speed benchmarks, use an arbitrary copyConcurrency value
+			copyConcurrency := 4
+			err := copyFiles(copyConcurrency, tc.mappings, tmpSrc, tmpDst)
 			assert.NoError(t, err)
 
 			for _, ef := range tc.expectedFiles {
@@ -184,4 +173,11 @@ func TestCopyFiles(t *testing.T) {
 		})
 	}
 
+}
+
+func TestSetupInstallPath(t *testing.T) {
+	tmpdir := t.TempDir()
+	err := setupInstallPath(tmpdir, utils.CurrentFileOwner())
+	require.NoError(t, err)
+	require.FileExists(t, filepath.Join(tmpdir, paths.MarkerFileName))
 }
