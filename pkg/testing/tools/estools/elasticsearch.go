@@ -222,7 +222,7 @@ func GetLatestDocumentMatchingQuery(ctx context.Context, client elastictransport
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	return performQueryForRawQuery(ctx, queryRaw, indexPattern, client)
+	return PerformQueryForRawQuery(ctx, queryRaw, indexPattern, client)
 }
 
 // GetIndexTemplatesForPattern lists all index templates on the system
@@ -362,7 +362,7 @@ func FindMatchingLogLinesWithContext(ctx context.Context, client elastictranspor
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
+	return PerformQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
 
 }
 
@@ -434,7 +434,7 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
+	return PerformQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
 }
 
 // GetLogsForDataset returns any logs associated with the datastream
@@ -487,7 +487,7 @@ func GetLogsForDatasetWithContext(ctx context.Context, client elastictransport.I
 		},
 	}
 
-	return performQueryForRawQuery(ctx, indexQuery, "logs-elastic_agent*", client)
+	return PerformQueryForRawQuery(ctx, indexQuery, "logs-elastic_agent*", client)
 }
 
 // GetLogsForIndexWithContext returns any logs that match the given condition
@@ -498,7 +498,7 @@ func GetLogsForIndexWithContext(ctx context.Context, client elastictransport.Int
 		},
 	}
 
-	return performQueryForRawQuery(ctx, indexQuery, index, client)
+	return PerformQueryForRawQuery(ctx, indexQuery, index, client)
 }
 
 // GetPing performs a basic ping and returns ES config info
@@ -523,7 +523,8 @@ func GetPing(ctx context.Context, client elastictransport.Interface) (Ping, erro
 
 }
 
-func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{}, index string, client elastictransport.Interface) (Documents, error) {
+// PerformQueryForRawQuery executes the ES query specified by queryRaw
+func PerformQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{}, index string, client elastictransport.Interface) (Documents, error) {
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(queryRaw)
 	if err != nil {
@@ -538,6 +539,7 @@ func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{
 		es.Search.WithTrackTotalHits(true),
 		es.Search.WithPretty(),
 		es.Search.WithContext(ctx),
+		es.Search.WithSize(300),
 	)
 	if err != nil {
 		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
