@@ -32,8 +32,6 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	t.Skip("Need to be skip until we have 8.14 first build")
-
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
