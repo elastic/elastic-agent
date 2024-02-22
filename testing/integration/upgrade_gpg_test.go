@@ -29,6 +29,8 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
+	t.Skip("Skipped until https://github.com/elastic/elastic-agent/issues/4317 is solved")
+
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
 	fromVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
@@ -84,6 +86,8 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+
+	t.Skip("Skipped until https://github.com/elastic/elastic-agent/issues/4317 is solved")
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
 	fromVersion, err := version.ParseVersion(define.Version())
