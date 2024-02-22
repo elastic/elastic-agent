@@ -15,7 +15,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
@@ -609,7 +608,6 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			},
 		},
 	}
-	logger := logp.L()
 
 	//create a new map with the monitoring beats included
 	componentListWithMonitoring := map[string]string{
@@ -627,7 +625,6 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 		}
 
 		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(unit, paths.TempDir()))}
-		logger.Infof("Injecting config for binary name %s and unit %s for endpoint %v", binaryName, unit, endpoints)
 		name := strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_") // conform with index naming policy
 
 		if isSupportedBeatsBinary(binaryName) {

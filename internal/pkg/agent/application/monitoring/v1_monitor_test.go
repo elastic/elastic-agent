@@ -165,16 +165,16 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 				if _, exists := processor["add_fields"]; !exists {
 					continue
 				}
-				p := Processor{}
-				if err := json.Unmarshal([]byte(mapstr.M(processor).String()), &p); err != nil {
+				streamProc := Processor{}
+				if err := json.Unmarshal([]byte(mapstr.M(processor).String()), &streamProc); err != nil {
 					t.Errorf("could not decode processor config: %q, err: %s", "foo", err)
 				}
-				if p.AddFields.Target != "component" {
+				if streamProc.AddFields.Target != "component" {
 					continue
 				}
 
-				binary := p.AddFields.Fields.Binary
-				componentID := p.AddFields.Fields.ID
+				binary := streamProc.AddFields.Fields.Binary
+				componentID := streamProc.AddFields.Fields.ID
 
 				// The elastic-Agent is a special case, handle it first
 				if strings.Contains(streamID, "monitoring-agent") {
@@ -186,11 +186,20 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 					}
 					continue
 				}
-				if binary != "filebeat" {
-					t.Errorf("expecting fields['binary'] = 'filebeat', got %q", binary)
-				}
-				if componentID != "filestream-default" {
-					t.Errorf("expecting fields['id'] = 'filestream-default', got %q", componentID)
+				if !strings.Contains(componentID, "monitoring") {
+					if binary != "filebeat" {
+						t.Errorf("expecting fields['binary'] = 'filebeat', got %q", binary)
+					}
+					if componentID != "filestream-default" {
+						t.Errorf("expecting fields['id'] = 'filestream-default', got %q", componentID)
+					}
+				} else {
+					if binary != "filebeat" && binary != "metricbeat" {
+						t.Errorf("expected monitoring compoent to be metricbeat or filebeat, got %s", binary)
+					}
+					if componentID != "filestream-monitoring" && componentID != "beat/metrics-monitoring" && componentID != "http/metrics-monitoring" {
+						t.Errorf("got unxpected monitoring component ID: %s", componentID)
+					}
 				}
 
 			}
