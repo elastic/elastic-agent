@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build !darwin
-
 package vault
 
 import (
@@ -23,19 +21,20 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
-func getTestVaultPath(t *testing.T) string {
+func getTestFileVaultPath(t *testing.T) string {
 	dir := t.TempDir()
 	return filepath.Join(dir, "vault")
 }
 
-func TestVaultRekey(t *testing.T) {
+func TestFileVaultRekey(t *testing.T) {
 	const key = "foo"
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	vaultPath := getTestVaultPath(t)
-	v, err := New(ctx, vaultPath)
+	vaultPath := getTestFileVaultPath(t)
+	options := ApplyOptions(WithVaultPath(vaultPath))
+	v, err := NewFileVault(ctx, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +65,7 @@ func TestVaultRekey(t *testing.T) {
 	}
 
 	// The vault with the new seed
-	v2, err := New(ctx, vaultPath)
+	v2, err := NewFileVault(ctx, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,13 +78,13 @@ func TestVaultRekey(t *testing.T) {
 	}
 }
 
-func TestVault(t *testing.T) {
-	vaultPath := getTestVaultPath(t)
+func TestFileVault(t *testing.T) {
+	vaultPath := getTestFileVaultPath(t)
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
-
-	v, err := New(ctx, vaultPath)
+	options := ApplyOptions(WithVaultPath(vaultPath))
+	v, err := NewFileVault(ctx, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +181,7 @@ type secret struct {
 	CreatedOn time.Time `json:"t"` // date/time the secret was created on
 }
 
-func TestVaultConcurrent(t *testing.T) {
+func TestFileVaultConcurrent(t *testing.T) {
 	const (
 		parallel   = 15
 		iterations = 7
@@ -190,7 +189,7 @@ func TestVaultConcurrent(t *testing.T) {
 		key = `secret`
 	)
 
-	vaultPath := getTestVaultPath(t)
+	vaultPath := getTestFileVaultPath(t)
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
@@ -210,7 +209,8 @@ func TestVaultConcurrent(t *testing.T) {
 }
 
 func doCrud(t *testing.T, ctx context.Context, vaultPath, key string) error {
-	v, err := New(ctx, vaultPath)
+	options := ApplyOptions(WithVaultPath(vaultPath))
+	v, err := NewFileVault(ctx, options)
 	if err != nil {
 		return fmt.Errorf("could not create new vault: %w", err)
 	}

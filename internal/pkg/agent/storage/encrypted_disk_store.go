@@ -13,6 +13,8 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+
 	"github.com/hectane/go-acl"
 
 	"github.com/elastic/elastic-agent-libs/file"
@@ -45,9 +47,10 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFun
 		return NewDiskStore(target)
 	}
 	s := &EncryptedDiskStore{
-		ctx:       ctx,
-		target:    target,
-		vaultPath: paths.AgentVaultPath(),
+		ctx:          ctx,
+		target:       target,
+		vaultPath:    paths.AgentVaultPath(),
+		unprivileged: false,
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -58,10 +61,14 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFun
 // WithVaultPath sets the path of the vault.
 func WithVaultPath(vaultPath string) OptionFunc {
 	return func(s *EncryptedDiskStore) {
-		if runtime.GOOS == darwin {
-			return
-		}
 		s.vaultPath = vaultPath
+	}
+}
+
+// WithUnprivileged sets if vault should be unprivileged.
+func WithUnprivileged(unprivileged bool) OptionFunc {
+	return func(s *EncryptedDiskStore) {
+		s.unprivileged = unprivileged
 	}
 }
 
@@ -79,7 +86,7 @@ func (d *EncryptedDiskStore) Exists() (bool, error) {
 
 func (d *EncryptedDiskStore) ensureKey(ctx context.Context) error {
 	if d.key == nil {
-		key, err := secret.GetAgentSecret(ctx, secret.WithVaultPath(d.vaultPath))
+		key, err := secret.GetAgentSecret(ctx, vault.WithVaultPath(d.vaultPath), vault.WithUnprivileged(d.unprivileged))
 		if err != nil {
 			return fmt.Errorf("could not get agent key: %w", err)
 		}
