@@ -139,7 +139,7 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 // to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
 // seconds if it keeps getting that error.
 func RemovePath(path string) error {
-	const arbitraryTimeout = 5 * time.Second
+	const arbitraryTimeout = 30 * time.Second
 	start := time.Now()
 	var lastErr error
 	for time.Since(start) <= arbitraryTimeout {
@@ -154,7 +154,7 @@ func RemovePath(path string) error {
 			_ = removeBlockingExe(lastErr)
 		}
 
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)
