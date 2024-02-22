@@ -3033,7 +3033,6 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	require.NoError(t, err, "could not crete new manager")
 
 	managerErrCh := make(chan error)
-	t.Cleanup(func() { drainErrChan(managerErrCh) })
 	go func() {
 		defer close(managerErrCh)
 		err := m.Run(ctx)
