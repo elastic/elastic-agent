@@ -836,6 +836,17 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) error {
 			return nil
 		}
 
+		// it might happen the component stop signal isn't received but the
+		// manager detects it stopped running. Then the manager removes it from
+		// its list of current components. Therefore, we also need to check if
+		// the component was removed, if it was, we consider it stopped.
+		m.currentMx.RLock()
+		if _, exists := m.current[compID]; !exists {
+			m.currentMx.RUnlock()
+			return nil
+		}
+		m.currentMx.RUnlock()
+
 		select {
 		case <-timeoutCh:
 			return fmt.Errorf("timeout exceeded after %s", timeout)
