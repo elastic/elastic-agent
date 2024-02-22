@@ -115,7 +115,8 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	pathMappings := manifest.Package.PathMappings
 
 	pt.Describe("Copying install files")
-	err = copyFiles(streams, pathMappings, dir, topPath)
+	copyConcurrency := calculateCopyConcurrency(streams)
+	err = copyFiles(copyConcurrency, pathMappings, dir, topPath)
 	if err != nil {
 		pt.Describe("Error copying files")
 		return utils.FileOwner{}, err
@@ -243,9 +244,7 @@ func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error
 	return manifest, nil
 }
 
-func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir string, topPath string) error {
-	// copy source into install path
-	//
+func calculateCopyConcurrency(streams *cli.IOStreams) int {
 	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
 	// otherwise fall back to the default.
 	copyConcurrency := 1
@@ -256,6 +255,12 @@ func copyFiles(streams *cli.IOStreams, pathMappings []map[string]string, srcDir 
 	if hasSSDs {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
+
+	return copyConcurrency
+}
+
+func copyFiles(copyConcurrency int, pathMappings []map[string]string, srcDir string, topPath string) error {
+	// copy source into install path
 
 	// these are needed to keep track of what we already copied
 	copiedFiles := map[string]struct{}{}
