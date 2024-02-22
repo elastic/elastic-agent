@@ -112,7 +112,8 @@ func migrateYAMLStateStoreToStateStoreV1(store storage.Storage) error {
 	}
 
 	st, err := readState(reader)
-	defer reader.Close()
+	// close it as soon as possible and before the next store save
+	_ = reader.Close()
 	if err == nil {
 		// it's a valid JSON, therefore nothing to migrate
 		return nil
