@@ -142,6 +142,9 @@ steps:
       buildkite-agent artifact download "build/**/*" .
       echo "+++ Changing permissions for the BK API commands"
       sudo chown -R :1000 build/distributions/
+      echo "+++ File listing"
+      ls -alR artifacts || true
+      ls -alR build
       echo "+++ Checking artifact validity with release-manager collect dry run"
       DRA_DRY_RUN="--dry-run"
       export DRA_DRY_RUN
