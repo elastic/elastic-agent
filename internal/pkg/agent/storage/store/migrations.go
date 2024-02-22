@@ -112,14 +112,10 @@ func migrateYAMLStateStoreToStateStoreV1(store storage.Storage) error {
 	}
 
 	st, err := readState(reader)
+	defer reader.Close()
 	if err == nil {
 		// it's a valid JSON, therefore nothing to migrate
 		return nil
-	}
-
-	err = reader.Close()
-	if err != nil {
-		return fmt.Errorf("could not close store reader: %w", err)
 	}
 
 	// Try to read the store as YAML
