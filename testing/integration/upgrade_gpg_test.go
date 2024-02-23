@@ -29,8 +29,6 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	t.Skip("Skipped until https://github.com/elastic/elastic-agent/issues/4317 is solved")
-
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
 	fromVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
@@ -58,6 +56,13 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
+	err = endFixture.EnsurePrepared(ctx)
+	require.NoError(t, err, "error preparing endFixture")
+
+	execVersion, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err, "error executing endFixture.ExecVersion()")
+
+	t.Logf("End fixture version: %v", execVersion)
 
 	defaultPGP := release.PGP()
 	firstSeven := string(defaultPGP[:7])
