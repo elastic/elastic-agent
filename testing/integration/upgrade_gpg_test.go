@@ -46,23 +46,21 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	require.NoError(t, err)
 
 	// Upgrade to an old build.
+	// This is probably a way of getting a signed package, we could use SNAPSHOTs from the unified
+	// release anyways but that probably does funny things with the fetchers
 	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
 	require.NoError(t, err)
+
+	// this fetcher will literally pull the package from the default elastic agent download URL
+	httpFetcher := atesting.NewHttpFetcher()
 	endFixture, err := atesting.NewFixture(
 		t,
 		upgradeToVersion,
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
+		atesting.WithFetcher(httpFetcher),
 	)
 	require.NoError(t, err)
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
-	err = endFixture.EnsurePrepared(ctx)
-	require.NoError(t, err, "error preparing endFixture")
-
-	execVersion, err := endFixture.ExecVersion(ctx)
-	require.NoError(t, err, "error executing endFixture.ExecVersion()")
-
-	t.Logf("End fixture version: %v", execVersion)
 
 	defaultPGP := release.PGP()
 	firstSeven := string(defaultPGP[:7])
@@ -79,6 +77,11 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
+		// passing "" as source URI is a hack to disable the --source-uri argument pointing at the endFixture srcPackage location
+		// this test needs the agent to download the real thing from artifacts.elastic.co so empty string.
+		// We need to download the same file from the same url and  use that as end fixture
+		// or we need a way to disable the commit hash check (in this case the upgrade can be verified just with the
+		// version string)
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
 		upgradetest.WithSkipVerify(false))
