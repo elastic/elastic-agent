@@ -23,7 +23,7 @@ type Storage interface {
 	Store
 
 	// Load return an io.ReadCloser for the target store.
-	Load() (io.ReadCloser, error)
+	Load() (io.Reader, error)
 
 	// Exists checks if the store exists.
 	Exists() (bool, error)

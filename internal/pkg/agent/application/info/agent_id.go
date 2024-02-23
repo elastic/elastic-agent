@@ -37,7 +37,7 @@ type persistentAgentInfo struct {
 
 type ioStore interface {
 	Save(io.Reader) error
-	Load() (io.ReadCloser, error)
+	Load() (io.Reader, error)
 }
 
 // updateLogLevel updates log level and persists it to disk.

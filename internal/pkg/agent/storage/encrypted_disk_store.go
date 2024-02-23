@@ -167,12 +167,12 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 }
 
 // Load returns an io.ReadCloser for the target.
-func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
-	fd, err := os.OpenFile(d.target, os.O_RDONLY, perms)
+func (d *EncryptedDiskStore) Load() (rc io.Reader, err error) {
+	data, err := os.ReadFile(d.target)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// If file doesn't exist, return empty reader closer
-			return io.NopCloser(bytes.NewReader([]byte{})), nil
+			return bytes.NewReader([]byte{}), nil
 		}
 		return nil, errors.New(err,
 			fmt.Sprintf("could not open %s", d.target),
@@ -180,18 +180,12 @@ func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
 			errors.M(errors.MetaKeyPath, d.target))
 	}
 
-	// Close fd if there is an error upon return
-	defer func() {
-		if err != nil && fd != nil {
-			_ = fd.Close()
-		}
-	}()
-
 	// Ensure has agent key
 	err = d.ensureKey(d.ctx)
 	if err != nil {
-		return nil, errors.New(err, "failed to ensure key during encrypted disk store Load")
+		return nil, errors.New(err,
+			"failed to ensure key during encrypted disk store Load")
 	}
 
-	return crypto.NewReaderWithDefaults(fd, d.key)
+	return crypto.NewReaderWithDefaults(bytes.NewReader(data), d.key)
 }

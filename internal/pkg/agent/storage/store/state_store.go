@@ -27,7 +27,7 @@ type store interface {
 
 type storeLoad interface {
 	store
-	Load() (io.ReadCloser, error)
+	Load() (io.Reader, error)
 }
 
 type action = fleetapi.Action
