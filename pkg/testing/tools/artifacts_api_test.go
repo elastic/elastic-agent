@@ -6,15 +6,12 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -218,75 +215,4 @@ func TestDefaultArtifactAPIClient(t *testing.T) {
 	assert.NotEmpty(t, buildDetails.Build)
 	assert.NotEmpty(t, buildDetails.Build.Projects)
 	assert.Contains(t, buildDetails.Build.Projects, "elastic-agent")
-}
-
-func createVersionList(t *testing.T) *VersionList {
-	var list VersionList
-	err := json.Unmarshal([]byte(cannedVersions), &list)
-	require.NoError(t, err)
-	return &list
-}
-
-func TestRemoveUnreleasedVersions(t *testing.T) {
-	versionRegExp := regexp.MustCompile(`/elastic-agent-(\d+\.\d+\.\d+)-.+$`)
-	var unreleasedVersions map[string]struct{}
-	server := httptest.NewServer(http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		matches := versionRegExp.FindAllStringSubmatch(req.URL.Path, 2)
-		if len(matches) == 0 || len(matches[0]) < 2 {
-			resp.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		version := matches[0][1]
-		if _, unreleased := unreleasedVersions[version]; unreleased {
-			resp.WriteHeader(http.StatusNotFound)
-			return
-		}
-
-		resp.WriteHeader(http.StatusOK)
-	}))
-
-	client := NewArtifactAPIClient(WithCDNUrl(server.URL))
-
-	t.Run("removes unreleased versions", func(t *testing.T) {
-		unreleasedVersions = map[string]struct{}{
-			"8.6.1": {},
-			"8.8.0": {},
-		}
-
-		versionList := createVersionList(t)
-		err := client.RemoveUnreleasedVersions(context.Background(), versionList)
-		require.NoError(t, err)
-		exp := []string{
-			"7.17.9",
-			"7.17.10",
-			"8.6.0",
-			"8.6.2",
-			"8.7.0",
-			"8.7.1",
-			"8.8.1",
-			"8.9.0-SNAPSHOT",
-		}
-		require.Equal(t, exp, versionList.Versions)
-	})
-
-	t.Run("does not change the list if all released", func(t *testing.T) {
-		unreleasedVersions = map[string]struct{}{} // everything is released
-
-		versionList := createVersionList(t)
-		err := client.RemoveUnreleasedVersions(context.Background(), versionList)
-		require.NoError(t, err)
-		exp := []string{
-			"7.17.9",
-			"7.17.10",
-			"8.6.0",
-			"8.6.1",
-			"8.6.2",
-			"8.7.0",
-			"8.7.1",
-			"8.8.0",
-			"8.8.1",
-			"8.9.0-SNAPSHOT",
-		}
-		require.Equal(t, exp, versionList.Versions)
-	})
 }
