@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -19,7 +19,8 @@ import (
 // take care of action policy change every other action are discarded. The store will only keep the
 // last good action on disk, we assume that the action is added to the store after it was ACK with
 // Fleet. The store is not threadsafe.
-// ATTN!!!: THE actionStore is deprecated, please use and extend the stateStore instead. The actionStore will be eventually removed.
+// The actionStore is deprecated, please use and extend the stateStore instead. The actionStore will be eventually removed.
+// Deprecated.
 type actionStore struct {
 	log    *logger.Logger
 	store  storeLoad
@@ -86,7 +87,7 @@ func (s *actionStore) save() error {
 	if apc, ok := s.action.(*fleetapi.ActionPolicyChange); ok {
 		serialize := actionPolicyChangeSerializer(*apc)
 
-		r, err := yamlToReader(&serialize)
+		r, err := jsonToReader(&serialize)
 		if err != nil {
 			return err
 		}
@@ -95,7 +96,7 @@ func (s *actionStore) save() error {
 	} else if aun, ok := s.action.(*fleetapi.ActionUnenroll); ok {
 		serialize := actionUnenrollSerializer(*aun)
 
-		r, err := yamlToReader(&serialize)
+		r, err := jsonToReader(&serialize)
 		if err != nil {
 			return err
 		}
@@ -130,26 +131,26 @@ func (s *actionStore) actions() []action {
 // There are four ways to achieve the same results:
 // 1. We create a second struct that map the existing field.
 // 2. We add the serialization in the fleetapi.
-// 3. We move the actual action type outside of the actual fleetapi package.
+// 3. We move the actual action type outside the actual fleetapi package.
 // 4. We have two sets of type.
 //
 // This could be done in a refactoring.
 type actionPolicyChangeSerializer struct {
-	ActionID   string                 `yaml:"action_id"`
-	ActionType string                 `yaml:"action_type"`
-	Policy     map[string]interface{} `yaml:"policy"`
+	ActionID   string                          `json:"id" yaml:"id"`
+	ActionType string                          `json:"type" yaml:"type"`
+	Data       fleetapi.ActionPolicyChangeData `json:"data,omitempty" yaml:"data,omitempty"`
 }
 
 // add a guards between the serializer structs and the original struct.
-var _ actionPolicyChangeSerializer = actionPolicyChangeSerializer(fleetapi.ActionPolicyChange{})
+var _ = actionPolicyChangeSerializer(fleetapi.ActionPolicyChange{})
 
 // actionUnenrollSerializer is a struct that adds a YAML serialization,
 type actionUnenrollSerializer struct {
-	ActionID   string           `yaml:"action_id"`
-	ActionType string           `yaml:"action_type"`
-	IsDetected bool             `yaml:"is_detected"`
-	Signed     *fleetapi.Signed `yaml:"signed,omitempty"`
+	ActionID   string           `json:"action_id"`
+	ActionType string           `json:"action_type"`
+	IsDetected bool             `json:"is_detected"`
+	Signed     *fleetapi.Signed `json:"signed,omitempty"`
 }
 
 // add a guards between the serializer structs and the original struct.
-var _ actionUnenrollSerializer = actionUnenrollSerializer(fleetapi.ActionUnenroll{})
+var _ = actionUnenrollSerializer(fleetapi.ActionUnenroll{})

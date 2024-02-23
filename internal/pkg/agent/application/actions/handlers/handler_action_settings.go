@@ -45,17 +45,18 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		return fmt.Errorf("invalid type, expected ActionSettings and received %T", a)
 	}
 
-	if !isSupportedLogLevel(action.LogLevel) {
-		return fmt.Errorf("invalid log level, expected debug|info|warning|error and received '%s'", action.LogLevel)
+	if !isSupportedLogLevel(action.Data.LogLevel) {
+		return fmt.Errorf("invalid log level, expected debug|info|warning|error and received '%s'",
+			action.Data.LogLevel)
 	}
 
 	lvl := logp.InfoLevel
-	err := lvl.Unpack(action.LogLevel)
+	err := lvl.Unpack(action.Data.LogLevel)
 	if err != nil {
 		return fmt.Errorf("failed to unpack log level: %w", err)
 	}
 
-	if err := h.agentInfo.SetLogLevel(ctx, action.LogLevel); err != nil {
+	if err := h.agentInfo.SetLogLevel(ctx, action.Data.LogLevel); err != nil {
 		return fmt.Errorf("failed to update log level: %w", err)
 	}
 

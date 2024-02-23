@@ -7,12 +7,11 @@ package store
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"sync"
-
-	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/conv"
@@ -43,25 +42,32 @@ type StateStore struct {
 	log   *logger.Logger
 	store storeLoad
 	dirty bool
-	state stateT
+	state state
 
 	mx sync.RWMutex
 }
 
-type stateT struct {
+type state struct {
 	action   action
 	ackToken string
-	queue    []action
+	// TODO: the queue is for scheduled actions. Set its type accordingly.
+	queue []action
 }
 
 // actionSerializer is a combined yml serializer for the ActionPolicyChange and ActionUnenroll
-// it is used to read the yaml file and assign the action to stateT.action as we must provide the
+// it is used to read the yaml file and assign the action to state.action as we must provide the
 // underlying struct that provides the action interface.
+// TODO: get rid of this type
 type actionSerializer struct {
-	ID         string                 `yaml:"action_id"`
-	Type       string                 `yaml:"action_type"`
-	Policy     map[string]interface{} `yaml:"policy,omitempty"`
-	IsDetected *bool                  `yaml:"is_detected,omitempty"`
+	ID         string               `json:"action_id"`
+	Type       string               `json:"action_type"`
+	Data       actionDataSerializer `json:"data,omitempty"`
+	IsDetected *bool                `json:"is_detected,omitempty"`
+	Signed     *fleetapi.Signed     `json:"signed,omitempty"`
+}
+
+type actionDataSerializer struct {
+	Policy map[string]interface{} `json:"policy" yaml:"policy,omitempty"`
 }
 
 // stateSerializer is used to serialize the state to yaml.
@@ -69,9 +75,9 @@ type actionSerializer struct {
 // queue serialization is handled through yaml struct tags or the actions unmarshaller defined in fleetapi
 // TODO clean up action serialization (have it be part of the fleetapi?)
 type stateSerializer struct {
-	Action   *actionSerializer `yaml:"action,omitempty"`
-	AckToken string            `yaml:"ack_token,omitempty"`
-	Queue    fleetapi.Actions  `yaml:"action_queue,omitempty"`
+	Action   *actionSerializer `json:"action,omitempty"`
+	AckToken string            `json:"ack_token,omitempty"`
+	Queue    fleetapi.Actions  `json:"action_queue,omitempty"`
 }
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.
@@ -102,10 +108,10 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	}
 	defer reader.Close()
 
-	var sr stateSerializer
+	var serializer stateSerializer
 
-	dec := yaml.NewDecoder(reader)
-	err = dec.Decode(&sr)
+	dec := json.NewDecoder(reader)
+	err = dec.Decode(&serializer)
 	if errors.Is(err, io.EOF) {
 		return &StateStore{
 			log:   log,
@@ -117,23 +123,29 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 		return nil, err
 	}
 
-	state := stateT{
-		ackToken: sr.AckToken,
-		queue:    sr.Queue,
+	st := state{
+		ackToken: serializer.AckToken,
+		queue:    serializer.Queue,
 	}
 
-	if sr.Action != nil {
-		if sr.Action.IsDetected != nil {
-			state.action = &fleetapi.ActionUnenroll{
-				ActionID:   sr.Action.ID,
-				ActionType: sr.Action.Type,
-				IsDetected: *sr.Action.IsDetected,
+	if serializer.Action != nil {
+		// TODO: use ActionType instead
+		if serializer.Action.IsDetected != nil {
+			st.action = &fleetapi.ActionUnenroll{
+				ActionID:   serializer.Action.ID,
+				ActionType: serializer.Action.Type,
+				IsDetected: *serializer.Action.IsDetected,
+				Signed:     serializer.Action.Signed,
 			}
 		} else {
-			state.action = &fleetapi.ActionPolicyChange{
-				ActionID:   sr.Action.ID,
-				ActionType: sr.Action.Type,
-				Policy:     conv.YAMLMapToJSONMap(sr.Action.Policy), // Fix Policy, in order to make it consistent with the policy received from the fleet gateway as nested map[string]interface{}
+			st.action = &fleetapi.ActionPolicyChange{
+				ActionID:   serializer.Action.ID,
+				ActionType: serializer.Action.Type,
+				Data: fleetapi.ActionPolicyChangeData{
+					// Fix Policy, in order to make it consistent with the policy
+					// received from the fleet gateway as nested map[string]interface{}
+					Policy: conv.YAMLMapToJSONMap(serializer.Action.Data.Policy),
+				},
 			}
 		}
 	}
@@ -141,7 +153,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	return &StateStore{
 		log:   log,
 		store: store,
-		state: state,
+		state: st,
 	}, nil
 }
 
@@ -216,6 +228,11 @@ func migrateStateStore(
 
 // Add is only taking care of ActionPolicyChange for now and will only keep the last one it receive,
 // any other type of action will be silently ignored.
+// TODO: fix docs: state:
+//   - the valid actions,
+//   - it silently discard invalid actions
+//   - perhaps rename it as it does not add to the queue, but sets the current
+//     action
 func (s *StateStore) Add(a action) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
@@ -269,16 +286,28 @@ func (s *StateStore) Save() error {
 	}
 
 	if s.state.action != nil {
-		if apc, ok := s.state.action.(*fleetapi.ActionPolicyChange); ok {
-			serialize.Action = &actionSerializer{apc.ActionID, apc.ActionType, apc.Policy, nil}
-		} else if aun, ok := s.state.action.(*fleetapi.ActionUnenroll); ok {
-			serialize.Action = &actionSerializer{aun.ActionID, aun.ActionType, nil, &aun.IsDetected}
-		} else {
-			return fmt.Errorf("incompatible type, expected ActionPolicyChange and received %T", s.state.action)
+		switch a := s.state.action.(type) {
+		case *fleetapi.ActionPolicyChange:
+			serialize.Action = &actionSerializer{
+				ID:   a.ActionID,
+				Type: a.ActionType,
+				Data: actionDataSerializer{
+					Policy: a.Data.Policy,
+				}}
+		case *fleetapi.ActionUnenroll:
+			serialize.Action = &actionSerializer{
+				ID:         a.ActionID,
+				Type:       a.ActionType,
+				IsDetected: &a.IsDetected,
+				Signed:     a.Signed,
+			}
+		default:
+			return fmt.Errorf("incompatible type, expected ActionPolicyChange "+
+				"or ActionUnenroll but received %T", s.state.action)
 		}
 	}
 
-	reader, err := yamlToReader(&serialize)
+	reader, err := jsonToReader(&serialize)
 	if err != nil {
 		return err
 	}
@@ -342,8 +371,8 @@ func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
 	return a.acker.Commit(ctx)
 }
 
-func yamlToReader(in interface{}) (io.Reader, error) {
-	data, err := yaml.Marshal(in)
+func jsonToReader(in interface{}) (io.Reader, error) {
+	data, err := json.Marshal(in)
 	if err != nil {
 		return nil, fmt.Errorf("could not marshal to YAML: %w", err)
 	}
