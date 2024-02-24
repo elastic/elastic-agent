@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -41,7 +42,7 @@ func NewHttpFetcher(opts ...HttpFetcherOpt) *HttpFetcher {
 }
 
 func (h HttpFetcher) Name() string {
-	return fmt.Sprintf("httpFetcher-%s", sanitizeName(h.baseURL))
+	return fmt.Sprintf("httpFetcher-%s", sanitizeFetcherName(h.baseURL))
 }
 
 func (h HttpFetcher) Fetch(ctx context.Context, operatingSystem string, architecture string, version string) (FetcherResult, error) {
@@ -82,8 +83,19 @@ func (h httpFetcherResult) Fetch(ctx context.Context, l Logger, dir string) erro
 	return err
 }
 
-func sanitizeName(name string) string {
+var hostRegexString = `^http(?:s?)://([a-z,A-z,0-9,\.]+)(?::[0-9]+)?(?:/.*)*$`
+var hostRegex = regexp.MustCompile(hostRegexString)
+
+const hostRegexGroup = 1
+
+func sanitizeFetcherName(name string) string {
+	match := hostRegex.FindStringSubmatch(name)
+	if len(match) > 1 {
+		host := match[hostRegexGroup]
+		return host
+	}
+	// falllback in case we don't match the url regex
 	sanitized := strings.ReplaceAll(name, ":", "-")
-	sanitized = strings.ReplaceAll(name, "/", "-")
+	sanitized = strings.ReplaceAll(sanitized, "/", "-")
 	return sanitized
 }
