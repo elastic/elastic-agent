@@ -15,21 +15,21 @@ import (
 
 const defaultAgentBaseURL = "https://artifacts.elastic.co/downloads/beats/elastic-agent/"
 
-type httpFetcher struct {
+type HttpFetcher struct {
 	baseURL string
 }
 
-type httpFetcherOpt func(hf *httpFetcher)
+type HttpFetcherOpt func(hf *HttpFetcher)
 
-func WithBaseURL(baseURL string) httpFetcherOpt {
-	return func(hf *httpFetcher) {
+func WithBaseURL(baseURL string) HttpFetcherOpt {
+	return func(hf *HttpFetcher) {
 		hf.baseURL = baseURL
 	}
 }
 
-func NewHttpFetcher(opts ...httpFetcherOpt) *httpFetcher {
+func NewHttpFetcher(opts ...HttpFetcherOpt) *HttpFetcher {
 
-	f := &httpFetcher{
+	f := &HttpFetcher{
 		baseURL: defaultAgentBaseURL,
 	}
 
@@ -40,11 +40,11 @@ func NewHttpFetcher(opts ...httpFetcherOpt) *httpFetcher {
 	return f
 }
 
-func (h httpFetcher) Name() string {
-	return fmt.Sprintf("httpFetcher-%s", "artifacts.elastic.co")
+func (h HttpFetcher) Name() string {
+	return fmt.Sprintf("httpFetcher-%s", sanitizeName(h.baseURL))
 }
 
-func (h httpFetcher) Fetch(ctx context.Context, operatingSystem string, architecture string, version string) (FetcherResult, error) {
+func (h HttpFetcher) Fetch(ctx context.Context, operatingSystem string, architecture string, version string) (FetcherResult, error) {
 	suffix, err := GetPackageSuffix(operatingSystem, architecture)
 	if err != nil {
 		return nil, err
@@ -80,4 +80,10 @@ func (h httpFetcherResult) Fetch(ctx context.Context, l Logger, dir string) erro
 	err = errors.Join(err, DownloadPackage(ctx, l, http.DefaultClient, packageSHAURL, filepath.Join(dir, h.packageName+extHash)))
 	err = errors.Join(err, DownloadPackage(ctx, l, http.DefaultClient, packageASCURL, filepath.Join(dir, h.packageName+extAsc)))
 	return err
+}
+
+func sanitizeName(name string) string {
+	sanitized := strings.ReplaceAll(name, ":", "-")
+	sanitized = strings.ReplaceAll(name, "/", "-")
+	return sanitized
 }
