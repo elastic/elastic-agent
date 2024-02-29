@@ -328,6 +328,7 @@ func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL st
 	if numAttempts == maxAttemptsForArtifactsAPICall {
 		return nil, fmt.Errorf("failed executing http request %v after %d retries: %w", req, numAttempts, err)
 	}
+
 	return resp, nil
 }
 
