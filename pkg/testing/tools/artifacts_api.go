@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"runtime"
 	"sort"
+	"time"
 
 	"github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/version"
@@ -29,6 +30,9 @@ const (
 
 	artifactElasticAgentProject = "elastic-agent-package"
 	artifactReleaseCDN          = "https://artifacts.elastic.co/downloads/beats/elastic-agent"
+
+	maxAttemptsForArtifactsAPICall   = 6
+	retryIntervalForArtifactsAPICall = 5 * time.Second
 )
 
 var (
@@ -310,11 +314,20 @@ func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL st
 		return nil, err
 	}
 
-	resp, err := aac.c.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("executing http request %v: %w", req, err)
+	// Make the request with retries as the artifacts API can sometimes be flaky.
+	var resp *http.Response
+	numAttempts := 0
+	for ; numAttempts < maxAttemptsForArtifactsAPICall; numAttempts++ {
+		resp, err = aac.c.Do(req)
+		if err != nil {
+			// TODO: log
+			time.Sleep(retryIntervalForArtifactsAPICall)
+		}
 	}
 
+	if numAttempts == maxAttemptsForArtifactsAPICall {
+		return nil, fmt.Errorf("failed executing http request %v after %d retries: %w", req, numAttempts, err)
+	}
 	return resp, nil
 }
 
