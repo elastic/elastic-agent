@@ -172,11 +172,11 @@ func TestDefaultArtifactAPIClientErrorHttpStatus(t *testing.T) {
 			defer testSrv.Close()
 
 			aac := NewArtifactAPIClient(WithUrl(testSrv.URL))
-			_, err := aac.GetVersions(context.Background())
+			_, err := aac.GetVersions(context.Background(), t)
 			assert.ErrorIs(t, err, ErrBadHTTPStatusCode, "Expected ErrBadHTTPStatusCode for status code %d", httpErrorCode)
-			_, err = aac.GetBuildsForVersion(context.Background(), "1.2.3-SNAPSHOT")
+			_, err = aac.GetBuildsForVersion(context.Background(), "1.2.3-SNAPSHOT", t)
 			assert.ErrorIs(t, err, ErrBadHTTPStatusCode, "Expected ErrBadHTTPStatusCode for status code %d", httpErrorCode)
-			_, err = aac.GetBuildDetails(context.Background(), "1.2.3", "abcdefg")
+			_, err = aac.GetBuildDetails(context.Background(), "1.2.3", "abcdefg", t)
 			assert.ErrorIs(t, err, ErrBadHTTPStatusCode, "Expected ErrBadHTTPStatusCode for status code %d", httpErrorCode)
 		})
 	}
@@ -202,17 +202,17 @@ func TestDefaultArtifactAPIClient(t *testing.T) {
 	defer testSrv.Close()
 
 	aac := NewArtifactAPIClient(WithUrl(testSrv.URL))
-	versions, err := aac.GetVersions(context.Background())
+	versions, err := aac.GetVersions(context.Background(), t)
 	assert.NoError(t, err)
 	assert.NotNil(t, versions)
 	assert.NotEmpty(t, versions.Versions)
 
-	builds, err := aac.GetBuildsForVersion(context.Background(), "8.9.0-SNAPSHOT")
+	builds, err := aac.GetBuildsForVersion(context.Background(), "8.9.0-SNAPSHOT", t)
 	assert.NoError(t, err)
 	assert.NotNil(t, builds)
 	assert.NotEmpty(t, builds.Builds)
 
-	buildDetails, err := aac.GetBuildDetails(context.Background(), "8.9.0-SNAPSHOT", "8.9.0-abcdefgh")
+	buildDetails, err := aac.GetBuildDetails(context.Background(), "8.9.0-SNAPSHOT", "8.9.0-abcdefgh", t)
 	assert.NoError(t, err)
 	assert.NotNil(t, buildDetails)
 	assert.NotEmpty(t, buildDetails.Build)

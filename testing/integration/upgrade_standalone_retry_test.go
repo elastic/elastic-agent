@@ -50,7 +50,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 
 	// Upgrade to an older snapshot build of same version but with a different commit hash
 	aac := tools.NewArtifactAPIClient()
-	buildInfo, err := aac.FindBuild(ctx, startVersion.VersionWithPrerelease(), startVersionInfo.Binary.Commit, 0)
+	buildInfo, err := aac.FindBuild(ctx, startVersion.VersionWithPrerelease(), startVersionInfo.Binary.Commit, 0, t)
 	if errors.Is(err, tools.ErrBuildNotFound) {
 		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", define.Version())
 		return

@@ -58,7 +58,7 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	// as the currently running binary (so, we don't have a file system collision).
 	// Multiple builds can have different IDs but the same commit hash.
 	preReleaseVersion := latestSnapshotVersion.VersionWithPrerelease()
-	buildInfo, err := aac.FindBuild(ctx, preReleaseVersion, startVersion.Binary.Commit, 1)
+	buildInfo, err := aac.FindBuild(ctx, preReleaseVersion, startVersion.Binary.Commit, 1, t)
 	if errors.Is(err, tools.ErrBuildNotFound) {
 		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", latestSnapshotVersion.VersionWithPrerelease())
 		return

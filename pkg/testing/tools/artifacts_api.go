@@ -159,13 +159,13 @@ func NewArtifactAPIClient(opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
 }
 
 // GetVersions returns a list of versions as server by the Artifact API along with some aliases and manifest information
-func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList, err error) {
+func (aac ArtifactAPIClient) GetVersions(ctx context.Context, log logger) (list *VersionList, err error) {
 	joinedURL, err := aac.composeURL(artifactsAPIV1VersionsEndpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := aac.createAndPerformRequest(ctx, joinedURL)
+	resp, err := aac.createAndPerformRequest(ctx, joinedURL, log)
 	if err != nil {
 		return nil, fmt.Errorf("getting versions: %w", err)
 	}
@@ -239,13 +239,13 @@ func (aac ArtifactAPIClient) RemoveUnreleasedVersions(ctx context.Context, vList
 // GetBuildsForVersion returns a list of builds for a specific version.
 // version should be one of the version strings returned by the GetVersions (expected format is semver
 // with optional prerelease but no build metadata, for example 8.9.0-SNAPSHOT)
-func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version string) (builds *VersionBuilds, err error) {
+func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version string, log logger) (builds *VersionBuilds, err error) {
 	joinedURL, err := aac.composeURL(fmt.Sprintf(artifactsAPIV1VersionBuildsEndpoint, version))
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := aac.createAndPerformRequest(ctx, joinedURL)
+	resp, err := aac.createAndPerformRequest(ctx, joinedURL, log)
 	if err != nil {
 		return nil, fmt.Errorf("getting builds for version %s: %w", version, err)
 	}
@@ -259,8 +259,8 @@ func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version st
 // to the oldest, starting the search at the `offset` index in the list of builds.
 // Setting `offset` to 0 includes all builds, 1 skips the latest, and so forth.
 // If there are no builds matching these conditions, returns `ErrBuildNotFound`.
-func (aac ArtifactAPIClient) FindBuild(ctx context.Context, version, excludeHash string, offset int) (buildDetails *BuildDetails, err error) {
-	resp, err := aac.GetBuildsForVersion(ctx, version)
+func (aac ArtifactAPIClient) FindBuild(ctx context.Context, version, excludeHash string, offset int, log logger) (buildDetails *BuildDetails, err error) {
+	resp, err := aac.GetBuildsForVersion(ctx, version, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get a list of builds: %w", err)
 	}
@@ -268,7 +268,7 @@ func (aac ArtifactAPIClient) FindBuild(ctx context.Context, version, excludeHash
 		return nil, ErrBuildNotFound
 	}
 	for _, buildID := range resp.Builds[offset:] {
-		details, err := aac.GetBuildDetails(ctx, version, buildID)
+		details, err := aac.GetBuildDetails(ctx, version, buildID, log)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get build information for %q: %w", buildID, err)
 		}
@@ -283,13 +283,13 @@ func (aac ArtifactAPIClient) FindBuild(ctx context.Context, version, excludeHash
 // GetBuildDetails returns the list of project and artifacts related to a specific build.
 // Version parameter format follows semver (without build metadata) and buildID format is <major>.<minor>.<patch>-<buildhash> as returned by
 // GetBuildsForVersion()
-func (aac ArtifactAPIClient) GetBuildDetails(ctx context.Context, version string, buildID string) (buildDetails *BuildDetails, err error) {
+func (aac ArtifactAPIClient) GetBuildDetails(ctx context.Context, version string, buildID string, log logger) (buildDetails *BuildDetails, err error) {
 	joinedURL, err := aac.composeURL(fmt.Sprintf(artifactAPIV1BuildDetailsEndpoint, version, buildID))
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := aac.createAndPerformRequest(ctx, joinedURL)
+	resp, err := aac.createAndPerformRequest(ctx, joinedURL, log)
 	if err != nil {
 		return nil, fmt.Errorf("getting build details for version %s buildID %s: %w", version, buildID, err)
 	}
@@ -307,7 +307,7 @@ func (aac ArtifactAPIClient) composeURL(relativePath string) (string, error) {
 	return joinedURL, nil
 }
 
-func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL string) (*http.Response, error) {
+func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL string, log logger) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, URL, nil)
 	if err != nil {
 		err = fmt.Errorf("composing request: %w", err)
@@ -320,7 +320,7 @@ func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL st
 	for ; numAttempts < maxAttemptsForArtifactsAPICall; numAttempts++ {
 		resp, err = aac.c.Do(req)
 		if err != nil {
-			// TODO: log
+			log.Logf("failed attempt %d of %d executing http request %v: %s; retrying...", numAttempts+1, maxAttemptsForArtifactsAPICall, err.Error())
 			time.Sleep(retryIntervalForArtifactsAPICall)
 		}
 	}
@@ -356,7 +356,7 @@ type logger interface {
 }
 
 func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context, log logger) (*version.ParsedSemVer, error) {
-	vList, err := aac.GetVersions(ctx)
+	vList, err := aac.GetVersions(ctx, log)
 	if err != nil {
 		return nil, err
 	}

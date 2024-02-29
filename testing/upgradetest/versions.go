@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
@@ -37,9 +38,9 @@ var (
 )
 
 // GetUpgradableVersions returns the version that the upgradeToVersion can upgrade from.
-func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int) ([]*version.ParsedSemVer, error) {
+func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int, t *testing.T) ([]*version.ParsedSemVer, error) {
 	aac := tools.NewArtifactAPIClient()
-	vList, err := aac.GetVersions(ctx)
+	vList, err := aac.GetVersions(ctx, t)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving versions from Artifact API: %w", err)
 	}
@@ -134,8 +135,8 @@ func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgrad
 // PreviousMinor gets the previous minor version of the provided version.
 //
 // This checks with the artifact API to ensure to only return version that have actual builds.
-func PreviousMinor(ctx context.Context, version string) (string, error) {
-	versions, err := GetUpgradableVersions(ctx, version, 1, 0)
+func PreviousMinor(ctx context.Context, version string, t *testing.T) (string, error) {
+	versions, err := GetUpgradableVersions(ctx, version, 1, 0, t)
 	if err != nil {
 		return "", err
 	}
