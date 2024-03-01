@@ -323,7 +323,10 @@ func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL st
 	for ; numAttempts < maxAttemptsForArtifactsAPICall; numAttempts++ {
 		resp, err = aac.c.Do(req)
 		if err != nil {
-			aac.logger.Logf("failed attempt %d of %d executing http request %v: %s; retrying...", numAttempts+1, maxAttemptsForArtifactsAPICall, err.Error())
+			aac.logger.Logf(
+				"failed attempt %d of %d executing http request %v: %s; retrying...",
+				numAttempts+1, maxAttemptsForArtifactsAPICall, req, err.Error(),
+			)
 			time.Sleep(retryIntervalForArtifactsAPICall)
 		}
 	}
