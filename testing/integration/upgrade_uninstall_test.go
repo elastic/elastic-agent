@@ -51,8 +51,8 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	// Start on a snapshot build, we want this test to upgrade to our
 	// build to ensure that the uninstall will kill the watcher.
 	// We need a snapshot with a non-matching commit hash to perform the upgrade
-	aac := tools.NewArtifactAPIClient()
-	buildInfo, err := aac.FindBuild(ctx, endVersion.VersionWithPrerelease(), endVersionInfo.Binary.Commit, 0, t)
+	aac := tools.NewArtifactAPIClient(t)
+	buildInfo, err := aac.FindBuild(ctx, endVersion.VersionWithPrerelease(), endVersionInfo.Binary.Commit, 0)
 	if errors.Is(err, tools.ErrBuildNotFound) {
 		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", endVersion.VersionWithPrerelease())
 		return

@@ -39,8 +39,8 @@ var (
 
 // GetUpgradableVersions returns the version that the upgradeToVersion can upgrade from.
 func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int, t *testing.T) ([]*version.ParsedSemVer, error) {
-	aac := tools.NewArtifactAPIClient()
-	vList, err := aac.GetVersions(ctx, t)
+	aac := tools.NewArtifactAPIClient(t)
+	vList, err := aac.GetVersions(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving versions from Artifact API: %w", err)
 	}

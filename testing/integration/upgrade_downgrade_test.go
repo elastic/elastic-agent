@@ -42,8 +42,8 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	aac := tools.NewArtifactAPIClient()
-	latestSnapshotVersion, err := aac.GetLatestSnapshotVersion(ctx, t)
+	aac := tools.NewArtifactAPIClient(t)
+	latestSnapshotVersion, err := aac.GetLatestSnapshotVersion(ctx)
 	require.NoError(t, err)
 
 	// start at the build version as we want to test the retry
@@ -58,7 +58,7 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	// as the currently running binary (so, we don't have a file system collision).
 	// Multiple builds can have different IDs but the same commit hash.
 	preReleaseVersion := latestSnapshotVersion.VersionWithPrerelease()
-	buildInfo, err := aac.FindBuild(ctx, preReleaseVersion, startVersion.Binary.Commit, 1, t)
+	buildInfo, err := aac.FindBuild(ctx, preReleaseVersion, startVersion.Binary.Commit, 1)
 	if errors.Is(err, tools.ErrBuildNotFound) {
 		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", latestSnapshotVersion.VersionWithPrerelease())
 		return

@@ -171,12 +171,12 @@ func TestDefaultArtifactAPIClientErrorHttpStatus(t *testing.T) {
 			testSrv := httptest.NewServer(errorHandler)
 			defer testSrv.Close()
 
-			aac := NewArtifactAPIClient(WithUrl(testSrv.URL))
-			_, err := aac.GetVersions(context.Background(), t)
+			aac := NewArtifactAPIClient(t, WithUrl(testSrv.URL))
+			_, err := aac.GetVersions(context.Background())
 			assert.ErrorIs(t, err, ErrBadHTTPStatusCode, "Expected ErrBadHTTPStatusCode for status code %d", httpErrorCode)
-			_, err = aac.GetBuildsForVersion(context.Background(), "1.2.3-SNAPSHOT", t)
+			_, err = aac.GetBuildsForVersion(context.Background(), "1.2.3-SNAPSHOT")
 			assert.ErrorIs(t, err, ErrBadHTTPStatusCode, "Expected ErrBadHTTPStatusCode for status code %d", httpErrorCode)
-			_, err = aac.GetBuildDetails(context.Background(), "1.2.3", "abcdefg", t)
+			_, err = aac.GetBuildDetails(context.Background(), "1.2.3", "abcdefg")
 			assert.ErrorIs(t, err, ErrBadHTTPStatusCode, "Expected ErrBadHTTPStatusCode for status code %d", httpErrorCode)
 		})
 	}
@@ -201,18 +201,18 @@ func TestDefaultArtifactAPIClient(t *testing.T) {
 	testSrv := httptest.NewServer(cannedRespHandler)
 	defer testSrv.Close()
 
-	aac := NewArtifactAPIClient(WithUrl(testSrv.URL))
-	versions, err := aac.GetVersions(context.Background(), t)
+	aac := NewArtifactAPIClient(t, WithUrl(testSrv.URL))
+	versions, err := aac.GetVersions(context.Background())
 	assert.NoError(t, err)
 	assert.NotNil(t, versions)
 	assert.NotEmpty(t, versions.Versions)
 
-	builds, err := aac.GetBuildsForVersion(context.Background(), "8.9.0-SNAPSHOT", t)
+	builds, err := aac.GetBuildsForVersion(context.Background(), "8.9.0-SNAPSHOT")
 	assert.NoError(t, err)
 	assert.NotNil(t, builds)
 	assert.NotEmpty(t, builds.Builds)
 
-	buildDetails, err := aac.GetBuildDetails(context.Background(), "8.9.0-SNAPSHOT", "8.9.0-abcdefgh", t)
+	buildDetails, err := aac.GetBuildDetails(context.Background(), "8.9.0-SNAPSHOT", "8.9.0-abcdefgh")
 	assert.NoError(t, err)
 	assert.NotNil(t, buildDetails)
 	assert.NotEmpty(t, buildDetails.Build)
@@ -245,7 +245,7 @@ func TestRemoveUnreleasedVersions(t *testing.T) {
 		resp.WriteHeader(http.StatusOK)
 	}))
 
-	client := NewArtifactAPIClient(WithCDNUrl(server.URL))
+	client := NewArtifactAPIClient(t, WithCDNUrl(server.URL))
 
 	t.Run("removes unreleased versions", func(t *testing.T) {
 		unreleasedVersions = map[string]struct{}{
