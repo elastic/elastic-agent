@@ -328,6 +328,14 @@ func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL st
 			break
 		}
 
+		// If the context was cancelled or timed out, return early
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf(
+				"executing http request %s %s (attempt %d of %d) cancelled or timed out: %w",
+				req.Method, req.URL, numAttempts+1, maxAttemptsForArtifactsAPICall, err,
+			)
+		}
+
 		aac.logger.Logf(
 			"failed attempt %d of %d executing http request %s %s: %s; retrying after %v...",
 			numAttempts+1, maxAttemptsForArtifactsAPICall, req.Method, req.URL, err.Error(), retryIntervalForArtifactsAPICall,
