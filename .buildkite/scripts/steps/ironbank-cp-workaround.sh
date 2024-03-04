@@ -22,13 +22,22 @@ if [[ -z "${PACKAGE_VERSION}" ]]; then
     exit 1
 fi
 
-IRONBANK_DOCKER_BLOB="elastic-agent-ironbank-*-docker-build-context.tar.gz"
+IRONBANK_DOCKER_BLOB_PREFIX="elastic-agent-ironbank"
+IRONBANK_DOCKER_BLOB_SUFFIX="docker-build-context.tar.gz"
 OUTPUT_DIRNAME="build/distributions"
 
-if ls "${OUTPUT_DIRNAME}/${IRONBANK_DOCKER_BLOB}" 2>/dev/null; then 
+echo "+++ ironbank - ls ${OUTPUT_DIRNAME}"
+ls -al "${OUTPUT_DIRNAME}"
+echo "+++ ironbank - ls blob"
+echo "${OUTPUT_DIRNAME}"/"${IRONBANK_DOCKER_BLOB_PREFIX}"*"${IRONBANK_DOCKER_BLOB_SUFFIX}"
+ls -al "${OUTPUT_DIRNAME}"/"${IRONBANK_DOCKER_BLOB_PREFIX}"*"${IRONBANK_DOCKER_BLOB_SUFFIX}" || true
+
+echo "+++ looking for ironbank file"
+if ls "${OUTPUT_DIRNAME}"/"${IRONBANK_DOCKER_BLOB_PREFIX}"*"${IRONBANK_DOCKER_BLOB_SUFFIX}" 2>/dev/null; then 
     # Found the ironbank file
+    echo "Found the ironbank file"
     NEW_IRONBANK_NAME="elastic-agent-ironbank-${PACKAGE_VERSION}-docker-build-context.tar.gz"
-    cp "${OUTPUT_DIRNAME}/${IRONBANK_DOCKER_BLOB}" "${OUTPUT_DIRNAME}/${NEW_IRONBANK_NAME}"
+    cp "${OUTPUT_DIRNAME}"/"${IRONBANK_DOCKER_BLOB_PREFIX}"*"${IRONBANK_DOCKER_BLOB_SUFFIX}" "${OUTPUT_DIRNAME}/${NEW_IRONBANK_NAME}"
 else
     echo "Error: could not find ironbank file"
     exit 1
