@@ -319,20 +319,25 @@ func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL st
 
 	// Make the request with retries as the artifacts API can sometimes be flaky.
 	var resp *http.Response
-	numAttempts := 0
-	for ; numAttempts < maxAttemptsForArtifactsAPICall; numAttempts++ {
+	// TODO (once we're on Go 1.22): replace with for numAttempts := range maxAttemptsForArtifactsAPICall {
+	for numAttempts := 0; numAttempts < maxAttemptsForArtifactsAPICall; numAttempts++ {
 		resp, err = aac.c.Do(req)
-		if err != nil {
-			aac.logger.Logf(
-				"failed attempt %d of %d executing http request %v: %s; retrying...",
-				numAttempts+1, maxAttemptsForArtifactsAPICall, req, err.Error(),
-			)
-			time.Sleep(retryIntervalForArtifactsAPICall)
+		if err == nil {
+			break
 		}
+
+		aac.logger.Logf(
+			"failed attempt %d of %d executing http request %s %s: %s; retrying after %v...",
+			numAttempts+1, maxAttemptsForArtifactsAPICall, req.Method, req.URL, err.Error(), retryIntervalForArtifactsAPICall,
+		)
+		time.Sleep(retryIntervalForArtifactsAPICall)
 	}
 
-	if numAttempts == maxAttemptsForArtifactsAPICall {
-		return nil, fmt.Errorf("failed executing http request %v after %d retries: %w", req, numAttempts, err)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed executing http request %s %s after %d attempts: %w",
+			req.Method, req.URL, maxAttemptsForArtifactsAPICall, err,
+		)
 	}
 
 	return resp, nil
