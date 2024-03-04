@@ -27,8 +27,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| filelogreceiver | v0.94.0|
-| otlpreceiver | v0.94.1|
+| filelogreceiver | v0.95.0|
+| otlpreceiver | v0.95.0|
 
 
 
@@ -37,9 +37,9 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| fileexporter | v0.94.0|
-| debugexporter | v0.94.1|
-| otlpexporter | v0.94.1|
+| fileexporter | v0.95.0|
+| debugexporter | v0.95.0|
+| otlpexporter | v0.95.0|
 
 
 
@@ -48,11 +48,11 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| attributesprocessor | v0.94.0|
-| resourceprocessor | v0.94.0|
-| transformprocessor | v0.94.0|
-| batchprocessor | v0.94.1|
-| memorylimiterprocessor | v0.94.1|
+| attributesprocessor | v0.95.0|
+| resourceprocessor | v0.95.0|
+| transformprocessor | v0.95.0|
+| batchprocessor | v0.95.0|
+| memorylimiterprocessor | v0.95.0|
 
 
 
