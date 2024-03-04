@@ -323,8 +323,6 @@ func PerformUpgrade(
 		upgradeCmdArgs = append(upgradeCmdArgs, "--skip-default-pgp")
 	}
 
-	logger.Logf("upgrading with arguments: %v", upgradeCmdArgs)
-
 	upgradeOutput, err := startFixture.Exec(ctx, upgradeCmdArgs)
 	if err != nil {
 		return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)

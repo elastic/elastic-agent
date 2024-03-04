@@ -115,8 +115,7 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	require.NoError(t, err)
 
 	// Upgrade to an old build.
-	// This is probably a way of getting a signed package, we could use SNAPSHOTs from the unified
-	// release anyways but that probably does funny things with the fetchers
+	// This is probably a way of getting a signed package
 	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version(), t)
 	require.NoError(t, err)
 
