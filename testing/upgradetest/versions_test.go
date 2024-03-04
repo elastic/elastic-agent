@@ -104,16 +104,13 @@ func TestFetchUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
 	}
 	versions, err := FetchUpgradableVersions(ctx, aac, reqs)
 	require.NoError(t, err)
-	t.Logf("exp: %s", expectedUpgradableVersions)
-	t.Logf("act: %s", versions)
-	require.Equal(t, expectedUpgradableVersions, versions)
+	assert.Equal(t, expectedUpgradableVersions, versions)
 }
 
 func TestGetUpgradableVersions(t *testing.T) {
 	versions, err := GetUpgradableVersions()
-	t.Log(versions)
 	require.NoError(t, err)
-	require.Truef(t, len(versions) > 1, "expected at least one version for testing, got %d", len(versions))
+	assert.Truef(t, len(versions) > 1, "expected at least one version for testing, got %d.\n%v", len(versions), versions)
 }
 
 func TestPreviousMinor(t *testing.T) {
@@ -122,11 +119,10 @@ func TestPreviousMinor(t *testing.T) {
 
 	v, err := PreviousMinor()
 	require.NoError(t, err)
-	t.Log(v)
 
 	parsed, err := version.ParseVersion(v)
 	require.NoError(t, err)
-	require.Truef(t, currentParsed.Major() == parsed.Major() && currentParsed.Minor() > parsed.Minor(), "%s is not previous minor for %s", v, bversion.Agent)
-	require.Empty(t, parsed.Prerelease())
-	require.Empty(t, parsed.BuildMetadata())
+	assert.Truef(t, currentParsed.Major() != parsed.Major() && currentParsed.Minor() > parsed.Minor(), "%s is not previous minor for %s", v, bversion.Agent)
+	assert.Empty(t, parsed.Prerelease())
+	assert.Empty(t, parsed.BuildMetadata())
 }

@@ -214,7 +214,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	return upgradableVersions, nil
 }
 
-// PreviousMinor gets the previous minor version available for upgrade.
+// PreviousMinor returns the previous minor version available for upgrade.
 func PreviousMinor() (string, error) {
 	versions, err := GetUpgradableVersions()
 	if err != nil {
