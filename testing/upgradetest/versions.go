@@ -186,6 +186,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 
 		// for the rest of the checks we capture only released versions
 		case version.Prerelease() != "" || version.BuildMetadata() != "":
+			continue
 
 		// previous minors
 		case previousMinorsToFind > 0 && version.Major() == currentMajor && version.Minor() < currentMinor:

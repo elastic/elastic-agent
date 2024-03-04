@@ -122,7 +122,7 @@ func TestPreviousMinor(t *testing.T) {
 
 	parsed, err := version.ParseVersion(v)
 	require.NoError(t, err)
-	assert.Truef(t, currentParsed.Major() != parsed.Major() && currentParsed.Minor() > parsed.Minor(), "%s is not previous minor for %s", v, bversion.Agent)
+	assert.Truef(t, currentParsed.Major() == parsed.Major() && currentParsed.Minor() > parsed.Minor(), "%s is not previous minor for %s", v, bversion.Agent)
 	assert.Empty(t, parsed.Prerelease())
 	assert.Empty(t, parsed.BuildMetadata())
 }
