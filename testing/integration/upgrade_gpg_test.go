@@ -117,13 +117,23 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	// This is probably a way of getting a signed package
 	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
 	require.NoError(t, err)
+	var fetcher atesting.Fetcher
 
-	// this fetcher will literally pull the package from the default elastic agent download URL
-	httpFetcher := atesting.NewHttpFetcher()
+	// FIXME: this is a hack, PreviousMinor() uses a version.ParsedSemVer internally and that's what we should use for the snapshot check
+	// We need to distinguish between snapshots and released versions and use the appropriate fetcher
+	if strings.HasSuffix(upgradeToVersion, "-SNAPSHOT") {
+		// it's a snapshot, use the artifact fetcher
+		fetcher = atesting.ArtifactFetcher()
+	} else {
+		// it's a released version, use httpFetcher
+		// this fetcher will literally pull the package from the default elastic agent download URL
+		fetcher = atesting.NewHttpFetcher()
+	}
+
 	endFixture, err := atesting.NewFixture(
 		t,
 		upgradeToVersion,
-		atesting.WithFetcher(httpFetcher),
+		atesting.WithFetcher(fetcher),
 	)
 	require.NoError(t, err)
 
