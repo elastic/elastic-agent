@@ -322,6 +322,8 @@ func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL st
 	// TODO (once we're on Go 1.22): replace with for numAttempts := range maxAttemptsForArtifactsAPICall {
 	for numAttempts := 0; numAttempts < maxAttemptsForArtifactsAPICall; numAttempts++ {
 		resp, err = aac.c.Do(req)
+
+		// If there is no error, no need to retry the request.
 		if err == nil {
 			break
 		}
