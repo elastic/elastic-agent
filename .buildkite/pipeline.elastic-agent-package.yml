@@ -142,11 +142,11 @@ steps:
       buildkite-agent artifact download "build/**/*" .
       echo "+++ Changing permissions for the BK API commands"
       sudo chown -R :1000 build/distributions/
-      echo "+++ File listing"
+      echo "--- File listing"
       ls -alR build
-      echo "+++ Copy workaround for ironbank container filename"
+      echo "--- Copy workaround for ironbank container filename"
       .buildkite/scripts/steps/ironbank-cp-workaround.sh
-      echo "+++ File listing after workaround"
+      echo "--- File listing after workaround"
       ls -alR build
       echo "+++ Checking artifact validity with release-manager collect dry run"
       DRA_DRY_RUN="--dry-run"
