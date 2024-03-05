@@ -40,7 +40,7 @@ func GetLatestPackageRelease(ctx context.Context, packageName string) (string, e
 		return "", fmt.Errorf("failed to create search request for EPR (%s): %w", body, err)
 	}
 	if resp.StatusCode >= 300 {
-		return "", fmt.Errorf("non-2xx status code from EPR")
+		return "", fmt.Errorf("bad status code in response from EPR: %d - %s", resp.StatusCode, resp.Status)
 	}
 
 	parsedResp := []PackageSearchResult{}

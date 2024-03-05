@@ -10,7 +10,6 @@
       "version": "1.17.0"
     },
     "enabled": true,
-    "policy_id": "cf3042c7-9086-463f-85c8-927bd8ec655b",
     "inputs": [
       {
         "type": "logfile",

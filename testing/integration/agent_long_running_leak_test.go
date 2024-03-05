@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+// // go:build integration
 
 package integration
 
@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -34,16 +35,11 @@ import (
 
 type ExtendedRunner struct {
 	suite.Suite
-	info         *define.Info
-	agentFixture *atesting.Fixture
-
-	ESHost string
-}
-
-type ComponentMetrics struct {
-	Memory        MemoryMetrics  `mapstructure:"memstats"`
-	Handles       HandlesMetrics `mapstructure:"handles"`
-	UnixTimestamp int64
+	info                   *define.Info
+	agentFixture           *atesting.Fixture
+	ESHost                 string
+	healthCheckTime        time.Duration
+	healthCheckRefreshTime time.Duration
 }
 
 // TestComponent is used as a key in our map of component metrics
@@ -97,18 +93,20 @@ func TestLongRunningAgentForLeaks(t *testing.T) {
 	})
 
 	if os.Getenv("TEST_LONG_RUNNING") == "" {
-		t.Skipf("not running extended test unless TEST_LONG_RUNNING is set")
+		t.Skip("not running extended test unless TEST_LONG_RUNNING is set")
 	}
 
-	suite.Run(t, &ExtendedRunner{info: info})
+	suite.Run(t, &ExtendedRunner{info: info, healthCheckTime: time.Minute * 3, healthCheckRefreshTime: time.Second * 20})
 }
 
 func (runner *ExtendedRunner) SetupSuite() {
-	cmd := exec.Command("go", "install", "-v", "github.com/mingrammer/flog@latest")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "go", "install", "-v", "github.com/mingrammer/flog@latest")
 	out, err := cmd.CombinedOutput()
 	require.NoError(runner.T(), err, "got out: %s", string(out))
 
-	cmd = exec.Command("flog", "-t", "log", "-f", "apache_error", "-o", "/var/log/httpd/error_log", "-b", "50485760", "-p", "1048576")
+	cmd = exec.CommandContext(ctx, "flog", "-t", "log", "-f", "apache_error", "-o", "/var/log/httpd/error_log", "-b", "50485760", "-p", "1048576")
 	out, err = cmd.CombinedOutput()
 	require.NoError(runner.T(), err, "got out: %s", string(out))
 
@@ -123,9 +121,6 @@ func (runner *ExtendedRunner) SetupSuite() {
 	fixture, err := define.NewFixture(runner.T(), define.Version())
 	require.NoError(runner.T(), err)
 	runner.agentFixture = fixture
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
 
 	basePolicy := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
@@ -178,7 +173,6 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		testRuntime = "15m"
 	}
 
-	regex := regexp.MustCompile(`[\d]+`)
 	status, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(runner.T(), err)
 
@@ -187,8 +181,8 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		allHealthy := true
 		status, err := runner.agentFixture.ExecStatus(ctx)
 
-		cefMatch := "logfile-apache"
-		foundCef := false
+		apacheMatch := "logfile-apache"
+		foundApache := false
 		systemMatch := "metrics-default"
 		foundSystem := false
 
@@ -198,8 +192,8 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 			for _, v := range comp.Units {
 				runner.T().Logf("unit ID: %s", v.UnitID)
 				// the full unit ID will be something like "log-default-logfile-cef-3f0764f0-4ade-4f46-9ead-f2f0f7865676"
-				if !foundCef && strings.Contains(v.UnitID, cefMatch) {
-					foundCef = true
+				if !foundApache && strings.Contains(v.UnitID, apacheMatch) {
+					foundApache = true
 				}
 				if !foundSystem && strings.Contains(v.UnitID, systemMatch) {
 					foundSystem = true
@@ -210,18 +204,19 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 				allHealthy = false
 			}
 		}
-		return allHealthy && foundCef && foundSystem
-	}, time.Minute*3, time.Second*20, "install never became healthy")
+		return allHealthy && foundApache && foundSystem
+	}, runner.healthCheckTime, runner.healthCheckRefreshTime, "install never became healthy")
 
 	handles := []processWatcher{}
 
 	// track running beats
 	// the `last 30s` metrics tend to report gauges, which we can't use for calculating a derivative.
 	// so separately fetch the PIDs
+	pidInStatusMessageRegex := regexp.MustCompile(`[\d]+`)
 	status, err = runner.agentFixture.ExecStatus(ctx)
 	require.NoError(runner.T(), err)
 	for _, comp := range status.Components {
-		pidStr := regex.FindString(comp.Message)
+		pidStr := pidInStatusMessageRegex.FindString(comp.Message)
 		pid, err := strconv.ParseInt(pidStr, 10, 64)
 		require.NoError(runner.T(), err)
 
@@ -279,18 +274,18 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		runner.T().Logf("=============================== %s (%d)", handle.name, handle.pid)
 		runner.T().Logf("handle formula: %s", handle.regHandles.Formula())
 		handleSlope := handle.regHandles.GetSlope()
-		require.LessOrEqual(runner.T(), handleSlope, handleSlopeFailure, "increase in open handles exceeded threshold: %s", handle.regHandles)
+		require.LessOrEqual(runner.T(), handleSlope, handleSlopeFailure, "increase in open handles exceeded threshold: %s", handle.regHandles.Debug())
 		runner.T().Logf("===============================")
 	}
 
 	// post-test: make sure that we actually ingested logs.
 	docs, err := estools.GetResultsForAgentAndDatastream(ctx, runner.info.ESClient, "apache.error", status.Info.ID)
-	require.NoError(runner.T(), err, "error fetching apache logs")
-	require.Greater(runner.T(), docs.Hits.Total.Value, 0, "could not find any matching apache logs for agent ID %s", status.Info.ID)
+	assert.NoError(runner.T(), err, "error fetching apache logs")
+	assert.Greater(runner.T(), docs.Hits.Total.Value, 0, "could not find any matching apache logs for agent ID %s", status.Info.ID)
 	runner.T().Logf("Generated %d apache logs", docs.Hits.Total.Value)
 
 	docs, err = estools.GetResultsForAgentAndDatastream(ctx, runner.info.ESClient, "system.cpu", status.Info.ID)
-	require.NoError(runner.T(), err, "error fetching system logs")
-	require.Greater(runner.T(), docs.Hits.Total.Value, 0, "could not find any matching system metrics for agent ID %s", status.Info.ID)
+	assert.NoError(runner.T(), err, "error fetching system metrics")
+	assert.Greater(runner.T(), docs.Hits.Total.Value, 0, "could not find any matching system metrics for agent ID %s", status.Info.ID)
 	runner.T().Logf("Generated %d system events", docs.Hits.Total.Value)
 }

@@ -1950,7 +1950,7 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	return integRunner(ctx, false, "TestBeatsServerless")
 }
 
-func (Integration) TestExtendedRuntime(ctx context.Context) error {
+func (Integration) TestForResourceLeaks(ctx context.Context) error {
 	err := os.Setenv("TEST_LONG_RUNNING", "true")
 	if err != nil {
 		return fmt.Errorf("error setting TEST_LONG_RUNNING: %w", err)
