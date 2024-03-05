@@ -26,6 +26,7 @@ import (
 	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent-system-metrics/report"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -186,7 +187,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// The secret is not created here if it exists already from the previous enrollment.
 	// This is needed for compatibility with agent running in standalone mode,
 	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
-	err = secret.CreateAgentSecret(ctx)
+	err = secret.CreateAgentSecret(ctx, vault.WithUnprivileged(!isRoot))
 	if err != nil {
 		return fmt.Errorf("failed to read/write secrets: %w", err)
 	}
@@ -194,13 +195,13 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// Migrate .yml files if the corresponding .enc does not exist
 
 	// the encrypted config does not exist but the unencrypted file does
-	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentConfigYmlFile(), paths.AgentConfigFile())
+	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentConfigYmlFile(), paths.AgentConfigFile(), storage.WithUnprivileged(!isRoot))
 	if err != nil {
 		return errors.New(err, "error migrating fleet config")
 	}
 
 	// the encrypted state does not exist but the unencrypted file does
-	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
+	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile(), storage.WithUnprivileged(!isRoot))
 	if err != nil {
 		return errors.New(err, "error migrating agent state")
 	}

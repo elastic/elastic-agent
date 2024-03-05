@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build linux || windows
-
 package migration
 
 import (
@@ -137,7 +135,7 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 			log := logp.NewLogger("test_migrate_config")
 			// setup end
 
-			err = MigrateToEncryptedConfig(ctx, log, absUnencryptedFile, absEncryptedFile)
+			err = MigrateToEncryptedConfig(ctx, log, absUnencryptedFile, absEncryptedFile, storage.WithUnprivileged(true))
 
 			assert.NoError(t, err)
 			if len(tc.expectedEncryptedContent) > 0 {
@@ -239,7 +237,7 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 			log := logp.NewLogger("test_migrate_config")
 			// setup end
 
-			err = MigrateToEncryptedConfig(ctx, log, absUnencryptedFile, absEncryptedFile)
+			err = MigrateToEncryptedConfig(ctx, log, absUnencryptedFile, absEncryptedFile, storage.WithUnprivileged(true))
 
 			assert.Error(t, err)
 		})
@@ -253,7 +251,7 @@ func createAndPersistStore(t *testing.T, ctx context.Context, baseDir string, cf
 	asbFilePath := path.Join(baseDir, cf.name)
 
 	if encrypted {
-		store = storage.NewEncryptedDiskStore(ctx, asbFilePath)
+		store = storage.NewEncryptedDiskStore(ctx, asbFilePath, storage.WithUnprivileged(true))
 	} else {
 		store = storage.NewDiskStore(asbFilePath)
 	}
