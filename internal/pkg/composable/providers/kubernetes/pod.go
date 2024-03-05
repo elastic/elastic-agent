@@ -212,7 +212,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 		if !p.managed {
 			if ann, ok := data.mapping["annotations"]; ok {
 				annotations, _ := ann.(mapstr.M)
-				//We check whether the provided annotation follows the supported format and vocabulary
+				//We check whether the provided annotation follows the supported format and vocabulary. The check happens for annotations that start with co.elastic.hints
 				if rawEntries, err := annotations.GetValue(p.config.Prefix); err == nil {
 					if entries, ok := rawEntries.(mapstr.M); ok {
 						for rawEntries, _ := range entries {
