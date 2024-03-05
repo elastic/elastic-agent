@@ -215,7 +215,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 				//We check whether the provided annotation follows the supported format and vocabulary. The check happens for annotations that start with co.elastic.hints
 				if rawEntries, err := annotations.GetValue(p.config.Prefix); err == nil {
 					if entries, ok := rawEntries.(mapstr.M); ok {
-						for rawEntries, _ := range entries {
+						for rawEntries := range entries {
 							found := false
 							for _, checksupported := range allSupportedHints {
 								p.logger.Warnf("Provided annotations2 :%v", rawEntries, checksupported)
