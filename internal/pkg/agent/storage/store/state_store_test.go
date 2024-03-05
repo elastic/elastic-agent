@@ -7,13 +7,10 @@ package store
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -896,32 +893,4 @@ func hasEmptyFields(action fleetapi.Action) []string {
 	}
 
 	return failures
-}
-
-func TestDecryptFleetEnc(t *testing.T) {
-	path := "/tmp/TestStateStoremigrateinvoked_to_existing_JSON_state_store2360411522/001/store.enc" // Default on Linux
-	encStore := storage.NewEncryptedDiskStore(context.Background(), path,
-		storage.WithVaultPath("/tmp/TestStateStoremigrateinvoked_to_existing_JSON_state_store2360411522/001/vault"))
-
-	r, err := encStore.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	buff := strings.Builder{}
-	if _, err := io.Copy(&buff, r); err != nil {
-		t.Fatalf("could not copy data from reader: %s", err)
-	}
-
-	fmt.Println(buff.String())
-
-	// stateStore, err := NewStateStoreWithMigration(
-	// 	context.Background(),
-	// 	logp.L(),
-	// 	paths.AgentActionStoreFile(),
-	// 	paths.AgentStateStoreFile())
-	// actions := stateStore.Queue()
-	// for _, s := range actions {
-	// 	fmt.Println(s.ID(), s.String())
-	// }
 }
