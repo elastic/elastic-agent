@@ -122,6 +122,12 @@ func WithUrl(url string) ArtifactAPIClientOpt {
 	return func(aac *ArtifactAPIClient) { aac.url = url }
 }
 
+type logFunc func(format string, args ...interface{})
+
+func WithLogFunc(logf logFunc) ArtifactAPIClientOpt {
+	return func(aac *ArtifactAPIClient) { aac.logFunc = logf }
+}
+
 func WithHttpClient(client httpDoer) ArtifactAPIClientOpt {
 	return func(aac *ArtifactAPIClient) { aac.c = client }
 }
@@ -130,17 +136,17 @@ func WithHttpClient(client httpDoer) ArtifactAPIClientOpt {
 // More information about the API can be found at https://artifacts-api.elastic.co/v1
 // which will print a list of available operations
 type ArtifactAPIClient struct {
-	c      httpDoer
-	url    string
-	logger logger
+	c       httpDoer
+	url     string
+	logFunc logFunc
 }
 
 // NewArtifactAPIClient creates a new Artifact API client
-func NewArtifactAPIClient(logger logger, opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
+func NewArtifactAPIClient(opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
 	c := &ArtifactAPIClient{
-		url:    defaultArtifactAPIURL,
-		c:      new(http.Client),
-		logger: logger,
+		url:     defaultArtifactAPIURL,
+		c:       new(http.Client),
+		logFunc: func(string, ...interface{}) {},
 	}
 
 	for _, opt := range opts {
@@ -263,7 +269,7 @@ func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL st
 			)
 		}
 
-		aac.logger.Logf(
+		aac.logFunc(
 			"failed attempt %d of %d executing http request %s %s: %s; retrying after %v...",
 			numAttempts+1, maxAttemptsForArtifactsAPICall, req.Method, req.URL, err.Error(), retryIntervalForArtifactsAPICall,
 		)
@@ -299,10 +305,6 @@ func checkResponseAndUnmarshal[T any](resp *http.Response) (*T, error) {
 	return result, nil
 }
 
-type logger interface {
-	Logf(format string, args ...any)
-}
-
 func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context) (*version.ParsedSemVer, error) {
 	vList, err := aac.GetVersions(ctx)
 	if err != nil {
@@ -317,7 +319,7 @@ func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context) (*ver
 	for _, v := range vList.Versions {
 		pv, err := version.ParseVersion(v)
 		if err != nil {
-			aac.logger.Logf("invalid version retrieved from artifact API: %q", v)
+			aac.logFunc("invalid version retrieved from artifact API: %q", v)
 			return nil, ErrInvalidVersionRetrieved
 		}
 		sortedParsedVersions = append(sortedParsedVersions, pv)

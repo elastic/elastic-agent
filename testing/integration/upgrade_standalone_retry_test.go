@@ -49,7 +49,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	require.NoError(t, err, "failed to get end agent build version info")
 
 	// Upgrade to an older snapshot build of same version but with a different commit hash
-	aac := tools.NewArtifactAPIClient(t)
+	aac := tools.NewArtifactAPIClient(tools.WithLogFunc(t.Logf))
 	buildInfo, err := aac.FindBuild(ctx, startVersion.VersionWithPrerelease(), startVersionInfo.Binary.Commit, 0)
 	if errors.Is(err, tools.ErrBuildNotFound) {
 		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", define.Version())

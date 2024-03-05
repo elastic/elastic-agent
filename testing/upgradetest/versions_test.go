@@ -93,7 +93,7 @@ func TestFetchUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
 		assert.NoError(t, err)
 	}))
 	defer server.Close()
-	aac := tools.NewArtifactAPIClient(t, tools.WithUrl(server.URL))
+	aac := tools.NewArtifactAPIClient(tools.WithUrl(server.URL), tools.WithLogFunc(t.Logf))
 
 	reqs := VersionRequirements{
 		UpgradeToVersion: "8.13.0", // to test that 8.14 is not returned

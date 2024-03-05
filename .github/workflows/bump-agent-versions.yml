@@ -30,7 +30,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          changes=$(git status -s -uno)
+          changes=$(git status -s -uno .agent-versions.json)
           if [ -z "$changes" ]
           then
             echo "The versions file didn't change, skipping..."

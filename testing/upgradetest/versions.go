@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -61,11 +60,10 @@ type AgentVersions struct {
 }
 
 var (
-	agentVersions       *AgentVersions
-	ensureAgentVersions = sync.OnceFunc(setAgentVersions)
+	agentVersions *AgentVersions
 )
 
-func setAgentVersions() {
+func init() {
 	v, err := getAgentVersions()
 	if err != nil {
 		panic(err)
@@ -110,8 +108,6 @@ func getAgentVersions() (*AgentVersions, error) {
 
 // FetchUpgradableVersions returns the versions list from the agent version file.
 func GetUpgradableVersions() ([]*version.ParsedSemVer, error) {
-	ensureAgentVersions()
-
 	parsedVersions := make([]*version.ParsedSemVer, 0, len(agentVersions.TestVersions))
 	for _, v := range agentVersions.TestVersions {
 		parsed, err := version.ParseVersion(v)

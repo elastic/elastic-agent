@@ -1585,7 +1585,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 		RecentSnapshots:  1,
 	}
 
-	aac := tools.NewArtifactAPIClient()
+	aac := tools.NewArtifactAPIClient(tools.WithLogFunc(log.Default().Printf))
 	versions, err := upgradetest.FetchUpgradableVersions(ctx, aac, reqs)
 	if err != nil {
 		return fmt.Errorf("failed to fetch upgradable versions: %w", err)
