@@ -215,6 +215,21 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 				hints := utils.GenerateHints(annotations, "", p.config.Prefix)
 				if len(hints) > 0 {
 					p.logger.Debugf("Extracted hints are :%v", hints)
+					//We check whether the provided annotation follows the supported format and vocabulary
+					for _, annots := range hints {
+						found := false
+						for _, checksupported := range allSupportedHints {
+							p.logger.Warnf("Provided annotations :%v", annots, p.config.Prefix+"."+"hints"+"."+checksupported)
+							if annots == p.config.Prefix+"."+"hints"+"."+checksupported {
+								found = true
+								break
+							}
+						}
+						if !found {
+							p.logger.Warnf("Provided hint :%v is not in the supported list for pod %v in namespace %v", annots, pod.Name, pod.Namespace)
+						}
+					}
+					//End of check
 					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")
 					p.logger.Debugf("Generated Pods' hints mappings are :%v", hintsMapping)
 					_ = p.comm.AddOrUpdate(
