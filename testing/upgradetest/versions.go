@@ -72,11 +72,15 @@ func init() {
 }
 
 func getAgentVersions() (*AgentVersions, error) {
-	var filePath string
-	dir, err := os.Getwd()
+	var (
+		filePath string
+		dir      string
+	)
+	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the current directory: %w", err)
 	}
+	dir = wd
 	for {
 		dir = filepath.Dir(dir)
 		pathToCheck := filepath.Join(dir, AgentVersionsFilename)
@@ -86,7 +90,7 @@ func getAgentVersions() (*AgentVersions, error) {
 			break
 		}
 		if strings.HasSuffix(dir, string(filepath.Separator)) {
-			return nil, fmt.Errorf("failed to find %s", AgentVersionsFilename)
+			return nil, fmt.Errorf("failed to find %s using working directory %s", AgentVersionsFilename, wd)
 		}
 	}
 
