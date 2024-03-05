@@ -211,22 +211,21 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 	if p.config.Hints.Enabled { // This is "hints based autodiscovery flow"
 		if !p.managed {
 			if ann, ok := data.mapping["annotations"]; ok {
-				p.logger.Warnf("Provided annotations :%v", data.mapping["annotations"])
 				annotations, _ := ann.(mapstr.M)
 				//We check whether the provided annotation follows the supported format and vocabulary
 				if rawEntries, err := annotations.GetValue(p.config.Prefix); err == nil {
 					if entries, ok := rawEntries.(mapstr.M); ok {
-						for _, rawValue := range entries {
+						for rawEntries, _ := range entries {
 							found := false
 							for _, checksupported := range allSupportedHints {
-								p.logger.Warnf("Provided annotations2 :%v", rawValue, checksupported)
-								if rawValue == checksupported {
+								p.logger.Warnf("Provided annotations2 :%v", rawEntries, checksupported)
+								if rawEntries == checksupported {
 									found = true
 									break
 								}
 							}
 							if !found {
-								p.logger.Warnf("Provided hint :%v is not in the supported list for pod %v in namespace %v", rawValue, pod.Name, pod.Namespace)
+								p.logger.Warnf("Provided hint :%v is not in the supported list for pod %v in namespace %v", rawEntries, pod.Name, pod.Namespace)
 							}
 						}
 					}
