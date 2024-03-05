@@ -92,7 +92,7 @@ func getAgentVersions() (*AgentVersions, error) {
 
 	f, err := os.OpenFile(filePath, os.O_RDONLY, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open %s", filePath)
+		return nil, fmt.Errorf("failed to open %s: %w", filePath, err)
 	}
 	defer f.Close()
 
@@ -100,7 +100,7 @@ func getAgentVersions() (*AgentVersions, error) {
 	var versionFile AgentVersions
 	err = d.Decode(&versionFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode JSON in %s", filePath)
+		return nil, fmt.Errorf("failed to decode JSON in %s: %w", filePath, err)
 	}
 
 	return &versionFile, nil
@@ -112,7 +112,7 @@ func GetUpgradableVersions() ([]*version.ParsedSemVer, error) {
 	for _, v := range agentVersions.TestVersions {
 		parsed, err := version.ParseVersion(v)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse version %q from %s", v, AgentVersionsFilename)
+			return nil, fmt.Errorf("failed to parse version %q from %s: %w", v, AgentVersionsFilename, err)
 		}
 		parsedVersions = append(parsedVersions, parsed)
 	}
