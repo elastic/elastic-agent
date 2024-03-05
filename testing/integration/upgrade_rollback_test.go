@@ -51,7 +51,7 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 
 	// Upgrade from an old build because the new watcher from the new build will
 	// be ran. Otherwise the test will run the old watcher from the old build.
-	upgradeFromVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	upgradeFromVersion, err := upgradetest.PreviousMinor(ctx, define.Version(), t)
 	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,
@@ -166,7 +166,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 
 	// Upgrade from an old build because the new watcher from the new build will
 	// be ran. Otherwise the test will run the old watcher from the old build.
-	upgradeFromVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	upgradeFromVersion, err := upgradetest.PreviousMinor(ctx, define.Version(), t)
 	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,

@@ -80,6 +80,11 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
+		// passing "" as source URI is a hack to disable the --source-uri argument pointing at the endFixture srcPackage location
+		// this test needs the agent to download the real thing from artifacts.elastic.co so empty string.
+		// We need to download the same file from the same url and  use that as end fixture
+		// or we need a way to disable the commit hash check (in this case the upgrade can be verified just with the
+		// version string)
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
 		upgradetest.WithSkipVerify(false))
@@ -110,12 +115,26 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	require.NoError(t, err)
 
 	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	// This is probably a way of getting a signed package
+	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version(), t)
 	require.NoError(t, err)
+	var fetcher atesting.Fetcher
+
+	// FIXME: this is a hack, PreviousMinor() uses a version.ParsedSemVer internally and that's what we should use for the snapshot check
+	// We need to distinguish between snapshots and released versions and use the appropriate fetcher
+	if strings.HasSuffix(upgradeToVersion, "-SNAPSHOT") {
+		// it's a snapshot, use the artifact fetcher
+		fetcher = atesting.ArtifactFetcher()
+	} else {
+		// it's a released version, use httpFetcher
+		// this fetcher will literally pull the package from the default elastic agent download URL
+		fetcher = atesting.NewHttpFetcher()
+	}
+
 	endFixture, err := atesting.NewFixture(
 		t,
 		upgradeToVersion,
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
+		atesting.WithFetcher(fetcher),
 	)
 	require.NoError(t, err)
 
@@ -137,6 +156,11 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
+		// passing "" as source URI is a hack to disable the --source-uri argument pointing at the endFixture srcPackage location
+		// this test needs the agent to download the real thing from artifacts.elastic.co so empty string.
+		// We need to download the same file from the same url and  use that as end fixture
+		// or we need a way to disable the commit hash check (in this case the upgrade can be verified just with the
+		// version string)
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
 		upgradetest.WithSkipVerify(false))

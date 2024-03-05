@@ -32,8 +32,6 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	t.Skip("Need to be skip until we have 8.14 first build")
-
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -43,7 +41,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version(), t)
 	require.NoError(t, err)
 	endFixture, err := atesting.NewFixture(
 		t,
