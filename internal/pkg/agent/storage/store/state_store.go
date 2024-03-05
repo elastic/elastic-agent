@@ -19,6 +19,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// Version is the current StateStore version. If any breaking change is
+// introduced, it should be increased and a migration added.
+const Version = "1"
+
 type saver interface {
 	Save(io.Reader) error
 }
@@ -144,16 +148,17 @@ func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 		return &StateStore{
 			log:   log,
 			store: store,
-			state: state{Version: "1"},
+			state: state{Version: Version},
 		}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not JSON unmarshal state store: %w", err)
 	}
 
-	if st.Version != "1" {
-		return nil, fmt.Errorf("invalid state store version, got \"%s\" isntead of 1",
-			st.Version)
+	if st.Version != Version {
+		return nil, fmt.Errorf(
+			"invalid state store version, got %q isntead of %s",
+			st.Version, Version)
 	}
 
 	return &StateStore{

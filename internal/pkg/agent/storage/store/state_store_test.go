@@ -138,9 +138,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		assert.Len(t, store.Queue(), 1)
 		assert.Equal(t, "test", store.Queue()[0].ID())
 
-		scheduledAction, ok := store.Queue()[0].(fleetapi.ScheduledAction)
-		assert.True(t, ok, "expected to be able to cast Action as ScheduledAction")
-		start, err := scheduledAction.StartTime()
+		start, err := store.Queue()[0].StartTime()
 		assert.NoError(t, err)
 		assert.Equal(t, ts, start)
 	})
@@ -188,11 +186,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 		got := store.Queue()
 		for i, want := range queue {
-			_, ok := got[i].(fleetapi.ScheduledAction)
-			assert.True(t, ok,
-				"expected to be able to cast Action as ScheduledAction")
-
-			upgradeAction := got[i].(*fleetapi.ActionUpgrade)
+			upgradeAction, ok := got[i].(*fleetapi.ActionUpgrade)
 			assert.True(t, ok,
 				"expected to be able to cast Action as ActionUpgrade")
 
