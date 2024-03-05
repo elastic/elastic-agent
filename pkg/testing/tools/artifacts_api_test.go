@@ -168,7 +168,7 @@ func TestDefaultArtifactAPIClientErrorHttpStatus(t *testing.T) {
 			testSrv := httptest.NewServer(errorHandler)
 			defer testSrv.Close()
 
-			aac := NewArtifactAPIClient(WithUrl(testSrv.URL))
+			aac := NewArtifactAPIClient(t, WithUrl(testSrv.URL))
 			_, err := aac.GetVersions(context.Background())
 			assert.ErrorIs(t, err, ErrBadHTTPStatusCode, "Expected ErrBadHTTPStatusCode for status code %d", httpErrorCode)
 			_, err = aac.GetBuildsForVersion(context.Background(), "1.2.3-SNAPSHOT")
@@ -198,7 +198,7 @@ func TestDefaultArtifactAPIClient(t *testing.T) {
 	testSrv := httptest.NewServer(cannedRespHandler)
 	defer testSrv.Close()
 
-	aac := NewArtifactAPIClient(WithUrl(testSrv.URL))
+	aac := NewArtifactAPIClient(t, WithUrl(testSrv.URL))
 	versions, err := aac.GetVersions(context.Background())
 	assert.NoError(t, err)
 	assert.NotNil(t, versions)

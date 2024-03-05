@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"time"
 
 	"github.com/elastic/elastic-agent/pkg/version"
 )
@@ -25,7 +26,9 @@ const (
 	artifactAPIV1BuildDetailsEndpoint   = "v1/versions/%s/builds/%s"
 	// artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
 
-	artifactElasticAgentProject = "elastic-agent-package"
+	artifactElasticAgentProject      = "elastic-agent-package"
+	maxAttemptsForArtifactsAPICall   = 6
+	retryIntervalForArtifactsAPICall = 5 * time.Second
 )
 
 var (
@@ -127,15 +130,17 @@ func WithHttpClient(client httpDoer) ArtifactAPIClientOpt {
 // More information about the API can be found at https://artifacts-api.elastic.co/v1
 // which will print a list of available operations
 type ArtifactAPIClient struct {
-	c   httpDoer
-	url string
+	c      httpDoer
+	url    string
+	logger logger
 }
 
 // NewArtifactAPIClient creates a new Artifact API client
-func NewArtifactAPIClient(opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
+func NewArtifactAPIClient(logger logger, opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
 	c := &ArtifactAPIClient{
-		url: defaultArtifactAPIURL,
-		c:   new(http.Client),
+		url:    defaultArtifactAPIURL,
+		c:      new(http.Client),
+		logger: logger,
 	}
 
 	for _, opt := range opts {
@@ -239,9 +244,37 @@ func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL st
 		return nil, err
 	}
 
-	resp, err := aac.c.Do(req)
+	// Make the request with retries as the artifacts API can sometimes be flaky.
+	var resp *http.Response
+	// TODO (once we're on Go 1.22): replace with for numAttempts := range maxAttemptsForArtifactsAPICall {
+	for numAttempts := 0; numAttempts < maxAttemptsForArtifactsAPICall; numAttempts++ {
+		resp, err = aac.c.Do(req)
+
+		// If there is no error, no need to retry the request.
+		if err == nil {
+			break
+		}
+
+		// If the context was cancelled or timed out, return early
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf(
+				"executing http request %s %s (attempt %d of %d) cancelled or timed out: %w",
+				req.Method, req.URL, numAttempts+1, maxAttemptsForArtifactsAPICall, err,
+			)
+		}
+
+		aac.logger.Logf(
+			"failed attempt %d of %d executing http request %s %s: %s; retrying after %v...",
+			numAttempts+1, maxAttemptsForArtifactsAPICall, req.Method, req.URL, err.Error(), retryIntervalForArtifactsAPICall,
+		)
+		time.Sleep(retryIntervalForArtifactsAPICall)
+	}
+
 	if err != nil {
-		return nil, fmt.Errorf("executing http request %v: %w", req, err)
+		return nil, fmt.Errorf(
+			"failed executing http request %s %s after %d attempts: %w",
+			req.Method, req.URL, maxAttemptsForArtifactsAPICall, err,
+		)
 	}
 
 	return resp, nil
@@ -270,7 +303,7 @@ type logger interface {
 	Logf(format string, args ...any)
 }
 
-func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context, log logger) (*version.ParsedSemVer, error) {
+func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context) (*version.ParsedSemVer, error) {
 	vList, err := aac.GetVersions(ctx)
 	if err != nil {
 		return nil, err
@@ -284,7 +317,7 @@ func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context, log l
 	for _, v := range vList.Versions {
 		pv, err := version.ParseVersion(v)
 		if err != nil {
-			log.Logf("invalid version retrieved from artifact API: %q", v)
+			aac.logger.Logf("invalid version retrieved from artifact API: %q", v)
 			return nil, ErrInvalidVersionRetrieved
 		}
 		sortedParsedVersions = append(sortedParsedVersions, pv)
