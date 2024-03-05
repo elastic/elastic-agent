@@ -82,7 +82,6 @@ func getAgentVersions() (*AgentVersions, error) {
 	}
 	dir = wd
 	for {
-		dir = filepath.Dir(dir)
 		pathToCheck := filepath.Join(dir, AgentVersionsFilename)
 		fi, err := os.Stat(pathToCheck)
 		if (err == nil || os.IsExist(err)) && !fi.IsDir() {
@@ -92,6 +91,7 @@ func getAgentVersions() (*AgentVersions, error) {
 		if strings.HasSuffix(dir, string(filepath.Separator)) {
 			return nil, fmt.Errorf("failed to find %s using working directory %s", AgentVersionsFilename, wd)
 		}
+		dir = filepath.Dir(dir)
 	}
 
 	f, err := os.OpenFile(filePath, os.O_RDONLY, 0)
