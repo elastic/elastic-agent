@@ -107,6 +107,7 @@ variables for the configuration.
 
 			ctx, cancel := context.WithCancel(context.Background())
 			service.HandleSignals(func() {}, cancel)
+
 			if err := inspectComponents(ctx, paths.ConfigFile(), opts, streams); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
