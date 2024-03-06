@@ -21,10 +21,22 @@ type WindowsRunner struct{}
 
 // Prepare the test
 func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string) error {
+	// Adding the user directory as an exception to Windows Defender, so it does not detect
+	// temporary mage binaries as malware.
+	//
+	// https://github.com/elastic/elastic-agent/issues/4355
+	// https://learn.microsoft.com/en-us/powershell/module/defender/set-mppreference?view=windowsserver2022-ps
+	logger.Logf("Adding exception in Windows Defender...")
+	defenderException := `Set-MpPreference -Force -ExclusionPath $env:USERPROFILE`
+	stdOut, errOut, err := sshRunPowershell(ctx, sshClient, defenderException)
+	if err != nil {
+		return fmt.Errorf("failed to add exception in Windows Defender: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
+	}
+
 	// install chocolatey
 	logger.Logf("Installing chocolatey")
 	chocoInstall := `"[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"`
-	stdOut, errOut, err := sshRunPowershell(ctx, sshClient, chocoInstall)
+	stdOut, errOut, err = sshRunPowershell(ctx, sshClient, chocoInstall)
 	if err != nil {
 		return fmt.Errorf("failed to install chocolatey: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}

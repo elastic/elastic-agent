@@ -29,17 +29,9 @@ const (
 	ShellWrapper = `#!/bin/sh
 exec %s/elastic-agent $@
 `
-
-	// defaultAgentVaultName is keychain item name for mac
-	defaultAgentVaultName = "co.elastic.elastic-agent"
 )
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
 func ArePathsEqual(expected, actual string) bool {
 	return expected == actual
-}
-
-// AgentVaultPath is keychain name on Mac OS
-func AgentVaultPath() string {
-	return defaultAgentVaultName
 }

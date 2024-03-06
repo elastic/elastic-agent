@@ -30,10 +30,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	// test 2 current 8.x version and 1 previous 7.x version
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(1*time.Minute))
-	defer cancel()
-	versionList, err := upgradetest.GetUpgradableVersions(ctx, define.Version(), 2, 1)
+	versionList, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err)
 	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)

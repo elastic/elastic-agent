@@ -19,6 +19,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 )
 
 const (
@@ -71,7 +72,7 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	}
 
 	// Create agent secret
-	err = secret.CreateAgentSecret(ctx, secret.WithVaultPath(dir))
+	err = secret.CreateAgentSecret(ctx, vault.WithVaultPath(dir))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 )
 
 type configfile struct {
@@ -111,7 +112,7 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 			paths.SetTop(top)
 
 			vaultPath := paths.AgentVaultPath()
-			err := secret.CreateAgentSecret(ctx, secret.WithVaultPath(vaultPath))
+			err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath))
 
 			require.NoError(t, err)
 
@@ -206,7 +207,7 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 			paths.SetTop(top)
 
 			vaultPath := paths.AgentVaultPath()
-			err := secret.CreateAgentSecret(ctx, secret.WithVaultPath(vaultPath))
+			err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath))
 
 			require.NoError(t, err)
 

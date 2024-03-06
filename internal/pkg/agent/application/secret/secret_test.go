@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build linux || windows
-
 package secret
 
 import (
@@ -15,6 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
@@ -23,9 +22,10 @@ func getTestVaultPath(t *testing.T) string {
 	return filepath.Join(dir, "vault", "co.elastic.agent")
 }
 
-func getTestOptions(t *testing.T) []OptionFunc {
-	return []OptionFunc{
-		WithVaultPath(getTestVaultPath(t)),
+func getTestOptions(t *testing.T) []vault.OptionFunc {
+	return []vault.OptionFunc{
+		vault.WithVaultPath(getTestVaultPath(t)),
+		vault.WithUnprivileged(true),
 	}
 }
 
