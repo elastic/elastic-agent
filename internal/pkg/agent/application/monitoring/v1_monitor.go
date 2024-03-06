@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
@@ -605,6 +606,10 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				},
 			},
 		},
+	}
+	dbgLog := logp.L()
+	for _, comp := range componentList {
+		dbgLog.Infof("component: %#v\n\t componentData: %#v", comp, comp.Component.String())
 	}
 	for unit, binaryName := range componentIDToBinary {
 		if !isSupportedMetricsBinary(binaryName) {
