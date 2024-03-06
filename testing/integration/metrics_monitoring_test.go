@@ -2,15 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+// //go:build integration
 
 package integration
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -77,29 +74,9 @@ func (runner *MetricsRunner) SetupSuite() {
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
-	runner.InstallPackage(ctx, "system", "1.53.1", "system_integration_setup.json", uuid.New().String(), policyResp.ID)
-
-}
-
-func (runner *MetricsRunner) InstallPackage(ctx context.Context, name string, version string, cfgFile string, policyUUID string, policyID string) {
-	installPackage := kibana.PackagePolicyRequest{}
-
-	jsonRaw, err := os.ReadFile(cfgFile)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", "1.53.1", "system_integration_setup.json", uuid.New().String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
-	err = json.Unmarshal(jsonRaw, &installPackage)
-	require.NoError(runner.T(), err)
-
-	installPackage.Package.Version = version
-	installPackage.ID = policyUUID
-	installPackage.PolicyID = policyID
-	installPackage.Namespace = "default"
-	installPackage.Name = fmt.Sprintf("%s-long-test-%s", name, policyUUID)
-	installPackage.Vars = map[string]interface{}{}
-
-	runner.T().Logf("Installing %s package....", name)
-	_, err = runner.info.KibanaClient.InstallFleetPackage(ctx, installPackage)
-	require.NoError(runner.T(), err, "error creating fleet package")
 }
 
 func (runner *MetricsRunner) TestBeatsMetrics() {

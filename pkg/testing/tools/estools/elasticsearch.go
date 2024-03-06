@@ -615,7 +615,7 @@ func FindMatchingLogLinesForAgentWithContext(ctx context.Context, client elastic
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
+	return PerformQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
 }
 
 // GetLogsForDatastream returns any logs associated with the datastream
