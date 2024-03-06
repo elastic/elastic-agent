@@ -45,15 +45,17 @@ type ActionQueue struct {
 	IsDetected     bool                   `yaml:"is_detected,omitempty"`
 }
 
-// LoadActionStore loads an action store from .
+// LoadActionStore loads an action store from loader.
 func LoadActionStore(loader interface{ Load() (io.ReadCloser, error) }) (*Action, error) {
 	return LoadStore[Action](loader)
 }
 
+// LoadYAMLStateStore loads the old YAML state store from loader.
 func LoadYAMLStateStore(loader interface{ Load() (io.ReadCloser, error) }) (*StateStore, error) {
 	return LoadStore[StateStore](loader)
 }
 
+// LoadStore loads a YAML file.
 func LoadStore[Store any](loader interface{ Load() (io.ReadCloser, error) }) (store *Store, err error) {
 	// Store is a generic type, this might be needed.
 	var st Store

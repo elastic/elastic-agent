@@ -25,6 +25,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+type wrongAction struct{}
+
+func (wrongAction) ID() string                  { return "" }
+func (wrongAction) Type() string                { return "" }
+func (wrongAction) String() string              { return "" }
+func (wrongAction) AckEvent() fleetapi.AckEvent { return fleetapi.AckEvent{} }
+
 func TestStateStore(t *testing.T) {
 	t.Run("ack token", func(t *testing.T) {
 		runTestStateStore(t, "czlV93YBwdkt5lYhBY7S")
@@ -54,8 +61,32 @@ func TestStateStore(t *testing.T) {
 			err := migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
 			require.NoError(t, err, "migration action store -> state store failed")
 
-			// to load from disk a new store needs to be created, it loads the file
-			// to memory during the store creation.
+			// to load from disk a new store needs to be created, it loads the
+			// file to memory during the store creation.
+			stateStore, err := NewStateStore(log, newStateStore)
+			require.NoError(t, err, "could not load state store")
+
+			assert.Nil(t, stateStore.Action())
+			assert.Empty(t, stateStore.Queue())
+		})
+
+		t.Run("action store is empty", func(t *testing.T) {
+			ctx := context.Background()
+			log, _ := logger.NewTesting("")
+
+			tempDir := t.TempDir()
+			oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
+			newStateStorePath := filepath.Join(tempDir, "state_store.yml")
+
+			err := os.WriteFile(oldActionStorePath, []byte(""), 0600)
+			require.NoError(t, err, "could not create empty action store file")
+
+			newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath)
+			err = migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
+			require.NoError(t, err, "migration action store -> state store failed")
+
+			// to load from disk a new store needs to be created, it loads the
+			// file to memory during the store creation.
 			stateStore, err := NewStateStore(log, newStateStore)
 			require.NoError(t, err, "could not load state store")
 
@@ -113,39 +144,27 @@ func TestStateStore(t *testing.T) {
 				"queue should be empty, old action store did not have a queue")
 		})
 
-		t.Run("YAML state store to JSON state store", func(t *testing.T) {
-			ctx := context.Background()
-			log, _ := logger.NewTesting("")
+		t.Run("YAML state store containing an ActionPolicyChange to JSON state store",
+			func(t *testing.T) {
+				ctx := context.Background()
+				log, _ := logger.NewTesting("")
 
-			want := state{
-				Version: "1",
-				ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
-					ActionID:   "abc123",
-					ActionType: "POLICY_CHANGE",
-					Data: fleetapi.ActionPolicyChangeData{
-						Policy: map[string]interface{}{
-							"hello":  "world",
-							"phi":    1.618,
-							"answer": 42.0,
+				want := state{
+					Version: "1",
+					ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
+						ActionID:   "abc123",
+						ActionType: "POLICY_CHANGE",
+						Data: fleetapi.ActionPolicyChangeData{
+							Policy: map[string]interface{}{
+								"hello":  "world",
+								"phi":    1.618,
+								"answer": 42.0,
+							},
 						},
-					},
-				}},
-				AckToken: "czlV93YBwdkt5lYhBY7S",
-				Queue: actionQueue{&fleetapi.ActionUpgrade{
-					ActionID:         "action1",
-					ActionType:       "UPGRADE",
-					ActionStartTime:  "2024-02-19T17:48:40Z",
-					ActionExpiration: "2025-02-19T17:48:40Z",
-					Data: fleetapi.ActionUpgradeData{
-						Version:   "1.2.3",
-						SourceURI: "https://example.com",
-						Retry:     1,
-					},
-					Signed: nil,
-					Err:    nil,
-				},
-					&fleetapi.ActionUpgrade{
-						ActionID:         "action2",
+					}},
+					AckToken: "czlV93YBwdkt5lYhBY7S",
+					Queue: actionQueue{&fleetapi.ActionUpgrade{
+						ActionID:         "action1",
 						ActionType:       "UPGRADE",
 						ActionStartTime:  "2024-02-19T17:48:40Z",
 						ActionExpiration: "2025-02-19T17:48:40Z",
@@ -156,32 +175,111 @@ func TestStateStore(t *testing.T) {
 						},
 						Signed: nil,
 						Err:    nil,
+					},
+						&fleetapi.ActionUpgrade{
+							ActionID:         "action2",
+							ActionType:       "UPGRADE",
+							ActionStartTime:  "2024-02-19T17:48:40Z",
+							ActionExpiration: "2025-02-19T17:48:40Z",
+							Data: fleetapi.ActionUpgradeData{
+								Version:   "1.2.3",
+								SourceURI: "https://example.com",
+								Retry:     1,
+							},
+							Signed: nil,
+							Err:    nil,
+						}},
+				}
+
+				tempDir := t.TempDir()
+				vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
+
+				yamlStorePlain, err := os.ReadFile(
+					filepath.Join("testdata", "8.0.0-action_policy_change.yml"))
+				require.NoError(t, err, "could not read action store golden file")
+
+				encDiskStorePath := filepath.Join(tempDir, "store.enc")
+				encDiskStore := storage.NewEncryptedDiskStore(ctx, encDiskStorePath,
+					storage.WithVaultPath(vaultPath))
+				err = encDiskStore.Save(bytes.NewBuffer(yamlStorePlain))
+				require.NoError(t, err,
+					"failed saving copy of golden files on an EncryptedDiskStore")
+
+				err = migrateYAMLStateStoreToStateStoreV1(encDiskStore)
+				require.NoError(t, err, "YAML state store -> JSON state store failed")
+
+				// Load migrated store from disk
+				stateStore, err := NewStateStore(log, encDiskStore)
+				require.NoError(t, err, "could not load store from disk")
+
+				assert.Equal(t, want, stateStore.state)
+			})
+
+		t.Run("YAML state store containing an ActionUnenroll to JSON state store",
+			func(t *testing.T) {
+				ctx := context.Background()
+				log, _ := logger.NewTesting("")
+
+				want := state{
+					Version: "1",
+					ActionSerializer: actionSerializer{Action: &fleetapi.ActionUnenroll{
+						ActionID:   "abc123",
+						ActionType: "UNENROLL",
+						IsDetected: true,
+						Signed:     nil,
 					}},
-			}
+					AckToken: "czlV93YBwdkt5lYhBY7S",
+					Queue: actionQueue{&fleetapi.ActionUpgrade{
+						ActionID:         "action1",
+						ActionType:       "UPGRADE",
+						ActionStartTime:  "2024-02-19T17:48:40Z",
+						ActionExpiration: "2025-02-19T17:48:40Z",
+						Data: fleetapi.ActionUpgradeData{
+							Version:   "1.2.3",
+							SourceURI: "https://example.com",
+							Retry:     1,
+						},
+						Signed: nil,
+						Err:    nil,
+					},
+						&fleetapi.ActionUpgrade{
+							ActionID:         "action2",
+							ActionType:       "UPGRADE",
+							ActionStartTime:  "2024-02-19T17:48:40Z",
+							ActionExpiration: "2025-02-19T17:48:40Z",
+							Data: fleetapi.ActionUpgradeData{
+								Version:   "1.2.3",
+								SourceURI: "https://example.com",
+								Retry:     1,
+							},
+							Signed: nil,
+							Err:    nil,
+						}},
+				}
 
-			tempDir := t.TempDir()
-			vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
+				tempDir := t.TempDir()
+				vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
 
-			yamlStorePlain, err := os.ReadFile(
-				filepath.Join("testdata", "8.0.0-action_policy_change.yml"))
-			require.NoError(t, err, "could not read action store golden file")
+				yamlStorePlain, err := os.ReadFile(
+					filepath.Join("testdata", "8.0.0-action_unenroll.yml"))
+				require.NoError(t, err, "could not read action store golden file")
 
-			encDiskStorePath := filepath.Join(tempDir, "store.enc")
-			encDiskStore := storage.NewEncryptedDiskStore(ctx, encDiskStorePath,
-				storage.WithVaultPath(vaultPath))
-			err = encDiskStore.Save(bytes.NewBuffer(yamlStorePlain))
-			require.NoError(t, err,
-				"failed saving copy of golden files on an EncryptedDiskStore")
+				encDiskStorePath := filepath.Join(tempDir, "store.enc")
+				encDiskStore := storage.NewEncryptedDiskStore(ctx, encDiskStorePath,
+					storage.WithVaultPath(vaultPath))
+				err = encDiskStore.Save(bytes.NewBuffer(yamlStorePlain))
+				require.NoError(t, err,
+					"failed saving copy of golden files on an EncryptedDiskStore")
 
-			err = migrateYAMLStateStoreToStateStoreV1(encDiskStore)
-			require.NoError(t, err, "YAML state store -> JSON state store failed")
+				err = migrateYAMLStateStoreToStateStoreV1(encDiskStore)
+				require.NoError(t, err, "YAML state store -> JSON state store failed")
 
-			// Load migrated store from disk
-			stateStore, err := NewStateStore(log, encDiskStore)
-			require.NoError(t, err, "could not load store from disk")
+				// Load migrated store from disk
+				stateStore, err := NewStateStore(log, encDiskStore)
+				require.NoError(t, err, "could not load store from disk")
 
-			assert.Equal(t, want, stateStore.state)
-		})
+				assert.Equal(t, want, stateStore.state)
+			})
 
 		t.Run("YAML state store when JSON state store exists", func(t *testing.T) {
 			log, _ := logger.NewTesting("")
@@ -507,7 +605,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.Equal(t, ackToken, store.AckToken())
 	})
 
-	t.Run("can save to disk known action type", func(t *testing.T) {
+	t.Run("can save to disk ActionPolicyChange", func(t *testing.T) {
 		ActionPolicyChange := &fleetapi.ActionPolicyChange{
 			ActionID:   "abc123",
 			ActionType: "POLICY_CHANGE",
@@ -542,6 +640,71 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 		require.Equal(t, ActionPolicyChange, action)
 		require.Equal(t, ackToken, store.AckToken())
+	})
+
+	t.Run("can save to disk ActionUnenroll", func(t *testing.T) {
+		want := &fleetapi.ActionUnenroll{
+			ActionID:   "abc123",
+			ActionType: "UNENROLL",
+		}
+
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
+
+		require.Empty(t, store.Action())
+		require.Empty(t, store.Queue())
+		store.SetAction(want)
+		store.SetAckToken(ackToken)
+		err = store.Save()
+		require.NoError(t, err)
+		require.NotNil(t, store.Action(), "store should have an action stored")
+		require.Empty(t, store.Queue())
+		require.Equal(t, ackToken, store.AckToken())
+
+		s = storage.NewDiskStore(storePath)
+		store1, err := NewStateStore(log, s)
+		require.NoError(t, err)
+
+		got := store1.Action()
+		require.NotNil(t, got, "store should have an action stored")
+		require.Empty(t, store1.Queue())
+		require.Equal(t, want, got)
+		require.Equal(t, ackToken, store.AckToken())
+	})
+
+	t.Run("errors when saving invalid action type", func(t *testing.T) {
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
+
+		store.state.ActionSerializer.Action = wrongAction{}
+		store.dirty = true
+		err = store.Save()
+		require.ErrorContains(t, err, "incompatible type, expected")
+	})
+
+	t.Run("do not set action if it has the same ID", func(t *testing.T) {
+		storePath := filepath.Join(t.TempDir(), "state.yml")
+		s := storage.NewDiskStore(storePath)
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
+
+		want := &fleetapi.ActionUnenroll{
+			ActionID:   "abc123",
+			ActionType: "UNENROLL",
+		}
+		store.state.ActionSerializer.Action = want
+
+		store.SetAction(&fleetapi.ActionUnenroll{
+			ActionID:   "abc123",
+			ActionType: "UNENROLL",
+			IsDetected: true,
+		})
+
+		assert.Equal(t, want, store.state.ActionSerializer.Action)
 	})
 
 	t.Run("can save a queue with one upgrade action", func(t *testing.T) {
@@ -629,38 +792,6 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 			assert.Equal(t, want, upgradeAction, "saved action is different from expected")
 		}
-	})
-
-	t.Run("can save to disk unenroll action type", func(t *testing.T) {
-		want := &fleetapi.ActionUnenroll{
-			ActionID:   "abc123",
-			ActionType: "UNENROLL",
-		}
-
-		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
-		store, err := NewStateStore(log, s)
-		require.NoError(t, err)
-
-		require.Empty(t, store.Action())
-		require.Empty(t, store.Queue())
-		store.SetAction(want)
-		store.SetAckToken(ackToken)
-		err = store.Save()
-		require.NoError(t, err)
-		require.NotNil(t, store.Action(), "store should have an action stored")
-		require.Empty(t, store.Queue())
-		require.Equal(t, ackToken, store.AckToken())
-
-		s = storage.NewDiskStore(storePath)
-		store1, err := NewStateStore(log, s)
-		require.NoError(t, err)
-
-		got := store1.Action()
-		require.NotNil(t, got, "store should have an action stored")
-		require.Empty(t, store1.Queue())
-		require.Equal(t, want, got)
-		require.Equal(t, ackToken, store.AckToken())
 	})
 
 	t.Run("when we ACK we save to disk", func(t *testing.T) {
