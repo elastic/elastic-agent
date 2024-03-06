@@ -76,10 +76,10 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
 
-	// only support Linux at the moment
+	// only support Linux and MacOS at the moment
 	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
-	if unprivileged && runtime.GOOS != "linux" {
-		return fmt.Errorf("unable to perform install command, unprivileged is currently only supported on Linux")
+	if unprivileged && (runtime.GOOS != "linux" && runtime.GOOS != "darwin") {
+		return fmt.Errorf("unable to perform install command, unprivileged is currently only supported on Linux and MacOSß")
 	}
 	if unprivileged {
 		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this is an experimental and currently unsupported feature.")

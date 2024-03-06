@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -29,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
@@ -72,6 +74,7 @@ type enrollCmd struct {
 	remoteConfig remote.Config
 	agentProc    *process.Info
 	configPath   string
+	unprivileged bool
 
 	// For testability
 	daemonReloadFunc func(context.Context) error
@@ -173,10 +176,15 @@ func newEnrollCmd(
 	configPath string,
 ) (*enrollCmd, error) {
 
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return nil, fmt.Errorf("checking for root permissions: %w", err)
+	}
+
 	store := storage.NewReplaceOnSuccessStore(
 		configPath,
 		application.DefaultAgentFleetConfig,
-		storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile()),
+		storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile(), storage.WithUnprivileged(!hasRoot)),
 	)
 
 	return newEnrollCmdWithStore(
@@ -184,6 +192,7 @@ func newEnrollCmd(
 		options,
 		configPath,
 		store,
+		!hasRoot,
 	)
 }
 
@@ -193,6 +202,7 @@ func newEnrollCmdWithStore(
 	options *enrollCmdOption,
 	configPath string,
 	store saver,
+	unprivileged bool,
 ) (*enrollCmd, error) {
 	return &enrollCmd{
 		log:              log,
@@ -200,6 +210,7 @@ func newEnrollCmdWithStore(
 		configStore:      store,
 		configPath:       configPath,
 		daemonReloadFunc: daemonReload,
+		unprivileged:     unprivileged,
 	}, nil
 }
 
@@ -216,7 +227,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 
 	// Create encryption key from the agent before touching configuration
 	if !c.options.SkipCreateSecret {
-		err = secret.CreateAgentSecret(ctx)
+		err = secret.CreateAgentSecret(ctx, vault.WithUnprivileged(c.unprivileged))
 		if err != nil {
 			return err
 		}

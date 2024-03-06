@@ -102,6 +102,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				true,
 			)
 			require.NoError(t, err)
 
@@ -157,6 +158,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				true,
 			)
 			require.NoError(t, err)
 
@@ -219,6 +221,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				true,
 			)
 			require.NoError(t, err)
 
@@ -283,6 +286,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				true,
 			)
 			require.NoError(t, err)
 
@@ -327,6 +331,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				true,
 			)
 			require.NoError(t, err)
 
