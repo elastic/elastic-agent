@@ -290,7 +290,7 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 		}
 	}
 
-	hintsExtracted := utils.GenerateHints(annotations, cName, prefix)
+	hintsExtracted, _ := utils.GenerateHints(annotations, cName, prefix, allSupportedHints)
 	if len(hintsExtracted) == 0 {
 		return hintData
 	}
