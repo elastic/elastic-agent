@@ -985,7 +985,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 				panic(fmt.Sprintf("No packages were successfully downloaded. You may be building against an invalid or unreleased version. version=%s. If this is an unreleased version, try SNAPSHOT=true or EXTERNAL=false", packageVersion))
 			}
 		} else {
-			packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
+			packedBeats := []string{"agentbeat"}
 			// build from local repo, will assume beats repo is located on the same root level
 			for _, b := range packedBeats {
 				pwd, err := filepath.Abs(filepath.Join("../beats/x-pack", b))
