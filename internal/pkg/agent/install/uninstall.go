@@ -33,7 +33,7 @@ import (
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
+func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, unprivileged bool) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
@@ -81,7 +81,7 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	}
 
 	// Uninstall components first
-	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken, log, pt); err != nil {
+	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken, log, pt, unprivileged); err != nil {
 		// If service status was running it was stopped to uninstall the components.
 		// If the components uninstall failed start the service again
 		if status == service.StatusRunning {
@@ -200,7 +200,7 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	return false
 }
 
-func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
+func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, unprivileged bool) error {
 
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
@@ -212,7 +212,7 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 
-	cfg, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false)
+	cfg, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
 	if err != nil {
 		return fmt.Errorf("error loading agent config: %w", err)
 	}

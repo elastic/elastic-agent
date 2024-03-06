@@ -48,7 +48,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		// Uninstall will fail on protected agent.
 		// The protected Agent will need to be uninstalled first before it can be installed.
 		pt.Describe("Uninstalling current Elastic Agent")
-		err = Uninstall(cfgFile, topPath, "", log, pt)
+		err = Uninstall(cfgFile, topPath, "", log, pt, unprivileged)
 		if err != nil {
 			pt.Describe("Failed to uninstall current Elastic Agent")
 			return utils.FileOwner{}, errors.New(

@@ -26,8 +26,8 @@ var (
 
 // LoadFullAgentConfig load agent config based on provided paths and defined capabilities.
 // In case fleet is used, config from policy action is returned.
-func LoadFullAgentConfig(ctx context.Context, logger *logger.Logger, cfgPath string, failOnFleetMissing bool) (*config.Config, error) {
-	rawConfig, err := loadConfig(ctx, cfgPath)
+func LoadFullAgentConfig(ctx context.Context, logger *logger.Logger, cfgPath string, failOnFleetMissing, unprivileged bool) (*config.Config, error) {
+	rawConfig, err := loadConfig(ctx, cfgPath, unprivileged)
 	if err != nil {
 		return nil, fmt.Errorf("error loading raw config: %w", err)
 	}
@@ -75,7 +75,7 @@ func LoadFullAgentConfig(ctx context.Context, logger *logger.Logger, cfgPath str
 	return rawConfig, nil
 }
 
-func loadConfig(ctx context.Context, configPath string) (*config.Config, error) {
+func loadConfig(ctx context.Context, configPath string, unprivileged bool) (*config.Config, error) {
 	rawConfig, err := config.LoadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("error loading config file %s: %w", configPath, err)
@@ -83,7 +83,7 @@ func loadConfig(ctx context.Context, configPath string) (*config.Config, error) 
 
 	path := paths.AgentConfigFile()
 
-	store := storage.NewEncryptedDiskStore(ctx, path)
+	store := storage.NewEncryptedDiskStore(ctx, path, storage.WithUnprivileged(unprivileged))
 	reader, err := store.Load()
 	if err != nil {
 		return nil, errors.New(err, "could not initialize config store",

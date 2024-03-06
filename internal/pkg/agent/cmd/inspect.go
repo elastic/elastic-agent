@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Command {
@@ -134,8 +135,12 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return fmt.Errorf("error creating logger: %w", err)
 	}
 
+	isAdmin, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("error checking for administrator privileges: %w", err)
+	}
 	if !opts.variables && !opts.includeMonitoring {
-		fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true)
+		fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, !isAdmin)
 		if err != nil {
 			return fmt.Errorf("error loading agent config: %w", err)
 		}
@@ -145,7 +150,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		}
 	}
 
-	cfg, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
+	cfg, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
 	if err != nil {
 		return fmt.Errorf("error fetching config with variables: %w", err)
 	}
@@ -258,7 +263,12 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 
-	m, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
+	isAdmin, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("error checking for administrator privileges: %w", err)
+	}
+
+	m, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
 	if err != nil {
 		return err
 	}
@@ -359,9 +369,9 @@ func getMonitoringFn(ctx context.Context, cfg map[string]interface{}) (component
 	return monitor.MonitoringConfig, nil
 }
 
-func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration) (map[string]interface{}, logp.Level, error) {
+func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration, unprivileged bool) (map[string]interface{}, logp.Level, error) {
 
-	cfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true)
+	cfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, unprivileged)
 	if err != nil {
 		return nil, logp.InfoLevel, err
 	}

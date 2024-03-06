@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -36,6 +37,8 @@ Unless -f is used this command will ask confirmation before performing removal.
 
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
 	cmd.Flags().String("uninstall-token", "", "Uninstall token required for protected agent uninstall")
+	cmd.Flags().Bool(flagInstallUnprivileged, false, "Installed Elastic Agent will create an 'elastic-agent' user and run as that user. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallUnprivileged) // Hidden until fully supported
 
 	return cmd
 }
@@ -108,8 +111,8 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			fmt.Fprintf(os.Stderr, "%v\n", oLog.Entry)
 		}
 	}()
-
-	err = install.Uninstall(paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar)
+	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
+	err = install.Uninstall(paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar, unprivileged)
 	if err != nil {
 		progBar.Describe("Failed to uninstall agent")
 		return fmt.Errorf("error uninstalling agent: %w", err)
