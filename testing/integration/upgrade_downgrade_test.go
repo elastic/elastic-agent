@@ -42,7 +42,7 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	aac := tools.NewArtifactAPIClient(t)
+	aac := tools.NewArtifactAPIClient(tools.WithLogFunc(t.Logf))
 	latestSnapshotVersion, err := aac.GetLatestSnapshotVersion(ctx)
 	require.NoError(t, err)
 

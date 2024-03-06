@@ -230,7 +230,7 @@ func TestPackages(options ...TestPackagesOption) error {
 		if mg.Verbose() {
 			fmt.Println(out)
 		}
-		return err
+		return fmt.Errorf("error running package_test.go: %w, stdout: %s", err, out)
 	}
 
 	return nil
