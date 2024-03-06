@@ -1,0 +1,57 @@
+---
+name: update-agent-versions
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  update_versions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.21
+
+      - name: Set up branch
+        run: git checkout -b update-agent-versions-$GITHUB_RUN_ID
+
+      - name: Update the agent version file
+        uses: magefile/mage-action@v3
+        with:
+          version: v1.13.0
+          args: integration:updateVersions
+
+      - name: Check for file changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          changes=$(git status -s -uno .agent-versions.json)
+          if [ -z "$changes" ]
+          then
+            echo "The versions file didn't change, skipping..."
+          else
+            echo "The versions file changed"
+            open=$(gh pr list --repo "$GITHUB_REPOSITORY" --label="update-versions" --limit 1 --state open --base "$GITHUB_REF_NAME")
+            if [ -n "$open" ]
+            then
+              echo "Another PR for $GITHUB_REF_NAME is in review, skipping..."
+              exit 0
+            fi
+            git diff -p
+            git add ".agent-versions.json"
+            git commit -m "[$GITHUB_REF_NAME](automation) Update .agent-versions.json" -m "This file is used for picking agent versions in integration tests. It's content is based on the reponse from https://artifacts-api.elastic.co/v1/versions/"
+            git push --set-upstream origin "update-agent-versions-$GITHUB_RUN_ID"
+            gh pr create \
+              --base "$GITHUB_REF_NAME" \
+              --fill-first \
+              --head "update-agent-versions-$GITHUB_RUN_ID" \
+              --label 'Team:Elastic-Agent' \
+              --label 'update-versions' \
+              --reviewer 'elastic/elastic-agent-control-plane' \
+              --repo $GITHUB_REPOSITORY
+          fi
