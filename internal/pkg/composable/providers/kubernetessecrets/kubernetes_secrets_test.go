@@ -404,7 +404,7 @@ func Test_MergeWitchCurrent(t *testing.T) {
 		fp.secretsCache = test.secretsCache
 		merged, updated := fp.mergeWithCurrent(test.updatedMap)
 
-		require.Equalf(t, len(test.mergedMap), len(merged), "Resulting merged map does not have the expected lenght.")
+		require.Equalf(t, len(test.mergedMap), len(merged), "Resulting merged map does not have the expected length.")
 		for key, data1 := range test.mergedMap {
 			data2, ok := merged[key]
 			if ok {
@@ -507,7 +507,7 @@ func Test_UpdateCache(t *testing.T) {
 		fp.secretsCache = test.secretsCache
 		updated := fp.updateCache()
 
-		require.Equalf(t, len(test.expectedCache), len(fp.secretsCache), "Resulting updated map does not have the expected lenght.")
+		require.Equalf(t, len(test.expectedCache), len(fp.secretsCache), "Resulting updated map does not have the expected length.")
 		for key, data1 := range test.expectedCache {
 			data2, ok := fp.secretsCache[key]
 			if ok {
