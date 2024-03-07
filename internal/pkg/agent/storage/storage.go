@@ -37,8 +37,9 @@ type DiskStore struct {
 // EncryptedDiskStore encrypts config when saving to disk.
 // When saving it will save to a temporary file then replace the target file.
 type EncryptedDiskStore struct {
-	ctx       context.Context
-	target    string
-	vaultPath string
-	key       []byte
+	ctx          context.Context
+	target       string
+	vaultPath    string
+	key          []byte
+	unprivileged bool
 }

@@ -17,11 +17,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-func (v *Vault) encrypt(data []byte) ([]byte, error) {
+func (v *FileVault) encrypt(data []byte) ([]byte, error) {
 	return dpapi.EncryptBytesMachineLocalEntropy(data, v.seed)
 }
 
-func (v *Vault) decrypt(data []byte) ([]byte, error) {
+func (v *FileVault) decrypt(data []byte) ([]byte, error) {
 	return dpapi.DecryptBytesEntropy(data, v.seed)
 }
 
