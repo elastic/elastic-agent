@@ -10,12 +10,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"time"
 
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -25,7 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -104,7 +106,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	}
 
 	h.log.Debugf("handlerPolicyChange: emit configuration for action %+v", a)
-	err = h.handleFleetServerHosts(ctx, c)
+	err = h.handleFleetServerConfig(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -118,11 +120,11 @@ func (h *PolicyChangeHandler) Watch() <-chan coordinator.ConfigChange {
 	return h.ch
 }
 
-func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *config.Config) (err error) {
-	// do not update fleet-server host from policy; no setters provided with local Fleet Server
+func (h *PolicyChangeHandler) handleFleetServerConfig(ctx context.Context, c *config.Config) (err error) {
 	if len(h.setters) == 0 {
 		return nil
 	}
+
 	data, err := c.ToMapStr()
 	if err != nil {
 		return errors.New(err, "could not convert the configuration from the policy", errors.TypeConfig)
@@ -142,29 +144,11 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 		return nil
 	}
 
-	// only set protocol/hosts as that is all Fleet currently sends
 	prevProtocol := h.config.Fleet.Client.Protocol
 	prevPath := h.config.Fleet.Client.Path
 	prevHost := h.config.Fleet.Client.Host
 	prevHosts := h.config.Fleet.Client.Hosts
-	prevProxy := h.config.Fleet.Client.Transport.Proxy
-	h.config.Fleet.Client.Protocol = cfg.Fleet.Client.Protocol
-	h.config.Fleet.Client.Path = cfg.Fleet.Client.Path
-	h.config.Fleet.Client.Host = cfg.Fleet.Client.Host
-	h.config.Fleet.Client.Hosts = cfg.Fleet.Client.Hosts
-
-	// Empty proxies from fleet are ignored. That way a proxy set by --proxy-url
-	// it won't be overridden by an absent or empty proxy from fleet-server.
-	// However, if there is a proxy sent by fleet-server, it'll take precedence.
-	// Therefore, it's not possible to remove a proxy once it's set.
-	if cfg.Fleet.Client.Transport.Proxy.URL == nil ||
-		cfg.Fleet.Client.Transport.Proxy.URL.String() == "" {
-		h.log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
-	} else {
-		h.config.Fleet.Client.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
-		h.log.Debug("received proxy from fleet, applying it")
-	}
-
+	prevTransport := h.config.Fleet.Client.Transport
 	// rollback on failure
 	defer func() {
 		if err != nil {
@@ -172,11 +156,13 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 			h.config.Fleet.Client.Path = prevPath
 			h.config.Fleet.Client.Host = prevHost
 			h.config.Fleet.Client.Hosts = prevHosts
-			h.config.Fleet.Client.Transport.Proxy = prevProxy
+			h.config.Fleet.Client.Transport = prevTransport
 		}
 	}()
 
-	client, err := client.NewAuthWithConfig(
+	h.applyConfigWithPrecedence(cfg.Fleet.Client)
+
+	client, err := fleetclient.NewAuthWithConfig(
 		h.log, h.config.Fleet.AccessAPIKey, h.config.Fleet.Client)
 	if err != nil {
 		return errors.New(
@@ -220,25 +206,77 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 	return nil
 }
 
-func clientEqual(k1 remote.Config, k2 remote.Config) bool {
-	if k1.Protocol != k2.Protocol {
+// applyConfigWithPrecedence applies Proxy and TLS configs, but ignores empty ones.
+// That way a proxy or TLS config set during install/enroll using cli flags
+// won't be overridden by an absent or empty proxy from fleet-server.
+// However, if there is a proxy or TLS config sent by fleet-server, it'll take
+// precedence. Therefore, it's not possible to remove a proxy or TLS config once
+// it's set.
+func (h *PolicyChangeHandler) applyConfigWithPrecedence(cfg remote.Config) {
+	defaultcfg := configuration.DefaultFleetAgentConfig()
+
+	if cfg.Protocol != defaultcfg.Client.Protocol ||
+		cfg.Host != defaultcfg.Client.Host ||
+		!slices.Equal(cfg.Hosts, defaultcfg.Client.Hosts) ||
+		cfg.Path != defaultcfg.Client.Path {
+		h.config.Fleet.Client.Protocol = cfg.Protocol
+		h.config.Fleet.Client.Path = cfg.Path
+		h.config.Fleet.Client.Host = cfg.Host
+		h.config.Fleet.Client.Hosts = cfg.Hosts
+	}
+
+	if cfg.Transport.Proxy.URL == nil ||
+		cfg.Transport.Proxy.URL.String() == "" {
+		h.log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
+	} else {
+		h.config.Fleet.Client.Transport.Proxy = cfg.Transport.Proxy
+		h.log.Debug("received proxy from fleet, applying it")
+	}
+
+	emptyCertificate := tlscommon.CertificateConfig{}
+	if cfg.Transport.TLS != nil {
+		if h.config.Fleet.Client.Transport.TLS == nil {
+			h.config.Fleet.Client.Transport.TLS = &tlscommon.Config{}
+		}
+
+		if cfg.Transport.TLS.Certificate == emptyCertificate {
+			h.log.Debug("TLS certificates from fleet are empty or null, the TLS config will not be changed")
+		} else {
+			h.config.Fleet.Client.Transport.TLS.Certificate = cfg.Transport.TLS.Certificate
+			h.log.Debug("received SSL from fleet, applying it")
+		}
+
+		if len(cfg.Transport.TLS.CAs) == 0 {
+			h.log.Debug("TLS CAs from fleet are empty or null, the TLS config will not be changed")
+		} else {
+			h.config.Fleet.Client.Transport.TLS.CAs = cfg.Transport.TLS.CAs
+			h.log.Debug("received SSL from fleet, applying it")
+		}
+	}
+}
+
+func clientEqual(current remote.Config, new remote.Config) bool {
+	if new.Protocol != "" &&
+		current.Protocol != new.Protocol {
 		return false
 	}
-	if k1.Path != k2.Path {
+	if new.Path != "" &&
+		current.Path != new.Path {
 		return false
 	}
 
-	sort.Strings(k1.Hosts)
-	sort.Strings(k2.Hosts)
-	if len(k1.Hosts) != len(k2.Hosts) {
+	sort.Strings(current.Hosts)
+	sort.Strings(new.Hosts)
+	if len(current.Hosts) != len(new.Hosts) {
 		return false
 	}
-	for i, v := range k1.Hosts {
-		if v != k2.Hosts[i] {
+	for i, v := range current.Hosts {
+		if v != new.Hosts[i] {
 			return false
 		}
 	}
 
+	// should it ignore empty headers?
 	headersEqual := func(h1, h2 httpcommon.ProxyHeaders) bool {
 		if len(h1) != len(h2) {
 			return false
@@ -255,9 +293,22 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	}
 
 	// different proxy
-	if k1.Transport.Proxy.URL != k2.Transport.Proxy.URL ||
-		k1.Transport.Proxy.Disable != k2.Transport.Proxy.Disable ||
-		!headersEqual(k1.Transport.Proxy.Headers, k2.Transport.Proxy.Headers) {
+	if new.Transport.Proxy.URL != nil &&
+		current.Transport.Proxy.URL != new.Transport.Proxy.URL ||
+		current.Transport.Proxy.Disable != new.Transport.Proxy.Disable ||
+		!headersEqual(current.Transport.Proxy.Headers, new.Transport.Proxy.Headers) {
+		return false
+	}
+
+	// different TLS config
+	if len(new.Transport.TLS.CAs) > 0 &&
+		!slices.Equal(current.Transport.TLS.CAs, new.Transport.TLS.CAs) {
+		return false
+	}
+
+	emptyCert := tlscommon.CertificateConfig{}
+	if new.Transport.TLS.Certificate != emptyCert &&
+		current.Transport.TLS.Certificate != new.Transport.TLS.Certificate {
 		return false
 	}
 

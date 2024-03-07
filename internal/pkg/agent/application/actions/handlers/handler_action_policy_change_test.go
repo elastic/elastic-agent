@@ -6,6 +6,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -158,7 +161,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"fleet.proxy_url": "http://some.proxy",
 				})
 
-			err := h.handleFleetServerHosts(context.Background(), cfg)
+			err := h.handleFleetServerConfig(context.Background(), cfg)
 			require.Error(t, err) // it needs to fail to rollback
 
 			assert.Equal(t, 0, setterCalledCount)
@@ -214,7 +217,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"fleet.proxy_url": "http://some.proxy",
 				})
 
-			err := h.handleFleetServerHosts(context.Background(), cfg)
+			err := h.handleFleetServerConfig(context.Background(), cfg)
 			require.Error(t, err) // it needs to fail to rollback
 
 			assert.Equal(t, 0, setterCalledCount)
@@ -260,52 +263,11 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 			map[string]interface{}{
 				"fleet.host": fleetServer.URL})
 
-		err := h.handleFleetServerHosts(context.Background(), cfg)
+		err := h.handleFleetServerConfig(context.Background(), cfg)
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, setterCalledCount)
 		assert.Equal(t, fleetServer.URL, h.config.Fleet.Client.Host)
-		assert.Empty(t,
-			h.config.Fleet.Client.Transport.Proxy.URL)
-	})
-
-	t.Run("A policy with new Hosts and no proxy changes the Hosts", func(t *testing.T) {
-		log, _ := logger.NewTesting("TestPolicyChangeHandler")
-		var setterCalledCount int
-		setter := testSetter{SetClientFn: func(c client.Sender) {
-			setterCalledCount++
-		}}
-
-		originalCfg := &configuration.Configuration{
-			Fleet: &configuration.FleetAgentConfig{
-				Server: &configuration.FleetServerConfig{
-					Host: fleetServerHost,
-					Port: uint16(fleetServerPort),
-				},
-				AccessAPIKey: "ignore",
-				Client: remote.Config{
-					Host: "http://example.co"},
-			},
-			Settings: configuration.DefaultSettingsConfig()}
-
-		h := PolicyChangeHandler{
-			agentInfo: &info.AgentInfo{},
-			config:    originalCfg,
-			store:     &storage.NullStore{},
-			setters:   []actions.ClientSetter{&setter},
-			log:       log,
-		}
-
-		wantHosts := []string{fleetServer.URL, fleetServer.URL}
-		cfg := config.MustNewConfigFrom(
-			map[string]interface{}{
-				"fleet.hosts": wantHosts})
-
-		err := h.handleFleetServerHosts(context.Background(), cfg)
-		require.NoError(t, err)
-
-		assert.Equal(t, 1, setterCalledCount)
-		assert.Equal(t, wantHosts, h.config.Fleet.Client.Hosts)
 		assert.Empty(t,
 			h.config.Fleet.Client.Transport.Proxy.URL)
 	})
@@ -347,7 +309,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				"fleet.proxy_url": mockProxy.URL,
 				"fleet.host":      fleetServer.URL})
 
-		err := h.handleFleetServerHosts(context.Background(), cfg)
+		err := h.handleFleetServerConfig(context.Background(), cfg)
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, setterCalledCount)
@@ -400,7 +362,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"fleet.proxy_url": "",
 					"fleet.host":      fleetServer.URL})
 
-			err = h.handleFleetServerHosts(context.Background(), cfg)
+			err = h.handleFleetServerConfig(context.Background(), cfg)
 			require.NoError(t, err)
 
 			assert.Equal(t, 1, setterCalledCount)
@@ -408,6 +370,82 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				wantProxy,
 				h.config.Fleet.Client.Transport.Proxy.URL.String())
 		})
+
+	t.Run("SSL", func(t *testing.T) {
+		// TODO: make sure the ssl config is applied when it needs:
+		//  - if there is SSL config and an empty one comes?
+
+		fleetRootPair, fleetChildPair, err := certutil.NewRootAndChildCerts()
+		require.NoError(t, err, "failed creating fleet root and child certs")
+
+		// agentRootPair, agentChildPair, err := certutil.NewRootAndChildCerts()
+		// require.NoError(t, err, "failed creating agent root and child certs")
+
+		fleetServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "api/status" {
+				w.WriteHeader(http.StatusNotFound)
+				_, err := w.Write(nil)
+				require.NoError(t, err)
+			}
+			_, err := w.Write(nil)
+			require.NoError(t, err)
+		}))
+
+		rootCertPool := x509.NewCertPool()
+		rootCertPool.AppendCertsFromPEM(fleetRootPair.Cert)
+		cert, err := tls.X509KeyPair(fleetChildPair.Cert, fleetChildPair.Key)
+		require.NoError(t, err, "could not create tls.Certificates from child certificate")
+
+		fleetServer.TLS = &tls.Config{
+			RootCAs:      rootCertPool,
+			Certificates: []tls.Certificate{cert},
+		}
+
+		fleetServer.StartTLS()
+		defer mockProxy.Close()
+		defer fleetServer.Close()
+
+		t.Run("A policy with fleet.ssl.certificate_authorities is applied", func(t *testing.T) {
+			log, _ := logger.NewTesting("TestPolicyChangeHandler")
+			var setterCalledCount int
+			setter := testSetter{SetClientFn: func(c client.Sender) {
+				setterCalledCount++
+			}}
+
+			originalCfg := &configuration.Configuration{
+				Fleet: &configuration.FleetAgentConfig{
+					Client: remote.Config{
+						Host: fleetServer.URL,
+					},
+					AccessAPIKey: "ignore",
+				},
+				Settings: configuration.DefaultSettingsConfig()}
+
+			h := PolicyChangeHandler{
+				agentInfo: &info.AgentInfo{},
+				config:    originalCfg,
+				store:     &storage.NullStore{},
+				setters:   []actions.ClientSetter{&setter},
+				log:       log,
+			}
+
+			cfg := config.MustNewConfigFrom(
+				map[string]interface{}{
+					"fleet.ssl.certificate_authorities": []string{string(fleetRootPair.Cert)},
+				})
+
+			err = h.handleFleetServerConfig(context.Background(), cfg)
+			require.NoError(t, err)
+
+			assert.Equal(t, 1, setterCalledCount)
+			require.NotNil(t, h.config.Fleet.Client.Transport.TLS, "fleet TLS config is nil")
+			assert.Equal(t,
+				[]string{string(fleetRootPair.Cert)},
+				h.config.Fleet.Client.Transport.TLS.CAs)
+		})
+
+	})
+
 }
 
 type testAcker struct {
