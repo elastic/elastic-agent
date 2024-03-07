@@ -129,12 +129,12 @@ func (p *contextProviderK8sSecrets) mergeWithCurrent(updatedMap map[string]*secr
 		diff := time.Since(data.lastAccess)
 		if diff < p.config.TTLDelete {
 			merged[name] = data
-		}
-		// Check if this key is part of the updatedMap. If it is not, we know the secrets cache was updated,
-		// and we need to signal that.
-		_, ok := updatedMap[name]
-		if !ok {
-			updatedCache = true
+			// Check if this key is part of the updatedMap. If it is not, we know the secrets cache was updated,
+			// and we need to signal that.
+			_, ok := updatedMap[name]
+			if !ok {
+				updatedCache = true
+			}
 		}
 	}
 
@@ -185,6 +185,8 @@ func (p *contextProviderK8sSecrets) updateCache() bool {
 					updatedCache = true
 				}
 			}
+		} else {
+			updatedCache = true
 		}
 	}
 

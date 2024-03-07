@@ -487,23 +487,19 @@ func Test_UpdateCache(t *testing.T) {
 		},
 		{
 			secretsCache: map[string]*secretsData{
-				// This secret is not registered (see above lines).
-				// So fetchTimeout will have an error. Because of that, the value will remain as it is.
-				// The only way to update a value in the cache would be through the last access time (to delete the key)
-				// or if the value gets updated.
-				"kubernetes_secrets.namespace_one.secret_one.secret_value": {
-					value:      "value-one",
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      pass,
 					lastAccess: ts,
 				},
 			},
 			expectedCache: map[string]*secretsData{
-				"kubernetes_secrets.namespace_one.secret_one.secret_value": {
-					value:      "value-one",
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      pass,
 					lastAccess: ts,
 				},
 			},
-			updatedCache: true,
-			message:      "When last access is still within the limits, values should be updated.",
+			updatedCache: false,
+			message:      "When the values did not change and last access is still within limits, no update happens.",
 		},
 	}
 
@@ -523,6 +519,102 @@ func Test_UpdateCache(t *testing.T) {
 		}
 
 		require.Equalf(t, test.updatedCache, updated, test.message)
+	}
+
+}
+
+func Test_Signal(t *testing.T) {
+	// The signal should get triggered every time there is an update on the cache
+	logger := logp.NewLogger("test_k8s_secrets")
+
+	client := k8sfake.NewSimpleClientset()
+
+	secret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "apps/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret_one",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"secret_value": []byte(pass),
+		},
+	}
+	_, err := client.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	refreshInterval, err := time.ParseDuration("100ms")
+	require.NoError(t, err)
+
+	c := map[string]interface{}{
+		"cache_refresh_interval": refreshInterval,
+	}
+	cfg, err := config.NewConfigFrom(c)
+	require.NoError(t, err)
+
+	p, err := ContextProviderBuilder(logger, cfg, true)
+	require.NoError(t, err)
+
+	fp, _ := p.(*contextProviderK8sSecrets)
+	fp.client = client
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := ctesting.NewContextComm(ctx)
+
+	signalTriggered := new(bool)
+	*signalTriggered = false
+
+	comm.CallOnSignal(func() {
+		*signalTriggered = true
+	})
+
+	go fp.updateSecrets(ctx, comm)
+
+	ts := time.Now()
+
+	var tests = []struct {
+		secretsCache map[string]*secretsData
+		updated      bool
+		message      string
+	}{
+		{
+			secretsCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts,
+				},
+			},
+			updated: true,
+			message: "Value of secret should be updated and signal should be triggered.",
+		},
+		{
+			secretsCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      pass,
+					lastAccess: ts,
+				},
+			},
+			updated: false,
+			message: "Value of secret should not be updated and signal should not be triggered.",
+		},
+	}
+
+	for _, test := range tests {
+		fp.secretsCacheMx.Lock()
+		fp.secretsCache = test.secretsCache
+		fp.secretsCacheMx.Unlock()
+
+		// wait for cache to be updated
+		<-time.After(fp.config.RefreshInterval)
+
+		assert.Eventuallyf(t, func() bool {
+			return *signalTriggered == test.updated
+		}, fp.config.RefreshInterval*3, fp.config.RefreshInterval, test.message)
+
+		*signalTriggered = false
 	}
 
 }
