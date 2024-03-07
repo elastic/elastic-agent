@@ -7,27 +7,16 @@ package info
 import (
 	"context"
 	"fmt"
-<<<<<<< HEAD
-=======
+	"github.com/elastic/go-sysinfo"
 
-	"github.com/elastic/elastic-agent/pkg/features"
-
->>>>>>> 4c9d8658cd (Pass context with timeout to FQDN lookup (#4147))
 	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/pkg/features"
-=======
 	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
->>>>>>> 4c9d8658cd (Pass context with timeout to FQDN lookup (#4147))
-
-	"github.com/elastic/go-sysinfo"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo/types"
 )
 
