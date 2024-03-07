@@ -43,6 +43,8 @@ jobs:
               exit 0
             fi
             git diff -p
+            git config --global user.name 'Agent Smith'
+            git config --global user.email 'elastic-agent+automation@elastic.co'
             git add ".agent-versions.json"
             git commit -m "[$GITHUB_REF_NAME](automation) Update .agent-versions.json" -m "This file is used for picking agent versions in integration tests. It's content is based on the reponse from https://artifacts-api.elastic.co/v1/versions/"
             git push --set-upstream origin "update-agent-versions-$GITHUB_RUN_ID"
