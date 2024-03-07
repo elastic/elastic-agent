@@ -94,7 +94,7 @@ func Package() error {
 
 				spec = spec.Evaluate()
 
-				tasks[target.GOOS()+"-"+target.Arch()] = append(tasks[target.Arch()], packageBuilder{target, spec, pkgType}.Build)
+				tasks[target.GOOS()+"-"+target.Arch()] = append(tasks[target.GOOS()+"-"+target.Arch()], packageBuilder{target, spec, pkgType}.Build)
 			}
 		}
 	}
