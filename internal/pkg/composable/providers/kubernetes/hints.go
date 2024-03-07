@@ -30,7 +30,7 @@ const (
 	processors  = "processors"
 )
 
-var allSupportedHints = []string{"enabled", integration, datastreams, host, period, timeout, metricspath, username, password, stream, processors}
+var allSupportedHints = []string{"enabled", "module", integration, datastreams, host, period, timeout, metricspath, username, password, stream, processors}
 
 type hintsBuilder struct {
 	Key string

@@ -212,10 +212,12 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 		if !p.managed {
 			if ann, ok := data.mapping["annotations"]; ok {
 				annotations, _ := ann.(mapstr.M)
-				//We check whether the provided annotation follows the supported format and vocabulary. The check happens for annotations that start with co.elastic.hints
-				hints, err := utils.GenerateHints(annotations, "", p.config.Prefix, allSupportedHints)
-				if err != nil {
-					p.logger.Warnf("%v for pod %s in namespace %s", err, pod.Name, pod.ObjectMeta.Namespace)
+				hints, incorrecthints := utils.GenerateHints(annotations, "", p.config.Prefix, allSupportedHints)
+				//We check whether the provided annotation follows the supported format and vocabulary. The check happens for annotations that have prefix co.elastic
+				if len(incorrecthints) > 0 {
+					for key := range incorrecthints {
+						p.logger.Warnf("provided hint: %s/%s is not in the supported list for pod %s in namespace %s", p.config.Prefix, key, pod.Name, pod.ObjectMeta.Namespace)
+					}
 				}
 
 				if len(hints) > 0 {
