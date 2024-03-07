@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -371,17 +372,21 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				h.config.Fleet.Client.Transport.Proxy.URL.String())
 		})
 
-	t.Run("SSL", func(t *testing.T) {
+	t.Run("policy with SSL config", func(t *testing.T) {
 		// TODO: make sure the ssl config is applied when it needs:
 		//  - if there is SSL config and an empty one comes?
+		//  - any invalid config isn't applied
 
 		fleetRootPair, fleetChildPair, err := certutil.NewRootAndChildCerts()
 		require.NoError(t, err, "failed creating fleet root and child certs")
 
+		wrongRootPair, _, err := certutil.NewRootAndChildCerts()
+		require.NoError(t, err, "failed creating root and child certs")
+
 		// agentRootPair, agentChildPair, err := certutil.NewRootAndChildCerts()
 		// require.NoError(t, err, "failed creating agent root and child certs")
 
-		fleetServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fleetTLSServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path != "api/status" {
 				w.WriteHeader(http.StatusNotFound)
 				_, err := w.Write(nil)
@@ -396,54 +401,156 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 		cert, err := tls.X509KeyPair(fleetChildPair.Cert, fleetChildPair.Key)
 		require.NoError(t, err, "could not create tls.Certificates from child certificate")
 
-		fleetServer.TLS = &tls.Config{
+		fleetTLSServer.TLS = &tls.Config{
 			RootCAs:      rootCertPool,
 			Certificates: []tls.Certificate{cert},
 		}
 
-		fleetServer.StartTLS()
+		fleetTLSServer.StartTLS()
 		defer mockProxy.Close()
-		defer fleetServer.Close()
-
-		t.Run("A policy with fleet.ssl.certificate_authorities is applied", func(t *testing.T) {
-			log, _ := logger.NewTesting("TestPolicyChangeHandler")
-			var setterCalledCount int
-			setter := testSetter{SetClientFn: func(c client.Sender) {
-				setterCalledCount++
-			}}
-
-			originalCfg := &configuration.Configuration{
-				Fleet: &configuration.FleetAgentConfig{
-					Client: remote.Config{
-						Host: fleetServer.URL,
+		defer fleetTLSServer.Close()
+		trueVar := true
+		tcs := []struct {
+			name              string
+			originalCfg       *configuration.Configuration
+			newCfg            map[string]interface{}
+			setterCalledCount int
+			wantCAs           []string
+			assertErr         func(t *testing.T, err error)
+		}{
+			{
+				name: "fleet.ssl.certificate_authorities is applied",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetTLSServer.URL,
+						},
+						AccessAPIKey: "ignore",
 					},
-					AccessAPIKey: "ignore",
+					Settings: configuration.DefaultSettingsConfig(),
 				},
-				Settings: configuration.DefaultSettingsConfig()}
-
-			h := PolicyChangeHandler{
-				agentInfo: &info.AgentInfo{},
-				config:    originalCfg,
-				store:     &storage.NullStore{},
-				setters:   []actions.ClientSetter{&setter},
-				log:       log,
-			}
-
-			cfg := config.MustNewConfigFrom(
-				map[string]interface{}{
+				newCfg: map[string]interface{}{
+					"fleet.ssl.enabled":                 true,
 					"fleet.ssl.certificate_authorities": []string{string(fleetRootPair.Cert)},
-				})
+				},
+				setterCalledCount: 1,
+				wantCAs:           []string{string(fleetRootPair.Cert)},
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"unexpected error when applying fleet.ssl.certificate_authorities")
+				},
+			},
+			{
+				name: "empty fleet.ssl.certificate_authorities is applied",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{CAs: []string{string(fleetRootPair.Cert)}},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.ssl.enabled":                 true,
+					"fleet.ssl.certificate_authorities": []string{},
+				},
+				setterCalledCount: 1,
+				wantCAs:           []string{},
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"unexpected error when applying fleet.ssl.certificate_authorities")
+				},
+			},
+			{
+				name: "an absent fleet.ssl.certificate_authorities is ignored",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{CAs: []string{string(fleetRootPair.Cert)}},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.ssl.enabled": true,
+				},
+				setterCalledCount: 1, // it should not exit early
+				wantCAs:           []string{string(fleetRootPair.Cert)},
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"unexpected error when applying fleet.ssl.certificate_authorities")
+				},
+			},
+			{
+				name: "a wrong fleet.ssl.certificate_authorities is ignored",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{
+									Enabled: &trueVar,
+									CAs:     []string{string(fleetRootPair.Cert)}},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.ssl.enabled":                 true,
+					"fleet.ssl.certificate_authorities": []string{string(wrongRootPair.Cert)},
+				},
+				setterCalledCount: 0,
+				wantCAs:           []string{string(fleetRootPair.Cert)},
+				assertErr: func(t *testing.T, err error) {
+					assert.Error(t, err,
+						"bad fleet.ssl.certificate_authorities provided, it should have returned an error")
+				},
+			},
+		}
 
-			err = h.handleFleetServerConfig(context.Background(), cfg)
-			require.NoError(t, err)
+		for _, tc := range tcs {
+			t.Run(tc.name, func(t *testing.T) {
+				log, logs := logger.NewTesting("")
+				defer func() {
+					if t.Failed() {
+						t.Log(logs.All())
+					}
+				}()
 
-			assert.Equal(t, 1, setterCalledCount)
-			require.NotNil(t, h.config.Fleet.Client.Transport.TLS, "fleet TLS config is nil")
-			assert.Equal(t,
-				[]string{string(fleetRootPair.Cert)},
-				h.config.Fleet.Client.Transport.TLS.CAs)
-		})
+				var setterCalledCount int
+				setter := testSetter{SetClientFn: func(c client.Sender) {
+					setterCalledCount++
+				}}
+				h := PolicyChangeHandler{
+					agentInfo: &info.AgentInfo{},
+					config:    tc.originalCfg,
+					store:     &storage.NullStore{},
+					setters:   []actions.ClientSetter{&setter},
+					log:       log,
+				}
 
+				cfg := config.MustNewConfigFrom(tc.newCfg)
+
+				err := h.handleFleetServerConfig(context.Background(), cfg)
+				tc.assertErr(t, err)
+
+				assert.Equal(t, tc.setterCalledCount, setterCalledCount,
+					"setter was not called")
+				assert.Equal(t,
+					tc.wantCAs, h.config.Fleet.Client.Transport.TLS.CAs,
+					"unexpected CAs")
+			})
+		}
 	})
 
 }

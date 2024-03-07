@@ -148,7 +148,16 @@ func (h *PolicyChangeHandler) handleFleetServerConfig(ctx context.Context, c *co
 	prevPath := h.config.Fleet.Client.Path
 	prevHost := h.config.Fleet.Client.Host
 	prevHosts := h.config.Fleet.Client.Hosts
-	prevTransport := h.config.Fleet.Client.Transport
+	prevProxy := h.config.Fleet.Client.Transport.Proxy
+
+	var prevTLSNil bool
+	var prevCAs []string
+	if h.config.Fleet.Client.Transport.TLS != nil {
+		prevTLSNil = false
+		prevCAs = h.config.Fleet.Client.Transport.TLS.CAs
+	} else {
+		prevTLSNil = true
+	}
 	// rollback on failure
 	defer func() {
 		if err != nil {
@@ -156,7 +165,13 @@ func (h *PolicyChangeHandler) handleFleetServerConfig(ctx context.Context, c *co
 			h.config.Fleet.Client.Path = prevPath
 			h.config.Fleet.Client.Host = prevHost
 			h.config.Fleet.Client.Hosts = prevHosts
-			h.config.Fleet.Client.Transport = prevTransport
+			h.config.Fleet.Client.Transport.Proxy = prevProxy
+			if prevTLSNil {
+				h.config.Fleet.Client.Transport.TLS = nil
+			} else {
+				h.config.Fleet.Client.Transport.TLS.CAs = prevCAs
+			}
+			h.log.Debugf("an error happened, reverting fleet-server config")
 		}
 	}()
 
@@ -246,7 +261,8 @@ func (h *PolicyChangeHandler) applyConfigWithPrecedence(cfg remote.Config) {
 			h.log.Debug("received SSL from fleet, applying it")
 		}
 
-		if len(cfg.Transport.TLS.CAs) == 0 {
+		// apply an empty CA
+		if cfg.Transport.TLS.CAs == nil {
 			h.log.Debug("TLS CAs from fleet are empty or null, the TLS config will not be changed")
 		} else {
 			h.config.Fleet.Client.Transport.TLS.CAs = cfg.Transport.TLS.CAs
