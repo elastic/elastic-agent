@@ -46,7 +46,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		s := storage.NewDiskStore(storePath)
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
-		require.Empty(t, store.Actions())
+		require.Empty(t, store.Action())
 		require.Empty(t, store.Queue())
 	})
 
@@ -60,12 +60,12 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
-		require.Equal(t, 0, len(store.Actions()))
-		store.Add(actionPolicyChange)
+		require.Nil(t, store.Action())
+		store.SetAction(actionPolicyChange)
 		store.SetAckToken(ackToken)
 		err = store.Save()
 		require.NoError(t, err)
-		require.Empty(t, store.Actions())
+		require.Empty(t, store.Action())
 		require.Empty(t, store.Queue())
 		require.Equal(t, ackToken, store.AckToken())
 	})
@@ -85,13 +85,13 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
-		require.Empty(t, store.Actions())
+		require.Empty(t, store.Action())
 		require.Empty(t, store.Queue())
-		store.Add(ActionPolicyChange)
+		store.SetAction(ActionPolicyChange)
 		store.SetAckToken(ackToken)
 		err = store.Save()
 		require.NoError(t, err)
-		require.Len(t, store.Actions(), 1)
+		require.NotNil(t, store.Action(), "store should have an action stored")
 		require.Empty(t, store.Queue())
 		require.Equal(t, ackToken, store.AckToken())
 
@@ -99,17 +99,17 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		store1, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
-		actions := store1.Actions()
-		require.Len(t, actions, 1)
+		action := store1.Action()
+		require.NotNil(t, action, "store should have an action stored")
 		require.Empty(t, store1.Queue())
 
-		require.Equal(t, ActionPolicyChange, actions[0])
+		require.Equal(t, ActionPolicyChange, action)
 		require.Equal(t, ackToken, store.AckToken())
 	})
 
 	t.Run("can save a queue with one upgrade action", func(t *testing.T) {
 		ts := time.Now().UTC().Round(time.Second)
-		queue := []action{&fleetapi.ActionUpgrade{
+		queue := []fleetapi.ScheduledAction{&fleetapi.ActionUpgrade{
 			ActionID:        "test",
 			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: ts.Format(time.RFC3339),
@@ -123,29 +123,29 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
-		require.Empty(t, store.Actions())
+		require.Empty(t, store.Action())
 		store.SetQueue(queue)
 		err = store.Save()
 		require.NoError(t, err)
-		require.Empty(t, store.Actions())
+		require.Empty(t, store.Action())
 		require.Len(t, store.Queue(), 1)
 
 		s = storage.NewDiskStore(storePath)
-		store1, err := NewStateStore(log, s)
+		store, err = NewStateStore(log, s)
 		require.NoError(t, err)
-		require.Empty(t, store1.Actions())
-		require.Len(t, store1.Queue(), 1)
-		require.Equal(t, "test", store1.Queue()[0].ID())
-		scheduledAction, ok := store1.Queue()[0].(fleetapi.ScheduledAction)
-		require.True(t, ok, "expected to be able to cast Action as ScheduledAction")
-		start, err := scheduledAction.StartTime()
-		require.NoError(t, err)
-		require.Equal(t, ts, start)
+
+		assert.Nil(t, store.Action())
+		assert.Len(t, store.Queue(), 1)
+		assert.Equal(t, "test", store.Queue()[0].ID())
+
+		start, err := store.Queue()[0].StartTime()
+		assert.NoError(t, err)
+		assert.Equal(t, ts, start)
 	})
 
 	t.Run("can save a queue with two actions", func(t *testing.T) {
 		ts := time.Now().UTC().Round(time.Second)
-		queue := []action{&fleetapi.ActionUpgrade{
+		queue := []fleetapi.ScheduledAction{&fleetapi.ActionUpgrade{
 			ActionID:        "test",
 			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: ts.Format(time.RFC3339),
@@ -153,50 +153,49 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				Version:   "1.2.3",
 				SourceURI: "https://example.com",
 				Retry:     1,
-			}}, &fleetapi.ActionPolicyChange{
-			ActionID:   "abc123",
-			ActionType: "POLICY_CHANGE",
-			Data: fleetapi.ActionPolicyChangeData{
-				Policy: map[string]interface{}{
-					"hello": "world",
-				}},
-		}}
+			}},
+			// only the latest upgrade action is kept, however it's not the store
+			// which handled that. Besides upgrade actions are the only
+			// ScheduledAction right now, so it'll use 2 of them for this test.
+			&fleetapi.ActionUpgrade{
+				ActionID:        "test2",
+				ActionType:      fleetapi.ActionTypeUpgrade,
+				ActionStartTime: ts.Format(time.RFC3339),
+				Data: fleetapi.ActionUpgradeData{
+					Version:   "1.2.4",
+					SourceURI: "https://example.com",
+					Retry:     1,
+				}}}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
 		s := storage.NewDiskStore(storePath)
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
-		require.Empty(t, store.Actions())
+		require.Empty(t, store.Action())
 		store.SetQueue(queue)
 		err = store.Save()
 		require.NoError(t, err)
-		require.Empty(t, store.Actions())
+		require.Empty(t, store.Action())
 		require.Len(t, store.Queue(), 2)
 
+		// Load state store from disk
 		s = storage.NewDiskStore(storePath)
-		store1, err := NewStateStore(log, s)
-		require.NoError(t, err)
-		require.Empty(t, store1.Actions())
-		require.Len(t, store1.Queue(), 2)
+		store, err = NewStateStore(log, s)
+		require.NoError(t, err, "could not load store from disk")
 
-		require.Equal(t, "test", store1.Queue()[0].ID())
-		scheduledAction, ok := store1.Queue()[0].(fleetapi.ScheduledAction)
-		require.True(t, ok, "expected to be able to cast Action as ScheduledAction")
-		start, err := scheduledAction.StartTime()
-		require.NoError(t, err)
-		require.Equal(t, ts, start)
-		retryableAction, ok := store1.Queue()[0].(fleetapi.RetryableAction)
-		require.True(t, ok, "expected to be able to cast Action as RetryableAction")
-		require.Equal(t, 1, retryableAction.RetryAttempt())
+		got := store.Queue()
+		for i, want := range queue {
+			upgradeAction, ok := got[i].(*fleetapi.ActionUpgrade)
+			assert.True(t, ok,
+				"expected to be able to cast Action as ActionUpgrade")
 
-		require.Equal(t, "abc123", store1.Queue()[1].ID())
-		_, ok = store1.Queue()[1].(fleetapi.ScheduledAction)
-		require.False(t, ok, "expected cast to ScheduledAction to fail")
+			assert.Equal(t, want, upgradeAction, "saved action is different from expected")
+		}
 	})
 
 	t.Run("can save to disk unenroll action type", func(t *testing.T) {
-		action := &fleetapi.ActionUnenroll{
+		want := &fleetapi.ActionUnenroll{
 			ActionID:   "abc123",
 			ActionType: "UNENROLL",
 		}
@@ -206,13 +205,13 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
-		require.Empty(t, store.Actions())
+		require.Empty(t, store.Action())
 		require.Empty(t, store.Queue())
-		store.Add(action)
+		store.SetAction(want)
 		store.SetAckToken(ackToken)
 		err = store.Save()
 		require.NoError(t, err)
-		require.Len(t, store.Actions(), 1)
+		require.NotNil(t, store.Action(), "store should have an action stored")
 		require.Empty(t, store.Queue())
 		require.Equal(t, ackToken, store.AckToken())
 
@@ -220,10 +219,10 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		store1, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
-		actions := store1.Actions()
-		require.Len(t, actions, 1)
+		got := store1.Action()
+		require.NotNil(t, got, "store should have an action stored")
 		require.Empty(t, store1.Queue())
-		require.Equal(t, action, actions[0])
+		require.Equal(t, want, got)
 		require.Equal(t, ackToken, store.AckToken())
 	})
 
@@ -239,10 +238,10 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		store.SetAckToken(ackToken)
 
 		acker := NewStateStoreActionAcker(&testAcker{}, store)
-		require.Empty(t, store.Actions())
+		require.Empty(t, store.Action())
 
 		require.NoError(t, acker.Ack(context.Background(), ActionPolicyChange))
-		require.Len(t, store.Actions(), 1)
+		require.NotNil(t, store.Action(), "store should have an action stored")
 		require.Empty(t, store.Queue())
 		require.Equal(t, ackToken, store.AckToken())
 	})
@@ -260,7 +259,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		newStateStorePath := filepath.Join(tempDir, "state_store.yml")
 
 		newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath)
-		err := migrateStateStore(log, oldActionStorePath, newStateStore)
+		err := migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
 		require.NoError(t, err, "migration action store -> state store failed")
 
 		// to load from disk a new store needs to be created, it loads the file
@@ -268,7 +267,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		stateStore, err := NewStateStore(log, storage.NewDiskStore(newStateStorePath))
 		require.NoError(t, err)
 		stateStore.SetAckToken(ackToken)
-		require.Empty(t, stateStore.Actions())
+		require.Empty(t, stateStore.Action())
 		require.Equal(t, ackToken, stateStore.AckToken())
 		require.Empty(t, stateStore.Queue())
 	})
@@ -329,7 +328,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
 		newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
 			storage.WithVaultPath(vaultPath))
-		err = migrateStateStore(log, oldActionStorePath, newStateStore)
+		err = migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
 		require.NoError(t, err, "migration action store -> state store failed")
 
 		// to load from disk a new store needs to be created, it loads the file
@@ -339,9 +338,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		stateStore, err := NewStateStore(log, newStateStore)
 		require.NoError(t, err, "could not create state store")
 
-		actions := stateStore.Actions()
-		require.Len(t, actions, 1, "state store should load exactly 1 action")
-		got := actions[0]
+		got := stateStore.Action()
+		require.NotNil(t, got, "should have loaded an action")
 
 		assert.Equalf(t, want, got,
 			"loaded action differs from action on the old action store")
@@ -369,7 +367,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.NoError(t, err, "could not create disk store")
 
 			stateStore.SetAckToken(ackToken)
-			stateStore.Add(want)
+			stateStore.SetAction(want)
 			err = stateStore.Save()
 			require.NoError(t, err, "failed saving state store")
 
@@ -378,10 +376,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			stateStore, err = NewStateStore(log, s)
 			require.NoError(t, err, "could not create disk store")
 
-			actions := stateStore.Actions()
-			require.Len(t, actions, 1,
-				"should have loaded exactly 1 action")
-			got, ok := actions[0].(*fleetapi.ActionPolicyChange)
+			action := stateStore.Action()
+			require.NotNil(t, action, "should have loaded an action")
+			got, ok := action.(*fleetapi.ActionPolicyChange)
 			require.True(t, ok, "could not cast action to fleetapi.ActionPolicyChange")
 			assert.Equal(t, want, got)
 
@@ -412,7 +409,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.NoError(t, err, "could not create disk store")
 
 			stateStore.SetAckToken(ackToken)
-			stateStore.Add(want)
+			stateStore.SetAction(want)
 			err = stateStore.Save()
 			require.NoError(t, err, "failed saving state store")
 
@@ -421,10 +418,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			stateStore, err = NewStateStore(log, s)
 			require.NoError(t, err, "could not create disk store")
 
-			actions := stateStore.Actions()
-			require.Len(t, actions, 1,
-				"should have loaded exactly 1 action")
-			got, ok := actions[0].(*fleetapi.ActionUnenroll)
+			action := stateStore.Action()
+			require.NotNil(t, action, "should have loaded an action")
+			got, ok := action.(*fleetapi.ActionUnenroll)
 			require.True(t, ok, "could not cast action to fleetapi.ActionUnenroll")
 			assert.Equal(t, want, got)
 
@@ -463,7 +459,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.NoError(t, err, "could not create disk store")
 
 			stateStore.SetAckToken(ackToken)
-			stateStore.SetQueue([]action{want})
+			stateStore.SetQueue([]fleetapi.ScheduledAction{want})
 			err = stateStore.Save()
 			require.NoError(t, err, "failed saving state store")
 

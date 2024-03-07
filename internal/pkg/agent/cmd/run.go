@@ -200,7 +200,9 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	}
 
 	// the encrypted state does not exist but the unencrypted file does
-	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
+	err = migration.MigrateToEncryptedConfig(ctx, l,
+		paths.AgentStateStoreYmlFile(),
+		paths.AgentStateStoreFile())
 	if err != nil {
 		return errors.New(err, "error migrating agent state")
 	}

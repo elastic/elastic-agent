@@ -50,6 +50,10 @@ type Action interface {
 	AckEvent() AckEvent
 }
 
+// Actions is a slice of Actions to executes and allow to unmarshal
+// heterogeneous action types.
+type Actions []Action
+
 // ScheduledAction is an Action that may be executed at a later date
 // Only ActionUpgrade implements this at the moment
 type ScheduledAction interface {
@@ -85,6 +89,38 @@ type RetryableAction interface {
 type Signed struct {
 	Data      string `json:"data" yaml:"data" mapstructure:"data"`
 	Signature string `json:"signature" yaml:"signature"  mapstructure:"signature"`
+}
+
+// NewAction returns a new, zero-value, action of the type defined by 'actionType'
+// or an ActionUnknown with the 'OriginalType' field set to 'actionType' if the
+// type is not valid.
+func NewAction(actionType string) Action {
+	var action Action
+
+	// keep the case statements alphabetically sorted
+	switch actionType {
+	case ActionTypeCancel:
+		action = &ActionCancel{}
+	case ActionTypeDiagnostics:
+		action = &ActionDiagnostics{}
+	case ActionTypeInputAction:
+		// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
+		action = &ActionApp{}
+	case ActionTypePolicyChange:
+		action = &ActionPolicyChange{}
+	case ActionTypePolicyReassign:
+		action = &ActionPolicyReassign{}
+	case ActionTypeSettings:
+		action = &ActionSettings{}
+	case ActionTypeUnenroll:
+		action = &ActionUnenroll{}
+	case ActionTypeUpgrade:
+		action = &ActionUpgrade{}
+	default:
+		action = &ActionUnknown{OriginalType: actionType}
+	}
+
+	return action
 }
 
 func newAckEvent(id, aType string) AckEvent {
@@ -535,9 +571,6 @@ func (a *ActionApp) MarshalMap() (map[string]interface{}, error) {
 	return res, err
 }
 
-// Actions is a list of Actions to executes and allow to unmarshal heterogenous action type.
-type Actions []Action
-
 // UnmarshalJSON takes every raw representation of an action and try to decode them.
 func (a *Actions) UnmarshalJSON(data []byte) error {
 	var typeUnmarshaler []struct {
@@ -559,30 +592,7 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 
 	actions := make([]Action, 0, len(typeUnmarshaler))
 	for i, response := range typeUnmarshaler {
-		var action Action
-
-		// keep the case statements alphabetically sorted
-		switch response.ActionType {
-		case ActionTypeCancel:
-			action = &ActionCancel{}
-		case ActionTypeDiagnostics:
-			action = &ActionDiagnostics{}
-		case ActionTypeInputAction:
-			// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
-			action = &ActionApp{}
-		case ActionTypePolicyChange:
-			action = &ActionPolicyChange{}
-		case ActionTypePolicyReassign:
-			action = &ActionPolicyReassign{}
-		case ActionTypeSettings:
-			action = &ActionSettings{}
-		case ActionTypeUnenroll:
-			action = &ActionUnenroll{}
-		case ActionTypeUpgrade:
-			action = &ActionUpgrade{}
-		default:
-			action = &ActionUnknown{OriginalType: response.ActionType}
-		}
+		action := NewAction(response.ActionType)
 
 		if err := json.Unmarshal(rawActions[i], action); err != nil {
 			return errors.New(err,
