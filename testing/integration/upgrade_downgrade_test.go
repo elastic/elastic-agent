@@ -42,8 +42,8 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	aac := tools.NewArtifactAPIClient()
-	latestSnapshotVersion, err := aac.GetLatestSnapshotVersion(ctx, t)
+	aac := tools.NewArtifactAPIClient(t)
+	latestSnapshotVersion, err := aac.GetLatestSnapshotVersion(ctx)
 	require.NoError(t, err)
 
 	// start at the build version as we want to test the retry
