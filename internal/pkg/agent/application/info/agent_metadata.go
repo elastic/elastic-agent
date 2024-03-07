@@ -7,8 +7,6 @@ package info
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/go-sysinfo"
-
 	"runtime"
 	"strings"
 
@@ -17,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 )
 
