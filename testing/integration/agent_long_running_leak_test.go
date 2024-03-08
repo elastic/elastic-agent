@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -300,7 +301,11 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 			httpClient: http.Client{
 				Transport: &http.Transport{
 					DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-						return net.Dial("unix", strings.Replace(socketPath, "unix://", "", -1))
+						path := strings.Replace(socketPath, "unix://", "", -1)
+						if runtime.GOOS == "windows" {
+							path = strings.Replace(socketPath, "npipe://", "", -1)
+						}
+						return net.Dial("unix", path)
 					},
 				},
 			},
