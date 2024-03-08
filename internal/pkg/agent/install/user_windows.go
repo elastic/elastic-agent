@@ -9,11 +9,17 @@ package install
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+	"strings"
 	"syscall"
 	"unsafe"
 
 	"github.com/winlabs/gowin32"
 	"golang.org/x/sys/windows"
+)
+
+const (
+	passwordLength = 127 // maximum length allowed by Windows
 )
 
 var (
@@ -100,6 +106,10 @@ func CreateUser(name string, _ string) (string, error) {
 	info.Usri1_name, err = syscall.UTF16PtrFromString(name)
 	if err != nil {
 		return "", fmt.Errorf("failed to encode username %s to UTF16: %w", name, err)
+	}
+	info.Usri1_password, err = syscall.UTF16PtrFromString(RandomPassword())
+	if err != nil {
+		return "", fmt.Errorf("failed to encode password to UTF16: %w", err)
 	}
 	ret, _, _ := procNetUserAdd.Call(
 		uintptr(0),
@@ -196,6 +206,16 @@ func SetUserPassword(name string, password string) error {
 		return fmt.Errorf("call to NetUserSetInfo failed: status=%d error=%d", ret, parmErr)
 	}
 	return nil
+}
+
+// RandomPassword generates a random password.
+func RandomPassword() string {
+	runes := []rune("abcdefghijklmnopqrstuvwxyz1234567890!@#$%^&*ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	var sb strings.Builder
+	for i := 0; i < passwordLength; i++ {
+		sb.WriteRune(runes[rand.Intn(len(runes))])
+	}
+	return sb.String()
 }
 
 // LOCALGROUP_INFO_0 structure contains a local group name.

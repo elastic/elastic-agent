@@ -8,18 +8,12 @@ package install
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
-)
-
-const (
-	passwordLength = 127 // maximum length allowed by Windows
 )
 
 // postInstall performs post installation for Windows systems.
@@ -64,7 +58,7 @@ func withServiceOptions(username string, groupName string) ([]serviceOpt, error)
 
 	// service requires a password to launch as the user
 	// this sets it to a random password that is only known by the service
-	password := randomPassword(passwordLength)
+	password := RandomPassword()
 	err := SetUserPassword(username, password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set user %s password for service: %w", username, err)
@@ -78,13 +72,4 @@ func withServiceOptions(username string, groupName string) ([]serviceOpt, error)
 	}
 	username = fmt.Sprintf(`%s\%s`, hostname, username)
 	return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
-}
-
-func randomPassword(length int) string {
-	runes := []rune("abcdefghijklmnopqrstuvwxyz1234567890!@#$%^&*ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	var sb strings.Builder
-	for i := 0; i < length; i++ {
-		sb.WriteRune(runes[rand.Intn(len(runes))])
-	}
-	return sb.String()
 }
