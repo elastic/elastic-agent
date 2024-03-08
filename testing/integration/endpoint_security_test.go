@@ -697,17 +697,20 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
+	// wait for endpoint to be healthy
 	t.Log("Polling for endpoint-security to become Healthy")
-	ctx, cancel := context.WithTimeout(context.Background(), endpointHealthPollingTimeout)
-	defer cancel()
+	pollingCtx, pollingCancel := context.WithTimeout(ctx, endpointHealthPollingTimeout)
+	defer pollingCancel()
 
 	agentClient := fixture.Client()
-	err = agentClient.Connect(ctx)
-	require.NoError(t, err)
 
-	// wait for endpoint to be healthy
 	require.Eventually(t,
-		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
+		func() bool {
+			err = agentClient.Connect(ctx)
+			require.NoError(t, err)
+			defer agentClient.Disconnect()
+			return agentAndEndpointAreHealthy(t, pollingCtx, agentClient)
+		},
 		endpointHealthPollingTimeout,
 		time.Second,
 		"Endpoint component or units are not healthy.",
