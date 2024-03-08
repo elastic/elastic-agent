@@ -381,7 +381,7 @@ func redactKey(k string) bool {
 }
 
 func zipLogs(zw *zip.Writer, ts time.Time) error {
-	currentDir := fmt.Sprintf("%s-%s", agentName, release.ShortCommit())
+	currentDir := filepath.Base(paths.Home())
 	if !paths.IsVersionHome() {
 		// running in a container with custom top path set
 		// logs are directly under top path
