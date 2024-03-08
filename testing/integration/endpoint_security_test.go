@@ -702,12 +702,14 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	pollingCtx, pollingCancel := context.WithTimeout(ctx, endpointHealthPollingTimeout)
 	defer pollingCancel()
 
-	agentClient := fixture.Client()
-
 	require.Eventually(t,
 		func() bool {
+			agentClient := fixture.Client()
 			err = agentClient.Connect(ctx)
-			require.NoError(t, err)
+			if err != nil {
+				t.Logf("error connecting to agent: %v", err)
+				return false
+			}
 			defer agentClient.Disconnect()
 			return agentAndEndpointAreHealthy(t, pollingCtx, agentClient)
 		},
