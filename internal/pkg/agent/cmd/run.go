@@ -140,13 +140,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 }
 
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, runAsOtel bool, awaiters awaiters, modifiers ...component.PlatformModifier) error {
-	// try early to check if running as root
-	isRoot, err := utils.HasRoot()
-	if err != nil {
-		return fmt.Errorf("failed to check for root permissions: %w", err)
-	}
-
-	cfg, err := loadConfig(ctx, override, runAsOtel, !isRoot)
+	cfg, err := loadConfig(ctx, override, runAsOtel)
 	if err != nil {
 		return err
 	}
@@ -169,7 +163,13 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 
 	l.Infow("Elastic Agent started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion())
 
-	cfg, err = tryDelayEnroll(ctx, l, cfg, override, !isRoot)
+	// try early to check if running as root
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to check for root permissions: %w", err)
+	}
+
+	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
 		err = errors.New(err, "failed to perform delayed enrollment")
 		l.Error(err)
@@ -195,13 +195,13 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// Migrate .yml files if the corresponding .enc does not exist
 
 	// the encrypted config does not exist but the unencrypted file does
-	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentConfigYmlFile(), paths.AgentConfigFile(), storage.WithUnprivileged(!isRoot))
+	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentConfigYmlFile(), paths.AgentConfigFile())
 	if err != nil {
 		return errors.New(err, "error migrating fleet config")
 	}
 
 	// the encrypted state does not exist but the unencrypted file does
-	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile(), storage.WithUnprivileged(!isRoot))
+	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
 	if err != nil {
 		return errors.New(err, "error migrating agent state")
 	}
@@ -373,7 +373,7 @@ LOOP:
 	return err
 }
 
-func loadConfig(ctx context.Context, override cfgOverrider, runAsOtel, unprivileged bool) (*configuration.Configuration, error) {
+func loadConfig(ctx context.Context, override cfgOverrider, runAsOtel bool) (*configuration.Configuration, error) {
 	if runAsOtel {
 		defaultCfg := configuration.DefaultConfiguration()
 		// disable monitoring to avoid injection of monitoring components
@@ -392,7 +392,7 @@ func loadConfig(ctx context.Context, override cfgOverrider, runAsOtel, unprivile
 			errors.M(errors.MetaKeyPath, pathConfigFile))
 	}
 
-	if err := getOverwrites(ctx, rawConfig, unprivileged); err != nil {
+	if err := getOverwrites(ctx, rawConfig); err != nil {
 		return nil, errors.New(err, "could not read overwrites")
 	}
 
@@ -424,7 +424,7 @@ func reexecPath() (string, error) {
 	return potentialReexec, nil
 }
 
-func getOverwrites(ctx context.Context, rawConfig *config.Config, unprivileged bool) error {
+func getOverwrites(ctx context.Context, rawConfig *config.Config) error {
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
 		return err
@@ -435,7 +435,7 @@ func getOverwrites(ctx context.Context, rawConfig *config.Config, unprivileged b
 		return nil
 	}
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(ctx, path, storage.WithUnprivileged(unprivileged))
+	store := storage.NewEncryptedDiskStore(ctx, path)
 
 	reader, err := store.Load()
 	if err != nil && errors.Is(err, os.ErrNotExist) {
@@ -481,7 +481,7 @@ func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) stri
 	return defaultLogLevel
 }
 
-func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider, unprivileged bool) (*configuration.Configuration, error) {
+func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider) (*configuration.Configuration, error) {
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
 		//nolint:nilerr // ignore the error, this is expected
@@ -533,7 +533,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 			errors.M("path", enrollPath)))
 	}
 	logger.Info("Successfully performed delayed enrollment of this Elastic Agent.")
-	return loadConfig(ctx, override, false, unprivileged)
+	return loadConfig(ctx, override, false)
 }
 
 func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig) (*apm.Tracer, error) {

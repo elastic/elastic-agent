@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // defaultAgentConfigFile is a name of file used to store agent information
@@ -54,11 +53,7 @@ func updateLogLevel(ctx context.Context, level string) error {
 	}
 
 	agentConfigFile := paths.AgentConfigFile()
-	hasRoot, err := utils.HasRoot()
-	if err != nil {
-		return fmt.Errorf("checking for root permissions: %w", err)
-	}
-	diskStore := storage.NewEncryptedDiskStore(ctx, agentConfigFile, storage.WithUnprivileged(!hasRoot))
+	diskStore := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
 
 	ai.LogLevel = level
 	return updateAgentInfo(diskStore, ai)
@@ -207,11 +202,7 @@ func loadAgentInfo(ctx context.Context, forceUpdate bool, logLevel string, creat
 	defer idLock.Unlock()
 
 	agentConfigFile := paths.AgentConfigFile()
-	hasRoot, err := utils.HasRoot()
-	if err != nil {
-		return nil, fmt.Errorf("checking for root permissions: %w", err)
-	}
-	diskStore := storage.NewEncryptedDiskStore(ctx, agentConfigFile, storage.WithUnprivileged(!hasRoot))
+	diskStore := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
 
 	agentInfo, err := getInfoFromStore(diskStore, logLevel)
 	if err != nil {

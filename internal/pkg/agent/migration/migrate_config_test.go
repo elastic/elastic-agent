@@ -110,7 +110,7 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 			paths.SetTop(top)
 
 			vaultPath := paths.AgentVaultPath()
-			err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath))
+			err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath), vault.WithUnprivileged(true))
 
 			require.NoError(t, err)
 
@@ -135,7 +135,7 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 			log := logp.NewLogger("test_migrate_config")
 			// setup end
 
-			err = MigrateToEncryptedConfig(ctx, log, absUnencryptedFile, absEncryptedFile, storage.WithUnprivileged(true))
+			err = MigrateToEncryptedConfig(ctx, log, absUnencryptedFile, absEncryptedFile)
 
 			assert.NoError(t, err)
 			if len(tc.expectedEncryptedContent) > 0 {
@@ -205,7 +205,7 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 			paths.SetTop(top)
 
 			vaultPath := paths.AgentVaultPath()
-			err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath))
+			err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath), vault.WithUnprivileged(true))
 
 			require.NoError(t, err)
 
@@ -237,7 +237,7 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 			log := logp.NewLogger("test_migrate_config")
 			// setup end
 
-			err = MigrateToEncryptedConfig(ctx, log, absUnencryptedFile, absEncryptedFile, storage.WithUnprivileged(true))
+			err = MigrateToEncryptedConfig(ctx, log, absUnencryptedFile, absEncryptedFile)
 
 			assert.Error(t, err)
 		})

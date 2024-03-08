@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,9 +20,11 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	aerrors "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
@@ -33,7 +36,7 @@ import (
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, unprivileged bool) error {
+func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
@@ -80,8 +83,16 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
 	}
 
+	ctx := context.Background()
+
+	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
+	unprivileged, err := checkForUnprivilegedVault(ctx)
+	if err != nil {
+		return fmt.Errorf("error checking for unprivileged vault: %w", err)
+	}
+
 	// Uninstall components first
-	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken, log, pt, unprivileged); err != nil {
+	if err := uninstallComponents(ctx, cfgFile, uninstallToken, log, pt, unprivileged); err != nil {
 		// If service status was running it was stopped to uninstall the components.
 		// If the components uninstall failed start the service again
 		if status == service.StatusRunning {
@@ -129,6 +140,23 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	pt.Describe("Removed install directory")
 
 	return nil
+}
+
+func checkForUnprivilegedVault(ctx context.Context) (bool, error) {
+	// check if we have a file vault to detect if we have to use it for reading config
+	vaultOpts := vault.ApplyOptions(vault.WithVaultPath(paths.AgentVaultPath()), vault.WithReadonly(true))
+	fileVault, fileVaultErr := vault.NewFileVault(ctx, vaultOpts)
+	if fileVaultErr == nil {
+		ok, keyErr := fileVault.Exists(ctx, secret.AgentSecretKey)
+		if keyErr == nil && ok {
+			// we have a valid file vault and it contains the key, set unprivileged
+			return true, nil
+		}
+	} else if !errors.Is(fileVaultErr, fs.ErrNotExist) {
+		// we had a different error than NotExist
+		return false, fmt.Errorf("error checking for file vault existence: %w", fileVaultErr)
+	}
+	return false, nil
 }
 
 // RemovePath helps with removal path where there is a probability

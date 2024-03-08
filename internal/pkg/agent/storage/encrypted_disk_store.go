@@ -14,6 +14,7 @@ import (
 	"runtime"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"github.com/hectane/go-acl"
 
@@ -46,11 +47,21 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFun
 	if encryptionDisabled {
 		return NewDiskStore(target)
 	}
+
+	unprivileged := false
+
+	hasRoot, err := utils.HasRoot()
+	if err != nil || !hasRoot {
+		// TODO log error
+		unprivileged = true
+		opts = append(opts, WithUnprivileged(unprivileged))
+	}
+
 	s := &EncryptedDiskStore{
 		ctx:          ctx,
 		target:       target,
 		vaultPath:    paths.AgentVaultPath(),
-		unprivileged: false,
+		unprivileged: unprivileged,
 	}
 	for _, opt := range opts {
 		opt(s)
