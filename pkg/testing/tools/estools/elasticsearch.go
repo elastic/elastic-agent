@@ -477,6 +477,44 @@ func GetLogsForAgentID(ctx context.Context, client elastictransport.Interface, i
 	return handleDocsResponse(res)
 }
 
+// GetResultsForAgentAndDatastream returns any documents match both the given agent ID and data stream
+func GetResultsForAgentAndDatastream(ctx context.Context, client elastictransport.Interface, dataset string, agentID string) (Documents, error) {
+	indexQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match": map[string]interface{}{"data_stream.dataset": dataset},
+					},
+					{
+						"match": map[string]interface{}{"agent.id": agentID},
+					},
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(indexQuery)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	es := esapi.New(client)
+	res, err := es.Search(
+		es.Search.WithExpandWildcards("all"),
+		es.Search.WithBody(&buf),
+		es.Search.WithTrackTotalHits(true),
+		es.Search.WithContext(ctx),
+		es.Search.WithSize(300),
+	)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
+	}
+
+	return handleDocsResponse(res)
+}
+
 // GetLogsForDatasetWithContext returns any logs associated with the datastream
 func GetLogsForDatasetWithContext(ctx context.Context, client elastictransport.Interface, index string) (Documents, error) {
 	indexQuery := map[string]interface{}{
@@ -544,6 +582,38 @@ func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{
 	}
 
 	return handleDocsResponse(res)
+}
+
+// FindMatchingLogLinesForAgentWithContext returns the matching `message` line field for an agent with the matching ID
+func FindMatchingLogLinesForAgentWithContext(ctx context.Context, client elastictransport.Interface, agentID, line string) (Documents, error) {
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match_phrase": map[string]interface{}{
+							"message": line,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"agent.id": map[string]interface{}{
+								"value": agentID,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(queryRaw)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
 }
 
 // GetLogsForDatastream returns any logs associated with the datastream

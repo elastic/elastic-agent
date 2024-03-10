@@ -36,7 +36,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 	bversion "github.com/elastic/elastic-agent/version"
 
 	// mage:import
@@ -1571,6 +1573,41 @@ func (Integration) Single(ctx context.Context, testName string) error {
 	return integRunner(ctx, false, testName)
 }
 
+// UpdateVersions runs an update on the `.agent-versions.json` fetching
+// the latest version list from the artifact API.
+func (Integration) UpdateVersions(ctx context.Context) error {
+	// test 2 current 8.x version, 1 previous 7.x version and 1 recent snapshot
+	reqs := upgradetest.VersionRequirements{
+		UpgradeToVersion: bversion.Agent,
+		CurrentMajors:    2,
+		PreviousMinors:   1,
+		PreviousMajors:   1,
+		RecentSnapshots:  1,
+	}
+
+	aac := tools.NewArtifactAPIClient(tools.WithLogFunc(log.Default().Printf))
+	versions, err := upgradetest.FetchUpgradableVersions(ctx, aac, reqs)
+	if err != nil {
+		return fmt.Errorf("failed to fetch upgradable versions: %w", err)
+	}
+	versionFileData := upgradetest.AgentVersions{
+		TestVersions: versions,
+	}
+	file, err := os.OpenFile(upgradetest.AgentVersionsFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open %s for write: %w", upgradetest.AgentVersionsFilename, err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	err = encoder.Encode(versionFileData)
+	if err != nil {
+		return fmt.Errorf("failed to encode JSON to file %s: %w", upgradetest.AgentVersionsFilename, err)
+	}
+	return nil
+}
+
 var stateDir = ".integration-cache"
 var stateFile = "state.yml"
 
@@ -1950,6 +1987,14 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	return integRunner(ctx, false, "TestBeatsServerless")
 }
 
+func (Integration) TestForResourceLeaks(ctx context.Context) error {
+	err := os.Setenv("TEST_LONG_RUNNING", "true")
+	if err != nil {
+		return fmt.Errorf("error setting TEST_LONG_RUNNING: %w", err)
+	}
+	return integRunner(ctx, false, "TestLongRunningAgentForLeaks")
+}
+
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	mg.Deps(Build.TestBinaries)
@@ -2175,6 +2220,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if os.Getenv("AGENT_KEEP_INSTALLED") != "" {
 		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
 	}
+
+	extraEnv["TEST_LONG_RUNNING"] = os.Getenv("TEST_LONG_RUNNING")
+	extraEnv["LONG_TEST_RUNTIME"] = os.Getenv("LONG_TEST_RUNTIME")
 
 	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
 	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258

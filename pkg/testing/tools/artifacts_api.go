@@ -12,10 +12,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"runtime"
 	"sort"
+	"time"
 
-	"github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -27,8 +26,9 @@ const (
 	artifactAPIV1BuildDetailsEndpoint   = "v1/versions/%s/builds/%s"
 	// artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
 
-	artifactElasticAgentProject = "elastic-agent-package"
-	artifactReleaseCDN          = "https://artifacts.elastic.co/downloads/beats/elastic-agent"
+	artifactElasticAgentProject      = "elastic-agent-package"
+	maxAttemptsForArtifactsAPICall   = 6
+	retryIntervalForArtifactsAPICall = 5 * time.Second
 )
 
 var (
@@ -122,8 +122,10 @@ func WithUrl(url string) ArtifactAPIClientOpt {
 	return func(aac *ArtifactAPIClient) { aac.url = url }
 }
 
-func WithCDNUrl(url string) ArtifactAPIClientOpt {
-	return func(aac *ArtifactAPIClient) { aac.cdnURL = url }
+type logFunc func(format string, args ...interface{})
+
+func WithLogFunc(logf logFunc) ArtifactAPIClientOpt {
+	return func(aac *ArtifactAPIClient) { aac.logFunc = logf }
 }
 
 func WithHttpClient(client httpDoer) ArtifactAPIClientOpt {
@@ -134,17 +136,17 @@ func WithHttpClient(client httpDoer) ArtifactAPIClientOpt {
 // More information about the API can be found at https://artifacts-api.elastic.co/v1
 // which will print a list of available operations
 type ArtifactAPIClient struct {
-	c      httpDoer
-	url    string
-	cdnURL string
+	c       httpDoer
+	url     string
+	logFunc logFunc
 }
 
 // NewArtifactAPIClient creates a new Artifact API client
 func NewArtifactAPIClient(opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
 	c := &ArtifactAPIClient{
-		url:    defaultArtifactAPIURL,
-		cdnURL: artifactReleaseCDN,
-		c:      new(http.Client),
+		url:     defaultArtifactAPIURL,
+		c:       new(http.Client),
+		logFunc: func(string, ...interface{}) {},
 	}
 
 	for _, opt := range opts {
@@ -168,68 +170,6 @@ func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList
 
 	defer resp.Body.Close()
 	return checkResponseAndUnmarshal[VersionList](resp)
-}
-
-// RemoveUnreleasedVersions from the list
-// There is a period of time when a version is already marked as released
-// but not published on the CDN. This happens when we already have build candidates.
-// This function checks if a version marked as released actually has published artifacts.
-// If there are no published artifacts, the version is removed from the list.
-func (aac ArtifactAPIClient) RemoveUnreleasedVersions(ctx context.Context, vList *VersionList) error {
-	suffix, err := testing.GetPackageSuffix(runtime.GOOS, runtime.GOARCH)
-	if err != nil {
-		return fmt.Errorf("failed to generate the artifact suffix: %w", err)
-	}
-
-	results := make([]string, 0, len(vList.Versions))
-
-	for _, versionItem := range vList.Versions {
-		parsedVersion, err := version.ParseVersion(versionItem)
-		if err != nil {
-			return fmt.Errorf("failed to parse version %s: %w", versionItem, err)
-		}
-		// we check only release versions without `-SNAPSHOT`
-		if parsedVersion.Prerelease() != "" {
-			results = append(results, versionItem)
-			continue
-		}
-		url := fmt.Sprintf("%s/elastic-agent-%s-%s", aac.cdnURL, versionItem, suffix)
-		// using method `HEAD` to avoid downloading the file
-		req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
-		if err != nil {
-			return fmt.Errorf("failed to create an HTTP request to %q: %w", url, err)
-		}
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("failed to request %q: %w", url, err)
-		}
-
-		// we don't read the response. However, we must drain when it's present,
-		// so the connection can be re-used later, see:
-		// https://cs.opensource.google/go/go/+/refs/tags/go1.22.0:src/net/http/response.go;l=62-64
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-
-		switch resp.StatusCode {
-		case http.StatusNotFound:
-			continue
-		case http.StatusOK:
-			results = append(results, versionItem)
-			continue
-		default:
-			return fmt.Errorf("unexpected status code from %s - %d", url, resp.StatusCode)
-		}
-	}
-
-	// nothing changed
-	if len(vList.Versions) == len(results) {
-		return nil
-	}
-
-	vList.Versions = results
-
-	return nil
 }
 
 // GetBuildsForVersion returns a list of builds for a specific version.
@@ -310,9 +250,37 @@ func (aac ArtifactAPIClient) createAndPerformRequest(ctx context.Context, URL st
 		return nil, err
 	}
 
-	resp, err := aac.c.Do(req)
+	// Make the request with retries as the artifacts API can sometimes be flaky.
+	var resp *http.Response
+	// TODO (once we're on Go 1.22): replace with for numAttempts := range maxAttemptsForArtifactsAPICall {
+	for numAttempts := 0; numAttempts < maxAttemptsForArtifactsAPICall; numAttempts++ {
+		resp, err = aac.c.Do(req)
+
+		// If there is no error, no need to retry the request.
+		if err == nil {
+			break
+		}
+
+		// If the context was cancelled or timed out, return early
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf(
+				"executing http request %s %s (attempt %d of %d) cancelled or timed out: %w",
+				req.Method, req.URL, numAttempts+1, maxAttemptsForArtifactsAPICall, err,
+			)
+		}
+
+		aac.logFunc(
+			"failed attempt %d of %d executing http request %s %s: %s; retrying after %v...",
+			numAttempts+1, maxAttemptsForArtifactsAPICall, req.Method, req.URL, err.Error(), retryIntervalForArtifactsAPICall,
+		)
+		time.Sleep(retryIntervalForArtifactsAPICall)
+	}
+
 	if err != nil {
-		return nil, fmt.Errorf("executing http request %v: %w", req, err)
+		return nil, fmt.Errorf(
+			"failed executing http request %s %s after %d attempts: %w",
+			req.Method, req.URL, maxAttemptsForArtifactsAPICall, err,
+		)
 	}
 
 	return resp, nil
@@ -337,11 +305,7 @@ func checkResponseAndUnmarshal[T any](resp *http.Response) (*T, error) {
 	return result, nil
 }
 
-type logger interface {
-	Logf(format string, args ...any)
-}
-
-func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context, log logger) (*version.ParsedSemVer, error) {
+func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context) (*version.ParsedSemVer, error) {
 	vList, err := aac.GetVersions(ctx)
 	if err != nil {
 		return nil, err
@@ -355,7 +319,7 @@ func (aac ArtifactAPIClient) GetLatestSnapshotVersion(ctx context.Context, log l
 	for _, v := range vList.Versions {
 		pv, err := version.ParseVersion(v)
 		if err != nil {
-			log.Logf("invalid version retrieved from artifact API: %q", v)
+			aac.logFunc("invalid version retrieved from artifact API: %q", v)
 			return nil, ErrInvalidVersionRetrieved
 		}
 		sortedParsedVersions = append(sortedParsedVersions, pv)

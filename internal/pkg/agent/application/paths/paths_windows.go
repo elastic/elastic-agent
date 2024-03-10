@@ -31,19 +31,11 @@ const (
 
 	// ShellWrapper is the wrapper that is installed.
 	ShellWrapper = "" // no wrapper on Windows
-
-	// defaultAgentVaultPath is the directory for windows where the vault store is located or the
-	defaultAgentVaultPath = "vault"
 )
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
 func ArePathsEqual(expected, actual string) bool {
 	return strings.EqualFold(expected, actual)
-}
-
-// AgentVaultPath is the directory that contains all the files for the value
-func AgentVaultPath() string {
-	return filepath.Join(Config(), defaultAgentVaultPath)
 }
 
 func initialControlSocketPath(topPath string) string {

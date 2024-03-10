@@ -6,18 +6,32 @@
 
 package paths
 
-import "path/filepath"
-
 const (
+	// BinaryName is the name of the installed binary.
+	BinaryName = "elastic-agent"
+
+	// DefaultBasePath is the base path used by the install command
+	// for installing Elastic Agent's files.
+	DefaultBasePath = "/opt"
+
+	// ServiceName is the service name when installed.
+	ServiceName = "elastic-agent"
+
+	// ShellWrapperPath is the path to the installed shell wrapper.
+	ShellWrapperPath = "/usr/bin/elastic-agent"
+
+	// ShellWrapper is the wrapper that is installed.  The %s must
+	// be substituted with the appropriate top path.
+	ShellWrapper = `#!/bin/sh
+exec %s/elastic-agent $@
+`
+
 	// ControlSocketRunSymlink is the path to the symlink that should be
 	// created to the control socket when Elastic Agent is running with root.
 	ControlSocketRunSymlink = "/run/elastic-agent.sock"
-
-	// defaultAgentVaultPath is the directory for linux where the vault store is located or the
-	defaultAgentVaultPath = "vault"
 )
 
-// AgentVaultPath is the directory that contains all the files for the value
-func AgentVaultPath() string {
-	return filepath.Join(Config(), defaultAgentVaultPath)
+// ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
+func ArePathsEqual(expected, actual string) bool {
+	return expected == actual
 }
