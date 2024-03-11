@@ -137,6 +137,8 @@ steps:
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
+    artifact_paths:
+      - "build/distributions/*"
     command: |
       echo "+++ Restoring Artifacts"
       buildkite-agent artifact download "build/**/*" .
@@ -152,8 +154,7 @@ steps:
       DRA_DRY_RUN="--dry-run"
       export DRA_DRY_RUN
       .buildkite/scripts/steps/dra-publish.sh
-      echo "+++ Call buildkite-agent upload to save artifacts for job that triggered us"
-      buildkite-agent artifact upload "build/distributions/*"
+      # Artifacts will be uploaded via the artifact_paths entry above
       echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
       if [[ -z "${TRIGGER_JOB_ID}" ]]; then
         echo "TRIGGER_JOB_ID is not set, so not setting metadata"
