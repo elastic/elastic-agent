@@ -193,6 +193,7 @@ func (h *Diagnostics) runHooks(ctx context.Context, action *fleetapi.ActionDiagn
 	collectCPU := false
 	for _, metric := range action.AdditionalMetrics {
 		if metric == "CPU" {
+			h.log.Debug("Diagnostics will collect CPU profile.")
 			collectCPU = true
 			break
 		}
