@@ -5,7 +5,6 @@
 package runtime
 
 import (
-	"fmt"
 	"net/url"
 	"testing"
 
@@ -228,7 +227,6 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			address := getConnInfoServerAddress(tc.os, tc.isLocal, tc.port)
-			fmt.Println(address)
 			diff := cmp.Diff(address, tc.expected)
 			if diff != "" {
 				t.Error(diff)
