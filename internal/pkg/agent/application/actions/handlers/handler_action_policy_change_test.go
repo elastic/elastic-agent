@@ -434,7 +434,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 			assertErr             func(t *testing.T, err error)
 		}{
 			{
-				name: "fleet.ssl.certificate_authorities is applied",
+				name: "certificate_authorities is applied when present",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
@@ -456,7 +456,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				},
 			},
 			{
-				name: "empty fleet.ssl.certificate_authorities is applied",
+				name: "certificate_authorities is ignored if empty",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
@@ -477,14 +477,14 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"fleet.ssl.certificate_authorities": []string{},
 				},
 				setterCalledCount: 1,
-				wantCAs:           []string{},
+				wantCAs:           []string{string(fleetRootPair.Cert)},
 				assertErr: func(t *testing.T, err error) {
 					assert.NoError(t, err,
 						"unexpected error when applying fleet.ssl.certificate_authorities")
 				},
 			},
 			{
-				name: "an absent fleet.ssl.certificate_authorities is ignored",
+				name: "certificate_authorities is ignored if absent",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
@@ -508,7 +508,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				},
 			},
 			{
-				name: "a wrong fleet.ssl.certificate_authorities isn't applied",
+				name: "certificate_authorities isn't applied if wrong",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
@@ -535,7 +535,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				},
 			},
 			{
-				name: "fleet.ssl.certificate and key is applied",
+				name: "certificate and key is applied when present",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
@@ -567,7 +567,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				},
 			},
 			{
-				name: "empty fleet.ssl.certificate and key is applied",
+				name: "certificate and key is ignored if empty",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
@@ -575,6 +575,10 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									CAs: []string{string(fleetRootPair.Cert)},
+									Certificate: tlscommon.CertificateConfig{
+										Certificate: string(agentChildPair.Cert),
+										Key:         string(agentChildPair.Key),
+									},
 								},
 							},
 						},
@@ -583,7 +587,6 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					Settings: configuration.DefaultSettingsConfig(),
 				},
 				newCfg: map[string]interface{}{
-					"fleet.host":            fleetNomTLSServer.URL,
 					"fleet.ssl.enabled":     true,
 					"fleet.ssl.certificate": "",
 					"fleet.ssl.key":         "",
@@ -591,8 +594,8 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				setterCalledCount: 1,
 				wantCAs:           []string{string(fleetRootPair.Cert)},
 				wantCertificateConfig: tlscommon.CertificateConfig{
-					Certificate: "",
-					Key:         "",
+					Certificate: string(agentChildPair.Cert),
+					Key:         string(agentChildPair.Key),
 				},
 				assertErr: func(t *testing.T, err error) {
 					assert.NoError(t, err,
@@ -600,7 +603,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				},
 			},
 			{
-				name: "an absent fleet.ssl.certificate and key is ignored",
+				name: "certificate and key is ignored if absent",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
@@ -632,7 +635,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				},
 			},
 			{
-				name: "a wrong fleet.ssl.certificate and key isn't applied",
+				name: "certificate and key isn't applied if wrong",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{

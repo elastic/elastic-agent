@@ -224,7 +224,8 @@ func (h *PolicyChangeHandler) handleFleetServerConfig(ctx context.Context, c *co
 	return nil
 }
 
-// applyConfigWithPrecedence applies Proxy and TLS configs, but ignores empty ones.
+// applyConfigWithPrecedence applies Proxy and TLS configs, but ignores empty or
+// absent ones.
 // That way a proxy or TLS config set during install/enroll using cli flags
 // won't be overridden by an absent or empty proxy from fleet-server.
 // However, if there is a proxy or TLS config sent by fleet-server, it'll take
@@ -258,14 +259,14 @@ func (h *PolicyChangeHandler) applyConfigWithPrecedence(cfg remote.Config) {
 		}
 
 		if cfg.Transport.TLS.Certificate == emptyCertificate {
-			h.log.Debug("TLS certificates from fleet are empty or null, the TLS config will not be changed")
+			h.log.Debug("TLS certificate/key from fleet are empty or null, the TLS config will not be changed")
 		} else {
 			h.config.Fleet.Client.Transport.TLS.Certificate = cfg.Transport.TLS.Certificate
-			h.log.Debug("received SSL from fleet, applying it")
+			h.log.Debug("received TSL certificate/key from fleet, applying it")
 		}
 
 		// apply an empty CA
-		if cfg.Transport.TLS.CAs == nil {
+		if len(cfg.Transport.TLS.CAs) == 0 {
 			h.log.Debug("TLS CAs from fleet are empty or null, the TLS config will not be changed")
 		} else {
 			h.config.Fleet.Client.Transport.TLS.CAs = cfg.Transport.TLS.CAs
