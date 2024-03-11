@@ -5,10 +5,13 @@
 package runtime
 
 import (
+	"fmt"
+	"net/url"
 	"testing"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/google/go-cmp/cmp"
@@ -171,6 +174,64 @@ func TestResolveUninstallTokenArg(t *testing.T) {
 				if diff != "" {
 					t.Fatal(diff)
 				}
+			}
+		})
+	}
+}
+
+func TestGetConnInfoServerAddress(t *testing.T) {
+	tests := []struct {
+		name     string
+		os       string
+		isLocal  bool
+		port     int
+		expected string
+	}{
+		{
+			name:     "windows.port",
+			os:       "windows",
+			isLocal:  false,
+			port:     6788,
+			expected: "127.0.0.1:6788",
+		},
+		{
+			name:     "unix.port",
+			os:       "linux",
+			isLocal:  false,
+			port:     6788,
+			expected: "127.0.0.1:6788",
+		},
+		{
+			name:    "windows.local",
+			os:      "windows",
+			isLocal: true,
+			expected: func() string {
+				u := url.URL{}
+				u.Path = "/"
+				u.Scheme = "npipe"
+				return u.JoinPath("/", elasticAgentConnInfoSocket).String()
+			}(),
+		},
+		{
+			name:    "unix.local",
+			os:      "linux",
+			isLocal: true,
+			expected: func() string {
+				u := url.URL{}
+				u.Path = "/"
+				u.Scheme = "unix"
+				return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), elasticAgentConnInfoSocket).String()
+			}(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			address := getConnInfoServerAddress(tc.os, tc.isLocal, tc.port)
+			fmt.Println(address)
+			diff := cmp.Diff(address, tc.expected)
+			if diff != "" {
+				t.Error(diff)
 			}
 		})
 	}

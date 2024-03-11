@@ -813,7 +813,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 	for _, comp := range newComponents {
 		// new component; create its runtime
 		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-		state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
+		state, err := newComponentRuntimeState(m, logger, m.monitor, comp, m.isLocal)
 		if err != nil {
 			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 		}
