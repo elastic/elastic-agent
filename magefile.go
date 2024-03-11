@@ -537,7 +537,7 @@ func RunGo(args ...string) error {
 
 // GoGet fetch a remote dependencies.
 func GoGet(link string) error {
-	_, err := sh.Exec(nil, os.Stdout, os.Stderr, "go", "get", link)
+	_, err := sh.Exec(map[string]string{"GO111MODULE": "off"}, os.Stdout, os.Stderr, "go", "get", link)
 	return err
 }
 
