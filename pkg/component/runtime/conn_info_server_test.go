@@ -158,7 +158,6 @@ func testConnInfoNormal(t *testing.T, address string) {
 		}
 	}()
 
-	//time.Sleep(time.Second)
 	const count = 2 // read connection info a couple of times to make sure the server keeps working for multiple calls
 
 	for i := 0; i < count; i++ {
