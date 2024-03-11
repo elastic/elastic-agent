@@ -158,6 +158,14 @@ steps:
       if [[ -z "${TRIGGER_JOB_ID}" ]]; then
         echo "TRIGGER_JOB_ID is not set, so not setting metadata"
       else
+        # If a pipeline that triggered this build passes in a "TRIGGER_JOB_ID" env var, that
+        # is an indicator that it will want us to set some metadata in that calling build
+        # so that it can reference this specific build ID in order to easily download
+        # artifacts saved off in this build.
+        #
+        # This is a much easier way to pull back artifacts from a triggered build than using
+        # a Buildkite token that we then have to manage via vault, etc.
+        # See: https://forum.buildkite.community/t/how-to-download-artifacts-back-from-triggered-pipeline/3480/2
         echo "Setting metadata for job that trigger this one"
         buildkite-agent meta-data set "triggered_build_id" "$BUILDKITE_BUILD_ID" --job $TRIGGER_JOB_ID
         buildkite-agent meta-data set "triggered_commit_hash" "$BUILDKITE_COMMIT" --job $TRIGGER_JOB_ID
