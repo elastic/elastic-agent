@@ -10,6 +10,7 @@ import (
 	"net"
 
 	"github.com/Microsoft/go-winio"
+
 	"github.com/elastic/elastic-agent-libs/api/npipe"
 )
 
