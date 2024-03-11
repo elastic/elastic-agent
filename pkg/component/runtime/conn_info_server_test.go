@@ -126,12 +126,7 @@ func TestConnInfoNormal(t *testing.T) {
 func dialAddress(address string) (net.Conn, error) {
 	// Connect to the server
 	if ipc.IsLocal(address) {
-		var u *url.URL
-		u, err := url.Parse(address)
-		if err != nil {
-			return nil, err
-		}
-		return dialLocal(u.Path)
+		return dialLocal(address)
 	}
 
 	return net.Dial("tcp", address)
@@ -273,13 +268,19 @@ func testConnInfoClosed(t *testing.T, address string) {
 	// causes issue for *nix builds: "imports golang.org/x/sys/windows: build constraints exclude all Go files".
 	// In order to avoid creating extra plaform specific files compare just errno for this test.
 	wantErrNo := int(syscall.ECONNREFUSED)
-	// For local IPC on *nix the syscall.ENOENT is expected
 	if ipc.IsLocal(address) {
-		wantErrNo = int(syscall.ENOENT)
+		if runtime.GOOS == windows {
+			wantErrNo = 2 // windows.ERROR_FILE_NOT_FOUND
+		} else {
+			// For local IPC on *nix the syscall.ENOENT is expected
+			wantErrNo = int(syscall.ENOENT)
+		}
+	} else {
+		if runtime.GOOS == windows {
+			wantErrNo = 10061 // windows.WSAECONNREFUSED
+		}
 	}
-	if runtime.GOOS == windows {
-		wantErrNo = 10061 // windows.WSAECONNREFUSED
-	}
+
 	var (
 		syserr syscall.Errno
 		errno  int
@@ -315,8 +316,11 @@ func testConnInfoDoubleStop(t *testing.T, address string) {
 	}
 
 	err = srv.stop()
-	if err == nil {
-		t.Fatal("want err, got nil ")
+	// Double close on named pipe doesn't cause the error
+	if !(ipc.IsLocal(address) && runtime.GOOS == "windows") {
+		if err == nil {
+			t.Fatal("want err, got nil ")
+		}
 	}
 }
 

@@ -8,8 +8,14 @@ package runtime
 
 import (
 	"net"
+	"net/url"
 )
 
 func dialLocal(address string) (net.Conn, error) {
-	return net.Dial("unix", address)
+	var u *url.URL
+	u, err := url.Parse(address)
+	if err != nil {
+		return nil, err
+	}
+	return net.Dial("unix", u.Path)
 }

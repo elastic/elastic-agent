@@ -10,8 +10,9 @@ import (
 	"net"
 
 	"github.com/Microsoft/go-winio"
+	"github.com/elastic/elastic-agent-libs/api/npipe"
 )
 
 func dialLocal(address string) (net.Conn, error) {
-	return winio.DialPipe(address, nil)
+	return winio.DialPipe(npipe.TransformString(address), nil)
 }
