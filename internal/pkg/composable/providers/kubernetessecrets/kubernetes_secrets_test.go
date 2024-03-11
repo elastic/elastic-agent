@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -566,9 +567,12 @@ func Test_Signal(t *testing.T) {
 
 	signalTriggered := new(bool)
 	*signalTriggered = false
+	var lock sync.RWMutex
 
 	comm.CallOnSignal(func() {
+		lock.Lock()
 		*signalTriggered = true
+		lock.Unlock()
 	})
 
 	go fp.updateSecrets(ctx, comm)
@@ -611,10 +615,14 @@ func Test_Signal(t *testing.T) {
 		<-time.After(fp.config.RefreshInterval)
 
 		assert.Eventuallyf(t, func() bool {
+			lock.RLock()
+			defer lock.RUnlock()
 			return *signalTriggered == test.updated
 		}, fp.config.RefreshInterval*3, fp.config.RefreshInterval, test.message)
 
+		lock.Lock()
 		*signalTriggered = false
+		lock.Unlock()
 	}
 
 }
