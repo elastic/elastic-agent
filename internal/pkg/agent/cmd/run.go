@@ -89,7 +89,11 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	// feature of the Elastic Agent. On Mac OS root privileges are required to perform the disk
 	// store encryption, by setting this flag it disables that feature and allows the Elastic Agent to
 	// run as non-root.
+	//
+	// Deprecated: MacOS can be run/installed without root privileges
 	cmd.Flags().Bool("disable-encrypted-store", false, "Disable the encrypted disk storage (Only useful on Mac OS)")
+	_ = cmd.Flags().MarkHidden("disable-encrypted-store")
+	_ = cmd.Flags().MarkDeprecated("disable-encrypted-store", "agent on Mac OS can be run/installed without root privileges, see elastic-agent install --help")
 
 	// --testing-mode is a hidden flag that spawns the Elastic Agent in testing mode
 	// it is hidden because we really don't want users to execute Elastic Agent to run
