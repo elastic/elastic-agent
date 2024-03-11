@@ -7,6 +7,7 @@ package mage
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,8 +17,6 @@ import (
 	"time"
 
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
-	pkg_errors "github.com/pkg/errors"
 )
 
 type dockerBuilder struct {
@@ -47,7 +46,7 @@ func newDockerBuilder(spec PackageSpec) (*dockerBuilder, error) {
 
 func (b *dockerBuilder) Build() error {
 	if err := os.RemoveAll(b.buildDir); err != nil {
-		return pkg_errors.Wrapf(err, "failed to clean existing build directory %s", b.buildDir)
+		return fmt.Errorf("failed to clean existing build directory %s: %w", b.buildDir, err)
 	}
 
 	if err := b.copyFiles(); err != nil {
@@ -55,7 +54,7 @@ func (b *dockerBuilder) Build() error {
 	}
 
 	if err := b.prepareBuild(); err != nil {
-		return pkg_errors.Wrap(err, "failed to prepare build")
+		return fmt.Errorf("failed to prepare build: %w", err)
 	}
 
 	tag, err := b.dockerBuild()
@@ -68,11 +67,11 @@ func (b *dockerBuilder) Build() error {
 		tries--
 	}
 	if err != nil {
-		return pkg_errors.Wrap(err, "failed to build docker")
+		return fmt.Errorf("failed to build docker: %w", err)
 	}
 
 	if err := b.dockerSave(tag); err != nil {
-		return pkg_errors.Wrap(err, "failed to save docker as artifact")
+		return fmt.Errorf("failed to save docker as artifact: %w", err)
 	}
 
 	return nil
@@ -99,10 +98,10 @@ func (b *dockerBuilder) copyFiles() error {
 	for _, f := range b.Files {
 		target := filepath.Join(b.beatDir, f.Target)
 		if err := Copy(f.Source, target); err != nil {
-			if f.SkipOnMissing && pkg_errors.Is(err, os.ErrNotExist) {
+			if f.SkipOnMissing && errors.Is(err, os.ErrNotExist) {
 				continue
 			}
-			return pkg_errors.Wrapf(err, "failed to copy from %s to %s", f.Source, target)
+			return fmt.Errorf("failed to copy from %s to %s: %w", f.Source, target, err)
 		}
 	}
 	return nil
@@ -129,7 +128,7 @@ func (b *dockerBuilder) prepareBuild() error {
 
 			err = b.ExpandFile(path, target, data)
 			if err != nil {
-				return pkg_errors.Wrapf(err, "expanding template '%s' to '%s'", path, target)
+				return fmt.Errorf("expanding template '%s' to '%s': %w", path, target, err)
 			}
 		}
 		return nil
@@ -170,7 +169,7 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 		path := filepath.Join(templatesDir, file.source)
 		err := b.ExpandFile(path, target, data)
 		if err != nil {
-			return pkg_errors.Wrapf(err, "expanding template '%s' to '%s'", path, target)
+			return fmt.Errorf("expanding template '%s' to '%s': %w", path, target, err)
 		}
 	}
 
@@ -243,9 +242,9 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 
 	if err = cmd.Wait(); err != nil {
 		if errmsg := strings.TrimSpace(stderr.String()); errmsg != "" {
-			err = pkg_errors.Wrap(errors.New(errmsg), err.Error())
+			err = fmt.Errorf("%s: %w", errors.New(errmsg), err)
 		}
 		return err
 	}
-	return pkg_errors.Wrap(CreateSHA512File(outputFile), "failed to create .sha512 file")
+	return fmt.Errorf("failed to create .sha512 file: %w", CreateSHA512File(outputFile))
 }
