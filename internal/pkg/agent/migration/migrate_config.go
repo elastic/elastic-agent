@@ -43,7 +43,10 @@ func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedCo
 	}
 
 	l.Info("Initiating migration of %q to %q", unencryptedConfigPath, encryptedConfigPath)
-	legacyStore := storage.NewDiskStore(unencryptedConfigPath)
+	legacyStore, err := storage.NewDiskStore(unencryptedConfigPath)
+	if err != nil {
+		return fmt.Errorf("error opening creating store: %w", err)
+	}
 	reader, err := legacyStore.Load()
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("loading of unencrypted config from file %q failed", unencryptedConfigPath))
@@ -54,7 +57,10 @@ func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedCo
 			l.Errorf("Error closing unencrypted store reader for %q: %v", unencryptedConfigPath, err)
 		}
 	}()
-	store := storage.NewEncryptedDiskStore(ctx, encryptedConfigPath, storageOpts...)
+	store, err := storage.NewEncryptedDiskStore(ctx, encryptedConfigPath, storageOpts...)
+	if err != nil {
+		return fmt.Errorf("error creating encrypted disk store: %w", err)
+	}
 	err = store.Save(reader)
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("error writing encrypted config from file %q to file %q", unencryptedConfigPath, encryptedConfigPath))

@@ -439,7 +439,10 @@ func getOverwrites(ctx context.Context, rawConfig *config.Config) error {
 		return nil
 	}
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(ctx, path)
+	store, err := storage.NewEncryptedDiskStore(ctx, path)
+	if err != nil {
+		return fmt.Errorf("error creating encrypted disk store: %w", err)
+	}
 
 	reader, err := store.Load()
 	if err != nil && errors.Is(err, os.ErrNotExist) {

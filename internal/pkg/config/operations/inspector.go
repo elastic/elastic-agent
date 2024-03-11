@@ -83,7 +83,10 @@ func loadConfig(ctx context.Context, configPath string, unprivileged bool) (*con
 
 	path := paths.AgentConfigFile()
 
-	store := storage.NewEncryptedDiskStore(ctx, path, storage.WithUnprivileged(unprivileged))
+	store, err := storage.NewEncryptedDiskStore(ctx, path, storage.WithUnprivileged(unprivileged))
+	if err != nil {
+		return nil, fmt.Errorf("error creating encrypted disk store: %w", err)
+	}
 	reader, err := store.Load()
 	if err != nil {
 		return nil, errors.New(err, "could not initialize config store",

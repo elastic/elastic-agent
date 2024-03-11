@@ -175,10 +175,14 @@ func newEnrollCmd(
 	configPath string,
 ) (*enrollCmd, error) {
 
+	encryptedDiskStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	if err != nil {
+		return nil, fmt.Errorf("error creating encrypted disk store: %w", err)
+	}
 	store := storage.NewReplaceOnSuccessStore(
 		configPath,
 		application.DefaultAgentFleetConfig,
-		storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile()),
+		encryptedDiskStore,
 	)
 
 	return newEnrollCmdWithStore(

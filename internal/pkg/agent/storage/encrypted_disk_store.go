@@ -43,7 +43,7 @@ type OptionFunc func(s *EncryptedDiskStore)
 
 // NewEncryptedDiskStore creates an encrypted disk store.
 // Drop-in replacement for NewDiskStorage
-func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFunc) Storage {
+func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFunc) (Storage, error) {
 	if encryptionDisabled {
 		return NewDiskStore(target)
 	}
@@ -51,7 +51,10 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFun
 	unprivileged := false
 
 	hasRoot, err := utils.HasRoot()
-	if err != nil || !hasRoot {
+	if err != nil {
+		return nil, fmt.Errorf("error checking for ")
+	}
+	if !hasRoot {
 		// TODO log error
 		unprivileged = true
 		opts = append(opts, WithUnprivileged(unprivileged))
@@ -66,7 +69,7 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFun
 	for _, opt := range opts {
 		opt(s)
 	}
-	return s
+	return s, nil
 }
 
 // WithVaultPath sets the path of the vault.

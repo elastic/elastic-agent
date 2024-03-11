@@ -247,20 +247,22 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 
 func createAndPersistStore(t *testing.T, ctx context.Context, baseDir string, cf configfile, encrypted bool) storage.Storage {
 	var store storage.Storage
-
+	var err error
 	asbFilePath := path.Join(baseDir, cf.name)
 
 	if encrypted {
-		store = storage.NewEncryptedDiskStore(ctx, asbFilePath, storage.WithUnprivileged(true))
+		store, err = storage.NewEncryptedDiskStore(ctx, asbFilePath, storage.WithUnprivileged(true))
+		require.NoError(t, err)
 	} else {
-		store = storage.NewDiskStore(asbFilePath)
+		store, err = storage.NewDiskStore(asbFilePath)
+		require.NoError(t, err)
 	}
 
 	if !cf.create {
 		return store
 	}
 
-	err := store.Save(bytes.NewReader(cf.content))
+	err = store.Save(bytes.NewReader(cf.content))
 	require.NoError(t, err)
 
 	err = os.Chmod(asbFilePath, cf.permissions&fs.ModePerm)

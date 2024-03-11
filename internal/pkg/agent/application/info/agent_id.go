@@ -53,7 +53,10 @@ func updateLogLevel(ctx context.Context, level string) error {
 	}
 
 	agentConfigFile := paths.AgentConfigFile()
-	diskStore := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
+	diskStore, err := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
+	if err != nil {
+		return fmt.Errorf("error creating encrypted disk store: %w", err)
+	}
 
 	ai.LogLevel = level
 	return updateAgentInfo(diskStore, ai)
@@ -202,7 +205,10 @@ func loadAgentInfo(ctx context.Context, forceUpdate bool, logLevel string, creat
 	defer idLock.Unlock()
 
 	agentConfigFile := paths.AgentConfigFile()
-	diskStore := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
+	diskStore, err := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
+	if err != nil {
+		return nil, fmt.Errorf("error creating encrypted disk store: %w", err)
+	}
 
 	agentInfo, err := getInfoFromStore(diskStore, logLevel)
 	if err != nil {
