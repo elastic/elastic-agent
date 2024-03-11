@@ -674,7 +674,10 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				log, logs := logger.NewTesting("")
 				defer func() {
 					if t.Failed() {
-						t.Log(logs.All())
+						t.Log("test failed, see handler logs below:")
+						for _, l := range logs.TakeAll() {
+							t.Log(l)
+						}
 					}
 				}()
 
@@ -705,9 +708,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"unexpected certificate/key pair")
 			})
 		}
-
 	})
-
 }
 
 type testAcker struct {
