@@ -152,9 +152,11 @@ func (h *PolicyChangeHandler) handleFleetServerConfig(ctx context.Context, c *co
 
 	var prevTLSNil bool
 	var prevCAs []string
+	var prevCertificateCfg tlscommon.CertificateConfig
 	if h.config.Fleet.Client.Transport.TLS != nil {
 		prevTLSNil = false
 		prevCAs = h.config.Fleet.Client.Transport.TLS.CAs
+		prevCertificateCfg = h.config.Fleet.Client.Transport.TLS.Certificate
 	} else {
 		prevTLSNil = true
 	}
@@ -170,6 +172,7 @@ func (h *PolicyChangeHandler) handleFleetServerConfig(ctx context.Context, c *co
 				h.config.Fleet.Client.Transport.TLS = nil
 			} else {
 				h.config.Fleet.Client.Transport.TLS.CAs = prevCAs
+				h.config.Fleet.Client.Transport.TLS.Certificate = prevCertificateCfg
 			}
 			h.log.Debugf("an error happened, reverting fleet-server config")
 		}
