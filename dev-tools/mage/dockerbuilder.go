@@ -242,7 +242,7 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 
 	if err = cmd.Wait(); err != nil {
 		if errmsg := strings.TrimSpace(stderr.String()); errmsg != "" {
-			err = fmt.Errorf("%s: %w", errors.New(errmsg), err)
+			err = fmt.Errorf("%w: %s", errors.New(errmsg), err.Error())
 		}
 		return err
 	}
