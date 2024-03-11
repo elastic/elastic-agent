@@ -55,7 +55,6 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFun
 		return nil, fmt.Errorf("error checking for ")
 	}
 	if !hasRoot {
-		// TODO log error
 		unprivileged = true
 		opts = append(opts, WithUnprivileged(unprivileged))
 	}
