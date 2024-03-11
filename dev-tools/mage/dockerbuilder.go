@@ -17,6 +17,7 @@ import (
 
 	"github.com/magefile/mage/sh"
 	"github.com/pkg/errors"
+	travis_errors "github.com/pkg/errors"
 )
 
 type dockerBuilder struct {
@@ -46,7 +47,7 @@ func newDockerBuilder(spec PackageSpec) (*dockerBuilder, error) {
 
 func (b *dockerBuilder) Build() error {
 	if err := os.RemoveAll(b.buildDir); err != nil {
-		return errors.Wrapf(err, "failed to clean existing build directory %s", b.buildDir)
+		return travis_errors.Wrapf(err, "failed to clean existing build directory %s", b.buildDir)
 	}
 
 	if err := b.copyFiles(); err != nil {
@@ -54,7 +55,7 @@ func (b *dockerBuilder) Build() error {
 	}
 
 	if err := b.prepareBuild(); err != nil {
-		return errors.Wrap(err, "failed to prepare build")
+		return travis_errors.Wrap(err, "failed to prepare build")
 	}
 
 	tag, err := b.dockerBuild()
@@ -67,11 +68,11 @@ func (b *dockerBuilder) Build() error {
 		tries--
 	}
 	if err != nil {
-		return errors.Wrap(err, "failed to build docker")
+		return travis_errors.Wrap(err, "failed to build docker")
 	}
 
 	if err := b.dockerSave(tag); err != nil {
-		return errors.Wrap(err, "failed to save docker as artifact")
+		return travis_errors.Wrap(err, "failed to save docker as artifact")
 	}
 
 	return nil
@@ -88,7 +89,7 @@ func (b *dockerBuilder) modulesDirs() []string {
 }
 
 func (b *dockerBuilder) exposePorts() []string {
-	if ports, _ := b.ExtraVars["expose_ports"]; ports != "" {
+	if ports := b.ExtraVars["expose_ports"]; ports != "" {
 		return strings.Split(ports, ",")
 	}
 	return nil
@@ -98,10 +99,10 @@ func (b *dockerBuilder) copyFiles() error {
 	for _, f := range b.Files {
 		target := filepath.Join(b.beatDir, f.Target)
 		if err := Copy(f.Source, target); err != nil {
-			if f.SkipOnMissing && errors.Is(err, os.ErrNotExist) {
+			if f.SkipOnMissing && travis_errors.Is(err, os.ErrNotExist) {
 				continue
 			}
-			return errors.Wrapf(err, "failed to copy from %s to %s", f.Source, target)
+			return travis_errors.Wrapf(err, "failed to copy from %s to %s", f.Source, target)
 		}
 	}
 	return nil
@@ -128,7 +129,7 @@ func (b *dockerBuilder) prepareBuild() error {
 
 			err = b.ExpandFile(path, target, data)
 			if err != nil {
-				return errors.Wrapf(err, "expanding template '%s' to '%s'", path, target)
+				return travis_errors.Wrapf(err, "expanding template '%s' to '%s'", path, target)
 			}
 		}
 		return nil
@@ -169,7 +170,7 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 		path := filepath.Join(templatesDir, file.source)
 		err := b.ExpandFile(path, target, data)
 		if err != nil {
-			return errors.Wrapf(err, "expanding template '%s' to '%s'", path, target)
+			return travis_errors.Wrapf(err, "expanding template '%s' to '%s'", path, target)
 		}
 	}
 
@@ -185,7 +186,7 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 	if b.Snapshot {
 		tag = tag + "-SNAPSHOT"
 	}
-	if repository, _ := b.ExtraVars["repository"]; repository != "" {
+	if repository := b.ExtraVars["repository"]; repository != "" {
 		tag = fmt.Sprintf("%s/%s", repository, tag)
 	}
 	return tag, sh.Run("docker", "build", "-t", tag, b.buildDir)
@@ -242,9 +243,9 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 
 	if err = cmd.Wait(); err != nil {
 		if errmsg := strings.TrimSpace(stderr.String()); errmsg != "" {
-			err = errors.Wrap(errors.New(errmsg), err.Error())
+			err = travis_errors.Wrap(errors.New(errmsg), err.Error())
 		}
 		return err
 	}
-	return errors.Wrap(CreateSHA512File(outputFile), "failed to create .sha512 file")
+	return travis_errors.Wrap(CreateSHA512File(outputFile), "failed to create .sha512 file")
 }
