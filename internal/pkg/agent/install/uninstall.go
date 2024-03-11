@@ -142,9 +142,10 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	return nil
 }
 
-func checkForUnprivilegedVault(ctx context.Context) (bool, error) {
+func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (bool, error) {
 	// check if we have a file vault to detect if we have to use it for reading config
-	vaultOpts := vault.ApplyOptions(vault.WithVaultPath(paths.AgentVaultPath()), vault.WithReadonly(true))
+	opts = append(opts, vault.WithReadonly(true))
+	vaultOpts := vault.ApplyOptions(opts...)
 	fileVault, fileVaultErr := vault.NewFileVault(ctx, vaultOpts)
 	if fileVaultErr == nil {
 		ok, keyErr := fileVault.Exists(ctx, secret.AgentSecretKey)
