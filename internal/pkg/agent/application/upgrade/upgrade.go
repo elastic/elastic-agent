@@ -329,8 +329,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 }
 
 func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
+	return waitForWatcherWithTimeoutCreationFunc(ctx, log, markerFilePath, waitTime, context.WithTimeout)
+}
+
+type createContextWithTimeout func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc)
+
+func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error {
 	// Wait for the watcher to be up and running
-	watcherContext, cancel := context.WithTimeout(ctx, waitTime)
+	watcherContext, cancel := createTimeoutContext(ctx, waitTime)
 	defer cancel()
 
 	markerWatcher := newMarkerFileWatcher(markerFilePath, log)
