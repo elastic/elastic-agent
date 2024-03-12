@@ -32,7 +32,7 @@ type MetricsRunner struct {
 
 func TestMetricsMonitoringCorrectBinaries(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: "fleet",
+		Group: Fleet,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -97,12 +97,13 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	require.Eventually(runner.T(), func() bool {
 		for _, cid := range componentIds {
 			query := genESQuery(agentStatus.Info.ID, cid)
-			res, err := estools.PerformQueryForRawQuery(ctx, query, ".ds-metrics*", runner.info.ESClient)
+			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
 			require.NoError(runner.T(), err)
 			runner.T().Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
 			if res.Hits.Total.Value < 5 {
 				return false
 			}
+
 		}
 		return true
 	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known beats in default install: %v", componentIds)
@@ -121,6 +122,11 @@ func genESQuery(agentID string, componentID string) map[string]interface{} {
 					{
 						"match": map[string]interface{}{
 							"component.id": componentID,
+						},
+					},
+					{
+						"exists": map[string]interface{}{
+							"field": "system.process.cpu.total.value", // make sure we fetch documents that have the metric field used by fleet monitoring
 						},
 					},
 				},
