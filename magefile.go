@@ -13,8 +13,10 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,10 +24,12 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/otiai10/copy"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
@@ -53,7 +57,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/otiai10/copy"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
@@ -77,6 +80,9 @@ const (
 	commitLen         = 7
 
 	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s"
+
+	baseURLForStagingDRA = "https://staging.elastic.co/"
+	agentCoreProjectName = "elastic-agent-core"
 )
 
 var (
@@ -420,7 +426,7 @@ func Package() {
 		panic("elastic-agent package is expected to build at least one platform package")
 	}
 
-	packageAgent(platforms, devtools.UseElasticAgentPackaging)
+	packageAgent(platforms, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder
@@ -827,7 +833,7 @@ func runAgent(env map[string]string) error {
 		// produce docker package
 		packageAgent([]string{
 			"linux/amd64",
-		}, devtools.UseElasticAgentDemoPackaging)
+		}, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -874,10 +880,68 @@ func runAgent(env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(platforms []string, packagingFn func()) {
+var platformPackages = map[string]string{
+	"darwin/amd64":  "darwin-x86_64.tar.gz",
+	"darwin/arm64":  "darwin-aarch64.tar.gz",
+	"linux/amd64":   "linux-x86_64.tar.gz",
+	"linux/arm64":   "linux-arm64.tar.gz",
+	"windows/amd64": "windows-x86_64.zip",
+}
+
+func packageAgent(platforms []string, agentPackaging, agentBinaryTarget mg.Fn) {
 	fmt.Println("--- Package Elastic-Agent")
-	var packageVersion string
-	// if we have defined a manifest URL to package Agent from, we sould be using the same packageVersion of that manifest
+
+	var dependenciesVersion string
+	if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
+		dependenciesVersion = bversion.GetDefaultVersion()
+	} else {
+		dependenciesVersion = beatVersion
+	}
+
+	requiredPackages := []string{}
+	for _, p := range platforms {
+		requiredPackages = append(requiredPackages, platformPackages[p])
+	}
+	if mg.Verbose() {
+		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, requiredPackages)
+	}
+
+	// download/copy all the necessary dependencies for packaging elastic-agent
+	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, requiredPackages)
+
+	// cleanup after build
+	defer os.RemoveAll(archivePath)
+	defer os.RemoveAll(dropPath)
+	defer os.Unsetenv(agentDropPath)
+
+	// create flat dir
+	flatPath := filepath.Join(dropPath, ".elastic-agent_flat")
+	if mg.Verbose() {
+		log.Printf("--- creating flat dir in .elastic-agent_flat")
+	}
+	os.MkdirAll(flatPath, 0755)
+	defer os.RemoveAll(flatPath)
+
+	// extract all dependencies from their archives into flat dir
+	flattenDependencies(requiredPackages, dependenciesVersion, archivePath, dropPath, flatPath)
+
+	// package agent
+	log.Println("--- Running packaging function")
+	mg.Deps(agentPackaging)
+
+	log.Println("--- Running post packaging ")
+	mg.Deps(Update)
+	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
+	mg.SerialDeps(devtools.Package, TestPackages)
+}
+
+// collectPackageDependencies performs the download (if it's an external dep), unpacking and move all the elastic-agent
+// dependencies in the archivePath and dropPath
+// NOTE: after the build is done the caller must:
+// - delete archivePath and dropPath contents
+// - unset AGENT_DROP_PATH environment variable
+func collectPackageDependencies(platforms []string, packageVersion string, requiredPackages []string) (archivePath string, dropPath string) {
+	// if we have defined a manifest URL to package Agent from, we should be using the same packageVersion of that manifest
 	if devtools.PackagingFromManifest {
 		if manifestResponse, err := manifest.DownloadManifest(devtools.ManifestURL); err != nil {
 			log.Panicf("failed to download remote manifest file %s", err)
@@ -895,35 +959,17 @@ func packageAgent(platforms []string, packagingFn func()) {
 			}
 		}
 	}
-	if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
-		packageVersion = bversion.GetDefaultVersion()
-	} else {
-		packageVersion = beatVersion
-	}
 
 	dropPath, found := os.LookupEnv(agentDropPath)
-	var archivePath string
 
-	platformPackages := map[string]string{
-		"darwin/amd64":  "darwin-x86_64.tar.gz",
-		"darwin/arm64":  "darwin-aarch64.tar.gz",
-		"linux/amd64":   "linux-x86_64.tar.gz",
-		"linux/arm64":   "linux-arm64.tar.gz",
-		"windows/amd64": "windows-x86_64.zip",
-	}
+	// try not to shadow too many variables
+	var err error
 
-	requiredPackages := []string{}
-	for _, p := range platforms {
-		requiredPackages = append(requiredPackages, platformPackages[p])
-	}
-	if mg.Verbose() {
-		log.Printf("--- Packaging packageVersion[%s], %+v \n", packageVersion, requiredPackages)
-	}
 	// build deps only when drop is not provided
 	if !found || len(dropPath) == 0 {
 		// prepare new drop
 		dropPath = filepath.Join("build", "distributions", "elastic-agent-drop")
-		dropPath, err := filepath.Abs(dropPath)
+		dropPath, err = filepath.Abs(dropPath)
 		if err != nil {
 			panic(err)
 		}
@@ -933,11 +979,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 		}
 		archivePath = movePackagesToArchive(dropPath, requiredPackages)
 
-		defer os.RemoveAll(dropPath)
 		os.Setenv(agentDropPath, dropPath)
-
-		// cleanup after build
-		defer os.Unsetenv(agentDropPath)
 
 		if devtools.ExternalBuild == true {
 			// Map of binaries to download to their project name in the unified-release manager.
@@ -989,7 +1031,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 				}
 			}
 
-			err := errGroup.Wait()
+			err = errGroup.Wait()
 			if err != nil {
 				panic(err)
 			}
@@ -1060,16 +1102,12 @@ func packageAgent(platforms []string, packagingFn func()) {
 	} else {
 		archivePath = movePackagesToArchive(dropPath, requiredPackages)
 	}
-	defer os.RemoveAll(archivePath)
+	return archivePath, dropPath
+}
 
-	// create flat dir
-	flatPath := filepath.Join(dropPath, ".elastic-agent_flat")
-	if mg.Verbose() {
-		log.Printf("--- creating flat dir in .elastic-agent_flat")
-	}
-	os.MkdirAll(flatPath, 0755)
-	defer os.RemoveAll(flatPath)
-
+// flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
+// regenerate checksums
+func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string) {
 	for _, rp := range requiredPackages {
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
@@ -1154,15 +1192,283 @@ func packageAgent(platforms []string, packagingFn func()) {
 			panic(err)
 		}
 	}
+}
 
-	// package agent
-	log.Println("--- Running packaging function")
-	packagingFn()
+// TODO: when we remove snapshot API dependency this can go in the artifact api client code
+type branchInfo struct {
+	Version     string `json:"version"`
+	BuildId     string `json:"build_id"`
+	ManifestUrl string `json:"manifest_url"`
+	SummaryUrl  string `json:"summary_url"`
+}
 
-	log.Println("--- Running post packaging ")
-	mg.Deps(Update)
-	mg.Deps(CrossBuild, CrossBuildGoDaemon)
-	mg.SerialDeps(devtools.Package, TestPackages)
+// FetchLatestAgentCoreStagingDRA is a simple mage target that will retrieve the elastic-agent-core DRA artifacts and
+// place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
+func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
+
+	branchInfo, err := findLatestBuildForBranch(ctx, baseURLForStagingDRA, branch)
+
+	// Create a dir with the buildID at <root>/build/dra/<buildID>
+	repositoryRoot, err := findRepositoryRoot()
+	if err != nil {
+		return fmt.Errorf("finding repository root: %w", err)
+	}
+	draDownloadDir := filepath.Join(repositoryRoot, "build", "dra")
+	err = os.MkdirAll(draDownloadDir, 0o770)
+
+	if err != nil {
+		return fmt.Errorf("creating %q directory: %w", err)
+	}
+
+	artifacts, err := downloadDRAArtifacts(ctx, branchInfo.ManifestUrl, draDownloadDir, agentCoreProjectName)
+
+	if err == nil {
+		fmt.Println("Downloaded agent core DRAs:")
+		for k, _ := range artifacts {
+			fmt.Println(k)
+		}
+	}
+	return err
+}
+
+func findRepositoryRoot() (string, error) {
+	return sh.Output(mg.GoCmd(), "list", "-f", "{{.Root}}")
+}
+
+func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
+	// latest build info for a branch is at "<base url>/latest/<branch>.json"
+	branchLatestBuildUrl := strings.TrimSuffix(baseURL, "/") + fmt.Sprintf("/latest/%s.json", branch)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, branchLatestBuildUrl, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error composing request for finding latest build using %q: %w", branchLatestBuildUrl, err)
+	}
+
+	c := new(http.Client)
+	resp, err := c.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching latest build using %q: %w", branchLatestBuildUrl, err)
+	}
+	if mg.Verbose() {
+		log.Printf("Received response for %q : %+v", branchLatestBuildUrl, resp)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("bad HTTP status for GET %q: %d - %q", branchLatestBuildUrl, resp.StatusCode, resp.Status)
+	}
+
+	bi := new(branchInfo)
+	// consume body
+	err = json.NewDecoder(resp.Body).Decode(bi)
+	if err != nil {
+		return nil, fmt.Errorf("decoding json branch information: %w", err)
+	}
+
+	if mg.Verbose() {
+		log.Printf("Received branch information for %q: %+v", branch, bi)
+	}
+
+	// return branch info
+	return bi, nil
+}
+
+func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
+	mappings := map[string]string{
+		"linux-x86_64":   "linux-amd64",
+		"windows-x86_64": "windows-amd64",
+		"darwin-x86_64":  "darwin-amd64",
+		"darwin-aarch64": "darwin-arm64",
+	}
+
+	mappedPltf, found := mappings[manifestPltf]
+	if !found {
+		// default to the manifest platform if no mapping is found
+		mappedPltf = manifestPltf
+	}
+
+	return mappedPltf, found
+
+}
+
+func filterPackagesByPlatform(pkgs map[string]tools.Package) map[string]tools.Package {
+	// FIXME platforms are not the same between the manifest and the platform list we use: it needs some mapping
+
+	//platforms := devtools.Platforms.Names()
+	//filteredPackages := map[string]tools.Package{}
+	//for pkgName, pkgDesc := range pkgs {
+	//	for _, os := range pkgDesc.Os {
+	//		platformString := fmt.Sprintf("%s/%s", os, pkgDesc.Architecture)
+	//		if slices.Contains(platforms, platformString) {
+	//			filteredPackages[pkgName] = pkgDesc
+	//			break
+	//		}
+	//	}
+	//}
+
+	log.Printf(">>>> WARNING: filtering by platform is not supported yet")
+
+	return pkgs
+}
+
+func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir string, projects ...string) (map[string]tools.Package, error) {
+
+	build, err := manifest.DownloadManifest(manifestUrl)
+	if err != nil {
+		return nil, fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)
+	}
+
+	// Create a dir with the buildID at <downloadDir>/<buildID>
+	draDownloadDir := filepath.Join(downloadDir, build.BuildID)
+	err = os.MkdirAll(draDownloadDir, 0o770)
+
+	if err != nil {
+		return nil, fmt.Errorf("creating %q directory: %w", err)
+	}
+
+	if mg.Verbose() {
+		log.Printf("url:%q, err %v", manifestUrl, err)
+	}
+
+	// sync access to the downloadedArtifacts map
+	mx := new(sync.Mutex)
+	downloadedArtifacts := map[string]tools.Package{}
+	errGrp, errCtx := errgroup.WithContext(ctx)
+
+	for _, projectName := range projects {
+		project, ok := build.Projects[projectName]
+		if !ok {
+			return nil, fmt.Errorf("project %q not found in manifest at %q", projectName, manifestUrl)
+		}
+
+		if mg.Verbose() {
+			log.Printf("build %q project %s packages: %+v", build.BuildID, projectName, project)
+		}
+		// filter down the packages to the platforms we are building/support
+		filteredPackages := filterPackagesByPlatform(project.Packages)
+
+		for pkgName, pkgDesc := range filteredPackages {
+
+			downloadFunc := func(pkgName string, pkgDesc tools.Package) func() error {
+				return func() error {
+					artifactDownloadPath := filepath.Join(draDownloadDir, pkgName)
+					errDownload := manifest.DownloadPackage(errCtx, pkgDesc.URL, artifactDownloadPath)
+					if errDownload == nil {
+						mx.Lock()
+						defer mx.Unlock()
+						downloadedArtifacts[artifactDownloadPath] = pkgDesc
+					}
+					return errDownload
+				}
+			}(pkgName, pkgDesc)
+
+			errGrp.Go(downloadFunc)
+
+			// TODO do we need the .sha512 and .asc ? returning the package metadata those can be downloaded later for verification purposes
+			//downloadFuncSha := func(pkgName string, pkgDesc tools.Package) func() error {
+			//	return func() error {
+			//		return manifest.DownloadPackage(errCtx, pkgDesc.ShaURL, filepath.Join(downloadDir, pkgName+".sha512"))
+			//	}
+			//}(pkgName, pkgDesc)
+			//
+			//errGrp.Go(downloadFuncSha)
+			//
+			//downloadFuncAsc := func(pkgName string, pkgDesc tools.Package) func() error {
+			//	return func() error {
+			//		return manifest.DownloadPackage(errCtx, pkgDesc.AscURL, filepath.Join(downloadDir, pkgName+".asc"))
+			//	}
+			//}(pkgName, pkgDesc)
+			//
+			//errGrp.Go(downloadFuncAsc)
+		}
+	}
+
+	return downloadedArtifacts, errGrp.Wait()
+}
+
+func UseDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error {
+
+	repositoryRoot, err := findRepositoryRoot()
+	if err != nil {
+		return fmt.Errorf("looking up for repository root: %w", err)
+	}
+
+	downloadDir := filepath.Join(repositoryRoot, "build", "dra")
+
+	// fetch the agent-core DRA artifacts for the current branch
+	artifacts, err := downloadDRAArtifacts(ctx, manifestUrl, downloadDir, agentCoreProjectName)
+
+	if err != nil {
+		return fmt.Errorf("downloading elastic-agent-core artifacts: %w", err)
+	}
+
+	dstDirectory := filepath.Join(repositoryRoot, "build", "golang-crossbuild")
+	err = os.MkdirAll(dstDirectory, 0o770)
+
+	if err != nil {
+		return fmt.Errorf("creating destination directory %q: %w", dstDirectory, err)
+	}
+
+	// place the artifacts where the package.yml expects them (in build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}})
+	for artifactFile, artifactMeta := range artifacts {
+		// uncompress the archive first
+		const extractionSubdir = "extracted"
+		extractDir := filepath.Join(filepath.Dir(artifactFile), extractionSubdir)
+		err = devtools.Extract(artifactFile, extractDir)
+		if err != nil {
+			return fmt.Errorf("extracting %q: %w", artifactFile, err)
+		}
+
+		// we can take a shortcut as the archive contains a subdirectory with the same name of the file minus the extension
+		// and we have to rename the binary file while moving using the same name
+		artifactBaseFileName := filepath.Base(artifactFile)
+		artifactBaseFileExt := filepath.Ext(artifactBaseFileName)
+		if artifactBaseFileExt == ".gz" {
+			// get the next extension to get .tar.gz if it's there
+			artifactBaseFileExt = filepath.Ext(strings.TrimSuffix(artifactBaseFileName, artifactBaseFileExt)) + artifactBaseFileExt
+		}
+
+		// this is the directory name where we can find the agent executable
+		targetArtifactName := strings.TrimSuffix(artifactBaseFileName, artifactBaseFileExt)
+		const agentBinaryName = "elastic-agent"
+		binaryExt := ""
+		if slices.Contains(artifactMeta.Os, "windows") {
+			binaryExt += ".exe"
+		}
+		srcBinaryPath := filepath.Join(extractDir, targetArtifactName, agentBinaryName+binaryExt)
+		srcStat, err := os.Stat(srcBinaryPath)
+		if err != nil {
+			return fmt.Errorf("stat source binary name %q: %w", srcBinaryPath, err)
+		}
+		log.Printf("Source binary %q stat: %+v", srcBinaryPath, srcStat)
+
+		dstPlatform, _ := mapManifestPlatformToAgentPlatform(fmt.Sprintf("%s-%s", artifactMeta.Os[0], artifactMeta.Architecture))
+		dstFileName := fmt.Sprintf("elastic-agent-%s", dstPlatform) + binaryExt
+		dstBinaryPath := filepath.Join(repositoryRoot, "build", "golang-crossbuild", dstFileName)
+
+		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
+
+		err = copyFile(srcBinaryPath, dstBinaryPath, srcStat.Mode())
+		if err != nil {
+			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
+		}
+	}
+	return nil
+}
+
+func copyFile(src string, dst string, dstFileMode os.FileMode) error {
+	srcFile, err := os.OpenFile(src, os.O_RDONLY, 0o000)
+	if err != nil {
+		return fmt.Errorf("opening src file %q: %w", src, err)
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, dstFileMode)
+	if err != nil {
+		return fmt.Errorf("opening dst file %q: %w", dst, err)
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	return err
 }
 
 // Helper that wraps the fetchBinaryFromArtifactsApi in a way that is compatible with the errgroup.Go() function.
