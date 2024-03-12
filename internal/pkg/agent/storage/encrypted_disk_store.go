@@ -56,7 +56,7 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFun
 	}
 	if !hasRoot {
 		unprivileged = true
-		opts = append(opts, WithUnprivileged(unprivileged))
+		opts = append([]OptionFunc{WithUnprivileged(unprivileged)}, opts...)
 	}
 
 	s := &EncryptedDiskStore{
