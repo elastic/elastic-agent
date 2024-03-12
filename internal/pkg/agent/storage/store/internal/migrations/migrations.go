@@ -45,21 +45,24 @@ type ActionQueue struct {
 	IsDetected     bool                   `yaml:"is_detected,omitempty"`
 }
 
+type loader interface {
+	Load() (io.ReadCloser, error)
+}
+
 // LoadActionStore loads an action store from loader.
-func LoadActionStore(loader interface{ Load() (io.ReadCloser, error) }) (*Action, error) {
+func LoadActionStore(loader loader) (*Action, error) {
 	return LoadStore[Action](loader)
 }
 
 // LoadYAMLStateStore loads the old YAML state store from loader.
-func LoadYAMLStateStore(loader interface{ Load() (io.ReadCloser, error) }) (*StateStore, error) {
+func LoadYAMLStateStore(loader loader) (*StateStore, error) {
 	return LoadStore[StateStore](loader)
 }
 
 // LoadStore loads a YAML file.
-func LoadStore[Store any](loader interface{ Load() (io.ReadCloser, error) }) (store *Store, err error) {
+func LoadStore[Store any](loader loader) (store *Store, err error) {
 	// Store is a generic type, this might be needed.
-	var st Store
-	store = &st
+	store = new(Store)
 
 	reader, err := loader.Load()
 	if err != nil {

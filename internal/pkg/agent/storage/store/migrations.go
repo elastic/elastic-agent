@@ -71,6 +71,15 @@ func migrateActionStoreToStateStore(
 		return nil
 	}
 
+	if action.Type != fleetapi.ActionTypePolicyChange {
+		log.Warnf("unexpected action type when migrating from action store. "+
+			"Found %s, but only %s is suported. Ignoring action and proceeding.",
+			action.Type, fleetapi.ActionTypePolicyChange)
+		// If it isn't ignored, the agent will be stuck here and require manual
+		// intervention to fix the store.
+		return nil
+	}
+
 	stateStore, err := NewStateStore(log, stateDiskStore)
 	if err != nil {
 		return err
@@ -93,7 +102,7 @@ func migrateActionStoreToStateStore(
 // migrateYAMLStateStoreToStateStoreV1 migrates the YAML store to the new JSON
 // state store. If the contents of store is already a JSON, it returns the
 // parsed JSON.
-func migrateYAMLStateStoreToStateStoreV1(store storage.Storage) error {
+func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Storage) error {
 	exists, err := store.Exists()
 	if err != nil {
 		return fmt.Errorf("migration YMAL to Store v1 failed: "+
@@ -146,6 +155,9 @@ func migrateYAMLStateStoreToStateStoreV1(store storage.Storage) error {
 			ActionType: yamlStore.Action.Type,
 			IsDetected: yamlStore.Action.IsDetected,
 		}
+	default:
+		log.Warnf("loaded a unsupported %s action from the deprecated YAML state store, ignoring it",
+			yamlStore.Action.Type)
 	}
 
 	var queue actionQueue

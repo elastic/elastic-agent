@@ -205,7 +205,7 @@ func TestStateStore(t *testing.T) {
 				require.NoError(t, err,
 					"failed saving copy of golden files on an EncryptedDiskStore")
 
-				err = migrateYAMLStateStoreToStateStoreV1(encDiskStore)
+				err = migrateYAMLStateStoreToStateStoreV1(log, encDiskStore)
 				require.NoError(t, err, "YAML state store -> JSON state store failed")
 
 				// Load migrated store from disk
@@ -271,7 +271,7 @@ func TestStateStore(t *testing.T) {
 				require.NoError(t, err,
 					"failed saving copy of golden files on an EncryptedDiskStore")
 
-				err = migrateYAMLStateStoreToStateStoreV1(encDiskStore)
+				err = migrateYAMLStateStoreToStateStoreV1(log, encDiskStore)
 				require.NoError(t, err, "YAML state store -> JSON state store failed")
 
 				// Load migrated store from disk
@@ -345,7 +345,7 @@ func TestStateStore(t *testing.T) {
 			require.NoError(t, err, "state store save filed")
 
 			// Try to migrate an existing JSON store
-			err = migrateYAMLStateStoreToStateStoreV1(endDiskStore)
+			err = migrateYAMLStateStoreToStateStoreV1(log, endDiskStore)
 			require.NoError(t, err, "YAML state store -> JSON state store failed")
 
 			// Load migrated store from disk

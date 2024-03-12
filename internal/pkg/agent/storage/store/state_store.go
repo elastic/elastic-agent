@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -91,7 +90,7 @@ func newStateStoreWithMigration(
 			err)
 	}
 
-	err = migrateYAMLStateStoreToStateStoreV1(stateStore)
+	err = migrateYAMLStateStoreToStateStoreV1(log, stateStore)
 	if err != nil {
 		return nil, fmt.Errorf("failed dmigrating YAML store JSON store: %w",
 			err)
@@ -151,9 +150,6 @@ func readState(reader io.ReadCloser) (state, error) {
 	}
 
 	err = json.Unmarshal(data, &st)
-	if errors.Is(err, io.EOF) {
-		return state{}, nil
-	}
 	if err != nil {
 		return state{}, fmt.Errorf("could not parse JSON: %w", err)
 	}
