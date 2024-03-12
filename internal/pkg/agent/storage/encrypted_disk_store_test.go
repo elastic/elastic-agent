@@ -12,11 +12,17 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func TestNewEncryptedDiskStore(t *testing.T) {
+
+	hasRoot, err := utils.HasRoot()
+	require.NoError(t, err, "error checking for administrative privileges")
+
 	type StoreAssertionFunction func(*testing.T, Storage)
 
 	type args struct {
@@ -39,25 +45,27 @@ func TestNewEncryptedDiskStore(t *testing.T) {
 				if assert.IsType(t, (*EncryptedDiskStore)(nil), storage, "a *EncryptedDiskStore should have been returned") {
 					eds := storage.(*EncryptedDiskStore)
 					assert.Equal(t, "simplestore.enc", filepath.Base(eds.target))
-					// we are running unit tests as non-root so unprivileged should be true by default
-					assert.Equal(t, true, eds.unprivileged)
+					// without override we should have the unprivileged flag set to (not root)
+					assert.Equal(t, !hasRoot, eds.unprivileged)
 					assert.Equal(t, paths.AgentVaultPath(), eds.vaultPath)
 				}
 			},
 			wantErr: assert.NoError,
 		},
 		{
-			name: "encrypted store with unprivileged=false override",
+			// This testcase sets the unprivileged override to the opposite of the default value ( the default is !hasRoot)
+			// and verifies that we respect the override
+			name: fmt.Sprintf("encrypted store with unprivileged=%v override", hasRoot),
 			args: args{
-				target: "privilegedstore.enc",
-				opts:   []OptionFunc{WithUnprivileged(false)},
+				target: "privilegedoverridestore.enc",
+				opts:   []OptionFunc{WithUnprivileged(hasRoot)},
 			},
 			want: func(t *testing.T, storage Storage) {
 				if assert.IsType(t, (*EncryptedDiskStore)(nil), storage, "a *EncryptedDiskStore should have been returned") {
 					eds := storage.(*EncryptedDiskStore)
-					assert.Equal(t, "privilegedstore.enc", filepath.Base(eds.target))
+					assert.Equal(t, "privilegedoverridestore.enc", filepath.Base(eds.target))
 					// override should have kicked in
-					assert.Equal(t, false, eds.unprivileged)
+					assert.Equal(t, hasRoot, eds.unprivileged)
 					assert.Equal(t, paths.AgentVaultPath(), eds.vaultPath)
 				}
 			},
@@ -74,7 +82,7 @@ func TestNewEncryptedDiskStore(t *testing.T) {
 					eds := storage.(*EncryptedDiskStore)
 					assert.Equal(t, "customvaultpathstore.enc", filepath.Base(eds.target))
 					// we are running unit tests as non-root so unprivileged should be true by default
-					assert.Equal(t, true, eds.unprivileged)
+					assert.Equal(t, !hasRoot, eds.unprivileged)
 					assert.Equal(t, "somecustomvault", eds.vaultPath)
 				}
 			},
