@@ -52,7 +52,7 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFun
 
 	hasRoot, err := utils.HasRoot()
 	if err != nil {
-		return nil, fmt.Errorf("error checking for admin privileges: %w", err)
+		return nil, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
 	}
 	if !hasRoot {
 		unprivileged = true

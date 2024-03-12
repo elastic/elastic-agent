@@ -177,7 +177,7 @@ func newEnrollCmd(
 
 	encryptedDiskStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
 	if err != nil {
-		return nil, fmt.Errorf("error creating encrypted disk store: %w", err)
+		return nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
 	}
 	store := storage.NewReplaceOnSuccessStore(
 		configPath,
@@ -222,7 +222,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 
 	hasRoot, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("checking if running with administrator privileges: %w", err)
+		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
 	}
 
 	// Create encryption key from the agent before touching configuration

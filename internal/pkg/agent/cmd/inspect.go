@@ -137,7 +137,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("error checking for administrator privileges: %w", err)
+		return fmt.Errorf("error checking for root/Administrator privileges: %w", err)
 	}
 	if !opts.variables && !opts.includeMonitoring {
 		fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, !isAdmin)
@@ -265,7 +265,7 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("error checking for administrator privileges: %w", err)
+		return fmt.Errorf("error checking for root/Administrator privileges: %w", err)
 	}
 
 	m, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)

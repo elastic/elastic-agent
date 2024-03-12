@@ -213,7 +213,7 @@ func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.St
 	path := paths.AgentConfigFile()
 	store, err := storage.NewEncryptedDiskStore(ctx, path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error creating encrypted disk store: %w", err)
+		return nil, nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
 	}
 
 	reader, err := store.Load()

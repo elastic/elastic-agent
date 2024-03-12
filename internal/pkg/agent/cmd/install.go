@@ -70,7 +70,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("unable to perform install command while checking for administrator rights, %w", err)
+		return fmt.Errorf("unable to perform install command while checking for root/Administrator rights: %w", err)
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)

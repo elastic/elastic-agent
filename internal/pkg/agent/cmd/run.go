@@ -170,7 +170,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// try early to check if running as root
 	isRoot, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("failed to check for root permissions: %w", err)
+		return fmt.Errorf("failed to check for root/Administrator privileges: %w", err)
 	}
 
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
@@ -441,7 +441,7 @@ func getOverwrites(ctx context.Context, rawConfig *config.Config) error {
 	path := paths.AgentConfigFile()
 	store, err := storage.NewEncryptedDiskStore(ctx, path)
 	if err != nil {
-		return fmt.Errorf("error creating encrypted disk store: %w", err)
+		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
 	}
 
 	reader, err := store.Load()
