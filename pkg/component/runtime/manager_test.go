@@ -142,7 +142,11 @@ func newDebugLogger(t *testing.T) *logger.Logger {
 func drainErrChan(ch chan error) {
 	for {
 		select {
-		case <-ch:
+		case _, ok := <-ch:
+			// channel is closed, nothing to drain
+			if !ok {
+				return
+			}
 		default:
 			return
 		}
