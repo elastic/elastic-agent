@@ -30,10 +30,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	// test 2 current 8.x version and 1 previous 7.x version
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(1*time.Minute))
-	defer cancel()
-	versionList, err := upgradetest.GetUpgradableVersions(ctx, define.Version(), 2, 1, t)
+	versionList, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err)
 	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
@@ -72,6 +69,15 @@ func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, end
 
 	endFixture, err := define.NewFixture(t, endVersion)
 	require.NoError(t, err)
+
+	startVersionInfo, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("both start and end versions have the same hash %q, skipping...", startVersionInfo.Binary.Commit)
+		return
+	}
 
 	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithUnprivileged(unprivileged))
 	assert.NoError(t, err)

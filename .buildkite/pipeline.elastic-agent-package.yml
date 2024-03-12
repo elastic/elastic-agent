@@ -138,7 +138,7 @@ steps:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
     artifact_paths:
-      - "build/distributions/*"
+      - "build/distributions/**/*"
     command: |
       echo "+++ Restoring Artifacts"
       buildkite-agent artifact download "build/**/*" .
