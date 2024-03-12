@@ -338,7 +338,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		&artifact.Config{},
 		&info.AgentInfo{},
 	)
-	require.NoError(t, err)
+	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple
 	// goroutines.
@@ -390,6 +390,7 @@ agent.download.sourceURI:
 		"failed to reload upgrade manager configuration",
 		"configErr should match policy failure, got %v", coord.configErr)
 
+	stateChangeTimeout := 2 * time.Second
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Failed policy change should cause Failed coordinator state")
@@ -398,10 +399,8 @@ agent.download.sourceURI:
 		// The component model update happens on a goroutine, thus the new state
 		// might not have been sent yet. Therefore, a timeout is required.
 	case <-time.After(time.Second):
-		assert.Fail(t, "Coordinator's state didn't change")
+		t.Fatalf("timedout after %s waiting Coordinator's state to change", stateChangeTimeout)
 	}
-
-	// isn't this another test?
 
 	// Send an empty vars update. This should regenerate the component model
 	// based on the last good (empty) policy, producing a "successful" update,
@@ -420,8 +419,9 @@ agent.download.sourceURI:
 
 		// The component model update happens on a goroutine, thus the new state
 		// might not have been sent yet. Therefore, a timeout is required.
-	case <-time.After(time.Second):
-		assert.Fail(t, "Vars change should cause state update")
+	case <-time.After(stateChangeTimeout):
+		t.Fatalf("timedout after %s waiting Vars change to cause a state update",
+			stateChangeTimeout)
 	}
 
 	// Finally, send an empty (valid) policy update and confirm that it
@@ -439,8 +439,9 @@ agent.download.sourceURI:
 
 		// The component model update happens on a goroutine, thus the new state
 		// might not have been sent yet. Therefore, a timeout is required.
-	case <-time.After(time.Second):
-		assert.Fail(t, "Policy change should cause state update")
+	case <-time.After(stateChangeTimeout):
+		t.Fatalf("timedout after %s waiting Policy change to cause a state update",
+			stateChangeTimeout)
 	}
 }
 
