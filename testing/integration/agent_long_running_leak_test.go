@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/elastic/elastic-agent-libs/api/npipe"
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -301,11 +302,17 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 			httpClient: http.Client{
 				Transport: &http.Transport{
 					DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-						path := strings.Replace(socketPath, "unix://", "", -1)
-						if runtime.GOOS == "windows" {
-							path = strings.Replace(socketPath, "npipe://", "", -1)
+						if runtime.GOOS != "windows" {
+							path := strings.Replace(socketPath, "unix://", "", -1)
+							return net.Dial("unix", path)
+						} else {
+							if strings.HasPrefix(socketPath, "npipe:///") {
+								path := strings.TrimPrefix(socketPath, "npipe:///")
+								socketPath = `\\.\pipe\` + path
+							}
+							return npipe.DialContext(socketPath)(ctx, "", "")
 						}
-						return net.Dial("unix", path)
+
 					},
 				},
 			},
