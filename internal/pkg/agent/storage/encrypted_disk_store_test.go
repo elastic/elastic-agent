@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -62,14 +61,7 @@ func TestNewEncryptedDiskStore(t *testing.T) {
 					assert.Equal(t, paths.AgentVaultPath(), eds.vaultPath)
 				}
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				if runtime.GOOS == "darwin" {
-					// on Mac OS this test will fail since we are not root and try to force instantiating a keychain vault
-					// expecting an error is still a good way to validate that the override took effect
-					return assert.Error(t, err, "on Mac OS we expect an error when instantiating an encrypted store with a privileged vault")
-				}
-				return assert.NoError(t, err)
-			},
+			wantErr: assert.NoError,
 		},
 		{
 			name: "encrypted store with custom vault path override",
