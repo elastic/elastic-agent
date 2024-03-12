@@ -223,15 +223,15 @@ func (h *Diagnostics) runHooks(ctx context.Context, action *fleetapi.ActionDiagn
 		h.log.Debugw(fmt.Sprintf("Hook %s execution complete, took %s", hook.Name, elapsed.String()), "hook", hook.Name, "filename", hook.Filename, "elapsed", elapsed.String())
 	}
 	if collectCPU {
-		p, err := diagnostics.CreateCPUProfile(ctx, 30*time.Second)
+		p, err := diagnostics.CreateCPUProfile(ctx, diagnostics.DiagCPUDuration)
 		if err != nil {
 			return diags, fmt.Errorf("unable to gather CPU profile: %w", err)
 		}
 		diags = append(diags, client.DiagnosticFileResult{
-			Name:        "cpuprofile",
-			Filename:    "cpu.pprof",
-			Description: "CPU profile",
-			ContentType: "application/octet-stream",
+			Name:        diagnostics.DiagCPUName,
+			Filename:    diagnostics.DiagCPUFilename,
+			Description: diagnostics.DiagCPUDescription,
+			ContentType: diagnostics.DiagCPUContentType,
 			Content:     p,
 			Generated:   time.Now().UTC(),
 		})
