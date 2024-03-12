@@ -31,6 +31,11 @@ import (
 // In either case the 1st action will succeed and the others will ack with an the error.
 var ErrRateLimit = fmt.Errorf("rate limit exceeded")
 
+// getCPUDiag is a wrapper around diagnostics.CreateCPUProfile so it can be replaced in unit-tests.
+var getCPUDiag = func(ctx context.Context, d time.Duration) ([]byte, error) {
+	return diagnostics.CreateCPUProfile(ctx, d)
+}
+
 // Uploader is the interface used to upload a diagnostics bundle to fleet-server.
 type Uploader interface {
 	UploadDiagnostics(context.Context, string, string, int64, io.Reader) (string, error)
@@ -223,7 +228,7 @@ func (h *Diagnostics) runHooks(ctx context.Context, action *fleetapi.ActionDiagn
 		h.log.Debugw(fmt.Sprintf("Hook %s execution complete, took %s", hook.Name, elapsed.String()), "hook", hook.Name, "filename", hook.Filename, "elapsed", elapsed.String())
 	}
 	if collectCPU {
-		p, err := diagnostics.CreateCPUProfile(ctx, diagnostics.DiagCPUDuration)
+		p, err := getCPUDiag(ctx, diagnostics.DiagCPUDuration)
 		if err != nil {
 			return diags, fmt.Errorf("unable to gather CPU profile: %w", err)
 		}
