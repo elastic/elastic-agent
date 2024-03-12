@@ -321,13 +321,15 @@ func clientEqual(current remote.Config, new remote.Config) bool {
 	}
 
 	// different TLS config
-	if len(new.Transport.TLS.CAs) > 0 &&
+	if new.Transport.TLS != nil &&
+		len(new.Transport.TLS.CAs) > 0 &&
 		!slices.Equal(current.Transport.TLS.CAs, new.Transport.TLS.CAs) {
 		return false
 	}
 
 	emptyCert := tlscommon.CertificateConfig{}
-	if new.Transport.TLS.Certificate != emptyCert &&
+	if new.Transport.TLS != nil &&
+		new.Transport.TLS.Certificate != emptyCert &&
 		current.Transport.TLS.Certificate != new.Transport.TLS.Certificate {
 		return false
 	}
