@@ -9,7 +9,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -149,26 +147,6 @@ func drainErrChan(ch chan error) {
 			return
 		}
 	}
-}
-
-func testPaths(t *testing.T) {
-	t.Helper()
-
-	versioned := paths.IsVersionHome()
-	topPath := paths.Top()
-
-	tmpDir, err := os.MkdirTemp("", "at-*")
-	if err != nil {
-		t.Fatalf("failed to create temp directory: %s", err)
-	}
-	paths.SetVersionHome(false)
-	paths.SetTop(tmpDir)
-
-	t.Cleanup(func() {
-		paths.SetVersionHome(versioned)
-		paths.SetTop(topPath)
-		_ = os.RemoveAll(tmpDir)
-	})
 }
 
 type testMonitoringManager struct{}
