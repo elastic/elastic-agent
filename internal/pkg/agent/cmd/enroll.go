@@ -23,6 +23,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
+)
+
+const (
+	fromInstallArg      = "from-install"
+	fromInstallUserArg  = "from-install-user"
+	fromInstallGroupArg = "from-install-group"
 )
 
 func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -42,8 +49,11 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
 
 	// used by install command
-	cmd.Flags().BoolP("from-install", "", false, "Set by install command to signal this was executed from install")
-	cmd.Flags().MarkHidden("from-install") //nolint:errcheck //not required
+	cmd.Flags().BoolP(fromInstallArg, "", false, "Set by install command to signal this was executed from install")
+	cmd.Flags().MarkHidden(fromInstallArg) //nolint:errcheck //not required
+
+	// platform specific flags
+	addPlatformFlags(cmd)
 
 	return cmd
 }
@@ -321,7 +331,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return err
 	}
 
-	fromInstall, _ := cmd.Flags().GetBool("from-install")
+	fromInstall, _ := cmd.Flags().GetBool(fromInstallArg)
 
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
@@ -417,9 +427,17 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	//  Error: failed to fix permissions: chown /Library/Elastic/Agent/data/elastic-agent-c13f91/elastic-agent.app: operation not permitted
 	// This is because we are fixing permissions twice, once during installation and again during the enrollment step.
 	// When we are enrolling as part of installation on MacOS, skip the second attempt to fix permissions.
-	fixPermissions := fromInstall
+	var fixPermissions *utils.FileOwner
+	if fromInstall {
+		perms, err := getFileOwnerFromCmd(cmd)
+		if err != nil {
+			// no context is added because the error is clear and user facing
+			return err
+		}
+		fixPermissions = &perms
+	}
 	if runtime.GOOS == "darwin" {
-		fixPermissions = false
+		fixPermissions = nil
 	}
 
 	options := enrollCmdOption{

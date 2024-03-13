@@ -50,15 +50,13 @@ func securityDescriptor(log *logger.Logger) (string, error) {
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
 		// do not fail, agent would end up in a loop, continue with limited permissions
-		log.Warnf("failed to detect admin: %w", err)
+		log.Warnf("failed to detect Administrator: %w", err)
 		isAdmin = false // just in-case to ensure that in error case that its always false
 	}
-	if isAdmin {
-		// running as SYSTEM or Administrators group add Administrators group so all Administrators
-		// can talk over the named pipe
-		// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
-		descriptor += "(A;;GA;;;" + utils.AdministratorSID + ")"
-	} else if paths.RunningInstalled() {
+	// SYSTEM/Administrators can always talk over the pipe, even when not running as privileged
+	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
+	descriptor += "(A;;GA;;;" + utils.AdministratorSID + ")"
+	if !isAdmin && paths.RunningInstalled() {
 		// Windows doesn't provide a way to set the executing group when being executed as a service,
 		// but a group needs to be added to the named pipe in unprivileged mode to allow users in the group
 		// to ability to communicate with the named pipe.

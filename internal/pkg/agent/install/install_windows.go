@@ -64,12 +64,7 @@ func withServiceOptions(username string, groupName string) ([]serviceOpt, error)
 		return nil, fmt.Errorf("failed to set user %s password for service: %w", username, err)
 	}
 
-	// username must be prefixed with the domain for the CreateServiceW call to work
-	// we are always working on the local machine so the hostname of the machine is used
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get hostname: %w", err)
-	}
-	username = fmt.Sprintf(`%s\%s`, hostname, username)
+	// username must be prefixed with `.\` so the service references the local systems users
+	username = fmt.Sprintf(`.\%s`, username)
 	return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
 }

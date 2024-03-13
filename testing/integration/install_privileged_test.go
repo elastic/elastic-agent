@@ -70,7 +70,7 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path
-	checkInstallSuccess(t, topPath, false)
+	checkInstallSuccess(t, fixture, topPath, false)
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }
 
@@ -117,6 +117,6 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-	checkInstallSuccess(t, topPath, false)
+	checkInstallSuccess(t, fixture, topPath, false)
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }

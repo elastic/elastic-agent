@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -74,7 +73,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path
-	checkInstallSuccess(t, topPath, true)
+	checkInstallSuccess(t, fixture, topPath, true)
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -148,7 +147,7 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	checkInstallSuccess(t, topPath, true)
+	checkInstallSuccess(t, fixture, topPath, true)
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -219,7 +218,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 			}
 
 			// Check that Agent was installed in default base path
-			checkInstallSuccess(t, topPath, !opts.Privileged)
+			checkInstallSuccess(t, fixture, topPath, !opts.Privileged)
 			t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 			require.NoErrorf(t, err, "uninstall failed: %s", err)
@@ -227,7 +226,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 	}
 }
 
-func checkInstallSuccess(t *testing.T, topPath string, unprivileged bool) {
+func checkInstallSuccess(t *testing.T, f *atesting.Fixture, topPath string, unprivileged bool) {
 	t.Helper()
 	_, err := os.Stat(topPath)
 	require.NoError(t, err)
@@ -246,24 +245,7 @@ func checkInstallSuccess(t *testing.T, topPath string, unprivileged bool) {
 
 	if unprivileged {
 		// Specific checks depending on the platform.
-		checkPlatformUnprivileged(t, topPath)
-
-		// Executing `elastic-agent status` as the `elastic-agent` user should work.
-		var output []byte
-		require.Eventuallyf(t, func() bool {
-			cmd := exec.Command("sudo", "-u", "elastic-agent", "elastic-agent", "status")
-			output, err = cmd.CombinedOutput()
-			return err == nil
-		}, 3*time.Minute, 1*time.Second, "status never successful: %s (output: %s)", err, output)
-
-		// Executing `elastic-agent status` as the original user should fail, because that
-		// user is not in the 'elastic-agent' group.
-		originalUser := os.Getenv("SUDO_USER")
-		if originalUser != "" {
-			cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
-			output, err := cmd.CombinedOutput()
-			require.Error(t, err, "running sudo -u %s elastic-agent status should have failed: %s", originalUser, output)
-		}
+		checkPlatformUnprivileged(t, f, topPath)
 	}
 }
 

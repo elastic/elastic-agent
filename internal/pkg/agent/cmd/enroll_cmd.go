@@ -117,7 +117,7 @@ type enrollCmdOption struct {
 	ProxyHeaders         map[string]string          `yaml:"proxy_headers,omitempty"`
 	DaemonTimeout        time.Duration              `yaml:"daemon_timeout,omitempty"`
 	UserProvidedMetadata map[string]interface{}     `yaml:"-"`
-	FixPermissions       bool                       `yaml:"-"`
+	FixPermissions       *utils.FileOwner           `yaml:"-"`
 	DelayEnroll          bool                       `yaml:"-"`
 	FleetServer          enrollCmdFleetServerOption `yaml:"-"`
 	SkipCreateSecret     bool                       `yaml:"-"`
@@ -276,8 +276,8 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		return fmt.Errorf("fail to enroll: %w", err)
 	}
 
-	if c.options.FixPermissions {
-		err = install.FixPermissions(paths.Top(), utils.CurrentFileOwner())
+	if c.options.FixPermissions != nil {
+		err = install.FixPermissions(paths.Top(), *c.options.FixPermissions)
 		if err != nil {
 			return errors.New(err, "failed to fix permissions")
 		}
