@@ -37,6 +37,15 @@ const (
 	agentName = "elastic-agent"
 )
 
+// DiagCPU* are contstants to describe the CPU profile that is collected when the --cpu-profile flag is used with the diagnostics command, or the diagnostics action contains "CPU" in the additional_metrics list.
+const (
+	DiagCPUName        = "cpuprofile"
+	DiagCPUFilename    = "cpu.pprof"
+	DiagCPUDescription = "CPU profile"
+	DiagCPUContentType = "application/octet-stream"
+	DiagCPUDuration    = 30 * time.Second
+)
+
 // Hook is a hook that gets used when diagnostic information is requested from the Elastic Agent.
 type Hook struct {
 	Name        string
