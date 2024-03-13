@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -331,10 +332,19 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	// does let's report a failure instead of timing out the test runner.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	logger := logp.NewLogger("testing")
+
+	log, obs := logger.NewTesting("")
+	defer func() {
+		if t.Failed() {
+			t.Log("test failed, coordinator logs below:")
+			for _, l := range obs.TakeAll() {
+				t.Log(l)
+			}
+		}
+	}()
 
 	upgradeMgr, err := upgrade.NewUpgrader(
-		logger,
+		log,
 		&artifact.Config{},
 		&info.AgentInfo{},
 	)
@@ -346,7 +356,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	configChan := make(chan ConfigChange, 1)
 	varsChan := make(chan []*transpiler.Vars, 1)
 	coord := &Coordinator{
-		logger: logger,
+		logger: log,
 		state: State{
 			CoordinatorState:   agentclient.Healthy,
 			CoordinatorMessage: "Running",
