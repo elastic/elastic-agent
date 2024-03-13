@@ -1987,6 +1987,14 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	return integRunner(ctx, false, "TestBeatsServerless")
 }
 
+func (Integration) TestForResourceLeaks(ctx context.Context) error {
+	err := os.Setenv("TEST_LONG_RUNNING", "true")
+	if err != nil {
+		return fmt.Errorf("error setting TEST_LONG_RUNNING: %w", err)
+	}
+	return integRunner(ctx, false, "TestLongRunningAgentForLeaks")
+}
+
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	mg.Deps(Build.TestBinaries)
@@ -2212,6 +2220,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if os.Getenv("AGENT_KEEP_INSTALLED") != "" {
 		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
 	}
+
+	extraEnv["TEST_LONG_RUNNING"] = os.Getenv("TEST_LONG_RUNNING")
+	extraEnv["LONG_TEST_RUNTIME"] = os.Getenv("LONG_TEST_RUNTIME")
 
 	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
 	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258

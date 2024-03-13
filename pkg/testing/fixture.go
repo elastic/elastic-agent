@@ -41,6 +41,7 @@ type Fixture struct {
 	fetcher         Fetcher
 	operatingSystem string
 	architecture    string
+	packageFormat   string
 	logOutput       bool
 	allowErrs       bool
 	connectTimout   time.Duration
@@ -80,6 +81,14 @@ func WithOSArchitecture(operatingSystem string, architecture string) FixtureOpt 
 	return func(f *Fixture) {
 		f.operatingSystem = operatingSystem
 		f.architecture = architecture
+	}
+}
+
+// WithPackageFormat changes the package format to use for the fixture.
+// By default, targz is picked except for windows which uses zip
+func WithPackageFormat(packageFormat string) FixtureOpt {
+	return func(f *Fixture) {
+		f.packageFormat = packageFormat
 	}
 }
 
@@ -139,6 +148,10 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 	if !ok {
 		return nil, errors.New("unable to determine callers file path")
 	}
+	pkgFormat := "targz"
+	if runtime.GOOS == "windows" {
+		pkgFormat = "zip"
+	}
 	f := &Fixture{
 		t:               t,
 		version:         version,
@@ -146,6 +159,7 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 		fetcher:         ArtifactFetcher(),
 		operatingSystem: runtime.GOOS,
 		architecture:    runtime.GOARCH,
+		packageFormat:   pkgFormat,
 		connectTimout:   15 * time.Second,
 		// default to elastic-agent, can be changed by a set FixtureOpt below
 		binaryName: "elastic-agent",
@@ -253,6 +267,11 @@ func (f *Fixture) SrcPackage(ctx context.Context) (string, error) {
 	return f.srcPackage, nil
 }
 
+// PackageFormat returns the package format for the  fixture
+func (f *Fixture) PackageFormat() string {
+	return f.packageFormat
+}
+
 func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	filename := filepath.Base(artifactFile)
 	_, ext, err := splitFileType(filename)
@@ -270,6 +289,11 @@ func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 		err := unzip(artifactFile, outputDir)
 		if err != nil {
 			return fmt.Errorf("failed to unzip %s: %w", artifactFile, err)
+		}
+	case ".deb", "rpm":
+		err := copy.Copy(artifactFile, filepath.Join(outputDir, filepath.Base(artifactFile)))
+		if err != nil {
+			return fmt.Errorf("failed to copy %s to %s: %w", artifactFile, outputDir, err)
 		}
 	}
 	l.Logf("Completed extraction of artifact %s to %s", filename, outputDir)
@@ -701,7 +725,10 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (Ag
 				}, uerr))
 	}
 
-	return status, err
+	if err != nil {
+		return status, fmt.Errorf("error running command (output: %s): %w", string(out), err)
+	}
+	return status, nil
 }
 
 // ExecInspect executes to inspect subcommand on the prepared Elastic Agent binary.
@@ -777,7 +804,7 @@ func (f *Fixture) ExecDiagnostics(ctx context.Context, cmd ...string) (string, e
 func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) error {
 	status, err := f.ExecStatus(ctx, opts...)
 	if err != nil {
-		return fmt.Errorf("agent status returned and error: %w", err)
+		return fmt.Errorf("agent status returned an error: %w", err)
 	}
 
 	if status.State != int(cproto.State_HEALTHY) {
@@ -810,6 +837,9 @@ func (f *Fixture) binaryPath() string {
 			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
 		}
 	}
+	if f.packageFormat == "deb" {
+		workDir = "/usr/bin"
+	}
 	defaultBin := "elastic-agent"
 	if f.binaryName != "" {
 		defaultBin = f.binaryName
@@ -837,7 +867,7 @@ func (f *Fixture) fetch(ctx context.Context) (string, error) {
 		cache.dir = dir
 	}
 
-	res, err := f.fetcher.Fetch(ctx, f.operatingSystem, f.architecture, f.version)
+	res, err := f.fetcher.Fetch(ctx, f.operatingSystem, f.architecture, f.version, f.packageFormat)
 	if err != nil {
 		return "", err
 	}
