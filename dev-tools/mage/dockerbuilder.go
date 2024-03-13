@@ -101,7 +101,9 @@ func (b *dockerBuilder) copyFiles() error {
 			if f.SkipOnMissing && errors.Is(err, os.ErrNotExist) {
 				continue
 			}
-			return fmt.Errorf("failed to copy from %s to %s: %w", f.Source, target, err)
+			if err != nil {
+				return fmt.Errorf("failed to copy from %s to %s: %w", f.Source, target, err)
+			}
 		}
 	}
 	return nil
