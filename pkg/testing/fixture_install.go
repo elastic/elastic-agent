@@ -130,7 +130,7 @@ func NewBool(value bool) *bool {
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 
-	// check for running agents before installing
+	// check for running agents before installing, but proceed anyway
 	assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
 
 	switch f.packageFormat {
