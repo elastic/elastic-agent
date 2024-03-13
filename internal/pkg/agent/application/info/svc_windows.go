@@ -7,6 +7,8 @@
 package info
 
 import (
+	"fmt"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -39,7 +41,10 @@ func RunningUnderSupervisor() bool {
 			return true
 		}
 	}
-	return false
+
+	// fallback check if process has service token
+	isService, _ := hasServiceToken()
+	return isService
 }
 
 func allocSid(subAuth0 uint32) (*windows.SID, error) {
@@ -50,4 +55,32 @@ func allocSid(subAuth0 uint32) (*windows.SID, error) {
 		return nil, err
 	}
 	return sid, nil
+}
+
+// hasServiceToken returns true process token has the service token added.
+//
+// When spawned by the process manager as a specific user the process gets this token.
+func hasServiceToken() (bool, error) {
+	var sid *windows.SID
+	err := windows.AllocateAndInitializeSid(
+		&windows.SECURITY_NT_AUTHORITY,
+		1,
+		windows.SECURITY_SERVICE_RID,
+		0, 0, 0, 0, 0, 0, 0,
+		&sid)
+	if err != nil {
+		return false, fmt.Errorf("allocate sid error: %w", err)
+	}
+	defer func() {
+		_ = windows.FreeSid(sid)
+	}()
+
+	token := windows.Token(0)
+
+	member, err := token.IsMember(sid)
+	if err != nil {
+		return false, fmt.Errorf("token membership error: %w", err)
+	}
+
+	return member, nil
 }
