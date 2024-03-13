@@ -682,7 +682,7 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(false),
+		Privileged:     true,
 	}
 
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
