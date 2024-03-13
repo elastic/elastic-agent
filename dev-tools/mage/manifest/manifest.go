@@ -106,7 +106,9 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	}
 
 	// For resolving manifest package name and version, just use the Major.Minor.Patch part of the version
-	majorMinorPatchVersion := fmt.Sprintf("%d.%d.%d", parsedManifestVersion.Major(), parsedManifestVersion.Minor(), parsedManifestVersion.Patch())
+	// for Staging builds, and Major.Minor.Patch-SNAPSHOT for snapshots.
+	// This eliminates the "+buildYYYYMMDDHHMM" suffix on Independent Agent Release builds
+	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
 
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
 	for component, pkgs := range componentSpec {
