@@ -87,7 +87,7 @@ func (DebianRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Log
 }
 
 // Copy places the required files on the host.
-func (DebianRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, build Build) error {
+func (DebianRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, builds []Build) error {
 	// copy the archive and extract it on the host
 	logger.Logf("Copying repo")
 	destRepoName := filepath.Base(repoArchive)
@@ -97,12 +97,14 @@ func (DebianRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger
 	}
 
 	// remove build paths, on cases where the build path is different from agent.
-	for _, remoteBuildPath := range []string{build.Path, build.SHA512Path} {
-		relativeAgentDir := filepath.Join("agent", remoteBuildPath)
-		_, _, err := sshClient.Exec(ctx, "sudo", []string{"rm", "-rf", relativeAgentDir}, nil)
-		// doesn't need to be a fatal error.
-		if err != nil {
-			logger.Logf("error removing build dir %s: %w", relativeAgentDir, err)
+	for _, build := range builds {
+		for _, remoteBuildPath := range []string{build.Path, build.SHA512Path} {
+			relativeAgentDir := filepath.Join("agent", remoteBuildPath)
+			_, _, err := sshClient.Exec(ctx, "sudo", []string{"rm", "-rf", relativeAgentDir}, nil)
+			// doesn't need to be a fatal error.
+			if err != nil {
+				logger.Logf("error removing build dir %s: %w", relativeAgentDir, err)
+			}
 		}
 	}
 
@@ -132,56 +134,58 @@ func (DebianRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger
 	// determine if the build needs to be replaced on the host
 	// if it already exists and the SHA512 are the same contents, then
 	// there is no reason to waste time uploading the build
-	copyBuild := true
-	localSHA512, err := os.ReadFile(build.SHA512Path)
-	if err != nil {
-		return fmt.Errorf("failed to read local SHA52 contents %s: %w", build.SHA512Path, err)
-	}
-	hostSHA512Path := filepath.Base(build.SHA512Path)
-	hostSHA512, err := sshClient.GetFileContents(ctx, hostSHA512Path)
-	if err == nil {
-		if string(localSHA512) == string(hostSHA512) {
-			logger.Logf("Skipping copy agent build %s; already the same", filepath.Base(build.Path))
-			copyBuild = false
-		}
-	}
-
-	if copyBuild {
-		// ensure the existing copies are removed first
-		toRemove := filepath.Base(build.Path)
-		stdOut, errOut, err = sshClient.Exec(ctx,
-			"sudo", []string{"rm", "-f", toRemove}, nil)
+	for _, build := range builds {
+		copyBuild := true
+		localSHA512, err := os.ReadFile(build.SHA512Path)
 		if err != nil {
-			return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
-				toRemove, err, stdOut, errOut)
+			return fmt.Errorf("failed to read local SHA52 contents %s: %w", build.SHA512Path, err)
 		}
-
-		toRemove = filepath.Base(build.SHA512Path)
-		stdOut, errOut, err = sshClient.Exec(ctx,
-			"sudo", []string{"rm", "-f", toRemove}, nil)
-		if err != nil {
-			return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
-				toRemove, err, stdOut, errOut)
-		}
-
-		logger.Logf("Copying agent build %s", filepath.Base(build.Path))
-	}
-
-	for _, buildPath := range []string{build.Path, build.SHA512Path} {
-		if copyBuild {
-			err = sshClient.Copy(buildPath, filepath.Base(buildPath))
-			if err != nil {
-				return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
+		hostSHA512Path := filepath.Base(build.SHA512Path)
+		hostSHA512, err := sshClient.GetFileContents(ctx, hostSHA512Path)
+		if err == nil {
+			if string(localSHA512) == string(hostSHA512) {
+				logger.Logf("Skipping copy agent build %s; already the same", filepath.Base(build.Path))
+				copyBuild = false
 			}
 		}
-		insideAgentDir := filepath.Join("agent", buildPath)
-		stdOut, errOut, err = sshClient.Exec(ctx, "mkdir", []string{"-p", filepath.Dir(insideAgentDir)}, nil)
-		if err != nil {
-			return fmt.Errorf("failed to create %s directory: %w (stdout: %s, stderr: %s)", filepath.Dir(insideAgentDir), err, stdOut, errOut)
+
+		if copyBuild {
+			// ensure the existing copies are removed first
+			toRemove := filepath.Base(build.Path)
+			stdOut, errOut, err = sshClient.Exec(ctx,
+				"sudo", []string{"rm", "-f", toRemove}, nil)
+			if err != nil {
+				return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
+					toRemove, err, stdOut, errOut)
+			}
+
+			toRemove = filepath.Base(build.SHA512Path)
+			stdOut, errOut, err = sshClient.Exec(ctx,
+				"sudo", []string{"rm", "-f", toRemove}, nil)
+			if err != nil {
+				return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
+					toRemove, err, stdOut, errOut)
+			}
+
+			logger.Logf("Copying agent build %s", filepath.Base(build.Path))
 		}
-		stdOut, errOut, err = sshClient.Exec(ctx, "ln", []string{filepath.Base(buildPath), insideAgentDir}, nil)
-		if err != nil {
-			return fmt.Errorf("failed to hard link %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
+
+		for _, buildPath := range []string{build.Path, build.SHA512Path} {
+			if copyBuild {
+				err = sshClient.Copy(buildPath, filepath.Base(buildPath))
+				if err != nil {
+					return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
+				}
+			}
+			insideAgentDir := filepath.Join("agent", buildPath)
+			stdOut, errOut, err = sshClient.Exec(ctx, "mkdir", []string{"-p", filepath.Dir(insideAgentDir)}, nil)
+			if err != nil {
+				return fmt.Errorf("failed to create %s directory: %w (stdout: %s, stderr: %s)", filepath.Dir(insideAgentDir), err, stdOut, errOut)
+			}
+			stdOut, errOut, err = sshClient.Exec(ctx, "ln", []string{filepath.Base(buildPath), insideAgentDir}, nil)
+			if err != nil {
+				return fmt.Errorf("failed to hard link %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
+			}
 		}
 	}
 

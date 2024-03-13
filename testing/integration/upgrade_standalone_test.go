@@ -70,6 +70,15 @@ func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, end
 	endFixture, err := define.NewFixture(t, endVersion)
 	require.NoError(t, err)
 
+	startVersionInfo, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("both start and end versions have the same hash %q, skipping...", startVersionInfo.Binary.Commit)
+		return
+	}
+
 	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithUnprivileged(unprivileged))
 	assert.NoError(t, err)
 }
