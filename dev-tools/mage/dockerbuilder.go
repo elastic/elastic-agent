@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -99,7 +100,7 @@ func (b *dockerBuilder) copyFiles() error {
 	for _, f := range b.Files {
 		target := filepath.Join(b.beatDir, f.Target)
 		if err := Copy(f.Source, target); err != nil {
-			if f.SkipOnMissing && errors.Is(err, os.ErrNotExist) {
+			if f.SkipOnMissing && errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
 			return pkg_errors.Wrapf(err, "failed to copy from %s to %s", f.Source, target)
