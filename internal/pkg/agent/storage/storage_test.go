@@ -49,7 +49,7 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 
 		require.True(t, bytes.Equal(writtenContent, replaceWith))
 		requireFilesCount(t, dir, 2)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 
 	t.Run("when save is not successful", func(t *testing.T) {
@@ -154,7 +154,7 @@ func TestDiskStore(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 
 	t.Run("when the target do no exist", func(t *testing.T) {
@@ -173,7 +173,7 @@ func TestDiskStore(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 
 	t.Run("return an io.ReadCloser to the target file", func(t *testing.T) {
@@ -189,7 +189,7 @@ func TestDiskStore(t *testing.T) {
 		content, err := io.ReadAll(r)
 		require.NoError(t, err)
 		require.Equal(t, msg, content)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 }
 

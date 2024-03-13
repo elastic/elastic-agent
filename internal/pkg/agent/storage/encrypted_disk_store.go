@@ -13,15 +13,13 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
-
-	"github.com/hectane/go-acl"
-
 	"github.com/elastic/elastic-agent-libs/file"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 )
 
@@ -106,7 +104,7 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 
 	tmpFile := d.target + ".tmp"
 
-	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, perms)
+	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask)
 	if err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not save to %s", tmpFile),
@@ -156,7 +154,7 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, d.target))
 	}
 
-	if err := acl.Chmod(d.target, perms); err != nil {
+	if err := perms.FixPermissions(d.target, perms.WithMask(permMask)); err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not set permissions target file %s", d.target),
 			errors.TypeFilesystem,
@@ -168,7 +166,7 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 
 // Load returns an io.ReadCloser for the target.
 func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
-	fd, err := os.OpenFile(d.target, os.O_RDONLY, perms)
+	fd, err := os.OpenFile(d.target, os.O_RDONLY, permMask)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// If file doesn't exist, return empty reader closer

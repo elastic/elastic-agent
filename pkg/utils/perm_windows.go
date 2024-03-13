@@ -15,6 +15,8 @@ const (
 	AdministratorSID = "S-1-5-32-544"
 	// SystemSID is the SID for the SYSTEM user.
 	SystemSID = "S-1-5-32-544"
+	// EveryoneSID is the SID for Everyone.
+	EveryoneSID = "S-1-1-0"
 )
 
 // FileOwner is the ownership a file should have.

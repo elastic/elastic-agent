@@ -9,10 +9,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/hectane/go-acl"
-
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 )
 
 // NewDiskStore creates an unencrypted disk store.
@@ -43,7 +42,7 @@ func (d *DiskStore) Delete() error {
 func (d *DiskStore) Save(in io.Reader) error {
 	tmpFile := d.target + ".tmp"
 
-	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, perms)
+	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask)
 	if err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not save to %s", tmpFile),
@@ -86,7 +85,7 @@ func (d *DiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, d.target))
 	}
 
-	if err := acl.Chmod(d.target, perms); err != nil {
+	if err := perms.FixPermissions(d.target, perms.WithMask(permMask)); err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not set permissions target file %s", d.target),
 			errors.TypeFilesystem,
@@ -98,7 +97,7 @@ func (d *DiskStore) Save(in io.Reader) error {
 
 // Load return a io.ReadCloser for the target file.
 func (d *DiskStore) Load() (io.ReadCloser, error) {
-	fd, err := os.OpenFile(d.target, os.O_RDONLY|os.O_CREATE, perms)
+	fd, err := os.OpenFile(d.target, os.O_RDONLY|os.O_CREATE, permMask)
 	if err != nil {
 		return nil, errors.New(err,
 			fmt.Sprintf("could not open %s", d.target),

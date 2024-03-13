@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -177,12 +178,12 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	}
 
 	// fix permissions
-	err = FixPermissions(topPath, ownership)
+	err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
 	if err != nil {
 		return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 	}
 	if paths.ShellWrapperPath != "" {
-		err = FixPermissions(paths.ShellWrapperPath, ownership)
+		err = perms.FixPermissions(paths.ShellWrapperPath, perms.WithOwnership(ownership))
 		if err != nil {
 			return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath, err)
 		}

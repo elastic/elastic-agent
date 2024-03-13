@@ -4,7 +4,7 @@
 
 //go:build windows
 
-package install
+package perms
 
 import (
 	"errors"
@@ -21,7 +21,9 @@ import (
 )
 
 // FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
-func FixPermissions(topPath string, ownership utils.FileOwner) error {
+func FixPermissions(topPath string, opts ...OptFunc) error {
+	o := newOpts(opts...)
+
 	// SYSTEM and Administrators always get permissions
 	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
 	systemSID, err := windows.StringToSid(utils.SystemSID)
@@ -40,23 +42,30 @@ func FixPermissions(topPath string, ownership utils.FileOwner) error {
 
 	// user gets full control of the acl's when set
 	var userSID *windows.SID
-	if ownership.UID != "" {
-		userSID, err = windows.StringToSid(ownership.UID)
+	if o.ownership.UID != "" {
+		userSID, err = windows.StringToSid(o.ownership.UID)
 		if err != nil {
-			return fmt.Errorf("failed to get user %s: %w", ownership.UID, err)
+			return fmt.Errorf("failed to get user %s: %w", o.ownership.UID, err)
 		}
-		grants = append(grants, acl.GrantSid(0xF10F0000, userSID)) // full control of all acl's
+		grants = append(grants, acl.GrantSid(uint32(((o.mask&0700)<<23)|((o.mask&0200)<<9)), userSID))
 	}
 
 	// group only gets READ_CONTROL rights
 	var groupSID *windows.SID
-	if ownership.GID != "" {
-		groupSID, err = windows.StringToSid(ownership.GID)
+	if o.ownership.GID != "" {
+		groupSID, err = windows.StringToSid(o.ownership.GID)
 		if err != nil {
-			return fmt.Errorf("failed to get group %s: %w", ownership.GID, err)
+			return fmt.Errorf("failed to get group %s: %w", o.ownership.GID, err)
 		}
-		grants = append(grants, acl.GrantSid(windows.READ_CONTROL, groupSID))
+		grants = append(grants, acl.GrantSid(uint32(((o.mask&0070)<<26)|((o.mask&0020)<<12)), groupSID))
 	}
+
+	// everyone grant SID
+	everyoneSID, err := windows.StringToSid(utils.EveryoneSID)
+	if err != nil {
+		return fmt.Errorf("failed to get Everyone SID: %w", err)
+	}
+	grants = append(grants, acl.GrantSid(uint32(((o.mask&0007)<<29)|((o.mask&0002)<<15)), everyoneSID))
 
 	// call to `takeOwnership` which sets the ownership information requires the current process
 	// token to have the 'SeRestorePrivilege' or it's unable to adjust the ownership
@@ -68,6 +77,7 @@ func FixPermissions(topPath string, ownership utils.FileOwner) error {
 				if topPath == name {
 					inherit = false
 				}
+
 				err = acl.Apply(name, true, inherit, grants...)
 				if err != nil {
 					return err

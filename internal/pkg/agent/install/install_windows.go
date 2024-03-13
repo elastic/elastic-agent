@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
@@ -46,7 +47,7 @@ func postInstall(topPath string) error {
 }
 
 func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
-	return FixPermissions(markerFilePath, ownership)
+	return perms.FixPermissions(markerFilePath, perms.WithOwnership(ownership))
 }
 
 // withServiceOptions just sets the user/group for the service.

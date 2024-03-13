@@ -27,7 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -277,7 +277,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	}
 
 	if c.options.FixPermissions != nil {
-		err = install.FixPermissions(paths.Top(), *c.options.FixPermissions)
+		err = perms.FixPermissions(paths.Top(), perms.WithOwnership(*c.options.FixPermissions))
 		if err != nil {
 			return errors.New(err, "failed to fix permissions")
 		}

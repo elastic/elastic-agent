@@ -10,7 +10,7 @@ import (
 	"os"
 )
 
-const perms os.FileMode = 0600
+const permMask os.FileMode = 0600
 
 // Store saves the io.Reader.
 type Store interface {

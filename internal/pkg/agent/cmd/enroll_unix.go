@@ -16,10 +16,10 @@ import (
 
 func addPlatformFlags(cmd *cobra.Command) {
 	cmd.Flags().Int32(fromInstallUserArg, -1, "UID of the elastic-agent-user user when enrolling from installer")
-	cmd.Flags().MarkHidden(fromInstallUserArg)
+	_ = cmd.Flags().MarkHidden(fromInstallUserArg)
 
 	cmd.Flags().Int32(fromInstallGroupArg, -1, "GID of the elastic-agent group when enrolling from installer")
-	cmd.Flags().MarkHidden(fromInstallGroupArg)
+	_ = cmd.Flags().MarkHidden(fromInstallGroupArg)
 }
 
 func getFileOwnerFromCmd(cmd *cobra.Command) (utils.FileOwner, error) {

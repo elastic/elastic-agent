@@ -11,10 +11,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/hectane/go-acl"
-
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 )
 
 // ReplaceOnSuccessStore takes a target file, a replacement content and a wrapped store. This
@@ -77,7 +76,7 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, r.target))
 	}
 
-	fd, err := os.OpenFile(r.target, os.O_CREATE|os.O_WRONLY, perms)
+	fd, err := os.OpenFile(r.target, os.O_CREATE|os.O_WRONLY, permMask)
 	if err != nil {
 		// Rollback on any errors to minimize non working state.
 		if err := file.SafeFileRotate(r.target, backFilename); err != nil {
@@ -100,7 +99,7 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 	// Always clean up the temporary file and ignore errors.
 	defer os.Remove(tmpFile)
 
-	fdt, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, perms)
+	fdt, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask)
 	if err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not save to %s", tmpFile),
@@ -140,7 +139,7 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 			errors.M("backup_path", backFilename))
 	}
 
-	if err := acl.Chmod(r.target, perms); err != nil {
+	if err := perms.FixPermissions(r.target, perms.WithMask(permMask)); err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not set permissions target file %s", r.target),
 			errors.TypeFilesystem,
