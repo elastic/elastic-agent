@@ -67,29 +67,51 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	}
 	grants = append(grants, acl.GrantSid(uint32(((o.mask&0007)<<29)|((o.mask&0002)<<15)), everyoneSID))
 
-	// call to `takeOwnership` which sets the ownership information requires the current process
-	// token to have the 'SeRestorePrivilege' or it's unable to adjust the ownership
-	return winio.RunWithPrivileges([]string{winio.SeRestorePrivilege}, func() error {
-		return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
-			if err == nil {
-				// first level doesn't inherit
-				inherit := true
-				if topPath == name {
-					inherit = false
-				}
+	// ownership can only be change to another user when running as Administrator
+	isAdmin, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to determine Administrator: %w", err)
+	}
+	if isAdmin {
+		// call to `takeOwnership` which sets the ownership information requires the current process
+		// token to have the 'SeRestorePrivilege' or it's unable to adjust the ownership
+		return winio.RunWithPrivileges([]string{winio.SeRestorePrivilege}, func() error {
+			return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
+				if err == nil {
+					// first level doesn't inherit
+					inherit := true
+					if topPath == name {
+						inherit = false
+					}
 
-				err = acl.Apply(name, true, inherit, grants...)
-				if err != nil {
-					return err
+					err = acl.Apply(name, true, inherit, grants...)
+					if err != nil {
+						return err
+					}
+					if userSID != nil && groupSID != nil {
+						err = takeOwnership(name, userSID, groupSID)
+					}
+				} else if errors.Is(err, fs.ErrNotExist) {
+					return nil
 				}
-				if userSID != nil && groupSID != nil {
-					err = takeOwnership(name, userSID, groupSID)
-				}
-			} else if errors.Is(err, fs.ErrNotExist) {
-				return nil
-			}
-			return err
+				return err
+			})
 		})
+	}
+
+	// ownership cannot be changed, that will keep the ownership as it currently is
+	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
+		if err == nil {
+			// first level doesn't inherit
+			inherit := true
+			if topPath == name {
+				inherit = false
+			}
+			return acl.Apply(name, true, inherit, grants...)
+		} else if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return err
 	})
 }
 
