@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
@@ -23,18 +24,17 @@ import (
 func newReExecWindowsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Hidden: true,
-		Use:    "reexec_windows <service_name> <pid>",
+		Use:    "reexec_windows <pid>",
 		Short:  "ReExec the windows service",
 		Long:   "This waits for the windows service to stop then restarts it to allow self-upgrading.",
-		Args:   cobra.ExactArgs(2),
+		Args:   cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			serviceName := args[0]
-			servicePid, err := strconv.Atoi(args[1])
+			servicePid, err := strconv.Atoi(args[0])
 			if err != nil {
 				fmt.Fprintf(streams.Err, "%v\n", err)
 				os.Exit(1)
 			}
-			err = reExec(serviceName, servicePid)
+			err = reExec(servicePid)
 			if err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
@@ -45,12 +45,12 @@ func newReExecWindowsCommand(_ []string, streams *cli.IOStreams) *cobra.Command 
 	return cmd
 }
 
-func reExec(serviceName string, servicePid int) error {
+func reExec(servicePid int) error {
 	manager, err := mgr.Connect()
 	if err != nil {
 		return errors.New(err, "failed to connect to service manager")
 	}
-	service, err := manager.OpenService(serviceName)
+	service, err := manager.OpenService(paths.ServiceName)
 	if err != nil {
 		return errors.New(err, "failed to open service")
 	}

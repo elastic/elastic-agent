@@ -31,3 +31,8 @@ func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwne
 func withServiceOptions(username string, groupName string) ([]serviceOpt, error) {
 	return []serviceOpt{withUserGroup(username, groupName)}, nil
 }
+
+func servicePostInstall(ownership utils.FileOwner) error {
+	// do nothing on unix
+	return nil
+}

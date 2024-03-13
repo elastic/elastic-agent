@@ -10,11 +10,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/svc/mgr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
+)
+
+var (
+	modadvapi32                  = syscall.NewLazyDLL("advapi32.dll")
+	procSetServiceObjectSecurity = modadvapi32.NewProc("SetServiceObjectSecurity")
 )
 
 // postInstall performs post installation for Windows systems.
@@ -68,4 +78,52 @@ func withServiceOptions(username string, groupName string) ([]serviceOpt, error)
 	// username must be prefixed with `.\` so the service references the local systems users
 	username = fmt.Sprintf(`.\%s`, username)
 	return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
+}
+
+// servicePostInstall sets the security descriptor for the service
+//
+// gives user the ability to control the service, needed when installed with --unprivileged or
+// ReExec is not possible on Windows.
+func servicePostInstall(ownership utils.FileOwner) error {
+	if ownership.UID == "" {
+		// no user, running with LOCAL SYSTEM (do nothing)
+		return nil
+	}
+
+	m, err := mgr.Connect()
+	if err != nil {
+		return fmt.Errorf("failed to connect to service manager: %w", err)
+	}
+	defer func() {
+		_ = m.Disconnect()
+	}()
+
+	s, err := m.OpenService(paths.ServiceName)
+	if err != nil {
+		return fmt.Errorf("failed to open service (%s): %w", paths.ServiceName, err)
+	}
+	defer func() {
+		_ = s.Close()
+	}()
+
+	sd, err := windows.SecurityDescriptorFromString(
+		"D:(A;;GA;;;SY)" + // SDDL_LOCAL_SYSTEM -> SDDL_GENERIC_ALL
+			"(A;;GA;;;BA)" + // SDDL_BUILTIN_ADMINISTRATORS -> SDDL_GENERIC_ALL
+			"(A;;GR;;;WD)" + // SDDL_EVERYONE -> SDDL_GENERIC_READ
+			"(A;;GRGX;;;NS)" + // SDDL_NETWORK_SERVICE -> SDDL_GENERIC_READ|SDDL_GENERIC_EXECUTE
+			fmt.Sprintf("(A;;GA;;;%s)", ownership.UID), // Ownership UID -> SDDL_GENERIC_ALL
+	)
+	if err != nil {
+		return fmt.Errorf("failed to crate security descriptor: %w", err)
+	}
+
+	ret, _, _ := procSetServiceObjectSecurity.Call(
+		uintptr(m.Handle),
+		uintptr(uint32(windows.DACL_SECURITY_INFORMATION)),
+		uintptr(unsafe.Pointer(&sd)),
+	)
+	if ret != 0 {
+		return fmt.Errorf("call to SetServiceObjectSecurity failed: status=%d", ret)
+	}
+	return nil
 }
