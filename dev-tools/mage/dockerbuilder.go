@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/magefile/mage/sh"
+	pkg_errors "github.com/pkg/errors"
 )
 
 type dockerBuilder struct {
@@ -101,9 +102,7 @@ func (b *dockerBuilder) copyFiles() error {
 			if f.SkipOnMissing && errors.Is(err, os.ErrNotExist) {
 				continue
 			}
-			if err != nil {
-				return fmt.Errorf("failed to copy from %s to %s: %w", f.Source, target, err)
-			}
+			return pkg_errors.Wrapf(err, "failed to copy from %s to %s", f.Source, target)
 		}
 	}
 	return nil
