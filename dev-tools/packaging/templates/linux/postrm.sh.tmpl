@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+set -e
+
+symlink="/usr/share/elastic-agent/bin/elastic-agent"
+
+case "$1" in
+  purge)
+    rm -rf /var/lib/elastic-agent /var/log/elastic-agent /etc/elastic-agent
+    ;;
+
+  # 0 is for rpm uninstall
+  upgrade|remove|failed-upgrade|abort-install|abort-upgrade|disappear|0)
+    if systemctl --quiet is-active elastic-agent; then
+      echo "stopping elastic-agent"
+      systemctl --quiet stop elastic-agent
+    fi
+    # delete symlink if exists
+    if test -L "$symlink"; then
+      echo "found symlink $symlink, unlink"
+      unlink "$symlink"
+    fi
+    ;;
+  *)
+    ;;
+esac
+
+echo "systemd daemon-reload"
+systemctl daemon-reload 2> /dev/null
+exit 0

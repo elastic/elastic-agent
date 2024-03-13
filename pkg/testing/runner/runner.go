@@ -24,6 +24,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"k8s.io/utils/strings/slices"
 
+	"github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
@@ -65,7 +66,7 @@ type OSRunner interface {
 	// Prepare prepares the runner to actual run on the host.
 	Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string) error
 	// Copy places the required files on the host.
-	Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, build Build) error
+	Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, builds []Build) error
 	// Run runs the actual tests and provides the result.
 	Run(ctx context.Context, verbose bool, sshClient SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
 	// Diagnostics gathers any diagnostics from the host.
@@ -361,7 +362,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	}
 
 	// copy the required files (done every run)
-	err = batch.OS.Runner.Copy(ctx, client, logger, repoArchive, r.getBuild(batch))
+	err = batch.OS.Runner.Copy(ctx, client, logger, repoArchive, r.getBuilds(batch))
 	if err != nil {
 		logger.Logf("Failed to copy files instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to copy files to instance %s: %w", instance.Name, err)
@@ -419,12 +420,13 @@ func (r *Runner) validate() error {
 	var requiredFiles []string
 	for _, b := range r.batches {
 		if !b.Skip {
-			build := r.getBuild(b)
-			if !slices.Contains(requiredFiles, build.Path) {
-				requiredFiles = append(requiredFiles, build.Path)
-			}
-			if !slices.Contains(requiredFiles, build.SHA512Path) {
-				requiredFiles = append(requiredFiles, build.SHA512Path)
+			for _, build := range r.getBuilds(b) {
+				if !slices.Contains(requiredFiles, build.Path) {
+					requiredFiles = append(requiredFiles, build.Path)
+				}
+				if !slices.Contains(requiredFiles, build.SHA512Path) {
+					requiredFiles = append(requiredFiles, build.SHA512Path)
+				}
 			}
 		}
 	}
@@ -443,29 +445,32 @@ func (r *Runner) validate() error {
 	return nil
 }
 
-// getBuild returns the build for the batch.
-func (r *Runner) getBuild(b OSBatch) Build {
-	arch := b.OS.Arch
-	if arch == define.AMD64 {
-		arch = "x86_64"
+// getBuilds returns the build for the batch.
+func (r *Runner) getBuilds(b OSBatch) []Build {
+	builds := []Build{}
+	formats := []string{"targz", "zip", "rpm", "deb"}
+	for _, f := range formats {
+		arch := b.OS.Arch
+		if arch == define.AMD64 {
+			arch = "x86_64"
+		}
+		suffix, err := testing.GetPackageSuffix(b.OS.Type, b.OS.Arch, f)
+		if err != nil {
+			// Means that OS type & Arch doesn't support that package format
+			continue
+		}
+		packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("%s-%s-%s", "elastic-agent", r.cfg.AgentVersion, suffix))
+		build := Build{
+			Version:    r.cfg.ReleaseVersion,
+			Type:       b.OS.Type,
+			Arch:       arch,
+			Path:       packageName,
+			SHA512Path: packageName + ".sha512",
+		}
+
+		builds = append(builds, build)
 	}
-	ext := "tar.gz"
-	if b.OS.Type == define.Windows {
-		ext = "zip"
-	}
-	hashExt := ".sha512"
-	name := "elastic-agent"
-	if r.cfg.BinaryName != "" {
-		name = r.cfg.BinaryName
-	}
-	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("%s-%s-%s-%s.%s", name, r.cfg.AgentVersion, b.OS.Type, arch, ext))
-	return Build{
-		Version:    r.cfg.ReleaseVersion,
-		Type:       b.OS.Type,
-		Arch:       arch,
-		Path:       packageName,
-		SHA512Path: packageName + hashExt,
-	}
+	return builds
 }
 
 // prepare prepares for the runner to run.

@@ -45,8 +45,8 @@ func (h HttpFetcher) Name() string {
 	return fmt.Sprintf("httpFetcher-%s", sanitizeFetcherName(h.baseURL))
 }
 
-func (h HttpFetcher) Fetch(ctx context.Context, operatingSystem string, architecture string, version string) (FetcherResult, error) {
-	suffix, err := GetPackageSuffix(operatingSystem, architecture)
+func (h HttpFetcher) Fetch(ctx context.Context, operatingSystem string, architecture string, version string, packageFormat string) (FetcherResult, error) {
+	suffix, err := GetPackageSuffix(operatingSystem, architecture, packageFormat)
 	if err != nil {
 		return nil, err
 	}

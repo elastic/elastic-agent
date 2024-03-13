@@ -21,6 +21,7 @@ shared:
   - &deb_rpm_agent_spec
     <<: *common
     post_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postinstall.sh.tmpl'
+    post_rm_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postrm.sh.tmpl'
     files:
       /usr/share/{{.BeatName}}/LICENSE.txt:
         source: '{{ repo.RootDir }}/LICENSE.txt'
