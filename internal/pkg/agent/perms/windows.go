@@ -40,7 +40,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	grants = append(grants, acl.GrantSid(0xF10F0000, systemSID))         // full control of all acl's
 	grants = append(grants, acl.GrantSid(0xF10F0000, administratorsSID)) // full control of all acl's
 
-	// user gets full control of the acl's when set
+	// user gets grant based on the mask
 	var userSID *windows.SID
 	if o.ownership.UID != "" {
 		userSID, err = windows.StringToSid(o.ownership.UID)
@@ -50,7 +50,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		grants = append(grants, acl.GrantSid(uint32(((o.mask&0700)<<23)|((o.mask&0200)<<9)), userSID))
 	}
 
-	// group only gets READ_CONTROL rights
+	// group gets grant based on the mask
 	var groupSID *windows.SID
 	if o.ownership.GID != "" {
 		groupSID, err = windows.StringToSid(o.ownership.GID)
@@ -60,7 +60,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		grants = append(grants, acl.GrantSid(uint32(((o.mask&0070)<<26)|((o.mask&0020)<<12)), groupSID))
 	}
 
-	// everyone grant SID
+	// everyone gets grant based on the mask
 	everyoneSID, err := windows.StringToSid(utils.EveryoneSID)
 	if err != nil {
 		return fmt.Errorf("failed to get Everyone SID: %w", err)
@@ -99,7 +99,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		})
 	}
 
-	// ownership cannot be changed, that will keep the ownership as it currently is
+	// ownership cannot be changed, this will keep the ownership as it currently is but apply the ACL's
 	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
 		if err == nil {
 			// first level doesn't inherit
