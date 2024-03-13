@@ -211,7 +211,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			return
 		}
 		oLogs := logp.ObserverLogs().TakeAll()
-		fmt.Fprintf(os.Stderr, "Error uninstalling.  Printing logs\n")
+		fmt.Fprintf(os.Stderr, "Error uninstalling. Printing logs\n")
 		for _, oLog := range oLogs {
 			fmt.Fprintf(os.Stderr, "%v\n", oLog.Entry)
 		}

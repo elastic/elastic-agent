@@ -13,13 +13,14 @@ import (
 // Slope is a slim wrapper around a regression library for calculating rate of change over time in tests.
 type Slope struct {
 	handler *regression.Regression
+	label   string
 }
 
 func NewSlope(label string) Slope {
 	handler := new(regression.Regression)
 	handler.SetObserved(label)
 	handler.SetVar(0, "time")
-	return Slope{handler: handler}
+	return Slope{handler: handler, label: label}
 }
 
 // add a datapoint and timestamp to the calculaton.
@@ -45,4 +46,8 @@ func (slope Slope) Formula() string {
 // Debug returns a string representation of the regression, including all datapoints
 func (slope Slope) Debug() string {
 	return slope.handler.String()
+}
+
+func (slope Slope) Name() string {
+	return slope.label
 }
