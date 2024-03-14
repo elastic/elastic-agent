@@ -10,21 +10,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"syscall"
-	"unsafe"
 
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/svc/mgr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
-)
-
-var (
-	modadvapi32                  = syscall.NewLazyDLL("advapi32.dll")
-	procSetServiceObjectSecurity = modadvapi32.NewProc("SetServiceObjectSecurity")
 )
 
 // postInstall performs post installation for Windows systems.
@@ -90,23 +82,7 @@ func servicePostInstall(ownership utils.FileOwner) error {
 		return nil
 	}
 
-	m, err := mgr.Connect()
-	if err != nil {
-		return fmt.Errorf("failed to connect to service manager: %w", err)
-	}
-	defer func() {
-		_ = m.Disconnect()
-	}()
-
-	s, err := m.OpenService(paths.ServiceName)
-	if err != nil {
-		return fmt.Errorf("failed to open service (%s): %w", paths.ServiceName, err)
-	}
-	defer func() {
-		_ = s.Close()
-	}()
-
-	sd, err := windows.SecurityDescriptorFromString(
+	securityDescriptor, err := windows.SecurityDescriptorFromString(
 		"D:(A;;GA;;;SY)" + // SDDL_LOCAL_SYSTEM -> SDDL_GENERIC_ALL
 			"(A;;GA;;;BA)" + // SDDL_BUILTIN_ADMINISTRATORS -> SDDL_GENERIC_ALL
 			"(A;;GR;;;WD)" + // SDDL_EVERYONE -> SDDL_GENERIC_READ
@@ -114,16 +90,15 @@ func servicePostInstall(ownership utils.FileOwner) error {
 			fmt.Sprintf("(A;;GA;;;%s)", ownership.UID), // Ownership UID -> SDDL_GENERIC_ALL
 	)
 	if err != nil {
-		return fmt.Errorf("failed to crate security descriptor: %w", err)
+		return fmt.Errorf("failed to build security descriptor from SSDL: %w", err)
 	}
-
-	ret, _, _ := procSetServiceObjectSecurity.Call(
-		uintptr(m.Handle),
-		uintptr(uint32(windows.DACL_SECURITY_INFORMATION)),
-		uintptr(unsafe.Pointer(&sd)),
-	)
-	if ret != 0 {
-		return fmt.Errorf("call to SetServiceObjectSecurity failed: status=%d", ret)
+	dacl, _, err := securityDescriptor.DACL()
+	if err != nil {
+		return fmt.Errorf("failed to get DACL from security descriptor: %w", err)
+	}
+	err = windows.SetNamedSecurityInfo(paths.ServiceName, windows.SE_SERVICE, windows.DACL_SECURITY_INFORMATION, nil, nil, dacl, nil)
+	if err != nil {
+		return fmt.Errorf("failed to set DACL for service(%s): %w", paths.ServiceName, err)
 	}
 	return nil
 }
