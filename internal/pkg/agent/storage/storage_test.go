@@ -144,7 +144,8 @@ func TestDiskStore(t *testing.T) {
 		target, err := genFile([]byte("hello world"))
 		require.NoError(t, err)
 		defer os.Remove(target)
-		d := NewDiskStore(target)
+		d, err := NewDiskStore(target)
+		require.NoError(t, err)
 
 		msg := []byte("bonjour la famille")
 		err = d.Save(bytes.NewReader(msg))
@@ -163,7 +164,8 @@ func TestDiskStore(t *testing.T) {
 		defer os.Remove(dir)
 
 		target := filepath.Join(dir, "hello.txt")
-		d := NewDiskStore(target)
+		d, err := NewDiskStore(target)
+		require.NoError(t, err)
 
 		msg := []byte("bonjour la famille")
 		err = d.Save(bytes.NewReader(msg))
@@ -181,7 +183,9 @@ func TestDiskStore(t *testing.T) {
 		target, err := genFile(msg)
 		require.NoError(t, err)
 
-		d := NewDiskStore(target)
+		d, err := NewDiskStore(target)
+		require.NoError(t, err)
+
 		r, err := d.Load()
 		require.NoError(t, err)
 		defer r.Close()

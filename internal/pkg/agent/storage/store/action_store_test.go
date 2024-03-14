@@ -30,7 +30,8 @@ func TestActionStore(t *testing.T) {
 
 	t.Run("action returns empty when no action is saved on disk",
 		withFile(func(t *testing.T, file string) {
-			s := storage.NewDiskStore(file)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store, err := newActionStore(log, s)
 			require.NoError(t, err)
 			require.Equal(t, 0, len(store.actions()))
@@ -42,7 +43,8 @@ func TestActionStore(t *testing.T) {
 				ActionID: "abc123",
 			}
 
-			s := storage.NewDiskStore(file)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store, err := newActionStore(log, s)
 			require.NoError(t, err)
 
@@ -63,7 +65,8 @@ func TestActionStore(t *testing.T) {
 				},
 			}
 
-			s := storage.NewDiskStore(file)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store, err := newActionStore(log, s)
 			require.NoError(t, err)
 
@@ -73,7 +76,8 @@ func TestActionStore(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, len(store.actions()))
 
-			s = storage.NewDiskStore(file)
+			s, err = storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store1, err := newActionStore(log, s)
 			require.NoError(t, err)
 
