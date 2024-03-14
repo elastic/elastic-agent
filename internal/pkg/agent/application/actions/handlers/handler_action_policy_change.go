@@ -258,6 +258,7 @@ func (h *PolicyChangeHandler) applyConfigWithPrecedence(cfg remote.Config) {
 			h.config.Fleet.Client.Transport.TLS = &tlscommon.Config{}
 		}
 
+		// client certificate
 		if cfg.Transport.TLS.Certificate == emptyCertificate {
 			h.log.Debug("TLS certificate/key from fleet are empty or null, the TLS config will not be changed")
 		} else {
@@ -265,7 +266,7 @@ func (h *PolicyChangeHandler) applyConfigWithPrecedence(cfg remote.Config) {
 			h.log.Debug("received TSL certificate/key from fleet, applying it")
 		}
 
-		// apply an empty CA
+		// CA
 		if len(cfg.Transport.TLS.CAs) == 0 {
 			h.log.Debug("TLS CAs from fleet are empty or null, the TLS config will not be changed")
 		} else {
