@@ -580,13 +580,23 @@ func Update() {
 	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
 }
 
+func EnsureCrossBuildOutputDir() error {
+	repositoryRoot, err := findRepositoryRoot()
+	if err != nil {
+		return fmt.Errorf("finding repository root: %w", err)
+	}
+	return os.MkdirAll(filepath.Join(repositoryRoot, "build", "golang-crossbuild"), 0o770)
+}
+
 // CrossBuild cross-builds the beat for all target platforms.
 func CrossBuild() error {
+	mg.Deps(EnsureCrossBuildOutputDir)
 	return devtools.CrossBuild()
 }
 
 // CrossBuildGoDaemon cross-builds the go-daemon binary using Docker.
 func CrossBuildGoDaemon() error {
+	mg.Deps(EnsureCrossBuildOutputDir)
 	return devtools.CrossBuildGoDaemon()
 }
 
@@ -1231,6 +1241,22 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	return err
 }
 
+// PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
+func PackageUsingDRA(ctx context.Context, manifestUrl string, packageVersion string) {
+
+	start := time.Now()
+	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	devtools.SetAgentPackageVersion(packageVersion)
+
+	platforms := devtools.Platforms.Names()
+	if len(platforms) == 0 {
+		panic("elastic-agent package is expected to build at least one platform package")
+	}
+
+	packageAgent(platforms, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, manifestUrl))
+}
+
 func findRepositoryRoot() (string, error) {
 	return sh.Output(mg.GoCmd(), "list", "-f", "{{.Root}}")
 }
@@ -1384,7 +1410,7 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 	return downloadedArtifacts, errGrp.Wait()
 }
 
-func UseDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error {
+func useDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error {
 
 	repositoryRoot, err := findRepositoryRoot()
 	if err != nil {
@@ -1400,12 +1426,7 @@ func UseDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error 
 		return fmt.Errorf("downloading elastic-agent-core artifacts: %w", err)
 	}
 
-	dstDirectory := filepath.Join(repositoryRoot, "build", "golang-crossbuild")
-	err = os.MkdirAll(dstDirectory, 0o770)
-
-	if err != nil {
-		return fmt.Errorf("creating destination directory %q: %w", dstDirectory, err)
-	}
+	mg.Deps(EnsureCrossBuildOutputDir)
 
 	// place the artifacts where the package.yml expects them (in build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}})
 	for artifactFile, artifactMeta := range artifacts {
