@@ -1205,7 +1205,23 @@ type branchInfo struct {
 // FetchLatestAgentCoreStagingDRA is a simple mage target that will retrieve the elastic-agent-core DRA artifacts and
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
-	artifacts, err := downloadLatestAgentCoreStagingDRA(ctx, branch)
+
+	branchInfo, err := findLatestBuildForBranch(ctx, baseURLForStagingDRA, branch)
+
+	// Create a dir with the buildID at <root>/build/dra/<buildID>
+	repositoryRoot, err := findRepositoryRoot()
+	if err != nil {
+		return fmt.Errorf("finding repository root: %w", err)
+	}
+	draDownloadDir := filepath.Join(repositoryRoot, "build", "dra")
+	err = os.MkdirAll(draDownloadDir, 0o770)
+
+	if err != nil {
+		return fmt.Errorf("creating %q directory: %w", err)
+	}
+
+	artifacts, err := downloadDRAArtifacts(ctx, branchInfo.ManifestUrl, draDownloadDir, agentCoreProjectName)
+
 	if err == nil {
 		fmt.Println("Downloaded agent core DRAs:")
 		for k, _ := range artifacts {
@@ -1213,27 +1229,6 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 		}
 	}
 	return err
-}
-
-func downloadLatestAgentCoreStagingDRA(ctx context.Context, branch string) (map[string]tools.Package, error) {
-	const baseURLForStagingDRA = "https://staging.elastic.co/"
-	const agentCoreProjectName = "elastic-agent-core"
-
-	branchInfo, err := findLatestBuildForBranch(ctx, baseURLForStagingDRA, branch)
-
-	// Create a dir with the buildID at <root>/build/dra/<buildID>
-	repositoryRoot, err := findRepositoryRoot()
-	if err != nil {
-		return nil, fmt.Errorf("finding repository root: %w", err)
-	}
-	draDownloadDir := filepath.Join(repositoryRoot, "build", "dra", branchInfo.BuildId)
-	err = os.MkdirAll(draDownloadDir, 0o770)
-
-	if err != nil {
-		return nil, fmt.Errorf("creating %q directory: %w", err)
-	}
-
-	return downloadDRAArtifacts(ctx, branchInfo.ManifestUrl, draDownloadDir, agentCoreProjectName)
 }
 
 func findRepositoryRoot() (string, error) {
@@ -1315,6 +1310,7 @@ func filterPackagesByPlatform(pkgs map[string]tools.Package) map[string]tools.Pa
 }
 
 func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir string, projects ...string) (map[string]tools.Package, error) {
+
 	build, err := manifest.DownloadManifest(manifestUrl)
 	if err != nil {
 		return nil, fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)
