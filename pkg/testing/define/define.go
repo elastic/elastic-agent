@@ -151,7 +151,7 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 		panic("failed to get OS information")
 	}
 	if !req.runtimeAllowed(runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform) {
-		t.Skipf("platform: %s, architecture: %s, version: %s, and distro: %s combination is not supported by test.  required: %v", runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, req.OS)
+		t.Skip("platform, architecture, version, and distro not supported by test")
 		return nil
 	}
 	namespace, err := getNamespace(t, local)

@@ -34,7 +34,7 @@ func Package() error {
 	// platforms := updateWithDarwinUniversal(Platforms)
 	platforms := Platforms
 
-	tasks := make(map[string][]interface{})
+	var tasks []interface{}
 	for _, target := range platforms {
 		for _, pkg := range Packages {
 			if pkg.OS != target.GOOS() || pkg.Arch != "" && pkg.Arch != target.Arch() {
@@ -94,15 +94,12 @@ func Package() error {
 
 				spec = spec.Evaluate()
 
-				tasks[target.GOOS()+"-"+target.Arch()] = append(tasks[target.GOOS()+"-"+target.Arch()], packageBuilder{target, spec, pkgType}.Build)
+				tasks = append(tasks, packageBuilder{target, spec, pkgType}.Build)
 			}
 		}
 	}
 
-	for k, v := range tasks {
-		fmt.Printf(">> package: Building %s\n", k)
-		Parallel(v...)
-	}
+	Parallel(tasks...)
 	return nil
 }
 

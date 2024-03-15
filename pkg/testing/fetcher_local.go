@@ -55,8 +55,8 @@ func (f *localFetcher) Name() string {
 }
 
 // Fetch fetches the Elastic Agent and places the resulting binary at the path.
-func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architecture string, version string, packageFormat string) (FetcherResult, error) {
-	suffix, err := GetPackageSuffix(operatingSystem, architecture, packageFormat)
+func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architecture string, version string) (FetcherResult, error) {
+	suffix, err := GetPackageSuffix(operatingSystem, architecture)
 	if err != nil {
 		return nil, err
 	}
