@@ -69,7 +69,7 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Lo
 }
 
 // Copy places the required files on the host.
-func (WindowsRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, builds []Build) error {
+func (WindowsRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, build Build) error {
 	// copy the archive and extract it on the host (tar exists and can extract zip on windows)
 	logger.Logf("Copying repo")
 	destRepoName := filepath.Base(repoArchive)
@@ -101,57 +101,55 @@ func (WindowsRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logge
 	// determine if the build needs to be replaced on the host
 	// if it already exists and the SHA512 are the same contents, then
 	// there is no reason to waste time uploading the build
-	for _, build := range builds {
-		copyBuild := true
-		localSHA512, err := os.ReadFile(build.SHA512Path)
+	copyBuild := true
+	localSHA512, err := os.ReadFile(build.SHA512Path)
+	if err != nil {
+		return fmt.Errorf("failed to read local SHA52 contents %s: %w", build.SHA512Path, err)
+	}
+	hostSHA512Path := filepath.Base(build.SHA512Path)
+	hostSHA512, err := sshClient.GetFileContents(ctx, hostSHA512Path, WithContentFetchCommand("type"))
+	if err == nil {
+		if string(localSHA512) == string(hostSHA512) {
+			logger.Logf("Skipping copy agent build %s; already the same", filepath.Base(build.Path))
+			copyBuild = false
+		}
+	}
+
+	if copyBuild {
+		// ensure the existing copies are removed first
+		toRemove := filepath.Base(build.Path)
+		stdOut, errOut, err = sshClient.Exec(ctx,
+			"del", []string{toRemove, "/f", "/q"}, nil)
 		if err != nil {
-			return fmt.Errorf("failed to read local SHA52 contents %s: %w", build.SHA512Path, err)
-		}
-		hostSHA512Path := filepath.Base(build.SHA512Path)
-		hostSHA512, err := sshClient.GetFileContents(ctx, hostSHA512Path, WithContentFetchCommand("type"))
-		if err == nil {
-			if string(localSHA512) == string(hostSHA512) {
-				logger.Logf("Skipping copy agent build %s; already the same", filepath.Base(build.Path))
-				copyBuild = false
-			}
+			return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
+				toRemove, err, stdOut, errOut)
 		}
 
+		toRemove = filepath.Base(build.SHA512Path)
+		stdOut, errOut, err = sshClient.Exec(ctx,
+			"del", []string{toRemove, "/f", "/q"}, nil)
+		if err != nil {
+			return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
+				toRemove, err, stdOut, errOut)
+		}
+
+		logger.Logf("Copying agent build %s", filepath.Base(build.Path))
+	}
+
+	for _, buildPath := range []string{build.Path, build.SHA512Path} {
 		if copyBuild {
-			// ensure the existing copies are removed first
-			toRemove := filepath.Base(build.Path)
-			stdOut, errOut, err = sshClient.Exec(ctx,
-				"del", []string{toRemove, "/f", "/q"}, nil)
+			err = sshClient.Copy(buildPath, filepath.Base(buildPath))
 			if err != nil {
-				return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
-					toRemove, err, stdOut, errOut)
+				return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
 			}
-
-			toRemove = filepath.Base(build.SHA512Path)
-			stdOut, errOut, err = sshClient.Exec(ctx,
-				"del", []string{toRemove, "/f", "/q"}, nil)
-			if err != nil {
-				return fmt.Errorf("failed to remove %q: %w (stdout: %q, stderr: %q)",
-					toRemove, err, stdOut, errOut)
-			}
-
-			logger.Logf("Copying agent build %s", filepath.Base(build.Path))
 		}
-
-		for _, buildPath := range []string{build.Path, build.SHA512Path} {
-			if copyBuild {
-				err = sshClient.Copy(buildPath, filepath.Base(buildPath))
-				if err != nil {
-					return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
-				}
-			}
-			insideAgentDir := filepath.Join("agent", buildPath)
-			// possible the build path already exists, 'mkdir' on windows will fail if it already exists
-			// error from this call is ignored because of it
-			_, _, _ = sshClient.Exec(ctx, "mkdir", []string{toWindowsPath(filepath.Dir(insideAgentDir))}, nil)
-			stdOut, errOut, err = sshClient.Exec(ctx, "mklink", []string{"/h", toWindowsPath(insideAgentDir), filepath.Base(buildPath)}, nil)
-			if err != nil {
-				return fmt.Errorf("failed to hard link %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), toWindowsPath(insideAgentDir), err, stdOut, errOut)
-			}
+		insideAgentDir := filepath.Join("agent", buildPath)
+		// possible the build path already exists, 'mkdir' on windows will fail if it already exists
+		// error from this call is ignored because of it
+		_, _, _ = sshClient.Exec(ctx, "mkdir", []string{toWindowsPath(filepath.Dir(insideAgentDir))}, nil)
+		stdOut, errOut, err = sshClient.Exec(ctx, "mklink", []string{"/h", toWindowsPath(insideAgentDir), filepath.Base(buildPath)}, nil)
+		if err != nil {
+			return fmt.Errorf("failed to hard link %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), toWindowsPath(insideAgentDir), err, stdOut, errOut)
 		}
 	}
 
