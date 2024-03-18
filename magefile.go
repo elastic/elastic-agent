@@ -426,7 +426,14 @@ func Package() {
 		panic("elastic-agent package is expected to build at least one platform package")
 	}
 
-	packageAgent(platforms, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
+	var dependenciesVersion string
+	if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
+		dependenciesVersion = bversion.GetDefaultVersion()
+	} else {
+		dependenciesVersion = beatVersion
+	}
+
+	packageAgent(platforms, dependenciesVersion, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder
@@ -840,10 +847,17 @@ func runAgent(env map[string]string) error {
 
 	// docker does not exists for this commit, build it
 	if !strings.Contains(dockerImageOut, tag) {
+		var dependenciesVersion string
+		if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
+			dependenciesVersion = bversion.GetDefaultVersion()
+		} else {
+			dependenciesVersion = beatVersion
+		}
+
 		// produce docker package
 		packageAgent([]string{
 			"linux/amd64",
-		}, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
+		}, dependenciesVersion, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -898,15 +912,8 @@ var platformPackages = map[string]string{
 	"windows/amd64": "windows-x86_64.zip",
 }
 
-func packageAgent(platforms []string, agentPackaging, agentBinaryTarget mg.Fn) {
+func packageAgent(platforms []string, dependenciesVersion string, agentPackaging, agentBinaryTarget mg.Fn) {
 	fmt.Println("--- Package Elastic-Agent")
-
-	var dependenciesVersion string
-	if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
-		dependenciesVersion = bversion.GetDefaultVersion()
-	} else {
-		dependenciesVersion = beatVersion
-	}
 
 	requiredPackages := []string{}
 	for _, p := range platforms {
@@ -1138,11 +1145,12 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 		matches = append(matches, zipMatches...)
 
 		if mg.Verbose() {
-			log.Printf("--- Extracting into the flat dir")
+			log.Printf("--- Extracting into the flat dir: %v", matches)
 		}
 		for _, m := range matches {
 			stat, err := os.Stat(m)
 			if os.IsNotExist(err) {
+				log.Printf("--- File %s not found: %v", m, err)
 				continue
 			} else if err != nil {
 				panic(fmt.Errorf("failed stating file: %w", err))
@@ -1159,13 +1167,17 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 			}
 		}
 
-		files, err := filepath.Glob(filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion)))
+		globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
+		if mg.Verbose() {
+			log.Printf("Finding files to copy with %s", globExpr)
+		}
+		files, err := filepath.Glob(globExpr)
 		if err != nil {
 			panic(err)
 		}
 		if mg.Verbose() {
 			log.Printf("Validating checksums for %+v", files)
-			log.Printf("--- Copy files into %s", versionedDropPath)
+			log.Printf("--- Copying into %s: %v", versionedDropPath, files)
 		}
 		checksums := make(map[string]string)
 		for _, f := range files {
@@ -1242,19 +1254,34 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 }
 
 // PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
-func PackageUsingDRA(ctx context.Context, manifestUrl string, packageVersion string) {
+func PackageUsingDRA(ctx context.Context) error {
 
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
-	devtools.SetAgentPackageVersion(packageVersion)
-
 	platforms := devtools.Platforms.Names()
 	if len(platforms) == 0 {
-		panic("elastic-agent package is expected to build at least one platform package")
+		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
 	}
 
-	packageAgent(platforms, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, manifestUrl))
+	if !devtools.PackagingFromManifest {
+		return fmt.Errorf("elastic-agent PackageUsingDRA is expected to build from a manifest. Check that %s is set to a manifest URL", devtools.ManifestUrlEnvVar)
+	}
+
+	manifestUrl := devtools.ManifestURL
+
+	build, err := manifest.DownloadManifest(manifestUrl)
+	if err != nil {
+		return fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)
+	}
+
+	parsedVersion, err := version.ParseVersion(build.Version)
+	if err != nil {
+		return fmt.Errorf("parsing version string %q: %w", build.Version, err)
+	}
+
+	packageAgent(platforms, parsedVersion.VersionWithPrerelease(), mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, manifestUrl))
+	return nil
 }
 
 func findRepositoryRoot() (string, error) {
