@@ -197,7 +197,7 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 					if binary != "filebeat" && binary != "metricbeat" {
 						t.Errorf("expected monitoring compoent to be metricbeat or filebeat, got %s", binary)
 					}
-					if componentID != "filestream-monitoring" && componentID != "beat/metrics-monitoring" && componentID != "http/metrics-monitoring" {
+					if componentID != monitoringFilesUnitsID && componentID != "beat/metrics-monitoring" && componentID != "http/metrics-monitoring" {
 						t.Errorf("got unxpected monitoring component ID: %s", componentID)
 					}
 				}
