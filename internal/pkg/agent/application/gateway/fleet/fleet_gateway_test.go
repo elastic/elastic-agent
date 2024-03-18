@@ -502,7 +502,8 @@ func newStateStore(t *testing.T, log *logger.Logger) *store.StateStore {
 	require.NoError(t, err)
 
 	filename := filepath.Join(dir, "state.enc")
-	diskStore := storage.NewDiskStore(filename)
+	diskStore, err := storage.NewDiskStore(filename)
+	require.NoError(t, err)
 	stateStore, err := store.NewStateStore(log, diskStore)
 	require.NoError(t, err)
 

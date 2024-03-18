@@ -19,6 +19,12 @@ type FetchContextProvider interface {
 type ContextProviderComm interface {
 	context.Context
 
+	// Signal signals that something has changed in the provider.
+	//
+	// Note: This should only be used by fetch context providers, standard context
+	// providers should use Set to update the overall state.
+	Signal()
+
 	// Set sets the current mapping for this context.
 	Set(map[string]interface{}) error
 }
