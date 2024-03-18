@@ -15,7 +15,7 @@ import (
 type factory func(<-chan struct{}) Backoff
 
 func TestCloseChannel(t *testing.T) {
-	init := 2 * time.Millisecond
+	init := time.Second
 	max := 5 * time.Second
 
 	tests := map[string]factory{
@@ -32,7 +32,7 @@ func TestCloseChannel(t *testing.T) {
 			c := make(chan struct{})
 			b := f(c)
 			close(c)
-			assert.False(t, b.Wait())
+			assert.False(t, b.Wait(), "should return false because the channel shuld get closed faster than the next wait duration")
 		})
 	}
 }
