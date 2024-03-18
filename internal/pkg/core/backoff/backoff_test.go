@@ -59,7 +59,7 @@ func TestUnblockAfterInit(t *testing.T) {
 
 			startedAt := time.Now()
 			assert.True(t, WaitOnError(b, errors.New("bad bad")))
-			assert.True(t, time.Now().Sub(startedAt) >= init)
+			assert.True(t, time.Since(startedAt) >= init)
 		})
 	}
 }
@@ -87,7 +87,7 @@ func TestNextWait(t *testing.T) {
 
 			startedAt := time.Now()
 			b.Wait()
-			waitDuration := time.Now().Sub(startedAt)
+			waitDuration := time.Since(startedAt)
 			nextWait := b.NextWait()
 
 			t.Logf("actualWait: %s startWait: %s nextWait: %s", waitDuration, startWait, nextWait)
