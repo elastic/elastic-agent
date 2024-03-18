@@ -8,7 +8,7 @@ package integration
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
