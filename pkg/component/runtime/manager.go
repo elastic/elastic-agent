@@ -259,7 +259,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	wgServer.Add(1)
 	go func() {
 		defer wgServer.Done()
-		go m.serverLoop(ctx, listener, server)
+		m.serverLoop(ctx, listener, server)
 	}()
 
 	// Start the run loop, which continues on the main goroutine

@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -301,4 +302,327 @@ func Test_K8sSecretsProvider_Fetch_Cache_Disabled(t *testing.T) {
 	val, found = fp.Fetch(key + "doesnotexist")
 	assert.False(t, found)
 	assert.Equal(t, "", val)
+}
+
+func Test_MergeWitchCurrent(t *testing.T) {
+	logger := logp.NewLogger("test_k8s_secrets")
+
+	c := map[string]interface{}{}
+	cfg, err := config.NewConfigFrom(c)
+	require.NoError(t, err)
+
+	p, err := ContextProviderBuilder(logger, cfg, true)
+	require.NoError(t, err)
+
+	fp, _ := p.(*contextProviderK8sSecrets)
+
+	ts := time.Now()
+	var tests = []struct {
+		secretsCache map[string]*secretsData
+		updatedMap   map[string]*secretsData
+		mergedMap    map[string]*secretsData
+		updatedCache bool
+		message      string
+	}{
+		{
+			secretsCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts,
+				},
+			},
+			updatedMap: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one-updated",
+					lastAccess: ts,
+				},
+			},
+			mergedMap: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one-updated",
+					lastAccess: ts,
+				},
+			},
+			updatedCache: true,
+			message:      "When the value of one of the keys in the map gets updated, updatedCache should be true.",
+		},
+		{
+			secretsCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts,
+				},
+			},
+			updatedMap: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts,
+				},
+			},
+			mergedMap: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts,
+				},
+			},
+			updatedCache: false,
+			message:      "When nothing changes in the cache, updatedCache should be false.",
+		},
+		{
+			secretsCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts,
+				},
+				"kubernetes_secrets.default.secret_two.secret_value": {
+					value:      "value-two",
+					lastAccess: ts,
+				},
+			},
+			updatedMap: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts,
+				},
+			},
+			mergedMap: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts,
+				},
+				"kubernetes_secrets.default.secret_two.secret_value": {
+					value:      "value-two",
+					lastAccess: ts,
+				},
+			},
+			updatedCache: true,
+			message: "When secretsCache gets updated at the same time we create updatedMap, then merging the two should" +
+				"detect the change on updatedCache.",
+		},
+	}
+
+	for _, test := range tests {
+		fp.secretsCache = test.secretsCache
+		merged, updated := fp.mergeWithCurrent(test.updatedMap)
+
+		require.Equalf(t, len(test.mergedMap), len(merged), "Resulting merged map does not have the expected length.")
+		for key, data1 := range test.mergedMap {
+			data2, ok := merged[key]
+			if ok {
+				require.Equalf(t, data1.value, data2.value, "Resulting merged map values do not equal the expected ones.")
+				require.Equalf(t, data1.lastAccess, data2.lastAccess, "Resulting merged map values do not equal the expected ones.")
+			} else {
+				t.Fatalf("Resulting merged map does not have expecting keys.")
+			}
+		}
+
+		require.Equalf(t, test.updatedCache, updated, test.message)
+	}
+}
+
+func Test_UpdateCache(t *testing.T) {
+	logger := logp.NewLogger("test_k8s_secrets")
+
+	c := map[string]interface{}{}
+	cfg, err := config.NewConfigFrom(c)
+	require.NoError(t, err)
+
+	p, err := ContextProviderBuilder(logger, cfg, true)
+	require.NoError(t, err)
+
+	fp, _ := p.(*contextProviderK8sSecrets)
+
+	ts := time.Now()
+
+	client := k8sfake.NewSimpleClientset()
+	secret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "apps/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret_one",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"secret_value": []byte(pass),
+		},
+	}
+	_, err = client.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	fp.client = client
+
+	var tests = []struct {
+		secretsCache  map[string]*secretsData
+		expectedCache map[string]*secretsData
+		updatedCache  bool
+		message       string
+	}{
+		{
+			secretsCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts,
+				},
+			},
+			expectedCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      pass,
+					lastAccess: ts,
+				},
+			},
+			updatedCache: true,
+			message:      "When last access is still within the limits, values should be updated.",
+		},
+		{
+			secretsCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts.Add(-fp.config.TTLDelete - time.Minute),
+				},
+			},
+			expectedCache: map[string]*secretsData{},
+			updatedCache:  true,
+			message:       "When last access is no longer within the limits, the data should be deleted.",
+		},
+		{
+			secretsCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      pass,
+					lastAccess: ts,
+				},
+			},
+			expectedCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      pass,
+					lastAccess: ts,
+				},
+			},
+			updatedCache: false,
+			message:      "When the values did not change and last access is still within limits, no update happens.",
+		},
+	}
+
+	for _, test := range tests {
+		fp.secretsCache = test.secretsCache
+		updated := fp.updateCache()
+
+		require.Equalf(t, len(test.expectedCache), len(fp.secretsCache), "Resulting updated map does not have the expected length.")
+		for key, data1 := range test.expectedCache {
+			data2, ok := fp.secretsCache[key]
+			if ok {
+				require.Equalf(t, data1.value, data2.value, "Resulting updating map values do not equal the expected ones.")
+				require.Equalf(t, data1.lastAccess, data2.lastAccess, "Resulting updated map values do not equal the expected ones.")
+			} else {
+				t.Fatalf("Resulting updated map does not have expecting keys.")
+			}
+		}
+
+		require.Equalf(t, test.updatedCache, updated, test.message)
+	}
+
+}
+
+func Test_Signal(t *testing.T) {
+	// The signal should get triggered every time there is an update on the cache
+	logger := logp.NewLogger("test_k8s_secrets")
+
+	client := k8sfake.NewSimpleClientset()
+
+	secret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "apps/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret_one",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"secret_value": []byte(pass),
+		},
+	}
+	_, err := client.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	refreshInterval, err := time.ParseDuration("100ms")
+	require.NoError(t, err)
+
+	c := map[string]interface{}{
+		"cache_refresh_interval": refreshInterval,
+	}
+	cfg, err := config.NewConfigFrom(c)
+	require.NoError(t, err)
+
+	p, err := ContextProviderBuilder(logger, cfg, true)
+	require.NoError(t, err)
+
+	fp, _ := p.(*contextProviderK8sSecrets)
+	fp.client = client
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := ctesting.NewContextComm(ctx)
+
+	signalTriggered := new(bool)
+	*signalTriggered = false
+	var lock sync.RWMutex
+
+	comm.CallOnSignal(func() {
+		lock.Lock()
+		*signalTriggered = true
+		lock.Unlock()
+	})
+
+	go fp.updateSecrets(ctx, comm)
+
+	ts := time.Now()
+
+	var tests = []struct {
+		secretsCache map[string]*secretsData
+		updated      bool
+		message      string
+	}{
+		{
+			secretsCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      "value-one",
+					lastAccess: ts,
+				},
+			},
+			updated: true,
+			message: "Value of secret should be updated and signal should be triggered.",
+		},
+		{
+			secretsCache: map[string]*secretsData{
+				"kubernetes_secrets.default.secret_one.secret_value": {
+					value:      pass,
+					lastAccess: ts,
+				},
+			},
+			updated: false,
+			message: "Value of secret should not be updated and signal should not be triggered.",
+		},
+	}
+
+	for _, test := range tests {
+		fp.secretsCacheMx.Lock()
+		fp.secretsCache = test.secretsCache
+		fp.secretsCacheMx.Unlock()
+
+		// wait for cache to be updated
+		<-time.After(fp.config.RefreshInterval)
+
+		assert.Eventuallyf(t, func() bool {
+			lock.RLock()
+			defer lock.RUnlock()
+			return *signalTriggered == test.updated
+		}, fp.config.RefreshInterval*3, fp.config.RefreshInterval, test.message)
+
+		lock.Lock()
+		*signalTriggered = false
+		lock.Unlock()
+	}
+
 }
