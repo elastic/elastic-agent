@@ -15,7 +15,7 @@ import (
 type factory func(<-chan struct{}) Backoff
 
 func TestCloseChannel(t *testing.T) {
-	init := 2 * time.Millisecond
+	init := time.Second
 	max := 5 * time.Second
 
 	tests := map[string]factory{
@@ -32,7 +32,7 @@ func TestCloseChannel(t *testing.T) {
 			c := make(chan struct{})
 			b := f(c)
 			close(c)
-			assert.False(t, b.Wait())
+			assert.False(t, b.Wait(), "should return false because the channel shuld get closed faster than the next wait duration")
 		})
 	}
 }
@@ -59,7 +59,7 @@ func TestUnblockAfterInit(t *testing.T) {
 
 			startedAt := time.Now()
 			assert.True(t, WaitOnError(b, errors.New("bad bad")))
-			assert.True(t, time.Now().Sub(startedAt) >= init)
+			assert.True(t, time.Since(startedAt) >= init)
 		})
 	}
 }
@@ -87,7 +87,7 @@ func TestNextWait(t *testing.T) {
 
 			startedAt := time.Now()
 			b.Wait()
-			waitDuration := time.Now().Sub(startedAt)
+			waitDuration := time.Since(startedAt)
 			nextWait := b.NextWait()
 
 			t.Logf("actualWait: %s startWait: %s nextWait: %s", waitDuration, startWait, nextWait)
