@@ -449,6 +449,17 @@ func (r *Runner) validate() error {
 func (r *Runner) getBuilds(b OSBatch) []Build {
 	builds := []Build{}
 	formats := []string{"targz", "zip", "rpm", "deb"}
+	binaryName := "elastic-agent"
+	
+	// This is for testing beats in serverless environment
+	if strings.HasSuffix(r.cfg.BinaryName, "beat") {
+		formats = []string{"targz","zip"}
+	}
+
+	if r.cfg.BinaryName != "" {
+		binaryName = r.cfg.BinaryName
+	}
+	
 	for _, f := range formats {
 		arch := b.OS.Arch
 		if arch == define.AMD64 {
@@ -459,7 +470,7 @@ func (r *Runner) getBuilds(b OSBatch) []Build {
 			// Means that OS type & Arch doesn't support that package format
 			continue
 		}
-		packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("%s-%s-%s", "elastic-agent", r.cfg.AgentVersion, suffix))
+		packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("%s-%s-%s", binaryName, r.cfg.AgentVersion, suffix))
 		build := Build{
 			Version:    r.cfg.ReleaseVersion,
 			Type:       b.OS.Type,
