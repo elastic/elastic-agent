@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -32,9 +34,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/ipc"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -151,7 +155,6 @@ type Manager struct {
 func NewManager(
 	logger,
 	baseLogger *logger.Logger,
-	listenAddr string,
 	agentInfo info.Agent,
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
@@ -165,6 +168,14 @@ func NewManager(
 	if agentInfo == nil {
 		return nil, errors.New("agentInfo cannot be nil")
 	}
+
+	controlAddress := control.Address()
+	listenAddr, err := deriveCommsAddress(controlAddress, grpcConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive comms GRPC: %w", err)
+	}
+	logger.With("address", listenAddr).Infof("GRPC comms socket listening at %s", listenAddr)
+
 	m := &Manager{
 		logger:         logger,
 		baseLogger:     baseLogger,
@@ -1073,4 +1084,33 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
 	}
 	return res.Diagnostic, nil
+}
+
+// deriveCommsAddress derives the comms socket/pipe path/name from given control address and GRPC config
+func deriveCommsAddress(controlAddress string, grpc *configuration.GRPCConfig) (string, error) {
+	if grpc.Local {
+		return deriveCommsSocketName(controlAddress)
+	}
+	return grpc.String(), nil
+}
+
+var errInvalidUri = errors.New("invalid uri")
+
+// deriveCommsSocketName derives the agent communication unix/npipe path
+// currently from the control socket path, since it's already set properly
+// matching the socket path length to meet the system limits of the platform
+func deriveCommsSocketName(uri string) (string, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return "", err
+	}
+
+	if len(u.Path) == 0 || (u.Scheme != "unix" && u.Scheme != "npipe") {
+		return "", fmt.Errorf("%w %s", errInvalidUri, uri)
+	}
+
+	// The base name without extension and use it as id argument for SocketURLWithFallback call
+	// THe idea it to use the same logic for the comms path as for the control socket/pipe path
+	base := strings.TrimSuffix(path.Base(u.Path), path.Ext(u.Path))
+	return utils.SocketURLWithFallback(base, path.Dir(u.Path)), nil
 }
