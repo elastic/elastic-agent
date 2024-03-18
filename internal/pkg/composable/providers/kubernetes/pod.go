@@ -212,7 +212,14 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 		if !p.managed {
 			if ann, ok := data.mapping["annotations"]; ok {
 				annotations, _ := ann.(mapstr.M)
-				hints := utils.GenerateHints(annotations, "", p.config.Prefix)
+				hints, incorrecthints := utils.GenerateHints(annotations, "", p.config.Prefix, allSupportedHints)
+				//We check whether the provided annotation follows the supported format and vocabulary. The check happens for annotations that have prefix co.elastic
+				if len(incorrecthints) > 0 {
+					for _, value := range incorrecthints {
+						p.logger.Warnf("provided hint: %s/%s is not recognised as supported annotation for pod %s in namespace %s", p.config.Prefix, value, pod.Name, pod.ObjectMeta.Namespace)
+					}
+				}
+
 				if len(hints) > 0 {
 					p.logger.Debugf("Extracted hints are :%v", hints)
 					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")

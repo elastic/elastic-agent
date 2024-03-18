@@ -30,6 +30,8 @@ const (
 	processors  = "processors"
 )
 
+var allSupportedHints = []string{"enabled", "default_container_logs", "package", integration, datastreams, host, period, timeout, metricspath, username, password, stream, processors}
+
 type hintsBuilder struct {
 	Key string
 
@@ -288,7 +290,7 @@ func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 		}
 	}
 
-	hintsExtracted := utils.GenerateHints(annotations, cName, prefix)
+	hintsExtracted, _ := utils.GenerateHints(annotations, cName, prefix, allSupportedHints)
 	if len(hintsExtracted) == 0 {
 		return hintData
 	}
