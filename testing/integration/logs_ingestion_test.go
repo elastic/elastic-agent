@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -22,6 +21,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -57,7 +57,7 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	// name. This policy does not contain any integration.
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
 		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
@@ -253,8 +253,9 @@ func testFlattenedDatastreamFleetPolicy(
 	policy kibana.PolicyResponse,
 ) {
 	dsType := "logs"
-	dsNamespace := cleanString(fmt.Sprintf("%snamespace%d", t.Name(), rand.Uint64()))
-	dsDataset := cleanString(fmt.Sprintf("%s-dataset", t.Name()))
+	id := uuid.New().String()
+	dsNamespace := cleanString(fmt.Sprintf("namespace-%s", id))
+	dsDataset := cleanString(fmt.Sprintf("dataset-%s", id))
 	numEvents := 60
 
 	// tempDir is not deleted to help with debugging issues
