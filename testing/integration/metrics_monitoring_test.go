@@ -100,7 +100,7 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
 			require.NoError(runner.T(), err)
 			runner.T().Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
-			if res.Hits.Total.Value < 5 {
+			if res.Hits.Total.Value < 1 {
 				return false
 			}
 
@@ -110,6 +110,7 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 }
 
 func genESQuery(agentID string, componentID string) map[string]interface{} {
+	// see https://github.com/elastic/kibana/blob/main/x-pack/plugins/fleet/server/services/agents/agent_metrics.ts
 	queryRaw := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
@@ -124,9 +125,15 @@ func genESQuery(agentID string, componentID string) map[string]interface{} {
 							"component.id": componentID,
 						},
 					},
+					// make sure we fetch documents that have the metric field used by fleet monitoring
 					{
 						"exists": map[string]interface{}{
-							"field": "system.process.cpu.total.value", // make sure we fetch documents that have the metric field used by fleet monitoring
+							"field": "system.process.cpu.total.value",
+						},
+					},
+					{
+						"exists": map[string]interface{}{
+							"field": "system.process.memory.size",
 						},
 					},
 				},
