@@ -253,8 +253,9 @@ func testFlattenedDatastreamFleetPolicy(
 	policy kibana.PolicyResponse,
 ) {
 	dsType := "logs"
-	dsNamespace := cleanString(fmt.Sprintf("%s-namespace-%s", t.Name(), uuid.New().String()))
-	dsDataset := cleanString(fmt.Sprintf("%s-dataset", t.Name()))
+	id := uuid.New().String()
+	dsNamespace := cleanString(fmt.Sprintf("namespace-%s", id))
+	dsDataset := cleanString(fmt.Sprintf("dataset-%s", id))
 	numEvents := 60
 
 	// tempDir is not deleted to help with debugging issues
