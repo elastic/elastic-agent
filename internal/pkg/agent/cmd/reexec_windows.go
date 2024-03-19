@@ -84,7 +84,9 @@ func getServiceState() (svc.Status, error) {
 	if err != nil {
 		return svc.Status{}, fmt.Errorf("failed to connect to service manager: %w", err)
 	}
-	defer manager.Disconnect()
+	defer func() {
+		_ = manager.Disconnect()
+	}()
 
 	service, err := manager.OpenService(paths.ServiceName)
 	if err != nil {
@@ -107,7 +109,9 @@ func startService() error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to service manager: %w", err)
 	}
-	defer manager.Disconnect()
+	defer func() {
+		_ = manager.Disconnect()
+	}()
 
 	service, err := manager.OpenService(paths.ServiceName)
 	if err != nil {
