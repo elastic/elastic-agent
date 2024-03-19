@@ -3,13 +3,16 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
+  ASDF_MAGE_VERSION: '1.14.0'
+
 steps:
   - label: "check-ci"
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
-      image: "family/core-ubuntu-2204"
+      imageProject: elastic-images-qa
+      image: family/platform-ingest-beats-ubuntu-2204
     retry:
       manual:
         allowed: true
@@ -26,7 +29,8 @@ steps:
           - "coverage.out"
         agents:
           provider: "gcp"
-          image: "family/core-ubuntu-2204"
+          imageProject: elastic-images-qa
+          image: family/platform-ingest-beats-ubuntu-2204
         retry:
           manual:
             allowed: true
