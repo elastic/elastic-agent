@@ -518,10 +518,14 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	// SkipDaemonRestart to true avoids running that code.
 	options.SkipDaemonRestart = true
 	pathConfigFile := paths.ConfigFile()
+	encStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create encrypted disk store: %w", err)
+	}
 	store := storage.NewReplaceOnSuccessStore(
 		pathConfigFile,
 		application.DefaultAgentFleetConfig,
-		storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile()),
+		encStore,
 	)
 	c, err := newEnrollCmd(
 		logger,

@@ -490,10 +490,14 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		storeOpts = append(storeOpts, storage.ReplaceOnSuccessStoreWithOwnership(*fixPermissions))
 		encryptOpts = append(encryptOpts, storage.EncryptedStoreWithOwnership(*fixPermissions))
 	}
+	encStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile(), encryptOpts...)
+	if err != nil {
+		return fmt.Errorf("failed to create encrypted disk store: %w", err)
+	}
 	store := storage.NewReplaceOnSuccessStore(
 		pathConfigFile,
 		application.DefaultAgentFleetConfig,
-		storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile(), encryptOpts...),
+		encStore,
 		storeOpts...,
 	)
 
