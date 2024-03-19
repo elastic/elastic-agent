@@ -6,11 +6,15 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"testing"
@@ -374,11 +378,35 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 	})
 
 	t.Run("policy with SSL config", func(t *testing.T) {
+		agentChildEncPassphrase := `reallySecurePassword`
+		passphrasePath := filepath.Join(t.TempDir(), "passphrase")
+		err = os.WriteFile(
+			passphrasePath,
+			[]byte(agentChildEncPassphrase),
+			0400)
+		require.NoError(t, err,
+			"could not write agent child certificate key passphrase to temp directory")
+
 		fleetRootPair, fleetChildPair, err := certutil.NewRootAndChildCerts()
 		require.NoError(t, err, "failed creating fleet root and child certs")
 
 		agentRootPair, agentChildPair, err := certutil.NewRootAndChildCerts()
 		require.NoError(t, err, "failed creating root and child certs")
+
+		agentChildDERKey, _ := pem.Decode(agentChildPair.Key)
+		require.NoError(t, err, "could not create tls.Certificates from child certificate")
+
+		encPem, err := x509.EncryptPEMBlock(
+			rand.Reader,
+			"EC PRIVATE KEY",
+			agentChildDERKey.Bytes,
+			[]byte(agentChildEncPassphrase),
+			x509.PEMCipherAES128)
+		require.NoError(t, err, "failed encrypting agent child certificate key block")
+		agentChildEncPair := certutil.Pair{
+			Cert: agentChildPair.Cert,
+			Key:  pem.EncodeToMemory(encPem),
+		}
 
 		wrongRootPair, wrongChildPair, err := certutil.NewRootAndChildCerts()
 		require.NoError(t, err, "failed creating root and child certs")
@@ -560,6 +588,74 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				wantCertificateConfig: tlscommon.CertificateConfig{
 					Certificate: string(agentChildPair.Cert),
 					Key:         string(agentChildPair.Key),
+				},
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"unexpected error when applying fleet.ssl.certificate and key")
+				},
+			},
+			{
+				name: "certificate and key with passphrase is applied when present",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{
+									CAs: []string{string(fleetRootPair.Cert)},
+								},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.ssl.enabled":        true,
+					"fleet.ssl.certificate":    string(agentChildEncPair.Cert),
+					"fleet.ssl.key":            string(agentChildEncPair.Key),
+					"fleet.ssl.key_passphrase": agentChildEncPassphrase,
+				},
+				setterCalledCount: 1,
+				wantCAs:           []string{string(fleetRootPair.Cert)},
+				wantCertificateConfig: tlscommon.CertificateConfig{
+					Certificate: string(agentChildEncPair.Cert),
+					Key:         string(agentChildEncPair.Key),
+					Passphrase:  agentChildEncPassphrase,
+				},
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"unexpected error when applying fleet.ssl.certificate and key")
+				},
+			},
+			{
+				name: "certificate and key with passphrase_path is applied when present",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{
+									CAs: []string{string(fleetRootPair.Cert)},
+								},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.ssl.enabled":             true,
+					"fleet.ssl.certificate":         string(agentChildEncPair.Cert),
+					"fleet.ssl.key":                 string(agentChildEncPair.Key),
+					"fleet.ssl.key_passphrase_path": passphrasePath,
+				},
+				setterCalledCount: 1,
+				wantCAs:           []string{string(fleetRootPair.Cert)},
+				wantCertificateConfig: tlscommon.CertificateConfig{
+					Certificate:    string(agentChildEncPair.Cert),
+					Key:            string(agentChildEncPair.Key),
+					PassphrasePath: passphrasePath,
 				},
 				assertErr: func(t *testing.T, err error) {
 					assert.NoError(t, err,
