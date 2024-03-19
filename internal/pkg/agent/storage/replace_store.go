@@ -157,7 +157,7 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 	}
 	if err := perms.FixPermissions(tmpFile, opts...); err != nil {
 		return errors.New(err,
-			fmt.Sprintf("could not set permissions on temporary file"),
+			fmt.Sprintf("could not set permissions on temporary file %s", tmpFile),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
