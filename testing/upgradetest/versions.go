@@ -247,19 +247,6 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 	return nil, ErrNoPreviousMinor
 }
 
-func LatestSnapshot() (*version.ParsedSemVer, error) {
-	versions, err := GetUpgradableVersions()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get upgradable versions: %w", err)
-	}
-	for _, v := range versions {
-		if v.IsSnapshot() {
-			return v, nil
-		}
-	}
-	return nil, fmt.Errorf("no snapshots on the list")
-}
-
 // EnsureSnapshot ensures that the version string is a snapshot version.
 func EnsureSnapshot(version string) string {
 	if !strings.HasSuffix(version, "-SNAPSHOT") {

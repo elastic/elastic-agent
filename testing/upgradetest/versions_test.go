@@ -99,14 +99,6 @@ func TestPreviousMinor(t *testing.T) {
 	assert.Empty(t, v.BuildMetadata())
 }
 
-func TestLatestSnapshot(t *testing.T) {
-	v, err := LatestSnapshot()
-	require.NoError(t, err)
-	t.Logf("latest snapshot: %s", v.String())
-	assert.NotNil(t, v)
-	assert.Truef(t, v.IsSnapshot(), "returned version must be a snapshot, got %s", v.String())
-}
-
 func buildVersionList(t *testing.T, versions []string) version.SortableParsedVersions {
 	result := make(version.SortableParsedVersions, 0, len(versions))
 	for _, v := range versions {

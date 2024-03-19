@@ -42,7 +42,7 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	latestSnapshotVersion, err := upgradetest.LatestSnapshot()
+	latestSnapshotVersion, err := version.ParseVersion(upgradetest.EnsureSnapshot(define.Version()))
 	require.NoError(t, err)
 
 	// start at the build version as we want to test the retry
