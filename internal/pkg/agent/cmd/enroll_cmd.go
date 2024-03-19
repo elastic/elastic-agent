@@ -190,9 +190,14 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		span.End()
 	}()
 
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
+	}
+
 	// Create encryption key from the agent before touching configuration
 	if !c.options.SkipCreateSecret {
-		var opts []vault.OptionFunc
+		opts := []vault.OptionFunc{vault.WithUnprivileged(!hasRoot)}
 		if c.options.FixPermissions != nil {
 			opts = append(opts, vault.WithVaultOwnership(*c.options.FixPermissions))
 		}

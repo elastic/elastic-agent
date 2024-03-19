@@ -26,12 +26,12 @@ func DiskStoreWithOwnership(ownership utils.FileOwner) DiskStoreOptionFunc {
 }
 
 // NewDiskStore creates an unencrypted disk store.
-func NewDiskStore(target string, opts ...DiskStoreOptionFunc) *DiskStore {
+func NewDiskStore(target string, opts ...DiskStoreOptionFunc) (*DiskStore, error) {
 	s := &DiskStore{target: target}
 	for _, opt := range opts {
 		opt(s)
 	}
-	return s
+	return s, nil
 }
 
 // Exists check if the store file exists on the disk

@@ -70,17 +70,13 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("unable to perform install command while checking for administrator rights, %w", err)
+		return fmt.Errorf("unable to perform install command while checking for root/Administrator rights: %w", err)
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
 
-	// only support Linux at the moment
 	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
-	if unprivileged && runtime.GOOS == "darwin" {
-		return fmt.Errorf("unable to perform install command, unprivileged is not supported on macOS")
-	}
 	if unprivileged {
 		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this is an experimental and currently unsupported feature.")
 	}
@@ -211,7 +207,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			return
 		}
 		oLogs := logp.ObserverLogs().TakeAll()
-		fmt.Fprintf(os.Stderr, "Error uninstalling.  Printing logs\n")
+		fmt.Fprintf(os.Stderr, "Error uninstalling. Printing logs\n")
 		for _, oLog := range oLogs {
 			fmt.Fprintf(os.Stderr, "%v\n", oLog.Entry)
 		}

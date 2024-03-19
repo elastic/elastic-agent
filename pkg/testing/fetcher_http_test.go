@@ -24,7 +24,6 @@ func TestHttpFetcher_Fetch(t *testing.T) {
 		operatingSystem string
 		architecture    string
 		version         string
-		pkgFormat       string
 	}
 	tests := []struct {
 		name    string
@@ -39,7 +38,6 @@ func TestHttpFetcher_Fetch(t *testing.T) {
 				operatingSystem: "linux",
 				architecture:    "arm64",
 				version:         "1.2.3",
-				pkgFormat:       "targz",
 			},
 			want: &httpFetcherResult{
 				baseURL:     "https://artifacts.elastic.co/downloads/beats/elastic-agent/",
@@ -54,7 +52,6 @@ func TestHttpFetcher_Fetch(t *testing.T) {
 				operatingSystem: "windows",
 				architecture:    "amd64",
 				version:         "1.2.3",
-				pkgFormat:       "zip",
 			},
 			want: &httpFetcherResult{
 				baseURL:     "http://somehost.somedomain/some/path/here",
@@ -72,7 +69,7 @@ func TestHttpFetcher_Fetch(t *testing.T) {
 			h := NewHttpFetcher(opts...)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			got, err := h.Fetch(ctx, tt.args.operatingSystem, tt.args.architecture, tt.args.version, tt.args.pkgFormat)
+			got, err := h.Fetch(ctx, tt.args.operatingSystem, tt.args.architecture, tt.args.version)
 			if !tt.wantErr(t, err, fmt.Sprintf("Fetch(%v, %v, %v, %v)", ctx, tt.args.operatingSystem, tt.args.architecture, tt.args.version)) {
 				return
 			}

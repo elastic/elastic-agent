@@ -30,7 +30,4 @@ const (
 
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
-
-	// Deb group of tests. Used for testing .deb packages install & upgrades
-	Deb = "deb"
 )

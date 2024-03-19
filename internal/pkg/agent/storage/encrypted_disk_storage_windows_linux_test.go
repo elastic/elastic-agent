@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
@@ -34,7 +35,8 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	defer cn()
 
 	fp := filepath.Join(dir, testConfigFile)
-	s := NewEncryptedDiskStore(ctx, fp, WithVaultPath(dir))
+	s, err := NewEncryptedDiskStore(ctx, fp, WithVaultPath(dir))
+	require.NoError(t, err)
 
 	// Test that the file loads and doesn't create vault
 	r, err := s.Load()

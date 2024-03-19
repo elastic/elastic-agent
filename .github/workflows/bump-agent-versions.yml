@@ -54,6 +54,7 @@ jobs:
               --head "update-agent-versions-$GITHUB_RUN_ID" \
               --label 'Team:Elastic-Agent' \
               --label 'update-versions' \
-              --reviewer 'elastic/elastic-agent-control-plane' \
+              --label 'skip-changelog' \
+              --label 'backport-skip' \
               --repo $GITHUB_REPOSITORY
           fi
