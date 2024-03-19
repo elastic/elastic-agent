@@ -14,7 +14,18 @@ import (
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
+
+// ReplaceOnSuccessStoreOptionFunc is an option configuration for the replace on success store.
+type ReplaceOnSuccessStoreOptionFunc func(s *ReplaceOnSuccessStore)
+
+// ReplaceOnSuccessStoreWithOwnership sets ownership for creating the files.
+func ReplaceOnSuccessStoreWithOwnership(ownership utils.FileOwner) ReplaceOnSuccessStoreOptionFunc {
+	return func(s *ReplaceOnSuccessStore) {
+		s.ownership = &ownership
+	}
+}
 
 // ReplaceOnSuccessStore takes a target file, a replacement content and a wrapped store. This
 // store is useful if you want to trigger an action to replace another file when the wrapped store save method
@@ -26,16 +37,22 @@ type ReplaceOnSuccessStore struct {
 	replaceWith []byte
 
 	wrapped Store
+
+	ownership *utils.FileOwner
 }
 
 // NewReplaceOnSuccessStore takes a target file and a replacement content and will replace the target
 // file content if the wrapped store execution is done without any error.
-func NewReplaceOnSuccessStore(target string, replaceWith []byte, wrapped Store) *ReplaceOnSuccessStore {
-	return &ReplaceOnSuccessStore{
+func NewReplaceOnSuccessStore(target string, replaceWith []byte, wrapped Store, opts ...ReplaceOnSuccessStoreOptionFunc) *ReplaceOnSuccessStore {
+	r := &ReplaceOnSuccessStore{
 		target:      target,
 		replaceWith: replaceWith,
 		wrapped:     wrapped,
 	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
 }
 
 // Save will replace a target file with new content if the wrapped store is successful.
@@ -131,17 +148,23 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
+	// fix the permissions of the temp file, ensuring that when the file is rotated in to place
+	// it has the correct permissions (otherwise it is possible to be a permissions error, between
+	// rotating the file and setting the permissions after).
+	opts := []perms.OptFunc{perms.WithMask(permMask)}
+	if r.ownership != nil {
+		opts = append(opts, perms.WithOwnership(*r.ownership))
+	}
+	if err := perms.FixPermissions(tmpFile, opts...); err != nil {
+		return errors.New(err,
+			fmt.Sprintf("could not set permissions on temporary file"),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, tmpFile))
+	}
+
 	if err := file.SafeFileRotate(r.target, tmpFile); err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s with %s", r.target, tmpFile),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, r.target),
-			errors.M("backup_path", backFilename))
-	}
-
-	if err := perms.FixPermissions(r.target, perms.WithMask(permMask)); err != nil {
-		return errors.New(err,
-			fmt.Sprintf("could not set permissions target file %s", r.target),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, r.target))
 	}

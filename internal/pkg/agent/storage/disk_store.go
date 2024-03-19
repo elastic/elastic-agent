@@ -12,11 +12,26 @@ import (
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+// DiskStoreOptionFunc is an option configuration for the disk store.
+type DiskStoreOptionFunc func(s *DiskStore)
+
+// DiskStoreWithOwnership sets ownership for creating the files.
+func DiskStoreWithOwnership(ownership utils.FileOwner) DiskStoreOptionFunc {
+	return func(s *DiskStore) {
+		s.ownership = &ownership
+	}
+}
+
 // NewDiskStore creates an unencrypted disk store.
-func NewDiskStore(target string) *DiskStore {
-	return &DiskStore{target: target}
+func NewDiskStore(target string, opts ...DiskStoreOptionFunc) *DiskStore {
+	s := &DiskStore{target: target}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // Exists check if the store file exists on the disk
@@ -78,16 +93,23 @@ func (d *DiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
+	// fix the permissions of the temp file, ensuring that when the file is rotated in to place
+	// it has the correct permissions (otherwise it is possible to be a permissions error, between
+	// rotating the file and setting the permissions after).
+	opts := []perms.OptFunc{perms.WithMask(permMask)}
+	if d.ownership != nil {
+		opts = append(opts, perms.WithOwnership(*d.ownership))
+	}
+	if err := perms.FixPermissions(tmpFile, opts...); err != nil {
+		return errors.New(err,
+			fmt.Sprintf("could not set permissions on temporary file"),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, tmpFile))
+	}
+
 	if err := file.SafeFileRotate(d.target, tmpFile); err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s", d.target),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, d.target))
-	}
-
-	if err := perms.FixPermissions(d.target, perms.WithMask(permMask)); err != nil {
-		return errors.New(err,
-			fmt.Sprintf("could not set permissions target file %s", d.target),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, d.target))
 	}

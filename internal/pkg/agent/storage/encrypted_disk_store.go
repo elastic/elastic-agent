@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const darwin = "darwin"
@@ -35,15 +36,12 @@ func DisableEncryptionDarwin() {
 	}
 }
 
-// OptionFunc is the functional configuration type.
-type OptionFunc func(s *EncryptedDiskStore)
+// EncryptedOptionFunc is an option configuration for the encrypted disk store.
+type EncryptedOptionFunc func(s *EncryptedDiskStore)
 
 // NewEncryptedDiskStore creates an encrypted disk store.
 // Drop-in replacement for NewDiskStorage
-func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFunc) Storage {
-	if encryptionDisabled {
-		return NewDiskStore(target)
-	}
+func NewEncryptedDiskStore(ctx context.Context, target string, opts ...EncryptedOptionFunc) Storage {
 	s := &EncryptedDiskStore{
 		ctx:          ctx,
 		target:       target,
@@ -53,20 +51,34 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFun
 	for _, opt := range opts {
 		opt(s)
 	}
+	if encryptionDisabled {
+		var opts []DiskStoreOptionFunc
+		if s.ownership != nil {
+			opts = append(opts, DiskStoreWithOwnership(*s.ownership))
+		}
+		return NewDiskStore(target, opts...)
+	}
 	return s
 }
 
 // WithVaultPath sets the path of the vault.
-func WithVaultPath(vaultPath string) OptionFunc {
+func WithVaultPath(vaultPath string) EncryptedOptionFunc {
 	return func(s *EncryptedDiskStore) {
 		s.vaultPath = vaultPath
 	}
 }
 
 // WithUnprivileged sets if vault should be unprivileged.
-func WithUnprivileged(unprivileged bool) OptionFunc {
+func WithUnprivileged(unprivileged bool) EncryptedOptionFunc {
 	return func(s *EncryptedDiskStore) {
 		s.unprivileged = unprivileged
+	}
+}
+
+// EncryptedStoreWithOwnership sets ownership for creating the files.
+func EncryptedStoreWithOwnership(ownership utils.FileOwner) EncryptedOptionFunc {
+	return func(s *EncryptedDiskStore) {
+		s.ownership = &ownership
 	}
 }
 
@@ -147,16 +159,23 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
+	// fix the permissions of the temp file, ensuring that when the file is rotated in to place
+	// it has the correct permissions (otherwise it is possible to be a permissions error, between
+	// rotating the file and setting the permissions after).
+	opts := []perms.OptFunc{perms.WithMask(permMask)}
+	if d.ownership != nil {
+		opts = append(opts, perms.WithOwnership(*d.ownership))
+	}
+	if err := perms.FixPermissions(tmpFile, opts...); err != nil {
+		return errors.New(err,
+			fmt.Sprintf("could not set permissions on temporary file"),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, tmpFile))
+	}
+
 	if err := file.SafeFileRotate(d.target, tmpFile); err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s", d.target),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, d.target))
-	}
-
-	if err := perms.FixPermissions(d.target, perms.WithMask(permMask)); err != nil {
-		return errors.New(err,
-			fmt.Sprintf("could not set permissions target file %s", d.target),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, d.target))
 	}

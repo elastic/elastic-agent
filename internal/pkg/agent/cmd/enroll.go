@@ -17,9 +17,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -482,11 +484,24 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		},
 	}
 
+	var storeOpts []storage.ReplaceOnSuccessStoreOptionFunc
+	var encryptOpts []storage.EncryptedOptionFunc
+	if fixPermissions != nil {
+		storeOpts = append(storeOpts, storage.ReplaceOnSuccessStoreWithOwnership(*fixPermissions))
+		encryptOpts = append(encryptOpts, storage.EncryptedStoreWithOwnership(*fixPermissions))
+	}
+	store := storage.NewReplaceOnSuccessStore(
+		pathConfigFile,
+		application.DefaultAgentFleetConfig,
+		storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile(), encryptOpts...),
+		storeOpts...,
+	)
+
 	c, err := newEnrollCmd(
-		ctx,
 		logger,
 		&options,
 		pathConfigFile,
+		store,
 	)
 
 	if err != nil {

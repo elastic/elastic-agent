@@ -77,7 +77,6 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
 			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-
 				return err
 			}
 			return nil
@@ -510,11 +509,17 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	// see https://github.com/elastic/elastic-agent/issues/4043
 	// SkipDaemonRestart to true avoids running that code.
 	options.SkipDaemonRestart = true
+	pathConfigFile := paths.ConfigFile()
+	store := storage.NewReplaceOnSuccessStore(
+		pathConfigFile,
+		application.DefaultAgentFleetConfig,
+		storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile()),
+	)
 	c, err := newEnrollCmd(
-		ctx,
 		logger,
 		&options,
 		paths.ConfigFile(),
+		store,
 	)
 	if err != nil {
 		return nil, err

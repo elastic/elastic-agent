@@ -20,7 +20,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -28,7 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
@@ -164,31 +163,8 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	return cfg, nil
 }
 
-// newEnrollCmd creates a new enroll command that will registers the current beats to the remote
-// system.
+// newEnrollCmd creates a new enrollment with the given store.
 func newEnrollCmd(
-	ctx context.Context,
-	log *logger.Logger,
-	options *enrollCmdOption,
-	configPath string,
-) (*enrollCmd, error) {
-
-	store := storage.NewReplaceOnSuccessStore(
-		configPath,
-		application.DefaultAgentFleetConfig,
-		storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile()),
-	)
-
-	return newEnrollCmdWithStore(
-		log,
-		options,
-		configPath,
-		store,
-	)
-}
-
-// newEnrollCmdWithStore creates a new enrollment and accept a custom store.
-func newEnrollCmdWithStore(
 	log *logger.Logger,
 	options *enrollCmdOption,
 	configPath string,
@@ -216,7 +192,11 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 
 	// Create encryption key from the agent before touching configuration
 	if !c.options.SkipCreateSecret {
-		err = secret.CreateAgentSecret(ctx)
+		var opts []vault.OptionFunc
+		if c.options.FixPermissions != nil {
+			opts = append(opts, vault.WithVaultOwnership(*c.options.FixPermissions))
+		}
+		err = secret.CreateAgentSecret(ctx, opts...)
 		if err != nil {
 			return err
 		}

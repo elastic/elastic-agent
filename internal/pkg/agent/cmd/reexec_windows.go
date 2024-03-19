@@ -8,6 +8,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -17,7 +18,6 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
@@ -34,43 +34,90 @@ func newReExecWindowsCommand(_ []string, streams *cli.IOStreams) *cobra.Command 
 				fmt.Fprintf(streams.Err, "%v\n", err)
 				os.Exit(1)
 			}
-			err = reExec(servicePid)
-			if err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
-			}
+			reExec(servicePid, streams.Err)
 		},
 	}
 
 	return cmd
 }
 
-func reExec(servicePid int) error {
-	manager, err := mgr.Connect()
-	if err != nil {
-		return errors.New(err, "failed to connect to service manager")
-	}
-	service, err := manager.OpenService(paths.ServiceName)
-	if err != nil {
-		return errors.New(err, "failed to open service")
-	}
+func reExec(servicePid int, writer io.Writer) {
 	for {
-		status, err := service.Query()
+		ready, err := ensureAnotherProcess(servicePid)
+		if err == nil && ready {
+			// all done
+			return
+		}
 		if err != nil {
-			return errors.New(err, "failed to query service")
-		}
-		if status.State == svc.Stopped {
-			err = service.Start()
-			if err != nil {
-				return errors.New(err, "failed to start service")
-			}
-			// triggered restart; done
-			return nil
-		}
-		if int(status.ProcessId) != servicePid {
-			// already restarted; has different PID, done!
-			return nil
+			fmt.Fprintf(writer, "%s", err)
 		}
 		<-time.After(300 * time.Millisecond)
 	}
+}
+
+func ensureAnotherProcess(servicePid int) (bool, error) {
+	status, err := getServiceState()
+	if err != nil {
+		return false, err
+	}
+
+	if status.State == svc.Running && status.ProcessId != 0 && int(status.ProcessId) != servicePid {
+		// running and its a different process
+		return true, nil
+	}
+
+	if status.State == svc.Stopped {
+		// fully stopped
+		err = startService()
+		return false, err
+	}
+
+	// not stopped and not running as a different PID, just wait
+	return false, nil
+}
+
+// getServiceState gets the current state from the service manager.
+//
+// Connects to the manager on every check to ensure that the correct ACL's are applied at the time.
+func getServiceState() (svc.Status, error) {
+	manager, err := mgr.Connect()
+	if err != nil {
+		return svc.Status{}, fmt.Errorf("failed to connect to service manager: %w", err)
+	}
+	defer manager.Disconnect()
+
+	service, err := manager.OpenService(paths.ServiceName)
+	if err != nil {
+		return svc.Status{}, fmt.Errorf("failed to open service: %w", err)
+	}
+	defer service.Close()
+
+	status, err := service.Query()
+	if err != nil {
+		return svc.Status{}, fmt.Errorf("failed to query service: %w", err)
+	}
+	return status, nil
+}
+
+// startService starts the service.
+//
+// Connects to the manager on every check to ensure that the correct ACL's are applied at the time.
+func startService() error {
+	manager, err := mgr.Connect()
+	if err != nil {
+		return fmt.Errorf("failed to connect to service manager: %w", err)
+	}
+	defer manager.Disconnect()
+
+	service, err := manager.OpenService(paths.ServiceName)
+	if err != nil {
+		return fmt.Errorf("failed to open service: %w", err)
+	}
+	defer service.Close()
+
+	err = service.Start()
+	if err != nil {
+		return fmt.Errorf("failed to start service: %w", err)
+	}
+	return nil
 }
