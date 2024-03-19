@@ -1578,15 +1578,16 @@ func (Integration) Single(ctx context.Context, testName string) error {
 // UpdateVersions runs an update on the `.agent-versions.json` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
-	maxSnapshots := 2
+	maxSnapshots := 3
 
 	branches, err := git.GetReleaseBranches(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list release branches: %w", err)
 	}
 
-	if len(branches) > maxSnapshots {
-		branches = branches[:maxSnapshots]
+	// -1 because we manually add 7.17 below
+	if len(branches) > maxSnapshots-1 {
+		branches = branches[:maxSnapshots-1]
 	}
 
 	// it's not a part of this repository, cannot be retrieved with `GetReleaseBranches`
