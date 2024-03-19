@@ -38,6 +38,7 @@ var DefaultOptions = []interface{}{
 	ucfg.ResolveEnv,
 	ucfg.VarExp,
 	VarSkipKeys("inputs"),
+	ucfg.IgnoreCommas,
 }
 
 // Config custom type over a ucfg.Config to add new methods on the object.
