@@ -16,6 +16,8 @@ type ContextComm struct {
 	lock     sync.Mutex
 	previous map[string]interface{}
 	current  map[string]interface{}
+	// Signal calls onSignal.
+	onSignal func()
 	// Set calls onSet with the new value, so tests can
 	// verify data from the provider.
 	onSet func(map[string]interface{})
@@ -25,6 +27,16 @@ type ContextComm struct {
 func NewContextComm(ctx context.Context) *ContextComm {
 	return &ContextComm{
 		Context: ctx,
+	}
+}
+
+// Signal signals that something has changed in the provider.
+func (t *ContextComm) Signal() {
+	t.lock.Lock()
+	onSignal := t.onSignal
+	t.lock.Unlock()
+	if onSignal != nil {
+		onSignal()
 	}
 }
 
@@ -45,6 +57,7 @@ func (t *ContextComm) Set(mapping map[string]interface{}) error {
 	if onSet != nil {
 		onSet(mapping)
 	}
+	t.Signal()
 
 	return nil
 }
@@ -61,6 +74,13 @@ func (t *ContextComm) Current() map[string]interface{} {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	return t.current
+}
+
+// CallOnSignal sets the OnSignal callback.
+func (t *ContextComm) CallOnSignal(f func()) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.onSignal = f
 }
 
 // CallOnSet sets the OnSet callback.
