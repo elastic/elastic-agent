@@ -450,16 +450,16 @@ func (r *Runner) getBuilds(b OSBatch) []Build {
 	builds := []Build{}
 	formats := []string{"targz", "zip", "rpm", "deb"}
 	binaryName := "elastic-agent"
-	
+
 	// This is for testing beats in serverless environment
 	if strings.HasSuffix(r.cfg.BinaryName, "beat") {
-		formats = []string{"targz","zip"}
+		formats = []string{"targz", "zip"}
 	}
 
 	if r.cfg.BinaryName != "" {
 		binaryName = r.cfg.BinaryName
 	}
-	
+
 	for _, f := range formats {
 		arch := b.OS.Arch
 		if arch == define.AMD64 {
