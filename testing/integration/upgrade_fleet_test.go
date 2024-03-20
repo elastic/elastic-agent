@@ -146,7 +146,7 @@ func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bo
 	err = upgradeTo.Prepare(ctx)
 	require.NoError(t, err)
 
-	s := newArtifactsServer(ctx, t, latest)
+	s := newArtifactsServer(ctx, t, latest, upgradeTo.PackageFormat())
 	host := "artifacts.elastic.co"
 	simulateAirGapedEnvironment(t, host)
 
@@ -392,14 +392,14 @@ func simulateAirGapedEnvironment(t *testing.T, host string) {
 	})
 }
 
-func newArtifactsServer(ctx context.Context, t *testing.T, version string) *httptest.Server {
+func newArtifactsServer(ctx context.Context, t *testing.T, version string, packageFormat string) *httptest.Server {
 	fileServerDir := t.TempDir()
 	downloadAt := filepath.Join(fileServerDir, "downloads", "beats", "elastic-agent", "beats", "elastic-agent")
 	err := os.MkdirAll(downloadAt, 0700)
 	require.NoError(t, err, "could not create directory structure for file server")
 
 	fetcher := atesting.ArtifactFetcher()
-	fr, err := fetcher.Fetch(ctx, runtime.GOOS, runtime.GOARCH, version)
+	fr, err := fetcher.Fetch(ctx, runtime.GOOS, runtime.GOARCH, version, packageFormat)
 	require.NoErrorf(t, err, "could not prepare fetcher to download agent %s",
 		version)
 	err = fr.Fetch(ctx, t, downloadAt)
