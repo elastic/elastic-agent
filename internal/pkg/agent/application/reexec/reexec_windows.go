@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -29,7 +30,7 @@ func reexec(log *logger.Logger, executable string, argOverrides ...string) error
 	if info.RunningUnderSupervisor() {
 		// running as a service; spawn re-exec windows sub-process
 		log.Infof("Running as Windows service; triggering service restart")
-		args := []string{filepath.Base(executable), "reexec_windows", strconv.Itoa(os.Getpid())}
+		args := []string{filepath.Base(executable), "reexec_windows", paths.ServiceName, strconv.Itoa(os.Getpid())}
 		args = append(args, argOverrides...)
 		cmd := exec.Cmd{
 			Path:   executable,
