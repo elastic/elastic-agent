@@ -115,16 +115,18 @@ func TestInstallWithBasePath(t *testing.T) {
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
+	// When installing with unprivileged using a base path the
+	// base needs to be accessible by the `elastic-agent-user` user that will be
+	// executing the process, but is not created yet. Using a base that exists
+	// and is known to be accessible by standard users, ensures this tests
+	// works correctly and will not hit a permission issue when spawning the
+	// elastic-agent service.
 	var basePath string
 	switch runtime.GOOS {
 	case define.Linux:
-		// When installing with unprivileged using a base path the
-		// base needs to be accessible by the `elastic-agent` user that will be
-		// executing the process, but is not created yet. Using a base that exists
-		// and is known to be accessible by standard users, ensures this tests
-		// works correctly and will not hit a permission issue when spawning the
-		// elastic-agent service.
 		basePath = `/usr`
+	case define.Windows:
+		basePath = `C:\`
 	default:
 		// Set up random temporary directory to serve as base path for Elastic Agent
 		// installation.
