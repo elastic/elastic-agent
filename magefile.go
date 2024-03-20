@@ -8,10 +8,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"html/template"
 	"io"
 	"log"
@@ -1216,7 +1220,8 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 	}
 }
 
-// TODO: when we remove snapshot API dependency this can go in the artifact api client code
+// simple struct to deserialize branch information.
+// When we remove snapshot API dependency this can go in the artifact api client code
 type branchInfo struct {
 	Version     string `json:"version"`
 	BuildId     string `json:"build_id"`
@@ -1415,38 +1420,104 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 			downloadFunc := func(pkgName string, pkgDesc tools.Package) func() error {
 				return func() error {
 					artifactDownloadPath := filepath.Join(draDownloadDir, pkgName)
-					errDownload := manifest.DownloadPackage(errCtx, pkgDesc.URL, artifactDownloadPath)
-					if errDownload == nil {
-						mx.Lock()
-						defer mx.Unlock()
-						downloadedArtifacts[artifactDownloadPath] = pkgDesc
+					err := manifest.DownloadPackage(errCtx, pkgDesc.URL, artifactDownloadPath)
+
+					if err != nil {
+						return fmt.Errorf("downloading %q: %w", pkgName, err)
 					}
-					return errDownload
+
+					// download the SHA to check integrity
+					artifactSHADownloadPath := filepath.Join(draDownloadDir, pkgName+".sha512")
+					err = manifest.DownloadPackage(errCtx, pkgDesc.ShaURL, artifactSHADownloadPath)
+					if err != nil {
+						return fmt.Errorf("downloading SHA for %q: %w", pkgName, err)
+					}
+
+					err = validateChecksum(sha512.New(), artifactDownloadPath, artifactSHADownloadPath)
+					if err != nil {
+						return fmt.Errorf("validating checksum for %q: %w", pkgName, err)
+					}
+
+					// we should probably validate the signature, it can be done later as we return the package metadata
+					// see https://github.com/elastic/elastic-agent/issues/4445
+
+					mx.Lock()
+					defer mx.Unlock()
+					downloadedArtifacts[artifactDownloadPath] = pkgDesc
+
+					return nil
 				}
 			}(pkgName, pkgDesc)
 
 			errGrp.Go(downloadFunc)
-
-			// TODO do we need the .sha512 and .asc ? returning the package metadata those can be downloaded later for verification purposes
-			//downloadFuncSha := func(pkgName string, pkgDesc tools.Package) func() error {
-			//	return func() error {
-			//		return manifest.DownloadPackage(errCtx, pkgDesc.ShaURL, filepath.Join(downloadDir, pkgName+".sha512"))
-			//	}
-			//}(pkgName, pkgDesc)
-			//
-			//errGrp.Go(downloadFuncSha)
-			//
-			//downloadFuncAsc := func(pkgName string, pkgDesc tools.Package) func() error {
-			//	return func() error {
-			//		return manifest.DownloadPackage(errCtx, pkgDesc.AscURL, filepath.Join(downloadDir, pkgName+".asc"))
-			//	}
-			//}(pkgName, pkgDesc)
-			//
-			//errGrp.Go(downloadFuncAsc)
 		}
 	}
 
 	return downloadedArtifacts, errGrp.Wait()
+}
+
+func validateChecksum(hasher hash.Hash, fileToValidate, checksumFile string) error {
+	artifactFile, err := os.Open(fileToValidate)
+	if err != nil {
+		return fmt.Errorf("opening artifact file %q for sha verification: %w", fileToValidate, err)
+	}
+	defer func(file *os.File) {
+		_ = file.Close()
+	}(artifactFile)
+	_, err = io.Copy(hasher, artifactFile)
+	if err != nil {
+		return fmt.Errorf("reading artifact file %q for sha verification: %w", fileToValidate, err)
+	}
+
+	pkgHash := hex.EncodeToString(hasher.Sum(nil))
+
+	// read checksumFile file line by line
+	shaFile, err := os.ReadFile(checksumFile)
+	if err != nil {
+		return fmt.Errorf("reading artifact hash file %q: %w", checksumFile, err)
+	}
+
+	if mg.Verbose() {
+		log.Printf("validating sha512 for %q", fileToValidate)
+	}
+
+	baseFilename := filepath.Base(fileToValidate)
+	valid := false
+
+	scanner := bufio.NewScanner(bytes.NewReader(shaFile))
+
+	for scanner.Scan() {
+
+		if mg.Verbose() {
+			log.Printf("read hash file line %q", scanner.Text())
+		}
+
+		hashString, filename, found := strings.Cut(scanner.Text(), "  ")
+		if mg.Verbose() {
+			log.Printf("hash file line tokens %q %q found: %v", hashString, filename, found)
+		}
+		if !found {
+			// we need the hash and the filename, keep reading
+			continue
+		}
+
+		if mg.Verbose() {
+			log.Printf("comparing %q for %q to %q", hashString, filename, pkgHash)
+		}
+		if filename == baseFilename && hashString == pkgHash {
+			valid = true
+			break
+		}
+	}
+
+	if err = scanner.Err(); err != nil {
+		return fmt.Errorf("reading artifact hash file %q content : %w", checksumFile, err)
+	}
+
+	if !valid {
+		return fmt.Errorf("hash validation for artifact %q failed: expected hash %q", fileToValidate, pkgHash)
+	}
+	return nil
 }
 
 func useDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error {
