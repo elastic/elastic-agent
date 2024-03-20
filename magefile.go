@@ -1330,6 +1330,10 @@ func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
 		"windows-x86_64": "windows-amd64",
 		"darwin-x86_64":  "darwin-amd64",
 		"darwin-aarch64": "darwin-arm64",
+		"linux/x86_64":   "linux/amd64",
+		"windows/x86_64": "windows/amd64",
+		"darwin/x86_64":  "darwin/amd64",
+		"darwin/aarch64": "darwin/arm64",
 	}
 
 	mappedPltf, found := mappings[manifestPltf]
@@ -1343,23 +1347,30 @@ func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
 }
 
 func filterPackagesByPlatform(pkgs map[string]tools.Package) map[string]tools.Package {
-	// FIXME platforms are not the same between the manifest and the platform list we use: it needs some mapping
-
-	//platforms := devtools.Platforms.Names()
-	//filteredPackages := map[string]tools.Package{}
-	//for pkgName, pkgDesc := range pkgs {
-	//	for _, os := range pkgDesc.Os {
-	//		platformString := fmt.Sprintf("%s/%s", os, pkgDesc.Architecture)
-	//		if slices.Contains(platforms, platformString) {
-	//			filteredPackages[pkgName] = pkgDesc
-	//			break
-	//		}
-	//	}
-	//}
-
-	log.Printf(">>>> WARNING: filtering by platform is not supported yet")
-
-	return pkgs
+	if mg.Verbose() {
+		log.Printf("unfiltered packages: %v", pkgs)
+	}
+	platforms := devtools.Platforms.Names()
+	filteredPackages := map[string]tools.Package{}
+	for pkgName, pkgDesc := range pkgs {
+		if mg.Verbose() {
+			log.Printf("checking if %s:%v should be included", pkgName, pkgDesc)
+		}
+		for _, pkgOS := range pkgDesc.Os {
+			platformString, _ := mapManifestPlatformToAgentPlatform(fmt.Sprintf("%s/%s", pkgOS, pkgDesc.Architecture))
+			if slices.Contains(platforms, platformString) {
+				if mg.Verbose() {
+					log.Printf("platforms include %s", platformString)
+				}
+				filteredPackages[pkgName] = pkgDesc
+				break
+			}
+		}
+	}
+	if mg.Verbose() {
+		log.Printf("filtered packages: %v", filteredPackages)
+	}
+	return filteredPackages
 }
 
 func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir string, projects ...string) (map[string]tools.Package, error) {
@@ -1397,9 +1408,10 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 		}
 		// filter down the packages to the platforms we are building/support
 		filteredPackages := filterPackagesByPlatform(project.Packages)
-
+		if mg.Verbose() {
+			log.Printf("packages to download: %v", filteredPackages)
+		}
 		for pkgName, pkgDesc := range filteredPackages {
-
 			downloadFunc := func(pkgName string, pkgDesc tools.Package) func() error {
 				return func() error {
 					artifactDownloadPath := filepath.Join(draDownloadDir, pkgName)
