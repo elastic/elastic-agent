@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/table"
+
 	"github.com/elastic/e2e-testing/pkg/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -33,7 +36,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 	bversion "github.com/elastic/elastic-agent/version"
 
 	// mage:import
@@ -1568,6 +1573,388 @@ func (Integration) Single(ctx context.Context, testName string) error {
 	return integRunner(ctx, false, testName)
 }
 
+// UpdateVersions runs an update on the `.agent-versions.json` fetching
+// the latest version list from the artifact API.
+func (Integration) UpdateVersions(ctx context.Context) error {
+	// test 2 current 8.x version, 1 previous 7.x version and 1 recent snapshot
+	reqs := upgradetest.VersionRequirements{
+		UpgradeToVersion: bversion.Agent,
+		CurrentMajors:    2,
+		PreviousMinors:   1,
+		PreviousMajors:   1,
+		RecentSnapshots:  1,
+	}
+
+	aac := tools.NewArtifactAPIClient(tools.WithLogFunc(log.Default().Printf))
+	versions, err := upgradetest.FetchUpgradableVersions(ctx, aac, reqs)
+	if err != nil {
+		return fmt.Errorf("failed to fetch upgradable versions: %w", err)
+	}
+	versionFileData := upgradetest.AgentVersions{
+		TestVersions: versions,
+	}
+	file, err := os.OpenFile(upgradetest.AgentVersionsFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open %s for write: %w", upgradetest.AgentVersionsFilename, err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	err = encoder.Encode(versionFileData)
+	if err != nil {
+		return fmt.Errorf("failed to encode JSON to file %s: %w", upgradetest.AgentVersionsFilename, err)
+	}
+	return nil
+}
+
+var stateDir = ".integration-cache"
+var stateFile = "state.yml"
+
+// readFrameworkState reads the state file from the integration test framework
+func readFrameworkState() (runner.State, error) {
+	stateFilePath := ".integration-cache/state.yml"
+	data, err := os.ReadFile(stateFilePath)
+	if err != nil {
+		return runner.State{}, fmt.Errorf("could not read state file %q: %w", stateFilePath, err)
+	}
+
+	state := runner.State{}
+	if err := yaml.Unmarshal(data, &state); err != nil {
+		return runner.State{}, fmt.Errorf("failed unmarshal state file %s: %w", stateFilePath, err)
+	}
+
+	return state, nil
+}
+
+func listInstances() (string, []runner.StateInstance, error) {
+	builder := strings.Builder{}
+	state, err := readFrameworkState()
+	if err != nil {
+		return "", []runner.StateInstance{}, fmt.Errorf("could not read state file: %w", err)
+	}
+
+	absStateDir, err := filepath.Abs(stateDir)
+	if err != nil {
+		return "", []runner.StateInstance{}, fmt.Errorf("cannot get absolute path from state directory '%s': %w", stateDir, err)
+	}
+
+	for i, vm := range state.Instances {
+		isGCP := vm.Provisioner != "multipass"
+
+		t := table.NewWriter()
+		t.AppendRows([]table.Row{
+			{"#", i},
+			{"Provisioner", vm.Provisioner},
+			{"Name", vm.Name},
+			{"ID", vm.ID},
+		})
+
+		if isGCP {
+			t.AppendRow(table.Row{"Instance ID", vm.Internal["instance_id"]})
+		}
+
+		t.AppendRows([]table.Row{
+			{"IP", vm.IP},
+			{"Private Key", filepath.Join(absStateDir, "id_rsa")},
+			{"Public Key", filepath.Join(absStateDir, "id_rsa.pub")},
+			{"SSH connection", fmt.Sprintf(`ssh -i %s %s@%s`, filepath.Join(absStateDir, "id_rsa"), vm.Username, vm.IP)},
+		})
+
+		if isGCP {
+			t.AppendRow(table.Row{"GCP Link", fmt.Sprintf("https://console.cloud.google.com/compute/instancesDetail/zones/us-central1-a/instances/%s", vm.Internal["instance_id"])})
+		}
+
+		builder.WriteString(t.Render())
+		builder.WriteString("\n")
+	}
+
+	return builder.String(), state.Instances, nil
+}
+
+func listStacks() (string, error) {
+	builder := strings.Builder{}
+
+	state, err := readFrameworkState()
+	if err != nil {
+		return "", fmt.Errorf("could not read state file: %w", err)
+	}
+
+	for i, stack := range state.Stacks {
+		t := table.NewWriter()
+		t.AppendRows([]table.Row{
+			table.Row{"#", i},
+			table.Row{"Type", stack.Provisioner},
+		})
+
+		switch {
+		case stack.Provisioner == "serverless":
+			t.AppendRow(table.Row{"Project ID", stack.Internal["deployment_id"]})
+		case stack.Provisioner == "stateful":
+			t.AppendRow(table.Row{"Deployment ID", stack.Internal["deployment_id"]})
+		}
+		t.AppendRows([]table.Row{
+			{"Elasticsearch URL", stack.Elasticsearch},
+			{"Kibana", stack.Kibana},
+			{"Username", stack.Username},
+			{"Password", stack.Password},
+		})
+		builder.WriteString(t.Render())
+		builder.WriteString("\n")
+	}
+
+	return builder.String(), nil
+}
+
+func askForVM() (runner.StateInstance, error) {
+	vms, instances, err := listInstances()
+	if err != nil {
+		fmt.Errorf("cannot list VMs: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, vms)
+
+	if len(instances) == 1 {
+		fmt.Fprintln(os.Stderr, "There is only one VM, auto-selecting it")
+		return instances[0], nil
+	}
+
+	id := 0
+	fmt.Fprint(os.Stderr, "Instance number: ")
+	if _, err := fmt.Scanf("%d", &id); err != nil {
+		return runner.StateInstance{}, fmt.Errorf("could not read instance number: %w:", err)
+	}
+
+	if id >= len(instances) {
+		return runner.StateInstance{}, fmt.Errorf("Invalid Stack number, it must be between 0 and %d", len(instances)-1)
+	}
+
+	return instances[id], nil
+}
+
+func askForStack() (runner.Stack, error) {
+	mg.Deps(Integration.Stacks)
+
+	state, err := readFrameworkState()
+	if err != nil {
+		return runner.Stack{}, fmt.Errorf("could not read state file: %w", err)
+	}
+
+	if len(state.Stacks) == 1 {
+		fmt.Println("There is only one Stack, auto-selecting it")
+		return state.Stacks[0], nil
+	}
+
+	id := 0
+	fmt.Print("Stack number: ")
+	if _, err := fmt.Scanf("%d", &id); err != nil {
+		return runner.Stack{}, fmt.Errorf("cannot read Stack number: %w", err)
+	}
+
+	if id >= len(state.Stacks) {
+		return runner.Stack{}, fmt.Errorf("Invalid Stack number, it must be between 0 and %d", len(state.Stacks)-1)
+	}
+
+	return state.Stacks[id], nil
+}
+
+func generateEnvFile(stack runner.Stack) error {
+	fileExists := true
+	stat, err := os.Stat("./env.sh")
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("cannot stat 'env.sh': %w", err)
+		}
+		fileExists = false
+	}
+
+	if fileExists {
+		bkpName := fmt.Sprintf("./env.sh-%d", rand.Int())
+		if err := os.Rename(stat.Name(), bkpName); err != nil {
+			return fmt.Errorf("cannot create backup: %w", err)
+		}
+		fmt.Printf("%q already existed, it was moved to %q\n", stat.Name(), bkpName)
+	}
+
+	f, err := os.Create("./env.sh")
+	if err != nil {
+		return fmt.Errorf("Could not create './env.sh': %w", err)
+	}
+	defer f.Close()
+
+	fmt.Fprintf(f, "export ELASTICSEARCH_HOST=\"%s\"\n", stack.Elasticsearch)
+	fmt.Fprintf(f, "export ELASTICSEARCH_USERNAME=\"%s\"\n", stack.Username)
+	fmt.Fprintf(f, "export ELASTICSEARCH_PASSWORD=\"%s\"\n", stack.Password)
+
+	fmt.Fprintf(f, "export KIBANA_HOST=\"%s\"\n", stack.Kibana)
+	fmt.Fprintf(f, "export KIBANA_USERNAME=\"%s\"\n", stack.Username)
+	fmt.Fprintf(f, "export KIBANA_PASSWORD=\"%s\"\n", stack.Password)
+
+	return nil
+}
+
+// PrintState prints details about cloud stacks and VMs
+func (Integration) PrintState(ctx context.Context) {
+	fmt.Println("Virtual Machines")
+	mg.Deps(Integration.ListInstances)
+	fmt.Print("\n\n")
+	fmt.Println("Cloud Stacks")
+	mg.Deps(Integration.Stacks)
+}
+
+// ListInstances lists all VMs in a human readable form, including connection details
+func (Integration) ListInstances() error {
+	t, _, err := listInstances()
+	if err != nil {
+		fmt.Errorf("cannot list VMs: %w", err)
+	}
+
+	fmt.Print(t)
+
+	return nil
+}
+
+// SSH prints to stdout the SSH command to connect to a VM, a menu is printed to stderr.
+func (Integration) SSH() error {
+	absStateDir, err := filepath.Abs(stateDir)
+	if err != nil {
+		return fmt.Errorf("cannot get absolute path from state directory '%s': %w", stateDir, err)
+	}
+
+	vm, err := askForVM()
+	if err != nil {
+		fmt.Errorf("cannot get VM: %w", err)
+	}
+
+	fmt.Println(fmt.Sprintf(`ssh -i %s %s@%s`, filepath.Join(absStateDir, "id_rsa"), vm.Username, vm.IP))
+	return nil
+}
+
+// Stacks lists all stack deployments in a human readable form
+func (Integration) Stacks() error {
+	stacks, err := listStacks()
+	if err != nil {
+		return fmt.Errorf("cannot list stacks: %w", err)
+	}
+
+	fmt.Print(stacks)
+	return nil
+}
+
+// GenerateEnvFile generates 'env.sh' containing envvars to connect to a cloud stack
+func (Integration) GenerateEnvFile() error {
+	stack, err := askForStack()
+	if err != nil {
+		return fmt.Errorf("cannot get stack: %w", err)
+	}
+
+	if err := generateEnvFile(stack); err != nil {
+		return fmt.Errorf("cannot generate env file: %w", err)
+	}
+	fmt.Println("run 'source ./env.sh' to load the environment variables to your shell")
+
+	return nil
+}
+
+// DeployEnvFile generates and deploys to a VM 'env.sh' containing envvars to connect to a cloud stack
+func (Integration) DeployEnvFile() error {
+	stack, err := askForStack()
+	if err != nil {
+		return fmt.Errorf("cannot get stack: %w", err)
+	}
+
+	if err := generateEnvFile(stack); err != nil {
+		return fmt.Errorf("cannot generate env file: %w", err)
+	}
+
+	fullEnvFilepath, err := filepath.Abs("./env.sh")
+	if err != nil {
+		return fmt.Errorf("cannot get full filepath for env file: %w", err)
+	}
+
+	absStateDir, err := filepath.Abs(stateDir)
+	if err != nil {
+		return fmt.Errorf("cannot get absolute path from state directory '%s': %w", stateDir, err)
+	}
+	keyFile := filepath.Join(absStateDir, "id_rsa")
+
+	vm, err := askForVM()
+	if err != nil {
+		return fmt.Errorf("cannot get VM: %w", err)
+	}
+
+	cmd := exec.Command("scp", "-i", keyFile, fullEnvFilepath, fmt.Sprintf("%s@%s:~/env.sh", vm.Username, vm.IP))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("could not copy env file to VM: %w", err)
+	}
+
+	return nil
+}
+
+// DeployDebugTools installs all necessary tools to debug tests from a VM
+func (Integration) DeployDebugTools() error {
+	absStateDir, err := filepath.Abs(stateDir)
+	if err != nil {
+		return fmt.Errorf("cannot get absolute path from state directory '%s': %w", stateDir, err)
+	}
+	keyFile := filepath.Join(absStateDir, "id_rsa")
+
+	vm, err := askForVM()
+	if err != nil {
+		return fmt.Errorf("cannot get VM: %w", err)
+	}
+
+	isWindowsVM := strings.Contains(vm.ID, "windows")
+
+	commands := []string{
+		fmt.Sprintf("sudo chown -R %s:%s $HOME/go/pkg", vm.Username, vm.Username),
+		"go install github.com/go-delve/delve/cmd/dlv@latest",
+	}
+
+	if isWindowsVM {
+		commands = append(commands,
+			"choco install -y git",
+			"if exist mage rmdir /s /q mage",
+			"if exist elastic-agent rmdir /s /q elastic-agent",
+		)
+	} else {
+		commands = append(commands,
+			`echo 'export PATH=$PATH:'"$HOME/go/bin" |sudo tee /root/.bashrc`,
+			"rm -rf mage",
+			"rm -rf elastic-agent",
+			"sudo apt install -y docker.io",
+			"sudo systemctl enable --now docker",
+			"sudo usermod -aG docker $USER",
+		)
+	}
+
+	commands = append(commands,
+		"git clone https://github.com/magefile/mage",
+		"cd mage && go run bootstrap.go",
+		"git clone https://github.com/elastic/elastic-agent",
+	)
+
+	if isWindowsVM {
+		commands = append(commands, "cd elastic-agent && xcopy /s /e /y ..\\agent\\ .\\")
+	} else {
+		commands = append(commands, "cd elastic-agent && cp -r ~/agent/* ./")
+	}
+
+	for _, c := range commands {
+		cmd := exec.Command("ssh", "-i", keyFile, fmt.Sprintf("%s@%s", vm.Username, vm.IP), c)
+		cmd.Stdin = os.Stdin
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+
+	fmt.Println("Delve, Mage have been installed and added to the path")
+	fmt.Println("~/elastic-agent")
+	return nil
+}
+
 // PrepareOnRemote shouldn't be called locally (called on remote host to prepare it for testing)
 func (Integration) PrepareOnRemote() {
 	mg.Deps(mage.InstallGoTestTools)
@@ -1598,6 +1985,14 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 		return fmt.Errorf("error setting binary name: %w", err)
 	}
 	return integRunner(ctx, false, "TestBeatsServerless")
+}
+
+func (Integration) TestForResourceLeaks(ctx context.Context) error {
+	err := os.Setenv("TEST_LONG_RUNNING", "true")
+	if err != nil {
+		return fmt.Errorf("error setting TEST_LONG_RUNNING: %w", err)
+	}
+	return integRunner(ctx, false, "TestLongRunningAgentForLeaks")
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
@@ -1825,6 +2220,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if os.Getenv("AGENT_KEEP_INSTALLED") != "" {
 		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
 	}
+
+	extraEnv["TEST_LONG_RUNNING"] = os.Getenv("TEST_LONG_RUNNING")
+	extraEnv["LONG_TEST_RUNTIME"] = os.Getenv("LONG_TEST_RUNTIME")
 
 	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
 	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258

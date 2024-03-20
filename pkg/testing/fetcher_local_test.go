@@ -28,19 +28,31 @@ func TestLocalFetcher(t *testing.T) {
 	snapshotContentHash := []byte("snapshot contents hash")
 	noSnapshotContent := []byte("not snapshot contents")
 	noSnapshotContentHash := []byte("not snapshot contents hash")
+	pkgFormat := "targz"
+	if runtime.GOOS == "windows" {
+		pkgFormat = "zip"
+	}
 
 	testdata := t.TempDir()
-	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH)
+	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH, pkgFormat)
 	require.NoError(t, err)
 
 	snapshotPath := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s", baseVersion, suffix)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, snapshotPath), snapshotContent, 0644))
 	snapshotPathHash := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s%s", baseVersion, suffix, extHash)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, snapshotPathHash), snapshotContentHash, 0644))
+
 	notSnapshotPath := fmt.Sprintf("elastic-agent-%s-%s", baseVersion, suffix)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPath), noSnapshotContent, 0644))
 	notSnapshotPathHash := fmt.Sprintf("elastic-agent-%s-%s%s", baseVersion, suffix, extHash)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPathHash), noSnapshotContentHash, 0644))
+
+	buildID := "l5snflwr"
+	require.NoError(t, os.MkdirAll(filepath.Join(testdata, buildID), 0755))
+	buildSnapshotPath := filepath.Join(buildID, fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s", baseVersion, suffix))
+	require.NoError(t, os.WriteFile(filepath.Join(testdata, buildSnapshotPath), snapshotContent, 0644))
+	buildSnapshotPathHash := buildSnapshotPath + extHash
+	require.NoError(t, os.WriteFile(filepath.Join(testdata, buildSnapshotPathHash), snapshotContentHash, 0644))
 
 	tcs := []struct {
 		name     string
@@ -71,6 +83,12 @@ func TestLocalFetcher(t *testing.T) {
 			opts:     []localFetcherOpt{WithLocalSnapshotOnly()},
 			want:     snapshotContent,
 			wantHash: snapshotContentHash,
+		}, {
+			name:     "version with snapshot and build ID",
+			version:  baseVersion + "-SNAPSHOT+l5snflwr",
+			opts:     []localFetcherOpt{},
+			want:     snapshotContent,
+			wantHash: snapshotContentHash,
 		},
 	}
 
@@ -78,8 +96,12 @@ func TestLocalFetcher(t *testing.T) {
 		tmp := t.TempDir()
 
 		f := LocalFetcher(testdata, tc.opts...)
+		pkgFormat := "targz"
+		if runtime.GOOS == "windows" {
+			pkgFormat = "zip"
+		}
 		got, err := f.Fetch(
-			context.Background(), runtime.GOOS, runtime.GOARCH, tc.version)
+			context.Background(), runtime.GOOS, runtime.GOARCH, tc.version, pkgFormat)
 		require.NoError(t, err)
 
 		err = got.Fetch(context.Background(), t, tmp)

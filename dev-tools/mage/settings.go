@@ -10,6 +10,7 @@ import (
 	"go/build"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -19,11 +20,13 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"gopkg.in/yaml.v3"
 
 	"github.com/magefile/mage/sh"
-	"golang.org/x/tools/go/vcs"
+	"golang.org/x/tools/go/vcs" //nolint:staticcheck // this deprecation will be handled in https://github.com/elastic/elastic-agent/issues/4138
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
 
 const (
@@ -43,7 +46,9 @@ const (
 	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
 
 	// Mapped functions
-	agentPackageVersionMappedFunc = "agent_package_version"
+	agentPackageVersionMappedFunc    = "agent_package_version"
+	agentManifestGeneratorMappedFunc = "manifest"
+	snapshotSuffix                   = "snapshot_suffix"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -91,18 +96,20 @@ var (
 	ManifestURL string
 
 	FuncMap = map[string]interface{}{
-		"beat_doc_branch":             BeatDocBranch,
-		"beat_version":                BeatQualifiedVersion,
-		"commit":                      CommitHash,
-		"commit_short":                CommitHashShort,
-		"date":                        BuildDate,
-		"elastic_beats_dir":           ElasticBeatsDir,
-		"go_version":                  GoVersion,
-		"repo":                        GetProjectRepoInfo,
-		"title":                       func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
-		"tolower":                     strings.ToLower,
-		"contains":                    strings.Contains,
-		agentPackageVersionMappedFunc: AgentPackageVersion,
+		"beat_doc_branch":                BeatDocBranch,
+		"beat_version":                   BeatQualifiedVersion,
+		"commit":                         CommitHash,
+		"commit_short":                   CommitHashShort,
+		"date":                           BuildDate,
+		"elastic_beats_dir":              ElasticBeatsDir,
+		"go_version":                     GoVersion,
+		"repo":                           GetProjectRepoInfo,
+		"title":                          func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
+		"tolower":                        strings.ToLower,
+		"contains":                       strings.Contains,
+		agentPackageVersionMappedFunc:    AgentPackageVersion,
+		agentManifestGeneratorMappedFunc: PackageManifest,
+		snapshotSuffix:                   SnapshotSuffix,
 	}
 )
 
@@ -248,6 +255,7 @@ repo.RootDir                 = {{ repo.RootDir }}
 repo.ImportPath              = {{ repo.ImportPath }}
 repo.SubDir                  = {{ repo.SubDir }}
 agent_package_version        = {{ agent_package_version}}
+snapshot_suffix              = {{ snapshot_suffix }}
 `
 
 	return Expand(dumpTemplate)
@@ -294,6 +302,57 @@ func AgentPackageVersion() (string, error) {
 	}
 
 	return BeatQualifiedVersion()
+}
+
+func PackageManifest() (string, error) {
+
+	packageVersion, err := AgentPackageVersion()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent package version: %w", err)
+	}
+
+	hash, err := CommitHash()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
+	}
+
+	commitHashShort, err := CommitHashShort()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
+	}
+
+	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort)
+}
+
+func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string) (string, error) {
+	m := v1.NewManifest()
+	m.Package.Version = packageVersion
+	m.Package.Snapshot = snapshot
+	m.Package.Hash = fullHash
+
+	versionedHomePath := path.Join("data", fmt.Sprintf("%s-%s", beatName, shortHash))
+	m.Package.VersionedHome = versionedHomePath
+	m.Package.PathMappings = []map[string]string{{}}
+	m.Package.PathMappings[0][versionedHomePath] = fmt.Sprintf("data/%s-%s%s-%s", beatName, m.Package.Version, GenerateSnapshotSuffix(snapshot), shortHash)
+	m.Package.PathMappings[0][v1.ManifestFileName] = fmt.Sprintf("data/%s-%s%s-%s/%s", beatName, m.Package.Version, GenerateSnapshotSuffix(snapshot), shortHash, v1.ManifestFileName)
+	yamlBytes, err := yaml.Marshal(m)
+	if err != nil {
+		return "", fmt.Errorf("marshaling manifest: %w", err)
+
+	}
+	return string(yamlBytes), nil
+}
+
+func SnapshotSuffix() string {
+	return GenerateSnapshotSuffix(Snapshot)
+}
+
+func GenerateSnapshotSuffix(snapshot bool) string {
+	if !snapshot {
+		return ""
+	}
+
+	return "-SNAPSHOT"
 }
 
 var (

@@ -41,7 +41,7 @@ func New(
 	log *logger.Logger,
 	baseLogger *logger.Logger,
 	logLevel logp.Level,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
 	testingMode bool,
@@ -51,8 +51,9 @@ func New(
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
-	err := version.InitVersionInformation()
-	if err != nil {
+	err := version.InitVersionError()
+	if err != nil && !runAsOtel {
+		// ignore this error when running in otel mode
 		// non-fatal error, log a warning and move on
 		log.With("error.message", err).Warnf("Error initializing version information: falling back to %s", release.Version())
 	}
@@ -134,6 +135,9 @@ func New(
 
 		// testing mode uses a config manager that takes configuration from over the control protocol
 		configMgr = newTestingModeConfigManager(log)
+	} else if runAsOtel {
+		// ignoring configuration in elastic-agent.yml
+		configMgr = otel.NewOtelModeConfigManager()
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
 
@@ -146,9 +150,6 @@ func New(
 			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
 			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
 		}
-	} else if runAsOtel {
-		// ignoring configuration in elastic-agent.yml
-		configMgr = otel.NewOtelModeConfigManager()
 	} else {
 		isManaged = true
 		var store storage.Store
@@ -210,7 +211,10 @@ func New(
 
 func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(ctx, path)
+	store, err := storage.NewEncryptedDiskStore(ctx, path)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
 
 	reader, err := store.Load()
 	if err != nil {

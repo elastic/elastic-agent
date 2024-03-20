@@ -4,3 +4,4 @@
 /deploy/kubernetes @elastic/obs-cloudnative-monitoring
 /dev-tools/kubernetes @elastic/obs-cloudnative-monitoring
 /internal/pkg/composable/providers/kubernetes @elastic/obs-cloudnative-monitoring
+/internal/pkg/agent/application/configuration_embed_changed_test.go @elastic/cloudbeat

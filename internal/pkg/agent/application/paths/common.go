@@ -5,6 +5,7 @@
 package paths
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -15,11 +16,16 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/utils"
+
+	// this is not a leftover: this anonymous import is needed for version initialization
+	_ "github.com/elastic/elastic-agent/version"
 )
 
 const (
 	// DefaultConfigName is the default name of the configuration file.
 	DefaultConfigName = "elastic-agent.yml"
+	// DefaultOtelConfigName is the default name of the otel configuration file.
+	DefaultOtelConfigName = "otel.yml"
 
 	// AgentLockFileName is the name of the overall Elastic Agent file lock.
 	AgentLockFileName = "agent.lock"
@@ -59,6 +65,7 @@ var (
 )
 
 func init() {
+	// this is the first call where we need version information (it calls isInsideData())
 	topPath = initialTop()
 	configPath = topPath
 	logsPath = topPath
@@ -146,8 +153,19 @@ func SetConfig(path string) {
 
 // ConfigFile returns the path to the configuration file.
 func ConfigFile() string {
+
+	return configFileWithDefaultOverride(DefaultConfigName)
+}
+
+// OtelConfigFile returns the path to the otel configuration file.
+func OtelConfigFile() string {
+	return configFileWithDefaultOverride(DefaultOtelConfigName)
+}
+
+// configFileWithDefaultOverride returns the path to the configuration file overriding default value.
+func configFileWithDefaultOverride(defaultConfig string) string {
 	if configFilePath == "" || configFilePath == DefaultConfigName {
-		return filepath.Join(Config(), DefaultConfigName)
+		return filepath.Join(Config(), defaultConfig)
 	}
 	if filepath.IsAbs(configFilePath) {
 		return configFilePath
@@ -162,11 +180,16 @@ func ExternalInputs() string {
 
 // Data returns the data directory for Agent
 func Data() string {
+	return DataFrom(Top())
+}
+
+// DataFrom returns the data directory for Agent using the passed directory as top path
+func DataFrom(topDirPath string) string {
 	if unversionedHome {
 		// unversioned means the topPath is the data path
-		return topPath
+		return topDirPath
 	}
-	return filepath.Join(Top(), "data")
+	return filepath.Join(topDirPath, "data")
 }
 
 // Run returns the run directory for Agent
@@ -191,7 +214,13 @@ func SetLogs(path string) {
 
 // VersionedHome returns a versioned path based on a TopPath and used commit.
 func VersionedHome(base string) string {
-	return filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
+	versionedHomePath := filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()))
+	_, err := os.Stat(versionedHomePath)
+	if errors.Is(err, os.ErrNotExist) {
+		// fallback to the legacy elastic-agent-<commit> path
+		versionedHomePath = filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
+	}
+	return versionedHomePath
 }
 
 // Downloads returns the downloads directory for Agent
@@ -253,8 +282,9 @@ func retrieveExecutableDir() string {
 
 // isInsideData returns true when the exePath is inside of the current Agents data path.
 func isInsideData(exeDir string) bool {
-	expectedDir := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
-	return strings.HasSuffix(exeDir, expectedDir)
+	expectedDirLegacy := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
+	expectedDirWithVersion := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())))
+	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
 // ExecDir returns the "executable" directory which is:
@@ -325,4 +355,18 @@ func ControlSocketFromPath(platform string, path string) string {
 	// place in global /tmp to ensure that its small enough to fit; current path is way to long
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
 	return utils.SocketURLWithFallback(socketPath, path)
+}
+
+func pathSplit(path string) []string {
+	dir, file := filepath.Split(path)
+	if dir == "" && file == "" {
+		return []string{}
+	}
+	if dir == "" && file != "" {
+		return []string{file}
+	}
+	if dir == path {
+		return []string{}
+	}
+	return append(pathSplit(filepath.Clean(dir)), file)
 }

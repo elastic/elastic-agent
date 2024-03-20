@@ -12,7 +12,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 	apmtransport "go.elastic.co/apm/transport"
 	"gopkg.in/yaml.v2"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/api"
@@ -28,6 +26,7 @@ import (
 	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent-system-metrics/report"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -48,7 +47,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
@@ -91,7 +89,11 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	// feature of the Elastic Agent. On Mac OS root privileges are required to perform the disk
 	// store encryption, by setting this flag it disables that feature and allows the Elastic Agent to
 	// run as non-root.
+	//
+	// Deprecated: MacOS can be run/installed without root privileges
 	cmd.Flags().Bool("disable-encrypted-store", false, "Disable the encrypted disk storage (Only useful on Mac OS)")
+	_ = cmd.Flags().MarkHidden("disable-encrypted-store")
+	_ = cmd.Flags().MarkDeprecated("disable-encrypted-store", "agent on Mac OS can be run/installed without root privileges, see elastic-agent install --help")
 
 	// --testing-mode is a hidden flag that spawns the Elastic Agent in testing mode
 	// it is hidden because we really don't want users to execute Elastic Agent to run
@@ -138,35 +140,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
 
-	// detect otel
-	runAsOtel := otel.IsOtelConfig(ctx, paths.ConfigFile())
-	var awaiters awaiters
-	var resErr error
-	if runAsOtel {
-		var otelStartWg sync.WaitGroup
-		otelAwaiter := make(chan struct{})
-		awaiters = append(awaiters, otelAwaiter)
-
-		otelStartWg.Add(1)
-		go func() {
-			otelStartWg.Done()
-			if err := otel.Run(ctx, stop); err != nil {
-				resErr = multierror.Append(resErr, err)
-			}
-
-			// close awaiter handled in run loop
-			close(otelAwaiter)
-		}()
-
-		// wait for otel to start
-		otelStartWg.Wait()
-	}
-
-	if err := runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, runAsOtel, awaiters, modifiers...); err != nil {
-		resErr = multierror.Append(resErr, err)
-	}
-
-	return resErr
+	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, false, nil, modifiers...)
 }
 
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, runAsOtel bool, awaiters awaiters, modifiers ...component.PlatformModifier) error {
@@ -193,6 +167,12 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 
 	l.Infow("Elastic Agent started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion())
 
+	// try early to check if running as root
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to check for root/Administrator privileges: %w", err)
+	}
+
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
 		err = errors.New(err, "failed to perform delayed enrollment")
@@ -201,14 +181,8 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	}
 	pathConfigFile := paths.AgentConfigFile()
 
-	// try early to check if running as root
-	isRoot, err := utils.HasRoot()
-	if err != nil {
-		return fmt.Errorf("failed to check for root permissions: %w", err)
-	}
-
 	// agent ID needs to stay empty in bootstrap mode
-	createAgentID := true
+	createAgentID := !runAsOtel
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
 		createAgentID = false
 	}
@@ -217,7 +191,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// The secret is not created here if it exists already from the previous enrollment.
 	// This is needed for compatibility with agent running in standalone mode,
 	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
-	err = secret.CreateAgentSecret(ctx)
+	err = secret.CreateAgentSecret(ctx, vault.WithUnprivileged(!isRoot))
 	if err != nil {
 		return fmt.Errorf("failed to read/write secrets: %w", err)
 	}
@@ -257,7 +231,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	}
 
 	// initiate agent watcher
-	if err := upgrade.InvokeWatcher(l); err != nil {
+	if _, err := upgrade.InvokeWatcher(l, paths.TopBinaryPath()); err != nil {
 		// we should not fail because watcher is not working
 		l.Error(errors.New(err, "failed to invoke rollback watcher"))
 	}
@@ -405,7 +379,12 @@ LOOP:
 
 func loadConfig(ctx context.Context, override cfgOverrider, runAsOtel bool) (*configuration.Configuration, error) {
 	if runAsOtel {
-		return configuration.DefaultConfiguration(), nil
+		defaultCfg := configuration.DefaultConfiguration()
+		// disable monitoring to avoid injection of monitoring components
+		// in case inputs are not empty
+		defaultCfg.Settings.MonitoringConfig.Enabled = false
+		defaultCfg.Settings.V1MonitoringEnabled = false
+		return defaultCfg, nil
 	}
 
 	pathConfigFile := paths.ConfigFile()
@@ -460,7 +439,10 @@ func getOverwrites(ctx context.Context, rawConfig *config.Config) error {
 		return nil
 	}
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(ctx, path)
+	store, err := storage.NewEncryptedDiskStore(ctx, path)
+	if err != nil {
+		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
 
 	reader, err := store.Load()
 	if err != nil && errors.Is(err, os.ErrNotExist) {
@@ -655,7 +637,7 @@ func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
 // ongoing upgrade operation, i.e. being re-exec'd and performs
 // any upgrade-specific work, if needed.
 func handleUpgrade() error {
-	upgradeMarker, err := upgrade.LoadMarker()
+	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
 	if err != nil {
 		return fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
 	}

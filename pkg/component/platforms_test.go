@@ -2,10 +2,16 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build darwin
+package component
 
-package vault
+import (
+	"testing"
 
-type Options struct {
-	readonly bool
+	"github.com/stretchr/testify/assert"
+)
+
+func TestLoadPlatformDetail(t *testing.T) {
+	platformDetail, err := LoadPlatformDetail()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, platformDetail)
 }

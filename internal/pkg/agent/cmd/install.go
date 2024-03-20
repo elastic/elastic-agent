@@ -14,10 +14,12 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -54,7 +56,9 @@ would like the Agent to operate.
 }
 
 func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
-	err := validateEnrollFlags(cmd)
+	var err error
+
+	err = validateEnrollFlags(cmd)
 	if err != nil {
 		return fmt.Errorf("could not validate flags: %w", err)
 	}
@@ -66,16 +70,16 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("unable to perform install command while checking for administrator rights, %w", err)
+		return fmt.Errorf("unable to perform install command while checking for root/Administrator rights: %w", err)
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
 
-	// only support Linux at the moment
+	// only support Linux and MacOS at the moment
 	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
-	if unprivileged && runtime.GOOS != "linux" {
-		return fmt.Errorf("unable to perform install command, unprivileged is currently only supported on Linux")
+	if unprivileged && (runtime.GOOS != "linux" && runtime.GOOS != "darwin") {
+		return fmt.Errorf("unable to perform install command, unprivileged is currently only supported on Linux and MacOSß")
 	}
 	if unprivileged {
 		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this is an experimental and currently unsupported feature.")
@@ -189,10 +193,34 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	progBar := install.CreateAndStartNewSpinner(streams.Out, "Installing Elastic Agent...")
 
+	logCfg := logp.DefaultConfig(logp.DefaultEnvironment)
+	logCfg.Level = logp.DebugLevel
+	// Using in memory logger, so we don't write logs to the
+	// directory we are trying to delete
+	logp.ToObserverOutput()(&logCfg)
+
+	err = logp.Configure(logCfg)
+	if err != nil {
+		return fmt.Errorf("error creating logging config: %w", err)
+	}
+
+	log := logger.NewWithoutConfig("")
+
+	defer func() {
+		if err == nil {
+			return
+		}
+		oLogs := logp.ObserverLogs().TakeAll()
+		fmt.Fprintf(os.Stderr, "Error uninstalling. Printing logs\n")
+		for _, oLog := range oLogs {
+			fmt.Fprintf(os.Stderr, "%v\n", oLog.Entry)
+		}
+	}()
+
 	var ownership utils.FileOwner
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
-		ownership, err = install.Install(cfgFile, topPath, unprivileged, progBar, streams)
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams)
 		if err != nil {
 			return fmt.Errorf("error installing package: %w", err)
 		}
@@ -200,7 +228,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		defer func() {
 			if err != nil {
 				progBar.Describe("Uninstalling")
-				innerErr := install.Uninstall(cfgFile, topPath, "", progBar)
+				innerErr := install.Uninstall(cfgFile, topPath, "", log, progBar)
 				if innerErr != nil {
 					progBar.Describe("Failed to Uninstall")
 				} else {

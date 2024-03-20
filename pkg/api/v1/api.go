@@ -2,13 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build !darwin
+// Package v1 contains definitions for elastic-agent/v1 objects
+package v1
 
-package vault
+const VERSION = "co.elastic.agent/v1"
 
-import "time"
-
-type Options struct {
-	readonly       bool
-	lockRetryDelay time.Duration
+type apiObject struct {
+	Version string `yaml:"version" json:"version"`
+	Kind    string `yaml:"kind" json:"kind"`
 }

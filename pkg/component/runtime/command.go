@@ -420,7 +420,7 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 
 func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	go func() {
-		err := comm.WriteConnInfo(info.Stdin)
+		err := comm.WriteStartUpInfo(info.Stdin)
 		if err != nil {
 			_, _ = c.logErr.Write([]byte(fmt.Sprintf("Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err)))
 			// kill instantly

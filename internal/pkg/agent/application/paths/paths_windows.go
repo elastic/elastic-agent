@@ -31,19 +31,11 @@ const (
 
 	// ShellWrapper is the wrapper that is installed.
 	ShellWrapper = "" // no wrapper on Windows
-
-	// defaultAgentVaultPath is the directory for windows where the vault store is located or the
-	defaultAgentVaultPath = "vault"
 )
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
 func ArePathsEqual(expected, actual string) bool {
 	return strings.EqualFold(expected, actual)
-}
-
-// AgentVaultPath is the directory that contains all the files for the value
-func AgentVaultPath() string {
-	return filepath.Join(Config(), defaultAgentVaultPath)
 }
 
 func initialControlSocketPath(topPath string) string {
@@ -66,4 +58,29 @@ func ResolveControlSocket() {
 		// reset the control socket path to be the installed path
 		SetControlSocket(WindowsControlSocketInstalledPath)
 	}
+}
+
+// HasPrefix tests if the path starts with the prefix.
+func HasPrefix(path string, prefix string) bool {
+	if path == "" || prefix == "" {
+		return false
+	}
+
+	if !strings.EqualFold(filepath.VolumeName(path), filepath.VolumeName(prefix)) {
+		return false
+	}
+
+	prefixParts := pathSplit(filepath.Clean(prefix))
+	pathParts := pathSplit(filepath.Clean(path))
+
+	if len(prefixParts) > len(pathParts) {
+		return false
+	}
+
+	for i := 0; i < len(prefixParts); i++ {
+		if !strings.EqualFold(prefixParts[i], pathParts[i]) {
+			return false
+		}
+	}
+	return true
 }

@@ -11,20 +11,23 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/gofrs/flock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/mocks"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -110,40 +113,80 @@ func Test_CopyFile(t *testing.T) {
 }
 
 func TestShutdownCallback(t *testing.T) {
-	l, _ := logger.New("test", false)
-	tmpDir, err := os.MkdirTemp("", "shutdown-test-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
 
-	// make homepath agent consistent (in a form of elastic-agent-hash)
-	homePath := filepath.Join(tmpDir, fmt.Sprintf("%s-%s", agentName, release.ShortCommit()))
+	type testcase struct {
+		name                  string
+		agentHomeDirectory    string
+		newAgentHomeDirectory string
+		agentVersion          string
+		newAgentVersion       string
+		oldRunFile            string
+		newRunFile            string
+	}
 
-	filename := "file.test"
-	newCommit := "abc123"
-	sourceVersion := "7.14.0"
-	targetVersion := "7.15.0"
+	testcases := []testcase{
+		{
+			name:                  "legacy run directories",
+			agentHomeDirectory:    fmt.Sprintf("%s-%s", agentName, release.ShortCommit()),
+			newAgentHomeDirectory: fmt.Sprintf("%s-%s", agentName, "abc123"),
+			agentVersion:          "7.14.0",
+			newAgentVersion:       "7.15.0",
+			oldRunFile:            filepath.Join("run", "default", "process-7.14.0", "file.test"),
+			newRunFile:            filepath.Join("run", "default", "process-7.15.0", "file.test"),
+		},
+		{
+			name:                  "new run directories",
+			agentHomeDirectory:    "elastic-agent-abcdef",
+			newAgentHomeDirectory: "elastic-agent-ghijkl",
+			agentVersion:          "1.2.3",
+			newAgentVersion:       "4.5.6",
+			oldRunFile:            filepath.Join("run", "component", "unit", "file.test"),
+			newRunFile:            filepath.Join("run", "component", "unit", "file.test"),
+		},
+		{
+			name:                  "new run directories, agents with version in path",
+			agentHomeDirectory:    "elastic-agent-1.2.3-abcdef",
+			newAgentHomeDirectory: "elastic-agent-4.5.6-ghijkl",
+			agentVersion:          "1.2.3",
+			newAgentVersion:       "4.5.6",
+			oldRunFile:            filepath.Join("run", "component", "unit", "file.test"),
+			newRunFile:            filepath.Join("run", "component", "unit", "file.test"),
+		},
+	}
 
-	content := []byte("content")
-	newHome := strings.ReplaceAll(homePath, release.ShortCommit(), newCommit)
-	sourceDir := filepath.Join(homePath, "run", "default", "process-"+sourceVersion)
-	targetDir := filepath.Join(newHome, "run", "default", "process-"+targetVersion)
+	for _, tt := range testcases {
 
-	require.NoError(t, os.MkdirAll(sourceDir, 0755))
-	require.NoError(t, os.MkdirAll(targetDir, 0755))
+		t.Run(tt.name, func(t *testing.T) {
+			l, _ := logger.New(tt.name, false)
+			tmpDir := t.TempDir()
 
-	cb := shutdownCallback(l, homePath, sourceVersion, targetVersion, newCommit)
+			// make homepath agent consistent
+			homePath := filepath.Join(tmpDir, tt.agentHomeDirectory)
+			newHome := filepath.Join(tmpDir, tt.newAgentHomeDirectory)
 
-	oldFilename := filepath.Join(sourceDir, filename)
-	err = os.WriteFile(oldFilename, content, 0640)
-	require.NoError(t, err, "preparing file failed")
+			content := []byte("content")
+			sourceDir := filepath.Join(homePath, filepath.Dir(tt.oldRunFile))
+			targetDir := filepath.Join(newHome, filepath.Dir(tt.newRunFile))
 
-	err = cb()
-	require.NoError(t, err, "callback failed")
+			require.NoError(t, os.MkdirAll(sourceDir, 0755))
+			require.NoError(t, os.MkdirAll(targetDir, 0755))
 
-	newFilename := filepath.Join(targetDir, filename)
-	newContent, err := os.ReadFile(newFilename)
-	require.NoError(t, err, "reading file failed")
-	require.Equal(t, content, newContent, "contents are not equal")
+			cb := shutdownCallback(l, homePath, tt.agentVersion, tt.newAgentVersion, newHome)
+
+			oldFilename := filepath.Join(homePath, tt.oldRunFile)
+			err := os.WriteFile(oldFilename, content, 0640)
+			require.NoError(t, err, "preparing file failed")
+
+			err = cb()
+			require.NoError(t, err, "callback failed")
+
+			newFilename := filepath.Join(newHome, tt.newRunFile)
+			newContent, err := os.ReadFile(newFilename)
+			require.NoError(t, err, "reading file failed")
+			require.Equal(t, content, newContent, "contents are not equal")
+		})
+	}
+
 }
 
 func TestIsInProgress(t *testing.T) {
@@ -496,5 +539,367 @@ agent.download:
 				assert.Equal(t, tc.proxyURL, u.settings.Proxy.URL.String())
 			}
 		})
+	}
+}
+
+var agentVersion123SNAPSHOTabcdef = agentVersion{
+	version:  "1.2.3",
+	snapshot: true,
+	hash:     "abcdef",
+}
+
+var agentVersion123SNAPSHOTabcdefRepackaged = agentVersion{
+	version:  "1.2.3-repackaged",
+	snapshot: true,
+	hash:     "abcdef",
+}
+
+var agentVersion123abcdef = agentVersion{
+	version:  "1.2.3",
+	snapshot: false,
+	hash:     "abcdef",
+}
+
+var agentVersion123SNAPSHOTghijkl = agentVersion{
+	version:  "1.2.3",
+	snapshot: true,
+	hash:     "ghijkl",
+}
+
+func TestIsSameVersion(t *testing.T) {
+	type args struct {
+		current  agentVersion
+		metadata packageMetadata
+		version  string
+	}
+	type want struct {
+		same       bool
+		newVersion agentVersion
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "same version, snapshot flag and hash",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       true,
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3-repackaged",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag (SNAPSHOT promotion to release)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      false,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123abcdef,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "ghijkl",
+				},
+				version: "unused",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+		},
+		{
+			name: "same version, snapshot flag and hash, no manifest",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				same:       true,
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version, no manifest",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3-repackaged-SNAPSHOT",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag, no manifest (SNAPSHOT promotion to release)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123abcdef,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "ghijkl",
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				same:       false,
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			log, _ := logger.NewTesting(test.name)
+			actualSame, actualNewVersion := isSameVersion(log, test.args.current, test.args.metadata, test.args.version)
+
+			assert.Equal(t, test.want.same, actualSame, "Unexpected boolean comparison result: isSameVersion(%v, %v, %v, %v) should be %v",
+				log, test.args.current, test.args.metadata, test.args.version, test.want.same)
+			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: isSameVersion(%v, %v, %v, %v) should be %v",
+				log, test.args.current, test.args.metadata, test.args.version, test.want.newVersion)
+		})
+	}
+}
+
+func TestWaitForWatcher(t *testing.T) {
+	wantErrWatcherNotStarted := func(t assert.TestingT, err error, i ...interface{}) bool {
+		return assert.ErrorIs(t, err, ErrWatcherNotStarted, i)
+	}
+
+	tests := []struct {
+		name                string
+		states              []details.State
+		stateChangeInterval time.Duration
+		cancelWaitContext   bool
+		wantErr             assert.ErrorAssertionFunc
+	}{
+		{
+			name:                "Happy path: watcher is watching already",
+			states:              []details.State{details.StateWatching},
+			stateChangeInterval: 1 * time.Millisecond,
+			wantErr:             assert.NoError,
+		},
+		{
+			name:                "Sad path: watcher is never starting",
+			states:              []details.State{details.StateReplacing},
+			stateChangeInterval: 1 * time.Millisecond,
+			cancelWaitContext:   true,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+		{
+			name: "Runaround path: marker is jumping around and landing on watching",
+			states: []details.State{
+				details.StateRequested,
+				details.StateScheduled,
+				details.StateDownloading,
+				details.StateExtracting,
+				details.StateReplacing,
+				details.StateRestarting,
+				details.StateWatching,
+			},
+			stateChangeInterval: 1 * time.Millisecond,
+			wantErr:             assert.NoError,
+		},
+		{
+			name:                "Timeout: marker is never created",
+			states:              nil,
+			stateChangeInterval: 1 * time.Millisecond,
+			cancelWaitContext:   true,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+		{
+			name: "Timeout2: state doesn't get there in time",
+			states: []details.State{
+				details.StateRequested,
+				details.StateScheduled,
+				details.StateDownloading,
+				details.StateExtracting,
+				details.StateReplacing,
+				details.StateRestarting,
+			},
+
+			stateChangeInterval: 1 * time.Millisecond,
+			cancelWaitContext:   true,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			deadline, ok := t.Deadline()
+			if !ok {
+				deadline = time.Now().Add(5 * time.Second)
+			}
+			testCtx, testCancel := context.WithDeadline(context.Background(), deadline)
+			defer testCancel()
+
+			tmpDir := t.TempDir()
+			updMarkerFilePath := filepath.Join(tmpDir, markerFilename)
+
+			waitContext, waitCancel := context.WithCancel(testCtx)
+			defer waitCancel()
+
+			fakeTimeout := 30 * time.Second
+
+			// in order to take timing out of the equation provide a context that we can cancel manually
+			// still assert that the parent context and timeout passed are correct
+			var createContextFunc createContextWithTimeout = func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+				assert.Same(t, testCtx, ctx, "parent context should be the same as the waitForWatcherCall")
+				assert.Equal(t, fakeTimeout, timeout, "timeout used in new context should be the same as testcase")
+
+				return waitContext, waitCancel
+			}
+
+			if len(tt.states) > 0 {
+				initialState := tt.states[0]
+				writeState(t, updMarkerFilePath, initialState)
+			}
+
+			wg := new(sync.WaitGroup)
+
+			var furtherStates []details.State
+			if len(tt.states) > 1 {
+				// we have more states to produce
+				furtherStates = tt.states[1:]
+			}
+
+			wg.Add(1)
+
+			// worker goroutine: writes out additional states while the test is blocked on waitOnWatcher() call and expires
+			// the wait context if cancelWaitContext is set to true. Timing of the goroutine is driven by stateChangeInterval.
+			go func() {
+				defer wg.Done()
+				tick := time.NewTicker(tt.stateChangeInterval)
+				defer tick.Stop()
+				for _, state := range furtherStates {
+					select {
+					case <-testCtx.Done():
+						return
+					case <-tick.C:
+						writeState(t, updMarkerFilePath, state)
+					}
+				}
+				if tt.cancelWaitContext {
+					<-tick.C
+					waitCancel()
+				}
+			}()
+
+			log, _ := logger.NewTesting(tt.name)
+
+			tt.wantErr(t, waitForWatcherWithTimeoutCreationFunc(testCtx, log, updMarkerFilePath, fakeTimeout, createContextFunc), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, fakeTimeout))
+
+			// wait for goroutines to finish
+			wg.Wait()
+		})
+	}
+}
+
+func writeState(t *testing.T, path string, state details.State) {
+	ms := newMarkerSerializer(&UpdateMarker{
+		Version:           "version",
+		Hash:              "hash",
+		VersionedHome:     "versionedHome",
+		UpdatedOn:         time.Now(),
+		PrevVersion:       "prev_version",
+		PrevHash:          "prev_hash",
+		PrevVersionedHome: "prev_versionedhome",
+		Acked:             false,
+		Action:            nil,
+		Details: &details.Details{
+			TargetVersion: "version",
+			State:         state,
+			ActionID:      "",
+			Metadata:      details.Metadata{},
+		},
+	})
+
+	bytes, err := yaml.Marshal(ms)
+	if assert.NoError(t, err, "error marshaling the test upgrade marker") {
+		err = os.WriteFile(path, bytes, 0770)
+		assert.NoError(t, err, "error writing out the test upgrade marker")
 	}
 }

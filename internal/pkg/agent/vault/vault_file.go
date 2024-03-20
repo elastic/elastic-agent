@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build !darwin
-
 package vault
 
 import (
@@ -20,15 +18,7 @@ import (
 	"github.com/gofrs/flock"
 )
 
-const (
-	// defaultFlockRetryDelay default file lock retry delay
-	defaultFlockRetryDelay = 10 * time.Millisecond
-
-	// lock file name
-	lockFile = `.lock`
-)
-
-type Vault struct {
+type FileVault struct {
 	path string
 	seed []byte
 
@@ -36,9 +26,9 @@ type Vault struct {
 	lock           *flock.Flock
 }
 
-// New creates the vault store
-func New(ctx context.Context, path string, opts ...OptionFunc) (v *Vault, err error) {
-	options := applyOptions(opts...)
+// NewFileVault creates the file-based vault store
+func NewFileVault(ctx context.Context, options Options) (v *FileVault, err error) {
+	path := options.vaultPath
 	dir := filepath.Dir(path)
 
 	// If there is no specific path then get the executable directory
@@ -70,7 +60,7 @@ func New(ctx context.Context, path string, opts ...OptionFunc) (v *Vault, err er
 		}
 	}
 
-	r := &Vault{
+	r := &FileVault{
 		path:           path,
 		lockRetryDelay: options.lockRetryDelay,
 		lock:           flock.New(filepath.Join(path, lockFile)),
@@ -93,25 +83,32 @@ func New(ctx context.Context, path string, opts ...OptionFunc) (v *Vault, err er
 }
 
 // Set stores the key in the vault store
-func (v *Vault) Set(ctx context.Context, key string, data []byte) (err error) {
+func (v *FileVault) Set(ctx context.Context, key string, data []byte) (err error) {
 	enc, err := v.encrypt(data)
 	if err != nil {
-		return err
+		return fmt.Errorf("vault Set: could not encrypt key: %w", err)
 	}
 
 	err = v.tryLock(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("vault Set: could acquire lock: %w", err)
 	}
 	defer func() {
 		err = v.unlockAndJoinErrors(err)
+		if err != nil {
+			err = fmt.Errorf("vault Set: unlockAndJoinErrors failed: %w", err)
+		}
 	}()
 
-	return writeFile(v.filepathFromKey(key), enc)
+	err = writeFile(v.filepathFromKey(key), enc)
+	if err != nil {
+		return fmt.Errorf("vaukt: could not write key to file: %w", err)
+	}
+	return nil
 }
 
 // Get retrieves the key from the vault store
-func (v *Vault) Get(ctx context.Context, key string) (dec []byte, err error) {
+func (v *FileVault) Get(ctx context.Context, key string) (dec []byte, err error) {
 	err = v.tryRLock(ctx)
 	if err != nil {
 		return nil, err
@@ -129,7 +126,7 @@ func (v *Vault) Get(ctx context.Context, key string) (dec []byte, err error) {
 }
 
 // Exists checks if the key exists
-func (v *Vault) Exists(ctx context.Context, key string) (ok bool, err error) {
+func (v *FileVault) Exists(ctx context.Context, key string) (ok bool, err error) {
 	err = v.tryRLock(ctx)
 	if err != nil {
 		return false, err
@@ -148,7 +145,7 @@ func (v *Vault) Exists(ctx context.Context, key string) (ok bool, err error) {
 }
 
 // Remove removes the key
-func (v *Vault) Remove(ctx context.Context, key string) (err error) {
+func (v *FileVault) Remove(ctx context.Context, key string) (err error) {
 	err = v.tryLock(ctx)
 	if err != nil {
 		return err
@@ -162,21 +159,8 @@ func (v *Vault) Remove(ctx context.Context, key string) (err error) {
 
 // Close closes the vault store
 // Noop for non-darwin implementation
-func (v *Vault) Close() error {
+func (v *FileVault) Close() error {
 	return nil
-}
-
-// applyOptions applies options for windows and linux, not used for darwin implementation
-func applyOptions(opts ...OptionFunc) Options {
-	options := Options{
-		lockRetryDelay: defaultFlockRetryDelay,
-	}
-
-	for _, opt := range opts {
-		opt(&options)
-	}
-
-	return options
 }
 
 // fileNameFromKey returns the filename as a hash of the vault seed combined with the key
@@ -187,12 +171,12 @@ func fileNameFromKey(seed []byte, key string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (v *Vault) filepathFromKey(key string) string {
+func (v *FileVault) filepathFromKey(key string) string {
 	return filepath.Join(v.path, fileNameFromKey(v.seed, key))
 }
 
 // try to acquire exclusive lock
-func (v *Vault) tryLock(ctx context.Context) error {
+func (v *FileVault) tryLock(ctx context.Context) error {
 	_, err := v.lock.TryLockContext(ctx, v.lockRetryDelay)
 	if err != nil {
 		return fmt.Errorf("failed to acquire exclusive lock: %v, err: %w", v.lock.Path(), err)
@@ -201,7 +185,7 @@ func (v *Vault) tryLock(ctx context.Context) error {
 }
 
 // try to acquire shared lock
-func (v *Vault) tryRLock(ctx context.Context) error {
+func (v *FileVault) tryRLock(ctx context.Context) error {
 	_, err := v.lock.TryRLockContext(ctx, v.lockRetryDelay)
 	if err != nil {
 		return fmt.Errorf("failed to acquire shared lock: %v, err: %w", v.lock.Path(), err)
@@ -210,6 +194,6 @@ func (v *Vault) tryRLock(ctx context.Context) error {
 }
 
 // unlockAndJoinErrors Helper function that unlocks the file lock and returns joined error
-func (v *Vault) unlockAndJoinErrors(err error) error {
+func (v *FileVault) unlockAndJoinErrors(err error) error {
 	return errors.Join(err, v.lock.Unlock())
 }

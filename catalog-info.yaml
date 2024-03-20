@@ -48,9 +48,9 @@ spec:
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       cancel_intermediate_builds: true
-      cancel_intermediate_builds_branch_filter: "!main"
+      cancel_intermediate_builds_branch_filter: '!main !7.* !8.* !9.*'
       skip_intermediate_builds: true
-      skip_intermediate_builds_branch_filter: "!main"
+      skip_intermediate_builds_branch_filter: '!main !7.* !8.* !9.*'
       env:
         ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "true"
         SLACK_NOTIFICATIONS_CHANNEL: "#ingest-notifications"
@@ -96,13 +96,15 @@ spec:
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       cancel_intermediate_builds: true
-      cancel_intermediate_builds_branch_filter: "!main"
+      cancel_intermediate_builds_branch_filter: '!main !7.* !8.* !9.*'
       skip_intermediate_builds: true
-      skip_intermediate_builds_branch_filter: "!main"
+      skip_intermediate_builds_branch_filter: '!main !7.* !8.* !9.*'
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
         release-eng:
+          access_level: BUILD_AND_READ
+        endpoint-ci-admin:
           access_level: BUILD_AND_READ
         everyone:
           access_level: READ_ONLY

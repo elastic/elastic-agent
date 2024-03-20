@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +24,8 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
@@ -95,6 +97,231 @@ func waitForState(
 			return
 		}
 	}
+}
+
+func TestComponentUpdateDiff(t *testing.T) {
+
+	err := logp.DevelopmentSetup(logp.ToObserverOutput())
+	require.NoError(t, err)
+
+	cases := []struct {
+		name    string
+		old     []component.Component
+		new     []component.Component
+		logtest func(t *testing.T, logs UpdateStats)
+	}{
+		{
+			name: "test-basic-removed",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+				{
+					ID:         "component-two",
+					OutputType: "kafka",
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+
+				require.Equal(t, []string{"component-two"}, logs.Components.Removed)
+				require.Equal(t, []string{"kafka"}, logs.Outputs.Removed)
+			},
+		},
+		{
+			name: "test-added-and-removed",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+				{
+					ID:         "component-two",
+					OutputType: "kafka",
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-three",
+					OutputType: "elasticsearch",
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Equal(t, 2, len(logs.Components.Removed))
+				require.Equal(t, []string{"component-three"}, logs.Components.Added)
+				require.Equal(t, []string{"kafka"}, logs.Outputs.Removed)
+			},
+		},
+		{
+			name: "test-updated-component",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "unit-one"},
+						{ID: "unit-two"},
+						{ID: "unit-x"},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "unit-one"},
+						{ID: "unit-two"},
+						{ID: "unit-three"},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Contains(t, logs.Components.Updated[0], "unit-three: added")
+				require.Contains(t, logs.Components.Updated[0], "unit-x: removed")
+			},
+		},
+		{
+			name: "just-change-output",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "logstash",
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Equal(t, []string{"elasticsearch"}, logs.Outputs.Removed)
+				require.Equal(t, []string{"logstash"}, logs.Outputs.Added)
+			},
+		},
+		{
+			name: "config-update",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "value"})},
+						},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "two"})},
+						},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.NotEmpty(t, logs.Components.Updated)
+			},
+		},
+		{
+			name: "config-no-changes",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "value"})},
+						},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "value"})},
+						},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Updated, 0)
+			},
+		},
+		{
+			name: "config-source-nil",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Id: "test"},
+						},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Id: "test"},
+						},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Updated, 0)
+			},
+		},
+	}
+
+	for _, testcase := range cases {
+
+		t.Run(testcase.name, func(t *testing.T) {
+			testCoord := Coordinator{
+				logger:         logp.L(),
+				componentModel: testcase.new,
+			}
+			testCoord.checkAndLogUpdate(testcase.old)
+
+			obsLogs := logp.ObserverLogs().TakeAll()
+			last := obsLogs[len(obsLogs)-1]
+
+			// extract the structured data from the log message
+			testcase.logtest(t, last.Context[0].Interface.(UpdateStats))
+		})
+
+	}
+
+}
+
+func mustNewStruct(t *testing.T, v map[string]interface{}) *structpb.Struct {
+	str, err := structpb.NewStruct(v)
+	require.NoError(t, err)
+	return str
 }
 
 func TestCoordinator_State_Starting(t *testing.T) {

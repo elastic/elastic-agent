@@ -13,6 +13,9 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/pkg/utils"
+
 	"github.com/hectane/go-acl"
 
 	"github.com/elastic/elastic-agent-libs/file"
@@ -40,28 +43,45 @@ type OptionFunc func(s *EncryptedDiskStore)
 
 // NewEncryptedDiskStore creates an encrypted disk store.
 // Drop-in replacement for NewDiskStorage
-func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFunc) Storage {
+func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFunc) (Storage, error) {
 	if encryptionDisabled {
 		return NewDiskStore(target)
 	}
+
+	unprivileged := false
+
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return nil, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
+	}
+	if !hasRoot {
+		unprivileged = true
+		opts = append([]OptionFunc{WithUnprivileged(unprivileged)}, opts...)
+	}
+
 	s := &EncryptedDiskStore{
-		ctx:       ctx,
-		target:    target,
-		vaultPath: paths.AgentVaultPath(),
+		ctx:          ctx,
+		target:       target,
+		vaultPath:    paths.AgentVaultPath(),
+		unprivileged: unprivileged,
 	}
 	for _, opt := range opts {
 		opt(s)
 	}
-	return s
+	return s, nil
 }
 
 // WithVaultPath sets the path of the vault.
 func WithVaultPath(vaultPath string) OptionFunc {
 	return func(s *EncryptedDiskStore) {
-		if runtime.GOOS == darwin {
-			return
-		}
 		s.vaultPath = vaultPath
+	}
+}
+
+// WithUnprivileged sets if vault should be unprivileged.
+func WithUnprivileged(unprivileged bool) OptionFunc {
+	return func(s *EncryptedDiskStore) {
+		s.unprivileged = unprivileged
 	}
 }
 
@@ -79,7 +99,7 @@ func (d *EncryptedDiskStore) Exists() (bool, error) {
 
 func (d *EncryptedDiskStore) ensureKey(ctx context.Context) error {
 	if d.key == nil {
-		key, err := secret.GetAgentSecret(ctx, secret.WithVaultPath(d.vaultPath))
+		key, err := secret.GetAgentSecret(ctx, vault.WithVaultPath(d.vaultPath), vault.WithUnprivileged(d.unprivileged))
 		if err != nil {
 			return fmt.Errorf("could not get agent key: %w", err)
 		}
@@ -164,7 +184,7 @@ func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
 	fd, err := os.OpenFile(d.target, os.O_RDONLY, perms)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			// If file doesn't exists, return empty reader closer
+			// If file doesn't exist, return empty reader closer
 			return io.NopCloser(bytes.NewReader([]byte{})), nil
 		}
 		return nil, errors.New(err,

@@ -41,7 +41,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	upgradeToVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
 	endFixture, err := atesting.NewFixture(
 		t,

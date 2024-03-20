@@ -8,6 +8,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -21,10 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
-)
-
-const (
-	artifactElasticAgentProject = "elastic-agent-package"
 )
 
 func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
@@ -45,8 +42,8 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	aac := tools.NewArtifactAPIClient()
-	latestSnapshotVersion, err := aac.GetLatestSnapshotVersion(ctx, t)
+	aac := tools.NewArtifactAPIClient(tools.WithLogFunc(t.Logf))
+	latestSnapshotVersion, err := aac.GetLatestSnapshotVersion(ctx)
 	require.NoError(t, err)
 
 	// start at the build version as we want to test the retry
@@ -61,48 +58,24 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	// as the currently running binary (so, we don't have a file system collision).
 	// Multiple builds can have different IDs but the same commit hash.
 	preReleaseVersion := latestSnapshotVersion.VersionWithPrerelease()
-	resp, err := aac.GetBuildsForVersion(ctx, preReleaseVersion)
-	require.NoError(t, err)
-
-	if len(resp.Builds) < 2 {
-		t.Skipf("need at least 2 builds in the version %s", latestSnapshotVersion.VersionWithPrerelease())
-		return
-	}
-
-	var upgradeVersionString string
-	for _, buildID := range resp.Builds[1:] {
-		details, err := aac.GetBuildDetails(ctx, preReleaseVersion, buildID)
-		require.NoError(t, err)
-		if details.Build.Projects[artifactElasticAgentProject].CommitHash != startVersion.Binary.Commit {
-			upgradeVersionString = buildID
-			break
-		}
-	}
-
-	if upgradeVersionString == "" {
+	buildInfo, err := aac.FindBuild(ctx, preReleaseVersion, startVersion.Binary.Commit, 1)
+	if errors.Is(err, tools.ErrBuildNotFound) {
 		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", latestSnapshotVersion.VersionWithPrerelease())
 		return
 	}
-
-	buildFragments := strings.Split(upgradeVersionString, "-")
-	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
-	endParsedVersion := version.NewParsedSemVer(
-		latestSnapshotVersion.Major(),
-		latestSnapshotVersion.Minor(),
-		latestSnapshotVersion.Patch(),
-		latestSnapshotVersion.Prerelease(),
-		buildFragments[1],
-	)
+	require.NoError(t, err)
 
 	// Upgrade to the specific build.
+	t.Logf("found build %q available for testing", buildInfo.Build.BuildID)
+	endVersion := versionWithBuildID(t, latestSnapshotVersion, buildInfo.Build.BuildID)
 	endFixture, err := atesting.NewFixture(
 		t,
-		endParsedVersion.String(),
+		endVersion,
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
 
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), endParsedVersion.String())
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), endVersion)
 
 	// We pass the upgradetest.WithDisableUpgradeWatcherUpgradeDetailsCheck option here because the endFixture
 	// is fetched from the artifacts API and it may not contain changes in the Upgrade Watcher whose effects are
@@ -110,4 +83,20 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 	// TODO: Stop passing this option and remove these comments once 8.13.0 has been released.
 	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithDisableUpgradeWatcherUpgradeDetailsCheck())
 	assert.NoError(t, err)
+}
+
+// versionWithBuildID creates a new parsed version created from the given `initialVersion` with the given `buildID` as build metadata.
+func versionWithBuildID(t *testing.T, initialVersion *version.ParsedSemVer, buildID string) string {
+	buildFragments := strings.Split(buildID, "-")
+	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", buildID)
+	result := version.NewParsedSemVer(
+		initialVersion.Major(),
+		initialVersion.Minor(),
+		initialVersion.Patch(),
+		initialVersion.Prerelease(),
+		buildFragments[1],
+	)
+
+	return result.String()
+
 }
