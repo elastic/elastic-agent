@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -70,59 +69,34 @@ type actionSerializer struct {
 // therefore the need for this type to do so.
 type actionQueue []fleetapi.ScheduledAction
 
-func (as *actionSerializer) MarshalJSON() ([]byte, error) {
-	return json.Marshal(as.Action)
-}
-
-func (as *actionSerializer) UnmarshalJSON(data []byte) error {
-	var typeUnmarshaler struct {
-		Type string `json:"type,omitempty" yaml:"type,omitempty"`
-	}
-	err := json.Unmarshal(data, &typeUnmarshaler)
-	if err != nil {
-		return err
-	}
-
-	as.Action = fleetapi.NewAction(typeUnmarshaler.Type)
-	err = json.Unmarshal(data, &as.Action)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (aq *actionQueue) UnmarshalJSON(data []byte) error {
-	actions := fleetapi.Actions{}
-	err := json.Unmarshal(data, &actions)
-	if err != nil {
-		return fmt.Errorf("actionQueue failed to unmarshal: %w", err)
-	}
-
-	var scheduledActions []fleetapi.ScheduledAction
-	for _, a := range actions {
-		sa, ok := a.(fleetapi.ScheduledAction)
-		if !ok {
-			return fmt.Errorf("actionQueue: action %s isn't a ScheduledAction,"+
-				"cannot unmarshal it to actionQueue", a.Type())
-		}
-		scheduledActions = append(scheduledActions, sa)
-	}
-
-	*aq = scheduledActions
-	return nil
-}
-
-// NewStateStoreWithMigration creates a new state store and migrates the old one.
-func NewStateStoreWithMigration(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string) (*StateStore, error) {
-
+// NewStateStoreWithMigration creates a new state store and migrates the old ones.
+func NewStateStoreWithMigration(
+	ctx context.Context,
+	log *logger.Logger,
+	actionStorePath,
+	stateStorePath string) (*StateStore, error) {
 	stateDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath)
-	err := migrateActionStoreToStateStore(log, actionStorePath, stateDiskStore)
+
+	return newStateStoreWithMigration(log, actionStorePath, stateDiskStore)
+}
+
+func newStateStoreWithMigration(
+	log *logger.Logger,
+	actionStorePath string,
+	stateStore storage.Storage) (*StateStore, error) {
+	err := migrateActionStoreToStateStore(log, actionStorePath, stateStore)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed migrating action store to YAML state store: %w",
+			err)
 	}
 
-	return NewStateStore(log, storage.NewEncryptedDiskStore(ctx, stateStorePath))
+	err = migrateYAMLStateStoreToStateStoreV1(log, stateStore)
+	if err != nil {
+		return nil, fmt.Errorf("failed dmigrating YAML store JSON store: %w",
+			err)
+	}
+
+	return NewStateStore(log, stateStore)
 }
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
@@ -141,18 +115,9 @@ func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 	}
 	defer reader.Close()
 
-	st := state{}
-	dec := json.NewDecoder(reader)
-	err = dec.Decode(&st)
-	if errors.Is(err, io.EOF) {
-		return &StateStore{
-			log:   log,
-			store: store,
-			state: state{Version: Version},
-		}, nil
-	}
+	st, err := readState(reader)
 	if err != nil {
-		return nil, fmt.Errorf("could not JSON unmarshal state store: %w", err)
+		return nil, fmt.Errorf("could not parse store content: %w", err)
 	}
 
 	if st.Version != Version {
@@ -166,6 +131,30 @@ func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 		store: store,
 		state: st,
 	}, nil
+}
+
+// readState parsed the content from reader as JSON to state.
+// It's mostly to abstract the parsing of the date so different functions can
+// reuse this.
+func readState(reader io.ReadCloser) (state, error) {
+	st := state{}
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return state{}, fmt.Errorf("could not read store state: %w", err)
+	}
+
+	if len(data) == 0 {
+		// empty file
+		return state{Version: "1"}, nil
+	}
+
+	err = json.Unmarshal(data, &st)
+	if err != nil {
+		return state{}, fmt.Errorf("could not parse JSON: %w", err)
+	}
+
+	return st, nil
 }
 
 // SetAction sets the current action. It accepts ActionPolicyChange or
@@ -294,73 +283,47 @@ func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
 	return a.acker.Commit(ctx)
 }
 
-func migrateActionStoreToStateStore(
-	log *logger.Logger,
-	actionStorePath string,
-	stateDiskStore storage.Storage) (err error) {
+func (as *actionSerializer) MarshalJSON() ([]byte, error) {
+	return json.Marshal(as.Action)
+}
 
-	log = log.Named("state_migration")
-	actionDiskStore := storage.NewDiskStore(actionStorePath)
-
-	stateStoreExits, err := stateDiskStore.Exists()
+func (as *actionSerializer) UnmarshalJSON(data []byte) error {
+	var typeUnmarshaler struct {
+		Type string `json:"type,omitempty" yaml:"type,omitempty"`
+	}
+	err := json.Unmarshal(data, &typeUnmarshaler)
 	if err != nil {
-		log.Errorf("failed to check if state store exists: %v", err)
 		return err
 	}
 
-	// do not migrate if the state store already exists
-	if stateStoreExits {
-		log.Debugf("state store already exists")
-		return nil
-	}
-
-	actionStoreExits, err := actionDiskStore.Exists()
+	as.Action = fleetapi.NewAction(typeUnmarshaler.Type)
+	err = json.Unmarshal(data, &as.Action)
 	if err != nil {
-		log.Errorf("failed to check if action store %s exists: %v", actionStorePath, err)
 		return err
 	}
 
-	// delete the actions store file upon successful migration
-	defer func() {
-		if err == nil && actionStoreExits {
-			err = actionDiskStore.Delete()
-			if err != nil {
-				log.Errorf("failed to delete action store %s exists: %v", actionStorePath, err)
-			}
+	return nil
+}
+
+func (aq *actionQueue) UnmarshalJSON(data []byte) error {
+	actions := fleetapi.Actions{}
+	err := json.Unmarshal(data, &actions)
+	if err != nil {
+		return fmt.Errorf("actionQueue failed to unmarshal: %w", err)
+	}
+
+	var scheduledActions []fleetapi.ScheduledAction
+	for _, a := range actions {
+		sa, ok := a.(fleetapi.ScheduledAction)
+		if !ok {
+			return fmt.Errorf("actionQueue: action %s isn't a ScheduledAction,"+
+				"cannot unmarshal it to actionQueue", a.Type())
 		}
-	}()
-
-	// nothing to migrate if the action store doesn't exists
-	if !actionStoreExits {
-		log.Debugf("action store %s doesn't exists, nothing to migrate", actionStorePath)
-		return nil
+		scheduledActions = append(scheduledActions, sa)
 	}
 
-	actionStore, err := newActionStore(log, actionDiskStore)
-	if err != nil {
-		log.Errorf("failed to create action store %s: %v", actionStorePath, err)
-		return err
-	}
-
-	// no actions stored nothing to migrate
-	if len(actionStore.actions()) == 0 {
-		log.Debugf("no actions stored in the action store %s, nothing to migrate", actionStorePath)
-		return nil
-	}
-
-	stateStore, err := NewStateStore(log, stateDiskStore)
-	if err != nil {
-		return err
-	}
-
-	// set actions from the action store to the state store
-	stateStore.SetAction(actionStore.actions()[0])
-
-	err = stateStore.Save()
-	if err != nil {
-		log.Debugf("failed to save agent state store, err: %v", err)
-	}
-	return err
+	*aq = scheduledActions
+	return nil
 }
 
 func jsonToReader(in interface{}) (io.Reader, error) {

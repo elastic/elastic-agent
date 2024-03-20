@@ -55,7 +55,7 @@ func (q queue) Swap(i, j int) {
 // When using the queue, the Add method should be used instead.
 func (q *queue) Push(x interface{}) {
 	n := len(*q)
-	e := x.(*item) //nolint:errcheck // should be an *item
+	e := x.(*item)
 	e.index = n
 	*q = append(*q, e)
 }
@@ -123,7 +123,7 @@ func (q *ActionQueue) DequeueActions() []fleetapi.ScheduledAction {
 		if (*q.q)[0].priority > ts {
 			break
 		}
-		item := heap.Pop(q.q).(*item) //nolint:errcheck // should be an *item
+		item := heap.Pop(q.q).(*item)
 		actions = append(actions, item.action)
 	}
 	return actions

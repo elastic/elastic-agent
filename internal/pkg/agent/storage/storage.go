@@ -14,7 +14,9 @@ const perms os.FileMode = 0600
 
 // Store saves the io.Reader.
 type Store interface {
-	// Save the io.Reader.
+	// Save the io.Reader. Depending on the underlying implementation, if
+	// Storage.Load() was called, the io.ReadCloser MUST be closed before Save()
+	// can be called.
 	Save(io.Reader) error
 }
 
