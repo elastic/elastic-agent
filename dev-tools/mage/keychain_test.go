@@ -13,7 +13,6 @@ import (
 )
 
 func TestAppleKeychainListIdentities(t *testing.T) {
-	t.Skip("Flaky test")
 	idents, err := _appleKeychain.ListIdentities()
 	if err != nil {
 		t.Fatal(err)
