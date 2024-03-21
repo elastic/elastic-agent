@@ -259,7 +259,7 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 			}
 		}
 		return allHealthy && foundApache && foundSystem
-	}, runner.healthCheckTime, runner.healthCheckRefreshTime, "install never became healthy: components did not return a healthy state: %s)
+	}, runner.healthCheckTime, runner.healthCheckRefreshTime, "install never became healthy: components did not return a healthy state: %s", compDebugName)
 }
 
 /*
