@@ -14,6 +14,7 @@ import (
 	"runtime"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"github.com/hectane/go-acl"
 
@@ -42,20 +43,32 @@ type OptionFunc func(s *EncryptedDiskStore)
 
 // NewEncryptedDiskStore creates an encrypted disk store.
 // Drop-in replacement for NewDiskStorage
-func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFunc) Storage {
+func NewEncryptedDiskStore(ctx context.Context, target string, opts ...OptionFunc) (Storage, error) {
 	if encryptionDisabled {
 		return NewDiskStore(target)
 	}
+
+	unprivileged := false
+
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return nil, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
+	}
+	if !hasRoot {
+		unprivileged = true
+		opts = append([]OptionFunc{WithUnprivileged(unprivileged)}, opts...)
+	}
+
 	s := &EncryptedDiskStore{
 		ctx:          ctx,
 		target:       target,
 		vaultPath:    paths.AgentVaultPath(),
-		unprivileged: false,
+		unprivileged: unprivileged,
 	}
 	for _, opt := range opts {
 		opt(s)
 	}
-	return s
+	return s, nil
 }
 
 // WithVaultPath sets the path of the vault.

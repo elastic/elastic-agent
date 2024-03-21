@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -41,7 +42,7 @@ func TestContainerCMD(t *testing.T) {
 	require.NoError(t, err)
 
 	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
 		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{

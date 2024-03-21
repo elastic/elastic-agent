@@ -16,8 +16,8 @@ import (
 )
 
 // NewDiskStore creates an unencrypted disk store.
-func NewDiskStore(target string) *DiskStore {
-	return &DiskStore{target: target}
+func NewDiskStore(target string) (*DiskStore, error) {
+	return &DiskStore{target: target}, nil
 }
 
 // Exists check if the store file exists on the disk
