@@ -20,7 +20,7 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.12.1
 	github.com/elastic/go-licenser v0.4.1
 	github.com/elastic/go-sysinfo v1.13.1
-	github.com/elastic/go-ucfg v0.8.7
+	github.com/elastic/go-ucfg v0.8.8
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gofrs/flock v0.8.1
