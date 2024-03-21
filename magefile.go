@@ -36,7 +36,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
+	pv "github.com/elastic/elastic-agent/pkg/testing/tools/product_versions"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/snapshots"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 	bversion "github.com/elastic/elastic-agent/version"
@@ -1576,17 +1578,37 @@ func (Integration) Single(ctx context.Context, testName string) error {
 // UpdateVersions runs an update on the `.agent-versions.json` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
-	// test 2 current 8.x version, 1 previous 7.x version and 1 recent snapshot
+	maxSnapshots := 3
+
+	branches, err := git.GetReleaseBranches(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list release branches: %w", err)
+	}
+
+	// -1 because we manually add 7.17 below
+	if len(branches) > maxSnapshots-1 {
+		branches = branches[:maxSnapshots-1]
+	}
+
+	// it's not a part of this repository, cannot be retrieved with `GetReleaseBranches`
+	branches = append(branches, "7.17")
+
+	// uncomment if want to have the current version snapshot on the list as well
+	// branches = append([]string{"master"}, branches...)
+
 	reqs := upgradetest.VersionRequirements{
 		UpgradeToVersion: bversion.Agent,
 		CurrentMajors:    2,
 		PreviousMinors:   1,
 		PreviousMajors:   1,
-		RecentSnapshots:  1,
+		SnapshotBranches: branches,
 	}
+	b, _ := json.MarshalIndent(reqs, "", "  ")
+	fmt.Printf("Current version requirements: \n%s\n", b)
 
-	aac := tools.NewArtifactAPIClient(tools.WithLogFunc(log.Default().Printf))
-	versions, err := upgradetest.FetchUpgradableVersions(ctx, aac, reqs)
+	pvc := pv.NewProductVersionsClient()
+	sc := snapshots.NewSnapshotsClient()
+	versions, err := upgradetest.FetchUpgradableVersions(ctx, pvc, sc, reqs)
 	if err != nil {
 		return fmt.Errorf("failed to fetch upgradable versions: %w", err)
 	}
