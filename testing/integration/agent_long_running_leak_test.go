@@ -236,7 +236,7 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 
 		apacheMatch := "logfile-apache"
 		foundApache := false
-		systemMatch := "metrics-fleet-default"
+		systemMatch := "system/metrics"
 		foundSystem := false
 
 		require.NoError(runner.T(), err)
