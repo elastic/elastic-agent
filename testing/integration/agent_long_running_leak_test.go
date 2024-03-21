@@ -236,7 +236,7 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 
 		apacheMatch := "logfile-apache"
 		foundApache := false
-		systemMatch := "metrics-default"
+		systemMatch := "metrics-fleet-default"
 		foundSystem := false
 
 		require.NoError(runner.T(), err)
@@ -259,7 +259,7 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 			}
 		}
 		return allHealthy && foundApache && foundSystem
-	}, runner.healthCheckTime, runner.healthCheckRefreshTime, "install never became healthy: components did not return a healthy state: %s", compDebugName)
+	}, runner.healthCheckTime, runner.healthCheckRefreshTime, "install never became healthy: components did not return a healthy state: %s)
 }
 
 /*
