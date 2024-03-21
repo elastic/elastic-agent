@@ -8,6 +8,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -80,14 +81,15 @@ func (runner *MetricsRunner) SetupSuite() {
 }
 
 func (runner *MetricsRunner) TestBeatsMetrics() {
+	UnitOutputName := "fleet-default-output"
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
 	defer cancel()
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(runner.T(), err)
 
 	componentIds := []string{
-		"system/metrics-default",
-		"log-default",
+		fmt.Sprintf("system/metrics-%s", UnitOutputName),
+		fmt.Sprintf("log-%s", UnitOutputName),
 		"beat/metrics-monitoring",
 		"elastic-agent",
 		"http/metrics-monitoring",
