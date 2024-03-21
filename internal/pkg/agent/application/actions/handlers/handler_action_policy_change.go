@@ -246,10 +246,13 @@ func (h *PolicyChangeHandler) applyConfigWithPrecedence(cfg remote.Config) {
 
 	if cfg.Transport.Proxy.URL == nil ||
 		cfg.Transport.Proxy.URL.String() == "" {
-		h.log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
+		h.log.Debugw("proxy from fleet is empty or null, the proxy will not be changed",
+			"proxy_url", h.config.Fleet.Client.Transport.Proxy.URL.String())
 	} else {
+		h.log.Debugw("received proxy from fleet, applying it",
+			"old_proxy_url", h.config.Fleet.Client.Transport.Proxy.URL.String(),
+			"new_proxy_url", cfg.Transport.Proxy.URL.String())
 		h.config.Fleet.Client.Transport.Proxy = cfg.Transport.Proxy
-		h.log.Debug("received proxy from fleet, applying it")
 	}
 
 	emptyCertificate := tlscommon.CertificateConfig{}
@@ -263,7 +266,7 @@ func (h *PolicyChangeHandler) applyConfigWithPrecedence(cfg remote.Config) {
 			h.log.Debug("TLS certificate/key from fleet are empty or null, the TLS config will not be changed")
 		} else {
 			h.config.Fleet.Client.Transport.TLS.Certificate = cfg.Transport.TLS.Certificate
-			h.log.Debug("received TSL certificate/key from fleet, applying it")
+			h.log.Debug("received TLS certificate/key from fleet, applying it")
 		}
 
 		// CA
@@ -271,7 +274,7 @@ func (h *PolicyChangeHandler) applyConfigWithPrecedence(cfg remote.Config) {
 			h.log.Debug("TLS CAs from fleet are empty or null, the TLS config will not be changed")
 		} else {
 			h.config.Fleet.Client.Transport.TLS.CAs = cfg.Transport.TLS.CAs
-			h.log.Debug("received SSL from fleet, applying it")
+			h.log.Debug("received TLS CAs from fleet, applying it")
 		}
 	}
 }
@@ -297,7 +300,6 @@ func clientEqual(current remote.Config, new remote.Config) bool {
 		}
 	}
 
-	// should it ignore empty headers?
 	headersEqual := func(h1, h2 httpcommon.ProxyHeaders) bool {
 		if len(h1) != len(h2) {
 			return false

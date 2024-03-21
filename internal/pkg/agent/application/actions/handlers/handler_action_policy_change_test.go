@@ -396,7 +396,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 		agentChildDERKey, _ := pem.Decode(agentChildPair.Key)
 		require.NoError(t, err, "could not create tls.Certificates from child certificate")
 
-		encPem, err := x509.EncryptPEMBlock(
+		encPem, err := x509.EncryptPEMBlock( //nolint:staticcheck // we need to drop support for this, but while we don't, it needs to be tested.
 			rand.Reader,
 			"EC PRIVATE KEY",
 			agentChildDERKey.Bytes,
@@ -434,14 +434,14 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 		agentRootCertPool := x509.NewCertPool()
 		agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
 
-		fleetTLSServer.TLS = &tls.Config{
+		fleetTLSServer.TLS = &tls.Config{ // nolint:gosec // it's just a test
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 			ClientCAs:    agentRootCertPool,
 			ClientAuth:   tls.RequireAndVerifyClientCert,
 		}
 
-		fleetNomTLSServer.TLS = &tls.Config{
+		fleetNomTLSServer.TLS = &tls.Config{ // nolint:gosec // it's just a test
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 		}
