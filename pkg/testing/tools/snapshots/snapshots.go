@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	errNoSnapshot = errors.New("there is no snapshot")
+	errNoSnapshot = errors.New("snapshot not found")
 )
 
 type response struct {

@@ -26,8 +26,7 @@ const (
 )
 
 var (
-	ErrBuildNotFound = errors.New("there are no build that satisfy given conditions")
-
+	ErrBuildNotFound     = errors.New("there are no builds that satisfy given conditions")
 	ErrBadHTTPStatusCode = errors.New("bad http status code")
 )
 
