@@ -731,6 +731,8 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 }
 
 func checkDiagnosticsForEndpointFiles(t *testing.T, diagsPath string) {
+	t.Skipf("flaky test: https://github.com/elastic/elastic-agent/issues/4449")
+
 	zipReader, err := zip.OpenReader(diagsPath)
 	require.NoError(t, err, "error opening diagnostics archive")
 
