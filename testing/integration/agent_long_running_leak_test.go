@@ -9,6 +9,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -121,12 +122,33 @@ func (runner *ExtendedRunner) SetupSuite() {
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", "1.53.1", "agent_long_test_base_system_integ.json", uuid.New().String(), policyResp.ID)
+	// install system package
+	runner.InstallPackage(ctx, "system", "1.53.1", "agent_long_test_base_system_integ.json", uuid.New().String(), policyResp.ID)
+
+	// install cef
+	runner.InstallPackage(ctx, "apache", "1.17.0", "agent_long_test_apache.json", uuid.New().String(), policyResp.ID)
+
+}
+
+func (runner *ExtendedRunner) InstallPackage(ctx context.Context, name string, version string, cfgFile string, policyUUID string, policyID string) {
+	installPackage := kibana.PackagePolicyRequest{}
+
+	jsonRaw, err := os.ReadFile(cfgFile)
 	require.NoError(runner.T(), err)
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "apache", "1.17.0", "agent_long_test_apache.json", uuid.New().String(), policyResp.ID)
+	err = json.Unmarshal(jsonRaw, &installPackage)
 	require.NoError(runner.T(), err)
 
+	installPackage.Package.Version = version
+	installPackage.ID = policyUUID
+	installPackage.PolicyID = policyID
+	installPackage.Namespace = "default"
+	installPackage.Name = fmt.Sprintf("%s-long-test-%s", name, policyUUID)
+	installPackage.Vars = map[string]interface{}{}
+
+	runner.T().Logf("Installing %s package....", name)
+	_, err = runner.info.KibanaClient.InstallFleetPackage(ctx, installPackage)
+	require.NoError(runner.T(), err, "error creating fleet package")
 }
 
 func (runner *ExtendedRunner) TestHandleLeak() {
