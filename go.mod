@@ -14,7 +14,7 @@ require (
 	github.com/elastic/e2e-testing v1.1.0
 	github.com/elastic/elastic-agent-autodiscover v0.6.8
 	github.com/elastic/elastic-agent-client/v7 v7.8.1
-	github.com/elastic/elastic-agent-libs v0.7.5
+	github.com/elastic/elastic-agent-libs v0.8.0
 	github.com/elastic/elastic-agent-system-metrics v0.9.2
 	github.com/elastic/elastic-transport-go/v8 v8.4.0
 	github.com/elastic/go-elasticsearch/v8 v8.12.1
@@ -282,5 +282,3 @@ replace (
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
-
-replace github.com/elastic/elastic-agent-libs => github.com/AndersonQ/elastic-agent-libs v0.0.0-20240307144511-b45f19396c67
