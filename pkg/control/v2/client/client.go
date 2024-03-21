@@ -99,13 +99,13 @@ type ComponentState struct {
 
 // AgentStateInfo is the overall information about the Elastic Agent.
 type AgentStateInfo struct {
-	ID         string `json:"id" yaml:"id"`
-	Version    string `json:"version" yaml:"version"`
-	Commit     string `json:"commit" yaml:"commit"`
-	BuildTime  string `json:"build_time" yaml:"build_time"`
-	Snapshot   bool   `json:"snapshot" yaml:"snapshot"`
-	PID        int32  `json:"pid" yaml:"pid"`
-	Privileged bool   `json:"privileged" yaml:"privileged"`
+	ID           string `json:"id" yaml:"id"`
+	Version      string `json:"version" yaml:"version"`
+	Commit       string `json:"commit" yaml:"commit"`
+	BuildTime    string `json:"build_time" yaml:"build_time"`
+	Snapshot     bool   `json:"snapshot" yaml:"snapshot"`
+	PID          int32  `json:"pid" yaml:"pid"`
+	Unprivileged bool   `json:"unprivileged" yaml:"unprivileged"`
 }
 
 // AgentState is the current state of the Elastic Agent.
@@ -468,13 +468,13 @@ func (sw *stateWatcher) Recv() (*AgentState, error) {
 func toState(res *cproto.StateResponse) (*AgentState, error) {
 	s := &AgentState{
 		Info: AgentStateInfo{
-			ID:         res.Info.Id,
-			Version:    res.Info.Version,
-			Commit:     res.Info.Commit,
-			BuildTime:  res.Info.BuildTime,
-			Snapshot:   res.Info.Snapshot,
-			PID:        res.Info.Pid,
-			Privileged: res.Info.Privileged,
+			ID:           res.Info.Id,
+			Version:      res.Info.Version,
+			Commit:       res.Info.Commit,
+			BuildTime:    res.Info.BuildTime,
+			Snapshot:     res.Info.Snapshot,
+			PID:          res.Info.Pid,
+			Unprivileged: res.Info.Unprivileged,
 		},
 		State:          res.State,
 		Message:        res.Message,

@@ -1162,13 +1162,13 @@ func performConfigure(ctx context.Context, c client.Client, cfg string, timeout 
 
 type AgentStatusOutput struct {
 	Info struct {
-		ID         string `json:"id"`
-		Version    string `json:"version"`
-		Commit     string `json:"commit"`
-		BuildTime  string `json:"build_time"`
-		Snapshot   bool   `json:"snapshot"`
-		PID        int32  `json:"pid"`
-		Privileged bool   `json:"privileged"`
+		ID           string `json:"id"`
+		Version      string `json:"version"`
+		Commit       string `json:"commit"`
+		BuildTime    string `json:"build_time"`
+		Snapshot     bool   `json:"snapshot"`
+		PID          int32  `json:"pid"`
+		Unprivileged bool   `json:"unprivileged"`
 	} `json:"info"`
 	State      int    `json:"state"`
 	Message    string `json:"message"`

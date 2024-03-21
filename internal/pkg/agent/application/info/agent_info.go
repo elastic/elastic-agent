@@ -35,15 +35,15 @@ type Agent interface {
 	// Version returns the version for this Agent.
 	Version() string
 
-	// Privileged returns true when this Agent is running privileged.
-	Privileged() bool
+	// Unprivileged returns true when this Agent is running unprivileged.
+	Unprivileged() bool
 }
 
 // AgentInfo is a collection of information about agent.
 type AgentInfo struct {
-	agentID    string
-	logLevel   string
-	privileged bool
+	agentID      string
+	logLevel     string
+	unprivileged bool
 
 	// esHeaders will be injected into the headers field of any elasticsearch
 	// output created by this agent (see component.toIntermediate).
@@ -67,10 +67,10 @@ func NewAgentInfoWithLog(ctx context.Context, level string, createAgentID bool) 
 	}
 
 	return &AgentInfo{
-		agentID:    agentInfo.ID,
-		logLevel:   agentInfo.LogLevel,
-		privileged: isRoot,
-		esHeaders:  agentInfo.Headers,
+		agentID:      agentInfo.ID,
+		logLevel:     agentInfo.LogLevel,
+		unprivileged: !isRoot,
+		esHeaders:    agentInfo.Headers,
 	}, nil
 }
 
@@ -131,7 +131,7 @@ func (i *AgentInfo) Headers() map[string]string {
 	return i.esHeaders
 }
 
-// Privileged returns true when this Agent is running privileged.
-func (i *AgentInfo) Privileged() bool {
-	return i.privileged
+// Unprivileged returns true when this Agent is running unprivileged.
+func (i *AgentInfo) Unprivileged() bool {
+	return i.unprivileged
 }

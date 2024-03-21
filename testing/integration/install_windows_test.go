@@ -33,5 +33,5 @@ func checkPlatformUnprivileged(t *testing.T, f *atesting.Fixture, topPath string
 	}, 3*time.Minute, 10*time.Second, "never got the status")
 
 	require.False(t, output.IsZero(), "must have an agent ID")
-	require.False(t, output.Info.Privileged, "must be unprivileged")
+	require.True(t, output.Info.Unprivileged, "must be unprivileged")
 }
