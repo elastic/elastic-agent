@@ -408,7 +408,7 @@ agent.download.sourceURI:
 
 		// The component model update happens on a goroutine, thus the new state
 		// might not have been sent yet. Therefore, a timeout is required.
-	case <-time.After(time.Second):
+	case <-time.After(stateChangeTimeout):
 		t.Fatalf("timedout after %s waiting Coordinator's state to change", stateChangeTimeout)
 	}
 
