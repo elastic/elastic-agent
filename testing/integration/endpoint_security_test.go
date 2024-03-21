@@ -740,12 +740,12 @@ func getEndpointComponents(ctx context.Context, t *testing.T, c client.Client) [
 
 	err := c.Connect(ctx)
 	require.NoError(t, err, "connecting to agent to retrieve endpoint components")
+	defer c.Disconnect()
 
 	agentState, err := c.State(ctx)
 	require.NoError(t, err, "retrieving agent state")
 
 	var endpointComponents []string
-
 	for _, componentState := range agentState.Components {
 		if strings.Contains(componentState.Name, "endpoint") {
 			endpointComponents = append(endpointComponents, componentState.ID)
