@@ -74,6 +74,19 @@ var ogcSupported = []LayoutOS{
 	},
 	{
 		OS: define.OS{
+			Type:    define.Linux,
+			Arch:    define.AMD64,
+			Distro:  runner.Sles,
+			Version: "15",
+		},
+		Provider:     Google,
+		InstanceSize: "e2-standard-2", // 2 amd64 cpus
+		RunsOn:       "sles-15",
+		Username:     "sles",
+		RemotePath:   "/home/sles/agent",
+	},
+	{
+		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2022",
