@@ -23,11 +23,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestFleetServerComponentModifier_NoServerConfig(t *testing.T) {
 	cfg := map[string]interface{}{}
-	modifier := FleetServerComponentModifier(nil)
+	log, _ := logger.NewTesting("test")
+	modifier := FleetServerComponentModifier(nil, log)
 	fleetServerInputSource, err := structpb.NewStruct(map[string]interface{}{
 		"id":   "fleet-server",
 		"type": "fleet-server",
@@ -139,6 +141,51 @@ func TestInjectFleetConfigComponentModifier(t *testing.T) {
 	require.Equal(t, 1, len(hostsSlice))
 	require.Equal(t, "sample.host", hostsSlice[0].(string))
 
+}
+
+func TestFleetConfigComponentModifier_MultipleHosts(t *testing.T) {
+	cfg := &configuration.FleetServerConfig{
+		Output: configuration.FleetServerOutputConfig{
+			Elasticsearch: configuration.Elasticsearch{
+				Protocol: "https",
+				Hosts:    []string{"test-server:9200"},
+			},
+		},
+	}
+	log, _ := logger.NewTesting("test")
+	modifier := FleetServerComponentModifier(cfg, log)
+
+	fleetServerOutputSource, err := structpb.NewStruct(map[string]interface{}{
+		"type":    "elasticsearch",
+		"api_key": "example",
+		"hosts":   []interface{}{"https://localhost:9200", "https://test-server:9200"},
+	})
+	require.NoError(t, err)
+	fleetServerComponent := component.Component{
+		InputSpec: &component.InputRuntimeSpec{
+			InputType: "fleet-server",
+		},
+		Units: []component.Unit{
+			{
+				Type: client.UnitTypeOutput,
+				Config: &proto.UnitExpectedConfig{
+					Type:   "elasticsearch",
+					Source: fleetServerOutputSource,
+				},
+			},
+		},
+	}
+	comps := []component.Component{fleetServerComponent}
+	resComps, err := modifier(comps, nil)
+	require.NoError(t, err)
+	t.Logf("RESCOMPS %v", resComps)
+	require.Len(t, resComps, 1)
+	require.Len(t, resComps[0].Units, 1)
+
+	resCfg := resComps[0].Units[0].Config.GetSource().AsMap()
+	assert.NotContains(t, resCfg, "api_key")
+	assert.Contains(t, resCfg, "hosts")
+	assert.Len(t, resCfg["hosts"], 2)
 }
 
 func TestFleetServerBootstrapManager(t *testing.T) {

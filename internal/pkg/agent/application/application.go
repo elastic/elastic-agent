@@ -160,13 +160,13 @@ func New(
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
-			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
+			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server, log))
 			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, rawConfig))
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
 			composableManaged = true
-			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
+			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server, log),
 				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo),
 				EndpointSignedComponentModifier(),
 			)

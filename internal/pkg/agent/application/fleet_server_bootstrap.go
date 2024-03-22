@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"gopkg.in/yaml.v2"
 
@@ -26,6 +27,9 @@ const (
 	endpoint      = "endpoint"
 	apmServer     = "apm"
 )
+
+// schemaReg is a regular expression to match the prefix schema for a host
+var schemaReg = regexp.MustCompile(`^https?://`)
 
 // ErrFleetServerNotBootstrapped set on fleet-server component and units when the Elastic Agent has not been
 // bootstrapped with the required command-line arguments for the Elastic Agent to be able to run the Fleet Server.
@@ -50,7 +54,7 @@ var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
 
 // FleetServerComponentModifier modifies the comps to inject extra information from the policy into
 // the Fleet Server component and units needed to run Fleet Server correctly.
-func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) coordinator.ComponentsModifier {
+func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig, log *logger.Logger) coordinator.ComponentsModifier {
 	return func(comps []component.Component, _ map[string]interface{}) ([]component.Component, error) {
 		for i, comp := range comps {
 			if comp.InputSpec != nil && comp.InputSpec.InputType == fleetServer && comp.Err == nil {
@@ -65,11 +69,15 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 				} else {
 					for j, unit := range comp.Units {
 						if unit.Type == client.UnitTypeOutput && unit.Config.Type == elasticsearch {
-							unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), &serverCfg.Output.Elasticsearch)
+							uMap := unit.Config.Source.AsMap()
+							unitCfgMap, err := toMapStr(uMap, &serverCfg.Output.Elasticsearch)
 							if err != nil {
 								return nil, err
 							}
 							fixOutputMap(unitCfgMap)
+							if err := injectESHosts(unitCfgMap, uMap); err != nil {
+								log.With("error.message", err).Warn("Unable to inject hosts from unit.")
+							}
 							unitCfg, err := component.ExpectedConfig(unitCfgMap)
 							if err != nil {
 								return nil, err
@@ -98,6 +106,60 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 		}
 		return comps, nil
 	}
+}
+
+// injectESHosts will take the hosts list in src and add them to the hosts list in dst if they are not there.
+// Items in the hosts list will not have the http(s) schema prefix.
+// If src does not have an api_key attribute the function is a nop.
+// api_key attribute is missing when src is not retrieved from fleet.
+func injectESHosts(dst, src map[string]interface{}) error {
+	if _, ok := src["api_key"]; !ok {
+		return nil
+	}
+
+	// get src hosts as a string slice
+	srcAttr, ok := src["hosts"]
+	if !ok {
+		return fmt.Errorf("source does not contain hosts attribute")
+	}
+	srcList, ok := srcAttr.([]interface{})
+	if !ok {
+		return fmt.Errorf("source hosts attribute is not []interface{}: type=%T", srcAttr)
+	}
+
+	//get dst hosts as a string slice
+	dstAttr, ok := dst["hosts"]
+	if !ok {
+		return fmt.Errorf("destination does not contain hosts attribute")
+	}
+	dstList, ok := dstAttr.([]interface{})
+	if !ok {
+		return fmt.Errorf("destination hosts attribute is not []inteface{}: type=%T", dstAttr)
+	}
+
+	m := make(map[string]struct{}, len(srcList)+len(dstList))
+	for i, o := range srcList {
+		if host, ok := o.(string); ok {
+			host = schemaReg.ReplaceAllString(host, "")
+			m[host] = struct{}{}
+		} else {
+			return fmt.Errorf("unable to cast source host item %d as string: type=%T", i, o)
+		}
+	}
+	for i, o := range dstList {
+		if host, ok := o.(string); ok {
+			host = schemaReg.ReplaceAllString(host, "")
+			m[host] = struct{}{}
+		} else {
+			return fmt.Errorf("unable to cast destination host item %d as string: type=%T", i, o)
+		}
+	}
+	hosts := make([]interface{}, 0, len(m))
+	for host, _ := range m {
+		hosts = append(hosts, host)
+	}
+	dst["hosts"] = hosts
+	return nil
 }
 
 // InjectFleetConfigComponentModifier The modifier that injects the fleet configuration for the components
