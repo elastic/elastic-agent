@@ -155,7 +155,7 @@ func injectESHosts(dst, src map[string]interface{}) error {
 		}
 	}
 	hosts := make([]interface{}, 0, len(m))
-	for host, _ := range m {
+	for host := range m {
 		hosts = append(hosts, host)
 	}
 	dst["hosts"] = hosts
