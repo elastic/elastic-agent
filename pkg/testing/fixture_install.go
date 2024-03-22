@@ -553,7 +553,9 @@ func (f *Fixture) collectDiagnostics() {
 			f.t.Logf("retrying in 15 seconds due to connection error; possible Elastic Agent was not fully started")
 			time.Sleep(15 * time.Second)
 			output, err = f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
-			f.t.Logf("failed to collect diagnostics a second time at %s (%s): %s", outputPath, err, output)
+			if err != nil {
+				f.t.Logf("failed to collect diagnostics a second time at %s (%s): %s", outputPath, err, output)
+			}
 		}
 		if err != nil {
 			// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
