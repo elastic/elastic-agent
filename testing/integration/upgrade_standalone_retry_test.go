@@ -8,7 +8,6 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -23,9 +22,7 @@ import (
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
-	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -41,27 +38,16 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
-	startVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
 	startFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
-	startVersionInfo, err := startFixture.ExecVersion(ctx)
-	require.NoError(t, err, "failed to get end agent build version info")
 
-	// Upgrade to an older snapshot build of same version but with a different commit hash
-	aac := tools.NewArtifactAPIClient(tools.WithLogFunc(t.Logf))
-	buildInfo, err := aac.FindBuild(ctx, startVersion.VersionWithPrerelease(), startVersionInfo.Binary.Commit, 0)
-	if errors.Is(err, tools.ErrBuildNotFound) {
-		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", define.Version())
-		return
-	}
+	// The end version does not matter much but it must not match
+	// the commit hash of the current build.
+	endVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
-
-	t.Logf("found build %q available for testing", buildInfo.Build.BuildID)
-	endVersion := versionWithBuildID(t, startVersion, buildInfo.Build.BuildID)
 	endFixture, err := atesting.NewFixture(
 		t,
-		endVersion,
+		endVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
