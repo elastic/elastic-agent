@@ -246,12 +246,17 @@ func (h *PolicyChangeHandler) applyConfigWithPrecedence(cfg remote.Config) {
 
 	if cfg.Transport.Proxy.URL == nil ||
 		cfg.Transport.Proxy.URL.String() == "" {
-		h.log.Debugw("proxy from fleet is empty or null, the proxy will not be changed",
-			"proxy_url", h.config.Fleet.Client.Transport.Proxy.URL.String())
+		h.log.Debugw("proxy from fleet is empty or null, the proxy will not be changed")
 	} else {
-		h.log.Debugw("received proxy from fleet, applying it",
-			"old_proxy_url", h.config.Fleet.Client.Transport.Proxy.URL.String(),
-			"new_proxy_url", cfg.Transport.Proxy.URL.String())
+		if h.config.Fleet.Client.Transport.Proxy.URL != nil {
+			h.log.Debugw("received proxy from fleet, applying it",
+				"old_proxy_url", h.config.Fleet.Client.Transport.Proxy.URL.String(),
+				"new_proxy_url", cfg.Transport.Proxy.URL.String())
+		} else {
+			h.log.Debugw("received proxy from fleet, applying it",
+				"old_proxy_url", "nil",
+				"new_proxy_url", cfg.Transport.Proxy.URL.String())
+		}
 		h.config.Fleet.Client.Transport.Proxy = cfg.Transport.Proxy
 	}
 
