@@ -837,7 +837,7 @@ func (f *Fixture) binaryPath() string {
 			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
 		}
 	}
-	if f.packageFormat == "deb" || f.packageFormat == "rpm" {
+	if f.packageFormat == "deb" {
 		workDir = "/usr/bin"
 	}
 	defaultBin := "elastic-agent"

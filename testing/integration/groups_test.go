@@ -33,7 +33,4 @@ const (
 
 	// Deb group of tests. Used for testing .deb packages install & upgrades
 	Deb = "deb"
-
-	// RPM group of tests. Used for testing .rpm packages install & upgrades
-	RPM = "rpm"
 )
