@@ -334,9 +334,26 @@ func unitForShipperOutput(output outputI, id string, shipperType string) Unit {
 }
 
 // Collect all inputs of the given type going to the given output and return
-// the resulting Component. The returned Component may have no units if no
+// the resulting Components. The returned Components may have no units if no
 // active inputs were found.
-func (r *RuntimeSpecs) componentForInputType(
+func (r *RuntimeSpecs) componentsForInputType(
+	inputType string,
+	output outputI,
+	featureFlags *features.Flags,
+	componentConfig *ComponentConfig,
+) []Component {
+	inputSpec, componentErr := r.GetInput(inputType)
+	// Treat as grouped component on error of reading the input spec
+	if componentErr != nil || !inputSpec.Spec.SkipGroup {
+		return []Component{
+			r.groupedComponentForInputType(inputType, output, featureFlags, componentConfig),
+		}
+	}
+	return r.nonGroupedComponentsForInputType(inputType, output, featureFlags, componentConfig)
+}
+
+// Returns a grouped component that will group all similar inputs under one component with multiple units.
+func (r *RuntimeSpecs) groupedComponentForInputType(
 	inputType string,
 	output outputI,
 	featureFlags *features.Flags,
@@ -411,22 +428,104 @@ func (r *RuntimeSpecs) componentForInputType(
 	}
 }
 
+// Returns a list of components that are not grouped, one component for each similar input.
+func (r *RuntimeSpecs) nonGroupedComponentsForInputType(
+	inputType string,
+	output outputI,
+	featureFlags *features.Flags,
+	componentConfig *ComponentConfig,
+) []Component {
+	// Might be less than len(output.inputs[inputType]) if some inputs are disabled.
+	components := make([]Component, 0, len(output.inputs[inputType]))
+
+	inputSpec, componentErr := r.GetInput(inputType)
+
+	for _, input := range output.inputs[inputType] {
+
+		// Units are being mapped to components, so we need a unique ID for each.
+		componentID := fmt.Sprintf("%s-%s-%s", inputType, output.name, input.id)
+
+		var shipperRef *ShipperReference
+		if componentErr == nil {
+			if output.shipperEnabled {
+				var shipperType string
+				shipperType, componentErr = r.getSupportedShipperType(inputSpec, output.outputType)
+
+				if componentErr == nil {
+					// We've found a valid shipper, construct the reference
+					shipperRef = &ShipperReference{
+						ShipperType: shipperType,
+						ComponentID: fmt.Sprintf("%s-%s", shipperType, output.name),
+						// The unit ID of this connection in the shipper is the same as the
+						// input's component id.
+						UnitID: componentID,
+					}
+				}
+			}
+			if shipperRef == nil {
+				// The shipper is disabled or we couldn't find a supported one.
+				if containsStr(inputSpec.Spec.Outputs, output.outputType) {
+					// We found a fallback output, clear componentErr in case it was
+					// set during shipper selection.
+					componentErr = nil
+				} else if componentErr == nil {
+					// This output is unsupported -- set an error if needed, but don't
+					// overwrite an existing error.
+					componentErr = ErrOutputNotSupported
+				}
+			}
+		}
+
+		var units []Unit
+		if input.enabled {
+			units = make([]Unit, 0, 2)
+			unitID := fmt.Sprintf("%s-unit", componentID)
+			units = append(units, unitForInput(input, unitID))
+			if shipperRef != nil {
+				// Shipper units are skipped if componentErr isn't nil, because in that
+				// case we generally don't have a valid shipper type to base it on.
+				if componentErr == nil {
+					units = append(units, unitForShipperOutput(output, componentID, shipperRef.ShipperType))
+				}
+			} else {
+				units = append(units, unitForOutput(output, componentID))
+			}
+		}
+
+		components = append(components, Component{
+			ID:         componentID,
+			Err:        componentErr,
+			InputSpec:  &inputSpec,
+			InputType:  inputType,
+			OutputType: output.outputType,
+			Units:      units,
+			Features:   featureFlags.AsProto(),
+			Component:  componentConfig.AsProto(),
+			ShipperRef: shipperRef,
+		})
+	}
+
+	return components
+}
+
 func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *features.Flags, componentConfig *ComponentConfig) []Component {
 	var components []Component
 	shipperTypes := make(map[string]bool)
 	for inputType := range output.inputs {
 		// No need for error checking at this stage -- we are guaranteed
-		// to get a Component back. If there is an error that prevents it
+		// to get a Component/s back. If there is an error that prevents it/them
 		// from running then it will be in the Component's Err field and
-		// we will report it later. The only thing we skip is a component
+		// we will report it later. The only thing we skip is a component/s
 		// with no units.
-		component := r.componentForInputType(inputType, output, featureFlags, componentConfig)
-		if len(component.Units) > 0 {
-			if component.ShipperRef != nil {
-				// If this component uses a shipper, mark that shipper type as active
-				shipperTypes[component.ShipperRef.ShipperType] = true
+		typeComponents := r.componentsForInputType(inputType, output, featureFlags, componentConfig)
+		for _, component := range typeComponents {
+			if len(component.Units) > 0 {
+				if component.ShipperRef != nil {
+					// If this component uses a shipper, mark that shipper type as active
+					shipperTypes[component.ShipperRef.ShipperType] = true
+				}
+				components = append(components, component)
 			}
-			components = append(components, component)
 		}
 	}
 
