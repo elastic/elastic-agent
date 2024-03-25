@@ -478,6 +478,7 @@ func (r *RuntimeSpecs) nonGroupedComponentsForInputType(
 
 		var units []Unit
 		if input.enabled {
+			// Might be less than 2 if there is a shipper ref and the component has an error.
 			units = make([]Unit, 0, 2)
 			unitID := fmt.Sprintf("%s-unit", componentID)
 			units = append(units, unitForInput(input, unitID))

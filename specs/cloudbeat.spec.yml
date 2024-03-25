@@ -15,6 +15,7 @@ inputs:
       - kafka
       - logstash
       - redis
+    # Introduced for non-grouping tests, not used by cloudbeat
     shippers: &shippers
       - shipper
     command: &command
