@@ -138,6 +138,8 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 		return f.installNoPkgManager(ctx, installOpts, opts)
 	case "deb":
 		return f.installDeb(ctx, installOpts, opts)
+	case "rpm":
+		return f.installRpm(ctx, installOpts, opts)
 	default:
 		return nil, fmt.Errorf("package format %s isn't supported yet", f.packageFormat)
 	}
@@ -435,6 +437,81 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 	return nil, nil
 }
 
+// installRpm installs the prepared Elastic Agent binary from the rpm
+// package and registers a t.Cleanup function to uninstall the agent if
+// it hasn't been uninstalled. It also takes care of collecting a
+// diagnostics when AGENT_COLLECT_DIAG=true or the test has failed.
+// It returns:
+//   - the combined output of Install command stdout and stderr
+//   - an error if any.
+func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture installRpm function", f.t.Name())
+	//Prepare so that the f.srcPackage string is populated
+	err := f.EnsurePrepared(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare: %w", err)
+	}
+
+	// sudo rpm -iv elastic-agent rpm
+	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-i", "-v", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	if err != nil {
+		return out, fmt.Errorf("rpm install failed: %w output:%s", err, string(out))
+	}
+
+	f.t.Cleanup(func() {
+		f.t.Logf("[test %s] Inside fixture installRpm cleanup function", f.t.Name())
+		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer uninstallCancel()
+		// stop elastic-agent, non fatal if error, might have been stopped before this.
+		f.t.Logf("running 'sudo systemctl stop elastic-agent'")
+		out, err := exec.CommandContext(uninstallCtx, "sudo", "systemctl", "stop", "elastic-agent").CombinedOutput()
+		if err != nil {
+			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
+		}
+		// rpm -e elastic-agent rpm
+		f.t.Logf("running 'sudo rpm -e elastic-agent'")
+		out, err = exec.CommandContext(uninstallCtx, "sudo", "rpm", "-e", "elastic-agent").CombinedOutput()
+		if err != nil {
+			f.t.Logf("failed to 'sudo rpm -e elastic-agent': %s, output: %s", err, string(out))
+			f.t.FailNow()
+		}
+	})
+
+	// start elastic-agent
+	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+	}
+
+	// rpm install doesn't enroll, so need to do that
+	enrollArgs := []string{"elastic-agent", "enroll"}
+	if installOpts.Force {
+		enrollArgs = append(enrollArgs, "--force")
+	}
+	if installOpts.Insecure {
+		enrollArgs = append(enrollArgs, "--insecure")
+	}
+	if installOpts.ProxyURL != "" {
+		enrollArgs = append(enrollArgs, "--proxy-url="+installOpts.ProxyURL)
+	}
+	if installOpts.DelayEnroll {
+		enrollArgs = append(enrollArgs, "--delay-enroll")
+	}
+	if installOpts.EnrollOpts.URL != "" {
+		enrollArgs = append(enrollArgs, "--url", installOpts.EnrollOpts.URL)
+	}
+	if installOpts.EnrollOpts.EnrollmentToken != "" {
+		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollOpts.EnrollmentToken)
+	}
+	// run sudo elastic-agent enroll
+	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("elastic-agent enroll failed: %w, output: %s args: %v", err, string(out), enrollArgs)
+	}
+
+	return nil, nil
+}
+
 type UninstallOpts struct {
 	Force          bool // --force
 	UninstallToken string
@@ -460,6 +537,8 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 		return f.uninstallNoPkgManager(ctx, uninstallOpts, opts)
 	case "deb":
 		return f.uninstallDeb(ctx, uninstallOpts, opts)
+	case "rpm":
+		return f.uninstallRpm(ctx, uninstallOpts, opts)
 	default:
 		return nil, fmt.Errorf("uninstall of package format '%s' not supported yet", f.packageFormat)
 	}
@@ -474,6 +553,19 @@ func (f *Fixture) uninstallDeb(ctx context.Context, uninstallOpts *UninstallOpts
 	out, err = exec.CommandContext(ctx, "sudo", "apt-get", "-y", "-q", "purge", "elastic-agent").CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("error removing apt: %w", err)
+	}
+	return out, nil
+}
+
+func (f *Fixture) uninstallRpm(ctx context.Context, uninstallOpts *UninstallOpts, opts []process.CmdOption) ([]byte, error) {
+	// stop elastic-agent, non fatal if error, might have been stopped before this.
+	out, err := exec.CommandContext(ctx, "sudo", "systemctl", "stop", "elastic-agent").CombinedOutput()
+	if err != nil {
+		f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
+	}
+	out, err = exec.CommandContext(ctx, "sudo", "rpm", "-e", "elastic-agent").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("error running 'sudo rpm -e elastic-agent': %w", err)
 	}
 	return out, nil
 }
