@@ -8,16 +8,12 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/sha512"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash"
 	"html/template"
-	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -39,6 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
@@ -1434,7 +1431,7 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 						return fmt.Errorf("downloading SHA for %q: %w", pkgName, err)
 					}
 
-					err = validateChecksum(sha512.New(), artifactDownloadPath, artifactSHADownloadPath)
+					err = download.VerifyChecksum(sha512.New(), artifactDownloadPath, artifactSHADownloadPath)
 					if err != nil {
 						return fmt.Errorf("validating checksum for %q: %w", pkgName, err)
 					}
@@ -1455,70 +1452,6 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 	}
 
 	return downloadedArtifacts, errGrp.Wait()
-}
-
-func validateChecksum(hasher hash.Hash, fileToValidate, checksumFile string) error {
-	artifactFile, err := os.Open(fileToValidate)
-	if err != nil {
-		return fmt.Errorf("opening artifact file %q for sha verification: %w", fileToValidate, err)
-	}
-	defer func(file *os.File) {
-		_ = file.Close()
-	}(artifactFile)
-	_, err = io.Copy(hasher, artifactFile)
-	if err != nil {
-		return fmt.Errorf("reading artifact file %q for sha verification: %w", fileToValidate, err)
-	}
-
-	pkgHash := hex.EncodeToString(hasher.Sum(nil))
-
-	// read checksumFile file line by line
-	shaFile, err := os.ReadFile(checksumFile)
-	if err != nil {
-		return fmt.Errorf("reading artifact hash file %q: %w", checksumFile, err)
-	}
-
-	if mg.Verbose() {
-		log.Printf("validating sha512 for %q", fileToValidate)
-	}
-
-	baseFilename := filepath.Base(fileToValidate)
-	valid := false
-
-	scanner := bufio.NewScanner(bytes.NewReader(shaFile))
-
-	for scanner.Scan() {
-
-		if mg.Verbose() {
-			log.Printf("read hash file line %q", scanner.Text())
-		}
-
-		hashString, filename, found := strings.Cut(scanner.Text(), "  ")
-		if mg.Verbose() {
-			log.Printf("hash file line tokens %q %q found: %v", hashString, filename, found)
-		}
-		if !found {
-			// we need the hash and the filename, keep reading
-			continue
-		}
-
-		if mg.Verbose() {
-			log.Printf("comparing %q for %q to %q", hashString, filename, pkgHash)
-		}
-		if filename == baseFilename && hashString == pkgHash {
-			valid = true
-			break
-		}
-	}
-
-	if err = scanner.Err(); err != nil {
-		return fmt.Errorf("reading artifact hash file %q content : %w", checksumFile, err)
-	}
-
-	if !valid {
-		return fmt.Errorf("hash validation for artifact %q failed: expected hash %q", fileToValidate, pkgHash)
-	}
-	return nil
 }
 
 func useDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error {
