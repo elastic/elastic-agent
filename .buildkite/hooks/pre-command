@@ -41,7 +41,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
     docker_login
   fi
 
-  if [[ "$BUILDKITE_STEP_KEY" == "dra-publish" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "dra-publish" || "$BUILDKITE_STEP_KEY" == "bk-api-publish-independent-agent" ]]; then
     release_manager_login
   fi
 fi

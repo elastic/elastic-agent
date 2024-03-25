@@ -7,6 +7,7 @@ package mage
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,7 +17,6 @@ import (
 	"time"
 
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 )
 
 type dockerBuilder struct {
@@ -46,7 +46,7 @@ func newDockerBuilder(spec PackageSpec) (*dockerBuilder, error) {
 
 func (b *dockerBuilder) Build() error {
 	if err := os.RemoveAll(b.buildDir); err != nil {
-		return errors.Wrapf(err, "failed to clean existing build directory %s", b.buildDir)
+		return fmt.Errorf("failed to clean existing build directory %s: %w", b.buildDir, err)
 	}
 
 	if err := b.copyFiles(); err != nil {
@@ -54,7 +54,7 @@ func (b *dockerBuilder) Build() error {
 	}
 
 	if err := b.prepareBuild(); err != nil {
-		return errors.Wrap(err, "failed to prepare build")
+		return fmt.Errorf("failed to prepare build: %w", err)
 	}
 
 	tag, err := b.dockerBuild()
@@ -67,11 +67,11 @@ func (b *dockerBuilder) Build() error {
 		tries--
 	}
 	if err != nil {
-		return errors.Wrap(err, "failed to build docker")
+		return fmt.Errorf("failed to build docker: %w", err)
 	}
 
 	if err := b.dockerSave(tag); err != nil {
-		return errors.Wrap(err, "failed to save docker as artifact")
+		return fmt.Errorf("failed to save docker as artifact: %w", err)
 	}
 
 	return nil
@@ -88,7 +88,7 @@ func (b *dockerBuilder) modulesDirs() []string {
 }
 
 func (b *dockerBuilder) exposePorts() []string {
-	if ports, _ := b.ExtraVars["expose_ports"]; ports != "" {
+	if ports := b.ExtraVars["expose_ports"]; ports != "" {
 		return strings.Split(ports, ",")
 	}
 	return nil
@@ -101,7 +101,7 @@ func (b *dockerBuilder) copyFiles() error {
 			if f.SkipOnMissing && errors.Is(err, os.ErrNotExist) {
 				continue
 			}
-			return errors.Wrapf(err, "failed to copy from %s to %s", f.Source, target)
+			return fmt.Errorf("failed to copy from %s to %s: %w", f.Source, target, err)
 		}
 	}
 	return nil
@@ -128,7 +128,7 @@ func (b *dockerBuilder) prepareBuild() error {
 
 			err = b.ExpandFile(path, target, data)
 			if err != nil {
-				return errors.Wrapf(err, "expanding template '%s' to '%s'", path, target)
+				return fmt.Errorf("expanding template '%s' to '%s': %w", path, target, err)
 			}
 		}
 		return nil
@@ -169,7 +169,7 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 		path := filepath.Join(templatesDir, file.source)
 		err := b.ExpandFile(path, target, data)
 		if err != nil {
-			return errors.Wrapf(err, "expanding template '%s' to '%s'", path, target)
+			return fmt.Errorf("expanding template '%s' to '%s': %w", path, target, err)
 		}
 	}
 
@@ -178,10 +178,14 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 
 func (b *dockerBuilder) dockerBuild() (string, error) {
 	tag := fmt.Sprintf("%s:%s", b.imageName, b.Version)
+	// For Independent Agent releases, replace the "+" with a "." since the "+" character
+	// currently isn't allowed in a tag in Docker
+	// E.g., 8.13.0+build202402191057 -> 8.13.0.build202402191057
+	tag = strings.Replace(tag, "+", ".", 1)
 	if b.Snapshot {
 		tag = tag + "-SNAPSHOT"
 	}
-	if repository, _ := b.ExtraVars["repository"]; repository != "" {
+	if repository := b.ExtraVars["repository"]; repository != "" {
 		tag = fmt.Sprintf("%s/%s", repository, tag)
 	}
 	return tag, sh.Run("docker", "build", "-t", tag, b.buildDir)
@@ -238,9 +242,14 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 
 	if err = cmd.Wait(); err != nil {
 		if errmsg := strings.TrimSpace(stderr.String()); errmsg != "" {
-			err = errors.Wrap(errors.New(errmsg), err.Error())
+			err = fmt.Errorf("%w: %s", errors.New(errmsg), err.Error())
 		}
 		return err
 	}
-	return errors.Wrap(CreateSHA512File(outputFile), "failed to create .sha512 file")
+
+	err = CreateSHA512File(outputFile)
+	if err != nil {
+		return fmt.Errorf("failed to create .sha512 file: %w", err)
+	}
+	return nil
 }
