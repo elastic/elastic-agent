@@ -1578,29 +1578,14 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error 
 
 		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
 
-		err = copyFile(srcBinaryPath, dstBinaryPath, srcStat.Mode())
+		err = copy.Copy(srcBinaryPath, dstBinaryPath, copy.Options{
+			PermissionControl: copy.PerservePermission,
+		})
 		if err != nil {
 			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
 		}
 	}
 	return nil
-}
-
-func copyFile(src string, dst string, dstFileMode os.FileMode) error {
-	srcFile, err := os.OpenFile(src, os.O_RDONLY, 0o000)
-	if err != nil {
-		return fmt.Errorf("opening src file %q: %w", src, err)
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, dstFileMode)
-	if err != nil {
-		return fmt.Errorf("opening dst file %q: %w", dst, err)
-	}
-	defer dstFile.Close()
-
-	_, err = io.Copy(dstFile, srcFile)
-	return err
 }
 
 // Helper that wraps the fetchBinaryFromArtifactsApi in a way that is compatible with the errgroup.Go() function.
