@@ -11,13 +11,14 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: Introduce a new flag in the spec that will allow to disable grouping of same input type inputs into a single component.
-If that flag is being activated the inputs won't be grouped and we will create a separate component for each input that will run units for that particular input.
+summary: Introduce non grouping for input spec.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: | 
+  Introduce a new flag in the spec that will allow to disable grouping of same input type inputs into a single component.
+  If that flag is being activated the inputs won't be grouped and we will create a separate component for each input that will run units for that particular input.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
