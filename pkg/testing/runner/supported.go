@@ -14,7 +14,6 @@ import (
 const (
 	// Ubuntu is a Linux distro.
 	Ubuntu = "ubuntu"
-	Sles   = "sles"
 )
 
 var (
@@ -70,16 +69,6 @@ var (
 			Version: "20.04",
 		},
 		Runner: DebianRunner{},
-	}
-	// SlesAMD64_15 - SUSE Linux Enteprise Server (amd64) 15
-	SlesAMD64_15 = SupportedOS{
-		OS: define.OS{
-			Type:    define.Linux,
-			Arch:    define.AMD64,
-			Distro:  Sles,
-			Version: "15",
-		},
-		Runner: SlesRunner{},
 	}
 	// WindowsAMD64_2022 - Windows (amd64) Server 2022
 	WindowsAMD64_2022 = SupportedOS{
@@ -150,7 +139,6 @@ var supported = []SupportedOS{
 	UbuntuAMD64_2004,
 	UbuntuARM64_2204,
 	UbuntuARM64_2004,
-	SlesAMD64_15,
 	WindowsAMD64_2022,
 	WindowsAMD64_2022_Core,
 	WindowsAMD64_2019,
