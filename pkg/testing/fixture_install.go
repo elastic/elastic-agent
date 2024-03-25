@@ -41,8 +41,11 @@ type CmdOpts interface {
 
 // EnrollOpts specifies the options for the enroll command
 type EnrollOpts struct {
-	URL             string // --url
+	DelayEnroll     bool   // --delay-enroll
 	EnrollmentToken string // --enrollment-token
+	Insecure        bool   // --insecure
+	ProxyURL        string // --proxy-url
+	URL             string // --url
 }
 
 func (e EnrollOpts) toCmdArgs() []string {
@@ -60,11 +63,7 @@ func (e EnrollOpts) toCmdArgs() []string {
 type InstallOpts struct {
 	BasePath       string // --base-path
 	Force          bool   // --force
-	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
-	ProxyURL       string // --proxy-url
-	DelayEnroll    bool   // --delay-enroll
-
 	// Unprivileged by default installs the Elastic Agent as `--unprivileged` unless
 	// the platform being tested doesn't currently support it, or it's explicitly set
 	// to false.
@@ -159,6 +158,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	}
 
 	installArgs := []string{"install"}
+	installOpts.DelayEnroll = true
 	installOptsArgs, err := installOpts.toCmdArgs(f.operatingSystem)
 	if err != nil {
 		return nil, err
@@ -370,7 +370,7 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 //   - an error if any.
 func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
-	//Prepare so that the f.srcPackage string is populated
+	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare: %w", err)
