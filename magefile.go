@@ -1283,6 +1283,16 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("parsing version string %q: %w", build.Version, err)
 	}
 
+	// fix the commit hash independently of the current commit hash on the branch
+	agentCoreProject, ok := build.Projects[agentCoreProjectName]
+	if !ok {
+		return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, manifestUrl)
+	}
+	err = os.Setenv(mage.AgentCommitHashEnvVar, agentCoreProject.CommitHash)
+	if err != nil {
+		return fmt.Errorf("setting agent commit hash %q: %w", agentCoreProject.CommitHash, err)
+	}
+
 	packageAgent(platforms, parsedVersion.VersionWithPrerelease(), mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, manifestUrl))
 	return nil
 }
