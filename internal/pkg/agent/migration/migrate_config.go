@@ -23,7 +23,7 @@ import (
 //   - The contents from the unencrypted file will be copied as a byte stream without any transformation.
 //   - The function will not perform any operation if the encryptedConfigPath already exists and it's not empty to avoid overwrites.
 //   - If neither the encrypted file nor the unencrypted file exist this call is a no-op
-func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedConfigPath string, encryptedConfigPath string, storageOpts ...storage.OptionFunc) error {
+func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedConfigPath string, encryptedConfigPath string, storageOpts ...storage.EncryptedOptionFunc) error {
 	encStat, encFileErr := os.Stat(encryptedConfigPath)
 
 	if encFileErr != nil && !errors.Is(encFileErr, fs.ErrNotExist) {

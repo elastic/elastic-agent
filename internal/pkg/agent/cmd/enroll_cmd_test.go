@@ -91,7 +91,7 @@ func TestEnroll(t *testing.T) {
 
 			url := "https://" + host
 			store := &mockStore{Err: errors.New("fail to save")}
-			cmd, err := newEnrollCmdWithStore(
+			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
 					URL:                  url,
@@ -145,7 +145,7 @@ func TestEnroll(t *testing.T) {
 
 			url := "https://" + host
 			store := &mockStore{}
-			cmd, err := newEnrollCmdWithStore(
+			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
 					URL:                  url,
@@ -206,7 +206,7 @@ func TestEnroll(t *testing.T) {
 		}, func(t *testing.T, host string) {
 			url := "http://" + host + "/"
 			store := &mockStore{}
-			cmd, err := newEnrollCmdWithStore(
+			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
 					URL:                  url,
@@ -270,7 +270,7 @@ func TestEnroll(t *testing.T) {
 		}, func(t *testing.T, host string) {
 			url := "http://" + host
 			store := &mockStore{}
-			cmd, err := newEnrollCmdWithStore(
+			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
 					URL:                  url,
@@ -315,7 +315,7 @@ func TestEnroll(t *testing.T) {
 		}, func(t *testing.T, host string) {
 			url := "http://" + host
 			store := &mockStore{}
-			cmd, err := newEnrollCmdWithStore(
+			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
 					URL:                  url,

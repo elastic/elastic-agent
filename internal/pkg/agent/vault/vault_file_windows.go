@@ -10,9 +10,8 @@ import (
 	"os"
 
 	"github.com/billgraziano/dpapi"
-	"github.com/hectane/go-acl"
-	"golang.org/x/sys/windows"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -24,26 +23,8 @@ func (v *FileVault) decrypt(data []byte) ([]byte, error) {
 	return dpapi.DecryptBytesEntropy(data, v.seed)
 }
 
-func tightenPermissions(path string) error {
-	return systemAdministratorsOnly(path, false)
-}
-
-func systemAdministratorsOnly(path string, inherit bool) error {
-	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
-	systemSID, err := windows.StringToSid(utils.SystemSID)
-	if err != nil {
-		return err
-	}
-	administratorsSID, err := windows.StringToSid(utils.AdministratorSID)
-	if err != nil {
-		return err
-	}
-
-	// https://docs.microsoft.com/en-us/windows/win32/secauthz/access-mask
-	return acl.Apply(
-		path, true, inherit,
-		acl.GrantSid(0xF10F0000, systemSID), // full control of all acl's
-		acl.GrantSid(0xF10F0000, administratorsSID))
+func tightenPermissions(path string, ownership utils.FileOwner) error {
+	return perms.FixPermissions(path, perms.WithMask(0750), perms.WithOwnership(ownership))
 }
 
 func writeFile(fp string, data []byte) error {

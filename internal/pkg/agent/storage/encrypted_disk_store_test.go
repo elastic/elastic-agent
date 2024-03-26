@@ -27,7 +27,7 @@ func TestNewEncryptedDiskStore(t *testing.T) {
 
 	type args struct {
 		target string
-		opts   []OptionFunc
+		opts   []EncryptedOptionFunc
 	}
 	tests := []struct {
 		name    string
@@ -58,7 +58,7 @@ func TestNewEncryptedDiskStore(t *testing.T) {
 			name: fmt.Sprintf("encrypted store with unprivileged=%v override", hasRoot),
 			args: args{
 				target: "privilegedoverridestore.enc",
-				opts:   []OptionFunc{WithUnprivileged(hasRoot)},
+				opts:   []EncryptedOptionFunc{WithUnprivileged(hasRoot)},
 			},
 			want: func(t *testing.T, storage Storage) {
 				if assert.IsType(t, (*EncryptedDiskStore)(nil), storage, "a *EncryptedDiskStore should have been returned") {
@@ -75,7 +75,7 @@ func TestNewEncryptedDiskStore(t *testing.T) {
 			name: "encrypted store with custom vault path override",
 			args: args{
 				target: "customvaultpathstore.enc",
-				opts:   []OptionFunc{WithVaultPath("somecustomvault")},
+				opts:   []EncryptedOptionFunc{WithVaultPath("somecustomvault")},
 			},
 			want: func(t *testing.T, storage Storage) {
 				if assert.IsType(t, (*EncryptedDiskStore)(nil), storage, "a *EncryptedDiskStore should have been returned") {

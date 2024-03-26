@@ -62,7 +62,7 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	opts := &atesting.InstallOpts{Force: true, Unprivileged: atesting.NewBool(false)}
+	opts := &atesting.InstallOpts{Force: true, Privileged: true}
 	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
@@ -70,7 +70,7 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path
-	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+	checkInstallSuccess(t, fixture, topPath, false)
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }
 
@@ -105,9 +105,9 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	opts := &atesting.InstallOpts{
-		BasePath:     randomBasePath,
-		Force:        true,
-		Unprivileged: atesting.NewBool(false),
+		BasePath:   randomBasePath,
+		Force:      true,
+		Privileged: true,
 	}
 	out, err := fixture.Install(ctx, opts)
 	if err != nil {
@@ -117,6 +117,6 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+	checkInstallSuccess(t, fixture, topPath, false)
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 }

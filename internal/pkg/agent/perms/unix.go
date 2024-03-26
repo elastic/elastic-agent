@@ -4,7 +4,7 @@
 
 //go:build !windows
 
-package install
+package perms
 
 import (
 	"errors"
@@ -12,12 +12,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // FixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
-func FixPermissions(topPath string, ownership utils.FileOwner) error {
+func FixPermissions(topPath string, opts ...OptFunc) error {
+	o := newOpts(opts...)
 	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil
@@ -28,12 +27,12 @@ func FixPermissions(topPath string, ownership utils.FileOwner) error {
 
 		// all files should be owned by uid:gid
 		// uses `os.Lchown` so the symlink is updated to have the permissions
-		if err := os.Lchown(name, ownership.UID, ownership.GID); err != nil {
+		if err := os.Lchown(name, o.ownership.UID, o.ownership.GID); err != nil {
 			return fmt.Errorf("cannot update ownership of %q: %w", topPath, err)
 		}
 
 		// remove any world permissions from the file
-		if err := os.Chmod(name, info.Mode().Perm()&0770); err != nil {
+		if err := os.Chmod(name, info.Mode().Perm()&o.mask); err != nil {
 			return fmt.Errorf("could not update permissions of %q: %w", topPath, err)
 		}
 

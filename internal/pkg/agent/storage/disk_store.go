@@ -9,15 +9,29 @@ import (
 	"io"
 	"os"
 
-	"github.com/hectane/go-acl"
-
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+// DiskStoreOptionFunc is an option configuration for the disk store.
+type DiskStoreOptionFunc func(s *DiskStore)
+
+// DiskStoreWithOwnership sets ownership for creating the files.
+func DiskStoreWithOwnership(ownership utils.FileOwner) DiskStoreOptionFunc {
+	return func(s *DiskStore) {
+		s.ownership = &ownership
+	}
+}
+
 // NewDiskStore creates an unencrypted disk store.
-func NewDiskStore(target string) (*DiskStore, error) {
-	return &DiskStore{target: target}, nil
+func NewDiskStore(target string, opts ...DiskStoreOptionFunc) (*DiskStore, error) {
+	s := &DiskStore{target: target}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s, nil
 }
 
 // Exists check if the store file exists on the disk
@@ -43,7 +57,7 @@ func (d *DiskStore) Delete() error {
 func (d *DiskStore) Save(in io.Reader) error {
 	tmpFile := d.target + ".tmp"
 
-	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, perms)
+	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask)
 	if err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not save to %s", tmpFile),
@@ -68,13 +82,27 @@ func (d *DiskStore) Save(in io.Reader) error {
 
 	if err := fd.Sync(); err != nil {
 		return errors.New(err,
-			fmt.Sprintf("could not sync temporary file %s", d.target),
+			fmt.Sprintf("could not sync temporary file %s", tmpFile),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
 	if err := fd.Close(); err != nil {
 		return errors.New(err, "could not close temporary file",
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, tmpFile))
+	}
+
+	// fix the permissions of the temp file, ensuring that when the file is rotated in to place
+	// it has the correct permissions (otherwise it is possible to be a permissions error, between
+	// rotating the file and setting the permissions after).
+	opts := []perms.OptFunc{perms.WithMask(permMask)}
+	if d.ownership != nil {
+		opts = append(opts, perms.WithOwnership(*d.ownership))
+	}
+	if err := perms.FixPermissions(tmpFile, opts...); err != nil {
+		return errors.New(err,
+			fmt.Sprintf("could not set permissions on temporary file %s", tmpFile),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
@@ -86,19 +114,12 @@ func (d *DiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, d.target))
 	}
 
-	if err := acl.Chmod(d.target, perms); err != nil {
-		return errors.New(err,
-			fmt.Sprintf("could not set permissions target file %s", d.target),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, d.target))
-	}
-
 	return nil
 }
 
 // Load return a io.ReadCloser for the target file.
 func (d *DiskStore) Load() (io.ReadCloser, error) {
-	fd, err := os.OpenFile(d.target, os.O_RDONLY|os.O_CREATE, perms)
+	fd, err := os.OpenFile(d.target, os.O_RDONLY|os.O_CREATE, permMask)
 	if err != nil {
 		return nil, errors.New(err,
 			fmt.Sprintf("could not open %s", d.target),

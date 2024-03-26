@@ -7,44 +7,65 @@
 package info
 
 import (
-	"golang.org/x/sys/windows"
-)
+	"fmt"
 
-const (
-	ML_SYSTEM_RID = 0x4000
+	"golang.org/x/sys/windows"
 )
 
 // RunningUnderSupervisor returns true when executing Agent is running under
 // the supervisor processes of the OS.
+//
+// Checks in the following order:
+//  1. Has SECURITY_LOCAL_SYSTEM_RID (aka. running as LOCAL SYSTEM)
+//  2. Has SECURITY_SERVICE_RID (aka. running as service as non LOCAL SYSTEM user)
 func RunningUnderSupervisor() bool {
-	serviceSid, err := allocSid(ML_SYSTEM_RID)
-	if err != nil {
-		return false
+	localSystem, _ := hasLocalSystemSID()
+	if localSystem {
+		return true
 	}
-	defer windows.FreeSid(serviceSid)
+	isService, _ := hasServiceSID()
+	return isService
+}
 
-	t, err := windows.OpenCurrentProcessToken()
+func hasLocalSystemSID() (bool, error) {
+	sid, err := allocSid(windows.SECURITY_LOCAL_SYSTEM_RID)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("allocate sid error: %w", err)
 	}
-	defer t.Close()
+	defer func() {
+		_ = windows.FreeSid(sid)
+	}()
 
-	gs, err := t.GetTokenGroups()
+	token := windows.Token(0)
+	member, err := token.IsMember(sid)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("token membership error: %w", err)
 	}
 
-	for _, g := range gs.AllGroups() {
-		if windows.EqualSid(g.Sid, serviceSid) {
-			return true
-		}
+	return member, nil
+}
+
+func hasServiceSID() (bool, error) {
+	sid, err := allocSid(windows.SECURITY_SERVICE_RID)
+	if err != nil {
+		return false, fmt.Errorf("allocate sid error: %w", err)
 	}
-	return false
+	defer func() {
+		_ = windows.FreeSid(sid)
+	}()
+
+	token := windows.Token(0)
+	member, err := token.IsMember(sid)
+	if err != nil {
+		return false, fmt.Errorf("token membership error: %w", err)
+	}
+
+	return member, nil
 }
 
 func allocSid(subAuth0 uint32) (*windows.SID, error) {
 	var sid *windows.SID
-	err := windows.AllocateAndInitializeSid(&windows.SECURITY_MANDATORY_LABEL_AUTHORITY,
+	err := windows.AllocateAndInitializeSid(&windows.SECURITY_NT_AUTHORITY,
 		1, subAuth0, 0, 0, 0, 0, 0, 0, 0, &sid)
 	if err != nil {
 		return nil, err
