@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build linux || windows
-
 package migration
 
 import (
@@ -23,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 )
 
 type configfile struct {
@@ -111,7 +110,7 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 			paths.SetTop(top)
 
 			vaultPath := paths.AgentVaultPath()
-			err := secret.CreateAgentSecret(ctx, secret.WithVaultPath(vaultPath))
+			err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath), vault.WithUnprivileged(true))
 
 			require.NoError(t, err)
 
@@ -206,7 +205,7 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 			paths.SetTop(top)
 
 			vaultPath := paths.AgentVaultPath()
-			err := secret.CreateAgentSecret(ctx, secret.WithVaultPath(vaultPath))
+			err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath), vault.WithUnprivileged(true))
 
 			require.NoError(t, err)
 
@@ -248,20 +247,22 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 
 func createAndPersistStore(t *testing.T, ctx context.Context, baseDir string, cf configfile, encrypted bool) storage.Storage {
 	var store storage.Storage
-
+	var err error
 	asbFilePath := path.Join(baseDir, cf.name)
 
 	if encrypted {
-		store = storage.NewEncryptedDiskStore(ctx, asbFilePath)
+		store, err = storage.NewEncryptedDiskStore(ctx, asbFilePath, storage.WithUnprivileged(true))
+		require.NoError(t, err)
 	} else {
-		store = storage.NewDiskStore(asbFilePath)
+		store, err = storage.NewDiskStore(asbFilePath)
+		require.NoError(t, err)
 	}
 
 	if !cf.create {
 		return store
 	}
 
-	err := store.Save(bytes.NewReader(cf.content))
+	err = store.Save(bytes.NewReader(cf.content))
 	require.NoError(t, err)
 
 	err = os.Chmod(asbFilePath, cf.permissions&fs.ModePerm)

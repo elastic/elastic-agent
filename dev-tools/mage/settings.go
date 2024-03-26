@@ -23,7 +23,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/magefile/mage/sh"
-	"golang.org/x/tools/go/vcs"
+	"golang.org/x/tools/go/vcs" //nolint:staticcheck // this deprecation will be handled in https://github.com/elastic/elastic-agent/issues/4138
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
@@ -48,6 +48,7 @@ const (
 	// Mapped functions
 	agentPackageVersionMappedFunc    = "agent_package_version"
 	agentManifestGeneratorMappedFunc = "manifest"
+	snapshotSuffix                   = "snapshot_suffix"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -108,6 +109,7 @@ var (
 		"contains":                       strings.Contains,
 		agentPackageVersionMappedFunc:    AgentPackageVersion,
 		agentManifestGeneratorMappedFunc: PackageManifest,
+		snapshotSuffix:                   SnapshotSuffix,
 	}
 )
 
@@ -253,6 +255,7 @@ repo.RootDir                 = {{ repo.RootDir }}
 repo.ImportPath              = {{ repo.ImportPath }}
 repo.SubDir                  = {{ repo.SubDir }}
 agent_package_version        = {{ agent_package_version}}
+snapshot_suffix              = {{ snapshot_suffix }}
 `
 
 	return Expand(dumpTemplate)
@@ -302,23 +305,36 @@ func AgentPackageVersion() (string, error) {
 }
 
 func PackageManifest() (string, error) {
-	m := v1.NewManifest()
-	m.Package.Snapshot = Snapshot
+
 	packageVersion, err := AgentPackageVersion()
 	if err != nil {
 		return "", fmt.Errorf("retrieving agent package version: %w", err)
 	}
-	m.Package.Version = packageVersion
+
+	hash, err := CommitHash()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
+	}
+
 	commitHashShort, err := CommitHashShort()
 	if err != nil {
 		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
 	}
 
-	versionedHomePath := path.Join("data", fmt.Sprintf("%s-%s", BeatName, commitHashShort))
+	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort)
+}
+
+func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string) (string, error) {
+	m := v1.NewManifest()
+	m.Package.Version = packageVersion
+	m.Package.Snapshot = snapshot
+	m.Package.Hash = fullHash
+
+	versionedHomePath := path.Join("data", fmt.Sprintf("%s-%s", beatName, shortHash))
 	m.Package.VersionedHome = versionedHomePath
 	m.Package.PathMappings = []map[string]string{{}}
-	m.Package.PathMappings[0][versionedHomePath] = fmt.Sprintf("data/elastic-agent-%s%s-%s", m.Package.Version, SnapshotSuffix(), commitHashShort)
-	m.Package.PathMappings[0]["manifest.yaml"] = fmt.Sprintf("data/elastic-agent-%s%s-%s/manifest.yaml", m.Package.Version, SnapshotSuffix(), commitHashShort)
+	m.Package.PathMappings[0][versionedHomePath] = fmt.Sprintf("data/%s-%s%s-%s", beatName, m.Package.Version, GenerateSnapshotSuffix(snapshot), shortHash)
+	m.Package.PathMappings[0][v1.ManifestFileName] = fmt.Sprintf("data/%s-%s%s-%s/%s", beatName, m.Package.Version, GenerateSnapshotSuffix(snapshot), shortHash, v1.ManifestFileName)
 	yamlBytes, err := yaml.Marshal(m)
 	if err != nil {
 		return "", fmt.Errorf("marshaling manifest: %w", err)
@@ -328,7 +344,11 @@ func PackageManifest() (string, error) {
 }
 
 func SnapshotSuffix() string {
-	if !Snapshot {
+	return GenerateSnapshotSuffix(Snapshot)
+}
+
+func GenerateSnapshotSuffix(snapshot bool) string {
+	if !snapshot {
 		return ""
 	}
 

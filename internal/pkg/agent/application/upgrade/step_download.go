@@ -40,19 +40,14 @@ type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.
 
 type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details) (string, error)
 
-func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
 
-	pgpBytes = u.appendFallbackPGP(version, pgpBytes)
-
-	parsedVersion, err := agtversion.ParseVersion(version)
-	if err != nil {
-		return "", fmt.Errorf("error parsing version %q: %w", version, err)
-	}
+	pgpBytes = u.appendFallbackPGP(parsedVersion, pgpBytes)
 
 	// do not update source config
 	settings := *u.settings
@@ -82,7 +77,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 			}
 
 			// log that a local upgrade artifact is being used
-			u.log.Infow("Using local upgrade artifact", "version", version,
+			u.log.Infow("Using local upgrade artifact", "version", parsedVersion,
 				"drop_path", settings.DropPath,
 				"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 		} else {
@@ -93,7 +88,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 	if factory == nil {
 		// set the factory to the newDownloader factory
 		factory = newDownloader
-		u.log.Infow("Downloading upgrade artifact", "version", version,
+		u.log.Infow("Downloading upgrade artifact", "version", parsedVersion,
 			"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 			"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 	}
@@ -127,7 +122,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 	return path, nil
 }
 
-func (u *Upgrader) appendFallbackPGP(targetVersion string, pgpBytes []string) []string {
+func (u *Upgrader) appendFallbackPGP(targetVersion *agtversion.ParsedSemVer, pgpBytes []string) []string {
 	if pgpBytes == nil {
 		pgpBytes = make([]string, 0, 1)
 	}
@@ -138,21 +133,15 @@ func (u *Upgrader) appendFallbackPGP(targetVersion string, pgpBytes []string) []
 	// add a secondary fallback if fleet server is configured
 	u.log.Debugf("Considering fleet server uri for pgp check fallback %q", u.fleetServerURI)
 	if u.fleetServerURI != "" {
-		tpv, err := agtversion.ParseVersion(targetVersion)
+		secondaryPath, err := url.JoinPath(
+			u.fleetServerURI,
+			fmt.Sprintf(fleetUpgradeFallbackPGPFormat, targetVersion.Major(), targetVersion.Minor(), targetVersion.Patch()),
+		)
 		if err != nil {
-			// best effort, log failure
-			u.log.Warnf("failed to parse agent version (%q) for secondary GPG fallback: %v", targetVersion, err)
+			u.log.Warnf("failed to compose Fleet Server URI: %v", err)
 		} else {
-			secondaryPath, err := url.JoinPath(
-				u.fleetServerURI,
-				fmt.Sprintf(fleetUpgradeFallbackPGPFormat, tpv.Major(), tpv.Minor(), tpv.Patch()),
-			)
-			if err != nil {
-				u.log.Warnf("failed to compose Fleet Server URI: %v", err)
-			} else {
-				secondaryFallback := download.PgpSourceURIPrefix + secondaryPath
-				pgpBytes = append(pgpBytes, secondaryFallback)
-			}
+			secondaryFallback := download.PgpSourceURIPrefix + secondaryPath
+			pgpBytes = append(pgpBytes, secondaryFallback)
 		}
 	}
 

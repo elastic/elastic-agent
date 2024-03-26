@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -103,7 +104,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			return
 		}
 		oLogs := logp.ObserverLogs().TakeAll()
-		fmt.Fprintf(os.Stderr, "Error uninstalling.  Printing logs\n")
+		fmt.Fprintf(os.Stderr, "Error uninstalling. Printing logs\n")
 		for _, oLog := range oLogs {
 			fmt.Fprintf(os.Stderr, "%v\n", oLog.Entry)
 		}

@@ -17,7 +17,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -28,7 +27,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ai, _ := info.NewAgentInfo(ctx, true)
+	ai := &info.AgentInfo{}
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
@@ -142,7 +141,11 @@ func newDebugLogger(t *testing.T) *logger.Logger {
 func drainErrChan(ch chan error) {
 	for {
 		select {
-		case <-ch:
+		case _, ok := <-ch:
+			// channel is closed, nothing to drain
+			if !ok {
+				return
+			}
 		default:
 			return
 		}

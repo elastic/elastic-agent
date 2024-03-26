@@ -7,9 +7,25 @@ package cmd
 import (
 	"testing"
 
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestOtelFlagsSetup(t *testing.T) {
+	fs := new(pflag.FlagSet)
+	setupOtelFlags(fs)
+
+	expectedFlags := []string{
+		configFlagName,
+		setFlagName,
+		"feature-gates",
+	}
+
+	for _, expectedFlag := range expectedFlags {
+		require.NotNil(t, fs.Lookup(expectedFlag), "Flag %q is not present", expectedFlag)
+	}
+}
 
 func TestGetSets(t *testing.T) {
 	testCases := []struct {

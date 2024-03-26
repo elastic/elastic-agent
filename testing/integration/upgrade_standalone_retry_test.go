@@ -41,10 +41,13 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	startFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	// Upgrade to an older snapshot build of same version.
+	// The end version does not matter much but it must not match
+	// the commit hash of the current build.
+	endVersion, err := upgradetest.PreviousMinor()
+	require.NoError(t, err)
 	endFixture, err := atesting.NewFixture(
 		t,
-		define.Version(),
+		endVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)

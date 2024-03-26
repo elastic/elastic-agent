@@ -23,7 +23,7 @@ import (
 //   - The contents from the unencrypted file will be copied as a byte stream without any transformation.
 //   - The function will not perform any operation if the encryptedConfigPath already exists and it's not empty to avoid overwrites.
 //   - If neither the encrypted file nor the unencrypted file exist this call is a no-op
-func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedConfigPath string, encryptedConfigPath string) error {
+func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedConfigPath string, encryptedConfigPath string, storageOpts ...storage.OptionFunc) error {
 	encStat, encFileErr := os.Stat(encryptedConfigPath)
 
 	if encFileErr != nil && !errors.Is(encFileErr, fs.ErrNotExist) {
@@ -43,7 +43,10 @@ func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedCo
 	}
 
 	l.Info("Initiating migration of %q to %q", unencryptedConfigPath, encryptedConfigPath)
-	legacyStore := storage.NewDiskStore(unencryptedConfigPath)
+	legacyStore, err := storage.NewDiskStore(unencryptedConfigPath)
+	if err != nil {
+		return fmt.Errorf("error instantiating disk store: %w", err)
+	}
 	reader, err := legacyStore.Load()
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("loading of unencrypted config from file %q failed", unencryptedConfigPath))
@@ -54,7 +57,10 @@ func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedCo
 			l.Errorf("Error closing unencrypted store reader for %q: %v", unencryptedConfigPath, err)
 		}
 	}()
-	store := storage.NewEncryptedDiskStore(ctx, encryptedConfigPath)
+	store, err := storage.NewEncryptedDiskStore(ctx, encryptedConfigPath, storageOpts...)
+	if err != nil {
+		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
 	err = store.Save(reader)
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("error writing encrypted config from file %q to file %q", unencryptedConfigPath, encryptedConfigPath))

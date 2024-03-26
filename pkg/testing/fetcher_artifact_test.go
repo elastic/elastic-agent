@@ -29,7 +29,7 @@ func TestArtifactFetcher_Default(t *testing.T) {
 	af.doer = newFakeHttpClient(t)
 
 	tmp := t.TempDir()
-	res, err := f.Fetch(context.Background(), "linux", "amd64", "8.12.0")
+	res, err := f.Fetch(context.Background(), "linux", "amd64", "8.12.0", "targz")
 	require.NoError(t, err)
 
 	err = res.Fetch(context.Background(), t, tmp)
@@ -46,7 +46,7 @@ func TestArtifactFetcher_Snapshot(t *testing.T) {
 	af.doer = newFakeHttpClient(t)
 
 	tmp := t.TempDir()
-	res, err := f.Fetch(context.Background(), "linux", "amd64", "8.13.0-SNAPSHOT")
+	res, err := f.Fetch(context.Background(), "linux", "amd64", "8.13.0-SNAPSHOT", "targz")
 	require.NoError(t, err)
 
 	err = res.Fetch(context.Background(), t, tmp)
@@ -64,7 +64,7 @@ func TestArtifactFetcher_SnapshotOnly(t *testing.T) {
 	af.doer = newFakeHttpClient(t)
 
 	tmp := t.TempDir()
-	res, err := f.Fetch(context.Background(), "linux", "amd64", "8.13.0")
+	res, err := f.Fetch(context.Background(), "linux", "amd64", "8.13.0", "targz")
 	require.NoError(t, err)
 
 	err = res.Fetch(context.Background(), t, tmp)
@@ -82,7 +82,7 @@ func TestArtifactFetcher_Build(t *testing.T) {
 	af.doer = newFakeHttpClient(t)
 
 	tmp := t.TempDir()
-	res, err := f.Fetch(context.Background(), "linux", "amd64", "8.13.0-SNAPSHOT+l5snflwr")
+	res, err := f.Fetch(context.Background(), "linux", "amd64", "8.13.0-SNAPSHOT+l5snflwr", "targz")
 	require.NoError(t, err)
 
 	err = res.Fetch(context.Background(), t, tmp)

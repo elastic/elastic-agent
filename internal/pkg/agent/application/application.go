@@ -41,7 +41,7 @@ func New(
 	log *logger.Logger,
 	baseLogger *logger.Logger,
 	logLevel logp.Level,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
 	testingMode bool,
@@ -211,7 +211,10 @@ func New(
 
 func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(ctx, path)
+	store, err := storage.NewEncryptedDiskStore(ctx, path)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
 
 	reader, err := store.Load()
 	if err != nil {

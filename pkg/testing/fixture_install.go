@@ -7,19 +7,25 @@ package testing
 import (
 	"archive/zip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	gotesting "testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	agentsystemprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -123,11 +129,36 @@ func NewBool(value bool) *bool {
 //   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
-	installArgs := []string{"install"}
+
+	// check for running agents before installing, but proceed anyway
+	assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
+
+	switch f.packageFormat {
+	case "targz", "zip":
+		return f.installNoPkgManager(ctx, installOpts, opts)
+	case "deb":
+		return f.installDeb(ctx, installOpts, opts)
+	default:
+		return nil, fmt.Errorf("package format %s isn't supported yet", f.packageFormat)
+	}
+}
+
+// installNoPkgManager installs the prepared Elastic Agent binary from
+// the tgz or zip archive and registers a t.Cleanup function to
+// uninstall the agent if it hasn't been uninstalled. It also takes
+// care of collecting a diagnostics when AGENT_COLLECT_DIAG=true or
+// the test has failed.
+// It returns:
+//   - the combined output of Install command stdout and stderr
+//   - an error if any.
+func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture installNoPkgManager function", f.t.Name())
 	if installOpts == nil {
 		// default options when not provided
 		installOpts = &InstallOpts{}
 	}
+
+	installArgs := []string{"install"}
 	installOptsArgs, err := installOpts.toCmdArgs(f.operatingSystem)
 	if err != nil {
 		return nil, err
@@ -162,7 +193,45 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
+		if f.t.Failed() {
+			procs := getProcesses(f.t, `.*`)
+			dir, err := findProjectRoot(f.caller)
+			if err != nil {
+				f.t.Logf("failed to dump process; failed to find project root: %s", err)
+				return
+			}
+
+			// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
+			sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
+
+			filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-%s-%s-ProcessDump.json", sanitizedTestName, f.operatingSystem, f.architecture))
+			f.t.Logf("Dumping running processes in %s", filePath)
+			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+			if err != nil {
+				f.t.Logf("failed to dump process; failed to create output file %s root: %s", file.Name(), err)
+				return
+			}
+			defer func(file *os.File) {
+				err := file.Close()
+				if err != nil {
+					f.t.Logf("error closing file %s: %s", file.Name(), err)
+				}
+			}(file)
+			err = json.NewEncoder(file).Encode(procs)
+			if err != nil {
+				f.t.Logf("error serializing processes: %s", err)
+			}
+		}
+	})
+
+	f.t.Cleanup(func() {
+		// check for running agents after uninstall had a chance to run
+		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at the end of the test")
+	})
+
+	f.t.Cleanup(func() {
 		f.t.Logf("[test %s] Inside fixture cleanup function", f.t.Name())
+
 		if !f.installed {
 			f.t.Logf("skipping uninstall; agent not installed (fixture.installed is false)")
 			// not installed; no need to clean up or collect diagnostics
@@ -218,6 +287,154 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	return out, nil
 }
 
+type runningProcess struct {
+	// Basic Process data
+	Name     string                      `json:"name,omitempty"`
+	State    agentsystemprocess.PidState `json:"state,omitempty"`
+	Username string                      `json:"username,omitempty"`
+	Pid      int                         `json:"pid"`
+	Ppid     int                         `json:"ppid"`
+	Pgid     int                         `json:"pgid"`
+
+	// Extended Process Data
+	Args    []string `json:"args,omitempty"`
+	Cmdline string   `json:"cmdline,omitempty"`
+	Cwd     string   `json:"cwd,omitempty"`
+	Exe     string   `json:"exe,omitempty"`
+	Env     mapstr.M `json:"env,omitempty"`
+}
+
+func (p runningProcess) String() string {
+	return fmt.Sprintf("{PID:%v, PPID: %v, Cwd: %s, Exe: %s, Cmdline: %s, Args: %v}",
+		p.Pid, p.Ppid, p.Cwd, p.Exe, p.Cmdline, p.Args)
+}
+
+func mapProcess(p agentsystemprocess.ProcState) runningProcess {
+	mappedProcess := runningProcess{
+		Name:     p.Name,
+		State:    p.State,
+		Username: p.Username,
+		// map pid/gid to int and default to an obvious impossible pid if we don't have a value
+		Pid:     p.Pid.ValueOr(-1),
+		Ppid:    p.Ppid.ValueOr(-1),
+		Pgid:    p.Pgid.ValueOr(-1),
+		Cmdline: p.Cmdline,
+		Cwd:     p.Cwd,
+		Exe:     p.Exe,
+		Args:    make([]string, len(p.Args)),
+		Env:     make(mapstr.M),
+	}
+	copy(mappedProcess.Args, p.Args)
+	for k, v := range p.Env {
+		mappedProcess.Env[k] = v
+	}
+	return mappedProcess
+}
+
+func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
+	return getProcesses(t, `.*elastic\-agent.*`)
+}
+
+func getProcesses(t *gotesting.T, regex string) []runningProcess {
+	procStats := agentsystemprocess.Stats{
+		Procs: []string{regex},
+	}
+
+	err := procStats.Init()
+	if !assert.NoError(t, err, "error initializing process.Stats") {
+		// we failed
+		return nil
+	}
+
+	_, pids, err := procStats.FetchPids()
+	if !assert.NoError(t, err, "error fetching process information") {
+		// we failed a bit further
+		return nil
+	}
+
+	processes := make([]runningProcess, 0, len(pids))
+
+	for _, p := range pids {
+		processes = append(processes, mapProcess(p))
+	}
+
+	return processes
+}
+
+// installDeb installs the prepared Elastic Agent binary from the deb
+// package and registers a t.Cleanup function to uninstall the agent if
+// it hasn't been uninstalled. It also takes care of collecting a
+// diagnostics when AGENT_COLLECT_DIAG=true or the test has failed.
+// It returns:
+//   - the combined output of Install command stdout and stderr
+//   - an error if any.
+func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
+	//Prepare so that the f.srcPackage string is populated
+	err := f.EnsurePrepared(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare: %w", err)
+	}
+
+	// sudo apt install the deb
+	out, err := exec.CommandContext(ctx, "sudo", "apt", "install", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	if err != nil {
+		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
+	}
+
+	f.t.Cleanup(func() {
+		f.t.Logf("[test %s] Inside fixture installDeb cleanup function", f.t.Name())
+		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer uninstallCancel()
+		// stop elastic-agent, non fatal if error, might have been stopped before this.
+		f.t.Logf("running 'sudo systemctl stop elastic-agent'")
+		out, err := exec.CommandContext(uninstallCtx, "sudo", "systemctl", "stop", "elastic-agent").CombinedOutput()
+		if err != nil {
+			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
+		}
+		// apt-get purge elastic-agent
+		f.t.Logf("running 'sudo apt-get -y -q purge elastic-agent'")
+		out, err = exec.CommandContext(uninstallCtx, "sudo", "apt-get", "-y", "-q", "purge", "elastic-agent").CombinedOutput()
+		if err != nil {
+			f.t.Logf("failed to apt-get purge elastic-agent: %s, output: %s", err, string(out))
+			f.t.FailNow()
+		}
+	})
+
+	// start elastic-agent
+	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+	}
+
+	// apt install doesn't enroll, so need to do that
+	enrollArgs := []string{"elastic-agent", "enroll"}
+	if installOpts.Force {
+		enrollArgs = append(enrollArgs, "--force")
+	}
+	if installOpts.Insecure {
+		enrollArgs = append(enrollArgs, "--insecure")
+	}
+	if installOpts.ProxyURL != "" {
+		enrollArgs = append(enrollArgs, "--proxy-url="+installOpts.ProxyURL)
+	}
+	if installOpts.DelayEnroll {
+		enrollArgs = append(enrollArgs, "--delay-enroll")
+	}
+	if installOpts.EnrollOpts.URL != "" {
+		enrollArgs = append(enrollArgs, "--url", installOpts.EnrollOpts.URL)
+	}
+	if installOpts.EnrollOpts.EnrollmentToken != "" {
+		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollOpts.EnrollmentToken)
+	}
+	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("elastic-agent enroll failed: %w, output: %s args: %v", err, string(out), enrollArgs)
+	}
+
+	return nil, nil
+}
+
 type UninstallOpts struct {
 	Force          bool // --force
 	UninstallToken string
@@ -238,6 +455,30 @@ func (i UninstallOpts) toCmdArgs() []string {
 
 // Uninstall uninstalls the installed Elastic Agent binary
 func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, opts ...process.CmdOption) ([]byte, error) {
+	switch f.packageFormat {
+	case "targz", "zip":
+		return f.uninstallNoPkgManager(ctx, uninstallOpts, opts)
+	case "deb":
+		return f.uninstallDeb(ctx, uninstallOpts, opts)
+	default:
+		return nil, fmt.Errorf("uninstall of package format '%s' not supported yet", f.packageFormat)
+	}
+}
+
+func (f *Fixture) uninstallDeb(ctx context.Context, uninstallOpts *UninstallOpts, opts []process.CmdOption) ([]byte, error) {
+	// stop elastic-agent, non fatal if error, might have been stopped before this.
+	out, err := exec.CommandContext(ctx, "sudo", "systemctl", "stop", "elastic-agent").CombinedOutput()
+	if err != nil {
+		f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
+	}
+	out, err = exec.CommandContext(ctx, "sudo", "apt-get", "-y", "-q", "purge", "elastic-agent").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("error removing apt: %w", err)
+	}
+	return out, nil
+}
+
+func (f *Fixture) uninstallNoPkgManager(ctx context.Context, uninstallOpts *UninstallOpts, opts []process.CmdOption) ([]byte, error) {
 	if !f.installed {
 		return nil, ErrNotInstalled
 	}
@@ -312,7 +553,9 @@ func (f *Fixture) collectDiagnostics() {
 			f.t.Logf("retrying in 15 seconds due to connection error; possible Elastic Agent was not fully started")
 			time.Sleep(15 * time.Second)
 			output, err = f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
-			f.t.Logf("failed to collect diagnostics a second time at %s (%s): %s", outputPath, err, output)
+			if err != nil {
+				f.t.Logf("failed to collect diagnostics a second time at %s (%s): %s", outputPath, err, output)
+			}
 		}
 		if err != nil {
 			// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.

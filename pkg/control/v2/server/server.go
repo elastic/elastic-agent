@@ -45,7 +45,7 @@ type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
 
 	logger     *logger.Logger
-	agentInfo  *info.AgentInfo
+	agentInfo  info.Agent
 	coord      *coordinator.Coordinator
 	listener   net.Listener
 	server     *grpc.Server
@@ -57,7 +57,7 @@ type Server struct {
 }
 
 // New creates a new control protocol server.
-func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig) *Server {
+func New(log *logger.Logger, agentInfo info.Agent, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig) *Server {
 	return &Server{
 		logger:     log,
 		agentInfo:  agentInfo,
@@ -205,17 +205,17 @@ func (s *Server) DiagnosticAgent(ctx context.Context, req *cproto.DiagnosticAgen
 	for _, metric := range req.AdditionalMetrics {
 		switch metric {
 		case cproto.AdditionalDiagnosticRequest_CPU:
-			duration := time.Second * 30
+			duration := diagnostics.DiagCPUDuration
 			s.logger.Infof("Collecting CPU metrics, waiting for %s", duration)
 			cpuResults, err := diagnostics.CreateCPUProfile(ctx, duration)
 			if err != nil {
 				return nil, fmt.Errorf("error gathering CPU profile: %w", err)
 			}
 			res = append(res, &cproto.DiagnosticFileResult{
-				Name:        "cpuprofile",
-				Filename:    "cpu.pprof",
-				Description: "CPU profile",
-				ContentType: "application/octet-stream",
+				Name:        diagnostics.DiagCPUName,
+				Filename:    diagnostics.DiagCPUFilename,
+				Description: diagnostics.DiagCPUDescription,
+				ContentType: diagnostics.DiagCPUContentType,
 				Content:     cpuResults,
 				Generated:   timestamppb.New(time.Now().UTC()),
 			})
@@ -329,7 +329,7 @@ func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*
 	return &cproto.Empty{}, nil
 }
 
-func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.StateResponse, error) {
+func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.StateResponse, error) {
 	var err error
 	components := make([]*cproto.ComponentState, 0, len(state.Components))
 	for _, comp := range state.Components {

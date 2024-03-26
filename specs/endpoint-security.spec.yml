@@ -79,6 +79,8 @@ inputs:
           message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
         - condition: number(${runtime.major}) <= 6
           message: "Elastic Defend requires Windows 10 / Server 2016 or newer."
+        - condition: ${runtime.native_arch} != '' and ${runtime.native_arch} != 'amd64'
+          message: "Elastic Defend cannot be installed on Windows running on non-AMD64 CPU"
     service:
       cport: 6788
       log:

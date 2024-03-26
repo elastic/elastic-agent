@@ -48,12 +48,7 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 		c.Root().HelpFunc()(c, s)
 	})
 
-	cmd.Flags().StringArray(configFlagName, []string{}, "Locations to the config file(s), note that only a"+
-		" single location can be set per flag entry e.g. `--config=file:/path/to/first --config=file:path/to/second`.")
-
-	cmd.Flags().StringArray(setFlagName, []string{}, "Set arbitrary component config property. The component has to be defined in the config file and the flag"+
-		" has a higher precedence. Array config properties are overridden and maps are joined. Example --set=processors.batch.timeout=2s")
-
+	setupOtelFlags(cmd.Flags())
 	cmd.AddCommand(newValidateCommandWithArgs(args, streams))
 
 	return cmd
