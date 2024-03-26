@@ -81,7 +81,7 @@ func (runner *MetricsRunner) SetupSuite() {
 }
 
 func (runner *MetricsRunner) TestBeatsMetrics() {
-	UnitOutputName := "fleet-default-output"
+	UnitOutputName := "default"
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
 	defer cancel()
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
