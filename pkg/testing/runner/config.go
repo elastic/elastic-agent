@@ -28,6 +28,11 @@ type Config struct {
 	// defined in this list.
 	Platforms []string
 
+	// Packages filters the tests to only run on the provided list
+	// of platforms even if the tests supports more than what is
+	// defined in this list.
+	Packages []string
+
 	// BinaryName is the name of the binary package under test, i.e, elastic-agent, metricbeat, etc
 	// this is used to copy the .tar.gz to the remote host
 	BinaryName string
