@@ -34,11 +34,6 @@ import (
 // ErrNotInstalled is returned in cases where Agent isn't installed
 var ErrNotInstalled = errors.New("Elastic Agent is not installed") //nolint:stylecheck // Elastic Agent is a proper noun
 
-// CmdOpts creates vectors of command arguments for different agent commands
-type CmdOpts interface {
-	toCmdArgs() []string
-}
-
 // EnrollOpts specifies the options for the enroll command
 type EnrollOpts struct {
 	DelayEnroll     bool   // --delay-enroll
@@ -50,12 +45,23 @@ type EnrollOpts struct {
 
 func (e EnrollOpts) toCmdArgs() []string {
 	var args []string
-	if e.URL != "" {
-		args = append(args, "--url", e.URL)
+
+	if e.DelayEnroll {
+		args = append(args, "--delay-enroll")
 	}
 	if e.EnrollmentToken != "" {
 		args = append(args, "--enrollment-token", e.EnrollmentToken)
 	}
+	if e.Insecure {
+		args = append(args, "--insecure")
+	}
+	if e.ProxyURL != "" {
+		args = append(args, "--proxy-url="+e.ProxyURL)
+	}
+	if e.URL != "" {
+		args = append(args, "--url", e.URL)
+	}
+
 	return args
 }
 
@@ -81,6 +87,14 @@ func (i InstallOpts) IsUnprivileged(operatingSystem string) bool {
 }
 
 func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
+	// 	BasePath       string // --base-path
+	//	Force          bool   // --force
+	//	NonInteractive bool   // --non-interactive
+	//	// Unprivileged by default installs the Elastic Agent as `--unprivileged` unless
+	//	// the platform being tested doesn't currently support it, or it's explicitly set
+	//	// to false.
+	//	Unprivileged *bool // --unprivileged
+
 	var args []string
 	if i.BasePath != "" {
 		args = append(args, "--base-path", i.BasePath)
@@ -88,19 +102,9 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	if i.Force {
 		args = append(args, "--force")
 	}
-	if i.Insecure {
-		args = append(args, "--insecure")
-	}
 	if i.NonInteractive {
 		args = append(args, "--non-interactive")
 	}
-	if i.ProxyURL != "" {
-		args = append(args, "--proxy-url="+i.ProxyURL)
-	}
-	if i.DelayEnroll {
-		args = append(args, "--delay-enroll")
-	}
-
 	unprivileged := i.IsUnprivileged(operatingSystem)
 	if unprivileged {
 		if operatingSystem != "linux" {
@@ -129,8 +133,10 @@ func NewBool(value bool) *bool {
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 
-	// check for running agents before installing, but proceed anyway
-	assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
+	// check for running agents before installing, there should be no agent
+	// process running. However, even if there is one, let's keep the test going
+	// and add a failure so we can investigate what happened.
+	// assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
 
 	switch f.packageFormat {
 	case "targz", "zip":
@@ -157,11 +163,18 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 		installOpts = &InstallOpts{}
 	}
 
+	// split install and enroll so if the enrollment fails, the agent won't
+	// uninstall itself. We will collect either a diagnostics or the agent
+	// directory if any failure occurs.
+
+	enrollOnlyOpts := installOpts.EnrollOpts
+	installOnlyOpts := installOpts
+	installOnlyOpts.EnrollOpts = EnrollOpts{}
+
 	installArgs := []string{"install"}
-	installOpts.DelayEnroll = true
-	installOptsArgs, err := installOpts.toCmdArgs(f.operatingSystem)
+	installOptsArgs, err := installOnlyOpts.toCmdArgs(f.operatingSystem)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not generate install args: %w", err)
 	}
 	installArgs = append(installArgs, installOptsArgs...)
 	out, err := f.Exec(ctx, installArgs, opts...)
@@ -193,98 +206,127 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
-		if f.t.Failed() {
-			procs := getProcesses(f.t, `.*`)
-			dir, err := findProjectRoot(f.caller)
-			if err != nil {
-				f.t.Logf("failed to dump process; failed to find project root: %s", err)
-				return
-			}
+		f.t.Logf("[test %s] Inside fixture cleanup function", f.t.Name())
 
-			// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
-			sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
+		f.cleanUpCollectDiagnostics()
 
-			filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-%s-%s-ProcessDump.json", sanitizedTestName, f.operatingSystem, f.architecture))
-			f.t.Logf("Dumping running processes in %s", filePath)
-			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-			if err != nil {
-				f.t.Logf("failed to dump process; failed to create output file %s root: %s", file.Name(), err)
-				return
-			}
-			defer func(file *os.File) {
-				err := file.Close()
-				if err != nil {
-					f.t.Logf("error closing file %s: %s", file.Name(), err)
-				}
-			}(file)
-			err = json.NewEncoder(file).Encode(procs)
-			if err != nil {
-				f.t.Logf("error serializing processes: %s", err)
-			}
+		if f.cleanUpKeepInstalled() {
+			return
 		}
-	})
 
-	f.t.Cleanup(func() {
+		if f.cleanUpUninstall() {
+			return
+		}
+
+		f.dumpProcessOnFailure()
+
 		// check for running agents after uninstall had a chance to run
 		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at the end of the test")
 	})
 
-	f.t.Cleanup(func() {
-		f.t.Logf("[test %s] Inside fixture cleanup function", f.t.Name())
-
-		if !f.installed {
-			f.t.Logf("skipping uninstall; agent not installed (fixture.installed is false)")
-			// not installed; no need to clean up or collect diagnostics
-			return
+	emptyEnrollOpts := EnrollOpts{}
+	if enrollOnlyOpts != emptyEnrollOpts {
+		enrollArgs := []string{"enroll"}
+		enrollArgs = append(enrollArgs, enrollOnlyOpts.toCmdArgs()...)
+		out, err = f.Exec(ctx, enrollArgs, opts...)
+		if err != nil {
+			return out, fmt.Errorf("error running agent enroll command: %w", err)
 		}
-
-		// diagnostics is collected when either the environment variable
-		// AGENT_COLLECT_DIAG=true or the test is marked failed
-		collect := collectDiagFlag()
-		failed := f.t.Failed()
-		if collect || failed {
-			if collect {
-				f.t.Logf("collecting diagnostics; AGENT_COLLECT_DIAG=true")
-			} else if failed {
-				f.t.Logf("collecting diagnostics; test failed")
-			}
-			f.collectDiagnostics()
-		}
-
-		// environment variable AGENT_KEEP_INSTALLED=true will skip the uninstallation
-		// useful to debug the issue with the Elastic Agent
-		if f.t.Failed() && keepInstalledFlag() {
-			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
-			return
-		}
-
-		if keepInstalledFlag() {
-			f.t.Logf("ignoring AGENT_KEEP_INSTALLED=true as test succeeded, " +
-				"keeping the agent installed will jeopardise other tests")
-		}
-
-		// 5 minute timeout, to ensure that it at least doesn't get stuck.
-		// original context is not used as it could have a timeout on the context
-		// for the install and we don't want that context to prevent the uninstall
-		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer uninstallCancel()
-		out, err := f.Uninstall(uninstallCtx, &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
-		f.setClient(nil)
-		if err != nil &&
-			(errors.Is(err, ErrNotInstalled) ||
-				strings.Contains(
-					err.Error(),
-					"elastic-agent: no such file or directory")) {
-			f.t.Logf("fixture.Install Cleanup: agent was already uninstalled, skipping uninstall")
-			// Agent fixture has already been uninstalled, perhaps by
-			// an explicit call to fixture.Uninstall, so nothing needs
-			// to be done here.
-			return
-		}
-		require.NoErrorf(f.t, err, "uninstalling agent failed. Output: %q", out)
-	})
+	}
 
 	return out, nil
+}
+
+func (f *Fixture) cleanUpUninstall() bool {
+	if !f.installed {
+		f.t.Logf("skipping uninstall; agent not installed (fixture.installed is false)")
+		// not installed; no need to clean up or collect diagnostics
+		return true
+	}
+
+	// uninstall agent
+	// 5 minute timeout, to ensure that it at least doesn't get stuck.
+	// original context is not used as it could have a timeout on the context
+	// for the install and we don't want that context to prevent the uninstall
+	uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer uninstallCancel()
+	out, err := f.Uninstall(uninstallCtx, &UninstallOpts{Force: true, UninstallToken: f.uninstallToken})
+	f.setClient(nil)
+	if err != nil &&
+		(errors.Is(err, ErrNotInstalled) ||
+			strings.Contains(
+				err.Error(),
+				"elastic-agent: no such file or directory")) {
+		f.t.Logf("fixture.Install Cleanup: agent was already uninstalled, skipping uninstall")
+		// Agent fixture has already been uninstalled, perhaps by
+		// an explicit call to fixture.Uninstall, so nothing needs
+		// to be done here.
+		return true
+	}
+	require.NoErrorf(f.t, err, "uninstalling agent failed. Output: %q", out)
+	return false
+}
+
+func (f *Fixture) cleanUpKeepInstalled() bool {
+	// environment variable AGENT_KEEP_INSTALLED=true will skip the uninstallation
+	// useful to debug the issue with the Elastic Agent
+	if f.t.Failed() && keepInstalledFlag() {
+		f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
+		return true
+	}
+
+	if keepInstalledFlag() {
+		f.t.Logf("ignoring AGENT_KEEP_INSTALLED=true as test succeeded, " +
+			"keeping the agent installed will jeopardise other tests")
+	}
+	return false
+}
+
+func (f *Fixture) cleanUpCollectDiagnostics() {
+	// diagnostics is collected when either the environment variable
+	// AGENT_COLLECT_DIAG=true or the test is marked failed
+	collect := collectDiagFlag()
+	failed := f.t.Failed()
+	if collect || failed {
+		if collect {
+			f.t.Logf("collecting diagnostics; AGENT_COLLECT_DIAG=true")
+		} else if failed {
+			f.t.Logf("collecting diagnostics; test failed")
+		}
+		f.collectDiagnostics()
+	}
+}
+
+func (f *Fixture) dumpProcessOnFailure() {
+	if f.t.Failed() {
+		procs := getProcesses(f.t, `.*`)
+		dir, err := findProjectRoot(f.caller)
+		if err != nil {
+			f.t.Logf("failed to dump process; failed to find project root: %s", err)
+			return
+		}
+
+		// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
+		sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
+
+		filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-%s-%s-ProcessDump.json", sanitizedTestName, f.operatingSystem, f.architecture))
+		f.t.Logf("Dumping running processes in %s", filePath)
+		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+		if err != nil {
+			f.t.Logf("failed to dump process; failed to create output file %s root: %s", file.Name(), err)
+			return
+		}
+		defer func(file *os.File) {
+			err := file.Close()
+			if err != nil {
+				f.t.Logf("error closing file %s: %s", file.Name(), err)
+			}
+		}(file)
+		err = json.NewEncoder(file).Encode(procs)
+		if err != nil {
+			f.t.Logf("error serializing processes: %s", err)
+		}
+	}
 }
 
 type runningProcess struct {

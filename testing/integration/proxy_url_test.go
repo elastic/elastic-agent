@@ -227,11 +227,11 @@ func TestProxyURL_ProxyInThePolicyTakesPrecedence(t *testing.T) {
 		&integrationtest.InstallOpts{
 			Force:          true,
 			NonInteractive: true,
-			Insecure:       true,
-			ProxyURL:       p.proxy1.LocalhostURL,
 			EnrollOpts: integrationtest.EnrollOpts{
 				URL:             p.fleetNeedsProxyHost,
 				EnrollmentToken: "anythingWillDO",
+				Insecure:        true,
+				ProxyURL:        p.proxy1.LocalhostURL,
 			}})
 	if err != nil {
 		t.Log(string(out))
@@ -295,10 +295,10 @@ func TestProxyURL_NoEnrollProxyAndProxyInThePolicy(t *testing.T) {
 		&integrationtest.InstallOpts{
 			Force:          true,
 			NonInteractive: true,
-			Insecure:       true,
 			EnrollOpts: integrationtest.EnrollOpts{
 				URL:             p.fleet.LocalhostURL,
 				EnrollmentToken: "anythingWillDO",
+				Insecure:        true,
 			}})
 	if err != nil {
 		t.Log(string(out))
@@ -359,11 +359,11 @@ func TestProxyURL_RemoveProxyFromThePolicy(t *testing.T) {
 		&integrationtest.InstallOpts{
 			Force:          true,
 			NonInteractive: true,
-			Insecure:       true,
-			ProxyURL:       p.proxy1.LocalhostURL,
 			EnrollOpts: integrationtest.EnrollOpts{
 				URL:             p.fleetNeedsProxyHost,
 				EnrollmentToken: "anythingWillDO",
+				Insecure:        true,
+				ProxyURL:        p.proxy1.LocalhostURL,
 			}})
 	if err != nil {
 		t.Log(string(out))
