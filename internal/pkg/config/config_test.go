@@ -91,7 +91,7 @@ func TestCommaParsing(t *testing.T) {
 	parsedMap, err := c.ToMapStr()
 	require.NoError(t, err)
 	t.Logf("got :%#v", parsedMap)
-	assert.True(t, reflect.DeepEqual(outMap, parsedMap))
+	require.Equal(t, outMap, parsedMap)
 }
 
 func testLoadFiles(t *testing.T) {
