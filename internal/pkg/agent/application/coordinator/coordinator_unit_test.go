@@ -14,7 +14,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -332,22 +332,31 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	// does let's report a failure instead of timing out the test runner.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	logger := logp.NewLogger("testing")
+
+	log, obs := logger.NewTesting("")
+	defer func() {
+		if t.Failed() {
+			t.Log("test failed, coordinator logs below:")
+			for _, l := range obs.TakeAll() {
+				t.Log(l)
+			}
+		}
+	}()
 
 	upgradeMgr, err := upgrade.NewUpgrader(
-		logger,
+		log,
 		&artifact.Config{},
 		&info.AgentInfo{},
 	)
-	require.NoError(t, err)
+	require.NoError(t, err, "errored when creating a new upgrader")
 
-	// Channels have buffer length 1 so we don't have to run on multiple
+	// Channels have buffer length 1, so we don't have to run on multiple
 	// goroutines.
 	stateChan := make(chan State, 1)
 	configChan := make(chan ConfigChange, 1)
 	varsChan := make(chan []*transpiler.Vars, 1)
 	coord := &Coordinator{
-		logger: logger,
+		logger: log,
 		state: State{
 			CoordinatorState:   agentclient.Healthy,
 			CoordinatorMessage: "Running",
@@ -381,21 +390,26 @@ agent.download.sourceURI:
 	coord.runLoopIteration(ctx)
 
 	assert.True(t, cfgChange.failed, "Policy with invalid field should have reported failed config change")
-	assert.Truef(t,
-		strings.HasPrefix(cfgChange.err.Error(),
-			"failed to reload upgrade manager configuration"),
+	require.ErrorContainsf(t,
+		cfgChange.err,
+		"failed to reload upgrade manager configuration",
 		"wrong error message, expected 'failed to reload upgrade manager configuration...' got %v",
-		cfgChange.err.Error())
-	require.Error(t, coord.configErr, "Policy error should be saved in configErr")
-	assert.Contains(t, coord.configErr.Error(),
-		"failed to reload upgrade manager configuration", "configErr should match policy failure")
+		cfgChange.err)
+	require.ErrorContainsf(t,
+		coord.configErr,
+		"failed to reload upgrade manager configuration",
+		"configErr should match policy failure, got %v", coord.configErr)
 
+	stateChangeTimeout := 2 * time.Second
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Failed policy change should cause Failed coordinator state")
 		assert.Contains(t, state.Message, cfgChange.err.Error(), "Coordinator state should report failed policy change")
-	default:
-		assert.Fail(t, "Coordinator's state didn't change")
+
+		// The component model update happens on a goroutine, thus the new state
+		// might not have been sent yet. Therefore, a timeout is required.
+	case <-time.After(stateChangeTimeout):
+		t.Fatalf("timedout after %s waiting Coordinator's state to change", stateChangeTimeout)
 	}
 
 	// Send an empty vars update. This should regenerate the component model
@@ -412,8 +426,12 @@ agent.download.sourceURI:
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Variable update should not overwrite policy error")
 		assert.Contains(t, state.Message, cfgChange.err.Error(), "Variable update should not overwrite policy error")
-	default:
-		assert.Fail(t, "Vars change should cause state update")
+
+		// The component model update happens on a goroutine, thus the new state
+		// might not have been sent yet. Therefore, a timeout is required.
+	case <-time.After(stateChangeTimeout):
+		t.Fatalf("timedout after %s waiting Vars change to cause a state update",
+			stateChangeTimeout)
 	}
 
 	// Finally, send an empty (valid) policy update and confirm that it
@@ -428,8 +446,12 @@ agent.download.sourceURI:
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Healthy, state.State, "Valid policy change should produce healthy state")
 		assert.Equal(t, state.Message, "Running", "Valid policy change should restore previous state message")
-	default:
-		assert.Fail(t, "Policy change should cause state update")
+
+		// The component model update happens on a goroutine, thus the new state
+		// might not have been sent yet. Therefore, a timeout is required.
+	case <-time.After(stateChangeTimeout):
+		t.Fatalf("timedout after %s waiting Policy change to cause a state update",
+			stateChangeTimeout)
 	}
 }
 

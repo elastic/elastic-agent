@@ -152,6 +152,24 @@ func TestBuildEnrollArgs(t *testing.T) {
 			expect: []string{"--fleet-server-service-token-path", "/path/to/token"},
 			err:    nil,
 		},
+		"mTLS flags": {
+			cfg: setupConfig{
+				Fleet: fleetConfig{
+					Cert:    "/path/to/agent.crt",
+					CertKey: "/path/to/agent.key",
+				},
+				FleetServer: fleetServerConfig{
+					Enable:     true,
+					ClientAuth: "optional",
+					Elasticsearch: elasticsearchConfig{
+						Cert:    "/path/to/es.crt",
+						CertKey: "/path/to/es.key",
+					},
+				},
+			},
+			expect: []string{"--fleet-server-es-cert", "/path/to/es.crt", "--fleet-server-es-cert-key", "/path/to/es.key", "--fleet-server-client-auth", "optional", "--elastic-agent-cert", "/path/to/agent.crt", "--elastic-agent-cert-key", "/path/to/agent.key"},
+			err:    nil,
+		},
 	}
 
 	for name, tc := range cases {

@@ -44,6 +44,9 @@ type upgradeOpts struct {
 	// See also WithDisableUpgradeWatcherUpgradeDetailsCheck.
 	disableUpgradeWatcherUpgradeDetailsCheck bool
 
+	// Disable check that enforces different hashed between the to and from version of upgrade
+	disableHashCheck bool
+
 	preInstallHook  func() error
 	postInstallHook func() error
 	preUpgradeHook  func() error
@@ -135,6 +138,13 @@ func WithDisableUpgradeWatcherUpgradeDetailsCheck() UpgradeOpt {
 	}
 }
 
+// WithDisableHashCheck disables hash check between start and end versions of upgrade
+func WithDisableHashCheck(disable bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.disableHashCheck = disable
+	}
+}
+
 // PerformUpgrade performs the upgrading of the Elastic Agent.
 func PerformUpgrade(
 	ctx context.Context,
@@ -217,7 +227,7 @@ func PerformUpgrade(
 		}
 	}
 
-	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+	if !upgradeOpts.disableHashCheck && startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
 		return fmt.Errorf("target version has the same commit hash %q", endVersionInfo.Binary.Commit)
 	}
 

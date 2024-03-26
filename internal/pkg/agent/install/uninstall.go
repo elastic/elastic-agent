@@ -54,13 +54,25 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	if status == service.StatusRunning {
 		err := svc.Stop()
 		if err != nil {
-			pt.Describe("Failed to stop service")
+			pt.Describe("Failed to issue stop service")
 			return aerrors.New(
 				err,
-				fmt.Sprintf("failed to stop service (%s)", paths.ServiceName),
+				fmt.Sprintf("failed to issue stop service (%s)", paths.ServiceName),
 				aerrors.M("service", paths.ServiceName))
 		}
 	}
+	// The kardianos service manager can't tell the difference
+	// between 'Stopped' and 'StopPending' on Windows, so make
+	// sure the service is stopped.
+	err = isStopped(30*time.Second, 250*time.Millisecond, paths.ServiceName)
+	if err != nil {
+		pt.Describe("Failed to complete stop of service")
+		return aerrors.New(
+			err,
+			fmt.Sprintf("failed to complete stop service (%s)", paths.ServiceName),
+			aerrors.M("service", paths.ServiceName))
+	}
+
 	pt.Describe("Successfully stopped service")
 
 	// kill any running watcher
@@ -127,7 +139,7 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 // to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
 // seconds if it keeps getting that error.
 func RemovePath(path string) error {
-	const arbitraryTimeout = 5 * time.Second
+	const arbitraryTimeout = 30 * time.Second
 	start := time.Now()
 	var lastErr error
 	for time.Since(start) <= arbitraryTimeout {
@@ -142,7 +154,7 @@ func RemovePath(path string) error {
 			_ = removeBlockingExe(lastErr)
 		}
 
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)

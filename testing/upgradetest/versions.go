@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
@@ -30,19 +31,25 @@ var (
 	Version_8_10_0_SNAPSHOT = version.NewParsedSemVer(8, 10, 0, "SNAPSHOT", "")
 	// Version_8_11_0_SNAPSHOT is the minimum version for uninstall command to kill the watcher upon uninstall
 	Version_8_11_0_SNAPSHOT = version.NewParsedSemVer(8, 11, 0, "SNAPSHOT", "")
+	// Version_8_13_0_SNAPSHOT is the minimum version for testing upgrading agent with the same hash
+	Version_8_13_0_SNAPSHOT = version.NewParsedSemVer(8, 13, 0, "SNAPSHOT", "")
 	// Version_8_13_0 is the minimum version for proper unprivileged execution
 	Version_8_13_0 = version.NewParsedSemVer(8, 13, 0, "", "")
 )
 
 // GetUpgradableVersions returns the version that the upgradeToVersion can upgrade from.
-func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int) ([]*version.ParsedSemVer, error) {
-	aac := tools.NewArtifactAPIClient()
+func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int, t *testing.T) ([]*version.ParsedSemVer, error) {
+	aac := tools.NewArtifactAPIClient(t)
 	vList, err := aac.GetVersions(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving versions from Artifact API: %w", err)
 	}
 	if len(vList.Versions) == 0 {
 		return nil, errors.New("retrieved versions list from Artifact API is empty")
+	}
+	err = aac.RemoveUnreleasedVersions(ctx, vList)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove unreleased versions: %w", err)
 	}
 
 	return getUpgradableVersions(ctx, vList, upgradeToVersion, currentMajorVersions, previousMajorVersions)
@@ -128,8 +135,8 @@ func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgrad
 // PreviousMinor gets the previous minor version of the provided version.
 //
 // This checks with the artifact API to ensure to only return version that have actual builds.
-func PreviousMinor(ctx context.Context, version string) (string, error) {
-	versions, err := GetUpgradableVersions(ctx, version, 1, 0)
+func PreviousMinor(ctx context.Context, version string, t *testing.T) (string, error) {
+	versions, err := GetUpgradableVersions(ctx, version, 1, 0, t)
 	if err != nil {
 		return "", err
 	}
