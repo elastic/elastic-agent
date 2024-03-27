@@ -1,0 +1,140 @@
+# For more information refer to https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-managed-by-fleet.html
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: elastic-agent
+  labels:
+    app: elastic-agent
+spec:
+  selector:
+    matchLabels:
+      app: elastic-agent
+  template:
+    metadata:
+      labels:
+        app: elastic-agent
+    spec:
+      # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
+      # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      serviceAccountName: elastic-agent
+      hostNetwork: true
+      # 'hostPID: true' enables the Elastic Security integration to observe all process exec events on the host.
+      # Sharing the host process ID namespace gives visibility of all processes running on the same host.
+      hostPID: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: elastic-agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- if .Values.env }}
+            {{- toYaml .Values.env | nindent 12 }}
+            {{- end}}
+            - name: FLEET_ENROLLMENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: elastic-agent
+                  key: FLEET_ENROLLMENT_TOKEN
+            # Set to 1 for enrollment into Fleet server. If not set, Elastic Agent is run in standalone mode
+            - name: FLEET_ENROLL
+              value: "1"
+            # Set to true to communicate with Fleet with either insecure HTTP or unverified HTTPS
+            - name: FLEET_INSECURE
+              value: "true"
+            # Fleet Server URL to enroll the Elastic Agent into
+            # FLEET_URL can be found in Kibana, go to Management > Fleet > Settings
+            - name: FLEET_URL
+              value: {{ .Values.config.fleetUrl }}
+            - name: KIBANA_HOST
+              value: {{ .Values.config.kibanaHost }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          securityContext:
+            runAsUser: 0
+          resources:
+            limits:
+              memory: 500Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+            - name: proc
+              mountPath: /hostfs/proc
+              readOnly: true
+            - name: cgroup
+              mountPath: /hostfs/sys/fs/cgroup
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: etc-kubernetes
+              mountPath: /hostfs/etc/kubernetes
+              readOnly: true
+            - name: var-lib
+              mountPath: /hostfs/var/lib
+              readOnly: true
+            - name: passwd
+              mountPath: /hostfs/etc/passwd
+              readOnly: true
+            - name: group
+              mountPath: /hostfs/etc/group
+              readOnly: true
+            - name: etcsysmd
+              mountPath: /hostfs/etc/systemd
+              readOnly: true
+            - name: etc-mid
+              mountPath: /etc/machine-id
+              readOnly: true
+      volumes:
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: varlog
+          hostPath:
+            path: /var/log
+        # Needed for cloudbeat
+        - name: etc-kubernetes
+          hostPath:
+            path: /etc/kubernetes
+        # Needed for cloudbeat
+        - name: var-lib
+          hostPath:
+            path: /var/lib
+        # Needed for cloudbeat
+        - name: passwd
+          hostPath:
+            path: /etc/passwd
+        # Needed for cloudbeat
+        - name: group
+          hostPath:
+            path: /etc/group
+        # Needed for cloudbeat
+        - name: etcsysmd
+          hostPath:
+            path: /etc/systemd
+        # Mount /etc/machine-id from the host to determine host ID
+        # Needed for Elastic Security integration
+        - name: etc-mid
+          hostPath:
+            path: /etc/machine-id
+            type: File

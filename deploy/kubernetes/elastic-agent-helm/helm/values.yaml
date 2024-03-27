@@ -1,0 +1,21 @@
+image:
+  repository: docker.elastic.co/beats/elastic-agent
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "8.12.2"
+config:
+  fleetUrl: "https://abcd123.fleet.cloud.es.io:443"
+  kibanaHost: "http://kibana:5601"
+# custom environment variables
+env: []
+  # - name: HTTP_PROXY
+  #   value: "http://127.0.0.1:3128"
+extraDeploy: []
+  # - |
+  #   apiVersion: v1
+  #   kind: Secret
+  #   type: Opaque
+  #   metadata:
+  #     name: elastic-agent
+  #   stringData:
+  #     FLEET_ENROLLMENT_TOKEN: xxx # get enrolment token from fleet policy
