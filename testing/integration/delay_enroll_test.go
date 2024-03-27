@@ -63,8 +63,9 @@ func TestDelayEnroll(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		DelayEnroll:    true,
+		EnrollOpts:     atesting.EnrollOpts{DelayEnroll: true},
 	}
+
 	// Install the Elastic-Agent with the policy that was just
 	// created.
 	_, err = tools.InstallAgentWithPolicy(
@@ -83,5 +84,4 @@ func TestDelayEnroll(t *testing.T) {
 
 	// check to make sure enroll worked
 	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
-
 }
