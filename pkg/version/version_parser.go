@@ -107,26 +107,11 @@ func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 	return false
 }
 
-func (psv ParsedSemVer) GetPreviousMinor() (*ParsedSemVer, error) {
-	major := psv.Major()
-	minor := psv.Minor()
 
-	if minor > 0 {
-		// We have at least one previous minor version in the current
-		// major version series. Set the patch to zero to guarnatee the
-		// version exists, the number of patch releases varies.
-		return NewParsedSemVer(major, minor-1, 0, psv.Prerelease(), psv.BuildMetadata()), nil
 	}
 
-	// We are at the first minor of the current major version series. To
-	// figure out the previous minor, we need to rely on knowledge of
-	// the release versions from the past major series'.
-	switch major {
-	case 8:
-		return NewParsedSemVer(7, 17, 10, psv.Prerelease(), psv.BuildMetadata()), nil
 	}
 
-	return nil, fmt.Errorf("unable to determine previous minor version for [%s]", psv.String())
 }
 
 func (psv ParsedSemVer) String() string {
