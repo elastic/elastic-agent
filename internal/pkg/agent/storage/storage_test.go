@@ -188,7 +188,6 @@ func TestDiskStore(t *testing.T) {
 
 		r, err := d.Load()
 		require.NoError(t, err)
-		defer r.Close()
 
 		content, err := io.ReadAll(r)
 		require.NoError(t, err)

@@ -43,7 +43,6 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
 
 	b, err := io.ReadAll(r)
 	if err != nil {
@@ -100,7 +99,6 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer nr.Close()
 
 	b, err = io.ReadAll(nr)
 	if err != nil {
