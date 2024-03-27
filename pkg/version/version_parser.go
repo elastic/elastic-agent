@@ -8,16 +8,19 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
 
 // regexp taken from https://semver.org/ (see the FAQ section/Is there a suggested regular expression (RegEx) to check a SemVer string?)
 const semVerFormat = `^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+const numericPrereleaseTokenFormat = `\d+`
 const preReleaseSeparator = "-"
 const metadataSeparator = "+"
 
 var semVerFmtRegEx *regexp.Regexp
+var numericPrerelaseTokenRegEx *regexp.Regexp
 var namedGroups map[string]int
 
 func init() {
@@ -28,6 +31,9 @@ func init() {
 	for i, groupName := range groups {
 		namedGroups[groupName] = i
 	}
+
+	// compile the numeric prerelease token regex
+	numericPrerelaseTokenRegEx = regexp.MustCompile(numericPrereleaseTokenFormat)
 }
 
 var ErrNoMatch = errors.New("version string does not match expected format")
@@ -80,7 +86,8 @@ func (psv ParsedSemVer) VersionWithPrerelease() string {
 }
 
 func (psv ParsedSemVer) IsSnapshot() bool {
-	return psv.prerelease == "SNAPSHOT" || strings.HasSuffix(psv.prerelease, "-SNAPSHOT")
+	prereleaseTokens := strings.Split(psv.prerelease, ".")
+	return slices.Contains(prereleaseTokens, "SNAPSHOT")
 }
 
 func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
@@ -99,19 +106,66 @@ func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 		return psv.patch < other.patch
 	}
 
-	// last resort check if one is prereleas and the other isn't
+	// compare prerelease strings as major.minor.patch are equal
+	return psv.comparePrerelease(other)
+}
+
+// comparePrerelease compares the prerelease part of 2 ParsedSemVer objects
+// the return value must conform to psv.prerelease < other.prerelease following comparison rules from https://semver.org/
+func (psv ParsedSemVer) comparePrerelease(other ParsedSemVer) bool {
+	// last resort before parsing prerelease: check if one is prerelease and the other isn't
 	if psv.prerelease != "" && other.prerelease == "" {
 		return true
 	}
 
-	return false
-}
-
-
+	if psv.prerelease == "" && other.prerelease != "" {
+		return false
 	}
 
+	// tokenize prereleases and compare them
+	prereleaseTokens := strings.Split(psv.prerelease, ".")
+	otherPrereleaseTokens := strings.Split(other.prerelease, ".")
+
+	// compute the min amount of tokens
+	minPrereleaseTokens := len(prereleaseTokens)
+	if len(otherPrereleaseTokens) < minPrereleaseTokens {
+		minPrereleaseTokens = len(otherPrereleaseTokens)
 	}
 
+	for i := 0; i < minPrereleaseTokens; i++ {
+		token := prereleaseTokens[i]
+		otherToken := otherPrereleaseTokens[i]
+
+		isTokenNumeric := numericPrerelaseTokenRegEx.MatchString(token)
+		isOtherTokenNumeric := numericPrerelaseTokenRegEx.MatchString(otherToken)
+
+		// numeric identifiers always have lower precedence than non-numeric identifiers
+		if isTokenNumeric && !isOtherTokenNumeric {
+			return true
+		}
+
+		if !isTokenNumeric && isOtherTokenNumeric {
+			return false
+		}
+
+		// prerelease tokens are of the same type: check if we have to compare them as numbers or strings
+		if isTokenNumeric {
+			// we can ignore the error as the regex we are using is even more restrictive than a generic integer regex
+			numericToken, _ := strconv.Atoi(token)
+			otherNumericToken, _ := strconv.Atoi(otherToken)
+			if numericToken != otherNumericToken {
+				return numericToken < otherNumericToken
+			}
+		} else {
+			// compare them as strings
+			if token != otherToken {
+				return token < otherToken
+			}
+		}
+	}
+
+	// the minimum number of tokens is the same across the two versions, check if one of the two have more tokens
+	return len(prereleaseTokens) < len(otherPrereleaseTokens)
 }
 
 func (psv ParsedSemVer) String() string {

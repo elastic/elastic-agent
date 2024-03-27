@@ -274,7 +274,12 @@ func TestIsSnapshot(t *testing.T) {
 		},
 		{
 			name:     "Emergency release snapshot is actually a snapshot",
-			input:    "8.8.0-er.1-SNAPSHOT ",
+			input:    "8.8.0-SNAPSHOT.er.1 ",
+			snapshot: true,
+		},
+		{
+			name:     "Emergency release with SNAPSHOT in the middle is actually a snapshot",
+			input:    "8.8.0-er.SNAPSHOT.1 ",
 			snapshot: true,
 		},
 	}
@@ -298,6 +303,7 @@ func TestLess(t *testing.T) {
 		rightVersion string
 		less         bool
 	}{
+		// major, minor, patch section
 		{
 			name:         "major version less than ours",
 			leftVersion:  "7.17.10",
@@ -316,10 +322,23 @@ func TestLess(t *testing.T) {
 			rightVersion: "8.7.1",
 			less:         true,
 		},
+		// prerelease section
 		{
 			name:         "prerelease is always less than non-prerelease",
 			leftVersion:  "8.9.0-SNAPSHOT",
 			rightVersion: "8.9.0",
+			less:         true,
+		},
+		{
+			name:         "2 prereleases are compared by their tokens",
+			leftVersion:  "8.9.0-SNAPSHOT",
+			rightVersion: "8.9.0-er1",
+			less:         false,
+		},
+		{
+			name:         "2 prereleases are compared by their tokens, reversed",
+			leftVersion:  "8.9.0-er1",
+			rightVersion: "8.9.0-SNAPSHOT",
 			less:         true,
 		},
 		{
@@ -328,12 +347,7 @@ func TestLess(t *testing.T) {
 			rightVersion: "8.9.0-er1",
 			less:         false,
 		},
-		{
-			name:         "2 prereleases have no specific order, reversed",
-			leftVersion:  "8.9.0-er1",
-			rightVersion: "8.9.0-SNAPSHOT",
-			less:         false,
-		},
+		// build metadata (these have no impact on precedence)
 		{
 			name:         "build metadata have no influence on precedence",
 			leftVersion:  "8.9.0-SNAPSHOT+aaaaaa",
@@ -346,6 +360,50 @@ func TestLess(t *testing.T) {
 			rightVersion: "8.9.0-SNAPSHOT+aaaaaa",
 			less:         false,
 		},
+		// testcases taken from semver.org
+		// 1.0.0-alpha < 1.0.0-alpha.1 < 1.0.0-alpha.beta < 1.0.0-beta < 1.0.0-beta.2 < 1.0.0-beta.11 < 1.0.0-rc.1 < 1.0.0.
+		{
+			name:         "prerelease with fewer tokens is less than same prerelease with extra tokens",
+			leftVersion:  "1.0.0-alpha",
+			rightVersion: "1.0.0-alpha.1",
+			less:         true,
+		},
+		{
+			name:         "numeric identifiers always have lower precedence than non-numeric identifiers",
+			leftVersion:  "1.0.0-alpha.1",
+			rightVersion: "1.0.0-alpha.beta",
+			less:         true,
+		},
+		{
+			name:         "minimum number of prerelease string tokens must be compared alphabetically",
+			leftVersion:  "1.0.0-alpha.beta",
+			rightVersion: "1.0.0-beta",
+			less:         true,
+		},
+		{
+			name:         "prerelease with fewer tokens is less than same prerelease with extra tokens #2",
+			leftVersion:  "1.0.0-beta",
+			rightVersion: "1.0.0-beta.2",
+			less:         true,
+		},
+		{
+			name:         "numeric identifiers must be compared numerically",
+			leftVersion:  "1.0.0-beta.2",
+			rightVersion: "1.0.0-beta.11",
+			less:         true,
+		},
+		{
+			name:         "string identifiers are compared lexically",
+			leftVersion:  "1.0.0-beta.11",
+			rightVersion: "1.0.0-rc.1",
+			less:         true,
+		},
+		{
+			name:         "prerelease versions have lower precedence than non-prerelease version ",
+			leftVersion:  "1.0.0-rc.1",
+			rightVersion: "1.0.0",
+			less:         true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -356,7 +414,7 @@ func TestLess(t *testing.T) {
 			right, err := ParseVersion(tc.rightVersion)
 			require.NoError(t, err)
 			require.NotNil(t, right)
-			assert.Equal(t, left.Less(*right), tc.less)
+			assert.Equalf(t, tc.less, left.Less(*right), "Expected %s < %s = %v", tc.leftVersion, tc.rightVersion, tc.less)
 		})
 	}
 }
