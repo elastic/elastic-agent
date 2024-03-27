@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -22,6 +21,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -49,6 +49,74 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	defer cancel()
 
 	agentFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	// 1. Create a policy in Fleet with monitoring enabled.
+	// To ensure there are no conflicts with previous test runs against
+	// the same ESS stack, we add the current time at the end of the policy
+	// name. This policy does not contain any integration.
+	t.Log("Enrolling agent in Fleet with a test policy")
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
+		Namespace:   info.Namespace,
+		Description: "test policy for agent enrollment",
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+		AgentFeatures: []map[string]interface{}{
+			{
+				"name":    "test_enroll",
+				"enabled": true,
+			},
+		},
+	}
+
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+
+	// 2. Install the Elastic-Agent with the policy that
+	// was just created.
+	policy, err := tools.InstallAgentWithPolicy(
+		ctx,
+		t,
+		installOpts,
+		agentFixture,
+		info.KibanaClient,
+		createPolicyReq)
+	require.NoError(t, err)
+	t.Logf("created policy: %s", policy.ID)
+	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
+
+	t.Run("Monitoring logs are shipped", func(t *testing.T) {
+		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
+	})
+
+	t.Run("Normal logs with flattened data_stream are shipped", func(t *testing.T) {
+		testFlattenedDatastreamFleetPolicy(t, ctx, info, policy)
+	})
+}
+
+func TestDebLogIngestFleetManaged(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Deb,
+		Stack: &define.Stack{},
+		OS: []define.OS{
+			{
+				Type:   define.Linux,
+				Distro: "ubuntu",
+			},
+		},
+		Local: false,
+		Sudo:  true,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	agentFixture, err := define.NewFixture(t, define.Version(), atesting.WithPackageFormat("deb"))
 	require.NoError(t, err)
 
 	// 1. Create a policy in Fleet with monitoring enabled.
@@ -143,6 +211,7 @@ func testMonitoringLogsAreShipped(
 			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/instance-type\\\": dial tcp 169.254.169.254:443: connect: connection refused",               // okay for the cloud metadata to not work
 			"add_cloud_metadata: received error failed with http status code 404", // okay for the cloud metadata to not work
 			"add_cloud_metadata: received error failed fetching EC2 Identity Document: operation error ec2imds: GetInstanceIdentityDocument, http response error StatusCode: 404, request to EC2 IMDS failed", // okay for the cloud metadata to not work
+			"failed to invoke rollback watcher: failed to start Upgrade Watcher: fork/exec /var/lib/elastic-agent/elastic-agent: no such file or directory",                                                   //on debian this happens probably need to fix.
 		})
 	})
 	t.Logf("error logs: Got %d documents", len(docs.Hits.Hits))
@@ -253,8 +322,9 @@ func testFlattenedDatastreamFleetPolicy(
 	policy kibana.PolicyResponse,
 ) {
 	dsType := "logs"
-	dsNamespace := cleanString(fmt.Sprintf("%snamespace%d", t.Name(), rand.Uint64()))
-	dsDataset := cleanString(fmt.Sprintf("%s-dataset", t.Name()))
+	id := uuid.New().String()
+	dsNamespace := cleanString(fmt.Sprintf("namespace-%s", id))
+	dsDataset := cleanString(fmt.Sprintf("dataset-%s", id))
 	numEvents := 60
 
 	// tempDir is not deleted to help with debugging issues

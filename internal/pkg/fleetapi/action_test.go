@@ -152,6 +152,29 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		assert.Equal(t, "http://example.com", action.Data.SourceURI)
 		assert.Equal(t, 1, action.Data.Retry)
 	})
+	t.Run("ActionDiagnostics with no additional metrics", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"REQUEST_DIAGNOSTICS","data":{}}]`)
+		a := &Actions{}
+		err := a.UnmarshalJSON(p)
+		require.Nil(t, err)
+		action, ok := (*a)[0].(*ActionDiagnostics)
+		require.True(t, ok, "unable to cast action to specific type")
+		assert.Equal(t, "testid", action.ActionID)
+		assert.Equal(t, ActionTypeDiagnostics, action.ActionType)
+		assert.Empty(t, action.AdditionalMetrics)
+	})
+	t.Run("ActionDiagnostics with additional CPU metrics", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"REQUEST_DIAGNOSTICS","data":{"additional_metrics":["CPU"]}}]`)
+		a := &Actions{}
+		err := a.UnmarshalJSON(p)
+		require.Nil(t, err)
+		action, ok := (*a)[0].(*ActionDiagnostics)
+		require.True(t, ok, "unable to cast action to specific type")
+		assert.Equal(t, "testid", action.ActionID)
+		assert.Equal(t, ActionTypeDiagnostics, action.ActionType)
+		require.Len(t, action.AdditionalMetrics, 1)
+		assert.Equal(t, "CPU", action.AdditionalMetrics[0])
+	})
 }
 
 func TestActionUnenrollMarshalMap(t *testing.T) {

@@ -24,12 +24,15 @@ type fleetConfig struct {
 	TokenPolicyName string        `config:"token_policy_name"`
 	URL             string        `config:"url"`
 	DaemonTimeout   time.Duration `config:"daemon_timeout"`
+	Cert            string        `config:"cert"`
+	CertKey         string        `config:"cert_key"`
 }
 
 type fleetServerConfig struct {
 	Cert           string              `config:"cert"`
 	CertKey        string              `config:"cert_key"`
 	PassphrasePath string              `config:"key_passphrase_path"`
+	ClientAuth     string              `config:"client_authentication"`
 	Elasticsearch  elasticsearchConfig `config:"elasticsearch"`
 	Enable         bool                `config:"enable"`
 	Host           string              `config:"host"`
@@ -47,6 +50,8 @@ type elasticsearchConfig struct {
 	ServiceToken         string `config:"service_token"`
 	ServiceTokenPath     string `config:"service_token_path"`
 	Insecure             bool   `config:"insecure"`
+	Cert                 string `config:"cert"`
+	CertKey              string `config:"cert_key"`
 }
 
 type kibanaConfig struct {
@@ -87,11 +92,14 @@ func defaultAccessConfig() (setupConfig, error) {
 			TokenPolicyName: envWithDefault("", "FLEET_TOKEN_POLICY_NAME"),
 			URL:             envWithDefault("", "FLEET_URL"),
 			DaemonTimeout:   envTimeout("FLEET_DAEMON_TIMEOUT"),
+			Cert:            envWithDefault("", "ELASTIC_AGENT_CERT"),
+			CertKey:         envWithDefault("", "ELASTIC_AGENT_CERT_KEY"),
 		},
 		FleetServer: fleetServerConfig{
 			Cert:           envWithDefault("", "FLEET_SERVER_CERT"),
 			CertKey:        envWithDefault("", "FLEET_SERVER_CERT_KEY"),
 			PassphrasePath: envWithDefault("", "FLEET_SERVER_CERT_KEY_PASSPHRASE"),
+			ClientAuth:     envWithDefault("none", "FLEET_SERVER_CLIENT_AUTH"),
 			Elasticsearch: elasticsearchConfig{
 				Host:                 envWithDefault("http://elasticsearch:9200", "FLEET_SERVER_ELASTICSEARCH_HOST", "ELASTICSEARCH_HOST"),
 				ServiceToken:         envWithDefault("", "FLEET_SERVER_SERVICE_TOKEN"),
@@ -99,6 +107,8 @@ func defaultAccessConfig() (setupConfig, error) {
 				CA:                   envWithDefault("", "FLEET_SERVER_ELASTICSEARCH_CA", "ELASTICSEARCH_CA"),
 				CATrustedFingerprint: envWithDefault("", "FLEET_SERVER_ELASTICSEARCH_CA_TRUSTED_FINGERPRINT"),
 				Insecure:             envBool("FLEET_SERVER_ELASTICSEARCH_INSECURE"),
+				Cert:                 envWithDefault("", "FLEET_SERVER_ES_CERT"),
+				CertKey:              envWithDefault("", "FLEET_SERVER_ES_CERT_KEY"),
 			},
 			Enable:       envBool("FLEET_SERVER_ENABLE"),
 			Host:         envWithDefault("", "FLEET_SERVER_HOST"),

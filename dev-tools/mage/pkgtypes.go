@@ -92,6 +92,7 @@ type PackageSpec struct {
 	Description       string                 `yaml:"description,omitempty"`
 	PreInstallScript  string                 `yaml:"pre_install_script,omitempty"`
 	PostInstallScript string                 `yaml:"post_install_script,omitempty"`
+	PostRmScript      string                 `yaml:"post_rm_script,omitempty"`
 	Files             map[string]PackageFile `yaml:"files"`
 	Qualifier         string                 `yaml:"qualifier,omitempty"`   // Optional
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
@@ -101,6 +102,7 @@ type PackageSpec struct {
 	packageDir             string
 	localPreInstallScript  string
 	localPostInstallScript string
+	localPostRmScript      string
 }
 
 // PackageFile represents a file or directory within a package.
@@ -390,6 +392,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 	s.Description = mustExpand(s.Description)
 	s.PreInstallScript = mustExpand(s.PreInstallScript)
 	s.PostInstallScript = mustExpand(s.PostInstallScript)
+	s.PostRmScript = mustExpand(s.PostRmScript)
 	s.OutputFile = mustExpand(s.OutputFile)
 
 	if s.ServiceName == "" {
@@ -454,6 +457,9 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		panic(err)
 	}
 	if err := copyInstallScript(s, s.PostInstallScript, &s.localPostInstallScript); err != nil {
+		panic(err)
+	}
+	if err := copyInstallScript(s, s.PostRmScript, &s.localPostRmScript); err != nil {
 		panic(err)
 	}
 
@@ -775,6 +781,9 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 	if spec.localPostInstallScript != "" {
 		args = append(args, "--after-install", spec.localPostInstallScript)
+	}
+	if spec.localPostRmScript != "" {
+		args = append(args, "--after-remove", spec.localPostRmScript)
 	}
 	for _, pf := range spec.Files {
 		if pf.Config {

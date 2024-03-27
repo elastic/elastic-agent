@@ -35,6 +35,14 @@ func agentGlobalConfig() (map[string]interface{}, error) {
 		return nil, err
 	}
 
+	nativeArch := hostInfo.Info().NativeArchitecture
+	if nativeArch == "x86_64" {
+		nativeArch = "amd64"
+	}
+	if nativeArch == "aarch64" {
+		nativeArch = "arm64"
+	}
+
 	return map[string]interface{}{
 		"path": map[string]interface{}{
 			"data":   paths.Data(),
@@ -47,6 +55,7 @@ func agentGlobalConfig() (map[string]interface{}, error) {
 		},
 		"runtime.os":             runtime.GOOS,
 		"runtime.arch":           runtime.GOARCH,
+		"runtime.native_arch":    nativeArch,
 		"runtime.osinfo.type":    hostInfo.Info().OS.Type,
 		"runtime.osinfo.family":  hostInfo.Info().OS.Family,
 		"runtime.osinfo.version": hostInfo.Info().OS.Version,

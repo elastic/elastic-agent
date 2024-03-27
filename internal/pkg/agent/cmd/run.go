@@ -26,6 +26,7 @@ import (
 	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent-system-metrics/report"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -88,7 +89,11 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	// feature of the Elastic Agent. On Mac OS root privileges are required to perform the disk
 	// store encryption, by setting this flag it disables that feature and allows the Elastic Agent to
 	// run as non-root.
+	//
+	// Deprecated: MacOS can be run/installed without root privileges
 	cmd.Flags().Bool("disable-encrypted-store", false, "Disable the encrypted disk storage (Only useful on Mac OS)")
+	_ = cmd.Flags().MarkHidden("disable-encrypted-store")
+	_ = cmd.Flags().MarkDeprecated("disable-encrypted-store", "agent on Mac OS can be run/installed without root privileges, see elastic-agent install --help")
 
 	// --testing-mode is a hidden flag that spawns the Elastic Agent in testing mode
 	// it is hidden because we really don't want users to execute Elastic Agent to run
@@ -162,6 +167,12 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 
 	l.Infow("Elastic Agent started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion())
 
+	// try early to check if running as root
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to check for root/Administrator privileges: %w", err)
+	}
+
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
 		err = errors.New(err, "failed to perform delayed enrollment")
@@ -169,12 +180,6 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 		return err
 	}
 	pathConfigFile := paths.AgentConfigFile()
-
-	// try early to check if running as root
-	isRoot, err := utils.HasRoot()
-	if err != nil {
-		return fmt.Errorf("failed to check for root permissions: %w", err)
-	}
 
 	// agent ID needs to stay empty in bootstrap mode
 	createAgentID := !runAsOtel
@@ -186,7 +191,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// The secret is not created here if it exists already from the previous enrollment.
 	// This is needed for compatibility with agent running in standalone mode,
 	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
-	err = secret.CreateAgentSecret(ctx)
+	err = secret.CreateAgentSecret(ctx, vault.WithUnprivileged(!isRoot))
 	if err != nil {
 		return fmt.Errorf("failed to read/write secrets: %w", err)
 	}
@@ -436,7 +441,10 @@ func getOverwrites(ctx context.Context, rawConfig *config.Config) error {
 		return nil
 	}
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(ctx, path)
+	store, err := storage.NewEncryptedDiskStore(ctx, path)
+	if err != nil {
+		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
 
 	reader, err := store.Load()
 	if err != nil && errors.Is(err, os.ErrNotExist) {
