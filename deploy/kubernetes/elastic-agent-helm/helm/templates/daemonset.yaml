@@ -35,11 +35,16 @@ spec:
             {{- if .Values.env }}
             {{- toYaml .Values.env | nindent 12 }}
             {{- end}}
+            {{- if .Values.config.enrollmentToken }}
+            - name: FLEET_ENROLLMENT_TOKEN
+              value: {{.Values.config.enrollmentToken}}
+            {{- else}}
             - name: FLEET_ENROLLMENT_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: elastic-agent
                   key: FLEET_ENROLLMENT_TOKEN
+            {{- end}}
             # Set to 1 for enrollment into Fleet server. If not set, Elastic Agent is run in standalone mode
             - name: FLEET_ENROLL
               value: "1"

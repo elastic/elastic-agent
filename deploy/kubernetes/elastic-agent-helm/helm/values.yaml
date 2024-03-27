@@ -6,6 +6,8 @@ image:
 config:
   fleetUrl: "https://abcd123.fleet.cloud.es.io:443"
   kibanaHost: "http://kibana:5601"
+  # Please provide elastic-agent secret if enrollment token is empty
+  enrollmentToken: ""
 # custom environment variables
 env: []
   # - name: HTTP_PROXY
