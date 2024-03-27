@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -84,7 +85,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	progBar := install.CreateAndStartNewSpinner(streams.Out, "Uninstalling Elastic Agent...")
 
-	log, logBuff := logger.NewInMemory("uninstall")
+	log, logBuff := logger.NewInMemory("uninstall", logp.ConsoleEncoderConfig())
 	defer func() {
 		if err == nil {
 			return

@@ -75,12 +75,12 @@ func NewWithoutConfig(name string) *Logger {
 
 // NewInMemory returns a new in-memory logger along with the buffer to which i
 // logs.
-// This logger utilizes a console format; for details, refer to
-// ecszap.ECSCompatibleEncoderConfig and logp.ConsoleEncoderConfig.
-func NewInMemory(selector string) (*Logger, *bytes.Buffer) {
+// encCfg configures the log format, use logp.ConsoleEncoderConfig for console
+// format, logp.JSONEncoderConfig for JSON or any other valid zapcore.EncoderConfig.
+func NewInMemory(selector string, encCfg zapcore.EncoderConfig) (*Logger, *bytes.Buffer) {
 	buff := bytes.Buffer{}
 
-	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.ConsoleEncoderConfig())
+	encoderConfig := ecszap.ECSCompatibleEncoderConfig(encCfg)
 	encoderConfig.EncodeTime = UtcTimestampEncode
 	encoder := zapcore.NewConsoleEncoder(encoderConfig)
 

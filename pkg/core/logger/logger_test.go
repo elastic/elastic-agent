@@ -60,7 +60,7 @@ func Test_SetLevel(t *testing.T) {
 }
 
 func TestNewInMemory(t *testing.T) {
-	log, buff := NewInMemory("in_memory")
+	log, buff := NewInMemory("in_memory", logp.ConsoleEncoderConfig())
 
 	log.Debugw("a debug message", "debug_key", "debug_val")
 	log.Infow("a info message", "info_key", "info_val")
