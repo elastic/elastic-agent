@@ -14,7 +14,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -193,28 +192,13 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	progBar := install.CreateAndStartNewSpinner(streams.Out, "Installing Elastic Agent...")
 
-	logCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	logCfg.Level = logp.DebugLevel
-	// Using in memory logger, so we don't write logs to the
-	// directory we are trying to delete
-	logp.ToObserverOutput()(&logCfg)
-
-	err = logp.Configure(logCfg)
-	if err != nil {
-		return fmt.Errorf("error creating logging config: %w", err)
-	}
-
-	log := logger.NewWithoutConfig("")
-
+	log, logBuff := logger.NewInMemory("install")
 	defer func() {
 		if err == nil {
 			return
 		}
-		oLogs := logp.ObserverLogs().TakeAll()
 		fmt.Fprintf(os.Stderr, "Error uninstalling. Printing logs\n")
-		for _, oLog := range oLogs {
-			fmt.Fprintf(os.Stderr, "%v\n", oLog.Entry)
-		}
+		fmt.Fprintf(os.Stderr, logBuff.String())
 	}()
 
 	var ownership utils.FileOwner
