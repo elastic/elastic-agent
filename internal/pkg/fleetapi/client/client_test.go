@@ -188,7 +188,7 @@ func TestElasticApiVersion(t *testing.T) {
 		defer cancel()
 
 		mux := http.NewServeMux()
-		mux.HandleFunc("/someotheroperationreturnsbadrequest", func(writer http.ResponseWriter, request *http.Request) {
+		mux.HandleFunc("/genericbadrequest", func(writer http.ResponseWriter, request *http.Request) {
 			assert.Equal(t, request.Header.Get(elasticApiVersionHeaderKey), defaultFleetApiVersion)
 			// request return a 400 with the defaultFleetApiVersion (just testing that we don't log that as a downgrade request)
 			writer.Header().Add(elasticApiVersionHeaderKey, defaultFleetApiVersion)
@@ -205,7 +205,7 @@ func TestElasticApiVersion(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		resp, err := clt.Send(ctx, http.MethodGet, "/someotheroperationreturnsbadrequest", nil, nil, nil)
+		resp, err := clt.Send(ctx, http.MethodGet, "/genericbadrequest", nil, nil, nil)
 		if assert.NoError(t, err) {
 			defer resp.Body.Close()
 		}
