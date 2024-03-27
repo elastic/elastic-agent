@@ -231,8 +231,8 @@ func (ad *ActionDispatcher) dispatchCancelActions(ctx context.Context, actions [
 func (ad *ActionDispatcher) gatherQueuedActions(ts time.Time) (queued, expired []fleetapi.Action) {
 	actions := ad.queue.DequeueActions()
 	for _, action := range actions {
-		exp, _ := action.Expiration()
-		if ts.After(exp) {
+		exp, err := action.Expiration()
+		if (err == nil || !errors.Is(err, fleetapi.ErrNoExpiration)) && ts.After(exp) {
 			expired = append(expired, action)
 			continue
 		}
