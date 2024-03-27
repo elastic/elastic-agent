@@ -447,20 +447,36 @@ func (r *Runner) validate() error {
 
 // getBuilds returns the build for the batch.
 func (r *Runner) getBuilds(b OSBatch) []Build {
-	builds := []Build{}
+	var builds []Build
 	formats := []string{"targz", "zip", "rpm", "deb"}
 	binaryName := "elastic-agent"
 
+	var packages []string
+	for _, p := range r.cfg.Packages {
+		if slices.Contains(formats, p) {
+			packages = append(packages, p)
+		}
+	}
+	if len(packages) == 0 {
+		packages = formats
+	}
+
 	// This is for testing beats in serverless environment
 	if strings.HasSuffix(r.cfg.BinaryName, "beat") {
-		formats = []string{"targz", "zip"}
+		var serverlessPackages []string
+		for _, p := range packages {
+			if slices.Contains([]string{"targz", "zip"}, p) {
+				packages = append(packages, p)
+			}
+		}
+		packages = serverlessPackages
 	}
 
 	if r.cfg.BinaryName != "" {
 		binaryName = r.cfg.BinaryName
 	}
 
-	for _, f := range formats {
+	for _, f := range packages {
 		arch := b.OS.Arch
 		if arch == define.AMD64 {
 			arch = "x86_64"
