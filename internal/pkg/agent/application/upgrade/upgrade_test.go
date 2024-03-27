@@ -22,6 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -32,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/mocks"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 func Test_CopyFile(t *testing.T) {
@@ -901,5 +903,53 @@ func writeState(t *testing.T, path string, state details.State) {
 	if assert.NoError(t, err, "error marshaling the test upgrade marker") {
 		err = os.WriteFile(path, bytes, 0770)
 		assert.NoError(t, err, "error writing out the test upgrade marker")
+	}
+}
+
+func Test_selectWatcherExecutable(t *testing.T) {
+	type args struct {
+		previous agentInstall
+		current  agentInstall
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Simple upgrade, we should launch the new (current) watcher",
+			args: args{
+				previous: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
+				},
+				current: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+				},
+			},
+			want: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+		},
+		{
+			name: "Simple downgrade, we should launch the previous watcher",
+			args: args{
+				previous: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+				},
+				current: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
+				},
+			},
+			want: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+		},
+	}
+	// Just need a top dir path. This test does not make any operation on the filesystem, so a temp dir path is as good as any
+	fakeTopDir := filepath.Join(t.TempDir(), "Elastic", "Agent")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, paths.BinaryPath(filepath.Join(fakeTopDir, tt.want), agentName), selectWatcherExecutable(fakeTopDir, tt.args.previous, tt.args.current), "selectWatcherExecutable(%v, %v)", tt.args.previous, tt.args.current)
+		})
 	}
 }
