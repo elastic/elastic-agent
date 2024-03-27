@@ -14,7 +14,7 @@ inputs:
       - UPGRADE
     runtime:
       preventions:
-        - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
+        - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == 7
           message: "Elastic Defend doesn't support RHEL7 on arm64"
         - condition: ${user.root} == false
           message: "Elastic Defend requires Elastic Agent be running as root"
@@ -79,6 +79,8 @@ inputs:
           message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
         - condition: ${runtime.native_arch} != '' and ${runtime.native_arch} != 'amd64'
           message: "Elastic Defend cannot be installed on Windows running on non-AMD64 CPU"
+        - condition: ${runtime.major} <= 6
+          message: "Elastic Defend requires Windows 10 / Server 2016 or newer."
     service:
       cport: 6788
       log:
@@ -93,7 +95,7 @@ inputs:
     proxied_actions: *proxied_actions
     runtime:
       preventions:
-        - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
+        - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == 7
           message: "No support for RHEL7 on arm64"
         - condition: ${user.root} == false
           message: "Elastic Agent must be running as root"

@@ -90,7 +90,7 @@ The variables that can be accessed by a condition are:
 - `runtime.native_arch`: the machine CPU architecture, either `"amd64"` or `"arm64"`.
 - `runtime.platform`: a string combining the OS and architecture, e.g. `"windows/amd64"`, `"darwin/arm64"`.
 - `runtime.family`: OS family, e.g. `"debian"`, `"redhat"`, `"windows"`, `"darwin"`
-- `runtime.major`, `runtime.minor`: the operating system version. Note that these are strings not integers, so they must be converted in order to use numeric comparison. For example to check if the OS major version is at most 12, use `number(runtime.major) <= 12`.
+- `runtime.major`, `runtime.minor`: the operating system version.
 - `user.root`: true if Agent is being run with root / administrator permissions.
 - `install.in_default`: true if the Agent is installed in the default location or has been installed via deb or rpm.
 
