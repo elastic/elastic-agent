@@ -23,7 +23,11 @@ func migrateActionStoreToStateStore(
 	stateDiskStore storage.Storage) (err error) {
 
 	log = log.Named("state_migration")
-	actionDiskStore := storage.NewDiskStore(actionStorePath)
+	actionDiskStore, err := storage.NewDiskStore(actionStorePath)
+	if err != nil {
+		return fmt.Errorf(
+			"could not create disk store when migratins action store: %w", err)
+	}
 
 	stateStoreExists, err := stateDiskStore.Exists()
 	if err != nil {

@@ -57,8 +57,10 @@ func TestStateStore(t *testing.T) {
 			oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
 			newStateStorePath := filepath.Join(tempDir, "state_store.yml")
 
-			newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath)
-			err := migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
+			newStateStore, err := storage.NewEncryptedDiskStore(ctx, newStateStorePath)
+			require.NoError(t, err, "failed creating EncryptedDiskStore")
+
+			err = migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
 			require.NoError(t, err, "migration action store -> state store failed")
 
 			// to load from disk a new store needs to be created, it loads the
@@ -81,7 +83,9 @@ func TestStateStore(t *testing.T) {
 			err := os.WriteFile(oldActionStorePath, []byte(""), 0600)
 			require.NoError(t, err, "could not create empty action store file")
 
-			newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath)
+			newStateStore, err := storage.NewEncryptedDiskStore(ctx, newStateStorePath)
+			require.NoError(t, err, "failed creating EncryptedDiskStore")
+
 			err = migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
 			require.NoError(t, err, "migration action store -> state store failed")
 
@@ -122,16 +126,19 @@ func TestStateStore(t *testing.T) {
 			require.NoError(t, err, "could not copy action store golden file")
 
 			newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
-			newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
+			newStateStore, err := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
 				storage.WithVaultPath(vaultPath))
+			require.NoError(t, err, "failed creating EncryptedDiskStore")
 
 			err = migrateActionStoreToStateStore(log, oldActionStorePath, newStateStore)
 			require.NoError(t, err, "migration action store -> state store failed")
 
 			// to load from disk a new store needs to be created, it loads the file
 			// to memory during the store creation.
-			newStateStore = storage.NewEncryptedDiskStore(ctx, newStateStorePath,
+			newStateStore, err = storage.NewEncryptedDiskStore(ctx, newStateStorePath,
 				storage.WithVaultPath(vaultPath))
+			require.NoError(t, err, "failed creating EncryptedDiskStore")
+
 			stateStore, err := NewStateStore(log, newStateStore)
 			require.NoError(t, err, "could not create state store")
 
@@ -199,8 +206,10 @@ func TestStateStore(t *testing.T) {
 				require.NoError(t, err, "could not read action store golden file")
 
 				encDiskStorePath := filepath.Join(tempDir, "store.enc")
-				encDiskStore := storage.NewEncryptedDiskStore(ctx, encDiskStorePath,
+				encDiskStore, err := storage.NewEncryptedDiskStore(ctx, encDiskStorePath,
 					storage.WithVaultPath(vaultPath))
+				require.NoError(t, err, "failed creating EncryptedDiskStore")
+
 				err = encDiskStore.Save(bytes.NewBuffer(yamlStorePlain))
 				require.NoError(t, err,
 					"failed saving copy of golden files on an EncryptedDiskStore")
@@ -265,8 +274,10 @@ func TestStateStore(t *testing.T) {
 				require.NoError(t, err, "could not read action store golden file")
 
 				encDiskStorePath := filepath.Join(tempDir, "store.enc")
-				encDiskStore := storage.NewEncryptedDiskStore(ctx, encDiskStorePath,
+				encDiskStore, err := storage.NewEncryptedDiskStore(ctx, encDiskStorePath,
 					storage.WithVaultPath(vaultPath))
+				require.NoError(t, err, "failed creating EncryptedDiskStore")
+
 				err = encDiskStore.Save(bytes.NewBuffer(yamlStorePlain))
 				require.NoError(t, err,
 					"failed saving copy of golden files on an EncryptedDiskStore")
@@ -332,8 +343,9 @@ func TestStateStore(t *testing.T) {
 			vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
 
 			stateStorePath := filepath.Join(tempDir, "store.enc")
-			endDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath,
+			endDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath,
 				storage.WithVaultPath(vaultPath))
+			require.NoError(t, err, "failed creating EncryptedDiskStore")
 
 			// Create and save a JSON state store
 			stateStore, err := NewStateStore(log, endDiskStore)
@@ -384,8 +396,9 @@ func TestStateStore(t *testing.T) {
 				require.NoError(t, err, "could not copy action store golden file")
 
 				newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
-				newStateStore := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
+				newStateStore, err := storage.NewEncryptedDiskStore(ctx, newStateStorePath,
 					storage.WithVaultPath(vaultPath))
+				require.NoError(t, err, "failed creating EncryptedDiskStore")
 
 				stateStore, err := newStateStoreWithMigration(log, oldActionStorePath, newStateStore)
 				require.NoError(t, err, "newStateStoreWithMigration failed")
@@ -451,8 +464,10 @@ func TestStateStore(t *testing.T) {
 				require.NoError(t, err, "could not read action store golden file")
 
 				yamlStoreEncPath := filepath.Join(tempDir, "yaml_store.enc")
-				yamlStoreEnc := storage.NewEncryptedDiskStore(ctx, yamlStoreEncPath,
+				yamlStoreEnc, err := storage.NewEncryptedDiskStore(ctx, yamlStoreEncPath,
 					storage.WithVaultPath(vaultPath))
+				require.NoError(t, err, "failed creating EncryptedDiskStore")
+
 				err = yamlStoreEnc.Save(bytes.NewBuffer(yamlStorePlain))
 				require.NoError(t, err,
 					"failed saving copy of golden files on an EncryptedDiskStore")
@@ -514,8 +529,9 @@ func TestStateStore(t *testing.T) {
 				vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
 
 				stateStorePath := filepath.Join(tempDir, "store.enc")
-				endDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath,
+				endDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath,
 					storage.WithVaultPath(vaultPath))
+				require.NoError(t, err, "failed creating EncryptedDiskStore")
 
 				// Create and save a JSON state store
 				stateStore, err := NewStateStore(log, endDiskStore)
@@ -540,8 +556,9 @@ func TestStateStore(t *testing.T) {
 				vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
 
 				stateStorePath := filepath.Join(tempDir, "store.enc")
-				endDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath,
+				endDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath,
 					storage.WithVaultPath(vaultPath))
+				require.NoError(t, err, "failed creating EncryptedDiskStore")
 
 				got, err := newStateStoreWithMigration(log, filepath.Join(tempDir, "non-existing-action-store.yaml"), endDiskStore)
 				require.NoError(t, err, "newStateStoreWithMigration failed")
@@ -563,11 +580,10 @@ func createAgentVaultAndSecret(t *testing.T, ctx context.Context, tempDir string
 	require.NoError(t, err,
 		"could not create directory for the agent's vault")
 
-	_, err = vault.New(ctx, vaultPath)
+	_, err = vault.New(ctx, vault.WithVaultPath(vaultPath))
 	require.NoError(t, err, "could not create agent's vault")
-
 	err = secret.CreateAgentSecret(
-		context.Background(), secret.WithVaultPath(vaultPath))
+		context.Background(), vault.WithVaultPath(vaultPath))
 	require.NoError(t, err, "could not create agent secret")
 
 	return vaultPath
@@ -578,7 +594,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 	t.Run("action returns empty when no action is saved on disk", func(t *testing.T) {
 		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 		require.Empty(t, store.Action())
@@ -591,7 +609,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
@@ -616,7 +636,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
@@ -630,7 +652,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.Empty(t, store.Queue())
 		require.Equal(t, ackToken, store.AckToken())
 
-		s = storage.NewDiskStore(storePath)
+		s, err = storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store1, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
@@ -649,7 +673,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
@@ -663,7 +689,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.Empty(t, store.Queue())
 		require.Equal(t, ackToken, store.AckToken())
 
-		s = storage.NewDiskStore(storePath)
+		s, err = storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store1, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
@@ -676,7 +704,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 	t.Run("errors when saving invalid action type", func(t *testing.T) {
 		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
@@ -688,7 +718,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 	t.Run("do not set action if it has the same ID", func(t *testing.T) {
 		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
@@ -719,7 +751,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			}}}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
@@ -730,7 +764,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.Empty(t, store.Action())
 		require.Len(t, store.Queue(), 1)
 
-		s = storage.NewDiskStore(storePath)
+		s, err = storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err = NewStateStore(log, s)
 		require.NoError(t, err)
 
@@ -768,7 +804,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				}}}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 
@@ -780,7 +818,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.Len(t, store.Queue(), 2)
 
 		// Load state store from disk
-		s = storage.NewDiskStore(storePath)
+		s, err = storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err = NewStateStore(log, s)
 		require.NoError(t, err, "could not load store from disk")
 
@@ -800,7 +840,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		}
 
 		storePath := filepath.Join(t.TempDir(), "state.yml")
-		s := storage.NewDiskStore(storePath)
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
 		store, err := NewStateStore(log, s)
 		require.NoError(t, err)
 		store.SetAckToken(ackToken)
@@ -829,7 +871,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				},
 			}
 
-			s := storage.NewDiskStore(storePath)
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
 			stateStore, err := NewStateStore(log, s)
 			require.NoError(t, err, "could not create disk store")
 
@@ -839,7 +883,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.NoError(t, err, "failed saving state store")
 
 			// to load from disk a new store needs to be created
-			s = storage.NewDiskStore(storePath)
+			s, err = storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
 			stateStore, err = NewStateStore(log, s)
 			require.NoError(t, err, "could not create disk store")
 
@@ -871,7 +917,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				},
 			}
 
-			s := storage.NewDiskStore(storePath)
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
 			stateStore, err := NewStateStore(log, s)
 			require.NoError(t, err, "could not create disk store")
 
@@ -881,7 +929,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.NoError(t, err, "failed saving state store")
 
 			// to load from disk a new store needs to be created
-			s = storage.NewDiskStore(storePath)
+			s, err = storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
 			stateStore, err = NewStateStore(log, s)
 			require.NoError(t, err, "could not create disk store")
 
@@ -921,7 +971,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			}
 
 			t.Logf("state store: %q", storePath)
-			s := storage.NewDiskStore(storePath)
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
 			stateStore, err := NewStateStore(log, s)
 			require.NoError(t, err, "could not create disk store")
 
@@ -931,7 +983,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.NoError(t, err, "failed saving state store")
 
 			// to load from disk a new store needs to be created
-			s = storage.NewDiskStore(storePath)
+			s, err = storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
 			stateStore, err = NewStateStore(log, s)
 			require.NoError(t, err, "could not create disk store")
 
