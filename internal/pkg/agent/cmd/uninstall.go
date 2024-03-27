@@ -91,7 +91,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			return
 		}
 		fmt.Fprintf(os.Stderr, "Error uninstalling. Printing logs\n")
-		fmt.Fprintf(os.Stderr, logBuff.String())
+		fmt.Fprint(os.Stderr, logBuff.String())
 	}()
 
 	err = install.Uninstall(paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar)
