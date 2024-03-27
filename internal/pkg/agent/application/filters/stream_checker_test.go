@@ -258,7 +258,8 @@ func TestStreamCheck(t *testing.T) {
 			assert.NoError(t, err)
 
 			result := StreamChecker(log, ast)
-			assert.Equal(t, tc.result, result)
+			t.Log("StreamChecker returned: ", result)
+			assert.ErrorIs(t, result, tc.result, "error is different from expected")
 		})
 	}
 }
