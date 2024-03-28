@@ -8,16 +8,21 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
 
 // regexp taken from https://semver.org/ (see the FAQ section/Is there a suggested regular expression (RegEx) to check a SemVer string?)
 const semVerFormat = `^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+const numericPrereleaseTokenFormat = `\d+`
 const preReleaseSeparator = "-"
 const metadataSeparator = "+"
+const prereleaseTokenSeparator = "."
+const snapshotPrereleaseToken = "SNAPSHOT"
 
 var semVerFmtRegEx *regexp.Regexp
+var numericPrereleaseTokenRegEx *regexp.Regexp
 var namedGroups map[string]int
 
 func init() {
@@ -28,6 +33,9 @@ func init() {
 	for i, groupName := range groups {
 		namedGroups[groupName] = i
 	}
+
+	// compile the numeric prerelease token regex
+	numericPrereleaseTokenRegEx = regexp.MustCompile(numericPrereleaseTokenFormat)
 }
 
 var ErrNoMatch = errors.New("version string does not match expected format")
@@ -65,6 +73,14 @@ func (psv ParsedSemVer) Prerelease() string {
 	return psv.prerelease
 }
 
+func (psv ParsedSemVer) PrereleaseTokens() []string {
+	if len(psv.prerelease) == 0 {
+		return nil
+	}
+
+	return strings.Split(psv.Prerelease(), prereleaseTokenSeparator)
+}
+
 func (psv ParsedSemVer) BuildMetadata() string {
 	return psv.buildMetadata
 }
@@ -73,14 +89,44 @@ func (psv ParsedSemVer) VersionWithPrerelease() string {
 	b := new(strings.Builder)
 	b.WriteString(psv.CoreVersion())
 	if psv.prerelease != "" {
-		b.WriteString("-")
+		b.WriteString(preReleaseSeparator)
 		b.WriteString(psv.prerelease)
 	}
 	return b.String()
 }
 
+func (psv ParsedSemVer) ExtractSnapshotFromVersionString() (string, bool) {
+
+	b := new(strings.Builder)
+	b.WriteString(psv.CoreVersion())
+
+	prereleaseTokens := psv.PrereleaseTokens()
+	isSnapshot := false
+
+	for i, t := range prereleaseTokens {
+		if t == snapshotPrereleaseToken {
+			// we found the snapshot prerelease qualifier (we assume there's only 1)
+			isSnapshot = true
+			prereleaseTokens = append(prereleaseTokens[:i], prereleaseTokens[i+1:]...)
+			break
+		}
+	}
+
+	if len(prereleaseTokens) > 0 {
+		b.WriteString(preReleaseSeparator)
+		b.WriteString(assemblePrereleaseStringFromTokens(prereleaseTokens))
+	}
+
+	if len(psv.buildMetadata) > 0 {
+		b.WriteString(metadataSeparator)
+		b.WriteString(psv.buildMetadata)
+	}
+	return b.String(), isSnapshot
+}
+
 func (psv ParsedSemVer) IsSnapshot() bool {
-	return psv.prerelease == "SNAPSHOT" || strings.HasSuffix(psv.prerelease, "-SNAPSHOT")
+	prereleaseTokens := psv.PrereleaseTokens()
+	return slices.Contains(prereleaseTokens, snapshotPrereleaseToken)
 }
 
 func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
@@ -99,34 +145,66 @@ func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 		return psv.patch < other.patch
 	}
 
-	// last resort check if one is prereleas and the other isn't
+	// compare prerelease strings as major.minor.patch are equal
+	return psv.comparePrerelease(other)
+}
+
+// comparePrerelease compares the prerelease part of 2 ParsedSemVer objects
+// the return value must conform to psv.prerelease < other.prerelease following comparison rules from https://semver.org/
+func (psv ParsedSemVer) comparePrerelease(other ParsedSemVer) bool {
+	// last resort before parsing prerelease: check if one is prerelease and the other isn't
 	if psv.prerelease != "" && other.prerelease == "" {
 		return true
 	}
 
-	return false
-}
-
-func (psv ParsedSemVer) GetPreviousMinor() (*ParsedSemVer, error) {
-	major := psv.Major()
-	minor := psv.Minor()
-
-	if minor > 0 {
-		// We have at least one previous minor version in the current
-		// major version series. Set the patch to zero to guarnatee the
-		// version exists, the number of patch releases varies.
-		return NewParsedSemVer(major, minor-1, 0, psv.Prerelease(), psv.BuildMetadata()), nil
+	if psv.prerelease == "" && other.prerelease != "" {
+		return false
 	}
 
-	// We are at the first minor of the current major version series. To
-	// figure out the previous minor, we need to rely on knowledge of
-	// the release versions from the past major series'.
-	switch major {
-	case 8:
-		return NewParsedSemVer(7, 17, 10, psv.Prerelease(), psv.BuildMetadata()), nil
+	// tokenize prereleases and compare them
+	prereleaseTokens := strings.Split(psv.prerelease, prereleaseTokenSeparator)
+	otherPrereleaseTokens := strings.Split(other.prerelease, prereleaseTokenSeparator)
+
+	// compute the min amount of tokens
+	minPrereleaseTokens := len(prereleaseTokens)
+	if len(otherPrereleaseTokens) < minPrereleaseTokens {
+		minPrereleaseTokens = len(otherPrereleaseTokens)
 	}
 
-	return nil, fmt.Errorf("unable to determine previous minor version for [%s]", psv.String())
+	for i := 0; i < minPrereleaseTokens; i++ {
+		token := prereleaseTokens[i]
+		otherToken := otherPrereleaseTokens[i]
+
+		isTokenNumeric := numericPrereleaseTokenRegEx.MatchString(token)
+		isOtherTokenNumeric := numericPrereleaseTokenRegEx.MatchString(otherToken)
+
+		// numeric identifiers always have lower precedence than non-numeric identifiers
+		if isTokenNumeric && !isOtherTokenNumeric {
+			return true
+		}
+
+		if !isTokenNumeric && isOtherTokenNumeric {
+			return false
+		}
+
+		// prerelease tokens are of the same type: check if we have to compare them as numbers or strings
+		if isTokenNumeric {
+			// we can ignore the error as the regex we are using is even more restrictive than a generic integer regex
+			numericToken, _ := strconv.Atoi(token)
+			otherNumericToken, _ := strconv.Atoi(otherToken)
+			if numericToken != otherNumericToken {
+				return numericToken < otherNumericToken
+			}
+		} else {
+			// compare them as strings
+			if token != otherToken {
+				return token < otherToken
+			}
+		}
+	}
+
+	// the minimum number of tokens is the same across the two versions, check if one of the two have more tokens
+	return len(prereleaseTokens) < len(otherPrereleaseTokens)
 }
 
 func (psv ParsedSemVer) String() string {
@@ -181,6 +259,17 @@ func ParseVersion(version string) (*ParsedSemVer, error) {
 		prerelease:    matches[namedGroups["prerelease"]],
 		buildMetadata: matches[namedGroups["buildmetadata"]],
 	}, nil
+}
+
+func assemblePrereleaseStringFromTokens(tokens []string) string {
+	builder := new(strings.Builder)
+	for _, t := range tokens {
+		if builder.Len() > 0 {
+			builder.WriteString(prereleaseTokenSeparator)
+		}
+		builder.WriteString(t)
+	}
+	return builder.String()
 }
 
 type SortableParsedVersions []*ParsedSemVer
