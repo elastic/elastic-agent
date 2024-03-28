@@ -695,7 +695,7 @@ func TestIsSameVersion(t *testing.T) {
 					manifest: nil,
 					hash:     "abcdef",
 				},
-				version: "1.2.3-repackaged-SNAPSHOT",
+				version: "1.2.3-SNAPSHOT.repackaged",
 			},
 			want: want{
 				same:       false,

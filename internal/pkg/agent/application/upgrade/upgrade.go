@@ -433,8 +433,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMet
 	} else {
 		// extract version info from the version string (we can ignore parsing errors as it would have never passed the download step)
 		parsedVersion, _ := agtversion.ParseVersion(upgradeVersion)
-		newVersion.version = strings.TrimSuffix(parsedVersion.VersionWithPrerelease(), snapshotSuffix)
-		newVersion.snapshot = parsedVersion.IsSnapshot()
+		newVersion.version, newVersion.snapshot = parsedVersion.ExtractSnapshotFromVersionString()
 	}
 	newVersion.hash = metadata.hash
 
