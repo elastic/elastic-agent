@@ -8,12 +8,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 )
 
 const errTypeUnexpected = "UNEXPECTED"
 
 type apiError interface {
 	Status() int
+}
+
+// CoordinatorState is used by the HTTP handlers that take a coordinator object.
+// This interface exists to help make testing easier.
+type CoordinatorState interface {
+	State() coordinator.State
 }
 
 func createHandler(fn func(w http.ResponseWriter, r *http.Request) error) *apiHandler {
