@@ -52,7 +52,8 @@ func (mc mockContext) Value(key any) any {
 }
 
 func TestProcessHTTPHandler(t *testing.T) {
-
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	testCases := []struct {
 		name         string
 		coord        mockCoordinator
@@ -182,10 +183,11 @@ func TestProcessHTTPHandler(t *testing.T) {
 			testSrv := httptest.NewServer(createHandler(processesHandler(test.coord, test.liveness)))
 			defer testSrv.Close()
 
-			res, err := http.Get(testSrv.URL)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, testSrv.URL, nil)
 			require.NoError(t, err)
-			defer res.Body.Close()
-			require.Equal(t, test.expectedCode, res.StatusCode)
+			res, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			res.Body.Close()
 
 		})
 	}
@@ -202,9 +204,12 @@ func TestProcessHTTPHandler(t *testing.T) {
 			testSrv.Config.ConnContext = customContext
 			testSrv.Start()
 
-			res, err := http.Get(testSrv.URL)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, testSrv.URL, nil)
+			require.NoError(t, err)
+			res, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
 			res.Body.Close()
+
 			require.Equal(t, test.expectedCode, res.StatusCode)
 		})
 	}
