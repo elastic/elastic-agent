@@ -16,7 +16,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -44,12 +44,11 @@ var redirectableProcesses = []string{
 	profilingServicePrefix,
 }
 
-func processHandler(coord *coordinator.Coordinator, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
+func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 		vars := mux.Vars(r)
-
 		componentID, found := vars[componentIDKey]
 		if !found {
 			return errorfWithStatus(http.StatusNotFound, "process with specified ID not found")
@@ -82,14 +81,18 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 
 		state := coord.State()
 
-		for _, c := range state.Components {
-			if matchesCloudProcessID(&c.Component, componentID) {
+		unhealthyComponent := false
+		for _, comp := range state.Components {
+			if comp.State.State == client.UnitStateFailed || comp.State.State == client.UnitStateDegraded {
+				unhealthyComponent = true
+			}
+			if matchesCloudProcessID(&comp.Component, componentID) {
 				data := struct {
 					State   string `json:"state"`
 					Message string `json:"message"`
 				}{
-					State:   c.State.State.String(),
-					Message: c.State.Message,
+					State:   comp.State.State.String(),
+					Message: comp.State.Message,
 				}
 
 				bytes, err := json.Marshal(data)
@@ -98,6 +101,9 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 					content = fmt.Sprintf("Not valid json: %v", err)
 				} else {
 					content = string(bytes)
+				}
+				if livenessMode && unhealthyComponent {
+					w.WriteHeader(500)
 				}
 				fmt.Fprint(w, content)
 

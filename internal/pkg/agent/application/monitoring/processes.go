@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 )
 
 type source struct {
@@ -40,7 +40,7 @@ func sourceFromComponentID(procID string) source {
 	return s
 }
 
-func processesHandler(coord *coordinator.Coordinator) func(http.ResponseWriter, *http.Request) error {
+func processesHandler(coord CoordinatorState, livenessMode bool) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
@@ -48,13 +48,17 @@ func processesHandler(coord *coordinator.Coordinator) func(http.ResponseWriter, 
 
 		state := coord.State()
 
-		for _, c := range state.Components {
-			if c.Component.InputSpec != nil {
+		unhealthyComponent := false
+		for _, comp := range state.Components {
+			if comp.State.State == client.UnitStateFailed || comp.State.State == client.UnitStateDegraded {
+				unhealthyComponent = true
+			}
+			if comp.Component.InputSpec != nil {
 				procs = append(procs, process{
-					ID:     expectedCloudProcessID(&c.Component),
-					PID:    c.LegacyPID,
-					Binary: c.Component.InputSpec.BinaryName,
-					Source: sourceFromComponentID(c.Component.ID),
+					ID:     expectedCloudProcessID(&comp.Component),
+					PID:    comp.LegacyPID,
+					Binary: comp.Component.InputSpec.BinaryName,
+					Source: sourceFromComponentID(comp.Component.ID),
 				})
 			}
 		}
@@ -70,6 +74,9 @@ func processesHandler(coord *coordinator.Coordinator) func(http.ResponseWriter, 
 			content = fmt.Sprintf("Not valid json: %v", err)
 		} else {
 			content = string(bytes)
+		}
+		if livenessMode && unhealthyComponent {
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 		fmt.Fprint(w, content)
 
