@@ -138,7 +138,7 @@ func newAckEvent(id, aType string) AckEvent {
 // NOTE: We only keep the original type and the action id, the payload of the event is dropped, we
 // do this to make sure we do not leak any unwanted information.
 type ActionUnknown struct {
-	ActionID   string `json:"id" yaml:"id" mapstructure:"id"`
+	ActionID   string `json:"action_id" yaml:"id" mapstructure:"id"`
 	ActionType string `json:"type,omitempty" yaml:"type,omitempty" mapstructure:"type"`
 	// OriginalType is the original type of the action as returned by the API.
 	OriginalType string `json:"original_type,omitempty" yaml:"original_type,omitempty" mapstructure:"original_type"`
@@ -156,7 +156,7 @@ func (a *ActionUnknown) ID() string {
 
 func (a *ActionUnknown) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -178,7 +178,7 @@ func (a *ActionUnknown) AckEvent() AckEvent {
 
 // ActionPolicyReassign is a request to apply a new policy
 type ActionPolicyReassign struct {
-	ActionID   string                   `json:"id" yaml:"id"`
+	ActionID   string                   `json:"action_id" yaml:"id"`
 	ActionType string                   `json:"type" yaml:"type"`
 	Data       ActionPolicyReassignData `json:"data,omitempty"`
 }
@@ -189,7 +189,7 @@ type ActionPolicyReassignData struct {
 
 func (a *ActionPolicyReassign) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -212,7 +212,7 @@ func (a *ActionPolicyReassign) AckEvent() AckEvent {
 
 // ActionPolicyChange is a request to apply a new
 type ActionPolicyChange struct {
-	ActionID   string                 `json:"id" yaml:"id"`
+	ActionID   string                 `json:"action_id" yaml:"id"`
 	ActionType string                 `json:"type" yaml:"type"`
 	Data       ActionPolicyChangeData `json:"data,omitempty" yaml:"data,omitempty"`
 }
@@ -223,7 +223,7 @@ type ActionPolicyChangeData struct {
 
 func (a *ActionPolicyChange) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -246,7 +246,7 @@ func (a *ActionPolicyChange) AckEvent() AckEvent {
 
 // ActionUpgrade is a request for agent to upgrade.
 type ActionUpgrade struct {
-	ActionID         string `json:"id" yaml:"id" mapstructure:"id"`
+	ActionID         string `json:"action_id" yaml:"id" mapstructure:"id"`
 	ActionType       string `json:"type" yaml:"type" mapstructure:"type"`
 	ActionStartTime  string `json:"start_time" yaml:"start_time,omitempty" mapstructure:"-"` // TODO change to time.Time in unmarshal
 	ActionExpiration string `json:"expiration" yaml:"expiration,omitempty" mapstructure:"-"`
@@ -265,7 +265,7 @@ type ActionUpgradeData struct {
 
 func (a *ActionUpgrade) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -360,7 +360,7 @@ func (a *ActionUpgrade) MarshalMap() (map[string]interface{}, error) {
 
 // ActionUnenroll is a request for agent to unhook from fleet.
 type ActionUnenroll struct {
-	ActionID   string  `json:"id" yaml:"id" mapstructure:"id"`
+	ActionID   string  `json:"action_id" yaml:"id" mapstructure:"id"`
 	ActionType string  `json:"type" yaml:"type" mapstructure:"type"`
 	IsDetected bool    `json:"is_detected,omitempty" yaml:"is_detected,omitempty" mapstructure:"-"`
 	Signed     *Signed `json:"signed,omitempty" mapstructure:"signed,omitempty"`
@@ -368,7 +368,7 @@ type ActionUnenroll struct {
 
 func (a *ActionUnenroll) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -398,7 +398,7 @@ func (a *ActionUnenroll) MarshalMap() (map[string]interface{}, error) {
 
 // ActionSettings is a request to change agent settings.
 type ActionSettings struct {
-	ActionID   string             `json:"id" yaml:"id"`
+	ActionID   string             `json:"action_id" yaml:"id"`
 	ActionType string             `json:"type" yaml:"type"`
 	Data       ActionSettingsData `json:"data,omitempty"`
 }
@@ -421,7 +421,7 @@ func (a *ActionSettings) Type() string {
 
 func (a *ActionSettings) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -436,7 +436,7 @@ func (a *ActionSettings) AckEvent() AckEvent {
 
 // ActionCancel is a request to cancel an action.
 type ActionCancel struct {
-	ActionID   string           `json:"id" yaml:"id"`
+	ActionID   string           `json:"action_id" yaml:"id"`
 	ActionType string           `json:"type" yaml:"type"`
 	Data       ActionCancelData `json:"data,omitempty"`
 }
@@ -457,7 +457,7 @@ func (a *ActionCancel) Type() string {
 
 func (a *ActionCancel) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -472,11 +472,13 @@ func (a *ActionCancel) AckEvent() AckEvent {
 
 // ActionDiagnostics is a request to gather and upload a diagnostics bundle.
 type ActionDiagnostics struct {
-	ActionID          string   `json:"action_id"`
-	ActionType        string   `json:"type"`
-	AdditionalMetrics []string `json:"additional_metrics"`
-	UploadID          string   `json:"-"`
-	Err               error    `json:"-"`
+	ActionID   string `json:"action_id"`
+	ActionType string `json:"type"`
+	Data       struct {
+		AdditionalMetrics []string `json:"additional_metrics"`
+	} `json:"data"`
+	UploadID string `json:"-"`
+	Err      error  `json:"-"`
 }
 
 // ID returns the ID of the action.
@@ -491,7 +493,7 @@ func (a *ActionDiagnostics) Type() string {
 
 func (a *ActionDiagnostics) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -517,7 +519,7 @@ func (a *ActionDiagnostics) AckEvent() AckEvent {
 
 // ActionApp is the application action request.
 type ActionApp struct {
-	ActionID    string                 `json:"id" mapstructure:"id"`
+	ActionID    string                 `json:"action_id" mapstructure:"id"`
 	ActionType  string                 `json:"type" mapstructure:"type"`
 	InputType   string                 `json:"input_type" mapstructure:"input_type"`
 	Timeout     int64                  `json:"timeout,omitempty" mapstructure:"timeout,omitempty"`
@@ -531,7 +533,7 @@ type ActionApp struct {
 
 func (a *ActionApp) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)

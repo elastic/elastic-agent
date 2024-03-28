@@ -161,7 +161,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		require.True(t, ok, "unable to cast action to specific type")
 		assert.Equal(t, "testid", action.ActionID)
 		assert.Equal(t, ActionTypeDiagnostics, action.ActionType)
-		assert.Empty(t, action.AdditionalMetrics)
+		assert.Empty(t, action.Data.AdditionalMetrics)
 	})
 	t.Run("ActionDiagnostics with additional CPU metrics", func(t *testing.T) {
 		p := []byte(`[{"id":"testid","type":"REQUEST_DIAGNOSTICS","data":{"additional_metrics":["CPU"]}}]`)
@@ -172,8 +172,8 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		require.True(t, ok, "unable to cast action to specific type")
 		assert.Equal(t, "testid", action.ActionID)
 		assert.Equal(t, ActionTypeDiagnostics, action.ActionType)
-		require.Len(t, action.AdditionalMetrics, 1)
-		assert.Equal(t, "CPU", action.AdditionalMetrics[0])
+		require.Len(t, action.Data.AdditionalMetrics, 1)
+		assert.Equal(t, "CPU", action.Data.AdditionalMetrics[0])
 	})
 }
 
