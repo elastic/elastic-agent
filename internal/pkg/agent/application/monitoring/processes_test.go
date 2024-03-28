@@ -184,6 +184,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 
 			res, err := http.Get(testSrv.URL)
 			require.NoError(t, err)
+			defer res.Body.Close()
 			require.Equal(t, test.expectedCode, res.StatusCode)
 
 		})
@@ -203,6 +204,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 
 			res, err := http.Get(testSrv.URL)
 			require.NoError(t, err)
+			res.Body.Close()
 			require.Equal(t, test.expectedCode, res.StatusCode)
 		})
 	}

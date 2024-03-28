@@ -55,7 +55,7 @@ func processesHandler(coord CoordinatorState, livenessMode bool) func(http.Respo
 			}
 			if comp.Component.InputSpec != nil {
 				procs = append(procs, process{
-					ID:     expectedCloudProcessID(&comp.Component),
+					ID:     expectedCloudProcessID(comp.Component),
 					PID:    comp.LegacyPID,
 					Binary: comp.Component.InputSpec.BinaryName,
 					Source: sourceFromComponentID(comp.Component.ID),

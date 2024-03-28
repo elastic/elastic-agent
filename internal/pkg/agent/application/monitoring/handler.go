@@ -38,7 +38,7 @@ type apiHandler struct {
 func (h *apiHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.innerFn(w, r)
 	if err != nil {
-		switch e := err.(type) { // nolint:errorlint // Will need refactor.
+		switch e := err.(type) { //nolint:errorlint // Will need refactor.
 		case apiError:
 			w.WriteHeader(e.Status())
 		default:
