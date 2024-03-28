@@ -9,9 +9,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
 
@@ -31,7 +34,6 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
-		"localhost:0",
 		ai,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
@@ -170,4 +172,77 @@ func waitForReady(ctx context.Context, m *Manager) error {
 		}
 	}
 	return nil
+}
+
+func TestDeriveCommsSocketName(t *testing.T) {
+	const controlAddressNix = "unix:///tmp/elastic-agent/pge4ao-u1YaV1dmSBfVX4saT8BL7b-Ey.sock"
+	const controlAddressWin = "npipe:///_HZ8OL-9bNW-SIU0joRfgUsej2KX0Sra.sock"
+
+	validControlAddress := func() string {
+		if runtime.GOOS == "windows" {
+			return controlAddressWin
+		}
+		return controlAddressNix
+	}
+
+	defaultCfg := configuration.DefaultGRPCConfig()
+
+	tests := []struct {
+		name           string
+		controlAddress string
+		local          bool
+		wantErr        error
+		want           string
+	}{
+		{
+			name: "empty uri not local",
+			want: defaultCfg.String(),
+		},
+		{
+			name:    "empty uri local",
+			local:   true,
+			wantErr: errInvalidUri,
+		},
+		{
+			name:           "invalid schema",
+			controlAddress: "lunix:///2323",
+			local:          true,
+			wantErr:        errInvalidUri,
+		},
+		{
+			name:           "valid schema empty path",
+			controlAddress: "unix://",
+			local:          true,
+			wantErr:        errInvalidUri,
+		},
+		{
+			name:           "valid path",
+			controlAddress: validControlAddress(),
+			local:          true,
+			want:           validControlAddress(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Copy default config
+			grpcCfg := *defaultCfg
+			grpcCfg.Local = tc.local
+			s, err := deriveCommsAddress(tc.controlAddress, &grpcCfg)
+
+			// If want error, test error and return
+			if tc.wantErr != nil {
+				diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
+				if diff != "" {
+					t.Fatal(diff)
+				}
+				return
+			}
+
+			diff := cmp.Diff(len(tc.want), len(s))
+			if diff != "" {
+				t.Fatal(diff)
+			}
+		})
+	}
 }

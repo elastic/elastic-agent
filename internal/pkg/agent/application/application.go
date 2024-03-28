@@ -114,7 +114,6 @@ func New(
 	runtime, err := runtime.NewManager(
 		log,
 		baseLogger,
-		cfg.Settings.GRPC.String(),
 		agentInfo,
 		tracer,
 		monitor,

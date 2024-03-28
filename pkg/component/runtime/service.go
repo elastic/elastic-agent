@@ -8,12 +8,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"runtime"
 	"time"
 
 	"github.com/kardianos/service"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -51,10 +54,12 @@ type serviceRuntime struct {
 	state ComponentState
 
 	executeServiceCommandImpl executeServiceCommandFunc
+
+	isLocal bool // true if rpc is domain socket, or named pipe
 }
 
 // newServiceRuntime creates a new command runtime for the provided component.
-func newServiceRuntime(comp component.Component, logger *logger.Logger) (*serviceRuntime, error) {
+func newServiceRuntime(comp component.Component, logger *logger.Logger, isLocal bool) (*serviceRuntime, error) {
 	if comp.ShipperSpec != nil {
 		return nil, errors.New("service runtime not supported for a shipper specification")
 	}
@@ -76,6 +81,7 @@ func newServiceRuntime(comp component.Component, logger *logger.Logger) (*servic
 		statusCh:                  make(chan service.Status),
 		state:                     state,
 		executeServiceCommandImpl: executeServiceCommand,
+		isLocal:                   isLocal,
 	}
 
 	// Set initial state as STOPPED
@@ -214,7 +220,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 				// Start connection info
 				if cis == nil {
-					cis, err = newConnInfoServer(s.log, comm, s.comp.InputSpec.Spec.Service.CPort)
+					cis, err = newConnInfoServer(s.log, comm, getConnInfoServerAddress(runtime.GOOS, s.isLocal, s.comp.InputSpec.Spec.Service.CPort))
 					if err != nil {
 						err = fmt.Errorf("failed to start connection info service %s: %w", s.name(), err)
 						break
@@ -273,6 +279,26 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			}
 		}
 	}
+}
+
+// .eaci.sock == Elastic Agent Connection Info socket
+const elasticAgentConnInfoSocket = ".eaci.sock"
+
+func getConnInfoServerAddress(os string, isLocal bool, port int) string {
+	if isLocal {
+		u := url.URL{}
+		u.Path = "/"
+
+		if os == "windows" {
+			u.Scheme = "npipe"
+			return u.JoinPath("/", elasticAgentConnInfoSocket).String()
+		}
+
+		u.Scheme = "unix"
+		return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), elasticAgentConnInfoSocket).String()
+	}
+
+	return fmt.Sprintf("127.0.0.1:%d", port)
 }
 
 func injectSigned(comp component.Component, signed *component.Signed) (component.Component, error) {
