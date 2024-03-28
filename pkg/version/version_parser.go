@@ -18,9 +18,11 @@ const semVerFormat = `^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0
 const numericPrereleaseTokenFormat = `\d+`
 const preReleaseSeparator = "-"
 const metadataSeparator = "+"
+const prereleaseTokenSeparator = "."
+const snapshotPrereleaseToken = "SNAPSHOT"
 
 var semVerFmtRegEx *regexp.Regexp
-var numericPrerelaseTokenRegEx *regexp.Regexp
+var numericPrereleaseTokenRegEx *regexp.Regexp
 var namedGroups map[string]int
 
 func init() {
@@ -33,7 +35,7 @@ func init() {
 	}
 
 	// compile the numeric prerelease token regex
-	numericPrerelaseTokenRegEx = regexp.MustCompile(numericPrereleaseTokenFormat)
+	numericPrereleaseTokenRegEx = regexp.MustCompile(numericPrereleaseTokenFormat)
 }
 
 var ErrNoMatch = errors.New("version string does not match expected format")
@@ -71,6 +73,14 @@ func (psv ParsedSemVer) Prerelease() string {
 	return psv.prerelease
 }
 
+func (psv ParsedSemVer) PrereleaseTokens() []string {
+	if len(psv.prerelease) == 0 {
+		return nil
+	}
+
+	return strings.Split(psv.Prerelease(), prereleaseTokenSeparator)
+}
+
 func (psv ParsedSemVer) BuildMetadata() string {
 	return psv.buildMetadata
 }
@@ -79,15 +89,44 @@ func (psv ParsedSemVer) VersionWithPrerelease() string {
 	b := new(strings.Builder)
 	b.WriteString(psv.CoreVersion())
 	if psv.prerelease != "" {
-		b.WriteString("-")
+		b.WriteString(preReleaseSeparator)
 		b.WriteString(psv.prerelease)
 	}
 	return b.String()
 }
 
+func (psv ParsedSemVer) ExtractSnapshotFromVersionString() (string, bool) {
+
+	b := new(strings.Builder)
+	b.WriteString(psv.CoreVersion())
+
+	prereleaseTokens := psv.PrereleaseTokens()
+	isSnapshot := false
+
+	for i, t := range prereleaseTokens {
+		if t == snapshotPrereleaseToken {
+			// we found the snapshot prerelease qualifier (we assume there's only 1)
+			isSnapshot = true
+			prereleaseTokens = append(prereleaseTokens[:i], prereleaseTokens[i+1:]...)
+			break
+		}
+	}
+
+	if len(prereleaseTokens) > 0 {
+		b.WriteString(preReleaseSeparator)
+		b.WriteString(assemblePrereleaseStringFromTokens(prereleaseTokens))
+	}
+
+	if len(psv.buildMetadata) > 0 {
+		b.WriteString(metadataSeparator)
+		b.WriteString(psv.buildMetadata)
+	}
+	return b.String(), isSnapshot
+}
+
 func (psv ParsedSemVer) IsSnapshot() bool {
-	prereleaseTokens := strings.Split(psv.prerelease, ".")
-	return slices.Contains(prereleaseTokens, "SNAPSHOT")
+	prereleaseTokens := psv.PrereleaseTokens()
+	return slices.Contains(prereleaseTokens, snapshotPrereleaseToken)
 }
 
 func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
@@ -123,8 +162,8 @@ func (psv ParsedSemVer) comparePrerelease(other ParsedSemVer) bool {
 	}
 
 	// tokenize prereleases and compare them
-	prereleaseTokens := strings.Split(psv.prerelease, ".")
-	otherPrereleaseTokens := strings.Split(other.prerelease, ".")
+	prereleaseTokens := strings.Split(psv.prerelease, prereleaseTokenSeparator)
+	otherPrereleaseTokens := strings.Split(other.prerelease, prereleaseTokenSeparator)
 
 	// compute the min amount of tokens
 	minPrereleaseTokens := len(prereleaseTokens)
@@ -136,8 +175,8 @@ func (psv ParsedSemVer) comparePrerelease(other ParsedSemVer) bool {
 		token := prereleaseTokens[i]
 		otherToken := otherPrereleaseTokens[i]
 
-		isTokenNumeric := numericPrerelaseTokenRegEx.MatchString(token)
-		isOtherTokenNumeric := numericPrerelaseTokenRegEx.MatchString(otherToken)
+		isTokenNumeric := numericPrereleaseTokenRegEx.MatchString(token)
+		isOtherTokenNumeric := numericPrereleaseTokenRegEx.MatchString(otherToken)
 
 		// numeric identifiers always have lower precedence than non-numeric identifiers
 		if isTokenNumeric && !isOtherTokenNumeric {
@@ -220,6 +259,17 @@ func ParseVersion(version string) (*ParsedSemVer, error) {
 		prerelease:    matches[namedGroups["prerelease"]],
 		buildMetadata: matches[namedGroups["buildmetadata"]],
 	}, nil
+}
+
+func assemblePrereleaseStringFromTokens(tokens []string) string {
+	builder := new(strings.Builder)
+	for _, t := range tokens {
+		if builder.Len() > 0 {
+			builder.WriteString(prereleaseTokenSeparator)
+		}
+		builder.WriteString(t)
+	}
+	return builder.String()
 }
 
 type SortableParsedVersions []*ParsedSemVer

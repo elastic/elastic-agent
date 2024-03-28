@@ -278,7 +278,7 @@ func TestIsSnapshot(t *testing.T) {
 			snapshot: true,
 		},
 		{
-			name:     "Emergency release with SNAPSHOT in the middle is actually a snapshot",
+			name:     "Emergency release with snapshot in the middle is a snapshot",
 			input:    "8.8.0-er.SNAPSHOT.1 ",
 			snapshot: true,
 		},
@@ -294,6 +294,75 @@ func TestIsSnapshot(t *testing.T) {
 
 	}
 
+}
+
+func TestExtractSnapshotFromVersionString(t *testing.T) {
+	testcases := []struct {
+		name          string
+		inputVersion  string
+		outputVersion string
+		snapshot      bool
+	}{
+		{
+			name:          "Simple snapshot",
+			inputVersion:  "8.8.0-SNAPSHOT",
+			outputVersion: "8.8.0",
+			snapshot:      true,
+		},
+		{
+			name:          "Snapshot with build meta",
+			inputVersion:  "8.8.0-SNAPSHOT+abcdef",
+			outputVersion: "8.8.0+abcdef",
+			snapshot:      true,
+		},
+		{
+			name:          "Snapshot comparison is case sensitive",
+			inputVersion:  "8.8.0-sNapShOt",
+			outputVersion: "8.8.0-sNapShOt",
+			snapshot:      false,
+		},
+		{
+			name:          "Only major minor patch",
+			inputVersion:  "8.8.0",
+			outputVersion: "8.8.0",
+			snapshot:      false,
+		},
+		{
+			name:          "Alpha prerelease is not snapshot",
+			inputVersion:  "8.8.0-alpha",
+			outputVersion: "8.8.0-alpha",
+			snapshot:      false,
+		},
+		{
+			name:          "Emergency release is not snapshot",
+			inputVersion:  "8.8.0-er.1",
+			outputVersion: "8.8.0-er.1",
+			snapshot:      false,
+		},
+		{
+			name:          "Emergency release snapshot is actually a snapshot",
+			inputVersion:  "8.8.0-SNAPSHOT.er.1 ",
+			outputVersion: "8.8.0-er.1",
+			snapshot:      true,
+		},
+		{
+			name:          "Emergency release with SNAPSHOT in the middle is a snapshot",
+			inputVersion:  "8.8.0-er.SNAPSHOT.1 ",
+			outputVersion: "8.8.0-er.1",
+			snapshot:      true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			psv, err := ParseVersion(tc.inputVersion)
+			require.NoError(t, err)
+			require.NotNil(t, psv)
+			actualOutputVersion, actualIsSnapshot := psv.ExtractSnapshotFromVersionString()
+			assert.Equal(t, tc.outputVersion, actualOutputVersion)
+			assert.Equal(t, tc.snapshot, actualIsSnapshot)
+		})
+
+	}
 }
 
 func TestLess(t *testing.T) {
