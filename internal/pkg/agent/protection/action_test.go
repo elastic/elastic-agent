@@ -47,8 +47,8 @@ func signAction(action map[string]interface{}, emptyData bool, pk *ecdsa.Private
 		"signature": base64.StdEncoding.EncodeToString(sig),
 	}
 	// Remap the action_id to id same way the fleet server does for checkins
-	action["id"] = action["action_id"]
-	delete(action, "action_id")
+	// action["id"] = action["action_id"]
+	// delete(action, "action_id")
 	return action, nil
 }
 

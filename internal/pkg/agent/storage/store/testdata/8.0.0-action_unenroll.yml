@@ -1,0 +1,20 @@
+action:
+  action_id: abc123
+  action_type: UNENROLL
+  is_detected: true
+ack_token: czlV93YBwdkt5lYhBY7S
+action_queue:
+  - action_id: action1
+    type: UPGRADE
+    start_time: "2024-02-19T17:48:40Z"
+    expiration: "2025-02-19T17:48:40Z"
+    version: 1.2.3
+    source_uri: https://example.com
+    retry_attempt: 1
+  - action_id: action2
+    type: UPGRADE
+    start_time: "2024-02-19T17:48:40Z"
+    expiration: "2025-02-19T17:48:40Z"
+    version: 1.2.3
+    source_uri: https://example.com
+    retry_attempt: 1

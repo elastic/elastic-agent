@@ -22,11 +22,11 @@ const (
 )
 
 type stateStore interface {
-	Add(fleetapi.Action)
+	SetAction(fleetapi.Action)
 	AckToken() string
 	SetAckToken(ackToken string)
 	Save() error
-	Actions() []fleetapi.Action
+	Action() fleetapi.Action
 }
 
 // Unenroll results in  running agent entering idle state, non managed non standalone.
@@ -94,7 +94,7 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 
 	if h.stateStore != nil {
 		// backup action for future start to avoid starting fleet gateway loop
-		h.stateStore.Add(a)
+		h.stateStore.SetAction(a)
 		if err := h.stateStore.Save(); err != nil {
 			h.log.Warnf("Failed to update state store: %v", err)
 		}

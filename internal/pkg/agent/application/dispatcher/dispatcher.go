@@ -304,7 +304,7 @@ func (ad *ActionDispatcher) handleExpired(
 			version := "unknown"
 			expiration := "unknown"
 			if upgrade, ok := e.(*fleetapi.ActionUpgrade); ok {
-				version = upgrade.Version
+				version = upgrade.Data.Version
 				expiration = upgrade.ActionExpiration
 			}
 			ad.lastUpgradeDetails = details.NewDetails(version, details.StateFailed, e.ID())
@@ -356,7 +356,7 @@ func (ad *ActionDispatcher) reportNextScheduledUpgrade(input []fleetapi.Action, 
 	}
 
 	upgradeDetails := details.NewDetails(
-		nextUpgrade.Version,
+		nextUpgrade.Data.Version,
 		details.StateScheduled,
 		nextUpgrade.ID())
 	startTime, err := nextUpgrade.StartTime()

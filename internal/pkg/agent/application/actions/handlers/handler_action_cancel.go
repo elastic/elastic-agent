@@ -37,11 +37,13 @@ func (h *Cancel) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acke
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionCancel and received %T", a)
 	}
-	n := h.c.Cancel(action.TargetID)
+	n := h.c.Cancel(action.Data.TargetID)
 	if n == 0 {
-		h.log.Debugf("Cancel action id: %s target id: %s found no actions in queue.", action.ActionID, action.TargetID)
+		h.log.Debugf("Cancel action id: %s target id: %s found no actions in queue.",
+			action.ActionID, action.Data.TargetID)
 		return nil
 	}
-	h.log.Infof("Cancel action id: %s target id: %s removed %d action(s) from queue.", action.ActionID, action.TargetID, n)
+	h.log.Infof("Cancel action id: %s target id: %s removed %d action(s) from queue.",
+		action.ActionID, action.Data.TargetID, n)
 	return nil
 }

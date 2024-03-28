@@ -116,18 +116,16 @@ func loadConfig(ctx context.Context, configPath string, unprivileged bool) (*con
 }
 
 func loadFleetConfig(ctx context.Context, l *logger.Logger) (map[string]interface{}, error) {
-	stateStore, err := store.NewStateStoreWithMigration(ctx, l, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
+	stateStore, err := store.NewStateStoreWithMigration(
+		ctx, l, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
 	if err != nil {
 		return nil, err
 	}
 
-	for _, c := range stateStore.Actions() {
-		cfgChange, ok := c.(*fleetapi.ActionPolicyChange)
-		if !ok {
-			continue
-		}
-
-		return cfgChange.Policy, nil
+	cfgChange, ok := stateStore.Action().(*fleetapi.ActionPolicyChange)
+	if ok {
+		return cfgChange.Data.Policy, nil
 	}
+
 	return nil, nil
 }

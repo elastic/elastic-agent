@@ -23,13 +23,20 @@ const defaultAgentFleetFile = "fleet.enc"
 // defaultAgentEnrollFile is a name of file used to enroll agent on first-start
 const defaultAgentEnrollFile = "enroll.yml"
 
-// defaultAgentActionStoreFile is the file that will contain the action that can be replayed after restart.
+// defaultAgentActionStoreFile is the file that will contain the action that can
+// be replayed after restart.
+// It's deprecated and kept for migration purposes.
+// Deprecated.
 const defaultAgentActionStoreFile = "action_store.yml"
 
-// defaultAgentStateStoreYmlFile is the file that will contain the action that can be replayed after restart.
+// defaultAgentStateStoreYmlFile is the file that will contain the action that
+// can be replayed after restart.
+// It's deprecated and kept for migration purposes.
+// Deprecated.
 const defaultAgentStateStoreYmlFile = "state.yml"
 
-// defaultAgentStateStoreFile is the file that will contain the action that can be replayed after restart encrypted.
+// defaultAgentStateStoreFile is the file that will contain the encrypted state
+// store.
 const defaultAgentStateStoreFile = "state.enc"
 
 // defaultInputDPath return the location of the inputs.d.

@@ -81,7 +81,8 @@ func TestUpgradeHandler(t *testing.T) {
 	go c.Run(ctx)
 
 	u := NewUpgrade(log, c)
-	a := fleetapi.ActionUpgrade{Version: "8.3.0", SourceURI: "http://localhost"}
+	a := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
+		Version: "8.3.0", SourceURI: "http://localhost"}}
 	ack := noopacker.New()
 	err := u.Handle(ctx, &a, ack)
 	require.NoError(t, err)
@@ -114,7 +115,8 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	go c.Run(ctx)
 
 	u := NewUpgrade(log, c)
-	a := fleetapi.ActionUpgrade{Version: "8.3.0", SourceURI: "http://localhost"}
+	a := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
+		Version: "8.3.0", SourceURI: "http://localhost"}}
 	ack := noopacker.New()
 	err1 := u.Handle(ctx, &a, ack)
 	err2 := u.Handle(ctx, &a, ack)
@@ -149,8 +151,10 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	go c.Run(ctx)
 
 	u := NewUpgrade(log, c)
-	a1 := fleetapi.ActionUpgrade{Version: "8.2.0", SourceURI: "http://localhost"}
-	a2 := fleetapi.ActionUpgrade{Version: "8.5.0", SourceURI: "http://localhost"}
+	a1 := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
+		Version: "8.2.0", SourceURI: "http://localhost"}}
+	a2 := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
+		Version: "8.5.0", SourceURI: "http://localhost"}}
 	ack := noopacker.New()
 	err1 := u.Handle(ctx, &a1, ack)
 	require.NoError(t, err1)
