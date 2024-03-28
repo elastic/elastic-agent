@@ -355,13 +355,16 @@ func TestExtractSnapshotFromVersionString(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			psv, err := ParseVersion(tc.inputVersion)
-			require.NoError(t, err)
-			require.NotNil(t, psv)
+			require.NoErrorf(t, err, "error parsing version %q", tc.inputVersion)
+			require.NotNil(t, psv, "parsed semver should not be nil with no errors returned from ParseVersion")
 			actualOutputVersion, actualIsSnapshot := psv.ExtractSnapshotFromVersionString()
-			assert.Equal(t, tc.outputVersion, actualOutputVersion)
-			assert.Equal(t, tc.snapshot, actualIsSnapshot)
-		})
+			assert.Equalf(t, tc.outputVersion, actualOutputVersion, "(%q).ExtractSnapshotFromVersionString() is expected to return version: %q", tc.inputVersion, tc.outputVersion)
+			assert.Equalf(t, tc.snapshot, actualIsSnapshot, "(%q).ExtractSnapshotFromVersionString() is expected to return snapshot: %v", tc.inputVersion, tc.snapshot)
+			// make sure that the actual snapshot flag is coherent with isSnapshot()
+			flagFromIsSnapshot := psv.IsSnapshot()
+			assert.Equalf(t, flagFromIsSnapshot, actualIsSnapshot, "(%q).ExtractSnapshotFromVersionString() is expected to return same snapshot flag value as (%q).IsSnapshot()=%v", tc.inputVersion, tc.inputVersion, flagFromIsSnapshot)
 
+		})
 	}
 }
 
