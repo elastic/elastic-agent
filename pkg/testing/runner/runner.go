@@ -466,7 +466,7 @@ func (r *Runner) getBuilds(b OSBatch) []Build {
 		var serverlessPackages []string
 		for _, p := range packages {
 			if slices.Contains([]string{"targz", "zip"}, p) {
-				packages = append(packages, p)
+				serverlessPackages = append(serverlessPackages, p)
 			}
 		}
 		packages = serverlessPackages
