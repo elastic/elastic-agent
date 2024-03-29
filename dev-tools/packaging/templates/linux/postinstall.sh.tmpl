@@ -3,7 +3,7 @@
 set -e
 
 commit_hash="{{ commit_short }}"
-version_dir="{{agent_package_version}}{{snapshot_suffix}}"
+version_dir="{{agent_package_version_with_snapshot}}"
 symlink="/usr/share/elastic-agent/bin/elastic-agent"
 new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
 
