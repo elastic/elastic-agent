@@ -91,7 +91,7 @@ func TestExpectedCloudProcessID(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.id, expectedCloudProcessID(tc.component))
+			assert.Equal(t, tc.id, expectedCloudProcessID(tc.component.InputSpec.BinaryName, tc.component.ID))
 		})
 	}
 }
@@ -143,7 +143,7 @@ func TestMatchesCloudProcessID(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.matches, matchesCloudProcessID(tc.component, tc.processID))
+			assert.Equal(t, tc.matches, matchesCloudProcessID(tc.component.InputSpec.BinaryName, tc.component.ID, tc.processID))
 		})
 	}
 }

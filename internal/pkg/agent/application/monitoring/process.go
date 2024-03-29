@@ -86,7 +86,7 @@ func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func
 			if comp.State.State == client.UnitStateFailed || comp.State.State == client.UnitStateDegraded {
 				unhealthyComponent = true
 			}
-			if matchesCloudProcessID(comp.Component, componentID) {
+			if matchesCloudProcessID(comp.Component.InputSpec.BinaryName, comp.Component.ID, componentID) {
 				data := struct {
 					State   string `json:"state"`
 					Message string `json:"message"`
