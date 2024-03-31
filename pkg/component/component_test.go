@@ -2833,7 +2833,6 @@ func TestToComponents(t *testing.T) {
 								},
 							}),
 						},
-
 						{
 							ID:       "shipper-default",
 							Type:     client.UnitTypeOutput,

@@ -61,6 +61,16 @@ var fakeComponent = atesting.UsableComponent{
 					},
 				},
 			},
+			{
+				Name:        "fake-non-grouped",
+				Description: "A fake non grouped input",
+				Platforms:   fakeComponentPltfs,
+				Shippers: []string{
+					fakeShipperName,
+				},
+				Command:   &component.CommandSpec{},
+				SkipGroup: true,
+			},
 		},
 	},
 }
