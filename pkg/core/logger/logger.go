@@ -5,6 +5,7 @@
 package logger
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -70,6 +71,31 @@ func NewFromConfig(name string, cfg *Config, logInternal bool) (*Logger, error) 
 // Use only when a clean logger is needed, and it is known that the logging configuration has already been performed.
 func NewWithoutConfig(name string) *Logger {
 	return logp.NewLogger(name)
+}
+
+// NewInMemory returns a new in-memory logger along with the buffer to which i
+// logs.
+// encCfg configures the log format, use logp.ConsoleEncoderConfig for console
+// format, logp.JSONEncoderConfig for JSON or any other valid zapcore.EncoderConfig.
+func NewInMemory(selector string, encCfg zapcore.EncoderConfig) (*Logger, *bytes.Buffer) {
+	buff := bytes.Buffer{}
+
+	encoderConfig := ecszap.ECSCompatibleEncoderConfig(encCfg)
+	encoderConfig.EncodeTime = UtcTimestampEncode
+	encoder := zapcore.NewConsoleEncoder(encoderConfig)
+
+	core := zapcore.NewCore(
+		encoder,
+		zapcore.AddSync(&buff),
+		zap.NewAtomicLevelAt(zap.DebugLevel))
+	ecszap.ECSCompatibleEncoderConfig(logp.ConsoleEncoderConfig())
+
+	logger := logp.NewLogger(
+		selector,
+		zap.WrapCore(func(in zapcore.Core) zapcore.Core {
+			return core
+		}))
+	return logger, &buff
 }
 
 // AddCallerSkip returns new logger with incremented stack frames to skip.
@@ -147,7 +173,7 @@ func DefaultLoggingConfig() *Config {
 	return &cfg
 }
 
-// makeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
+// MakeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
 //
 // This is the logger that the spawned filebeat expects to read the log file from and ship to ES.
 func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {

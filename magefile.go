@@ -79,14 +79,22 @@ const (
 	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s"
 )
 
-// Aliases for commands required by master makefile
-var Aliases = map[string]interface{}{
-	"build": Build.All,
-	"demo":  Demo.Enroll,
-}
-var errNoManifest = errors.New("missing ManifestURL environment variable")
-var errNoAgentDropPath = errors.New("missing AGENT_DROP_PATH environment variable")
-var errAtLeastOnePlatform = errors.New("elastic-agent package is expected to build at least one platform package")
+var (
+	// Aliases for commands required by master makefile
+	Aliases = map[string]interface{}{
+		"build": Build.All,
+		"demo":  Demo.Enroll,
+	}
+
+	errNoManifest         = errors.New("missing ManifestURL environment variable")
+	errNoAgentDropPath    = errors.New("missing AGENT_DROP_PATH environment variable")
+	errAtLeastOnePlatform = errors.New("elastic-agent package is expected to build at least one platform package")
+
+	// goIntegTestTimeout is the timeout passed to each instance of 'go test' used in integration tests.
+	goIntegTestTimeout = 2 * time.Hour
+	// goProvisionAndTestTimeout is the timeout used for both provisioning and running tests.
+	goProvisionAndTestTimeout = goIntegTestTimeout + 30*time.Minute
+)
 
 func init() {
 	common.RegisterCheckDeps(Update, Check.All)
@@ -2069,7 +2077,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 			extraFlags = append(extraFlags, goTestFlags...)
 		}
 		extraFlags = append(extraFlags, "-test.shuffle", "on",
-			"-test.timeout", "2h", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
+			"-test.timeout", goIntegTestTimeout.String(), "-test.run", "^("+strings.Join(packageTests, "|")+")$")
 		params := mage.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
@@ -2091,6 +2099,13 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 }
 
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
+	if _, ok := ctx.Deadline(); !ok {
+		// If the context doesn't have a timeout (usually via the mage -t option), give it one.
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, goProvisionAndTestTimeout)
+		defer cancel()
+	}
+
 	for {
 		failedCount, err := integRunnerOnce(ctx, matrix, singleTest)
 		if err != nil {
@@ -2270,6 +2285,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		DiagnosticsDir: diagDir,
 		StateDir:       ".integration-cache",
 		Platforms:      testPlatforms(),
+		Packages:       testPackages(),
 		Groups:         testGroups(),
 		Matrix:         matrix,
 		SingleTest:     singleTest,
@@ -2363,6 +2379,23 @@ func testPlatforms() []string {
 		}
 	}
 	return platforms
+}
+
+func testPackages() []string {
+	packagesStr, defined := os.LookupEnv("TEST_PACKAGES")
+	if !defined {
+		return nil
+	}
+
+	var packages []string
+	for _, p := range strings.Split(packagesStr, ",") {
+		if p == "tar.gz" {
+			p = "targz"
+		}
+		packages = append(packages, p)
+	}
+
+	return packages
 }
 
 func testGroups() []string {
