@@ -59,6 +59,17 @@ var (
 			},
 		},
 	}
+	fakeNonGroupedInputSpec = component.InputSpec{
+		Name: "fake-non-grouped",
+		Command: &component.CommandSpec{
+			Timeouts: component.CommandTimeoutSpec{
+				Checkin: 30 * time.Second,
+				Restart: 10 * time.Millisecond, // quick restart during tests
+				Stop:    30 * time.Second,
+			},
+		},
+		SkipGroup: true,
+	}
 	fakeShipperSpec = component.ShipperSpec{
 		Name: "fake-shipper",
 		Command: &component.CommandSpec{
