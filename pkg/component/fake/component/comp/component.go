@@ -27,10 +27,10 @@ import (
 )
 
 const (
-	Fake         = "fake"
-	FakeNonGroup = "fake-non-group"
-	fakeShipper  = "fake-shipper"
-	APM          = "fake-apm"
+	Fake           = "fake"
+	FakeNonGrouped = "fake-non-grouped"
+	fakeShipper    = "fake-shipper"
+	APM            = "fake-apm"
 
 	configuringMsg = "Configuring"
 	stoppingMsg    = "Stopping"
@@ -387,7 +387,7 @@ func (f *fakeInput) Update(u *client.Unit, triggers client.Trigger) error {
 	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if expected.Config.Type != Fake {
+	if expected.Config.Type != Fake && expected.Config.Type != FakeNonGrouped {
 		return fmt.Errorf("unit type changed with the same unit ID: %s",
 			expected.Config.Type)
 	}

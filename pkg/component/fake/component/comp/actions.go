@@ -134,6 +134,7 @@ func newRunningUnit(logger zerolog.Logger, manager *StateManager, unit *client.U
 	}
 	switch expected.Config.Type {
 	case Fake:
+	case FakeNonGrouped:
 		return newFakeInput(logger, expected.LogLevel, manager, unit, expected.Config)
 	case APM:
 		return newFakeAPMInput(logger, expected.LogLevel, unit)
