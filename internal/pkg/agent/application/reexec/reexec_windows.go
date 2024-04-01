@@ -7,10 +7,14 @@
 package reexec
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"syscall"
+
+	"golang.org/x/sys/windows"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -30,14 +34,24 @@ func reexec(log *logger.Logger, executable string, argOverrides ...string) error
 	if info.RunningUnderSupervisor() {
 		// running as a service; spawn re-exec windows sub-process
 		log.Infof("Running as Windows service; triggering service restart")
+
+		// use the same token of this process to perform the rexec_windows command
+		// otherwise the spawned process will not be able to connect to the service control manager
+		t, err := windows.OpenCurrentProcessToken()
+		if err != nil {
+			return fmt.Errorf("failed to open current process token: %w", err)
+		}
+		defer t.Close()
+
 		args := []string{filepath.Base(executable), "reexec_windows", paths.ServiceName, strconv.Itoa(os.Getpid())}
 		args = append(args, argOverrides...)
 		cmd := exec.Cmd{
-			Path:   executable,
-			Args:   args,
-			Stdin:  os.Stdin,
-			Stdout: os.Stdout,
-			Stderr: os.Stderr,
+			Path:        executable,
+			Args:        args,
+			Stdin:       os.Stdin,
+			Stdout:      os.Stdout,
+			Stderr:      os.Stderr,
+			SysProcAttr: &syscall.SysProcAttr{Token: syscall.Token(t)},
 		}
 		if err := cmd.Start(); err != nil {
 			return err

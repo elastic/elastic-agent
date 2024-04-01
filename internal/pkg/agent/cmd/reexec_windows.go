@@ -13,10 +13,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
