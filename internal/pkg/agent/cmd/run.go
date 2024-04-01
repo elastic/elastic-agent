@@ -142,6 +142,13 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, false, nil, modifiers...)
 }
 
+func logReturn(l *logger.Logger, err error) error {
+	if err != nil {
+		l.Errorf("%s", err)
+	}
+	return err
+}
+
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, runAsOtel bool, awaiters awaiters, modifiers ...component.PlatformModifier) error {
 	cfg, err := loadConfig(ctx, override, runAsOtel)
 	if err != nil {
@@ -164,19 +171,20 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 		"source": agentName,
 	})
 
-	l.Infow("Elastic Agent started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion())
-
 	// try early to check if running as root
 	isRoot, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("failed to check for root/Administrator privileges: %w", err)
+		return logReturn(l, fmt.Errorf("failed to check for root/Administrator privileges: %w", err))
 	}
+
+	l.Infow("Elastic Agent started",
+		"process.pid", os.Getpid(),
+		"agent.version", version.GetAgentPackageVersion(),
+		"agent.unprivileged", !isRoot)
 
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
-		err = errors.New(err, "failed to perform delayed enrollment")
-		l.Error(err)
-		return err
+		return logReturn(l, errors.New(err, "failed to perform delayed enrollment"))
 	}
 	pathConfigFile := paths.AgentConfigFile()
 
@@ -192,7 +200,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
 	err = secret.CreateAgentSecret(ctx, vault.WithUnprivileged(!isRoot))
 	if err != nil {
-		return fmt.Errorf("failed to read/write secrets: %w", err)
+		return logReturn(l, fmt.Errorf("failed to read/write secrets: %w", err))
 	}
 
 	// Migrate .yml files if the corresponding .enc does not exist
@@ -200,21 +208,21 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// the encrypted config does not exist but the unencrypted file does
 	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentConfigYmlFile(), paths.AgentConfigFile())
 	if err != nil {
-		return errors.New(err, "error migrating fleet config")
+		return logReturn(l, errors.New(err, "error migrating fleet config"))
 	}
 
 	// the encrypted state does not exist but the unencrypted file does
 	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
 	if err != nil {
-		return errors.New(err, "error migrating agent state")
+		return logReturn(l, errors.New(err, "error migrating agent state"))
 	}
 
 	agentInfo, err := info.NewAgentInfoWithLog(ctx, defaultLogLevel(cfg, logLvl.String()), createAgentID)
 	if err != nil {
-		return errors.New(err,
+		return logReturn(l, errors.New(err,
 			"could not load agent info",
 			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile))
+			errors.M(errors.MetaKeyPath, pathConfigFile)))
 	}
 
 	// Ensure that the log level now matches what is configured in the agentInfo.
@@ -237,14 +245,14 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 
 	execPath, err := reexecPath()
 	if err != nil {
-		return err
+		return logReturn(l, fmt.Errorf("failed to get reexec path: %w", err))
 	}
 	rexLogger := l.Named("reexec")
 	rex := reexec.NewManager(rexLogger, execPath)
 
 	tracer, err := initTracer(agentName, release.Version(), cfg.Settings.MonitoringConfig)
 	if err != nil {
-		return fmt.Errorf("could not initiate APM tracer: %w", err)
+		return logReturn(l, fmt.Errorf("could not initiate APM tracer: %w", err))
 	}
 	if tracer != nil {
 		l.Info("APM instrumentation enabled")
@@ -258,13 +266,13 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 
 	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), runAsOtel, modifiers...)
 	if err != nil {
-		return err
+		return logReturn(l, err)
 	}
 	defer composable.Close()
 
 	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
-		return err
+		return logReturn(l, err)
 	}
 	coord.RegisterMonitoringServer(monitoringServer)
 	defer func() {
@@ -288,7 +296,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 
 	// start the control listener
 	if err := control.Start(); err != nil {
-		return err
+		return logReturn(l, err)
 	}
 	defer control.Stop()
 
@@ -373,7 +381,7 @@ LOOP:
 	if isRex {
 		rex.ShutdownComplete()
 	}
-	return err
+	return logReturn(l, err)
 }
 
 func loadConfig(ctx context.Context, override cfgOverrider, runAsOtel bool) (*configuration.Configuration, error) {

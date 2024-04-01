@@ -13,11 +13,16 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+)
+
+const (
+	reexecName = "elastic-agent-reexec"
 )
 
 func newReExecWindowsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -28,46 +33,62 @@ func newReExecWindowsCommand(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Long:   "This waits for the windows service to stop then restarts it to allow self-upgrading.",
 		Args:   cobra.ExactArgs(2),
 		Run: func(c *cobra.Command, args []string) {
+			cfg := getConfig(streams)
+			log, err := configuredLogger(cfg, reexecName)
+			if err != nil {
+				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
+				os.Exit(3)
+			}
+
+			// Make sure to flush any buffered logs before we're done.
+			defer log.Sync() //nolint:errcheck // flushing buffered logs is best effort.
+
 			serviceName := args[0]
 			servicePid, err := strconv.Atoi(args[1])
 			if err != nil {
-				fmt.Fprintf(streams.Err, "%v\n", err)
+				log.Errorw("reexec failed", "error.message", err)
+				fmt.Fprintf(streams.Err, "reexec failed: %v\n", err)
 				os.Exit(1)
 			}
-			reExec(serviceName, servicePid, streams.Err)
+			reExec(log, serviceName, servicePid, streams.Err)
 		},
 	}
 
 	return cmd
 }
 
-func reExec(serviceName string, servicePid int, writer io.Writer) {
+func reExec(log *logp.Logger, serviceName string, servicePid int, writer io.Writer) {
 	for {
-		ready, err := ensureAnotherProcess(serviceName, servicePid)
+		ready, err := ensureAnotherProcess(log, serviceName, servicePid)
 		if err == nil && ready {
 			// all done
+			// success is logged in the ensureAnotherProcess with more detail
 			return
 		}
 		if err != nil {
-			fmt.Fprintf(writer, "%s", err)
+			log.Errorw("failed to ensure another service process was spawned; will retry in 0.3 seconds", "error.message", err)
+			_, _ = fmt.Fprintf(writer, "failed to ensure another service process was spawned; will retry in 0.3 seconds: %s", err)
 		}
 		<-time.After(300 * time.Millisecond)
 	}
 }
 
-func ensureAnotherProcess(serviceName string, servicePid int) (bool, error) {
+func ensureAnotherProcess(log *logp.Logger, serviceName string, servicePid int) (bool, error) {
 	status, err := getServiceState(serviceName)
 	if err != nil {
 		return false, err
 	}
+	log.Infof("current state for service(%s): %s [%d]", serviceName, status.State, status.ProcessId)
 
 	if status.State == svc.Running && status.ProcessId != 0 && int(status.ProcessId) != servicePid {
 		// running and it's a different process
+		log.Infof("reexec complete; running and with a different PID (%d != %d)", servicePid, status.ProcessId)
 		return true, nil
 	}
 
 	if status.State == svc.Stopped {
 		// fully stopped
+		log.Infof("service is completely stopped; starting the service")
 		err = startService(serviceName)
 		return false, err
 	}
