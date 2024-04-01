@@ -5,33 +5,24 @@
 package upgradetest
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
 	bversion "github.com/elastic/elastic-agent/version"
 )
 
-// Response from https://artifacts-api.elastic.co/v1/versions
-var versionsResponse = tools.VersionList{
-	Versions: []string{
+var (
+	versionList = []string{
 		"7.17.13",
 		"7.17.14",
 		"7.17.15",
 		"7.17.16",
 		"7.17.17",
-		"7.17.18-SNAPSHOT",
 		"7.17.18",
-		"7.17.19-SNAPSHOT",
 		"8.9.2",
 		"8.10.0",
 		"8.10.1",
@@ -44,31 +35,17 @@ var versionsResponse = tools.VersionList{
 		"8.11.3",
 		"8.11.4",
 		"8.12.0",
-		"8.12.1-SNAPSHOT",
 		"8.12.1",
-		"8.12.2-SNAPSHOT",
 		"8.12.2",
-		"8.13.0-SNAPSHOT",
 		"8.13.0",
+	}
+	snapshotList = []string{
+		"7.17.19-SNAPSHOT",
+		"8.12.2-SNAPSHOT",
+		"8.13.0-SNAPSHOT",
 		"8.14.0-SNAPSHOT",
-	},
-	Aliases: []string{
-		"7.17-SNAPSHOT",
-		"7.17",
-		"8.9",
-		"8.10",
-		"8.11",
-		"8.12-SNAPSHOT",
-		"8.12",
-		"8.13-SNAPSHOT",
-		"8.13",
-		"8.14-SNAPSHOT",
-	},
-	Manifests: tools.Manifests{
-		LastUpdateTime:         "Fri, 23 Feb 2024 11:25:33 UTC",
-		SecondsSinceLastUpdate: 164,
-	},
-}
+	}
+)
 
 func TestFetchUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -84,25 +61,22 @@ func TestFetchUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
 		"7.17.18",
 	}
 
-	versionBytes, err := json.Marshal(versionsResponse)
-	require.NoError(t, err)
-
-	server := httptest.NewServer(http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		resp.WriteHeader(http.StatusOK)
-		_, err := io.Copy(resp, bytes.NewBuffer(versionBytes))
-		assert.NoError(t, err)
-	}))
-	defer server.Close()
-	aac := tools.NewArtifactAPIClient(tools.WithUrl(server.URL), tools.WithLogFunc(t.Logf))
-
 	reqs := VersionRequirements{
-		UpgradeToVersion: "8.13.0", // to test that 8.14 is not returned
-		CurrentMajors:    3,        // should return 8.12.2, 8.12.1, 8.12.0
-		PreviousMajors:   3,        // should return 7.17.18
-		PreviousMinors:   2,        // should return 8.12.2, 8.11.4
-		RecentSnapshots:  2,        // should return 8.13.0-SNAPSHOT, 8.12.2-SNAPSHOT
+		UpgradeToVersion: "8.13.0",                 // to test that 8.14 is not returned
+		CurrentMajors:    3,                        // should return 8.12.2, 8.12.1, 8.12.0
+		PreviousMajors:   3,                        // should return 7.17.18
+		PreviousMinors:   2,                        // should return 8.12.2, 8.11.4
+		SnapshotBranches: []string{"8.13", "8.12"}, // should return 8.13.0-SNAPSHOT, 8.12.2-SNAPSHOT
 	}
-	versions, err := FetchUpgradableVersions(ctx, aac, reqs)
+
+	vf := fetcherMock{
+		list: buildVersionList(t, versionList),
+	}
+	sf := fetcherMock{
+		list: buildVersionList(t, snapshotList),
+	}
+
+	versions, err := FetchUpgradableVersions(ctx, vf, sf, reqs)
 	require.NoError(t, err)
 	assert.Equal(t, expectedUpgradableVersions, versions)
 }
@@ -119,10 +93,29 @@ func TestPreviousMinor(t *testing.T) {
 
 	v, err := PreviousMinor()
 	require.NoError(t, err)
+	t.Logf("previous minor: %s", v.String())
+	assert.Truef(t, currentParsed.Major() == v.Major() && currentParsed.Minor() > v.Minor(), "%s is not previous minor for %s", v, bversion.Agent)
+	assert.Empty(t, v.Prerelease())
+	assert.Empty(t, v.BuildMetadata())
+}
 
-	parsed, err := version.ParseVersion(v)
-	require.NoError(t, err)
-	assert.Truef(t, currentParsed.Major() == parsed.Major() && currentParsed.Minor() > parsed.Minor(), "%s is not previous minor for %s", v, bversion.Agent)
-	assert.Empty(t, parsed.Prerelease())
-	assert.Empty(t, parsed.BuildMetadata())
+func buildVersionList(t *testing.T, versions []string) version.SortableParsedVersions {
+	result := make(version.SortableParsedVersions, 0, len(versions))
+	for _, v := range versions {
+		parsed, err := version.ParseVersion(v)
+		require.NoError(t, err)
+		result = append(result, parsed)
+	}
+	return result
+}
+
+type fetcherMock struct {
+	list version.SortableParsedVersions
+}
+
+func (f fetcherMock) FetchAgentVersions(ctx context.Context) (version.SortableParsedVersions, error) {
+	return f.list, nil
+}
+func (f fetcherMock) FindLatestSnapshots(ctx context.Context, branches []string) (version.SortableParsedVersions, error) {
+	return f.list, nil
 }

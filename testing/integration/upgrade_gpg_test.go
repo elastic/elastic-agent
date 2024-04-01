@@ -122,7 +122,7 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 
 	// FIXME: this is a hack, PreviousMinor() uses a version.ParsedSemVer internally and that's what we should use for the snapshot check
 	// We need to distinguish between snapshots and released versions and use the appropriate fetcher
-	if strings.HasSuffix(upgradeToVersion, "-SNAPSHOT") {
+	if upgradeToVersion.IsSnapshot() {
 		// it's a snapshot, use the artifact fetcher
 		fetcher = atesting.ArtifactFetcher()
 	} else {
@@ -133,7 +133,7 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 
 	endFixture, err := atesting.NewFixture(
 		t,
-		upgradeToVersion,
+		upgradeToVersion.String(),
 		atesting.WithFetcher(fetcher),
 	)
 	require.NoError(t, err)

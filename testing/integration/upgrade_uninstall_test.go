@@ -20,7 +20,6 @@ import (
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -41,8 +40,6 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	defer cancel()
 
 	// Upgrades to build under test.
-	endVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
 	endFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
@@ -50,20 +47,12 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 
 	// Start on a snapshot build, we want this test to upgrade to our
 	// build to ensure that the uninstall will kill the watcher.
-	// We need a snapshot with a non-matching commit hash to perform the upgrade
-	aac := tools.NewArtifactAPIClient(tools.WithLogFunc(t.Logf))
-	buildInfo, err := aac.FindBuild(ctx, endVersion.VersionWithPrerelease(), endVersionInfo.Binary.Commit, 0)
-	if errors.Is(err, tools.ErrBuildNotFound) {
-		t.Skipf("there is no other build with a non-matching commit hash in the given version %s", endVersion.VersionWithPrerelease())
-		return
-	}
+	// We need a version with a non-matching commit hash to perform the upgrade
+	startVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
-
-	t.Logf("found build %q available for testing", buildInfo.Build.BuildID)
-	startVersion := versionWithBuildID(t, endVersion, buildInfo.Build.BuildID)
 	startFixture, err := atesting.NewFixture(
 		t,
-		startVersion,
+		startVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
