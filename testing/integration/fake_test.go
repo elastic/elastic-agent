@@ -63,7 +63,7 @@ outputs:
 inputs:
   - id: fake-non-grouped-0
     type: fake-non-grouped
-    state: 1
+    state: 2
     message: Healthy
   - id: fake-non-grouped-1
     type: fake-non-grouped
