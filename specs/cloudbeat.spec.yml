@@ -38,46 +38,46 @@ inputs:
         - "logging.to_stderr=true"
         - "-E"
         - "gc_percent=${CLOUDBEAT_GOGC:100}"
-    skip_group: true
+    isolate_units: true
   - name: cloudbeat/cis_k8s
     description: "CIS Kubernetes monitoring"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
     command: *command
-    skip_group: true
+    isolate_units: true
   - name: cloudbeat/cis_eks
     description: "CIS elastic Kubernetes monitoring"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
     command: *command
-    skip_group: true
+    isolate_units: true
   - name: cloudbeat/cis_aws
     description: "CIS AWS monitoring"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
     command: *command
-    skip_group: true
+    isolate_units: true
   - name: cloudbeat/cis_gcp
     description: "CIS GCP monitoring"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
     command: *command
-    skip_group: true
+    isolate_units: true
   - name: cloudbeat/cis_azure
     description: "CIS AZURE monitoring"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
     command: *command
-    skip_group: true
+    isolate_units: true
   - name: cloudbeat/vuln_mgmt_aws
     description: "AWS Vulnerabilities management"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
     command: *command
-    skip_group: true
+    isolate_units: true

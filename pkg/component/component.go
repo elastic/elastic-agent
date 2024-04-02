@@ -344,7 +344,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 ) []Component {
 	inputSpec, componentErr := r.GetInput(inputType)
 	// Treat as grouped component on error of reading the input spec
-	if componentErr != nil || !inputSpec.Spec.SkipGroup {
+	if componentErr != nil || !inputSpec.Spec.IsolateUnits {
 		return []Component{
 			r.groupedComponentForInputType(inputType, output, featureFlags, componentConfig),
 		}

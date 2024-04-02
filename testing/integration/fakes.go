@@ -68,8 +68,8 @@ var fakeComponent = atesting.UsableComponent{
 				Shippers: []string{
 					fakeShipperName,
 				},
-				Command:   &component.CommandSpec{},
-				SkipGroup: true,
+				Command:      &component.CommandSpec{},
+				IsolateUnits: true,
 			},
 		},
 	},

@@ -21,9 +21,9 @@ type InputSpec struct {
 	Shippers       []string    `config:"shippers,omitempty" yaml:"shippers,omitempty"`
 	Runtime        RuntimeSpec `config:"runtime,omitempty" yaml:"runtime,omitempty"`
 
-	Command   *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
-	Service   *ServiceSpec `config:"service,omitempty" yaml:"service,omitempty"`
-	SkipGroup bool         `config:"skip_group,omitempty" yaml:"skip_group,omitempty"`
+	Command      *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
+	Service      *ServiceSpec `config:"service,omitempty" yaml:"service,omitempty"`
+	IsolateUnits bool         `config:"isolate_units,omitempty" yaml:"isolate_units,omitempty"`
 }
 
 // Validate ensures correctness of input specification.
