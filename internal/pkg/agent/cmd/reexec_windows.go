@@ -70,7 +70,7 @@ func reExec(log *logp.Logger, serviceName string, servicePid int, writer io.Writ
 			log.Errorw("failed to ensure another service process was spawned; will retry in 0.3 seconds", "error.message", err)
 			_, _ = fmt.Fprintf(writer, "failed to ensure another service process was spawned; will retry in 0.3 seconds: %s", err)
 		}
-		<-time.After(300 * time.Millisecond)
+		time.Sleep(300 * time.Millisecond)
 	}
 }
 
@@ -79,7 +79,7 @@ func ensureAnotherProcess(log *logp.Logger, serviceName string, servicePid int) 
 	if err != nil {
 		return false, err
 	}
-	log.Infof("current state for service(%s): %s [%d]", serviceName, status.State, status.ProcessId)
+	log.Infof("current state for service(%s); state: %d [pid: %d]", serviceName, status.State, status.ProcessId)
 
 	if status.State == svc.Running && status.ProcessId != 0 && int(status.ProcessId) != servicePid {
 		// running and it's a different process

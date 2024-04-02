@@ -26,6 +26,10 @@ type FileOwner struct {
 }
 
 // CurrentFileOwner returns the executing UID and GID of the current process.
+//
+// Note: Very unlikely for this to panic if this function is unable to get the current
+// user. Not being able to get the current user, is a critical problem and nothing
+// can continue so a panic is appropriate.
 func CurrentFileOwner() FileOwner {
 	u, err := user.Current()
 	if err != nil {

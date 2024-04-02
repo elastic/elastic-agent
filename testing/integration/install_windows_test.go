@@ -19,10 +19,10 @@ import (
 
 func checkPlatformUnprivileged(t *testing.T, f *atesting.Fixture, topPath string) {
 	// Check that the elastic-agent user/group exist.
-	_, err := install.FindUID("elastic-agent-user")
-	require.NoError(t, err, "failed to find elastic-agent-user user")
-	_, err = install.FindGID("elastic-agent")
-	require.NoError(t, err, "failed to find elastic-agent group")
+	_, err := install.FindUID(install.ElasticUsername)
+	require.NoErrorf(t, err, "failed to find %s user", install.ElasticUsername)
+	_, err = install.FindGID(install.ElasticGroupName)
+	require.NoError(t, err, "failed to find %s group", install.ElasticGroupName)
 
 	var output atesting.AgentStatusOutput
 	require.Eventuallyf(t, func() bool {

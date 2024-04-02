@@ -95,7 +95,7 @@ func FindUID(name string) (string, error) {
 
 // CreateUser creates a user on the machine.
 //
-// User is created with about interactive rights, no logon rights, and only service rights.
+// User is created without interactive rights, no logon rights, and only service rights.
 func CreateUser(name string, _ string) (string, error) {
 	var parmErr uint32
 	var err error

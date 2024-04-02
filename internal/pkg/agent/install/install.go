@@ -29,8 +29,8 @@ import (
 const (
 	darwin = "darwin"
 
-	elasticUsername  = "elastic-agent-user"
-	elasticGroupName = "elastic-agent"
+	ElasticUsername  = "elastic-agent-user"
+	ElasticGroupName = "elastic-agent"
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
@@ -64,8 +64,8 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	username := ""
 	groupName := ""
 	if unprivileged {
-		username = elasticUsername
-		groupName = elasticGroupName
+		username = ElasticUsername
+		groupName = ElasticGroupName
 
 		// ensure required group
 		ownership.GID, err = FindGID(groupName)

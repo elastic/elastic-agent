@@ -23,9 +23,9 @@ import (
 
 func checkPlatformUnprivileged(t *testing.T, _ *atesting.Fixture, topPath string) {
 	// Check that the elastic-agent user/group exist.
-	uid, err := install.FindUID("elastic-agent-user")
+	uid, err := install.FindUID(install.ElasticUsername)
 	require.NoError(t, err)
-	gid, err := install.FindGID("elastic-agent")
+	gid, err := install.FindGID(install.ElasticGroupName)
 	require.NoError(t, err)
 
 	// Path should now exist as well as be owned by the correct user/group.
@@ -33,8 +33,8 @@ func checkPlatformUnprivileged(t *testing.T, _ *atesting.Fixture, topPath string
 	require.NoError(t, err)
 	fs, ok := info.Sys().(*syscall.Stat_t)
 	require.True(t, ok)
-	require.Equalf(t, fs.Uid, uint32(uid), "%s not owned by elastic-agent-user user", topPath)
-	require.Equalf(t, fs.Gid, uint32(gid), "%s not owned by elastic-agent group", topPath)
+	require.Equalf(t, fs.Uid, uint32(uid), "%s not owned by %s user", install.ElasticUsername, topPath)
+	require.Equalf(t, fs.Gid, uint32(gid), "%s not owned by %s group", install.ElasticGroupName, topPath)
 
 	// Check that the socket is created with the correct permissions.
 	socketPath := filepath.Join(topPath, paths.ControlSocketName)
@@ -46,13 +46,13 @@ func checkPlatformUnprivileged(t *testing.T, _ *atesting.Fixture, topPath string
 	require.NoError(t, err)
 	fs, ok = info.Sys().(*syscall.Stat_t)
 	require.True(t, ok)
-	require.Equalf(t, fs.Uid, uint32(uid), "%s not owned by elastic-agent-user user", socketPath)
-	require.Equalf(t, fs.Gid, uint32(gid), "%s not owned by elastic-agent group", socketPath)
+	require.Equalf(t, fs.Uid, uint32(uid), "%s not owned by %s user", install.ElasticUsername, socketPath)
+	require.Equalf(t, fs.Gid, uint32(gid), "%s not owned by %s group", install.ElasticGroupName, socketPath)
 
 	// Executing `elastic-agent status` as the `elastic-agent-user` user should work.
 	var output []byte
 	require.Eventuallyf(t, func() bool {
-		cmd := exec.Command("sudo", "-u", "elastic-agent-user", "elastic-agent", "status")
+		cmd := exec.Command("sudo", "-u", install.ElasticUsername, "elastic-agent", "status")
 		output, err = cmd.CombinedOutput()
 		return err == nil
 	}, 3*time.Minute, 1*time.Second, "status never successful: %s (output: %s)", err, output)

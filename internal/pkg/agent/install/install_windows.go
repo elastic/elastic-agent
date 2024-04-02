@@ -82,6 +82,7 @@ func servicePostInstall(ownership utils.FileOwner) error {
 		return nil
 	}
 
+	// https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/sddl-for-device-objects
 	securityDescriptor, err := windows.SecurityDescriptorFromString(
 		"D:(A;;GA;;;SY)" + // SDDL_LOCAL_SYSTEM -> SDDL_GENERIC_ALL
 			"(A;;GA;;;BA)" + // SDDL_BUILTIN_ADMINISTRATORS -> SDDL_GENERIC_ALL

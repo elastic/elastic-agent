@@ -37,11 +37,14 @@ func reexec(log *logger.Logger, executable string, argOverrides ...string) error
 
 		// use the same token of this process to perform the rexec_windows command
 		// otherwise the spawned process will not be able to connect to the service control manager
-		t, err := windows.OpenCurrentProcessToken()
+		var t windows.Token
+		err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &t)
 		if err != nil {
 			return fmt.Errorf("failed to open current process token: %w", err)
 		}
-		defer t.Close()
+		defer func() {
+			_ = t.Close()
+		}()
 
 		args := []string{filepath.Base(executable), "reexec_windows", paths.ServiceName, strconv.Itoa(os.Getpid())}
 		args = append(args, argOverrides...)
