@@ -170,7 +170,7 @@ func ExampleNewServer_checkin() {
 
 	fmt.Println(got.Actions)
 	// Output:
-	// [action_id: anActionID, type: POLICY_CHANGE]
+	// [id: anActionID, type: POLICY_CHANGE]
 }
 
 func ExampleNewServer_ack() {
@@ -353,7 +353,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 	fmt.Println(resp.Actions)
 
 	// Output:
-	// [action_id: anActionID, type: POLICY_CHANGE]
+	// [id: anActionID, type: POLICY_CHANGE]
 	// Error: status code: 418, fleet-server returned an error: I'm a teapot
 	// []
 }
@@ -423,7 +423,7 @@ func ExampleNewServer_checkin_withDelay() {
 		resp.Actions)
 
 	// Output:
-	// took more than 250ms: true. response: [action_id: anActionID, type: POLICY_CHANGE]
+	// took more than 250ms: true. response: [id: anActionID, type: POLICY_CHANGE]
 	// took more than 250ms: false. response: []
 }
 
@@ -647,7 +647,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// Output:
 	// [1st ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action anActionID not found"}}}
-	// [1st checkin] [action_id: anActionID, type: POLICY_CHANGE]
+	// [1st checkin] [id: anActionID, type: POLICY_CHANGE]
 	// [2nd ack] &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
 	// [2nd checkin] Error: status code: 418, fleet-server returned an error: I'm a teapot
 	// [3rd ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}
