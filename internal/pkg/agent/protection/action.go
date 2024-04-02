@@ -21,7 +21,7 @@ var (
 )
 
 type fleetActionWithAgents struct {
-	ActionID         string          `json:"action_id"` // Note the action_id here, since the signed action uses action_id for id
+	ActionID         string          `json:"id"`
 	ActionType       string          `json:"type,omitempty"`
 	InputType        string          `json:"input_type,omitempty"`
 	Timestamp        string          `json:"@timestamp"`

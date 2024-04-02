@@ -156,7 +156,7 @@ func (a *ActionUnknown) ID() string {
 
 func (a *ActionUnknown) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -189,7 +189,7 @@ type ActionPolicyReassignData struct {
 
 func (a *ActionPolicyReassign) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -223,7 +223,7 @@ type ActionPolicyChangeData struct {
 
 func (a *ActionPolicyChange) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -265,7 +265,7 @@ type ActionUpgradeData struct {
 
 func (a *ActionUpgrade) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -368,7 +368,7 @@ type ActionUnenroll struct {
 
 func (a *ActionUnenroll) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -421,7 +421,7 @@ func (a *ActionSettings) Type() string {
 
 func (a *ActionSettings) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -457,7 +457,7 @@ func (a *ActionCancel) Type() string {
 
 func (a *ActionCancel) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -472,11 +472,13 @@ func (a *ActionCancel) AckEvent() AckEvent {
 
 // ActionDiagnostics is a request to gather and upload a diagnostics bundle.
 type ActionDiagnostics struct {
-	ActionID          string   `json:"action_id"`
-	ActionType        string   `json:"type"`
-	AdditionalMetrics []string `json:"additional_metrics"`
-	UploadID          string   `json:"-"`
-	Err               error    `json:"-"`
+	ActionID   string `json:"id"`
+	ActionType string `json:"type"`
+	Data       struct {
+		AdditionalMetrics []string `json:"additional_metrics"`
+	} `json:"data"`
+	UploadID string `json:"-"`
+	Err      error  `json:"-"`
 }
 
 // ID returns the ID of the action.
@@ -491,7 +493,7 @@ func (a *ActionDiagnostics) Type() string {
 
 func (a *ActionDiagnostics) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
@@ -531,7 +533,7 @@ type ActionApp struct {
 
 func (a *ActionApp) String() string {
 	var s strings.Builder
-	s.WriteString("action_id: ")
+	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
