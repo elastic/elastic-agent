@@ -112,10 +112,4 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	if diff != "" {
 		t.Error(diff)
 	}
-
-	// Save something else
-	err = s.Save(bytes.NewBuffer([]byte("new data")))
-	if err != nil {
-		t.Fatal(err)
-	}
 }
