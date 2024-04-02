@@ -593,7 +593,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 	log, _ := logger.New("state_store", false)
 
 	t.Run("action returns empty when no action is saved on disk", func(t *testing.T) {
-		storePath := filepath.Join(t.TempDir(), "state.yml")
+		storePath := filepath.Join(t.TempDir(), "state.json")
 		s, err := storage.NewDiskStore(storePath)
 		require.NoError(t, err, "failed creating DiskStore")
 
@@ -608,7 +608,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			ActionID: "abc123",
 		}
 
-		storePath := filepath.Join(t.TempDir(), "state.yml")
+		storePath := filepath.Join(t.TempDir(), "state.json")
 		s, err := storage.NewDiskStore(storePath)
 		require.NoError(t, err, "failed creating DiskStore")
 
@@ -635,7 +635,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				}},
 		}
 
-		storePath := filepath.Join(t.TempDir(), "state.yml")
+		storePath := filepath.Join(t.TempDir(), "state.json")
 		s, err := storage.NewDiskStore(storePath)
 		require.NoError(t, err, "failed creating DiskStore")
 
@@ -672,7 +672,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			ActionType: "UNENROLL",
 		}
 
-		storePath := filepath.Join(t.TempDir(), "state.yml")
+		storePath := filepath.Join(t.TempDir(), "state.json")
 		s, err := storage.NewDiskStore(storePath)
 		require.NoError(t, err, "failed creating DiskStore")
 
@@ -703,7 +703,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 	})
 
 	t.Run("errors when saving invalid action type", func(t *testing.T) {
-		storePath := filepath.Join(t.TempDir(), "state.yml")
+		storePath := filepath.Join(t.TempDir(), "state.json")
 		s, err := storage.NewDiskStore(storePath)
 		require.NoError(t, err, "failed creating DiskStore")
 
@@ -717,7 +717,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 	})
 
 	t.Run("do not set action if it has the same ID", func(t *testing.T) {
-		storePath := filepath.Join(t.TempDir(), "state.yml")
+		storePath := filepath.Join(t.TempDir(), "state.json")
 		s, err := storage.NewDiskStore(storePath)
 		require.NoError(t, err, "failed creating DiskStore")
 
@@ -750,7 +750,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				SourceURI: "https://example.com",
 			}}}
 
-		storePath := filepath.Join(t.TempDir(), "state.yml")
+		storePath := filepath.Join(t.TempDir(), "state.json")
 		s, err := storage.NewDiskStore(storePath)
 		require.NoError(t, err, "failed creating DiskStore")
 
@@ -803,7 +803,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 					Retry:     1,
 				}}}
 
-		storePath := filepath.Join(t.TempDir(), "state.yml")
+		storePath := filepath.Join(t.TempDir(), "state.json")
 		s, err := storage.NewDiskStore(storePath)
 		require.NoError(t, err, "failed creating DiskStore")
 
@@ -839,7 +839,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			ActionID: "abc123",
 		}
 
-		storePath := filepath.Join(t.TempDir(), "state.yml")
+		storePath := filepath.Join(t.TempDir(), "state.json")
 		s, err := storage.NewDiskStore(storePath)
 		require.NoError(t, err, "failed creating DiskStore")
 
@@ -858,7 +858,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 	t.Run("state store is correctly loaded from disk", func(t *testing.T) {
 		t.Run("ActionPolicyChange", func(t *testing.T) {
-			storePath := filepath.Join(t.TempDir(), "state.yaml")
+			storePath := filepath.Join(t.TempDir(), "state.json")
 			want := &fleetapi.ActionPolicyChange{
 				ActionID:   "abc123",
 				ActionType: "POLICY_CHANGE",
@@ -906,7 +906,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		})
 
 		t.Run("ActionUnenroll", func(t *testing.T) {
-			storePath := filepath.Join(t.TempDir(), "state.yaml")
+			storePath := filepath.Join(t.TempDir(), "state.json")
 			want := &fleetapi.ActionUnenroll{
 				ActionID:   "abc123",
 				ActionType: fleetapi.ActionTypeUnenroll,
@@ -952,7 +952,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		})
 
 		t.Run("action queue", func(t *testing.T) {
-			storePath := filepath.Join(t.TempDir(), "state.yaml")
+			storePath := filepath.Join(t.TempDir(), "state.json")
 			now := time.Now().UTC().Round(time.Second)
 			want := &fleetapi.ActionUpgrade{
 				ActionID:         "test",
