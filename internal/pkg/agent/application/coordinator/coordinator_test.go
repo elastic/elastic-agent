@@ -72,7 +72,7 @@ var (
 				Stop:    30 * time.Second,
 			},
 		},
-		SkipGroup: true,
+		IsolateUnits: true,
 	}
 	fakeShipperSpec = component.ShipperSpec{
 		Name:      "fake-shipper",
