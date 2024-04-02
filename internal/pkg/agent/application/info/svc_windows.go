@@ -28,6 +28,8 @@ func RunningUnderSupervisor() bool {
 }
 
 func hasLocalSystemSID() (bool, error) {
+	// local system RID is given to processes that are running as a service
+	// with local system rights.
 	sid, err := allocSid(windows.SECURITY_LOCAL_SYSTEM_RID)
 	if err != nil {
 		return false, fmt.Errorf("allocate sid error: %w", err)
@@ -36,6 +38,9 @@ func hasLocalSystemSID() (bool, error) {
 		_ = windows.FreeSid(sid)
 	}()
 
+	// Internally uses CheckTokenMembership where `windows.Token(0)` represents a NULL
+	// token which uses the current process token.
+	// https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-checktokenmembership
 	token := windows.Token(0)
 	member, err := token.IsMember(sid)
 	if err != nil {
@@ -46,6 +51,8 @@ func hasLocalSystemSID() (bool, error) {
 }
 
 func hasServiceSID() (bool, error) {
+	// service RID is given to processes that are running as a service
+	// but do not have local system rights.
 	sid, err := allocSid(windows.SECURITY_SERVICE_RID)
 	if err != nil {
 		return false, fmt.Errorf("allocate sid error: %w", err)
@@ -54,6 +61,9 @@ func hasServiceSID() (bool, error) {
 		_ = windows.FreeSid(sid)
 	}()
 
+	// Internally uses CheckTokenMembership where `windows.Token(0)` represents a NULL
+	// token which uses the current process token.
+	// https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-checktokenmembership
 	token := windows.Token(0)
 	member, err := token.IsMember(sid)
 	if err != nil {
@@ -63,6 +73,9 @@ func hasServiceSID() (bool, error) {
 	return member, nil
 }
 
+// allocSID creates a SID from the provided subAuth0.
+//
+// allocated SID must be freed with `windows.FreeSid`.
 func allocSid(subAuth0 uint32) (*windows.SID, error) {
 	var sid *windows.SID
 	err := windows.AllocateAndInitializeSid(&windows.SECURITY_NT_AUTHORITY,
