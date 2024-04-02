@@ -472,13 +472,15 @@ func (a *ActionCancel) AckEvent() AckEvent {
 
 // ActionDiagnostics is a request to gather and upload a diagnostics bundle.
 type ActionDiagnostics struct {
-	ActionID   string `json:"id"`
-	ActionType string `json:"type"`
-	Data       struct {
-		AdditionalMetrics []string `json:"additional_metrics"`
-	} `json:"data"`
-	UploadID string `json:"-"`
-	Err      error  `json:"-"`
+	ActionID   string                `json:"id"`
+	ActionType string                `json:"type"`
+	Data       ActionDiagnosticsData `json:"data"`
+	UploadID   string                `json:"-"`
+	Err        error                 `json:"-"`
+}
+
+type ActionDiagnosticsData struct {
+	AdditionalMetrics []string `json:"additional_metrics"`
 }
 
 // ID returns the ID of the action.
