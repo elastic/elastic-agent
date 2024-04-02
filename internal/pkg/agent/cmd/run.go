@@ -143,7 +143,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 }
 
 func logReturn(l *logger.Logger, err error) error {
-	if err != nil {
+	if err != nil && !errors.Is(err, context.Canceled) {
 		l.Errorf("%s", err)
 	}
 	return err
