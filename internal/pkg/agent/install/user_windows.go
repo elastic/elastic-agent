@@ -7,9 +7,10 @@
 package install
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -98,7 +99,10 @@ func FindUID(name string) (string, error) {
 // User is created without interactive rights, no logon rights, and only service rights.
 func CreateUser(name string, _ string) (string, error) {
 	var parmErr uint32
-	var err error
+	password, err := RandomPassword()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random password: %w", err)
+	}
 	info := USER_INFO_1{
 		Usri1_priv:  USER_PRIV_USER,
 		Usri1_flags: USER_UF_SCRIPT | USER_UF_NORMAL_ACCOUNT | USER_UF_DONT_EXPIRE_PASSWD,
@@ -107,7 +111,7 @@ func CreateUser(name string, _ string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to encode username %s to UTF16: %w", name, err)
 	}
-	info.Usri1_password, err = syscall.UTF16PtrFromString(RandomPassword())
+	info.Usri1_password, err = syscall.UTF16PtrFromString(password)
 	if err != nil {
 		return "", fmt.Errorf("failed to encode password to UTF16: %w", err)
 	}
@@ -209,13 +213,18 @@ func SetUserPassword(name string, password string) error {
 }
 
 // RandomPassword generates a random password.
-func RandomPassword() string {
+func RandomPassword() (string, error) {
 	runes := []rune("abcdefghijklmnopqrstuvwxyz1234567890!@#$%^&*ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	maxN := big.NewInt(int64(len(runes)))
 	var sb strings.Builder
 	for i := 0; i < passwordLength; i++ {
-		sb.WriteRune(runes[rand.Intn(len(runes))])
+		n, err := rand.Int(rand.Reader, maxN)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate random integer: %w", err)
+		}
+		sb.WriteRune(runes[n.Int64()])
 	}
-	return sb.String()
+	return sb.String(), nil
 }
 
 // LOCALGROUP_INFO_0 structure contains a local group name.

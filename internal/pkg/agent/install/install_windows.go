@@ -61,8 +61,11 @@ func withServiceOptions(username string, groupName string) ([]serviceOpt, error)
 
 	// service requires a password to launch as the user
 	// this sets it to a random password that is only known by the service
-	password := RandomPassword()
-	err := SetUserPassword(username, password)
+	password, err := RandomPassword()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random password: %w", err)
+	}
+	err = SetUserPassword(username, password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set user %s password for service: %w", username, err)
 	}
