@@ -105,20 +105,20 @@ var nonGroupedComponentSetup = map[string]integrationtest.ComponentState{
 			},
 		},
 	},
-	// "fake-shipper-default": {
-	// 	State: integrationtest.NewClientState(client.Healthy),
-	// 	Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-	// 		integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
-	// 			State: integrationtest.NewClientState(client.Healthy),
-	// 		},
-	// 		integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-0"}: {
-	// 			State: integrationtest.NewClientState(client.Healthy),
-	// 		},
-	// 		integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
-	// 			State: integrationtest.NewClientState(client.Healthy),
-	// 		},
-	// 	},
-	// },
+	"fake-shipper-default": {
+		State: integrationtest.NewClientState(client.Healthy),
+		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-0"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+		},
+	},
 }
 
 type componentAndUnitNames struct {
