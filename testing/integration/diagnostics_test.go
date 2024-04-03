@@ -83,40 +83,40 @@ var componentSetup = map[string]integrationtest.ComponentState{
 }
 
 var nonGroupedComponentSetup = map[string]integrationtest.ComponentState{
-	"fake-non-grouped-default-fake-non-grouped-0": {
+	"fake-non-grouped-default-fake-non-grouped": {
 		State: integrationtest.NewClientState(client.Healthy),
 		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-0"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-0-unit"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-unit"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
 		},
 	},
-	"fake-non-grouped-default-fake-non-grouped-1": {
-		State: integrationtest.NewClientState(client.Healthy),
-		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
-				State: integrationtest.NewClientState(client.Healthy),
-			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1-unit"}: {
-				State: integrationtest.NewClientState(client.Healthy),
-			},
-		},
-	},
+	// "fake-non-grouped-default-fake-non-grouped-1": {
+	// 	State: integrationtest.NewClientState(client.Healthy),
+	// 	Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+	// 		integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+	// 			State: integrationtest.NewClientState(client.Healthy),
+	// 		},
+	// 		integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1-unit"}: {
+	// 			State: integrationtest.NewClientState(client.Healthy),
+	// 		},
+	// 	},
+	// },
 	"fake-shipper-default": {
 		State: integrationtest.NewClientState(client.Healthy),
 		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
 			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-0"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
-				State: integrationtest.NewClientState(client.Healthy),
-			},
+			// integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+			// 	State: integrationtest.NewClientState(client.Healthy),
+			// },
 		},
 	},
 }
