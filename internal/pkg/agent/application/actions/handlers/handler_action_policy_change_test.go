@@ -434,14 +434,14 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 		agentRootCertPool := x509.NewCertPool()
 		agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
 
-		fleetTLSServer.TLS = &tls.Config{ // nolint:gosec // it's just a test
+		fleetTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 			ClientCAs:    agentRootCertPool,
 			ClientAuth:   tls.RequireAndVerifyClientCert,
 		}
 
-		fleetNomTLSServer.TLS = &tls.Config{ // nolint:gosec // it's just a test
+		fleetNomTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 		}
