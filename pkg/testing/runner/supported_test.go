@@ -79,26 +79,26 @@ func TestGetSupported(t *testing.T) {
 			},
 		},
 		{
-			Name: "sles/not specific",
+			Name: "rhel/not specific",
 			OS: define.OS{
 				Type:   define.Linux,
 				Arch:   define.AMD64,
-				Distro: Sles,
+				Distro: Rhel,
 			},
 			Results: []SupportedOS{
-				SlesAMD64_15,
+				RhelAMD64_8,
 			},
 		},
 		{
-			Name: "sles/specific",
+			Name: "rhel/specific",
 			OS: define.OS{
 				Type:    define.Linux,
 				Arch:    define.AMD64,
-				Distro:  Sles,
-				Version: "15",
+				Distro:  Rhel,
+				Version: "8",
 			},
 			Results: []SupportedOS{
-				SlesAMD64_15,
+				RhelAMD64_8,
 			},
 		},
 	}
