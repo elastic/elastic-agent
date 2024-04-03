@@ -47,7 +47,6 @@ var simpleNonGroupedConfig = `
 outputs:
   default:
     type: fake-action-output
-    shipper.enabled: false
 inputs:
   - id: fake-non-grouped
     type: fake-non-grouped
@@ -59,7 +58,6 @@ var complexNonGroupedConfig = `
 outputs:
   default:
     type: fake-action-output
-    shipper.enabled: false
 inputs:
   - id: fake-non-grouped-0
     type: fake-non-grouped
@@ -153,7 +151,7 @@ func TestFakeNonGroupedComponent(t *testing.T) {
 			"fake-non-grouped-default-fake-non-grouped": {
 				State: atesting.NewClientState(client.Healthy),
 				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-action-output"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-unit"}: {
@@ -169,7 +167,7 @@ func TestFakeNonGroupedComponent(t *testing.T) {
 			"fake-non-grouped-default-fake-non-grouped-0": {
 				State: atesting.NewClientState(client.Healthy),
 				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-0"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-action-output"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-0-unit"}: {
@@ -180,7 +178,7 @@ func TestFakeNonGroupedComponent(t *testing.T) {
 			"fake-non-grouped-default-fake-non-grouped-1": {
 				State: atesting.NewClientState(client.Healthy),
 				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-action-output"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1-unit"}: {

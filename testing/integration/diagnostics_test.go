@@ -86,7 +86,7 @@ var nonGroupedComponentSetup = map[string]integrationtest.ComponentState{
 	"fake-non-grouped-default-fake-non-grouped-0": {
 		State: integrationtest.NewClientState(client.Healthy),
 		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-0"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-action-output"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
 			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-0-unit"}: {
@@ -97,7 +97,7 @@ var nonGroupedComponentSetup = map[string]integrationtest.ComponentState{
 	"fake-non-grouped-default-fake-non-grouped-1": {
 		State: integrationtest.NewClientState(client.Healthy),
 		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-action-output"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
 			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1-unit"}: {
