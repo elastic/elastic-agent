@@ -768,8 +768,8 @@ github.com/docker/distribution v2.8.2+incompatible/go.mod h1:J2gT2udsDAN96Uj4Kfc
 github.com/docker/docker v1.4.2-0.20190924003213-a8608b5b67c7/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker v20.10.11+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker v20.10.21+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
-github.com/docker/docker v24.0.7+incompatible h1:Wo6l37AuwP3JaMnZa226lzVXGA3F9Ig1seQen0cKYlM=
-github.com/docker/docker v24.0.7+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+github.com/docker/docker v24.0.9+incompatible h1:HPGzNmwfLZWdxHqK9/II92pyi1EpYKsAqcl4G0Of9v0=
+github.com/docker/docker v24.0.9+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker-credential-helpers v0.6.3/go.mod h1:WRaJzqw3CTB9bk10avuGsjVBZsD05qeibJ1/TYlvc0Y=
 github.com/docker/docker-credential-helpers v0.7.0/go.mod h1:rETQfLdHNT3foU5kuNkFR1R1V12OJRRO5lzt2D1b5X0=
 github.com/docker/go-connections v0.4.0/go.mod h1:Gbd7IOopHjR8Iph03tsViu4nIes5XhDvyHbTtUxmeec=
@@ -794,8 +794,8 @@ github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25Kn
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/elastic/e2e-testing v1.1.0 h1:Y+K215EWkf3ojAWmBK2JrxH/rITjkKM1zR8mnwIpvLw=
 github.com/elastic/e2e-testing v1.1.0/go.mod h1:8q2d8dmwavJXISowwaoreHFBnbR/uK4qanfRGhC/W9A=
-github.com/elastic/elastic-agent-autodiscover v0.6.8 h1:BSXz+QwjZAEt08G+T3GDGl14Bh9a6zD8luNCvZut/b8=
-github.com/elastic/elastic-agent-autodiscover v0.6.8/go.mod h1:hFeFqneS2r4jD0/QzGkrNk0YVdN0JGh7lCWdsH7zcI4=
+github.com/elastic/elastic-agent-autodiscover v0.6.11 h1:4APZd4kKJWilqUYrD63CGBqEp/6SJLjA7x+M4GBhDBk=
+github.com/elastic/elastic-agent-autodiscover v0.6.11/go.mod h1:7P6YVKxuBT0qE/VxuA87obwZUAEU0O44mCN3r4/6x8w=
 github.com/elastic/elastic-agent-client/v7 v7.8.1 h1:J9wZc/0mUvSEok0X5iR5+n60Jgb+AWooKddb3XgPWqM=
 github.com/elastic/elastic-agent-client/v7 v7.8.1/go.mod h1:axl1nkdqc84YRFkeJGD9jExKNPUrOrzf3DFo2m653nY=
 github.com/elastic/elastic-agent-libs v0.8.0 h1:q8N6zXWbVTRWXD0mqyLrYzh3MNpHpE2iURoDX9XCU2o=
