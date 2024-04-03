@@ -2285,6 +2285,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		DiagnosticsDir: diagDir,
 		StateDir:       ".integration-cache",
 		Platforms:      testPlatforms(),
+		Packages:       testPackages(),
 		Groups:         testGroups(),
 		Matrix:         matrix,
 		SingleTest:     singleTest,
@@ -2378,6 +2379,23 @@ func testPlatforms() []string {
 		}
 	}
 	return platforms
+}
+
+func testPackages() []string {
+	packagesStr, defined := os.LookupEnv("TEST_PACKAGES")
+	if !defined {
+		return nil
+	}
+
+	var packages []string
+	for _, p := range strings.Split(packagesStr, ",") {
+		if p == "tar.gz" {
+			p = "targz"
+		}
+		packages = append(packages, p)
+	}
+
+	return packages
 }
 
 func testGroups() []string {
