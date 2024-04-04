@@ -7,10 +7,14 @@
 package install
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
+	"golang.org/x/sys/windows"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
@@ -45,6 +49,60 @@ func postInstall(topPath string) error {
 }
 
 func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
-	// TODO(blakerouse): Fix the market permissions on Windows.
+	return perms.FixPermissions(markerFilePath, perms.WithOwnership(ownership))
+}
+
+// withServiceOptions just sets the user/group for the service.
+func withServiceOptions(username string, groupName string) ([]serviceOpt, error) {
+	if username == "" {
+		// not installed with --unprivileged; nothing to do
+		return []serviceOpt{}, nil
+	}
+
+	// service requires a password to launch as the user
+	// this sets it to a random password that is only known by the service
+	password, err := RandomPassword()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random password: %w", err)
+	}
+	err = SetUserPassword(username, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set user %s password for service: %w", username, err)
+	}
+
+	// username must be prefixed with `.\` so the service references the local systems users
+	username = fmt.Sprintf(`.\%s`, username)
+	return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
+}
+
+// servicePostInstall sets the security descriptor for the service
+//
+// gives user the ability to control the service, needed when installed with --unprivileged or
+// ReExec is not possible on Windows.
+func servicePostInstall(ownership utils.FileOwner) error {
+	if ownership.UID == "" {
+		// no user, running with LOCAL SYSTEM (do nothing)
+		return nil
+	}
+
+	// https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/sddl-for-device-objects
+	securityDescriptor, err := windows.SecurityDescriptorFromString(
+		"D:(A;;GA;;;SY)" + // SDDL_LOCAL_SYSTEM -> SDDL_GENERIC_ALL
+			"(A;;GA;;;BA)" + // SDDL_BUILTIN_ADMINISTRATORS -> SDDL_GENERIC_ALL
+			"(A;;GR;;;WD)" + // SDDL_EVERYONE -> SDDL_GENERIC_READ
+			"(A;;GRGX;;;NS)" + // SDDL_NETWORK_SERVICE -> SDDL_GENERIC_READ|SDDL_GENERIC_EXECUTE
+			fmt.Sprintf("(A;;GA;;;%s)", ownership.UID), // Ownership UID -> SDDL_GENERIC_ALL
+	)
+	if err != nil {
+		return fmt.Errorf("failed to build security descriptor from SSDL: %w", err)
+	}
+	dacl, _, err := securityDescriptor.DACL()
+	if err != nil {
+		return fmt.Errorf("failed to get DACL from security descriptor: %w", err)
+	}
+	err = windows.SetNamedSecurityInfo(paths.ServiceName, windows.SE_SERVICE, windows.DACL_SECURITY_INFORMATION, nil, nil, dacl, nil)
+	if err != nil {
+		return fmt.Errorf("failed to set DACL for service(%s): %w", paths.ServiceName, err)
+	}
 	return nil
 }

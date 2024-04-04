@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hectane/go-acl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -125,7 +126,75 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 	// name. This policy does not contain any integration.
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
+		Namespace:   info.Namespace,
+		Description: "test policy for agent enrollment",
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+		AgentFeatures: []map[string]interface{}{
+			{
+				"name":    "test_enroll",
+				"enabled": true,
+			},
+		},
+	}
+
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+
+	// 2. Install the Elastic-Agent with the policy that
+	// was just created.
+	policy, err := tools.InstallAgentWithPolicy(
+		ctx,
+		t,
+		installOpts,
+		agentFixture,
+		info.KibanaClient,
+		createPolicyReq)
+	require.NoError(t, err)
+	t.Logf("created policy: %s", policy.ID)
+	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
+
+	t.Run("Monitoring logs are shipped", func(t *testing.T) {
+		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
+	})
+
+	t.Run("Normal logs with flattened data_stream are shipped", func(t *testing.T) {
+		testFlattenedDatastreamFleetPolicy(t, ctx, info, policy)
+	})
+}
+
+func TestRpmLogIngestFleetManaged(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: RPM,
+		Stack: &define.Stack{},
+		OS: []define.OS{
+			{
+				Type:   define.Linux,
+				Distro: "rhel",
+			},
+		},
+		Local: false,
+		Sudo:  true,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	agentFixture, err := define.NewFixture(t, define.Version(), atesting.WithPackageFormat("rpm"))
+	require.NoError(t, err)
+
+	// 1. Create a policy in Fleet with monitoring enabled.
+	// To ensure there are no conflicts with previous test runs against
+	// the same ESS stack, we add the current time at the end of the policy
+	// name. This policy does not contain any integration.
+	t.Log("Enrolling agent in Fleet with a test policy")
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
 		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
@@ -333,7 +402,7 @@ func testFlattenedDatastreamFleetPolicy(
 	if err != nil {
 		t.Fatalf("failed to create temp directory: %s", err)
 	}
-	err = os.Chmod(tempDir, 0o755)
+	err = acl.Chmod(tempDir, 0o755) // `acl.Chmod` is used to ensure unprivileged mode on Windows works
 	if err != nil {
 		t.Fatalf("failed to chmod temp directory %s: %s", tempDir, err)
 	}
@@ -439,7 +508,7 @@ func generateLogFile(t *testing.T, fullPath string, tick time.Duration, events i
 	if err != nil {
 		t.Fatalf("could not create file '%s': %s", fullPath, err)
 	}
-	err = os.Chmod(fullPath, 0o644)
+	err = acl.Chmod(fullPath, 0o644) // `acl.Chmod` is used to ensure unprivileged mode on Windows works
 	if err != nil {
 		t.Fatalf("failed to chmod file '%s': %s", fullPath, err)
 	}
