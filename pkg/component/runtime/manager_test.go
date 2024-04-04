@@ -190,7 +190,6 @@ func TestDeriveCommsSocketName(t *testing.T) {
 	tests := []struct {
 		name           string
 		controlAddress string
-		local          bool
 		wantErr        error
 		want           string
 	}{
@@ -200,25 +199,21 @@ func TestDeriveCommsSocketName(t *testing.T) {
 		},
 		{
 			name:    "empty uri local",
-			local:   true,
 			wantErr: errInvalidUri,
 		},
 		{
 			name:           "invalid schema",
 			controlAddress: "lunix:///2323",
-			local:          true,
 			wantErr:        errInvalidUri,
 		},
 		{
 			name:           "valid schema empty path",
 			controlAddress: "unix://",
-			local:          true,
 			wantErr:        errInvalidUri,
 		},
 		{
 			name:           "valid path",
 			controlAddress: validControlAddress(),
-			local:          true,
 			want:           validControlAddress(),
 		},
 	}
@@ -226,8 +221,7 @@ func TestDeriveCommsSocketName(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// Copy default config
-			grpcCfg := *defaultCfg
-			grpcCfg.Local = tc.local
+			grpcCfg := *defaultCfg // default rpc has port set to -1 == local rpc
 			s, err := deriveCommsAddress(tc.controlAddress, &grpcCfg)
 
 			// If want error, test error and return

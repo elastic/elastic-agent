@@ -11,24 +11,27 @@ import (
 // GRPCConfig is a configuration of GRPC server.
 type GRPCConfig struct {
 	Address                 string `config:"address"`
-	Port                    uint16 `config:"port"`
+	Port                    int16  `config:"port"`
 	MaxMsgSize              int    `config:"max_message_size"`
 	CheckinChunkingDisabled bool   `config:"checkin_chunking_disabled"`
-	Local                   bool   `config:"local"` // Enables RPC via domain socker/named pipe
 }
 
 // DefaultGRPCConfig creates a default server configuration.
 func DefaultGRPCConfig() *GRPCConfig {
 	return &GRPCConfig{
 		Address:                 "localhost",
-		Port:                    6789,
+		Port:                    -1,                // -1 (negative) port value by default enabled "local" rpc utilizing domain sockets and named pipes
 		MaxMsgSize:              1024 * 1024 * 100, // grpc default 4MB is unsufficient for diagnostics
 		CheckinChunkingDisabled: false,             // on by default
-		Local:                   false,             // Use IP port grpc by default
 	}
 }
 
 // String returns the composed listen address for the GRPC.
 func (cfg *GRPCConfig) String() string {
 	return fmt.Sprintf("%s:%d", cfg.Address, cfg.Port)
+}
+
+// IsLocal returns true if port value is less than 0
+func (cfg *GRPCConfig) IsLocal() bool {
+	return cfg.Port < 0
 }

@@ -1088,7 +1088,7 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 
 // deriveCommsAddress derives the comms socket/pipe path/name from given control address and GRPC config
 func deriveCommsAddress(controlAddress string, grpc *configuration.GRPCConfig) (string, error) {
-	if grpc.Local {
+	if grpc.IsLocal() {
 		return deriveCommsSocketName(controlAddress)
 	}
 	return grpc.String(), nil
