@@ -12,6 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -19,8 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
-	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
 )
 
 func TestConfigUpdateOnReload(t *testing.T) {
@@ -60,7 +61,8 @@ func TestConfigUpdateOnReload(t *testing.T) {
 	waitOnReturnCode(t, http.StatusOK, "?failon=failed", serverReloader.Addr())
 
 	t.Logf("stopping server...")
-	serverReloader.Stop()
+	err = serverReloader.Stop()
+	require.NoError(t, err)
 
 }
 
@@ -79,6 +81,7 @@ func waitOnReturnCode(t *testing.T, expectedReturnCode int, formValue string, ad
 			t.Logf("error fetching endpoint: %s", err)
 			return false
 		}
+		defer resp.Body.Close()
 		// should return 500 as we have one component set to UnitStateDegraded
 		return resp.StatusCode == expectedReturnCode
 	}, time.Second*30, time.Second*3)
