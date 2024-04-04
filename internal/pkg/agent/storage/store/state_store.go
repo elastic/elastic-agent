@@ -97,7 +97,7 @@ func newStateStoreWithMigration(
 
 	err = migrateYAMLStateStoreToStateStoreV1(log, stateStore)
 	if err != nil {
-		return nil, fmt.Errorf("failed dmigrating YAML store JSON store: %w",
+		return nil, fmt.Errorf("failed migrating YAML store JSON store: %w",
 			err)
 	}
 

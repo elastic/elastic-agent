@@ -37,7 +37,7 @@ func migrateActionStoreToStateStore(
 
 	// do not migrate if the state store already exists
 	if stateStoreExists {
-		log.Debugf("state store already exists")
+		log.Debugf("not attempting to migrare from action store: state store already exists")
 		return nil
 	}
 
@@ -47,25 +47,25 @@ func migrateActionStoreToStateStore(
 		return err
 	}
 
-	// delete the actions store file upon successful migration
-	defer func() {
-		if err == nil && actionStoreExists {
-			err = actionDiskStore.Delete()
-			if err != nil {
-				log.Errorf("failed to delete action store %s exists: %v", actionStorePath, err)
-			}
-		}
-	}()
-
 	// nothing to migrate if the action store doesn't exist
 	if !actionStoreExists {
 		log.Debugf("action store %s doesn't exists, nothing to migrate", actionStorePath)
 		return nil
 	}
+	// delete the actions store file upon successful migration
+	defer func() {
+		if err == nil {
+			err = actionDiskStore.Delete()
+			if err != nil {
+				log.Errorf("failed to delete action store %s after migration: %v", actionStorePath, err)
+			}
+		}
+	}()
 
 	action, err := migrations.LoadActionStore(actionDiskStore)
 	if err != nil {
-		log.Errorf("failed to create action store %s: %v", actionStorePath, err)
+		log.Errorf("failed to load action store for migration %s: %v",
+			actionStorePath, err)
 		return err
 	}
 

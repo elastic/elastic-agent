@@ -70,9 +70,11 @@ func LoadStore[Store any](loader loader) (store *Store, err error) {
 	}
 	defer func() {
 		err2 := reader.Close()
+		if err2 != nil {
+			err2 = fmt.Errorf("migration storeLoad failed to close reader: %w", err2)
+		}
 		if err != nil {
-			err = errors.Join(err,
-				fmt.Errorf("migration storeLoad failed to close reader: %w", err2))
+			err = errors.Join(err, err2)
 		}
 	}()
 

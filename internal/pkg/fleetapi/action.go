@@ -104,7 +104,6 @@ func NewAction(actionType string) Action {
 	case ActionTypeDiagnostics:
 		action = &ActionDiagnostics{}
 	case ActionTypeInputAction:
-		// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
 		action = &ActionApp{}
 	case ActionTypePolicyChange:
 		action = &ActionPolicyChange{}
