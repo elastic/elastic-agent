@@ -7,12 +7,26 @@
 package cmd
 
 import (
+	"fmt"
 	"os/exec"
 
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func enrollCmdExtras(cmd *exec.Cmd, ownership utils.FileOwner) error {
-	// TODO: Add ability to call enroll as non-Administrator on Windows.
+	if ownership.UID != "" {
+		cmd.Args = append(
+			cmd.Args,
+			fmt.Sprintf("--%s", fromInstallUserArg),
+			ownership.UID,
+		)
+	}
+	if ownership.GID != "" {
+		cmd.Args = append(
+			cmd.Args,
+			fmt.Sprintf("--%s", fromInstallGroupArg),
+			ownership.GID,
+		)
+	}
 	return nil
 }
