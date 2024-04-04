@@ -2817,3 +2817,13 @@ func getOtelDependencies() (*dependencies, error) {
 		Extensions: extensions,
 	}, nil
 }
+
+// TODO: remove after testing linter for https://github.com/elastic/elastic-agent/pull/4514
+func RandomPassword(passwordLength int) string {
+	runes := []rune("abcdefghijklmnopqrstuvwxyz1234567890!@#$%^&*ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	var sb strings.Builder
+	for i := 0; i < passwordLength; i++ {
+		sb.WriteRune(runes[rand.Intn(len(runes))])
+	}
+	return sb.String()
+}
