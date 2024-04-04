@@ -17,9 +17,10 @@ import (
 )
 
 type agentInfoMock struct {
-	agentID  string
-	snapshot bool
-	version  string
+	agentID      string
+	snapshot     bool
+	version      string
+	unprivileged bool
 }
 
 func (a agentInfoMock) AgentID() string {
@@ -33,6 +34,10 @@ func (a agentInfoMock) Version() string {
 	return a.version
 }
 
+func (a agentInfoMock) Unprivileged() bool {
+	return a.unprivileged
+}
+
 func (a agentInfoMock) Headers() map[string]string                          { panic("implement me") }
 func (a agentInfoMock) LogLevel() string                                    { panic("implement me") }
 func (a agentInfoMock) ReloadID(ctx context.Context) error                  { panic("implement me") }
@@ -40,9 +45,10 @@ func (a agentInfoMock) SetLogLevel(ctx context.Context, level string) error { pa
 
 func TestRuntimeComm_WriteStartUpInfo_packageVersion(t *testing.T) {
 	agentInfo := agentInfoMock{
-		agentID:  "NCC-1701",
-		snapshot: true,
-		version:  "8.13.0+build1966-09-6",
+		agentID:      "NCC-1701",
+		snapshot:     true,
+		version:      "8.13.0+build1966-09-6",
+		unprivileged: false,
 	}
 
 	want := client.AgentInfo{

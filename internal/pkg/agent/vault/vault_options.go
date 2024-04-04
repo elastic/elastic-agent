@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 type OptionFunc func(o *Options)
@@ -20,6 +21,7 @@ type CommonVaultOptions struct {
 type FileVaultOptions struct {
 	vaultPath      string
 	lockRetryDelay time.Duration
+	ownership      utils.FileOwner
 }
 
 type KeychainVaultOptions struct {
@@ -43,6 +45,13 @@ func WithReadonly(readonly bool) OptionFunc {
 func WithVaultPath(vaultPath string) OptionFunc {
 	return func(o *Options) {
 		o.vaultPath = vaultPath
+	}
+}
+
+// WithVaultOwnership allows to specify the ownership that should apply for the file-based vault implementation (doesn't apply for the keychain vault)
+func WithVaultOwnership(ownership utils.FileOwner) OptionFunc {
+	return func(o *Options) {
+		o.ownership = ownership
 	}
 }
 
@@ -70,6 +79,7 @@ func ApplyOptions(opts ...OptionFunc) Options {
 		FileVaultOptions: FileVaultOptions{
 			vaultPath:      paths.AgentVaultPath(),
 			lockRetryDelay: defaultFlockRetryDelay,
+			ownership:      utils.CurrentFileOwner(),
 		},
 		KeychainVaultOptions: KeychainVaultOptions{
 			entryName: paths.AgentKeychainName(),

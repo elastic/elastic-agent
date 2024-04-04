@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hectane/go-acl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -401,7 +402,7 @@ func testFlattenedDatastreamFleetPolicy(
 	if err != nil {
 		t.Fatalf("failed to create temp directory: %s", err)
 	}
-	err = os.Chmod(tempDir, 0o755)
+	err = acl.Chmod(tempDir, 0o755) // `acl.Chmod` is used to ensure unprivileged mode on Windows works
 	if err != nil {
 		t.Fatalf("failed to chmod temp directory %s: %s", tempDir, err)
 	}
@@ -507,7 +508,7 @@ func generateLogFile(t *testing.T, fullPath string, tick time.Duration, events i
 	if err != nil {
 		t.Fatalf("could not create file '%s': %s", fullPath, err)
 	}
-	err = os.Chmod(fullPath, 0o644)
+	err = acl.Chmod(fullPath, 0o644) // `acl.Chmod` is used to ensure unprivileged mode on Windows works
 	if err != nil {
 		t.Fatalf("failed to chmod file '%s': %s", fullPath, err)
 	}

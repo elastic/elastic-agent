@@ -65,20 +65,9 @@ type InstallOpts struct {
 	ProxyURL       string // --proxy-url
 	DelayEnroll    bool   // --delay-enroll
 
-	// Unprivileged by default installs the Elastic Agent as `--unprivileged` unless
-	// the platform being tested doesn't currently support it, or it's explicitly set
-	// to false.
-	Unprivileged *bool // --unprivileged
+	Privileged bool // inverse of --unprivileged (as false is the default)
 
 	EnrollOpts
-}
-
-func (i InstallOpts) IsUnprivileged(operatingSystem string) bool {
-	if i.Unprivileged == nil {
-		// not explicitly set, default to true on Linux only (until other platforms support it)
-		return operatingSystem == "linux"
-	}
-	return *i.Unprivileged
 }
 
 func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
@@ -101,23 +90,13 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	if i.DelayEnroll {
 		args = append(args, "--delay-enroll")
 	}
-
-	unprivileged := i.IsUnprivileged(operatingSystem)
-	if unprivileged {
-		if operatingSystem != "linux" {
-			return nil, fmt.Errorf("--unprivileged cannot be set to true unless testing is being done on Linux")
-		}
+	if !i.Privileged {
 		args = append(args, "--unprivileged")
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
 
 	return args, nil
-}
-
-// NewBool returns a boolean pointer.
-func NewBool(value bool) *bool {
-	return &value
 }
 
 // Install installs the prepared Elastic Agent binary and registers a t.Cleanup
@@ -186,7 +165,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 		// Windows uses a fixed named pipe, that is always the same.
 		// It is the same even running in unprivileged mode.
 		socketPath = paths.WindowsControlSocketInstalledPath
-	} else if installOpts.IsUnprivileged(f.operatingSystem) {
+	} else if !installOpts.Privileged {
 		// Unprivileged versions move the socket to inside the installed directory
 		// of the Elastic Agent.
 		socketPath = paths.ControlSocketFromPath(runtime.GOOS, f.workDir)

@@ -11,8 +11,12 @@ import (
 	"net"
 	"os/user"
 
+	"github.com/hectane/go-acl/api"
+	"golang.org/x/sys/windows"
+
 	"github.com/elastic/elastic-agent-libs/api/npipe"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -43,15 +47,55 @@ func securityDescriptor(log *logger.Logger) (string, error) {
 
 	descriptor := "D:P(A;;GA;;;" + u.Uid + ")"
 
-	if isAdmin, err := utils.HasRoot(); err != nil {
+	isAdmin, err := utils.HasRoot()
+	if err != nil {
 		// do not fail, agent would end up in a loop, continue with limited permissions
-		log.Warnf("failed to detect admin: %w", err)
-	} else if isAdmin {
-		// running as SYSTEM, include Administrators group so Administrators can talk over
-		// the named pipe to the running Elastic Agent system process
-		// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
-		descriptor += "(A;;GA;;;" + utils.AdministratorSID + ")"
+		log.Warnf("failed to detect Administrator: %w", err)
+		isAdmin = false // just in-case to ensure that in error case that its always false
+	}
+	// SYSTEM/Administrators can always talk over the pipe, even when not running as privileged
+	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
+	descriptor += "(A;;GA;;;" + utils.AdministratorSID + ")"
+	if !isAdmin && paths.RunningInstalled() {
+		// Windows doesn't provide a way to set the executing group when being executed as a service,
+		// but a group needs to be added to the named pipe in unprivileged mode to allow users in the group
+		// to ability to communicate with the named pipe.
+		//
+		// During installation a group is set as the owner of the files which can be used here to determine
+		// the group that should be added to the named pipe.
+		gid, err := pathGID(paths.Top())
+		if err != nil {
+			// do not fail, agent would end up in a loop, continue with limited permissions
+			log.Warnf("failed to detect group: %w", err)
+		} else {
+			descriptor += "(A;;GA;;;" + gid + ")"
+		}
 	}
 
 	return descriptor, nil
+}
+
+func pathGID(path string) (string, error) {
+	var group *windows.SID
+	var secDesc windows.Handle
+	err := api.GetNamedSecurityInfo(
+		path,
+		api.SE_FILE_OBJECT,
+		api.GROUP_SECURITY_INFORMATION,
+		nil,
+		&group,
+		nil,
+		nil,
+		&secDesc,
+	)
+	if err != nil {
+		return "", fmt.Errorf("call to GetNamedSecurityInfo at %s failed: %w", path, err)
+	}
+	defer func() {
+		_, _ = windows.LocalFree(secDesc)
+	}()
+	if group == nil {
+		return "", fmt.Errorf("failed to determine group using GetNamedSecurityInfo at %s", path)
+	}
+	return group.String(), nil
 }
