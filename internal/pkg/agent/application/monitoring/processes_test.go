@@ -59,6 +59,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 		coord        mockCoordinator
 		expectedCode int
 		liveness     bool
+		failon       string
 	}{
 		{
 			name: "degraded",
@@ -80,6 +81,29 @@ func TestProcessHTTPHandler(t *testing.T) {
 			},
 			expectedCode: 500,
 			liveness:     true,
+			failon:       "degraded",
+		},
+		{
+			name: "degraded-check-off",
+			coord: mockCoordinator{
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "2",
+							State:     runtime.ComponentState{State: client.UnitStateDegraded},
+							Component: component.Component{
+								ID: "test-component",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 200,
+			liveness:     true,
+			failon:       "failed",
 		},
 		{
 			name: "degraded-liveness-off",
@@ -101,6 +125,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 			},
 			expectedCode: 200,
 			liveness:     false,
+			failon:       "degraded",
 		},
 		{
 			name: "healthy",
@@ -122,6 +147,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 			},
 			expectedCode: 200,
 			liveness:     true,
+			failon:       "degraded",
 		},
 		{
 			name: "healthy-liveness-off",
@@ -143,6 +169,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 			},
 			expectedCode: 200,
 			liveness:     false,
+			failon:       "degraded",
 		},
 		{
 			name: "degraded-and-healthy",
@@ -174,6 +201,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 			},
 			expectedCode: 500,
 			liveness:     true,
+			failon:       "degraded",
 		},
 	}
 
@@ -183,7 +211,8 @@ func TestProcessHTTPHandler(t *testing.T) {
 			testSrv := httptest.NewServer(createHandler(processesHandler(test.coord, test.liveness)))
 			defer testSrv.Close()
 
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, testSrv.URL, nil)
+			path := fmt.Sprintf("%s?failon=%s", testSrv.URL, test.failon)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 			require.NoError(t, err)
 			res, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
@@ -204,7 +233,8 @@ func TestProcessHTTPHandler(t *testing.T) {
 			testSrv.Config.ConnContext = customContext
 			testSrv.Start()
 
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, testSrv.URL, nil)
+			path := fmt.Sprintf("%s?failon=%s", testSrv.URL, test.failon)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 			require.NoError(t, err)
 			res, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)

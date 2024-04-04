@@ -48,9 +48,14 @@ func processesHandler(coord CoordinatorState, livenessMode bool) func(http.Respo
 
 		state := coord.State()
 
+		failConfig, err := handleFormValues(r)
+		if err != nil {
+			return fmt.Errorf("error handling form values: %w", err)
+		}
+
 		unhealthyComponent := false
 		for _, comp := range state.Components {
-			if comp.State.State == client.UnitStateFailed || comp.State.State == client.UnitStateDegraded {
+			if (failConfig.Failed && comp.State.State == client.UnitStateFailed) || (failConfig.Degraded && comp.State.State == client.UnitStateDegraded) {
 				unhealthyComponent = true
 			}
 			if comp.Component.InputSpec != nil {

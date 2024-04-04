@@ -48,6 +48,11 @@ func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
+		failOn, err := handleFormValues(r)
+		if err != nil {
+			return fmt.Errorf("error handling form values: %w", err)
+		}
+
 		vars := mux.Vars(r)
 		componentID, found := vars[componentIDKey]
 		if !found {
@@ -83,7 +88,7 @@ func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func
 
 		unhealthyComponent := false
 		for _, comp := range state.Components {
-			if comp.State.State == client.UnitStateFailed || comp.State.State == client.UnitStateDegraded {
+			if (failOn.Failed && comp.State.State == client.UnitStateFailed) || (failOn.Degraded && comp.State.State == client.UnitStateDegraded) {
 				unhealthyComponent = true
 			}
 			if matchesCloudProcessID(comp.Component.InputSpec.BinaryName, comp.Component.ID, componentID) {
