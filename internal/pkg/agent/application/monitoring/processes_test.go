@@ -224,7 +224,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 	// test with processHandler
 	for _, test := range testCases {
 		t.Run(fmt.Sprintf("process-%s", test.name), func(t *testing.T) {
-			testSrv := httptest.NewUnstartedServer(createHandler(processHandler(test.coord, test.liveness, nil, "linux")))
+			testSrv := httptest.NewUnstartedServer(createHandler(processHandler(test.coord, test.liveness, nil)))
 			defer testSrv.Close()
 
 			customContext := func(ctx context.Context, c net.Conn) context.Context {

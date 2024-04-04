@@ -99,7 +99,7 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 	var err error
 
 	if sr.config != nil && sr.config.Enabled {
-		//TODO: do we actually need to stop the server or close anything before we start?
+		//TODO: do we actually need to stop the server or close anything before we restart?
 		if sr.isServerRunning.Load() {
 			err = sr.Stop()
 			if err != nil {
