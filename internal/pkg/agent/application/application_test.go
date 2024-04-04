@@ -32,7 +32,7 @@ func TestMergeFleetConfig(t *testing.T) {
 		},
 		"agent": map[string]interface{}{
 			"grpc": map[string]interface{}{
-				"port": uint16(6790),
+				"port": int32(6790),
 			},
 		},
 	}
@@ -44,7 +44,7 @@ func TestMergeFleetConfig(t *testing.T) {
 	assert.NotNil(t, conf)
 	assert.Equal(t, conf.Fleet.Enabled, cfg["fleet"].(map[string]interface{})["enabled"])
 	assert.Equal(t, conf.Fleet.AccessAPIKey, cfg["fleet"].(map[string]interface{})["access_api_key"])
-	assert.Equal(t, conf.Settings.GRPC.Port, cfg["agent"].(map[string]interface{})["grpc"].(map[string]interface{})["port"].(uint16))
+	assert.Equal(t, conf.Settings.GRPC.Port, cfg["agent"].(map[string]interface{})["grpc"].(map[string]interface{})["port"].(int32))
 }
 
 func TestLimitsLog(t *testing.T) {

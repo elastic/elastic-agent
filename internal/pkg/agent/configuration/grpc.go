@@ -11,7 +11,7 @@ import (
 // GRPCConfig is a configuration of GRPC server.
 type GRPCConfig struct {
 	Address                 string `config:"address"`
-	Port                    int16  `config:"port"`
+	Port                    int32  `config:"port"` // Using int32 instead of int16, since now it is signed and negative values mean local RPC
 	MaxMsgSize              int    `config:"max_message_size"`
 	CheckinChunkingDisabled bool   `config:"checkin_chunking_disabled"`
 }
