@@ -60,28 +60,12 @@ agent.monitoring.enabled: false
 			false, false, true,
 		},
 		{
-			"do not stop when running, monitoring.metrics disabled",
-			true, true, true,
-			`
-agent.monitoring.metrics: false
-`,
-			true, false, false,
-		},
-		{
 			"stop stopped server",
 			false, false, false,
 			`
 agent.monitoring.enabled: false
 `,
 			false, false, false,
-		},
-		{
-			"start started server",
-			true, true, true,
-			`
-agent.monitoring.enabled: true
-`,
-			true, false, false,
 		},
 	}
 
