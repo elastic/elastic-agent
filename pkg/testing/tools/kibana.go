@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -88,4 +89,35 @@ func GetDashboards(ctx context.Context, client *kibana.Client) ([]Dashboard, err
 	}
 
 	return dashboards, nil
+}
+
+// InstallPackageFromDefaultFile allows for a test ideom where a JSON policy file can be loaded, and then updated with variables that are specific to a given test.
+// This can allow a single JSON policy file to be reused across multiple tests.
+// existingPolicyID should be the ID of an agent policy that was already created with InstallAgentWithPolicy()
+func InstallPackageFromDefaultFile(ctx context.Context, client *kibana.Client, packagePolicyName string, packageVersion string, policyJsonPath string, policyUUID string, existingPolicyID string) (kibana.PackagePolicyResponse, error) {
+	installPackage := kibana.PackagePolicyRequest{}
+
+	jsonRaw, err := os.ReadFile(policyJsonPath)
+	if err != nil {
+		return kibana.PackagePolicyResponse{}, fmt.Errorf("error reading JSON policy file: %w", err)
+	}
+
+	err = json.Unmarshal(jsonRaw, &installPackage)
+	if err != nil {
+		return kibana.PackagePolicyResponse{}, fmt.Errorf("error unmarshaling json: %w", err)
+	}
+
+	installPackage.Package.Version = packageVersion
+	installPackage.ID = policyUUID
+	installPackage.PolicyID = existingPolicyID
+	installPackage.Namespace = "default"
+	installPackage.Name = fmt.Sprintf("%s-test-%s", packagePolicyName, policyUUID)
+	installPackage.Vars = map[string]interface{}{}
+
+	resp, err := client.InstallFleetPackage(ctx, installPackage)
+	if err != nil {
+		return kibana.PackagePolicyResponse{}, fmt.Errorf("error installing fleet package: %w", err)
+	}
+
+	return resp, nil
 }

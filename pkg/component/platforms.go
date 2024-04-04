@@ -7,7 +7,6 @@ package component
 import (
 	"fmt"
 	goruntime "runtime"
-	"strconv"
 	"strings"
 
 	"github.com/elastic/go-sysinfo"
@@ -105,8 +104,8 @@ type PlatformDetail struct {
 
 	NativeArch string
 	Family     string
-	Major      string
-	Minor      string
+	Major      int
+	Minor      int
 }
 
 // PlatformModifier can modify the platform details before the runtime specifications are loaded.
@@ -138,8 +137,8 @@ func LoadPlatformDetail(modifiers ...PlatformModifier) (PlatformDetail, error) {
 		},
 		NativeArch: nativeArch,
 		Family:     os.Family,
-		Major:      strconv.Itoa(os.Major),
-		Minor:      strconv.Itoa(os.Minor),
+		Major:      os.Major,
+		Minor:      os.Minor,
 	}
 	for _, modifier := range modifiers {
 		detail = modifier(detail)

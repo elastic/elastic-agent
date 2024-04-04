@@ -55,7 +55,7 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,
-		upgradeFromVersion,
+		upgradeFromVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
@@ -170,7 +170,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,
-		upgradeFromVersion,
+		upgradeFromVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
