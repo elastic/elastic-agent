@@ -12,10 +12,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"syscall"
 
-	"golang.org/x/sys/windows/svc"
-	"golang.org/x/sys/windows/svc/mgr"
+	"golang.org/x/sys/windows"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -29,25 +31,35 @@ import (
 //
 // * Sub-process - As a sub-process a new child is spawned and the current process just exits.
 func reexec(log *logger.Logger, executable string, argOverrides ...string) error {
-	svc, status, err := getService()
-	if err == nil {
+	if info.RunningUnderSupervisor() {
 		// running as a service; spawn re-exec windows sub-process
-		log.Infof("Running as Windows service %s; triggering service restart", svc.Name)
-		args := []string{filepath.Base(executable), "reexec_windows", svc.Name, strconv.Itoa(int(status.ProcessId))}
+		log.Infof("Running as Windows service; triggering service restart")
+
+		// use the same token of this process to perform the rexec_windows command
+		// otherwise the spawned process will not be able to connect to the service control manager
+		var t windows.Token
+		err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &t)
+		if err != nil {
+			return fmt.Errorf("failed to open current process token: %w", err)
+		}
+		defer func() {
+			_ = t.Close()
+		}()
+
+		args := []string{filepath.Base(executable), "reexec_windows", paths.ServiceName, strconv.Itoa(os.Getpid())}
 		args = append(args, argOverrides...)
 		cmd := exec.Cmd{
-			Path:   executable,
-			Args:   args,
-			Stdin:  os.Stdin,
-			Stdout: os.Stdout,
-			Stderr: os.Stderr,
+			Path:        executable,
+			Args:        args,
+			Stdin:       os.Stdin,
+			Stdout:      os.Stdout,
+			Stderr:      os.Stderr,
+			SysProcAttr: &syscall.SysProcAttr{Token: syscall.Token(t)},
 		}
 		if err := cmd.Start(); err != nil {
 			return err
 		}
 	} else {
-		log.Debugf("Discovering Windows service result: %s", err)
-
 		// running as a sub-process of another process; just execute as a child
 		log.Infof("Running as Windows process; spawning new child process")
 		args := []string{filepath.Base(executable)}
@@ -67,31 +79,4 @@ func reexec(log *logger.Logger, executable string, argOverrides ...string) error
 	// force log sync before exit
 	_ = log.Sync()
 	return nil
-}
-
-func getService() (*mgr.Service, svc.Status, error) {
-	pid := uint32(os.Getpid())
-	manager, err := mgr.Connect()
-	if err != nil {
-		return nil, svc.Status{}, err
-	}
-	names, err := manager.ListServices()
-	if err != nil {
-		return nil, svc.Status{}, err
-	}
-	for _, name := range names {
-		service, err := manager.OpenService(name)
-		if err != nil {
-			continue
-		}
-		status, err := service.Query()
-		if err != nil {
-			continue
-		}
-		if status.ProcessId == pid {
-			// pid match; found ourself
-			return service, status, nil
-		}
-	}
-	return nil, svc.Status{}, fmt.Errorf("failed to find service")
 }

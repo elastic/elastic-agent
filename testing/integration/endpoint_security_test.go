@@ -7,14 +7,17 @@
 package integration
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"text/template"
@@ -185,7 +188,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(false),
+		Privileged:     true,
 	}
 
 	policy, err := tools.InstallAgentWithPolicy(ctx, t,
@@ -244,7 +247,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(false),
+		Privileged:     true,
 	}
 
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -357,7 +360,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(false),
+		Privileged:     true,
 	}
 
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -525,7 +528,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(false),
+		Privileged:     true,
 		BasePath:       filepath.Join(paths.DefaultBasePath, "not_default"),
 	}
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
@@ -603,7 +606,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(true), // ensure always unprivileged
+		Privileged:     false, // ensure always unprivileged
 	}
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
@@ -644,6 +647,170 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 		}
 		return false
 	}, 2*time.Minute, 10*time.Second, "Agent never became DEGRADED with root/Administrator install message")
+}
+
+// TestEndpointLogsAreCollectedInDiagnostics tests that diagnostics archive contain endpoint logs
+func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cn()
+
+	// Get path to agent executable.
+	fixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	t.Log("Enrolling the agent in Fleet")
+	policyUUID := uuid.New().String()
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		Privileged:     true,
+	}
+
+	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
+
+	t.Cleanup(func() {
+		t.Log("Un-enrolling Elastic Agent...")
+		// Use a separate context as the one in the test body will have been cancelled at this point.
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cleanupCancel()
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policyResp.ID))
+	})
+
+	t.Log("Installing Elastic Defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	// wait for endpoint to be healthy
+	t.Log("Polling for endpoint-security to become Healthy")
+	pollingCtx, pollingCancel := context.WithTimeout(ctx, endpointHealthPollingTimeout)
+	defer pollingCancel()
+
+	require.Eventually(t,
+		func() bool {
+			agentClient := fixture.Client()
+			err = agentClient.Connect(ctx)
+			if err != nil {
+				t.Logf("error connecting to agent: %v", err)
+				return false
+			}
+			defer agentClient.Disconnect()
+			return agentAndEndpointAreHealthy(t, pollingCtx, agentClient)
+		},
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy.",
+	)
+
+	// get endpoint component name
+	endpointComponents := getEndpointComponents(ctx, t, fixture.Client())
+	require.NotEmpty(t, endpointComponents, "there should be at least one endpoint component")
+
+	t.Logf("endpoint components: %v", endpointComponents)
+
+	outDir := t.TempDir()
+	diagFile := t.Name() + ".zip"
+	diagAbsPath := filepath.Join(outDir, diagFile)
+	_, err = fixture.Exec(ctx, []string{"diagnostics", "-f", diagAbsPath})
+	require.NoError(t, err, "diagnostics command failed")
+	require.FileExists(t, diagAbsPath, "diagnostic archive should have been created")
+	checkDiagnosticsForEndpointFiles(t, diagAbsPath, endpointComponents)
+}
+
+func getEndpointComponents(ctx context.Context, t *testing.T, c client.Client) []string {
+
+	err := c.Connect(ctx)
+	require.NoError(t, err, "connecting to agent to retrieve endpoint components")
+	defer c.Disconnect()
+
+	agentState, err := c.State(ctx)
+	require.NoError(t, err, "retrieving agent state")
+
+	var endpointComponents []string
+	for _, componentState := range agentState.Components {
+		if strings.Contains(componentState.Name, "endpoint") {
+			endpointComponents = append(endpointComponents, componentState.ID)
+		}
+	}
+	return endpointComponents
+}
+
+func checkDiagnosticsForEndpointFiles(t *testing.T, diagsPath string, endpointComponents []string) {
+	zipReader, err := zip.OpenReader(diagsPath)
+	require.NoError(t, err, "error opening diagnostics archive")
+
+	defer func(zipReader *zip.ReadCloser) {
+		err := zipReader.Close()
+		assert.NoError(t, err, "error closing diagnostic archive")
+	}(zipReader)
+
+	t.Logf("---- Contents of diagnostics archive")
+	for _, file := range zipReader.File {
+		t.Logf("%q - %+v", file.Name, file.FileHeader.FileInfo())
+	}
+	t.Logf("---- End contents of diagnostics archive")
+	// check there are files under the components/ directory
+	for _, componentName := range endpointComponents {
+		endpointComponentDirName := fmt.Sprintf("components/%s", componentName)
+		endpointComponentDir, err := zipReader.Open(endpointComponentDirName)
+		if assert.NoErrorf(t, err, "error looking up directory %q for endpoint component %q in diagnostic archive: %v", endpointComponentDirName, componentName, err) {
+			defer func(endpointComponentDir fs.File) {
+				err := endpointComponentDir.Close()
+				if err != nil {
+					assert.NoError(t, err, "error closing endpoint component directory")
+				}
+			}(endpointComponentDir)
+			if assert.Implementsf(t, (*fs.ReadDirFile)(nil), endpointComponentDir, "endpoint component %q should have a directory in the diagnostic archive under %s", componentName, endpointComponentDirName) {
+				dirFile := endpointComponentDir.(fs.ReadDirFile)
+				endpointFiles, err := dirFile.ReadDir(-1)
+				assert.NoErrorf(t, err, "error reading endpoint component %q directory %q in diagnostic archive", componentName, endpointComponentDirName)
+				assert.NotEmptyf(t, endpointFiles, "endpoint component %q directory should not be empty", componentName)
+			}
+		}
+	}
+
+	// check endpoint logs
+	servicesLogDirName := "logs/services"
+	servicesLogDir, err := zipReader.Open(servicesLogDirName)
+	if assert.NoErrorf(t, err, "error looking up directory %q in diagnostic archive: %v", servicesLogDirName, err) {
+		defer func(servicesLogDir fs.File) {
+			err := servicesLogDir.Close()
+			if err != nil {
+				assert.NoError(t, err, "error closing services logs directory")
+			}
+		}(servicesLogDir)
+		if assert.Implementsf(t, (*fs.ReadDirFile)(nil), servicesLogDir, "service logs should be in a directory in the diagnostic archive under %s", servicesLogDir) {
+			dirFile := servicesLogDir.(fs.ReadDirFile)
+			servicesLogFiles, err := dirFile.ReadDir(-1)
+			assert.NoError(t, err, "error reading services logs directory %q in diagnostic archive", servicesLogDirName)
+			assert.True(t,
+				slices.ContainsFunc(servicesLogFiles,
+					func(entry fs.DirEntry) bool {
+						return strings.HasPrefix(entry.Name(), "endpoint-") && strings.HasSuffix(entry.Name(), ".log")
+					}),
+				"service logs should contain endpoint-*.log files",
+			)
+		}
+	}
 }
 
 func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient client.Client) bool {

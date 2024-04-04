@@ -205,17 +205,17 @@ func (s *Server) DiagnosticAgent(ctx context.Context, req *cproto.DiagnosticAgen
 	for _, metric := range req.AdditionalMetrics {
 		switch metric {
 		case cproto.AdditionalDiagnosticRequest_CPU:
-			duration := time.Second * 30
+			duration := diagnostics.DiagCPUDuration
 			s.logger.Infof("Collecting CPU metrics, waiting for %s", duration)
 			cpuResults, err := diagnostics.CreateCPUProfile(ctx, duration)
 			if err != nil {
 				return nil, fmt.Errorf("error gathering CPU profile: %w", err)
 			}
 			res = append(res, &cproto.DiagnosticFileResult{
-				Name:        "cpuprofile",
-				Filename:    "cpu.pprof",
-				Description: "CPU profile",
-				ContentType: "application/octet-stream",
+				Name:        diagnostics.DiagCPUName,
+				Filename:    diagnostics.DiagCPUFilename,
+				Description: diagnostics.DiagCPUDescription,
+				ContentType: diagnostics.DiagCPUContentType,
 				Content:     cpuResults,
 				Generated:   timestamppb.New(time.Now().UTC()),
 			})
@@ -392,12 +392,13 @@ func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.State
 
 	return &cproto.StateResponse{
 		Info: &cproto.StateAgentInfo{
-			Id:        agentInfo.AgentID(),
-			Version:   release.Version(),
-			Commit:    release.Commit(),
-			BuildTime: release.BuildTime().Format(control.TimeFormat()),
-			Snapshot:  release.Snapshot(),
-			Pid:       int32(os.Getpid()),
+			Id:           agentInfo.AgentID(),
+			Version:      release.Version(),
+			Commit:       release.Commit(),
+			BuildTime:    release.BuildTime().Format(control.TimeFormat()),
+			Snapshot:     release.Snapshot(),
+			Pid:          int32(os.Getpid()),
+			Unprivileged: agentInfo.Unprivileged(),
 		},
 		State:          state.State,
 		Message:        state.Message,

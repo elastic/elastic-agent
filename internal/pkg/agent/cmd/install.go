@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -70,17 +69,13 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("unable to perform install command while checking for administrator rights, %w", err)
+		return fmt.Errorf("unable to perform install command while checking for root/Administrator rights: %w", err)
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
 
-	// only support Linux at the moment
 	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
-	if unprivileged && runtime.GOOS != "linux" {
-		return fmt.Errorf("unable to perform install command, unprivileged is currently only supported on Linux")
-	}
 	if unprivileged {
 		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this is an experimental and currently unsupported feature.")
 	}
@@ -193,28 +188,13 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	progBar := install.CreateAndStartNewSpinner(streams.Out, "Installing Elastic Agent...")
 
-	logCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	logCfg.Level = logp.DebugLevel
-	// Using in memory logger, so we don't write logs to the
-	// directory we are trying to delete
-	logp.ToObserverOutput()(&logCfg)
-
-	err = logp.Configure(logCfg)
-	if err != nil {
-		return fmt.Errorf("error creating logging config: %w", err)
-	}
-
-	log := logger.NewWithoutConfig("")
-
+	log, logBuff := logger.NewInMemory("install", logp.ConsoleEncoderConfig())
 	defer func() {
 		if err == nil {
 			return
 		}
-		oLogs := logp.ObserverLogs().TakeAll()
-		fmt.Fprintf(os.Stderr, "Error uninstalling.  Printing logs\n")
-		for _, oLog := range oLogs {
-			fmt.Fprintf(os.Stderr, "%v\n", oLog.Entry)
-		}
+		fmt.Fprintf(os.Stderr, "Error uninstalling. Printing logs\n")
+		fmt.Fprint(os.Stderr, logBuff.String())
 	}()
 
 	var ownership utils.FileOwner

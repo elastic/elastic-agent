@@ -300,6 +300,21 @@ type contextProviderState struct {
 	signal   chan bool
 }
 
+// Signal signals that something has changed in the provider.
+//
+// Note: This should only be used by fetch context providers, standard context
+// providers should use Set to update the overall state.
+func (c *contextProviderState) Signal() {
+	// Notify the controller Run loop that a state has changed. The notification
+	// channel has buffer size 1 so this ensures that an update will always
+	// happen after this change, while coalescing multiple simultaneous changes
+	// into a single controller update.
+	select {
+	case c.signal <- true:
+	default:
+	}
+}
+
 // Set sets the current mapping.
 func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 	var err error
@@ -321,15 +336,7 @@ func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 		return nil
 	}
 	c.mapping = mapping
-
-	// Notify the controller Run loop that a state has changed. The notification
-	// channel has buffer size 1 so this ensures that an update will always
-	// happen after this change, while coalescing multiple simultaneous changes
-	// into a single controller update.
-	select {
-	case c.signal <- true:
-	default:
-	}
+	c.Signal()
 	return nil
 }
 

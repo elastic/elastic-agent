@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers/mocks"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -349,4 +350,55 @@ func TestDiagnosticHandlerContexteExpiredErrorWithLogs(t *testing.T) {
 			All(),
 		1)
 	// we could assert the logs for the hooks, but those will be the same as the happy path, so for brevity we won't
+}
+
+func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
+	tempAgentRoot := t.TempDir()
+	paths.SetTop(tempAgentRoot)
+	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
+	require.NoError(t, err)
+
+	// make a flag to check if a CPU profile is collected.
+	cpuCalled := false
+	getCPUDiag = func(_ context.Context, _ time.Duration) ([]byte, error) {
+		cpuCalled = true
+		return []byte(`hello, world!`), nil
+	}
+
+	mockDiagProvider := mocks.NewDiagnosticsProvider(t)
+	mockUploader := mocks.NewUploader(t)
+	testLogger, _ := logger.NewTesting("diagnostic-handler-test")
+	handler := NewDiagnostics(testLogger, mockDiagProvider, defaultRateLimit, mockUploader)
+
+	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
+	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{mockUnitDiagnostic})
+
+	// only match if CPU metrics are requested.
+	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.MatchedBy(func(additionalMetrics []cproto.AdditionalDiagnosticRequest) bool {
+		for _, metric := range additionalMetrics {
+			if metric == cproto.AdditionalDiagnosticRequest_CPU {
+				return true
+			}
+		}
+		return false
+	})).Return([]runtime.ComponentDiagnostic{}, nil)
+
+	mockAcker := mocks.NewAcker(t)
+	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
+		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
+		assert.NoError(t, a.(*fleetapi.ActionDiagnostics).Err)
+		return nil
+	})
+	mockAcker.EXPECT().Commit(mock.Anything).Return(nil)
+
+	mockUploader.EXPECT().UploadDiagnostics(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("upload-id", nil)
+
+	diagAction := &fleetapi.ActionDiagnostics{
+		AdditionalMetrics: []string{"CPU"},
+	}
+	handler.collectDiag(context.Background(), diagAction, mockAcker)
+
+	// Check that CPU profile was collected and passed to PerformComponentDiagnostics
+	assert.True(t, cpuCalled, "CPU profile collector was not called.")
+	mockDiagProvider.AssertExpectations(t)
 }

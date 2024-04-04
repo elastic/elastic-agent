@@ -36,7 +36,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
+	pv "github.com/elastic/elastic-agent/pkg/testing/tools/product_versions"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/snapshots"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 	bversion "github.com/elastic/elastic-agent/version"
@@ -77,14 +79,22 @@ const (
 	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s"
 )
 
-// Aliases for commands required by master makefile
-var Aliases = map[string]interface{}{
-	"build": Build.All,
-	"demo":  Demo.Enroll,
-}
-var errNoManifest = errors.New("missing ManifestURL environment variable")
-var errNoAgentDropPath = errors.New("missing AGENT_DROP_PATH environment variable")
-var errAtLeastOnePlatform = errors.New("elastic-agent package is expected to build at least one platform package")
+var (
+	// Aliases for commands required by master makefile
+	Aliases = map[string]interface{}{
+		"build": Build.All,
+		"demo":  Demo.Enroll,
+	}
+
+	errNoManifest         = errors.New("missing ManifestURL environment variable")
+	errNoAgentDropPath    = errors.New("missing AGENT_DROP_PATH environment variable")
+	errAtLeastOnePlatform = errors.New("elastic-agent package is expected to build at least one platform package")
+
+	// goIntegTestTimeout is the timeout passed to each instance of 'go test' used in integration tests.
+	goIntegTestTimeout = 2 * time.Hour
+	// goProvisionAndTestTimeout is the timeout used for both provisioning and running tests.
+	goProvisionAndTestTimeout = goIntegTestTimeout + 30*time.Minute
+)
 
 func init() {
 	common.RegisterCheckDeps(Update, Check.All)
@@ -1576,17 +1586,37 @@ func (Integration) Single(ctx context.Context, testName string) error {
 // UpdateVersions runs an update on the `.agent-versions.json` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
-	// test 2 current 8.x version, 1 previous 7.x version and 1 recent snapshot
+	maxSnapshots := 3
+
+	branches, err := git.GetReleaseBranches(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list release branches: %w", err)
+	}
+
+	// -1 because we manually add 7.17 below
+	if len(branches) > maxSnapshots-1 {
+		branches = branches[:maxSnapshots-1]
+	}
+
+	// it's not a part of this repository, cannot be retrieved with `GetReleaseBranches`
+	branches = append(branches, "7.17")
+
+	// uncomment if want to have the current version snapshot on the list as well
+	// branches = append([]string{"master"}, branches...)
+
 	reqs := upgradetest.VersionRequirements{
 		UpgradeToVersion: bversion.Agent,
 		CurrentMajors:    2,
 		PreviousMinors:   1,
 		PreviousMajors:   1,
-		RecentSnapshots:  1,
+		SnapshotBranches: branches,
 	}
+	b, _ := json.MarshalIndent(reqs, "", "  ")
+	fmt.Printf("Current version requirements: \n%s\n", b)
 
-	aac := tools.NewArtifactAPIClient(tools.WithLogFunc(log.Default().Printf))
-	versions, err := upgradetest.FetchUpgradableVersions(ctx, aac, reqs)
+	pvc := pv.NewProductVersionsClient()
+	sc := snapshots.NewSnapshotsClient()
+	versions, err := upgradetest.FetchUpgradableVersions(ctx, pvc, sc, reqs)
 	if err != nil {
 		return fmt.Errorf("failed to fetch upgradable versions: %w", err)
 	}
@@ -2047,7 +2077,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 			extraFlags = append(extraFlags, goTestFlags...)
 		}
 		extraFlags = append(extraFlags, "-test.shuffle", "on",
-			"-test.timeout", "2h", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
+			"-test.timeout", goIntegTestTimeout.String(), "-test.run", "^("+strings.Join(packageTests, "|")+")$")
 		params := mage.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
@@ -2069,6 +2099,13 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 }
 
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
+	if _, ok := ctx.Deadline(); !ok {
+		// If the context doesn't have a timeout (usually via the mage -t option), give it one.
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, goProvisionAndTestTimeout)
+		defer cancel()
+	}
+
 	for {
 		failedCount, err := integRunnerOnce(ctx, matrix, singleTest)
 		if err != nil {
@@ -2248,6 +2285,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		DiagnosticsDir: diagDir,
 		StateDir:       ".integration-cache",
 		Platforms:      testPlatforms(),
+		Packages:       testPackages(),
 		Groups:         testGroups(),
 		Matrix:         matrix,
 		SingleTest:     singleTest,
@@ -2341,6 +2379,23 @@ func testPlatforms() []string {
 		}
 	}
 	return platforms
+}
+
+func testPackages() []string {
+	packagesStr, defined := os.LookupEnv("TEST_PACKAGES")
+	if !defined {
+		return nil
+	}
+
+	var packages []string
+	for _, p := range strings.Split(packagesStr, ",") {
+		if p == "tar.gz" {
+			p = "targz"
+		}
+		packages = append(packages, p)
+	}
+
+	return packages
 }
 
 func testGroups() []string {
