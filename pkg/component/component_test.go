@@ -420,8 +420,8 @@ func TestToComponents(t *testing.T) {
 					GOOS: Linux,
 				},
 				Family: "redhat",
-				Major:  "7",
-				Minor:  "2",
+				Major:  7,
+				Minor:  2,
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -1985,8 +1985,8 @@ func TestPreventionsAreValid(t *testing.T) {
 			"arch":        "arch",
 			"native_arch": "native_arch",
 			"family":      "family",
-			"major":       "major",
-			"minor":       "minor",
+			"major":       1,
+			"minor":       2,
 		},
 		"user": map[string]interface{}{
 			"root": false,

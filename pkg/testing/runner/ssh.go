@@ -110,22 +110,36 @@ type sshClient struct {
 	ip       string
 	username string
 	auth     ssh.AuthMethod
-
-	c *ssh.Client
+	logger   Logger
+	c        *ssh.Client
 }
 
 // NewSSHClient creates a new SSH client connection to the host.
-func NewSSHClient(ip string, username string, sshAuth ssh.AuthMethod) SSHClient {
+func NewSSHClient(ip string, username string, sshAuth ssh.AuthMethod, logger Logger) SSHClient {
 	return &sshClient{
 		ip:       ip,
 		username: username,
 		auth:     sshAuth,
+		logger:   logger,
 	}
 }
 
 // Connect connects to the host.
 func (s *sshClient) Connect(ctx context.Context) error {
 	var lastErr error
+	config := &ssh.ClientConfig{
+		User:            s.username,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec // it's the tests framework test
+		Auth:            []ssh.AuthMethod{s.auth},
+		Timeout:         30 * time.Second,
+	}
+	addr := net.JoinHostPort(s.ip, "22")
+
+	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("unable to resolve ssh address %q :%w", addr, err)
+	}
+	delay := 1 * time.Second
 	for {
 		if ctx.Err() != nil {
 			if lastErr == nil {
@@ -133,18 +147,37 @@ func (s *sshClient) Connect(ctx context.Context) error {
 			}
 			return lastErr
 		}
-		config := &ssh.ClientConfig{
-			User:            s.username,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec // it's the tests framework test
-			Auth:            []ssh.AuthMethod{s.auth},
-			Timeout:         30 * time.Second,
+		if lastErr != nil {
+			s.logger.Logf("ssh connect error: %q, will try again in %s", lastErr, delay)
+			time.Sleep(delay)
+			delay = 2 * delay
+
 		}
-		client, err := ssh.Dial("tcp", net.JoinHostPort(s.ip, "22"), config)
-		if err == nil {
-			s.c = client
-			return nil
+		conn, err := net.DialTCP("tcp", nil, tcpAddr)
+		if err != nil {
+			lastErr = fmt.Errorf("error dialing tcp address %q :%w", addr, err)
+			continue
 		}
-		lastErr = err
+		err = conn.SetKeepAlive(true)
+		if err != nil {
+			_ = conn.Close()
+			lastErr = fmt.Errorf("error setting TCP keepalive for ssh to %q :%w", addr, err)
+			continue
+		}
+		err = conn.SetKeepAlivePeriod(config.Timeout)
+		if err != nil {
+			_ = conn.Close()
+			lastErr = fmt.Errorf("error setting TCP keepalive period for ssh to %q :%w", addr, err)
+			continue
+		}
+		sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
+		if err != nil {
+			_ = conn.Close()
+			lastErr = fmt.Errorf("error NewClientConn for ssh to %q :%w", addr, err)
+			continue
+		}
+		s.c = ssh.NewClient(sshConn, chans, reqs)
+		return nil
 	}
 }
 
@@ -189,12 +222,21 @@ func (s *sshClient) Exec(ctx context.Context, cmd string, args []string, stdin i
 		return nil, nil, ctx.Err()
 	}
 
+	var session *ssh.Session
 	cmdArgs := []string{cmd}
 	cmdArgs = append(cmdArgs, args...)
 	cmdStr := strings.Join(cmdArgs, " ")
 	session, err := s.NewSession()
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not create new SSH session: %w", err)
+		s.logger.Logf("new session failed: %q, trying reconnect", err)
+		lErr := s.Reconnect(ctx)
+		if lErr != nil {
+			return nil, nil, fmt.Errorf("ssh reconnect failed: %w, after new session failed: %w", lErr, err)
+		}
+		session, lErr = s.NewSession()
+		if lErr != nil {
+			return nil, nil, fmt.Errorf("new session failed after reconnect: %w, original new session failure was: %w", lErr, err)
+		}
 	}
 	defer session.Close()
 
@@ -225,6 +267,7 @@ func (s *sshClient) ExecWithRetry(ctx context.Context, cmd string, args []string
 		if err == nil {
 			return stdout, stderr, nil
 		}
+		s.logger.Logf("ssh exec error: %q, will try again in %s", err, interval)
 		lastErr = err
 		lastStdout = stdout
 		lastStderr = stderr
