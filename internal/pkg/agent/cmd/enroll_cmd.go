@@ -51,6 +51,8 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
+	enrollBackoffInit              = time.Second
+	enrollBackoffMax               = 10 * time.Second
 )
 
 var (
@@ -507,16 +509,10 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 		return nil
 	}
 
-	const deadline = 10 * time.Minute
-	const frequency = 60 * time.Second
-
-	c.log.Infof("1st enrollment attempt failed, retrying for %s, every %s enrolling to URL: %s",
-		deadline,
-		frequency,
-		c.client.URI())
+	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", c.client.URI(), enrollBackoffInit, enrollBackoffMax)
 	signal := make(chan struct{})
 	defer close(signal)
-	backExp := backoff.NewExpBackoff(signal, frequency, deadline)
+	backExp := backoff.NewExpBackoff(signal, enrollBackoffInit, enrollBackoffMax)
 
 	for {
 		retry := false
@@ -525,6 +521,9 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 			retry = true
 		} else if errors.Is(err, fleetapi.ErrConnRefused) {
 			c.log.Warn("Remote server is not ready to accept connections, will retry in a moment.")
+			retry = true
+		} else if errors.Is(err, fleetapi.ErrTemporaryServerError) {
+			c.log.Warn("Remote server failed to handle the request, will retry in a moment.")
 			retry = true
 		}
 		if !retry {
