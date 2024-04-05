@@ -274,6 +274,7 @@ func ExampleNewServer_enroll() {
 	//           "id": "agentID",
 	//           "log_level": "",
 	//           "snapshot": false,
+	//           "unprivileged": false,
 	//           "upgradeable": false,
 	//           "version": ""
 	//         }
