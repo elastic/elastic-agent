@@ -5,16 +5,18 @@
 package info
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/go-sysinfo"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/features"
-	"github.com/elastic/go-sysinfo"
-	"github.com/stretchr/testify/require"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestECSMetadata(t *testing.T) {
