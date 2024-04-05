@@ -189,7 +189,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			f.t.Logf("Dumping running processes in %s", filePath)
 			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 			if err != nil {
-				f.t.Logf("failed to dump process; failed to create output file %s root: %s", file.Name(), err)
+				f.t.Logf("failed to dump process; failed to create output file %s root: %s", filePath, err)
 				return
 			}
 			defer func(file *os.File) {
