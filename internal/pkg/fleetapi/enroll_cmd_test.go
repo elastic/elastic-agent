@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -58,7 +59,8 @@ func TestEnroll(t *testing.T) {
 				b, err := json.Marshal(response)
 				require.NoError(t, err)
 
-				w.Write(b)
+				_, err = w.Write(b)
+				assert.NoError(t, err)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -93,7 +95,8 @@ func TestEnroll(t *testing.T) {
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"statusCode": 500, "error":"Something is really bad here"}`))
+				_, err := w.Write([]byte(`{"statusCode": 500, "error":"Something is really bad here"}`))
+				assert.NoError(t, err)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -128,7 +131,8 @@ func TestEnroll(t *testing.T) {
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusServiceUnavailable)
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"statusCode": 503, "error":"maintainence"}`))
+				_, err := w.Write([]byte(`{"statusCode": 503, "error":"maintainence"}`))
+				assert.NoError(t, err)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
