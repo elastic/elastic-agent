@@ -131,7 +131,7 @@ func TestEnroll(t *testing.T) {
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusServiceUnavailable)
 				w.Header().Set("Content-Type", "application/json")
-				_, err := w.Write([]byte(`{"statusCode": 503, "error":"maintainence"}`))
+				_, err := w.Write([]byte(`{"statusCode": 503, "error":"maintenance"}`))
 				assert.NoError(t, err)
 			})
 			return mux
