@@ -11,12 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
 func TestUpgradeCmd(t *testing.T) {
