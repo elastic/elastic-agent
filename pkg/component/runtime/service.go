@@ -287,9 +287,6 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 	}
 }
 
-// .eaci.sock == Elastic Agent Connection Info socket
-const elasticAgentConnInfoSocket = ".eaci.sock"
-
 var errEmptySocketValue = errors.New("empty socket value")
 
 func getConnInfoServerAddress(os string, isLocal bool, port int, socket string) (string, error) {
