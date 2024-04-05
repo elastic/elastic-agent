@@ -58,10 +58,14 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 }
 
 func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+	c := client.New()
+	return upgradeCmdWithClient(streams, cmd, args, c)
+}
+
+func upgradeCmdWithClient(streams *cli.IOStreams, cmd *cobra.Command, args []string, c client.Client) error {
 	version := args[0]
 	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
 
-	c := client.New()
 	err := c.Connect(context.Background())
 	if err != nil {
 		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
