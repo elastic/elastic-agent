@@ -77,7 +77,7 @@ ifeq ($(DRY_RUN),TRUE)
 	echo "INFO: skip pushing branch"
 else
 	echo "INFO: push branch"
-	@git push --set-upstream origin $(ELASTIC_AGENT_BRANCH)
+	@git push --set-upstream origin $(ELASTIC_AGENT_BRANCH) -u "$(GITHUB_TOKEN)"
 	echo "INFO: create pull request"
 	@gh pr create \
 		--title "Update kubernetes templates for elastic-agent" \
