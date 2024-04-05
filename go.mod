@@ -16,8 +16,8 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.8.1
 	github.com/elastic/elastic-agent-libs v0.8.0
 	github.com/elastic/elastic-agent-system-metrics v0.9.2
-	github.com/elastic/elastic-transport-go/v8 v8.4.0
-	github.com/elastic/go-elasticsearch/v8 v8.12.1
+	github.com/elastic/elastic-transport-go/v8 v8.5.0
+	github.com/elastic/go-elasticsearch/v8 v8.13.0
 	github.com/elastic/go-licenser v0.4.1
 	github.com/elastic/go-sysinfo v1.13.1
 	github.com/elastic/go-ucfg v0.8.8
@@ -58,6 +58,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
 	github.com/tsg/go-daemon v0.0.0-20200207173439-e704b93fd89b
+	github.com/winlabs/gowin32 v0.0.0-20221003142512-0d265587d3c9
 	go.elastic.co/apm/module/apmgorilla v1.15.0
 	go.elastic.co/ecszap v1.0.1
 	go.elastic.co/go-licence-detector v0.5.0

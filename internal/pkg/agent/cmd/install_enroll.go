@@ -7,13 +7,29 @@
 package cmd
 
 import (
+	"fmt"
 	"os/exec"
+	"strconv"
 	"syscall"
 
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func enrollCmdExtras(cmd *exec.Cmd, ownership utils.FileOwner) error {
+	if ownership.UID > 0 {
+		cmd.Args = append(
+			cmd.Args,
+			fmt.Sprintf("--%s", fromInstallUserArg),
+			strconv.Itoa(ownership.UID),
+		)
+	}
+	if ownership.GID > 0 {
+		cmd.Args = append(
+			cmd.Args,
+			fmt.Sprintf("--%s", fromInstallGroupArg),
+			strconv.Itoa(ownership.GID),
+		)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Credential: &syscall.Credential{
 			Uid: uint32(ownership.UID),
