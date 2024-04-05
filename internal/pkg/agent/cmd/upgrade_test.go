@@ -53,7 +53,8 @@ func TestUpgradeCmd(t *testing.T) {
 
 		// we will know that the client reached the server watching the `mock.upgrades` counter
 		require.Eventually(t, func() bool {
-			return mock.upgrades > 0
+			counter := atomic.LoadInt32(&mock.upgrades)
+			return counter > 0
 		}, 5*time.Second, 100*time.Millisecond)
 
 		// then we close the tcp server which is supposed to interrupt the connection
