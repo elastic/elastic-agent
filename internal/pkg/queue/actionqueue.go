@@ -144,7 +144,7 @@ func (q *ActionQueue) Cancel(actionID string) int {
 	return len(items)
 }
 
-// Actions returns all actions in the queue, item 0 is garunteed to be the min, the rest may not be in sorted order.
+// Actions returns all actions in the queue, item 0 is guaranteed to be the min, the rest may not be in sorted order.
 func (q *ActionQueue) Actions() []fleetapi.ScheduledAction {
 	actions := make([]fleetapi.ScheduledAction, q.q.Len())
 	for i, item := range *q.q {
