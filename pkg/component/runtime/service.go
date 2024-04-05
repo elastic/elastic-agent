@@ -220,7 +220,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 				// Start connection info
 				if cis == nil {
-					cis, err = newConnInfoServer(s.log, comm, getConnInfoServerAddress(runtime.GOOS, s.isLocal, s.comp.InputSpec.Spec.Service.CPort))
+					cis, err = newConnInfoServer(s.log, comm, getConnInfoServerAddress(runtime.GOOS, s.isLocal, s.comp.InputSpec.Spec.Service.CPort, s.comp.InputSpec.Spec.Service.CSocket))
 					if err != nil {
 						err = fmt.Errorf("failed to start connection info service %s: %w", s.name(), err)
 						break
@@ -284,18 +284,22 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 // .eaci.sock == Elastic Agent Connection Info socket
 const elasticAgentConnInfoSocket = ".eaci.sock"
 
-func getConnInfoServerAddress(os string, isLocal bool, port int) string {
+func getConnInfoServerAddress(os string, isLocal bool, port int, socket string) string {
 	if isLocal {
+		if socket == "" {
+			socket = elasticAgentConnInfoSocket
+		}
+
 		u := url.URL{}
 		u.Path = "/"
 
 		if os == "windows" {
 			u.Scheme = "npipe"
-			return u.JoinPath("/", elasticAgentConnInfoSocket).String()
+			return u.JoinPath("/", socket).String()
 		}
 
 		u.Scheme = "unix"
-		return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), elasticAgentConnInfoSocket).String()
+		return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), socket).String()
 	}
 
 	return fmt.Sprintf("127.0.0.1:%d", port)

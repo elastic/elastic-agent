@@ -184,6 +184,7 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 		os       string
 		isLocal  bool
 		port     int
+		socket   string
 		expected string
 	}{
 		{
@@ -222,11 +223,35 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 				return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), elasticAgentConnInfoSocket).String()
 			}(),
 		},
+		{
+			name:    "windows.local.custom.socket",
+			os:      "windows",
+			isLocal: true,
+			socket:  "test.sock",
+			expected: func() string {
+				u := url.URL{}
+				u.Path = "/"
+				u.Scheme = "npipe"
+				return u.JoinPath("/", "test.sock").String()
+			}(),
+		},
+		{
+			name:    "unix.local.custom.socket",
+			os:      "linux",
+			isLocal: true,
+			socket:  "test.sock",
+			expected: func() string {
+				u := url.URL{}
+				u.Path = "/"
+				u.Scheme = "unix"
+				return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), "test.sock").String()
+			}(),
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			address := getConnInfoServerAddress(tc.os, tc.isLocal, tc.port)
+			address := getConnInfoServerAddress(tc.os, tc.isLocal, tc.port, tc.socket)
 			diff := cmp.Diff(address, tc.expected)
 			if diff != "" {
 				t.Error(diff)
