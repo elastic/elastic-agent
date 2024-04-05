@@ -54,7 +54,7 @@ endef
 ## ci-clone-kibana-repository : Clone Kibana Repository and copy new files for the PR
 .PHONY: ci-clone-kibana-repository
 ci-clone-kibana-repository:
-	git clone git@github.com:elastic/kibana.git
+	git clone https://github.com/elastic/kibana.git
 	cp $(FILE_REPO)  $(ELASTIC_AGENT_REPO)/$(ELASTIC_AGENT_REPO_PATH)
 
 ## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
