@@ -46,7 +46,8 @@ func TestUpgradeCmd(t *testing.T) {
 			err = upgradeCmdWithClient(streams, cmd, args, c)
 			assert.NoError(t, err)
 			// verify that we actually talked to the server
-			assert.Equal(t, int32(1), mock.upgrades, "server should have handled one upgrade")
+			counter := atomic.LoadInt32(&mock.upgrades)
+			assert.Equal(t, int32(1), counter, "server should have handled one upgrade")
 			// unblock the test execution
 			close(clientStop)
 		}()
