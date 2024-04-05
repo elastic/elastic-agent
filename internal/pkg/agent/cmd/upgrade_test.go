@@ -22,21 +22,24 @@ import (
 
 func TestUpgradeCmd(t *testing.T) {
 	t.Run("no error when connection gets interrupted", func(t *testing.T) {
-		tcpServer, err := net.Listen("unix", "test-upgrade-cmd.sock")
+		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
 		require.NoError(t, err)
 		defer tcpServer.Close()
 
 		s := grpc.NewServer()
-		serverStop := make(chan struct{})
-		mock := &mockServer{upgradeStop: serverStop}
+		defer s.Stop()
+
+		upgradeCh := make(chan struct{})
+		mock := &mockServer{upgradeStop: upgradeCh}
 		cproto.RegisterElasticAgentControlServer(s, mock)
 		go func() {
 			err := s.Serve(tcpServer)
 			assert.NoError(t, err)
 		}()
 
-		clientStop := make(chan struct{})
-		c := client.New(client.WithAddress(tcpServer.Addr().String()))
+		clientCh := make(chan struct{})
+		// use HTTP prefix for the dialer to use TCP, otherwise it's a unix socket/named pipe
+		c := client.New(client.WithAddress("http://" + tcpServer.Addr().String()))
 		args := []string{"--skip-verify", "8.13.0"}
 		streams := cli.NewIOStreams()
 		cmd := newUpgradeCommandWithArgs(args, streams)
@@ -48,8 +51,8 @@ func TestUpgradeCmd(t *testing.T) {
 			// verify that we actually talked to the server
 			counter := atomic.LoadInt32(&mock.upgrades)
 			assert.Equal(t, int32(1), counter, "server should have handled one upgrade")
-			// unblock the test execution
-			close(clientStop)
+			// unblock the further test execution
+			close(clientCh)
 		}()
 
 		// we will know that the client reached the server watching the `mock.upgrades` counter
@@ -61,15 +64,15 @@ func TestUpgradeCmd(t *testing.T) {
 		// then we close the tcp server which is supposed to interrupt the connection
 		s.Stop()
 		// this stops the mock server
-		close(serverStop)
+		close(upgradeCh)
 		// this makes sure all client assertions are done
-		<-clientStop
+		<-clientCh
 	})
 }
 
 type mockServer struct {
 	cproto.ElasticAgentControlServer
-	upgradeStop chan struct{}
+	upgradeStop <-chan struct{}
 	upgrades    int32
 }
 
