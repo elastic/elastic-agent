@@ -220,7 +220,7 @@ func (c *Component) BinaryName() string {
 		return c.InputSpec.BinaryName
 	}
 	if c.ShipperSpec != nil {
-		if c.ShipperSpec.Spec.Command != nil && c.InputSpec.Spec.Command.Name != "" {
+		if c.ShipperSpec.Spec.Command != nil && c.ShipperSpec.Spec.Command.Name != "" {
 			return c.ShipperSpec.Spec.Command.Name
 		}
 		return c.ShipperSpec.BinaryName
