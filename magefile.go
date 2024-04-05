@@ -1612,7 +1612,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 		SnapshotBranches: branches,
 	}
 	b, _ := json.MarshalIndent(reqs, "", "  ")
-	fmt.Printf("Current version requirements: \n%s\n", b)
+	fmt.Println(string(b))
 
 	pvc := pv.NewProductVersionsClient()
 	sc := snapshots.NewSnapshotsClient()
