@@ -15,8 +15,6 @@ else
         exit 0
     fi
     git diff -p
-    git config --global user.name 'apmmachine'
-    git config --global user.email 'apmmachine@users.noreply.github.com'
     git add ".agent-versions.json"
     git commit -m "[$GITHUB_REF_NAME](automation) Update .agent-versions.json" -m "This file is used for picking agent versions in integration tests.\n\nThe file's content is based on responses from https://www.elastic.co/api/product_versions and https://snapshots.elastic.co\n\nThe current update is generated based on the following requirements:\n\`\`\`json\n$version_requirements\n\`\`\`"
     git push --set-upstream origin "update-agent-versions-$GITHUB_RUN_ID"

@@ -9,6 +9,15 @@ jobs:
   update_versions:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Git
+        uses: elastic/apm-pipeline-library/.github/actions/setup-git@current
+
+      - uses: elastic/apm-pipeline-library/.github/actions/github-token@current
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -32,5 +41,23 @@ jobs:
 
       - name: Update versions file
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ env.GITHUB_TOKEN }}
         run: ./.github/workflows/bump-agent-versions.sh
+
+      - if: ${{ failure() }}
+        uses: elastic/apm-pipeline-library/.github/actions/slack-message@current
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          message: ":traffic_cone: Elastic Agent versions file update failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          channel: "#ingest-notifications"
+
+      - if: ${{ success() }}
+        uses: elastic/apm-pipeline-library/.github/actions/slack-message@current
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          message: "Update for Elastic Agent versions file has been created https://github.com/elastic/elastic-agent/pulls?q=is%3Aopen+is%3Apr+label%3Aupdate-versions"
+          channel: "#ingest-notifications"
