@@ -47,7 +47,9 @@ func createAgentVaultAndSecret(t *testing.T, ctx context.Context, tempDir string
 	require.NoError(t, err,
 		"could not create directory for the agent's vault")
 
-	_, err = vault.New(ctx, vault.WithVaultPath(vaultPath))
+	_, err = vault.New(ctx,
+		vault.WithVaultPath(vaultPath),
+		vault.WithUnprivileged(true))
 	require.NoError(t, err, "could not create agent's vault")
 	err = secret.CreateAgentSecret(
 		context.Background(), vault.WithVaultPath(vaultPath))
