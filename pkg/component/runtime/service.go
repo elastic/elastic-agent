@@ -220,7 +220,13 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 				// Start connection info
 				if cis == nil {
-					cis, err = newConnInfoServer(s.log, comm, getConnInfoServerAddress(runtime.GOOS, s.isLocal, s.comp.InputSpec.Spec.Service.CPort, s.comp.InputSpec.Spec.Service.CSocket))
+					var address string
+					address, err = getConnInfoServerAddress(runtime.GOOS, s.isLocal, s.comp.InputSpec.Spec.Service.CPort, s.comp.InputSpec.Spec.Service.CSocket)
+					if err != nil {
+						err = fmt.Errorf("failed to create connection info service address for %s: %w", s.name(), err)
+						break
+					}
+					cis, err = newConnInfoServer(s.log, comm, address)
 					if err != nil {
 						err = fmt.Errorf("failed to start connection info service %s: %w", s.name(), err)
 						break
@@ -284,10 +290,14 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 // .eaci.sock == Elastic Agent Connection Info socket
 const elasticAgentConnInfoSocket = ".eaci.sock"
 
-func getConnInfoServerAddress(os string, isLocal bool, port int, socket string) string {
+var errEmptySocketValue = errors.New("empty socket value")
+
+func getConnInfoServerAddress(os string, isLocal bool, port int, socket string) (string, error) {
 	if isLocal {
+		// Return an empty string if socket string is empty
+		// The connectionInfo server fails on empty address
 		if socket == "" {
-			socket = elasticAgentConnInfoSocket
+			return "", errEmptySocketValue
 		}
 
 		u := url.URL{}
@@ -295,14 +305,14 @@ func getConnInfoServerAddress(os string, isLocal bool, port int, socket string) 
 
 		if os == "windows" {
 			u.Scheme = "npipe"
-			return u.JoinPath("/", socket).String()
+			return u.JoinPath("/", socket).String(), nil
 		}
 
 		u.Scheme = "unix"
-		return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), socket).String()
+		return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), socket).String(), nil
 	}
 
-	return fmt.Sprintf("127.0.0.1:%d", port)
+	return fmt.Sprintf("127.0.0.1:%d", port), nil
 }
 
 func injectSigned(comp component.Component, signed *component.Signed) (component.Component, error) {

@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func makeComponent(name string, config map[string]interface{}) (component.Component, error) {
@@ -186,6 +187,7 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 		port     int
 		socket   string
 		expected string
+		wantErr  error
 	}{
 		{
 			name:     "windows.port",
@@ -202,29 +204,19 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 			expected: "127.0.0.1:6788",
 		},
 		{
-			name:    "windows.local",
+			name:    "windows.local.socket.empty",
 			os:      "windows",
 			isLocal: true,
-			expected: func() string {
-				u := url.URL{}
-				u.Path = "/"
-				u.Scheme = "npipe"
-				return u.JoinPath("/", elasticAgentConnInfoSocket).String()
-			}(),
+			wantErr: errEmptySocketValue,
 		},
 		{
-			name:    "unix.local",
+			name:    "unix.local.socket.empty",
 			os:      "linux",
 			isLocal: true,
-			expected: func() string {
-				u := url.URL{}
-				u.Path = "/"
-				u.Scheme = "unix"
-				return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), elasticAgentConnInfoSocket).String()
-			}(),
+			wantErr: errEmptySocketValue,
 		},
 		{
-			name:    "windows.local.custom.socket",
+			name:    "windows.local.socket",
 			os:      "windows",
 			isLocal: true,
 			socket:  "test.sock",
@@ -236,7 +228,7 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 			}(),
 		},
 		{
-			name:    "unix.local.custom.socket",
+			name:    "unix.local.socket",
 			os:      "linux",
 			isLocal: true,
 			socket:  "test.sock",
@@ -251,8 +243,12 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			address := getConnInfoServerAddress(tc.os, tc.isLocal, tc.port, tc.socket)
-			diff := cmp.Diff(address, tc.expected)
+			address, err := getConnInfoServerAddress(tc.os, tc.isLocal, tc.port, tc.socket)
+			diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
+			if diff != "" {
+				t.Fatal(diff)
+			}
+			diff = cmp.Diff(address, tc.expected)
 			if diff != "" {
 				t.Error(diff)
 			}
