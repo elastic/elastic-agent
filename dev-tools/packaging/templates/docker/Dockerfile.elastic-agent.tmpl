@@ -37,8 +37,8 @@ RUN true && \
     mkdir -p /opt/filebeat /opt/metricbeat && \
     tar xf {{ $beatHome }}/data/cloud_downloads/metricbeat-*.tar.gz -C /opt/metricbeat --strip-components=1 && \
     tar xf {{ $beatHome }}/data/cloud_downloads/filebeat-*.tar.gz -C /opt/filebeat --strip-components=1 && \
-{{- end }}
     rm -rf {{ $beatHome }}/data/cloud_downloads && \
+{{- end }}
     true
 
 FROM {{ .from }}
@@ -192,7 +192,7 @@ RUN cd {{$beatHome}}/.node \
   && chmod ugo+rwX -R $NODE_PATH \
 # Install synthetics as a regular user, installing npm deps as root odesn't work
    # fix .node .npm and .synthetics
-   && chown -R {{ .user }}:{{ .user }} $NODE_PATH 
+   && chown -R {{ .user }}:{{ .user }} $NODE_PATH
 USER {{ .user }}
 # If this fails dump the NPM logs
 RUN (npm i -g --loglevel verbose --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
