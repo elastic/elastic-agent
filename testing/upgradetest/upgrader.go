@@ -16,8 +16,6 @@ import (
 	"time"
 
 	"github.com/otiai10/copy"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
@@ -328,12 +326,11 @@ func PerformUpgrade(
 
 	upgradeOutput, err := startFixture.Exec(ctx, upgradeCmdArgs)
 	if err != nil {
-		s, ok := status.FromError(err)
 		// Sometimes the gRPC server shuts down before replying to the command which is expected
 		// we can determine this state by the EOF error coming from the server.
 		// If the server is just unavailable/not running, we should not succeed.
 		// Starting with version 8.13.2, this is handled by the upgrade command itself.
-		isConnectionInterrupted := ok && s.Code() == codes.Unavailable && strings.Contains(s.Message(), "EOF")
+		isConnectionInterrupted := strings.Contains(err.Error(), "Unavailable") && strings.Contains(err.Error(), "EOF")
 		if !isConnectionInterrupted {
 			return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
 		}
