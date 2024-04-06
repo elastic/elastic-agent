@@ -8,8 +8,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -55,10 +58,14 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 }
 
 func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+	c := client.New()
+	return upgradeCmdWithClient(streams, cmd, args, c)
+}
+
+func upgradeCmdWithClient(streams *cli.IOStreams, cmd *cobra.Command, args []string, c client.Client) error {
 	version := args[0]
 	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
 
-	c := client.New()
 	err := c.Connect(context.Background())
 	if err != nil {
 		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
@@ -106,7 +113,14 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	skipDefaultPgp, _ := cmd.Flags().GetBool(flagSkipDefaultPgp)
 	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, skipDefaultPgp, pgpChecks...)
 	if err != nil {
-		return errors.New(err, "Failed trigger upgrade of daemon")
+		s, ok := status.FromError(err)
+		// Sometimes the gRPC server shuts down before replying to the command which is expected
+		// we can determine this state by the EOF error coming from the server.
+		// If the server is just unavailable/not running, we should not succeed.
+		isConnectionInterrupted := ok && s.Code() == codes.Unavailable && strings.Contains(s.Message(), "EOF")
+		if !isConnectionInterrupted {
+			return errors.New(err, "Failed trigger upgrade of daemon")
+		}
 	}
 	fmt.Fprintf(streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
 	return nil
