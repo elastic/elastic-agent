@@ -105,20 +105,13 @@ func (p *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 	}
 	p.logger.Debugf("Starting Leader Elector")
 
-runLeaderElector:
-	for {
+        for {
 		le.Run(ctx)
-		select {
-		case <-ctx.Done():
-			break runLeaderElector
-		default:
-			// Run returned because the lease was lost. Run the leader elector again, so this instance
-			// is still a candidate to get the lease.
+		if ctx.Err() != nil {
+			p.logger.Debugf("Stopped Leader Elector")
+			return comm.Err()
 		}
 	}
-
-	p.logger.Debugf("Stopped Leader Elector")
-	return comm.Err()
 }
 
 func (p *contextProvider) startLeading(comm corecomp.ContextProviderComm) {
