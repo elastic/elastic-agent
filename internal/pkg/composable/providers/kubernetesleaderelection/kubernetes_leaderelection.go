@@ -104,7 +104,19 @@ func (p *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 		p.logger.Errorf("error while creating Leader Elector: %v", err)
 	}
 	p.logger.Debugf("Starting Leader Elector")
-	le.Run(comm)
+
+runLeaderElector:
+	for {
+		le.Run(ctx)
+		select {
+		case <-ctx.Done():
+			break runLeaderElector
+		default:
+			// Run returned because the lease was lost. Run the leader elector again, so this instance
+			// is still a candidate to get the lease.
+		}
+	}
+
 	p.logger.Debugf("Stopped Leader Elector")
 	return comm.Err()
 }
