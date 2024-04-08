@@ -1222,12 +1222,12 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 // When we remove snapshot API dependency this can go in the artifact api client code
 type branchInfo struct {
 	Version     string `json:"version"`
-	BuildId     string `json:"build_id"`
-	ManifestUrl string `json:"manifest_url"`
-	SummaryUrl  string `json:"summary_url"`
+	BuildID     string `json:"build_id"`
+	ManifestURL string `json:"manifest_url"`
+	SummaryURL  string `json:"summary_url"`
 }
 
-// FetchLatestAgentCoreStagingDRA is a simple mage target that will retrieve the elastic-agent-core DRA artifacts and
+// FetchLatestAgentCoreStagingDRA is a mage target that will retrieve the elastic-agent-core DRA artifacts and
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 
@@ -1240,20 +1240,20 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	}
 	draDownloadDir := filepath.Join(repositoryRoot, "build", "dra")
 	err = os.MkdirAll(draDownloadDir, 0o770)
-
 	if err != nil {
 		return fmt.Errorf("creating %q directory: %w", err)
 	}
 
-	artifacts, err := downloadDRAArtifacts(ctx, branchInfo.ManifestUrl, draDownloadDir, agentCoreProjectName)
-
-	if err == nil {
-		fmt.Println("Downloaded agent core DRAs:")
-		for k, _ := range artifacts {
-			fmt.Println(k)
-		}
+	artifacts, err := downloadDRAArtifacts(ctx, branchInfo.ManifestURL, draDownloadDir, agentCoreProjectName)
+	if err != nil {
+		return fmt.Errorf("downloading DRA artifacts from %q: %w", branchInfo.ManifestURL, err)
 	}
-	return err
+
+	fmt.Println("Downloaded agent core DRAs:")
+	for k, _ := range artifacts {
+		fmt.Println(k)
+	}
+	return nil
 }
 
 // PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
@@ -1333,7 +1333,6 @@ func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string
 		log.Printf("Received branch information for %q: %+v", branch, bi)
 	}
 
-	// return branch info
 	return bi, nil
 }
 
@@ -1356,7 +1355,6 @@ func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
 	}
 
 	return mappedPltf, found
-
 }
 
 func filterPackagesByPlatform(pkgs map[string]tools.Package) map[string]tools.Package {
@@ -1396,13 +1394,8 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 	// Create a dir with the buildID at <downloadDir>/<buildID>
 	draDownloadDir := filepath.Join(downloadDir, build.BuildID)
 	err = os.MkdirAll(draDownloadDir, 0o770)
-
 	if err != nil {
 		return nil, fmt.Errorf("creating %q directory: %w", err)
-	}
-
-	if mg.Verbose() {
-		log.Printf("url:%q, err %v", manifestUrl, err)
 	}
 
 	// sync access to the downloadedArtifacts map
@@ -1429,7 +1422,6 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 				return func() error {
 					artifactDownloadPath := filepath.Join(draDownloadDir, pkgName)
 					err := manifest.DownloadPackage(errCtx, pkgDesc.URL, artifactDownloadPath)
-
 					if err != nil {
 						return fmt.Errorf("downloading %q: %w", pkgName, err)
 					}
@@ -1475,7 +1467,6 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error 
 
 	// fetch the agent-core DRA artifacts for the current branch
 	artifacts, err := downloadDRAArtifacts(ctx, manifestUrl, downloadDir, agentCoreProjectName)
-
 	if err != nil {
 		return fmt.Errorf("downloading elastic-agent-core artifacts: %w", err)
 	}
