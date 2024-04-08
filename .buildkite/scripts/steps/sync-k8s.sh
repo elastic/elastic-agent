@@ -6,6 +6,7 @@ export PATH=$HOME/bin:${PATH}
 source .buildkite/scripts/install-gh.sh
 source .buildkite/scripts/common.sh
 
+echo "--- [Prepare env] Create required env variables"
 GITHUB_TOKEN_VAULT_PATH="kv/ci-shared/platform-ingest/github_token"
 GITHUB_USERNAME_SECRET=$(retry 5 vault kv get -field username ${GITHUB_TOKEN_VAULT_PATH})
 export GITHUB_USERNAME_SECRET
