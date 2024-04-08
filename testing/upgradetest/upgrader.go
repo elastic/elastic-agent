@@ -330,7 +330,8 @@ func PerformUpgrade(
 		// we can determine this state by the EOF error coming from the server.
 		// If the server is just unavailable/not running, we should not succeed.
 		// Starting with version 8.13.2, this is handled by the upgrade command itself.
-		isConnectionInterrupted := strings.Contains(err.Error(), "Unavailable") && strings.Contains(err.Error(), "EOF")
+		outputString := string(upgradeOutput)
+		isConnectionInterrupted := strings.Contains(outputString, "Unavailable") && strings.Contains(outputString, "EOF")
 		if !isConnectionInterrupted {
 			return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
 		}
