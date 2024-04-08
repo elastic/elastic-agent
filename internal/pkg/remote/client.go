@@ -27,6 +27,7 @@ import (
 
 const (
 	retryOnBadConnTimeout = 5 * time.Minute
+	requestIDHeaderName   = "X-Request-ID"
 )
 
 type wrapperFunc func(rt http.RoundTripper) (http.RoundTripper, error)
@@ -194,7 +195,7 @@ func (c *Client) Send(
 
 		// If available, add the request id as an HTTP header
 		if reqID != "" {
-			req.Header.Add("X-Request-ID", reqID)
+			req.Header.Add(requestIDHeaderName, reqID)
 		}
 
 		// copy headers.
@@ -220,7 +221,7 @@ func (c *Client) Send(
 			c.log.With("error", err).Debugf(msg)
 			continue
 		}
-		c.checkApiVersionHeaders(reqID, resp)
+		c.checkApiVersionHeaders(req, resp)
 
 		return resp, nil
 	}
@@ -228,19 +229,22 @@ func (c *Client) Send(
 	return nil, fmt.Errorf("all hosts failed: %w", multiErr)
 }
 
-func (c *Client) checkApiVersionHeaders(reqID string, resp *http.Response) {
+func (c *Client) checkApiVersionHeaders(req *http.Request, resp *http.Response) {
 	const elasticApiVersionHeaderKey = "Elastic-Api-Version"
 	const warningHeaderKey = "Warning"
 
 	warning := resp.Header.Get(warningHeaderKey)
+	requestID := req.Header.Get(requestIDHeaderName)
 	if warning != "" {
-		c.log.With("http.request.id", reqID).Warnf("warning in fleet response: %q", warning)
+		c.log.With("http.request.id", requestID).Warnf("warning in fleet response: %q", warning)
 	}
 
-	if downgradeVersion := resp.Header.Get(elasticApiVersionHeaderKey); resp.StatusCode == http.StatusBadRequest && downgradeVersion != "" {
+	requestAPIVersion := req.Header.Get(elasticApiVersionHeaderKey)
+	downgradeVersion := resp.Header.Get(elasticApiVersionHeaderKey)
+	if resp.StatusCode == http.StatusBadRequest && downgradeVersion != "" && downgradeVersion != requestAPIVersion {
 		// fleet server requested a downgrade to a different api version, we should bubble up an error until some kind
 		// of fallback mechanism can instantiate the requested version. This is not yet implemented so we log an error
-		c.log.With("http.request.id", reqID).Errorf("fleet requested a different api version %q but this is currently not implemented", downgradeVersion)
+		c.log.With("http.request.id", requestID).Errorf("fleet requested a different api version %q but this is currently not implemented", downgradeVersion)
 	}
 }
 
