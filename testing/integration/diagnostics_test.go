@@ -94,17 +94,17 @@ var nonGroupedComponentSetup = map[string]integrationtest.ComponentState{
 			},
 		},
 	},
-	// "fake-non-grouped-default-fake-non-grouped-1": {
-	// 	State: integrationtest.NewClientState(client.Healthy),
-	// 	Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-	// 		integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
-	// 			State: integrationtest.NewClientState(client.Healthy),
-	// 		},
-	// 		integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1-unit"}: {
-	// 			State: integrationtest.NewClientState(client.Healthy),
-	// 		},
-	// 	},
-	// },
+	"fake-non-grouped-default-fake-non-grouped-1": {
+		State: integrationtest.NewClientState(client.Healthy),
+		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1-unit"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+		},
+	},
 	"fake-shipper-default": {
 		State: integrationtest.NewClientState(client.Healthy),
 		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
@@ -114,9 +114,9 @@ var nonGroupedComponentSetup = map[string]integrationtest.ComponentState{
 			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
-			// integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
-			// 	State: integrationtest.NewClientState(client.Healthy),
-			// },
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
 		},
 	},
 }
