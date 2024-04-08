@@ -97,11 +97,10 @@ func (runner *ExtendedRunner) SetupSuite() {
 	require.NoError(runner.T(), err, "got out: %s", string(out))
 
 	policyUUID := uuid.New().String()
-	unpr := false
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   &unpr,
+		Privileged:     true,
 	}
 
 	fixture, err := define.NewFixture(runner.T(), define.Version())

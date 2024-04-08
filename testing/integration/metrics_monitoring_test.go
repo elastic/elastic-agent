@@ -62,11 +62,10 @@ func (runner *MetricsRunner) SetupSuite() {
 		},
 	}
 
-	unpr := false
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   &unpr,
+		Privileged:     true,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)

@@ -54,7 +54,7 @@ func NewFileVault(ctx context.Context, options Options) (v *FileVault, err error
 		if err != nil {
 			return nil, fmt.Errorf("failed to create vault path: %v, err: %w", path, err)
 		}
-		err = tightenPermissions(path)
+		err = tightenPermissions(path, options.ownership)
 		if err != nil {
 			return nil, err
 		}

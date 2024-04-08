@@ -259,7 +259,7 @@ func testUpgradeFleetManagedElasticAgent(
 			URL:             fleetServerURL,
 			EnrollmentToken: enrollmentToken.APIKey,
 		},
-		Unprivileged: atesting.NewBool(unprivileged),
+		Privileged: !unprivileged,
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
