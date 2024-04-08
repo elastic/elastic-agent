@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
@@ -105,7 +106,7 @@ func (p *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 	}
 	p.logger.Debugf("Starting Leader Elector")
 
-        for {
+	for {
 		le.Run(ctx)
 		if ctx.Err() != nil {
 			p.logger.Debugf("Stopped Leader Elector")
