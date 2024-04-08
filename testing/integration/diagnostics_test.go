@@ -150,14 +150,6 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 		After:      testDiagnosticsFactory(t, componentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
 	})
 	require.NoError(t, err)
-
-	err = fixture.Run(ctx, integrationtest.State{
-		Configure:  complexIsolatedUnitsConfig,
-		AgentState: integrationtest.NewClientState(client.Healthy),
-		Components: isolatedUnitsComponentSetup,
-		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
-	})
-	require.NoError(t, err)
 }
 
 func TestIsolatedUnitsDiagnosticsOptionalValues(t *testing.T) {
