@@ -32,6 +32,10 @@ inputs:
         - "logging.to_stderr=true"
         - "-E"
         - "gc_percent=${HEARTBEAT_GOGC:100}"
+        - "-E"
+        - "logging.event_data.to_stderr=true"
+        - "-E"
+        - "logging.event_data.to_files=false"
   - name: synthetics/http
     description: "Synthetics HTTP Monitor"
     platforms: *platforms

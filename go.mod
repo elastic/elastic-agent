@@ -2,8 +2,6 @@ module github.com/elastic/elastic-agent
 
 go 1.21.0
 
-toolchain go1.21.10
-
 require (
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230321174746-8dcc6526cfb1
@@ -134,7 +132,6 @@ require (
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
-	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/expr-lang/expr v1.16.7 // indirect
@@ -216,6 +213,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
+	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.elastic.co/apm/module/apmhttp v1.15.0 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.6.0 // indirect
@@ -296,3 +294,5 @@ replace (
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
+
+replace github.com/elastic/elastic-agent-libs => github.com/belimawr/elastic-agent-libs v0.2.9-0.20240408162830-ec4a1aa41dd1

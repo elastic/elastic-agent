@@ -133,7 +133,11 @@ func newDebugLogger(t *testing.T) *logger.Logger {
 	loggerCfg.Level = logp.DebugLevel
 	loggerCfg.ToStderr = true
 
-	log, err := logger.NewFromConfig("", loggerCfg, false)
+	eventLoggerCfg := logger.DefaultEventLoggingConfig()
+	eventLoggerCfg.Level = loggerCfg.Level
+	eventLoggerCfg.ToStderr = loggerCfg.ToStderr
+
+	log, err := logger.NewFromConfig("", loggerCfg, eventLoggerCfg, false)
 	require.NoError(t, err)
 	return log
 }
