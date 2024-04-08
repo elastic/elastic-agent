@@ -20,16 +20,13 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -119,7 +116,7 @@ type enrollCmdOption struct {
 	ProxyHeaders         map[string]string          `yaml:"proxy_headers,omitempty"`
 	DaemonTimeout        time.Duration              `yaml:"daemon_timeout,omitempty"`
 	UserProvidedMetadata map[string]interface{}     `yaml:"-"`
-	FixPermissions       bool                       `yaml:"-"`
+	FixPermissions       *utils.FileOwner           `yaml:"-"`
 	DelayEnroll          bool                       `yaml:"-"`
 	FleetServer          enrollCmdFleetServerOption `yaml:"-"`
 	SkipCreateSecret     bool                       `yaml:"-"`
@@ -166,35 +163,8 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	return cfg, nil
 }
 
-// newEnrollCmd creates a new enroll command that will registers the current beats to the remote
-// system.
+// newEnrollCmd creates a new enrollment with the given store.
 func newEnrollCmd(
-	ctx context.Context,
-	log *logger.Logger,
-	options *enrollCmdOption,
-	configPath string,
-) (*enrollCmd, error) {
-
-	encryptedDiskStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
-	if err != nil {
-		return nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
-	}
-	store := storage.NewReplaceOnSuccessStore(
-		configPath,
-		application.DefaultAgentFleetConfig,
-		encryptedDiskStore,
-	)
-
-	return newEnrollCmdWithStore(
-		log,
-		options,
-		configPath,
-		store,
-	)
-}
-
-// newEnrollCmdWithStore creates a new enrollment and accept a custom store.
-func newEnrollCmdWithStore(
 	log *logger.Logger,
 	options *enrollCmdOption,
 	configPath string,
@@ -227,7 +197,11 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 
 	// Create encryption key from the agent before touching configuration
 	if !c.options.SkipCreateSecret {
-		err = secret.CreateAgentSecret(ctx, vault.WithUnprivileged(!hasRoot))
+		opts := []vault.OptionFunc{vault.WithUnprivileged(!hasRoot)}
+		if c.options.FixPermissions != nil {
+			opts = append(opts, vault.WithVaultOwnership(*c.options.FixPermissions))
+		}
+		err = secret.CreateAgentSecret(ctx, opts...)
 		if err != nil {
 			return err
 		}
@@ -287,8 +261,8 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		return fmt.Errorf("fail to enroll: %w", err)
 	}
 
-	if c.options.FixPermissions {
-		err = install.FixPermissions(paths.Top(), utils.CurrentFileOwner())
+	if c.options.FixPermissions != nil {
+		err = perms.FixPermissions(paths.Top(), perms.WithOwnership(*c.options.FixPermissions))
 		if err != nil {
 			return errors.New(err, "failed to fix permissions")
 		}

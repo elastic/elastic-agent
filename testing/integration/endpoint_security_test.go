@@ -188,7 +188,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(false),
+		Privileged:     true,
 	}
 
 	policy, err := tools.InstallAgentWithPolicy(ctx, t,
@@ -247,7 +247,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(false),
+		Privileged:     true,
 	}
 
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -360,7 +360,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(false),
+		Privileged:     true,
 	}
 
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -528,7 +528,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(false),
+		Privileged:     true,
 		BasePath:       filepath.Join(paths.DefaultBasePath, "not_default"),
 	}
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
@@ -606,7 +606,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(true), // ensure always unprivileged
+		Privileged:     false, // ensure always unprivileged
 	}
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
@@ -682,7 +682,7 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   atesting.NewBool(false),
+		Privileged:     true,
 	}
 
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)

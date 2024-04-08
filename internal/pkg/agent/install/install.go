@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -28,8 +29,8 @@ import (
 const (
 	darwin = "darwin"
 
-	elasticUsername  = "elastic-agent"
-	elasticGroupName = "elastic-agent"
+	ElasticUsername  = "elastic-agent-user"
+	ElasticGroupName = "elastic-agent"
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
@@ -63,8 +64,8 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	username := ""
 	groupName := ""
 	if unprivileged {
-		username = elasticUsername
-		groupName = elasticGroupName
+		username = ElasticUsername
+		groupName = ElasticGroupName
 
 		// ensure required group
 		ownership.GID, err = FindGID(groupName)
@@ -177,12 +178,12 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	}
 
 	// fix permissions
-	err = FixPermissions(topPath, ownership)
+	err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
 	if err != nil {
 		return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 	}
 	if paths.ShellWrapperPath != "" {
-		err = FixPermissions(paths.ShellWrapperPath, ownership)
+		err = perms.FixPermissions(paths.ShellWrapperPath, perms.WithOwnership(ownership))
 		if err != nil {
 			return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath, err)
 		}
@@ -190,7 +191,12 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	// install service
 	pt.Describe("Installing service")
-	svc, err := newService(topPath, withUserGroup(username, groupName))
+	opts, err := withServiceOptions(username, groupName)
+	if err != nil {
+		pt.Describe("Failed to install service")
+		return ownership, fmt.Errorf("error getting service installation options: %w", err)
+	}
+	svc, err := newService(topPath, opts...)
 	if err != nil {
 		pt.Describe("Failed to install service")
 		return ownership, fmt.Errorf("error installing new service: %w", err)
@@ -201,6 +207,17 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		return ownership, errors.New(
 			err,
 			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
+			errors.M("service", paths.ServiceName))
+	}
+	err = servicePostInstall(ownership)
+	if err != nil {
+		pt.Describe("Failed to configure service")
+
+		// ignore error
+		_ = svc.Uninstall()
+		return ownership, errors.New(
+			err,
+			fmt.Sprintf("failed to configure service (%s)", paths.ServiceName),
 			errors.M("service", paths.ServiceName))
 	}
 	pt.Describe("Installed service")
