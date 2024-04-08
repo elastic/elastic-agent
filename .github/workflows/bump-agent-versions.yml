@@ -40,6 +40,7 @@ jobs:
           install-only: true
 
       - name: Update versions file
+        id: update
         env:
           GH_TOKEN: ${{ env.GITHUB_TOKEN }}
         run: ./.github/workflows/bump-agent-versions.sh
@@ -53,7 +54,7 @@ jobs:
           message: ":traffic_cone: Elastic Agent versions file update failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           channel: "#ingest-notifications"
 
-      - if: ${{ success() }}
+      - if: ${{ success() && steps.update.output.pr == true}}
         uses: elastic/apm-pipeline-library/.github/actions/slack-message@current
         with:
           url: ${{ secrets.VAULT_ADDR }}
