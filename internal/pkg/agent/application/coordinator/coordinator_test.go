@@ -61,8 +61,8 @@ var (
 			},
 		},
 	}
-	fakeNonGroupedInputSpec = component.InputSpec{
-		Name:      "fake-non-grouped",
+	fakeIsolatedUnitsInputSpec = component.InputSpec{
+		Name:      "fake-isolated-units",
 		Platforms: []string{fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH)},
 		Shippers:  []string{"fake-shipper"},
 		Command: &component.CommandSpec{
@@ -560,12 +560,12 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCoordinator_StateSubscribeNonGrouped(t *testing.T) {
+func TestCoordinator_StateSubscribeIsolatedUnits(t *testing.T) {
 	coordCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, WithComponentInputSpec(fakeNonGroupedInputSpec))
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, WithComponentInputSpec(fakeIsolatedUnitsInputSpec))
 	go func() {
 		err := coord.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -589,14 +589,14 @@ func TestCoordinator_StateSubscribeNonGrouped(t *testing.T) {
 			case state := <-subChan:
 				t.Logf("%+v", state)
 				if len(state.Components) == 3 {
-					compState0 := getComponentState(state.Components, "fake-non-grouped-default-fake-non-grouped-0")
-					compState1 := getComponentState(state.Components, "fake-non-grouped-default-fake-non-grouped-1")
+					compState0 := getComponentState(state.Components, "fake-isolated-units-default-fake-isolated-units-0")
+					compState1 := getComponentState(state.Components, "fake-isolated-units-default-fake-isolated-units-1")
 					if compState0 != nil && compState1 != nil {
-						unit0, ok0 := compState0.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-0-unit"}]
-						unit1, ok1 := compState1.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1-unit"}]
+						unit0, ok0 := compState0.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-0-unit"}]
+						unit1, ok1 := compState1.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1-unit"}]
 						if ok0 && ok1 {
-							if (unit0.State == client.UnitStateHealthy && unit0.Message == "Healthy From Fake Non Grouped 0 Config") &&
-								(unit1.State == client.UnitStateHealthy && unit1.Message == "Healthy From Fake Non Grouped 1 Config") {
+							if (unit0.State == client.UnitStateHealthy && unit0.Message == "Healthy From Fake Isolated Units 0 Config") &&
+								(unit1.State == client.UnitStateHealthy && unit1.Message == "Healthy From Fake Isolated Units 1 Config") {
 								resultChan <- nil
 								return
 							}
@@ -622,18 +622,18 @@ func TestCoordinator_StateSubscribeNonGrouped(t *testing.T) {
 		},
 		"inputs": []interface{}{
 			map[string]interface{}{
-				"id":         "fake-non-grouped-0",
-				"type":       "fake-non-grouped",
+				"id":         "fake-isolated-units-0",
+				"type":       "fake-isolated-units",
 				"use_output": "default",
 				"state":      client.UnitStateHealthy,
-				"message":    "Healthy From Fake Non Grouped 0 Config",
+				"message":    "Healthy From Fake Isolated Units 0 Config",
 			},
 			map[string]interface{}{
-				"id":         "fake-non-grouped-1",
-				"type":       "fake-non-grouped",
+				"id":         "fake-isolated-units-1",
+				"type":       "fake-isolated-units",
 				"use_output": "default",
 				"state":      client.UnitStateHealthy,
-				"message":    "Healthy From Fake Non Grouped 1 Config",
+				"message":    "Healthy From Fake Isolated Units 1 Config",
 			},
 		},
 	})

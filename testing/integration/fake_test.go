@@ -43,46 +43,30 @@ inputs:
     message: Healthy
 `
 
-var simpleConfig3 = `
+var simpleIsolatedUnitsConfig = `
 outputs:
   default:
     type: fake-action-output
     shipper.enabled: true
 inputs:
-  - id: fake
-    type: fake
-    state: 2
-    message: Healthy
-  - id: fake-non-grouped
-    type: fake-non-grouped
-    state: 2
-    message: Healthy
-`
-
-var simpleNonGroupedConfig = `
-outputs:
-  default:
-    type: fake-action-output
-    shipper.enabled: true
-inputs:
-  - id: fake-non-grouped
-    type: fake-non-grouped
+  - id: fake-isolated-units
+    type: fake-isolated-units
     state: 1
     message: Configuring
 `
 
-var complexNonGroupedConfig = `
+var complexIsolatedUnitsConfig = `
 outputs:
   default:
     type: fake-action-output
     shipper.enabled: true
 inputs:
-  - id: fake-non-grouped
-    type: fake-non-grouped
+  - id: fake-isolated-units
+    type: fake-isolated-units
     state: 2
     message: Healthy
-  - id: fake-non-grouped-1
-    type: fake-non-grouped
+  - id: fake-isolated-units-1
+    type: fake-isolated-units
     state: 2
     message: Healthy
 `
@@ -118,7 +102,7 @@ func TestFakeComponent(t *testing.T) {
 			},
 		},
 	}, atesting.State{
-		Configure:  simpleConfig3,
+		Configure:  simpleConfig2,
 		AgentState: atesting.NewClientState(client.Healthy),
 		StrictComponents: map[string]atesting.ComponentState{
 			"fake-default": {
@@ -132,17 +116,6 @@ func TestFakeComponent(t *testing.T) {
 					},
 				},
 			},
-			"fake-non-grouped-default-fake-non-grouped": {
-				State: atesting.NewClientState(client.Healthy),
-				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
-						State: atesting.NewClientState(client.Healthy),
-					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-unit"}: {
-						State: atesting.NewClientState(client.Healthy),
-					},
-				},
-			},
 			"fake-shipper-default": {
 				State: atesting.NewClientState(client.Healthy),
 				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
@@ -152,9 +125,6 @@ func TestFakeComponent(t *testing.T) {
 					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
-						State: atesting.NewClientState(client.Healthy),
-					},
 				},
 			},
 		},
@@ -162,8 +132,17 @@ func TestFakeComponent(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestFakeNonGroupedComponent(t *testing.T) {
+func TestFakeIsolatedUnitsComponent(t *testing.T) {
 	define.Require(t, define.Requirements{
+		// TODO: Support isolated units with shipper on Windows
+		OS: []define.OS{
+			{
+				Type: define.Darwin,
+			},
+			{
+				Type: define.Linux,
+			},
+		},
 		Group: Default,
 		Local: true,
 	})
@@ -177,43 +156,43 @@ func TestFakeNonGroupedComponent(t *testing.T) {
 	require.NoError(t, err)
 
 	err = f.Run(ctx, atesting.State{
-		Configure:  simpleNonGroupedConfig,
+		Configure:  simpleIsolatedUnitsConfig,
 		AgentState: atesting.NewClientState(client.Healthy),
 		Components: map[string]atesting.ComponentState{
-			"fake-non-grouped-default-fake-non-grouped": {
+			"fake-isolated-units-default-fake-isolated-units": {
 				State: atesting.NewClientState(client.Healthy),
 				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-unit"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-unit"}: {
 						State: atesting.NewClientState(client.Configuring),
 					},
 				},
 			},
 		},
 	}, atesting.State{
-		Configure:  complexNonGroupedConfig,
+		Configure:  complexIsolatedUnitsConfig,
 		AgentState: atesting.NewClientState(client.Healthy),
 		Components: map[string]atesting.ComponentState{
-			"fake-non-grouped-default-fake-non-grouped": {
+			"fake-isolated-units-default-fake-isolated-units": {
 				State: atesting.NewClientState(client.Healthy),
 				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-unit"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-unit"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 				},
 			},
-			"fake-non-grouped-default-fake-non-grouped-1": {
+			"fake-isolated-units-default-fake-isolated-units-1": {
 				State: atesting.NewClientState(client.Healthy),
 				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-isolated-units-default-fake-isolated-units-1"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1-unit"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1-unit"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 				},
@@ -224,10 +203,10 @@ func TestFakeNonGroupedComponent(t *testing.T) {
 					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 				},

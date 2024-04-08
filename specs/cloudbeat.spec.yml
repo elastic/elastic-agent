@@ -7,7 +7,6 @@ inputs:
       - linux/arm64
       - darwin/amd64
       - darwin/arm64
-      - windows/amd64
       - container/amd64
       - container/arm64
     outputs: &outputs
@@ -15,7 +14,7 @@ inputs:
       - kafka
       - logstash
       - redis
-    # Introduced for non-grouping tests, not used by cloudbeat
+    # Introduced for isolated units tests, not used by cloudbeat
     shippers: &shippers
       - shipper
     command: &command

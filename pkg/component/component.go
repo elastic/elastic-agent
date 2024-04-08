@@ -343,17 +343,17 @@ func (r *RuntimeSpecs) componentsForInputType(
 	componentConfig *ComponentConfig,
 ) []Component {
 	inputSpec, componentErr := r.GetInput(inputType)
-	// Treat as grouped component on error of reading the input spec
+	// Treat as non isolated units component on error of reading the input spec
 	if componentErr != nil || !inputSpec.Spec.IsolateUnits {
 		return []Component{
-			r.groupedComponentForInputType(inputType, output, featureFlags, componentConfig),
+			r.nonIsolatedUnitsComponentForInputType(inputType, output, featureFlags, componentConfig),
 		}
 	}
-	return r.nonGroupedComponentsForInputType(inputType, output, featureFlags, componentConfig)
+	return r.isolatedUnitsComponentsForInputType(inputType, output, featureFlags, componentConfig)
 }
 
-// Returns a grouped component that will group all similar inputs under one component with multiple units.
-func (r *RuntimeSpecs) groupedComponentForInputType(
+// Returns a non isolated units component that will group all similar inputs under one component with multiple units.
+func (r *RuntimeSpecs) nonIsolatedUnitsComponentForInputType(
 	inputType string,
 	output outputI,
 	featureFlags *features.Flags,
@@ -428,8 +428,8 @@ func (r *RuntimeSpecs) groupedComponentForInputType(
 	}
 }
 
-// Returns a list of components that are not grouped, one component for each similar input.
-func (r *RuntimeSpecs) nonGroupedComponentsForInputType(
+// Returns a list of isolated unit components that are not grouped, one component for each similar input.
+func (r *RuntimeSpecs) isolatedUnitsComponentsForInputType(
 	inputType string,
 	output outputI,
 	featureFlags *features.Flags,

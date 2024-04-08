@@ -235,7 +235,7 @@ func TestToComponents(t *testing.T) {
 			Err: `invalid 'inputs.1.id', has a duplicate id "filestream". Please add a unique value for the 'id' key to each input in the agent policy`,
 		},
 		{
-			Name:     "Invalid: inputs entry duplicate because of missing id (non grouped)",
+			Name:     "Invalid: inputs entry duplicate because of missing id (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -275,7 +275,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.id', expected a string not a int",
 		},
 		{
-			Name:     "Invalid: inputs entry id not a string (non grouped)",
+			Name:     "Invalid: inputs entry id not a string (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -314,7 +314,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.use_output', expected a string not a int",
 		},
 		{
-			Name:     "Invalid: inputs entry use_output not a string (non grouped)",
+			Name:     "Invalid: inputs entry use_output not a string (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -354,7 +354,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.use_output', references an unknown output 'other'",
 		},
 		{
-			Name:     "Invalid: inputs entry use_output references unknown output (non grouped)",
+			Name:     "Invalid: inputs entry use_output references unknown output (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -395,7 +395,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.enabled', expected a bool not a string",
 		},
 		{
-			Name:     "Invalid: inputs entry enabled not a bool (non grouped)",
+			Name:     "Invalid: inputs entry enabled not a bool (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -638,7 +638,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Invalid: single input failed to decode into config (non grouped)",
+			Name:     "Invalid: single input failed to decode into config (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -745,7 +745,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Output disabled (non grouped)",
+			Name:     "Output disabled (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -783,7 +783,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Input disabled (non grouped)",
+			Name:     "Input disabled (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -861,7 +861,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Simple representation (non grouped)",
+			Name:     "Simple representation (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -970,7 +970,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Debug log level (non grouped)",
+			Name:     "Debug log level (isolated units)",
 			Platform: linuxAMD64Platform,
 			LogLevel: logp.DebugLevel,
 			Policy: map[string]interface{}{
@@ -1081,7 +1081,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Unique log level (non grouped)",
+			Name:     "Unique log level (isolated units)",
 			Platform: linuxAMD64Platform,
 			LogLevel: logp.ErrorLevel,
 			Policy: map[string]interface{}{
@@ -1436,7 +1436,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Complex representation (non grouped)",
+			Name:     "Complex representation (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -1892,7 +1892,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Simple w/ shipper (non grouped)",
+			Name:     "Simple w/ shipper (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -2473,7 +2473,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Complex w/ shipper (non grouped)",
+			Name:     "Complex w/ shipper (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -3164,7 +3164,7 @@ func TestToComponents(t *testing.T) {
 			}},
 		},
 		{
-			Name:     "Headers injection (non grouped)",
+			Name:     "Headers injection (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -3278,7 +3278,7 @@ func TestToComponents(t *testing.T) {
 			}},
 		},
 		{
-			Name:     "Headers injection merge (non grouped)",
+			Name:     "Headers injection merge (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -3389,7 +3389,7 @@ func TestToComponents(t *testing.T) {
 			}},
 		},
 		{
-			Name:     "Headers injection not injecting kafka (non grouped)",
+			Name:     "Headers injection not injecting kafka (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -3493,7 +3493,7 @@ func TestToComponents(t *testing.T) {
 			}},
 		},
 		{
-			Name:     "Headers injection not injecting logstash (non grouped)",
+			Name:     "Headers injection not injecting logstash (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -4103,7 +4103,7 @@ func TestFlattenedDataStream(t *testing.T) {
 	}
 }
 
-func TestFlattenedDataStreamNonGrouped(t *testing.T) {
+func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 	id0 := "cloudbeat-0"
 	id1 := "cloudbeat-1"
 	expectedNamespace := map[string]string{

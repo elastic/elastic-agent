@@ -82,25 +82,25 @@ var componentSetup = map[string]integrationtest.ComponentState{
 	},
 }
 
-var nonGroupedComponentSetup = map[string]integrationtest.ComponentState{
-	"fake-non-grouped-default-fake-non-grouped": {
+var isolatedUnitsComponentSetup = map[string]integrationtest.ComponentState{
+	"fake-isolated-units-default-fake-isolated-units": {
 		State: integrationtest.NewClientState(client.Healthy),
 		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-unit"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-unit"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
 		},
 	},
-	"fake-non-grouped-default-fake-non-grouped-1": {
+	"fake-isolated-units-default-fake-isolated-units-1": {
 		State: integrationtest.NewClientState(client.Healthy),
 		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-isolated-units-default-fake-isolated-units-1"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1-unit"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1-unit"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
 		},
@@ -111,10 +111,10 @@ var nonGroupedComponentSetup = map[string]integrationtest.ComponentState{
 			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-non-grouped-default-fake-non-grouped-1"}: {
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1"}: {
 				State: integrationtest.NewClientState(client.Healthy),
 			},
 		},
@@ -152,10 +152,45 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 	require.NoError(t, err)
 
 	err = fixture.Run(ctx, integrationtest.State{
-		Configure:  complexNonGroupedConfig,
+		Configure:  complexIsolatedUnitsConfig,
 		AgentState: integrationtest.NewClientState(client.Healthy),
-		Components: nonGroupedComponentSetup,
-		After:      testDiagnosticsFactory(t, nonGroupedComponentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
+		Components: isolatedUnitsComponentSetup,
+		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
+	})
+	require.NoError(t, err)
+}
+
+func TestIsolatedUnitsDiagnosticsOptionalValues(t *testing.T) {
+	define.Require(t, define.Requirements{
+		// TODO: Support isolated units with shipper on Windows
+		OS: []define.OS{
+			{
+				Type: define.Darwin,
+			},
+			{
+				Type: define.Linux,
+			},
+		},
+		Group: Default,
+		Local: false,
+	})
+
+	fixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
+	require.NoError(t, err)
+
+	diagpprof := append(diagnosticsFiles, "cpu.pprof")
+	diagCompPprof := append(compDiagnosticsFiles, "cpu.pprof")
+
+	err = fixture.Run(ctx, integrationtest.State{
+		Configure:  complexIsolatedUnitsConfig,
+		AgentState: integrationtest.NewClientState(client.Healthy),
+		Components: isolatedUnitsComponentSetup,
+		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
 	})
 	require.NoError(t, err)
 }
@@ -181,12 +216,36 @@ func TestDiagnosticsCommand(t *testing.T) {
 		After:      testDiagnosticsFactory(t, componentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 	})
 	assert.NoError(t, err)
+}
+
+func TestIsolatedUnitsDiagnosticsCommand(t *testing.T) {
+	define.Require(t, define.Requirements{
+		// TODO: Support isolated units with shipper on Windows
+		OS: []define.OS{
+			{
+				Type: define.Darwin,
+			},
+			{
+				Type: define.Linux,
+			},
+		},
+		Group: Default,
+		Local: false,
+	})
+
+	f, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	require.NoError(t, err)
 
 	err = f.Run(ctx, integrationtest.State{
-		Configure:  complexNonGroupedConfig,
+		Configure:  complexIsolatedUnitsConfig,
 		AgentState: integrationtest.NewClientState(client.Healthy),
-		Components: nonGroupedComponentSetup,
-		After:      testDiagnosticsFactory(t, nonGroupedComponentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+		Components: isolatedUnitsComponentSetup,
+		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 	})
 	assert.NoError(t, err)
 }
