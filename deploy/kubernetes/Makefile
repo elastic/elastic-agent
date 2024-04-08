@@ -63,9 +63,9 @@ $(eval HASDIFF =$(shell sh -c "git status | grep $(FILE_REPO) | wc -l"))
 ci-create-kubernetes-templates-pull-request:
 ifeq ($(HASDIFF),1)
 	echo "INFO: Create branch to update k8s templates"	
-	git config user.name "${GITHUB_USERNAME_SECRET}"
-	git config user.email "${GITHUB_EMAIL_SECRET}"
-	git config remote.origin.url "https://${GITHUB_USERNAME_SECRET}:${GITHUB_TOKEN_SECRET}@github.com/elastic/kibana.git"
+	@git config user.name "${GITHUB_USERNAME_SECRET}"
+	@git config user.email "${GITHUB_EMAIL_SECRET}"
+	@git config remote.origin.url "https://${GITHUB_USERNAME_SECRET}:${GITHUB_TOKEN_SECRET}@github.com/elastic/kibana.git"
 	git checkout -b $(ELASTIC_AGENT_BRANCH)
 	echo "INFO: add files if any"
 	git add $(ELASTIC_AGENT_REPO_PATH)$(FILE_REPO)
@@ -80,7 +80,7 @@ else
 	echo "INFO: push branch"
 	@git push --set-upstream origin $(ELASTIC_AGENT_BRANCH)
 	echo "INFO: create pull request"
-	@gh pr create \
+	@GITHUB_TOKEN=$(GITHUB_TOKEN_SECRET) gh pr create \
 		--title "Update kubernetes templates for elastic-agent" \
 		--body "Automated by ${BUILDKITE_BUILD_URL}" \
 		--label automation \
