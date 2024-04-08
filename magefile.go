@@ -94,7 +94,7 @@ var (
 		"demo":  Demo.Enroll,
 	}
 
-	errNoManifest         = errors.New("missing ManifestURL environment variable")
+	errNoManifest         = errors.New(fmt.Sprintf("missing %q environment variable", mage.ManifestUrlEnvVar))
 	errNoAgentDropPath    = errors.New("missing AGENT_DROP_PATH environment variable")
 	errAtLeastOnePlatform = errors.New("elastic-agent package is expected to build at least one platform package")
 
