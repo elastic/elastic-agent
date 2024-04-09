@@ -2,7 +2,6 @@ package kubernetesleaderelection
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -163,7 +162,6 @@ func TestNewLeaderElectionManager(t *testing.T) {
 
 	select {
 	case <-done:
-		fmt.Println("here")
 	case <-time.After(time.Duration(leaseDuration+leaseRetryPeriod) * 20 * time.Second):
 		require.FailNow(t, "Waited for 20 lease durations, but agent2 still not acquired the lease. This error "+
 			"is possible, but unlikely.")
