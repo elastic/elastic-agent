@@ -1606,8 +1606,8 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 
 	reqs := upgradetest.VersionRequirements{
 		UpgradeToVersion: bversion.Agent,
-		CurrentMajors:    2,
-		PreviousMinors:   1,
+		CurrentMajors:    1,
+		PreviousMinors:   2,
 		PreviousMajors:   1,
 		SnapshotBranches: branches,
 	}
