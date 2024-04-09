@@ -15,6 +15,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -334,6 +335,81 @@ func TestEnroll(t *testing.T) {
 			err = cmd.Execute(context.Background(), streams)
 			require.Error(t, err)
 			require.False(t, store.Called)
+		},
+	))
+
+	counter := int32(0)
+
+	t.Run("there is a retry on a temporary server error", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
+
+				// first request fails with 503, retry is expected
+				if atomic.CompareAndSwapInt32(&counter, 0, 1) {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_, _ = w.Write([]byte(`
+{
+		"statusCode": 503,
+		"error": "Internal Server Error"
+}`))
+					return
+				}
+
+				// second attempt is successful
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`
+{
+    "action": "created",
+    "item": {
+        "id": "a9328860-ec54-11e9-93c4-d72ab8a69391",
+        "active": true,
+        "policy_id": "69f3f5a0-ec52-11e9-93c4-d72ab8a69391",
+        "type": "PERMANENT",
+        "enrolled_at": "2019-10-11T18:26:37.158Z",
+        "user_provided_metadata": {
+						"custom": "customize"
+				},
+        "local_metadata": {
+            "platform": "linux",
+            "version": "8.0.0"
+        },
+        "actions": [],
+        "access_api_key": "my-access-api-key"
+    }
+}`))
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			url := "http://" + host
+			store := &mockStore{}
+			cmd, err := newEnrollCmd(
+				log,
+				&enrollCmdOption{
+					URL:                  url,
+					CAs:                  []string{},
+					EnrollAPIKey:         "my-enrollment-api-key",
+					Insecure:             true,
+					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
+					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
+				},
+				"",
+				store,
+			)
+			require.NoError(t, err)
+
+			streams, _, _, _ := cli.NewTestingIOStreams()
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			require.NoError(t, err, "enroll command should return no error")
+
+			assert.True(t, store.Called, "the store should have been called")
+			config, err := readConfig(store.Content)
+			require.NoError(t, err)
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
+			assert.Equal(t, host, config.Client.Host)
 		},
 	))
 }
