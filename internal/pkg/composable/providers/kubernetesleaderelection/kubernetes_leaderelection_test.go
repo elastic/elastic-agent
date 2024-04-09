@@ -7,13 +7,14 @@ import (
 	"time"
 
 	autodiscoverK8s "github.com/elastic/elastic-agent-autodiscover/kubernetes"
-	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	k8sclient "k8s.io/client-go/kubernetes"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -91,7 +92,7 @@ func TestNewLeaderElectionManager(t *testing.T) {
 	cfg, err := config.NewConfigFrom(c)
 	require.NoError(t, err)
 
-	getK8sClientFunc = func(kubeconfig string, opt autodiscoverK8s.KubeClientOptions) (k8sclient.Interface, error) {
+	getK8sClientFunc = func(kubeconfig string, opt autodiscoverK8s.KubeClientOptions) (kubernetes.Interface, error) {
 		return client, nil
 	}
 	require.NoError(t, err)
@@ -108,8 +109,16 @@ func TestNewLeaderElectionManager(t *testing.T) {
 		cancelFuncs[i] = cancel
 		comm := ctesting.NewContextComm(ctx)
 
-		os.Setenv("POD_NAME", podNames[i])
-		go p.Run(ctx, comm)
+		err = os.Setenv("POD_NAME", podNames[i])
+		if err != nil {
+			require.FailNow(t, "Failed to set pod name environment variable.")
+		}
+		go func() {
+			err := p.Run(ctx, comm)
+			if err != nil {
+				require.FailNow(t, "Failed to run the context provider.")
+			}
+		}()
 
 		if i == 1 {
 			break
