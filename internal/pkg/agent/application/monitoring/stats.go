@@ -29,14 +29,14 @@ func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
 	defaultUserCfg := LivenessFailConfig{Degraded: false, Failed: true}
 
 	userConfig := req.Form.Get(formValueKey)
-	if userConfig == "failed" {
-		// same as default
+	switch userConfig {
+	case "failed":
 		return defaultUserCfg, nil
-	} else if userConfig == "degraded" {
+	case "degraded":
 		return LivenessFailConfig{Failed: true, Degraded: true}, nil
-	} else if userConfig == "" {
+	case "":
 		return defaultUserCfg, nil
-	} else {
+	default:
 		return defaultUserCfg, fmt.Errorf("got unexpected value for `%s` attribute: %s", formValueKey, userConfig)
 	}
 }

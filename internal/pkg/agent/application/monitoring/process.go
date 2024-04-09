@@ -108,7 +108,7 @@ func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func
 					content = string(bytes)
 				}
 				if livenessMode && unhealthyComponent {
-					w.WriteHeader(500)
+					w.WriteHeader(http.StatusInternalServerError)
 				}
 				fmt.Fprint(w, content)
 
