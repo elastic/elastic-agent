@@ -130,6 +130,7 @@ spec:
     metadata:
       name: elastic-agent-binary-dra
       description: Buildkite pipeline for packaging Elastic Agent core binary and publish it to DRA
+    branch_configuration: "main 7.* 8.* v7.* v8.*"
     spec:
       pipeline_file: ".buildkite/pipeline.elastic-agent-binary-dra.yml"
       provider_settings:
