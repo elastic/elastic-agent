@@ -16,7 +16,11 @@ else
     fi
     git diff -p
     git add ".agent-versions.json"
-    git commit -m "[$GITHUB_REF_NAME](automation) Update .agent-versions.json" -m "This file is used for picking agent versions in integration tests.\n\nThe file's content is based on responses from https://www.elastic.co/api/product_versions and https://snapshots.elastic.co\n\nThe current update is generated based on the following requirements:\n\`\`\`json\n$version_requirements\n\`\`\`"
+
+    nl=$'\n' # otherwise the new line character is not recognized properly
+    commit_desc="This file is used for picking agent versions in integration tests.${nl}${nl}The file's content is based on responses from https://www.elastic.co/api/product_versions and https://snapshots.elastic.co${nl}${nl}The current update is generated based on the following requirements:${nl}${nl}\`\`\`json${nl}${version_requirements}${nl}\`\`\`"
+
+    git commit -m "[$GITHUB_REF_NAME][Automation] Update .agent-versions.json" -m "$commit_desc"
     git push --set-upstream origin "update-agent-versions-$GITHUB_RUN_ID"
     gh pr create \
        --base "$GITHUB_REF_NAME" \
@@ -27,4 +31,5 @@ else
        --label 'skip-changelog' \
        --label 'backport-skip' \
        --repo $GITHUB_REPOSITORY
+    echo "::set-output name=pr::true" # set step output for notifications
 fi
