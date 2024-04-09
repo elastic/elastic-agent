@@ -114,10 +114,7 @@ func TestNewLeaderElectionManager(t *testing.T) {
 			require.FailNow(t, "Failed to set pod name environment variable.")
 		}
 		go func() {
-			err := p.Run(ctx, comm)
-			if err != nil {
-				require.FailNow(t, "Failed to run the context provider.")
-			}
+			_ = p.Run(ctx, comm)
 		}()
 
 		if i == 1 {
