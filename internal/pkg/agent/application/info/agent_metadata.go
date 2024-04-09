@@ -52,6 +52,8 @@ type AgentECSMeta struct {
 	LogLevel string `json:"log_level"`
 	// Complete is a flag specifying that the agent used is a complete image.
 	Complete bool `json:"complete"`
+	// Unprivileged is a flag specifying that the agent is running in unprivileged mode.
+	Unprivileged bool `json:"unprivileged"`
 }
 
 // SystemECSMeta is a collection of operating system metadata in ECS compliant object form.
@@ -163,8 +165,9 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 				BuildOriginal: release.Info().String(),
 				// only upgradeable if running from Agent installer and running under the
 				// control of the system supervisor (or built specifically with upgrading enabled)
-				Upgradeable: release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
-				LogLevel:    i.LogLevel(),
+				Upgradeable:  release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
+				LogLevel:     i.LogLevel(),
+				Unprivileged: i.unprivileged,
 			},
 		},
 		Host: &HostECSMeta{

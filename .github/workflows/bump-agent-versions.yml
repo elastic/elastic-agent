@@ -54,11 +54,12 @@ jobs:
           message: ":traffic_cone: Elastic Agent versions file update failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           channel: "#ingest-notifications"
 
-      - if: ${{ success() && steps.update.output.pr == true}}
+        # if a PR was created as a result of this job, we notify on the Slack channel
+      - if: ${{ startsWith(steps.update.output.pr, 'https') }}
         uses: elastic/apm-pipeline-library/.github/actions/slack-message@current
         with:
           url: ${{ secrets.VAULT_ADDR }}
           roleId: ${{ secrets.VAULT_ROLE_ID }}
           secretId: ${{ secrets.VAULT_SECRET_ID }}
-          message: "Update for Elastic Agent versions file has been created https://github.com/elastic/elastic-agent/pulls?q=is%3Aopen+is%3Apr+label%3Aupdate-versions"
+          message: "Update for Elastic Agent versions file has been created: ${{ steps.update.output.pr }}"
           channel: "#ingest-notifications"
