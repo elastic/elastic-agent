@@ -137,7 +137,6 @@ func TestNewLeaderElectionManager(t *testing.T) {
 	}
 
 	// At this point the current holder is agent1. Let's change it to agent2.
-	// We do this as a goroutine, so we can have a timeout to avoid this function running forever.
 	for {
 		// Force the lease to be applied again, so a new leader is elected.
 		intermediateHolder := "does-not-matter"
@@ -169,7 +168,6 @@ func TestNewLeaderElectionManager(t *testing.T) {
 	// To avoid having to wait very long, the context of agent2 will be canceled so the leader elector will not be
 	// running anymore. This way there is only one instance fighting to acquire the lease.
 	cancelFuncs[1]()
-	// We do this as a goroutine, so we can have a timeout to avoid this function running forever.
 	for {
 		// Force the lease to be applied again, so a new leader is elected.
 		intermediateHolder := "does-not-matter"
