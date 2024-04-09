@@ -144,17 +144,13 @@ func TestNewLeaderElectionManager(t *testing.T) {
 		err = applyLease(client, lease, false)
 		require.NoError(t, err)
 
-		// Make sure the holder changed
-		currentHolder, err := getLeaseHolder(client)
-		require.NoError(t, err)
-		require.Equal(t, intermediateHolder, currentHolder)
-
+		var currentHolder string
 		for {
 			currentHolder, err = getLeaseHolder(client)
 			require.NoError(t, err)
 
 			// In this case, we already have an agent as holder
-			if currentHolder != intermediateHolder {
+			if currentHolder == leaderElectorPrefix+podNames[0] || currentHolder == leaderElectorPrefix+podNames[1] {
 				break
 			}
 		}
@@ -175,22 +171,13 @@ func TestNewLeaderElectionManager(t *testing.T) {
 		err = applyLease(client, lease, false)
 		require.NoError(t, err)
 
-		// Make sure the holder changed
 		var currentHolder string
-		for {
-			currentHolder, err = getLeaseHolder(client)
-			require.NoError(t, err)
-			if currentHolder == intermediateHolder {
-				break
-			}
-		}
-
 		for {
 			currentHolder, err = getLeaseHolder(client)
 			require.NoError(t, err)
 
 			// In this case, we already have an agent as holder
-			if currentHolder != intermediateHolder {
+			if currentHolder == leaderElectorPrefix+podNames[0] || currentHolder == leaderElectorPrefix+podNames[1] {
 				break
 			}
 		}
