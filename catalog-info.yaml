@@ -172,7 +172,7 @@ spec:
     kind: Pipeline
     metadata:
       name: elastic-agent-gce-cleanup
-      description: Buildkite pipeline for packaging Elastic Agent core binary and publish it to DRA
+      description: Pipeline file for cleaning up lingering GCE instances
     spec:
       pipeline_file: ".buildkite/pipeline.elastic-agent-gce-cleanup.yml"
       provider_settings:
