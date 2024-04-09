@@ -22,7 +22,7 @@ else
 
     git commit -m "[$GITHUB_REF_NAME][Automation] Update .agent-versions.json" -m "$commit_desc"
     git push --set-upstream origin "update-agent-versions-$GITHUB_RUN_ID"
-    gh pr create \
+    pr=$(gh pr create \
        --base "$GITHUB_REF_NAME" \
        --fill-first \
        --head "update-agent-versions-$GITHUB_RUN_ID" \
@@ -30,6 +30,6 @@ else
        --label 'update-versions' \
        --label 'skip-changelog' \
        --label 'backport-skip' \
-       --repo $GITHUB_REPOSITORY
-    echo "::set-output name=pr::true" # set step output for notifications
+       --repo $GITHUB_REPOSITORY)
+    echo "pr=$pr" >> $GITHUB_OUTPUT # set the step output for Slack notifications
 fi
