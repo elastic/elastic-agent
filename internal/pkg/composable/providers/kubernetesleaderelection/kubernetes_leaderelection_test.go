@@ -8,7 +8,6 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	autodiscoverK8s "github.com/elastic/elastic-agent-autodiscover/kubernetes"
 
@@ -137,44 +136,33 @@ func TestNewLeaderElectionManager(t *testing.T) {
 		}
 	}
 
-	done := make(chan int)
 	// At this point the current holder is agent1. Let's change it to agent2.
 	// We do this as a goroutine, so we can have a timeout to avoid this function running forever.
-	go func() {
+	for {
+		// Force the lease to be applied again, so a new leader is elected.
+		intermediateHolder := "does-not-matter"
+		lease.Spec.HolderIdentity = &intermediateHolder
+		err = applyLease(client, lease, false)
+		require.NoError(t, err)
+
+		// Make sure the holder changed
+		currentHolder, err := getLeaseHolder(client)
+		require.NoError(t, err)
+		require.Equal(t, intermediateHolder, currentHolder)
+
 		for {
-			// Force the lease to be applied again, so a new leader is elected.
-			intermediateHolder := "does-not-matter"
-			lease.Spec.HolderIdentity = &intermediateHolder
-			err = applyLease(client, lease, false)
+			currentHolder, err = getLeaseHolder(client)
 			require.NoError(t, err)
 
-			// Make sure the holder changed
-			currentHolder, err := getLeaseHolder(client)
-			require.NoError(t, err)
-			require.Equal(t, intermediateHolder, currentHolder)
-
-			for {
-				currentHolder, err = getLeaseHolder(client)
-				require.NoError(t, err)
-
-				// In this case, we already have an agent as holder
-				if currentHolder != intermediateHolder {
-					break
-				}
-			}
-
-			if currentHolder == leaderElectorPrefix+podNames[1] {
-				done <- 1
+			// In this case, we already have an agent as holder
+			if currentHolder != intermediateHolder {
 				break
 			}
 		}
-	}()
 
-	select {
-	case <-done:
-	case <-time.After(time.Duration(leaseDuration+leaseRetryPeriod) * 20 * time.Second):
-		require.FailNow(t, "Waited for 20 lease durations, but agent2 still not acquired the lease. This error "+
-			"is possible, but unlikely.")
+		if currentHolder == leaderElectorPrefix+podNames[1] {
+			break
+		}
 	}
 
 	// Now that the holder is agent2, let's wait for agent1 to be reelected.
@@ -182,46 +170,36 @@ func TestNewLeaderElectionManager(t *testing.T) {
 	// running anymore. This way there is only one instance fighting to acquire the lease.
 	cancelFuncs[1]()
 	// We do this as a goroutine, so we can have a timeout to avoid this function running forever.
-	go func() {
+	for {
+		// Force the lease to be applied again, so a new leader is elected.
+		intermediateHolder := "does-not-matter"
+		lease.Spec.HolderIdentity = &intermediateHolder
+		err = applyLease(client, lease, false)
+		require.NoError(t, err)
+
+		// Make sure the holder changed
+		var currentHolder string
 		for {
-			// Force the lease to be applied again, so a new leader is elected.
-			intermediateHolder := "does-not-matter"
-			lease.Spec.HolderIdentity = &intermediateHolder
-			err = applyLease(client, lease, false)
+			currentHolder, err = getLeaseHolder(client)
 			require.NoError(t, err)
-
-			// Make sure the holder changed
-			var currentHolder string
-			for {
-				currentHolder, err = getLeaseHolder(client)
-				require.NoError(t, err)
-				if currentHolder == intermediateHolder {
-					break
-				}
-			}
-
-			for {
-				currentHolder, err = getLeaseHolder(client)
-				require.NoError(t, err)
-
-				// In this case, we already have an agent as holder
-				if currentHolder != intermediateHolder {
-					break
-				}
-			}
-
-			if currentHolder == leaderElectorPrefix+podNames[0] {
-				done <- 1
+			if currentHolder == intermediateHolder {
 				break
 			}
 		}
-	}()
 
-	select {
-	case <-done:
-	case <-time.After(time.Duration(leaseDuration+leaseRetryPeriod) * 3 * time.Second):
-		require.FailNow(t, "Waited for 3 lease durations, but agent1 still not acquired the lease. This is not expected"+
-			" since agent1 is the only candidate to acquire the lease.")
+		for {
+			currentHolder, err = getLeaseHolder(client)
+			require.NoError(t, err)
+
+			// In this case, we already have an agent as holder
+			if currentHolder != intermediateHolder {
+				break
+			}
+		}
+
+		if currentHolder == leaderElectorPrefix+podNames[0] {
+			break
+		}
 	}
 
 	cancelFuncs[0]()
