@@ -78,7 +78,7 @@ func newManagedConfigManager(
 	// Create the state store that will persist the last good policy change on disk.
 	stateStore, err := store.NewStateStoreWithMigration(ctx, log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
 	if err != nil {
-		return nil, errors.New(err, fmt.Sprintf("fail to read action store '%s'", paths.AgentActionStoreFile()))
+		return nil, errors.New(err, fmt.Sprintf("fail to read state store '%s'", paths.AgentStateStoreFile()))
 	}
 
 	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore)

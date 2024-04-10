@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store/internal/migrations"
+	"github.com/elastic/elastic-agent/internal/pkg/conv"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -93,7 +94,9 @@ func migrateActionStoreToStateStore(
 	stateStore.SetAction(&fleetapi.ActionPolicyChange{
 		ActionID:   action.ActionID,
 		ActionType: action.Type,
-		Data:       fleetapi.ActionPolicyChangeData{Policy: action.Policy},
+		Data: fleetapi.ActionPolicyChangeData{
+			Policy: conv.YAMLMapToJSONMap(action.Policy),
+		},
 	})
 
 	err = stateStore.Save()
@@ -151,7 +154,7 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 			ActionID:   yamlStore.Action.ActionID,
 			ActionType: yamlStore.Action.Type,
 			Data: fleetapi.ActionPolicyChangeData{
-				Policy: yamlStore.Action.Policy},
+				Policy: conv.YAMLMapToJSONMap(yamlStore.Action.Policy)},
 		}
 	case fleetapi.ActionTypeUnenroll:
 		action = &fleetapi.ActionUnenroll{
