@@ -15,120 +15,29 @@ import (
 )
 
 const (
-	cannedVersions = `
-	{
-		"versions": [
-		  "7.17.9",
-		  "7.17.10",
-		  "8.6.0",
-		  "8.6.1",
-		  "8.6.2",
-		  "8.7.0",
-		  "8.7.1",
-		  "8.8.0",
-		  "8.8.1",
-		  "8.9.0-SNAPSHOT"
-		],
-		"aliases": [
-		  "7.17",
-		  "8.6",
-		  "8.7",
-		  "8.8"
-		],
-		"manifests": {
-		  "last-update-time": "Thu, 01 Jun 2023 07:50:21 UTC",
-		  "seconds-since-last-update": 78
-		}
-	  }
-	`
 	// simplified response for version 8.9.0-SNAPSHOT
 	cannedBuildVersions = `{
 		"builds": [
 		  "8.9.0-abcdefgh",
 		  "8.9.0-12343567",
-		  "8.9.0-asdfasds",
-		  "8.9.0-zzaqwsxc",
-		  "8.9.0-iopwerth"
+		  "8.9.0-asdfasds"
 		],
 		"manifests": {
 		  "last-update-time": "Thu, 01 Jun 2023 08:31:02 UTC",
 		  "seconds-since-last-update": 284
 		}
-	  }
+	}
 	`
 	// simplified response for build 8.9.0-SNAPSHOT+abcdefgh (the original one is over 6k lines)
-	cannedBuildDetails = `
+	cannedBuildDetails1 = `
 	{
 		"build": {
 		  "projects": {
-			"elastic-agent": {
+			"elastic-agent-package": {
 			  "branch": "main",
 			  "commit_hash": "a35c4986baf59970963b1027d9d5f8c06e24457c",
 			  "commit_url": "https://github.com/elastic/elastic-agent/commits/a35c4986baf59970963b1027d9d5f8c06e24457c",
-			  "build_duration_seconds": 3319,
-			  "packages": {
-				"elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz": {
-				  "url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz",
-				  "sha_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.sha512",
-				  "asc_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-cloud-8.9.0-SNAPSHOT-docker-image-linux-amd64.tar.gz.asc",
-				  "type": "docker",
-				  "architecture": "amd64",
-				  "os": [
-					"linux"
-				  ],
-				  "classifier": "docker-image",
-				  "attributes": {
-					"artifactNoKpi": "true",
-					"internal": "false",
-					"org": "beats-ci",
-					"url": "docker.elastic.co/beats-ci/elastic-agent-cloud",
-					"repo": "docker.elastic.co"
-				  }
-				},
-				"elastic-agent-8.9.0-SNAPSHOT-arm64.deb": {
-				  "url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-arm64.deb",
-				  "sha_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-arm64.deb.sha512",
-				  "asc_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-arm64.deb.asc",
-				  "type": "deb",
-				  "architecture": "arm64",
-				  "attributes": {
-					"include_in_repo": "true",
-					"oss": "false"
-				  }
-				},
-				"elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz": {
-				  "url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz",
-				  "sha_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz.sha512",
-				  "asc_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-linux-x86_64.tar.gz.asc",
-				  "type": "tar",
-				  "architecture": "x86_64",
-				  "os": [
-					"linux"
-				  ]
-				},
-				"elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip": {
-				  "url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip",
-				  "sha_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip.sha512",
-				  "asc_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-windows-x86_64.zip.asc",
-				  "type": "zip",
-				  "architecture": "x86_64",
-				  "os": [
-					"windows"
-				  ]
-				},
-				"elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm": {
-				  "url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm",
-				  "sha_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm.sha512",
-				  "asc_url": "https://unit.test.snapshot/8.9.0-abcdefgh/downloads/beats/elastic-agent/elastic-agent-8.9.0-SNAPSHOT-aarch64.rpm.asc",
-				  "type": "rpm",
-				  "architecture": "aarch64",
-				  "attributes": {
-					"include_in_repo": "true",
-					"oss": "false"
-				  }
-				}
-			  },
-			  "dependencies": []
+			  "build_duration_seconds": 3319
 			}
 		  },
 		  "start_time": "Thu, 1 Jun 2023 00:17:37 GMT",
@@ -145,7 +54,33 @@ const (
 		  "last-update-time": "Thu, 01 Jun 2023 08:36:07 UTC",
 		  "seconds-since-last-update": 208
 		}
-	  }
+	}
+	`
+	cannedBuildDetails2 = `
+	{
+		"build": {
+		  "projects": {
+			  "elastic-agent-package": {
+			    "branch": "main",
+			    "commit_hash": "b35c4986baf59970963b1027d9d5f8c06e24457d",
+			    "commit_url": "https://github.com/elastic/elastic-agent/commits/a35c4986baf59970963b1027d9d5f8c06e24457c"
+		    }
+		  },
+		  "start_time": "Thu, 1 Jun 2023 00:17:37 GMT",
+		  "release_branch": "master",
+		  "prefix": "",
+		  "end_time": "Thu, 1 Jun 2023 04:20:22 GMT",
+		  "manifest_version": "2.1.0",
+		  "version": "8.9.0-SNAPSHOT",
+		  "branch": "master",
+		  "build_id": "8.9.0-12343567",
+		  "build_duration_seconds": 14565
+		},
+		"manifests": {
+		  "last-update-time": "Thu, 01 Jun 2023 08:36:07 UTC",
+		  "seconds-since-last-update": 208
+		}
+	}
 	`
 )
 
@@ -169,11 +104,7 @@ func TestDefaultArtifactAPIClientErrorHttpStatus(t *testing.T) {
 			defer testSrv.Close()
 
 			aac := NewArtifactAPIClient(WithUrl(testSrv.URL), WithLogFunc(t.Logf))
-			_, err := aac.GetVersions(context.Background())
-			assert.ErrorIs(t, err, ErrBadHTTPStatusCode, "Expected ErrBadHTTPStatusCode for status code %d", httpErrorCode)
-			_, err = aac.GetBuildsForVersion(context.Background(), "1.2.3-SNAPSHOT")
-			assert.ErrorIs(t, err, ErrBadHTTPStatusCode, "Expected ErrBadHTTPStatusCode for status code %d", httpErrorCode)
-			_, err = aac.GetBuildDetails(context.Background(), "1.2.3", "abcdefg")
+			_, err := aac.FindBuild(context.Background(), "1.2.3", "abcdefg", 0)
 			assert.ErrorIs(t, err, ErrBadHTTPStatusCode, "Expected ErrBadHTTPStatusCode for status code %d", httpErrorCode)
 		})
 	}
@@ -184,12 +115,16 @@ func TestDefaultArtifactAPIClient(t *testing.T) {
 	cannedRespHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Logf("Handling request %s", r.URL)
 		switch r.URL.Path {
-		case "/v1/versions/":
-			_, _ = w.Write([]byte(cannedVersions))
 		case "/v1/versions/8.9.0-SNAPSHOT/builds/":
 			_, _ = w.Write([]byte(cannedBuildVersions))
 		case "/v1/versions/8.9.0-SNAPSHOT/builds/8.9.0-abcdefgh":
-			_, _ = w.Write([]byte(cannedBuildDetails))
+			_, _ = w.Write([]byte(cannedBuildDetails1))
+		case "/v1/versions/8.9.0-SNAPSHOT/builds/8.9.0-12343567":
+			_, _ = w.Write([]byte(cannedBuildDetails2))
+		case "/v1/versions/8.9.0-SNAPSHOT/builds/8.9.0-asdfasds":
+			// re-use the second details here because it does not matter if
+			// it's different in all the test-cases below
+			_, _ = w.Write([]byte(cannedBuildDetails2))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -199,20 +134,37 @@ func TestDefaultArtifactAPIClient(t *testing.T) {
 	defer testSrv.Close()
 
 	aac := NewArtifactAPIClient(WithUrl(testSrv.URL), WithLogFunc(t.Logf))
-	versions, err := aac.GetVersions(context.Background())
-	assert.NoError(t, err)
-	assert.NotNil(t, versions)
-	assert.NotEmpty(t, versions.Versions)
 
-	builds, err := aac.GetBuildsForVersion(context.Background(), "8.9.0-SNAPSHOT")
-	assert.NoError(t, err)
-	assert.NotNil(t, builds)
-	assert.NotEmpty(t, builds.Builds)
+	t.Run("returns the latest", func(t *testing.T) {
+		expBuildID := "8.9.0-abcdefgh"
+		build, err := aac.FindBuild(context.Background(), "8.9.0-SNAPSHOT", "", 0)
+		assert.NoError(t, err)
+		assert.NotNil(t, build)
+		assert.Equal(t, expBuildID, build.Build.BuildID)
+	})
 
-	buildDetails, err := aac.GetBuildDetails(context.Background(), "8.9.0-SNAPSHOT", "8.9.0-abcdefgh")
-	assert.NoError(t, err)
-	assert.NotNil(t, buildDetails)
-	assert.NotEmpty(t, buildDetails.Build)
-	assert.NotEmpty(t, buildDetails.Build.Projects)
-	assert.Contains(t, buildDetails.Build.Projects, "elastic-agent")
+	t.Run("returns offset 1", func(t *testing.T) {
+		expBuildID := "8.9.0-12343567"
+		build, err := aac.FindBuild(context.Background(), "8.9.0-SNAPSHOT", "", 1)
+		assert.NoError(t, err)
+		assert.NotNil(t, build)
+		assert.Equal(t, expBuildID, build.Build.BuildID)
+	})
+
+	t.Run("returns no excluded hash", func(t *testing.T) {
+		excludeHash := "a35c4986baf59970963b1027d9d5f8c06e24457c"
+		expBuildID := "8.9.0-12343567"
+		build, err := aac.FindBuild(context.Background(), "8.9.0-SNAPSHOT", excludeHash, 0)
+		assert.NoError(t, err)
+		assert.NotNil(t, build)
+		assert.Equal(t, expBuildID, build.Build.BuildID)
+	})
+
+	t.Run("returns ErrBuildNotFound when offset and matching excluded hash", func(t *testing.T) {
+		excludeHash := "b35c4986baf59970963b1027d9d5f8c06e24457d"
+		build, err := aac.FindBuild(context.Background(), "8.9.0-SNAPSHOT", excludeHash, 1)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrBuildNotFound)
+		assert.Nil(t, build)
+	})
 }

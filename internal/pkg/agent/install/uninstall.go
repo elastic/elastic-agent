@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,9 +20,11 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	aerrors "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
@@ -80,8 +83,16 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
 	}
 
+	ctx := context.Background()
+
+	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
+	unprivileged, err := checkForUnprivilegedVault(ctx)
+	if err != nil {
+		return fmt.Errorf("error checking for unprivileged vault: %w", err)
+	}
+
 	// Uninstall components first
-	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken, log, pt); err != nil {
+	if err := uninstallComponents(ctx, cfgFile, uninstallToken, log, pt, unprivileged); err != nil {
 		// If service status was running it was stopped to uninstall the components.
 		// If the components uninstall failed start the service again
 		if status == service.StatusRunning {
@@ -129,6 +140,24 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	pt.Describe("Removed install directory")
 
 	return nil
+}
+
+func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (bool, error) {
+	// check if we have a file vault to detect if we have to use it for reading config
+	opts = append(opts, vault.WithReadonly(true))
+	vaultOpts := vault.ApplyOptions(opts...)
+	fileVault, fileVaultErr := vault.NewFileVault(ctx, vaultOpts)
+	if fileVaultErr == nil {
+		ok, keyErr := fileVault.Exists(ctx, secret.AgentSecretKey)
+		if keyErr == nil && ok {
+			// we have a valid file vault and it contains the key, set unprivileged
+			return true, nil
+		}
+	} else if !errors.Is(fileVaultErr, fs.ErrNotExist) {
+		// we had a different error than NotExist
+		return false, fmt.Errorf("error checking for file vault existence: %w", fileVaultErr)
+	}
+	return false, nil
 }
 
 // RemovePath helps with removal path where there is a probability
@@ -200,7 +229,7 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	return false
 }
 
-func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
+func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, unprivileged bool) error {
 
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
@@ -212,7 +241,7 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 
-	cfg, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false)
+	cfg, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
 	if err != nil {
 		return fmt.Errorf("error loading agent config: %w", err)
 	}

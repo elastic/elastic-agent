@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -66,7 +65,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	opts := &atesting.InstallOpts{Force: true}
+	opts := &atesting.InstallOpts{Force: true, Privileged: false}
 	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
@@ -74,7 +73,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path
-	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+	checkInstallSuccess(t, fixture, topPath, true)
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -116,33 +115,32 @@ func TestInstallWithBasePath(t *testing.T) {
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
-	// Set up random temporary directory to serve as base path for Elastic Agent
-	// installation.
-	tmpDir := t.TempDir()
-	basePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
+	// When installing with unprivileged using a base path the
+	// base needs to be accessible by the `elastic-agent-user` user that will be
+	// executing the process, but is not created yet. Using a base that exists
+	// and is known to be accessible by standard users, ensures this tests
+	// works correctly and will not hit a permission issue when spawning the
+	// elastic-agent service.
+	var basePath string
+	switch runtime.GOOS {
+	case define.Linux:
+		basePath = `/usr`
+	case define.Windows:
+		basePath = `C:\`
+	default:
+		// Set up random temporary directory to serve as base path for Elastic Agent
+		// installation.
+		tmpDir := t.TempDir()
+		basePath = filepath.Join(tmpDir, strings.ToLower(randStr(8)))
+	}
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	opts := &atesting.InstallOpts{
-		BasePath: basePath,
-		Force:    true,
+		BasePath:   basePath,
+		Force:      true,
+		Privileged: false,
 	}
-	if opts.IsUnprivileged(runtime.GOOS) {
-		switch runtime.GOOS {
-		case define.Linux:
-			// When installing with unprivileged using a base path the
-			// base needs to be accessible by the `elastic-agent` user that will be
-			// executing the process, but is not created yet. Using a base that exists
-			// and is known to be accessible by standard users, ensures this tests
-			// works correctly and will not hit a permission issue when spawning the
-			// elastic-agent service.
-			basePath = `/usr`
-		default:
-			t.Fatalf("only Linux supports unprivileged mode")
-		}
-		opts.BasePath = basePath
-	}
-
 	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
@@ -151,7 +149,7 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+	checkInstallSuccess(t, fixture, topPath, true)
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -222,7 +220,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 			}
 
 			// Check that Agent was installed in default base path
-			checkInstallSuccess(t, topPath, opts.IsUnprivileged(runtime.GOOS))
+			checkInstallSuccess(t, fixture, topPath, !opts.Privileged)
 			t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 			require.NoErrorf(t, err, "uninstall failed: %s", err)
@@ -230,7 +228,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 	}
 }
 
-func checkInstallSuccess(t *testing.T, topPath string, unprivileged bool) {
+func checkInstallSuccess(t *testing.T, f *atesting.Fixture, topPath string, unprivileged bool) {
 	t.Helper()
 	_, err := os.Stat(topPath)
 	require.NoError(t, err)
@@ -249,24 +247,7 @@ func checkInstallSuccess(t *testing.T, topPath string, unprivileged bool) {
 
 	if unprivileged {
 		// Specific checks depending on the platform.
-		checkPlatformUnprivileged(t, topPath)
-
-		// Executing `elastic-agent status` as the `elastic-agent` user should work.
-		var output []byte
-		require.Eventuallyf(t, func() bool {
-			cmd := exec.Command("sudo", "-u", "elastic-agent", "elastic-agent", "status")
-			output, err = cmd.CombinedOutput()
-			return err == nil
-		}, 3*time.Minute, 1*time.Second, "status never successful: %s (output: %s)", err, output)
-
-		// Executing `elastic-agent status` as the original user should fail, because that
-		// user is not in the 'elastic-agent' group.
-		originalUser := os.Getenv("SUDO_USER")
-		if originalUser != "" {
-			cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
-			output, err := cmd.CombinedOutput()
-			require.Error(t, err, "running sudo -u %s elastic-agent status should have failed: %s", originalUser, output)
-		}
+		checkPlatformUnprivileged(t, f, topPath)
 	}
 }
 

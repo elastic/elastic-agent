@@ -18,6 +18,7 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -58,7 +59,7 @@ func deriveKey(pw []byte, salt []byte) ([]byte, []byte, error) {
 	return pbkdf2.Key(pw, salt, 12022, 32, sha256.New), salt, nil
 }
 
-func tightenPermissions(path string) error {
+func tightenPermissions(path string, ownership utils.FileOwner) error {
 	// Noop for linx
 	return nil
 }

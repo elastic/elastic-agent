@@ -49,7 +49,7 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 
 		require.True(t, bytes.Equal(writtenContent, replaceWith))
 		requireFilesCount(t, dir, 2)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 
 	t.Run("when save is not successful", func(t *testing.T) {
@@ -144,7 +144,8 @@ func TestDiskStore(t *testing.T) {
 		target, err := genFile([]byte("hello world"))
 		require.NoError(t, err)
 		defer os.Remove(target)
-		d := NewDiskStore(target)
+		d, err := NewDiskStore(target)
+		require.NoError(t, err)
 
 		msg := []byte("bonjour la famille")
 		err = d.Save(bytes.NewReader(msg))
@@ -154,7 +155,7 @@ func TestDiskStore(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 
 	t.Run("when the target do no exist", func(t *testing.T) {
@@ -163,7 +164,8 @@ func TestDiskStore(t *testing.T) {
 		defer os.Remove(dir)
 
 		target := filepath.Join(dir, "hello.txt")
-		d := NewDiskStore(target)
+		d, err := NewDiskStore(target)
+		require.NoError(t, err)
 
 		msg := []byte("bonjour la famille")
 		err = d.Save(bytes.NewReader(msg))
@@ -173,7 +175,7 @@ func TestDiskStore(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 
 	t.Run("return an io.ReadCloser to the target file", func(t *testing.T) {
@@ -181,7 +183,9 @@ func TestDiskStore(t *testing.T) {
 		target, err := genFile(msg)
 		require.NoError(t, err)
 
-		d := NewDiskStore(target)
+		d, err := NewDiskStore(target)
+		require.NoError(t, err)
+
 		r, err := d.Load()
 		require.NoError(t, err)
 		defer r.Close()
@@ -189,7 +193,7 @@ func TestDiskStore(t *testing.T) {
 		content, err := io.ReadAll(r)
 		require.NoError(t, err)
 		require.Equal(t, msg, content)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 }
 

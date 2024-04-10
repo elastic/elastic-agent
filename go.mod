@@ -13,14 +13,14 @@ require (
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/e2e-testing v1.1.0
 	github.com/elastic/elastic-agent-autodiscover v0.6.8
-	github.com/elastic/elastic-agent-client/v7 v7.8.0
-	github.com/elastic/elastic-agent-libs v0.7.5
+	github.com/elastic/elastic-agent-client/v7 v7.8.1
+	github.com/elastic/elastic-agent-libs v0.9.1
 	github.com/elastic/elastic-agent-system-metrics v0.9.2
-	github.com/elastic/elastic-transport-go/v8 v8.4.0
-	github.com/elastic/go-elasticsearch/v8 v8.12.1
+	github.com/elastic/elastic-transport-go/v8 v8.5.0
+	github.com/elastic/go-elasticsearch/v8 v8.13.0
 	github.com/elastic/go-licenser v0.4.1
-	github.com/elastic/go-sysinfo v1.13.1
-	github.com/elastic/go-ucfg v0.8.6
+	github.com/elastic/go-sysinfo v1.14.0
+	github.com/elastic/go-ucfg v0.8.8
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gofrs/flock v0.8.1
@@ -58,6 +58,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
 	github.com/tsg/go-daemon v0.0.0-20200207173439-e704b93fd89b
+	github.com/winlabs/gowin32 v0.0.0-20221003142512-0d265587d3c9
 	go.elastic.co/apm/module/apmgorilla v1.15.0
 	go.elastic.co/ecszap v1.0.1
 	go.elastic.co/go-licence-detector v0.5.0
@@ -91,7 +92,7 @@ require (
 	golang.org/x/tools v0.16.0
 	golang.org/x/tools/go/vcs v0.1.0-deprecated
 	google.golang.org/grpc v1.62.0
-	google.golang.org/protobuf v1.32.0
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1

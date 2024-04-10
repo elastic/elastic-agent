@@ -44,7 +44,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
 		Run: func(_ *cobra.Command, _ []string) {
 			cfg := getConfig(streams)
-			log, err := configuredLogger(cfg)
+			log, err := configuredLogger(cfg, watcherName)
 			if err != nil {
 				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(3)
@@ -200,8 +200,8 @@ func gracePeriod(marker *upgrade.UpdateMarker, gracePeriodDuration time.Duration
 	return false, gracePeriodDuration
 }
 
-func configuredLogger(cfg *configuration.Configuration) (*logger.Logger, error) {
-	cfg.Settings.LoggingConfig.Beat = watcherName
+func configuredLogger(cfg *configuration.Configuration, name string) (*logger.Logger, error) {
+	cfg.Settings.LoggingConfig.Beat = name
 	cfg.Settings.LoggingConfig.Level = logp.DebugLevel
 	internal, err := logger.MakeInternalFileOutput(cfg.Settings.LoggingConfig)
 	if err != nil {

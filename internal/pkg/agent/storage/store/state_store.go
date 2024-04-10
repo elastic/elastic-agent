@@ -81,7 +81,11 @@ func NewStateStoreWithMigration(ctx context.Context, log *logger.Logger, actionS
 		return nil, err
 	}
 
-	return NewStateStore(log, storage.NewEncryptedDiskStore(ctx, stateStorePath))
+	encryptedDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath)
+	if err != nil {
+		return nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
+	return NewStateStore(log, encryptedDiskStore)
 }
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
@@ -145,8 +149,15 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 
 func migrateStateStore(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string) (err error) {
 	log = log.Named("state_migration")
-	actionDiskStore := storage.NewDiskStore(actionStorePath)
-	stateDiskStore := storage.NewEncryptedDiskStore(ctx, stateStorePath)
+	actionDiskStore, err := storage.NewDiskStore(actionStorePath)
+	if err != nil {
+		return fmt.Errorf("error creating disk store: %w", err)
+	}
+
+	stateDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath)
+	if err != nil {
+		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
 
 	stateStoreExits, err := stateDiskStore.Exists()
 	if err != nil {
