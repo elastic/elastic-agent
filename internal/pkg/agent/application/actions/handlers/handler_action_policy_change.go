@@ -109,6 +109,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return err
 	}
 
+	// persist, apply
 	h.ch <- newPolicyChange(ctx, c, a, acker, false)
 	return nil
 }
@@ -118,88 +119,143 @@ func (h *PolicyChangeHandler) Watch() <-chan coordinator.ConfigChange {
 	return h.ch
 }
 
-func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *config.Config) (err error) {
-	// do not update fleet-server host from policy; no setters provided with local Fleet Server
-	if len(h.setters) == 0 {
-		return nil
-	}
+func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, c *config.Config) (*remote.Config, error) {
 	data, err := c.ToMapStr()
 	if err != nil {
-		return errors.New(err, "could not convert the configuration from the policy", errors.TypeConfig)
+		return nil, errors.New(err, "could not convert the configuration from the policy", errors.TypeConfig)
 	}
 	if _, ok := data["fleet"]; !ok {
 		// no fleet information in the configuration (skip checking client)
-		return nil
+		return nil, nil
 	}
 
 	cfg, err := configuration.NewFromConfig(c)
 	if err != nil {
-		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
+		return nil, errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
 
 	if clientEqual(h.config.Fleet.Client, cfg.Fleet.Client) {
 		// already the same hosts
-		return nil
+		return nil, nil
 	}
 
 	// only set protocol/hosts as that is all Fleet currently sends
-	prevProtocol := h.config.Fleet.Client.Protocol
-	prevPath := h.config.Fleet.Client.Path
-	prevHost := h.config.Fleet.Client.Host
-	prevHosts := h.config.Fleet.Client.Hosts
-	prevProxy := h.config.Fleet.Client.Transport.Proxy
-	h.config.Fleet.Client.Protocol = cfg.Fleet.Client.Protocol
-	h.config.Fleet.Client.Path = cfg.Fleet.Client.Path
-	h.config.Fleet.Client.Host = cfg.Fleet.Client.Host
-	h.config.Fleet.Client.Hosts = cfg.Fleet.Client.Hosts
+	// copy the client config and apply the changes on this copy
+	newFleetClientConfig := h.config.Fleet.Client
+	updateFleetConfig(h.log, cfg.Fleet.Client, &newFleetClientConfig)
 
-	// Empty proxies from fleet are ignored. That way a proxy set by --proxy-url
-	// it won't be overridden by an absent or empty proxy from fleet-server.
-	// However, if there is a proxy sent by fleet-server, it'll take precedence.
-	// Therefore, it's not possible to remove a proxy once it's set.
-	if cfg.Fleet.Client.Transport.Proxy.URL == nil ||
-		cfg.Fleet.Client.Transport.Proxy.URL.String() == "" {
-		h.log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
-	} else {
-		h.config.Fleet.Client.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
-		h.log.Debug("received proxy from fleet, applying it")
+	// Test new config
+	err = testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
+	if err != nil {
+		return nil, fmt.Errorf("validating fleet client config: %w", err)
 	}
 
-	// rollback on failure
-	defer func() {
-		if err != nil {
-			h.config.Fleet.Client.Protocol = prevProtocol
-			h.config.Fleet.Client.Path = prevPath
-			h.config.Fleet.Client.Host = prevHost
-			h.config.Fleet.Client.Hosts = prevHosts
-			h.config.Fleet.Client.Transport.Proxy = prevProxy
-		}
-	}()
+	return &newFleetClientConfig, nil
+}
 
-	client, err := client.NewAuthWithConfig(
-		h.log, h.config.Fleet.AccessAPIKey, h.config.Fleet.Client)
+func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remote.Config, apiKey string) error {
+	fleetClient, err := client.NewAuthWithConfig(
+		log, apiKey, clientConfig)
 	if err != nil {
 		return errors.New(
 			err, "fail to create API client with updated config",
 			errors.TypeConfig,
 			errors.M("hosts", append(
-				h.config.Fleet.Client.Hosts, h.config.Fleet.Client.Host)))
+				clientConfig.Hosts, clientConfig.Host)))
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
 	defer cancel()
 
-	resp, err := client.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
+	// FIXME: a HEAD should be enough as we need to test only the connectivity part
+	resp, err := fleetClient.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
 	if err != nil {
 		return errors.New(
 			err, "fail to communicate with Fleet Server API client hosts",
-			errors.TypeNetwork, errors.M("hosts", h.config.Fleet.Client.Hosts))
+			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
 	}
 
 	// discard body for proper cancellation and connection reuse
 	_, _ = io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 
+	return nil
+}
+
+func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config) {
+	dst.Protocol = src.Protocol
+	dst.Path = src.Path
+	dst.Host = src.Host
+	dst.Hosts = src.Hosts
+
+	// Empty proxies from fleet are ignored. That way a proxy set by --proxy-url
+	// it won't be overridden by an absent or empty proxy from fleet-server.
+	// However, if there is a proxy sent by fleet-server, it'll take precedence.
+	// Therefore, it's not possible to remove a proxy once it's set.
+
+	// FIXME transport settings are passed by reference so is the proxy URL, properly copy or restore it if validation fails
+
+	if src.Transport.Proxy.URL == nil ||
+		src.Transport.Proxy.URL.String() == "" {
+		log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
+	} else {
+		dst.Transport.Proxy = src.Transport.Proxy
+		log.Debug("received proxy from fleet, applying it")
+	}
+}
+
+func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *config.Config) (err error) {
+	// do not update fleet-server host from policy; no setters provided with local Fleet Server
+	if len(h.setters) == 0 {
+		return nil
+	}
+	var validatedConfig *remote.Config
+	validatedConfig, err = h.validateFleetServerHosts(ctx, c)
+	if err != nil {
+		return fmt.Errorf("error validating Fleet client config: %w", err)
+	}
+
+	err = saveFleetClientConfig(validatedConfig)
+	if err != nil {
+		return fmt.Errorf("saving FleetClientConfig: %w", err)
+	}
+
+	err = h.applyFleetClientConfig(validatedConfig)
+	if err != nil {
+		return fmt.Errorf("applying FleetClientConfig: %w", err)
+	}
+
+	previousConfig := h.config.Fleet.Client
+
+	h.config.Fleet.Client = *validatedConfig
+	// rollback on failure
+	defer func() {
+		if err != nil {
+			h.config.Fleet.Client = previousConfig
+		}
+	}()
+
+	fleetClient, err := client.NewAuthWithConfig(
+		h.log, h.config.Fleet.AccessAPIKey, *validatedConfig)
+	for _, setter := range h.setters {
+		setter.SetClient(fleetClient)
+	}
+	return nil
+}
+
+func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Config) error {
+	if validatedConfig == nil {
+		// nothing to do for fleet hosts
+		return nil
+	}
+
+}
+
+func saveFleetClientConfig(validatedConfig *remote.Config) error {
+	if validatedConfig == nil {
+		// nothing to do for fleet hosts
+		return nil
+	}
 	reader, err := fleetToReader(h.agentInfo, h.config)
 	if err != nil {
 		return errors.New(
@@ -213,11 +269,6 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 			err, "fail to persist new Fleet Server API client hosts",
 			errors.TypeFilesystem, errors.M("hosts", h.config.Fleet.Client.Hosts))
 	}
-
-	for _, setter := range h.setters {
-		setter.SetClient(client)
-	}
-	return nil
 }
 
 func clientEqual(k1 remote.Config, k2 remote.Config) bool {
