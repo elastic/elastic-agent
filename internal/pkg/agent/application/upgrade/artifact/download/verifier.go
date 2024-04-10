@@ -11,6 +11,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
 	"net/url"
@@ -130,8 +131,16 @@ func getHashFileName(filename string) string {
 // exists and that the checksum in the sidecar file matches the checksum of
 // the file. It returns an error if validation fails.
 func VerifySHA512Hash(filename string) error {
+	hasher := sha512.New()
+	checksumFileName := getHashFileName(filename)
+	return VerifyChecksum(hasher, filename, checksumFileName)
+}
+
+// VerifyChecksum checks that the hash contained in checksumFileName correspond to the hash calculated for filename using
+// hasher.Sum()
+func VerifyChecksum(hasher hash.Hash, filename, checksumFileName string) error {
 	// Read expected checksum.
-	expectedHash, err := readChecksumFile(getHashFileName(filename), filepath.Base(filename))
+	expectedHash, err := readChecksumFile(checksumFileName, filepath.Base(filename))
 	if err != nil {
 		return fmt.Errorf("could not read checksum file: %w", err)
 	}
@@ -143,12 +152,11 @@ func VerifySHA512Hash(filename string) error {
 	}
 	defer f.Close()
 
-	hash := sha512.New()
-	if _, err := io.Copy(hash, f); err != nil {
+	if _, err := io.Copy(hasher, f); err != nil {
 		return fmt.Errorf("faled to read file to calculate hash")
 	}
 
-	computedHash := hex.EncodeToString(hash.Sum(nil))
+	computedHash := hex.EncodeToString(hasher.Sum(nil))
 	if computedHash != expectedHash {
 		return &ChecksumMismatchError{
 			Expected: expectedHash,
