@@ -421,7 +421,7 @@ func (c *Coordinator) State() State {
 // CoordinatorActive is a blocking method that waits for a channel response
 // from the coordinator loop. This can be used to as a basic health check,
 // as we'll timeout and return false if the coordinator run loop doesn't
-// respond to our channel fast enough
+// respond to our channel.
 func (c *Coordinator) CoordinatorActive(timeout time.Duration) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

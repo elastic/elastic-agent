@@ -99,14 +99,15 @@ func (runner *MonitoringRunner) TestBeatsMetrics() {
 
 	client := http.Client{Timeout: time.Second * 4}
 	endpoint := "http://localhost:6792/liveness"
-	// first stage: ensure the default behavior, http monitoring is off
+	// first stage: ensure the default behavior, http monitoring is off. This should return an error
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	require.NoError(runner.T(), err)
 
 	_, err = client.Do(req)
 	require.Error(runner.T(), err)
 
-	// set fleet override
+	// use the fleet override API to enable http monitoring.
+	// This tests both the http server itself, and tests that the agent reloader actually reloads the agent config.
 	override := map[string]interface{}{
 		"name":      runner.policyName,
 		"namespace": "default",
@@ -123,7 +124,6 @@ func (runner *MonitoringRunner) TestBeatsMetrics() {
 		},
 	}
 
-	// set fleet override
 	raw, err := json.Marshal(override)
 	require.NoError(runner.T(), err)
 	reader := bytes.NewBuffer(raw)
@@ -138,6 +138,7 @@ func (runner *MonitoringRunner) TestBeatsMetrics() {
 	req, err = http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	require.NoError(runner.T(), err)
 
+	// second check: the /liveness endpoint should now be responding
 	livenessResp, err := client.Do(req)
 	require.NoError(runner.T(), err)
 	defer livenessResp.Body.Close()
@@ -154,7 +155,7 @@ func (runner *MonitoringRunner) TestBeatsMetrics() {
 	respList := processData["processes"].([]interface{})
 	require.NotZero(runner.T(), respList)
 
-	// check for coordinator state
+	// check for coordinator state field
 	coordResp := processData["coordinator_healthy"].(bool)
 	require.True(runner.T(), coordResp)
 }
