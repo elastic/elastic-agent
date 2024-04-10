@@ -28,6 +28,7 @@ func TestConfigUpdateOnReload(t *testing.T) {
 	_ = logp.DevelopmentSetup()
 	testAPIConfig := api.Config{}
 	mockCoord := mockCoordinator{
+		isUp: true,
 		state: coordinator.State{
 			Components: []runtime.ComponentComponentState{
 				{
