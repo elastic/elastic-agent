@@ -55,7 +55,7 @@ jobs:
           channel: "#ingest-notifications"
 
         # if a PR was created as a result of this job, we notify on the Slack channel
-      - if: ${{ startsWith(steps.update.output.pr, 'https') }}
+      - if: ${{ startsWith(steps.update.outputs.pr, 'https') }}
         uses: elastic/apm-pipeline-library/.github/actions/slack-message@current
         with:
           url: ${{ secrets.VAULT_ADDR }}
