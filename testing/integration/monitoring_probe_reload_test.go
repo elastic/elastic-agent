@@ -97,7 +97,7 @@ func (runner *MonitoringRunner) TestBeatsMetrics() {
 
 	runner.AllComponentsHealthy(ctx)
 
-	client := http.Client{Timeout: time.Second}
+	client := http.Client{Timeout: time.Second * 4}
 	endpoint := "http://localhost:6792/liveness"
 	// first stage: ensure the default behavior, http monitoring is off
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
@@ -153,6 +153,10 @@ func (runner *MonitoringRunner) TestBeatsMetrics() {
 	// check for list of processes
 	respList := processData["processes"].([]interface{})
 	require.NotZero(runner.T(), respList)
+
+	// check for coordinator state
+	coordResp := processData["coordinator_healthy"].(bool)
+	require.True(runner.T(), coordResp)
 }
 
 // AllComponentsHealthy ensures all the beats and agent are healthy and working before we continue

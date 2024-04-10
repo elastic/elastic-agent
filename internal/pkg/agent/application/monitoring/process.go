@@ -86,6 +86,8 @@ func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func
 
 		state := coord.State()
 
+		isUp := coord.CoordinatorActive(time.Second * 10)
+
 		unhealthyComponent := false
 		for _, comp := range state.Components {
 			if (failOn.Failed && comp.State.State == client.UnitStateFailed) || (failOn.Degraded && comp.State.State == client.UnitStateDegraded) {
@@ -93,11 +95,13 @@ func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func
 			}
 			if matchesCloudProcessID(comp.Component.InputSpec.BinaryName, comp.Component.ID, componentID) {
 				data := struct {
-					State   string `json:"state"`
-					Message string `json:"message"`
+					State              string `json:"state"`
+					Message            string `json:"message"`
+					CoordinatorHealthy bool   `json:"coordinator_healthy"`
 				}{
-					State:   comp.State.State.String(),
-					Message: comp.State.Message,
+					State:              comp.State.State.String(),
+					Message:            comp.State.Message,
+					CoordinatorHealthy: isUp,
 				}
 
 				bytes, err := json.Marshal(data)
@@ -107,7 +111,7 @@ func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func
 				} else {
 					content = string(bytes)
 				}
-				if livenessMode && unhealthyComponent {
+				if livenessMode && (unhealthyComponent || !isUp) {
 					w.WriteHeader(http.StatusInternalServerError)
 				}
 				fmt.Fprint(w, content)

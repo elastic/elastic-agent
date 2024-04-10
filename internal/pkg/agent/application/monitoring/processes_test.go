@@ -23,10 +23,15 @@ import (
 
 type mockCoordinator struct {
 	state coordinator.State
+	isUp  bool
 }
 
 func (mc mockCoordinator) State() coordinator.State {
 	return mc.state
+}
+
+func (mc mockCoordinator) CoordinatorActive(_ time.Duration) bool {
+	return mc.isUp
 }
 
 type mockContext struct {
@@ -64,6 +69,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 		{
 			name: "degraded",
 			coord: mockCoordinator{
+				isUp: true,
 				state: coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						{
@@ -86,6 +92,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 		{
 			name: "degraded-check-off",
 			coord: mockCoordinator{
+				isUp: true,
 				state: coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						{
@@ -108,6 +115,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 		{
 			name: "degraded-liveness-off",
 			coord: mockCoordinator{
+				isUp: true,
 				state: coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						{
@@ -130,6 +138,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 		{
 			name: "healthy",
 			coord: mockCoordinator{
+				isUp: true,
 				state: coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						{
@@ -150,8 +159,32 @@ func TestProcessHTTPHandler(t *testing.T) {
 			failon:       "degraded",
 		},
 		{
+			name: "healthy-coordinator-down",
+			coord: mockCoordinator{
+				isUp: false,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "5",
+							State:     runtime.ComponentState{State: client.UnitStateHealthy},
+							Component: component.Component{
+								ID: "test-component3",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 500,
+			liveness:     true,
+			failon:       "degraded",
+		},
+		{
 			name: "healthy-liveness-off",
 			coord: mockCoordinator{
+				isUp: true,
 				state: coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						{
@@ -174,6 +207,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 		{
 			name: "degraded-and-healthy",
 			coord: mockCoordinator{
+				isUp: true,
 				state: coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						{

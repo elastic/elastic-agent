@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 )
@@ -47,6 +48,7 @@ func processesHandler(coord CoordinatorState, livenessMode bool) func(http.Respo
 		procs := make([]process, 0)
 
 		state := coord.State()
+		isUp := coord.CoordinatorActive(time.Second * 10)
 
 		failConfig, err := handleFormValues(r)
 		if err != nil {
@@ -68,9 +70,11 @@ func processesHandler(coord CoordinatorState, livenessMode bool) func(http.Respo
 			}
 		}
 		data := struct {
-			Processes []process `json:"processes"`
+			Processes          []process `json:"processes"`
+			CoordinatorHealthy bool      `json:"coordinator_healthy"`
 		}{
-			Processes: procs,
+			Processes:          procs,
+			CoordinatorHealthy: isUp,
 		}
 
 		bytes, err := json.Marshal(data)
@@ -80,7 +84,7 @@ func processesHandler(coord CoordinatorState, livenessMode bool) func(http.Respo
 		} else {
 			content = string(bytes)
 		}
-		if livenessMode && unhealthyComponent {
+		if livenessMode && (unhealthyComponent || !isUp) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		fmt.Fprint(w, content)

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 )
@@ -22,6 +23,7 @@ type apiError interface {
 // This interface exists to help make testing easier.
 type CoordinatorState interface {
 	State() coordinator.State
+	CoordinatorActive(timeout time.Duration) bool
 }
 
 func createHandler(fn func(w http.ResponseWriter, r *http.Request) error) *apiHandler {
