@@ -31,5 +31,6 @@ else
        --label 'skip-changelog' \
        --label 'backport-skip' \
        --repo $GITHUB_REPOSITORY)
-    echo "pr=$pr" >> $GITHUB_OUTPUT # set the step output for Slack notifications
+    echo "pr=$pr" >> "$GITHUB_OUTPUT" # set the step output for Slack notifications
+    echo "Created a PR with the file update: $pr"
 fi
