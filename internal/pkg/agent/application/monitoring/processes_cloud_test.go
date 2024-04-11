@@ -91,7 +91,7 @@ func TestExpectedCloudProcessID(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.id, expectedCloudProcessID(&tc.component))
+			assert.Equal(t, tc.id, expectedCloudProcessID(tc.component))
 		})
 	}
 }

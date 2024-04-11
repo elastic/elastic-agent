@@ -18,7 +18,7 @@ func cloudComponentIDToAgentInputType(componentID string) string {
 	return componentID
 }
 
-func expectedCloudProcessID(c *component.Component) string {
+func expectedCloudProcessID(c component.Component) string {
 	// Cloud explicitly looks for an ID of "apm-server" to determine if APM is in managed mode.
 	// Ensure that this is the ID we use, in agent v2 the ID is usually "apm-default".
 	// Otherwise apm-server won't be routable/accessible in cloud.
