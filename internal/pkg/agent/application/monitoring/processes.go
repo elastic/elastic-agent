@@ -49,8 +49,8 @@ func processesHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Re
 		for iter, c := range state.Components {
 			if c.Component.InputSpec != nil {
 				procs = append(procs, process{
-					// access the components array manually to avoid a memory aliasing error
-					ID:     expectedCloudProcessID(state.Components[iter].Component),
+					// access the components array manually to avoid a memory aliasing error. This is fixed in go 1.22
+					ID:     expectedCloudProcessID(&state.Components[iter].Component),
 					PID:    c.LegacyPID,
 					Binary: c.Component.InputSpec.BinaryName,
 					Source: sourceFromComponentID(c.Component.ID),

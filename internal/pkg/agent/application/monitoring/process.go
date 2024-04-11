@@ -81,8 +81,9 @@ func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWrite
 
 		state := coord.State()
 
-		for _, c := range state.Components {
-			if matchesCloudProcessID(&c.Component, componentID) {
+		for iter, c := range state.Components {
+			// access the components array manually to avoid a memory aliasing error. This is fixed in go 1.22
+			if matchesCloudProcessID(&state.Components[iter].Component, componentID) {
 				data := struct {
 					State   string `json:"state"`
 					Message string `json:"message"`
