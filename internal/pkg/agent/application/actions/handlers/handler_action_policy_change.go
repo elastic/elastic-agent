@@ -119,20 +119,7 @@ func (h *PolicyChangeHandler) Watch() <-chan coordinator.ConfigChange {
 	return h.ch
 }
 
-func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, c *config.Config) (*remote.Config, error) {
-	data, err := c.ToMapStr()
-	if err != nil {
-		return nil, errors.New(err, "could not convert the configuration from the policy", errors.TypeConfig)
-	}
-	if _, ok := data["fleet"]; !ok {
-		// no fleet information in the configuration (skip checking client)
-		return nil, nil
-	}
-
-	cfg, err := configuration.NewFromConfig(c)
-	if err != nil {
-		return nil, errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
-	}
+func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg *configuration.Configuration) (*remote.Config, error) {
 
 	if clientEqual(h.config.Fleet.Client, cfg.Fleet.Client) {
 		// already the same hosts
@@ -145,7 +132,7 @@ func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, c *c
 	updateFleetConfig(h.log, cfg.Fleet.Client, &newFleetClientConfig)
 
 	// Test new config
-	err = testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
+	err := testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
 	if err != nil {
 		return nil, fmt.Errorf("validating fleet client config: %w", err)
 	}
@@ -193,29 +180,55 @@ func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config
 	// However, if there is a proxy sent by fleet-server, it'll take precedence.
 	// Therefore, it's not possible to remove a proxy once it's set.
 
-	// FIXME transport settings are passed by reference so is the proxy URL, properly copy or restore it if validation fails
-
 	if src.Transport.Proxy.URL == nil ||
 		src.Transport.Proxy.URL.String() == "" {
 		log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
 	} else {
+		// copy the proxy struct
 		dst.Transport.Proxy = src.Transport.Proxy
+
+		// replace in dst the attributes that are passed by reference within the proxy struct
+
+		// Headers map
+		dst.Transport.Proxy.Headers = map[string]string{}
+		for k, v := range src.Transport.Proxy.Headers {
+			dst.Transport.Proxy.Headers[k] = v
+		}
+
+		// Proxy URL
+		urlCopy := *src.Transport.Proxy.URL
+		dst.Transport.Proxy.URL = &urlCopy
+
 		log.Debug("received proxy from fleet, applying it")
 	}
 }
 
 func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *config.Config) (err error) {
+	data, err := c.ToMapStr()
+	if err != nil {
+		return errors.New(err, "could not convert the configuration from the policy", errors.TypeConfig)
+	}
+	if _, ok := data["fleet"]; !ok {
+		// no fleet information in the configuration (skip checking client)
+		return nil
+	}
+
+	cfg, err := configuration.NewFromConfig(c)
+	if err != nil {
+		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
+	}
+
 	// do not update fleet-server host from policy; no setters provided with local Fleet Server
 	if len(h.setters) == 0 {
 		return nil
 	}
 	var validatedConfig *remote.Config
-	validatedConfig, err = h.validateFleetServerHosts(ctx, c)
+	validatedConfig, err = h.validateFleetServerHosts(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("error validating Fleet client config: %w", err)
 	}
 
-	err = saveFleetClientConfig(validatedConfig)
+	err = saveConfig(h.agentInfo, cfg, h.store)
 	if err != nil {
 		return fmt.Errorf("saving FleetClientConfig: %w", err)
 	}
@@ -225,21 +238,6 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 		return fmt.Errorf("applying FleetClientConfig: %w", err)
 	}
 
-	previousConfig := h.config.Fleet.Client
-
-	h.config.Fleet.Client = *validatedConfig
-	// rollback on failure
-	defer func() {
-		if err != nil {
-			h.config.Fleet.Client = previousConfig
-		}
-	}()
-
-	fleetClient, err := client.NewAuthWithConfig(
-		h.log, h.config.Fleet.AccessAPIKey, *validatedConfig)
-	for _, setter := range h.setters {
-		setter.SetClient(fleetClient)
-	}
 	return nil
 }
 
@@ -249,26 +247,45 @@ func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Con
 		return nil
 	}
 
+	//previousConfig := h.config.Fleet.Client
+	//
+	h.config.Fleet.Client = *validatedConfig
+	//// rollback on failure
+	//defer func() {
+	//	if err != nil {
+	//		h.config.Fleet.Client = previousConfig
+	//	}
+	//}()
+
+	// the config has already been validated, no need for error handling
+	fleetClient, _ := client.NewAuthWithConfig(
+		h.log, h.config.Fleet.AccessAPIKey, *validatedConfig)
+	for _, setter := range h.setters {
+		setter.SetClient(fleetClient)
+	}
+
+	return nil
 }
 
-func saveFleetClientConfig(validatedConfig *remote.Config) error {
+func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store) error {
 	if validatedConfig == nil {
 		// nothing to do for fleet hosts
 		return nil
 	}
-	reader, err := fleetToReader(h.agentInfo, h.config)
+	reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), validatedConfig)
 	if err != nil {
 		return errors.New(
 			err, "fail to persist new Fleet Server API client hosts",
-			errors.TypeUnexpected, errors.M("hosts", h.config.Fleet.Client.Hosts))
+			errors.TypeUnexpected, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
 	}
 
-	err = h.store.Save(reader)
+	err = store.Save(reader)
 	if err != nil {
 		return errors.New(
 			err, "fail to persist new Fleet Server API client hosts",
-			errors.TypeFilesystem, errors.M("hosts", h.config.Fleet.Client.Hosts))
+			errors.TypeFilesystem, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
 	}
+	return nil
 }
 
 func clientEqual(k1 remote.Config, k2 remote.Config) bool {
@@ -315,12 +332,12 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	return true
 }
 
-func fleetToReader(agentInfo info.Agent, cfg *configuration.Configuration) (io.Reader, error) {
+func fleetToReader(agentID string, headers map[string]string, cfg *configuration.Configuration) (io.Reader, error) {
 	configToStore := map[string]interface{}{
 		"fleet": cfg.Fleet,
 		"agent": map[string]interface{}{
-			"id":               agentInfo.AgentID(),
-			"headers":          agentInfo.Headers(),
+			"id":               agentID,
+			"headers":          headers,
 			"logging.level":    cfg.Settings.LoggingConfig.Level,
 			"monitoring.http":  cfg.Settings.MonitoringConfig.HTTP,
 			"monitoring.pprof": cfg.Settings.MonitoringConfig.Pprof,
