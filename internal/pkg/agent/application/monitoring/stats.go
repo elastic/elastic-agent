@@ -28,6 +28,12 @@ func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
 
 	defaultUserCfg := LivenessFailConfig{Degraded: false, Failed: true}
 
+	for formKey, _ := range req.Form {
+		if formKey != formValueKey {
+			return defaultUserCfg, fmt.Errorf("got invalid HTTP form key: '%s'", formKey)
+		}
+	}
+
 	userConfig := req.Form.Get(formValueKey)
 	switch userConfig {
 	case "failed":

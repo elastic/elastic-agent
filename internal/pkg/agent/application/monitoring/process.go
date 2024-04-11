@@ -16,7 +16,6 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -44,14 +43,9 @@ var redirectableProcesses = []string{
 	profilingServicePrefix,
 }
 
-func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
-		failOn, err := handleFormValues(r)
-		if err != nil {
-			return fmt.Errorf("error handling form values: %w", err)
-		}
 
 		vars := mux.Vars(r)
 		componentID, found := vars[componentIDKey]
@@ -86,22 +80,14 @@ func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func
 
 		state := coord.State()
 
-		isUp := coord.CoordinatorActive(time.Second * 10)
-
-		unhealthyComponent := false
 		for _, comp := range state.Components {
-			if (failOn.Failed && comp.State.State == client.UnitStateFailed) || (failOn.Degraded && comp.State.State == client.UnitStateDegraded) {
-				unhealthyComponent = true
-			}
 			if matchesCloudProcessID(comp.Component.InputSpec.BinaryName, comp.Component.ID, componentID) {
 				data := struct {
-					State              string `json:"state"`
-					Message            string `json:"message"`
-					CoordinatorHealthy bool   `json:"coordinator_healthy"`
+					State   string `json:"state"`
+					Message string `json:"message"`
 				}{
-					State:              comp.State.State.String(),
-					Message:            comp.State.Message,
-					CoordinatorHealthy: isUp,
+					State:   comp.State.State.String(),
+					Message: comp.State.Message,
 				}
 
 				bytes, err := json.Marshal(data)
@@ -110,9 +96,6 @@ func processHandler(coord CoordinatorState, livenessMode bool, statsHandler func
 					content = fmt.Sprintf("Not valid json: %v", err)
 				} else {
 					content = string(bytes)
-				}
-				if livenessMode && (unhealthyComponent || !isUp) {
-					w.WriteHeader(http.StatusInternalServerError)
 				}
 				fmt.Fprint(w, content)
 

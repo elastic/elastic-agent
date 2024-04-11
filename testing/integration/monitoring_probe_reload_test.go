@@ -91,7 +91,7 @@ func (runner *MonitoringRunner) SetupSuite() {
 	require.NoError(runner.T(), err)
 }
 
-func (runner *MonitoringRunner) TestBeatsMetrics() {
+func (runner *MonitoringRunner) TestMonitoringLiveness() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 	defer cancel()
 
@@ -142,7 +142,7 @@ func (runner *MonitoringRunner) TestBeatsMetrics() {
 	livenessResp, err := client.Do(req)
 	require.NoError(runner.T(), err)
 	defer livenessResp.Body.Close()
-	require.Equal(runner.T(), http.StatusOK, livenessResp.StatusCode)
+	require.Equal(runner.T(), http.StatusOK, livenessResp.StatusCode) // this is effectively the check for the test
 
 	statusStr, err := io.ReadAll(livenessResp.Body)
 	require.NoError(runner.T(), err)
@@ -151,13 +151,6 @@ func (runner *MonitoringRunner) TestBeatsMetrics() {
 	err = json.Unmarshal(statusStr, &processData)
 	require.NoError(runner.T(), err)
 
-	// check for list of processes
-	respList := processData["processes"].([]interface{})
-	require.NotZero(runner.T(), respList)
-
-	// check for coordinator state field
-	coordResp := processData["coordinator_healthy"].(bool)
-	require.True(runner.T(), coordResp)
 }
 
 // AllComponentsHealthy ensures all the beats and agent are healthy and working before we continue

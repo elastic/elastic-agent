@@ -7,7 +7,6 @@ package monitoring
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -32,28 +31,6 @@ func (mc mockCoordinator) State() coordinator.State {
 
 func (mc mockCoordinator) CoordinatorActive(_ time.Duration) bool {
 	return mc.isUp
-}
-
-type mockContext struct {
-	parent context.Context
-	vars   map[string]string
-}
-
-func (mc mockContext) Deadline() (deadline time.Time, ok bool) {
-	return mc.parent.Deadline()
-}
-
-func (mc mockContext) Done() <-chan struct{} {
-	return mc.parent.Done()
-}
-
-func (mc mockContext) Err() error {
-	return mc.parent.Err()
-}
-
-func (mc mockContext) Value(key any) any {
-	// the gorilla mux uses a private type wrapper for the key, so we just gotta blindly return a map if we want this to work in a test
-	return mc.vars
 }
 
 func TestProcessHTTPHandler(t *testing.T) {
@@ -177,7 +154,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 					},
 				},
 			},
-			expectedCode: 500,
+			expectedCode: 503,
 			liveness:     true,
 			failon:       "degraded",
 		},
@@ -242,7 +219,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 	// test with processesHandler
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			testSrv := httptest.NewServer(createHandler(processesHandler(test.coord, test.liveness)))
+			testSrv := httptest.NewServer(createHandler(livenessHandler(test.coord)))
 			defer testSrv.Close()
 
 			path := fmt.Sprintf("%s?failon=%s", testSrv.URL, test.failon)
@@ -252,29 +229,6 @@ func TestProcessHTTPHandler(t *testing.T) {
 			require.NoError(t, err)
 			res.Body.Close()
 
-		})
-	}
-
-	// test with processHandler
-	for _, test := range testCases {
-		t.Run(fmt.Sprintf("process-%s", test.name), func(t *testing.T) {
-			testSrv := httptest.NewUnstartedServer(createHandler(processHandler(test.coord, test.liveness, nil)))
-			defer testSrv.Close()
-
-			customContext := func(ctx context.Context, c net.Conn) context.Context {
-				return mockContext{parent: ctx, vars: map[string]string{componentIDKey: test.coord.state.Components[0].Component.ID}}
-			}
-			testSrv.Config.ConnContext = customContext
-			testSrv.Start()
-
-			path := fmt.Sprintf("%s?failon=%s", testSrv.URL, test.failon)
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
-			require.NoError(t, err)
-			res, err := http.DefaultClient.Do(req)
-			require.NoError(t, err)
-			res.Body.Close()
-
-			require.Equal(t, test.expectedCode, res.StatusCode)
 		})
 	}
 
