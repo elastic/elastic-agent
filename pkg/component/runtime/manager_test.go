@@ -9,12 +9,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
 
@@ -174,80 +171,81 @@ func waitForReady(ctx context.Context, m *Manager) error {
 	return nil
 }
 
-func TestDeriveCommsSocketName(t *testing.T) {
-	const controlAddressNix = "unix:///tmp/elastic-agent/pge4ao-u1YaV1dmSBfVX4saT8BL7b-Ey.sock"
-	const controlAddressWin = "npipe:///_HZ8OL-9bNW-SIU0joRfgUsej2KX0Sra.sock"
+// [gRPC:8.15] Uncomment this test only after Agent/Endpoint switches fully to local gRPC, post 8.14
+// func TestDeriveCommsSocketName(t *testing.T) {
+// 	const controlAddressNix = "unix:///tmp/elastic-agent/pge4ao-u1YaV1dmSBfVX4saT8BL7b-Ey.sock"
+// 	const controlAddressWin = "npipe:///_HZ8OL-9bNW-SIU0joRfgUsej2KX0Sra.sock"
 
-	validControlAddress := func() string {
-		if runtime.GOOS == "windows" {
-			return controlAddressWin
-		}
-		return controlAddressNix
-	}
+// 	validControlAddress := func() string {
+// 		if runtime.GOOS == "windows" {
+// 			return controlAddressWin
+// 		}
+// 		return controlAddressNix
+// 	}
 
-	defaultCfg := configuration.DefaultGRPCConfig()
+// 	defaultCfg := configuration.DefaultGRPCConfig()
 
-	tests := []struct {
-		name           string
-		controlAddress string
-		port           int32
-		wantErr        error
-		want           string
-	}{
-		{
-			name: "empty uri not local",
-			port: 6789,
-			want: func() string {
-				grpcCfg := *defaultCfg
-				grpcCfg.Port = 6789
-				return grpcCfg.String()
-			}(),
-		},
-		{
-			name:    "empty uri local",
-			port:    -1,
-			wantErr: errInvalidUri,
-		},
-		{
-			name:           "invalid schema",
-			port:           -1,
-			controlAddress: "lunix:///2323",
-			wantErr:        errInvalidUri,
-		},
-		{
-			name:           "valid schema empty path",
-			port:           -1,
-			controlAddress: "unix://",
-			wantErr:        errInvalidUri,
-		},
-		{
-			name:           "valid path",
-			port:           -1,
-			controlAddress: validControlAddress(),
-			want:           validControlAddress(),
-		},
-	}
+// 	tests := []struct {
+// 		name           string
+// 		controlAddress string
+// 		port           int32
+// 		wantErr        error
+// 		want           string
+// 	}{
+// 		{
+// 			name: "empty uri not local",
+// 			port: 6789,
+// 			want: func() string {
+// 				grpcCfg := *defaultCfg
+// 				grpcCfg.Port = 6789
+// 				return grpcCfg.String()
+// 			}(),
+// 		},
+// 		{
+// 			name:    "empty uri local",
+// 			port:    -1,
+// 			wantErr: errInvalidUri,
+// 		},
+// 		{
+// 			name:           "invalid schema",
+// 			port:           -1,
+// 			controlAddress: "lunix:///2323",
+// 			wantErr:        errInvalidUri,
+// 		},
+// 		{
+// 			name:           "valid schema empty path",
+// 			port:           -1,
+// 			controlAddress: "unix://",
+// 			wantErr:        errInvalidUri,
+// 		},
+// 		{
+// 			name:           "valid path",
+// 			port:           -1,
+// 			controlAddress: validControlAddress(),
+// 			want:           validControlAddress(),
+// 		},
+// 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// Copy default config
-			grpcCfg := *defaultCfg // default rpc has port set to -1 == local rpc
-			grpcCfg.Port = tc.port
-			s, err := deriveCommsAddress(tc.controlAddress, &grpcCfg)
+// 	for _, tc := range tests {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			// Copy default config
+// 			grpcCfg := *defaultCfg // default rpc has port set to -1 == local rpc
+// 			grpcCfg.Port = tc.port
+// 			s, err := deriveCommsAddress(tc.controlAddress, &grpcCfg)
 
-			// If want error, test error and return
-			if tc.wantErr != nil {
-				diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
-				if diff != "" {
-					t.Fatal(diff)
-				}
-				return
-			}
+// 			// If want error, test error and return
+// 			if tc.wantErr != nil {
+// 				diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
+// 				if diff != "" {
+// 					t.Fatal(diff)
+// 				}
+// 				return
+// 			}
 
-			diff := cmp.Diff(len(tc.want), len(s))
-			if diff != "" {
-				t.Fatal(diff)
-			}
-		})
-	}
-}
+// 			diff := cmp.Diff(len(tc.want), len(s))
+// 			if diff != "" {
+// 				t.Fatal(diff)
+// 			}
+// 		})
+// 	}
+// }

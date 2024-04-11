@@ -170,6 +170,7 @@ func NewManager(
 	}
 
 	controlAddress := control.Address()
+	// [gRPC:8.15] For 8.14 this always returns local TCP address, until Endpoint is modified to support domain sockets gRPC
 	listenAddr, err := deriveCommsAddress(controlAddress, grpcConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive comms GRPC: %w", err)

@@ -221,11 +221,17 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				// Start connection info
 				if cis == nil {
 					var address string
-					address, err = getConnInfoServerAddress(runtime.GOOS, s.isLocal, s.comp.InputSpec.Spec.Service.CPort, s.comp.InputSpec.Spec.Service.CSocket)
+					// [gRPC:8.15] Uncomment after 8.14 when Endpoint is ready for local gRPC
+					// isLocal := s.isLocal
+
+					// [gRPC:8.15] Set connection info to local socket always for 8.14. Remove when Endpoint is ready for local gRPC
+					isLocal := true
+					address, err = getConnInfoServerAddress(runtime.GOOS, isLocal, s.comp.InputSpec.Spec.Service.CPort, s.comp.InputSpec.Spec.Service.CSocket)
 					if err != nil {
 						err = fmt.Errorf("failed to create connection info service address for %s: %w", s.name(), err)
 						break
 					}
+					s.log.Infof("Creating connection info server for %s service, address: %v", s.name(), address)
 					cis, err = newConnInfoServer(s.log, comm, address)
 					if err != nil {
 						err = fmt.Errorf("failed to start connection info service %s: %w", s.name(), err)
