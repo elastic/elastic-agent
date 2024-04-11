@@ -104,12 +104,11 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	}
 
 	h.log.Debugf("handlerPolicyChange: emit configuration for action %+v", a)
-	err = h.handleFleetServerHosts(ctx, c)
+	err = h.handlePolicyChange(ctx, c)
 	if err != nil {
 		return err
 	}
 
-	// persist, apply
 	h.ch <- newPolicyChange(ctx, c, a, acker, false)
 	return nil
 }
@@ -120,16 +119,18 @@ func (h *PolicyChangeHandler) Watch() <-chan coordinator.ConfigChange {
 }
 
 func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg *configuration.Configuration) (*remote.Config, error) {
+	// do not update fleet-server host from policy; no setters provided with local Fleet Server
+	if len(h.setters) == 0 {
+		return nil, nil
+	}
 
 	if clientEqual(h.config.Fleet.Client, cfg.Fleet.Client) {
 		// already the same hosts
 		return nil, nil
 	}
 
-	// only set protocol/hosts as that is all Fleet currently sends
-	// copy the client config and apply the changes on this copy
+	// make a copy the current client config and apply the changes in place on this copy
 	newFleetClientConfig := h.config.Fleet.Client
-	// modify in-place newFleetClientConfig
 	updateFleetConfig(h.log, cfg.Fleet.Client, &newFleetClientConfig)
 
 	// Test new config
@@ -170,6 +171,7 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 	return nil
 }
 
+// updateFleetConfig copies the relevant Fleet client settings from src on dst. The destination struct is modified in-place
 func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config) {
 	dst.Protocol = src.Protocol
 	dst.Path = src.Path
@@ -204,36 +206,26 @@ func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config
 	}
 }
 
-func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *config.Config) (err error) {
-	data, err := c.ToMapStr()
-	if err != nil {
-		return errors.New(err, "could not convert the configuration from the policy", errors.TypeConfig)
-	}
-	if _, ok := data["fleet"]; !ok {
-		// no fleet information in the configuration (skip checking client)
-		return nil
-	}
-
+func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) (err error) {
 	cfg, err := configuration.NewFromConfig(c)
 	if err != nil {
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
 
-	// do not update fleet-server host from policy; no setters provided with local Fleet Server
-	if len(h.setters) == 0 {
-		return nil
-	}
+	// validate Fleet connectivity with the new configuration
 	var validatedConfig *remote.Config
 	validatedConfig, err = h.validateFleetServerHosts(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("error validating Fleet client config: %w", err)
 	}
 
+	// persist configuration
 	err = saveConfig(h.agentInfo, cfg, h.store)
 	if err != nil {
 		return fmt.Errorf("saving FleetClientConfig: %w", err)
 	}
 
+	// apply the new configuration to the current clients
 	err = h.applyFleetClientConfig(validatedConfig)
 	if err != nil {
 		return fmt.Errorf("applying FleetClientConfig: %w", err)
@@ -243,7 +235,7 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 }
 
 func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Config) error {
-	if validatedConfig == nil {
+	if validatedConfig == nil || len(h.setters) == 0 {
 		// nothing to do for fleet hosts
 		return nil
 	}
@@ -251,8 +243,11 @@ func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Con
 	h.config.Fleet.Client = *validatedConfig
 
 	// the config has already been validated, no need for error handling
-	fleetClient, _ := client.NewAuthWithConfig(
+	fleetClient, err := client.NewAuthWithConfig(
 		h.log, h.config.Fleet.AccessAPIKey, *validatedConfig)
+	if err != nil {
+		return fmt.Errorf("creating new fleet client with updated config: %w", err)
+	}
 	for _, setter := range h.setters {
 		setter.SetClient(fleetClient)
 	}
