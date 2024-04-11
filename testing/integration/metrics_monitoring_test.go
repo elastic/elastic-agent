@@ -47,7 +47,7 @@ func TestMetricsMonitoringCorrectBinaries(t *testing.T) {
 }
 
 func (runner *MetricsRunner) SetupSuite() {
-	fixture, err := define.NewFixture(runner.T(), define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(runner.T(), define.Version())
 	require.NoError(runner.T(), err)
 	runner.agentFixture = fixture
 

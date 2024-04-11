@@ -128,7 +128,7 @@ func TestOtelFileProcessing(t *testing.T) {
 	cfgFilePath := filepath.Join(tempDir, "otel.yml")
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileProcessingConfig), 0600))
 
-	fixture, err := define.NewFixture(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -245,7 +245,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(apmConfig), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, fileName), []byte{}, 0600))
 
-	fixture, err := define.NewFixture(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
