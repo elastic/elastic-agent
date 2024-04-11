@@ -43,11 +43,12 @@ var redirectableProcesses = []string{
 	profilingServicePrefix,
 }
 
-func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 		vars := mux.Vars(r)
+
 		componentID, found := vars[componentIDKey]
 		if !found {
 			return errorfWithStatus(http.StatusNotFound, "process with specified ID not found")
@@ -75,19 +76,19 @@ func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWrite
 				metricsPath = "stats"
 			}
 
-			return redirectToPath(w, r, componentID, metricsPath)
+			return redirectToPath(w, r, componentID, metricsPath, operatingSystem)
 		}
 
 		state := coord.State()
 
-		for _, comp := range state.Components {
-			if matchesCloudProcessID(comp.Component.InputSpec.BinaryName, comp.Component.ID, componentID) {
+		for _, c := range state.Components {
+			if matchesCloudProcessID(&c.Component, componentID) {
 				data := struct {
 					State   string `json:"state"`
 					Message string `json:"message"`
 				}{
-					State:   comp.State.State.String(),
-					Message: comp.State.Message,
+					State:   c.State.State.String(),
+					Message: c.State.Message,
 				}
 
 				bytes, err := json.Marshal(data)
@@ -117,7 +118,7 @@ func isProcessRedirectable(componentID string) bool {
 	return false
 }
 
-func redirectToPath(w http.ResponseWriter, r *http.Request, id, path string) error {
+func redirectToPath(w http.ResponseWriter, r *http.Request, id, path, operatingSystem string) error {
 	endpoint := prefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
 	metricsBytes, statusCode, metricsErr := processMetrics(r.Context(), endpoint, path)
 	if metricsErr != nil {

@@ -68,9 +68,9 @@ func exposeMetricsEndpoint(
 
 		if isProcessStatsEnabled(cfg) {
 			r.Handle("/processes", createHandler(processesHandler(coord)))
-			r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler)))
-			r.Handle("/processes/{componentID}/", createHandler(processHandler(coord, statsHandler)))
-			r.Handle("/processes/{componentID}/{metricsPath}", createHandler(processHandler(coord, statsHandler)))
+			r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+			r.Handle("/processes/{componentID}/", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+			r.Handle("/processes/{componentID}/{metricsPath}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
 
 			r.Handle("/liveness", createHandler(livenessHandler(coord)))
 		}
