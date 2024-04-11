@@ -129,6 +129,7 @@ func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg 
 	// only set protocol/hosts as that is all Fleet currently sends
 	// copy the client config and apply the changes on this copy
 	newFleetClientConfig := h.config.Fleet.Client
+	// modify in-place newFleetClientConfig
 	updateFleetConfig(h.log, cfg.Fleet.Client, &newFleetClientConfig)
 
 	// Test new config
@@ -154,7 +155,7 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
 	defer cancel()
 
-	// FIXME: a HEAD should be enough as we need to test only the connectivity part
+	// TODO: a HEAD should be enough as we need to test only the connectivity part
 	resp, err := fleetClient.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
 	if err != nil {
 		return errors.New(
@@ -247,15 +248,7 @@ func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Con
 		return nil
 	}
 
-	//previousConfig := h.config.Fleet.Client
-	//
 	h.config.Fleet.Client = *validatedConfig
-	//// rollback on failure
-	//defer func() {
-	//	if err != nil {
-	//		h.config.Fleet.Client = previousConfig
-	//	}
-	//}()
 
 	// the config has already been validated, no need for error handling
 	fleetClient, _ := client.NewAuthWithConfig(
