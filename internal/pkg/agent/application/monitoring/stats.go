@@ -12,39 +12,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/monitoring"
 )
 
-const formValueKey = "failon"
-
-type LivenessFailConfig struct {
-	Degraded bool `yaml:"degraded" config:"degraded"`
-	Failed   bool `yaml:"failed" config:"failed"`
-}
-
-// process the form values we get via HTTP
-func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
-	err := req.ParseForm()
-	if err != nil {
-		return LivenessFailConfig{}, fmt.Errorf("Error parsing form: %w", err)
-	}
-
-	defaultUserCfg := LivenessFailConfig{Degraded: false, Failed: true}
-
-	for formKey := range req.Form {
-		if formKey != formValueKey {
-			return defaultUserCfg, fmt.Errorf("got invalid HTTP form key: '%s'", formKey)
-		}
-	}
-
-	userConfig := req.Form.Get(formValueKey)
-	switch userConfig {
-	case "failed", "":
-		return defaultUserCfg, nil
-	case "degraded":
-		return LivenessFailConfig{Failed: true, Degraded: true}, nil
-	default:
-		return defaultUserCfg, fmt.Errorf("got unexpected value for `%s` attribute: %s", formValueKey, userConfig)
-	}
-}
-
 func statsHandler(ns *monitoring.Namespace) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")

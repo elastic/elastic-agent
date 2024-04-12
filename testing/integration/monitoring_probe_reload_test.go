@@ -138,11 +138,24 @@ func (runner *MonitoringRunner) TestMonitoringLiveness() {
 	require.NoError(runner.T(), err)
 
 	// second check: the /liveness endpoint should now be responding
+	runner.CheckResponse(ctx, endpoint)
+
+	runner.CheckResponse(ctx, fmt.Sprintf("%s?failon=degraded", endpoint))
+
+	runner.CheckResponse(ctx, fmt.Sprintf("%s?failon=coordinator", endpoint))
+}
+
+// CheckResponse checks to see if the liveness probe returns a 200
+func (runner *MonitoringRunner) CheckResponse(ctx context.Context, endpoint string) {
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	require.NoError(runner.T(), err)
+
+	client := http.Client{Timeout: time.Second * 4}
+
 	livenessResp, err := client.Do(req)
 	require.NoError(runner.T(), err)
 	defer livenessResp.Body.Close()
 	require.Equal(runner.T(), http.StatusOK, livenessResp.StatusCode) // this is effectively the check for the test
-
 }
 
 // AllComponentsHealthy ensures all the beats and agent are healthy and working before we continue

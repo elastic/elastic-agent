@@ -136,6 +136,98 @@ func TestProcessHTTPHandler(t *testing.T) {
 			failon:       "degraded",
 		},
 		{
+			name: "coord-only-healthy",
+			coord: mockCoordinator{
+				isUp: false,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "5",
+							State:     runtime.ComponentState{State: client.UnitStateHealthy},
+							Component: component.Component{
+								ID: "test-component3",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 503,
+			liveness:     true,
+			failon:       "coordinator",
+		},
+		{
+			name: "coord-only-failed",
+			coord: mockCoordinator{
+				isUp: false,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "5",
+							State:     runtime.ComponentState{State: client.UnitStateFailed},
+							Component: component.Component{
+								ID: "test-component3",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 503,
+			liveness:     true,
+			failon:       "coordinator",
+		},
+		{
+			name: "degraded-coordinator-down",
+			coord: mockCoordinator{
+				isUp: false,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "5",
+							State:     runtime.ComponentState{State: client.UnitStateDegraded},
+							Component: component.Component{
+								ID: "test-component3",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 503,
+			liveness:     true,
+			failon:       "degraded",
+		},
+		{
+			name: "unhealthy-coordinator-down",
+			coord: mockCoordinator{
+				isUp: false,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "5",
+							State:     runtime.ComponentState{State: client.UnitStateFailed},
+							Component: component.Component{
+								ID: "test-component3",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 503,
+			liveness:     true,
+			failon:       "degraded",
+		},
+		{
 			name: "healthy-coordinator-down",
 			coord: mockCoordinator{
 				isUp: false,
