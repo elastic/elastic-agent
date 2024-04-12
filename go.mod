@@ -14,12 +14,12 @@ require (
 	github.com/elastic/e2e-testing v1.1.0
 	github.com/elastic/elastic-agent-autodiscover v0.6.8
 	github.com/elastic/elastic-agent-client/v7 v7.8.1
-	github.com/elastic/elastic-agent-libs v0.8.0
+	github.com/elastic/elastic-agent-libs v0.9.1
 	github.com/elastic/elastic-agent-system-metrics v0.9.2
 	github.com/elastic/elastic-transport-go/v8 v8.5.0
 	github.com/elastic/go-elasticsearch/v8 v8.13.0
 	github.com/elastic/go-licenser v0.4.1
-	github.com/elastic/go-sysinfo v1.13.1
+	github.com/elastic/go-sysinfo v1.14.0
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.7.0

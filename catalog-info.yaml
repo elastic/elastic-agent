@@ -118,7 +118,7 @@ metadata:
   description: Buildkite pipeline for packaging Elastic Agent core binary and publish it to DRA
   links:
     - title: Pipeline
-      url: https://buildkite.com/elastic/elastic-agent
+      url: https://buildkite.com/elastic/elastic-agent-binary-dra
 
 spec:
   type: buildkite-pipeline
@@ -131,13 +131,14 @@ spec:
       name: elastic-agent-binary-dra
       description: Buildkite pipeline for packaging Elastic Agent core binary and publish it to DRA
     spec:
+      branch_configuration: "main 7.* 8.* v7.* v8.*"
       pipeline_file: ".buildkite/pipeline.elastic-agent-binary-dra.yml"
       provider_settings:
         build_pull_request_forks: false
         build_pull_requests: true # requires filter_enabled and filter_condition settings as below when used with buildkite-pr-bot
         publish_commit_status: false # do not update status of commits for this pipeline
         build_tags: false
-        build_branches: false
+        build_branches: true # enable build for branches. This relies on the filter in .buildkite/pipeline.elastic-agent-binary-dra.yml
         filter_enabled: true
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
@@ -172,7 +173,7 @@ spec:
     kind: Pipeline
     metadata:
       name: elastic-agent-gce-cleanup
-      description: Buildkite pipeline for packaging Elastic Agent core binary and publish it to DRA
+      description: Pipeline file for cleaning up lingering GCE instances
     spec:
       pipeline_file: ".buildkite/pipeline.elastic-agent-gce-cleanup.yml"
       provider_settings:

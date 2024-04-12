@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/otiai10/copy"
@@ -325,7 +326,15 @@ func PerformUpgrade(
 
 	upgradeOutput, err := startFixture.Exec(ctx, upgradeCmdArgs)
 	if err != nil {
-		return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
+		// Sometimes the gRPC server shuts down before replying to the command which is expected
+		// we can determine this state by the EOF error coming from the server.
+		// If the server is just unavailable/not running, we should not succeed.
+		// Starting with version 8.13.2, this is handled by the upgrade command itself.
+		outputString := string(upgradeOutput)
+		isConnectionInterrupted := strings.Contains(outputString, "Unavailable") && strings.Contains(outputString, "EOF")
+		if !isConnectionInterrupted {
+			return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
+		}
 	}
 
 	// wait for the watcher to show up
