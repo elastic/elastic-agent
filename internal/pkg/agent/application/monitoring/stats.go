@@ -36,12 +36,10 @@ func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
 
 	userConfig := req.Form.Get(formValueKey)
 	switch userConfig {
-	case "failed":
+	case "failed", "":
 		return defaultUserCfg, nil
 	case "degraded":
 		return LivenessFailConfig{Failed: true, Degraded: true}, nil
-	case "":
-		return defaultUserCfg, nil
 	default:
 		return defaultUserCfg, fmt.Errorf("got unexpected value for `%s` attribute: %s", formValueKey, userConfig)
 	}
