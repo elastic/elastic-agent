@@ -7,14 +7,17 @@ package handlers
 import (
 	"bytes"
 	"context"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -28,21 +31,26 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
 	apiStatusTimeout = 15 * time.Second
 )
 
+type logLevelSetter interface {
+	SetLogLevel(ctx context.Context, lvl logp.Level) error
+}
+
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
-	log       *logger.Logger
-	agentInfo info.Agent
-	config    *configuration.Configuration
-	store     storage.Store
-	ch        chan coordinator.ConfigChange
-	setters   []actions.ClientSetter
-
+	log            *logger.Logger
+	agentInfo      info.Agent
+	config         *configuration.Configuration
+	store          storage.Store
+	ch             chan coordinator.ConfigChange
+	setters        []actions.ClientSetter
+	logLevelSetter logLevelSetter
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 	// // Last known valid signature validation key
@@ -56,15 +64,17 @@ func NewPolicyChangeHandler(
 	config *configuration.Configuration,
 	store storage.Store,
 	ch chan coordinator.ConfigChange,
+	logLevelSetter logLevelSetter,
 	setters ...actions.ClientSetter,
 ) *PolicyChangeHandler {
 	return &PolicyChangeHandler{
-		log:       log,
-		agentInfo: agentInfo,
-		config:    config,
-		store:     store,
-		ch:        ch,
-		setters:   setters,
+		log:            log,
+		agentInfo:      agentInfo,
+		config:         config,
+		store:          store,
+		ch:             ch,
+		setters:        setters,
+		logLevelSetter: logLevelSetter,
 	}
 }
 
@@ -212,11 +222,26 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
 
+	var validationErr error
+
 	// validate Fleet connectivity with the new configuration
 	var validatedConfig *remote.Config
 	validatedConfig, err = h.validateFleetServerHosts(ctx, cfg)
 	if err != nil {
-		return fmt.Errorf("error validating Fleet client config: %w", err)
+		validationErr = goerrors.Join(validationErr, fmt.Errorf("validating Fleet client config: %w", err))
+	}
+
+	// validate agent settings
+
+	// agent logging
+
+	loggingConfig, err := validateLoggingConfig(c)
+	if err != nil {
+		validationErr = goerrors.Join(validationErr, fmt.Errorf("validating logging config: %w", err))
+	}
+
+	if validationErr != nil {
+		return validationErr
 	}
 
 	if validatedConfig != nil {
@@ -236,16 +261,80 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	// persist configuration
 	err = saveConfig(h.agentInfo, h.config, h.store)
 	if err != nil {
-		return fmt.Errorf("saving FleetClientConfig: %w", err)
+		return fmt.Errorf("saving config: %w", err)
 	}
 
-	// apply the new configuration to the current clients
+	// apply the new Fleet client configuration to the current clients
 	err = h.applyFleetClientConfig(validatedConfig)
 	if err != nil {
 		return fmt.Errorf("applying FleetClientConfig: %w", err)
 	}
 
+	// apply logging configuration
+	h.applyLoggingConfig(ctx, loggingConfig)
+
 	return nil
+}
+
+func validateLoggingConfig(cfg *config.Config) (*logger.Config, error) {
+
+	loggingConfig, err := lookupLoggingConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("lookin up logging config: %w", err)
+	}
+
+	if loggingConfig == nil {
+		// no logging config, nothing to do
+		return nil, nil
+	}
+
+	logLevel := loggingConfig.Level
+	if logLevel < logp.DebugLevel || logLevel > logp.CriticalLevel {
+		return nil, fmt.Errorf("unrecognized log level %d", logLevel)
+	}
+
+	return loggingConfig, nil
+
+}
+
+func lookupLoggingConfig(cfg *config.Config) (*logger.Config, error) {
+	mapCfg, err := cfg.ToMapStr()
+	if err != nil {
+		return nil, fmt.Errorf("transforming config in a map: %w", err)
+	}
+
+	const agentLoggingConfigKey = "agent.logging"
+	const configKeyTokenSeparator = "."
+
+	var loggingConfigBlob any
+	loggingConfigBlob, err = utils.GetNestedMap(mapCfg, strings.Split(agentLoggingConfigKey, configKeyTokenSeparator)...)
+	if errors.Is(err, utils.ErrKeyNotFound) {
+		// No logging config found, nothing to do
+		return nil, nil
+	}
+	if err != nil {
+		// we had an error looking up the logging nested map
+		return nil, fmt.Errorf("looking up %q in config received from Fleet: %w", agentLoggingConfigKey, err)
+	}
+
+	loggingConfigMap, ok := loggingConfigBlob.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("entry with key %q is not a map", agentLoggingConfigKey)
+	}
+
+	// we found the logging config map, unpack and return
+	loggingConfig, err := config.NewConfigFrom(loggingConfigMap)
+	if err != nil {
+		return nil, fmt.Errorf("creating config from map: %w", err)
+	}
+
+	var loggingConfigStruct *logger.Config
+	err = loggingConfig.Unpack(loggingConfigStruct, config.DefaultOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("unpacking from config: %w", err)
+	}
+
+	return loggingConfigStruct, nil
 }
 
 func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Config) error {
@@ -265,6 +354,21 @@ func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Con
 	}
 
 	return nil
+}
+
+func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingConfig *logger.Config) error {
+
+	if loggingConfig == nil {
+		// no logging config to set, nothing to do
+		return nil
+	}
+
+	if h.agentInfo.LogLevel() != logger.DefaultLogLevel.String() {
+		// there is a specific log level set at agent level, nothing to do
+		return nil
+	}
+
+	return h.logLevelSetter.SetLogLevel(ctx, loggingConfig.Level)
 }
 
 func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store) error {
