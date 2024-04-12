@@ -219,8 +219,19 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return fmt.Errorf("error validating Fleet client config: %w", err)
 	}
 
+	backupFleetClientCfg := h.config.Fleet.Client
+	// rollback in case of error
+	defer func() {
+		if err != nil {
+			h.config.Fleet.Client = backupFleetClientCfg
+		}
+	}()
+
+	// modify runtime handler config before saving
+	h.config.Fleet.Client = *validatedConfig
+
 	// persist configuration
-	err = saveConfig(h.agentInfo, cfg, h.store)
+	err = saveConfig(h.agentInfo, h.config, h.store)
 	if err != nil {
 		return fmt.Errorf("saving FleetClientConfig: %w", err)
 	}
@@ -239,8 +250,6 @@ func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Con
 		// nothing to do for fleet hosts
 		return nil
 	}
-
-	h.config.Fleet.Client = *validatedConfig
 
 	// the config has already been validated, no need for error handling
 	fleetClient, err := client.NewAuthWithConfig(
