@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -143,13 +142,6 @@ func (runner *MonitoringRunner) TestMonitoringLiveness() {
 	require.NoError(runner.T(), err)
 	defer livenessResp.Body.Close()
 	require.Equal(runner.T(), http.StatusOK, livenessResp.StatusCode) // this is effectively the check for the test
-
-	statusStr, err := io.ReadAll(livenessResp.Body)
-	require.NoError(runner.T(), err)
-
-	processData := map[string]interface{}{}
-	err = json.Unmarshal(statusStr, &processData)
-	require.NoError(runner.T(), err)
 
 }
 

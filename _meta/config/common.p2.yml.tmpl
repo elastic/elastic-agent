@@ -66,6 +66,10 @@ inputs:
 #   # The name of the output to use for monitoring data.
 #   use_output: monitoring
 #   # exposes agent metrics using http, by default sockets and named pipes are used
+#   # Also exposes a /liveness endpoint that will return an HTTP code depending on agent status:
+#   # 200: Agent is healthy
+#   # 500: A component or unit is in a failed state
+#   # 503: The agent coordinator is unresponsive
 #   http:
 #       # enables http endpoint
 #       enabled: false
