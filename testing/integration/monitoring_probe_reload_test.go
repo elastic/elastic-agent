@@ -142,7 +142,9 @@ func (runner *MonitoringRunner) TestMonitoringLiveness() {
 
 	runner.CheckResponse(ctx, fmt.Sprintf("%s?failon=degraded", endpoint))
 
-	runner.CheckResponse(ctx, fmt.Sprintf("%s?failon=coordinator", endpoint))
+	runner.CheckResponse(ctx, fmt.Sprintf("%s?failon=failed", endpoint))
+
+	runner.CheckResponse(ctx, fmt.Sprintf("%s?failon=heartbeat", endpoint))
 }
 
 // CheckResponse checks to see if the liveness probe returns a 200

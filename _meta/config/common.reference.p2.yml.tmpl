@@ -156,8 +156,8 @@ inputs:
 #   # The possible values for `failon` are:
 #   # `degraded`: return an error if a component is in a degraded state or failed state, or if the agent coordinator is unresponsive.
 #   # `failed`: return an error if a unit is in a failed state, or if the agent coordinator is unresponsive.
-#   # `coordinator`: return an error only if the agent coordinator is unresponsive. 
-#   # If no `failon` parameter is provided, the default behavior is `failon=failed`
+#   # `heartbeat`: return an error only if the agent coordinator is unresponsive. 
+#   # If no `failon` parameter is provided, the default behavior is `failon=heartbeat`
 #   http:
 #       # enables http endpoint
 #       enabled: false

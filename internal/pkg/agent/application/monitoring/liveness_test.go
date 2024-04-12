@@ -44,6 +44,52 @@ func TestProcessHTTPHandler(t *testing.T) {
 		failon       string
 	}{
 		{
+			name: "default-failed",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "2",
+							State:     runtime.ComponentState{State: client.UnitStateFailed},
+							Component: component.Component{
+								ID: "test-component",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 200,
+			liveness:     true,
+			failon:       "heartbeat",
+		},
+		{
+			name: "default-healthy",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "2",
+							State:     runtime.ComponentState{State: client.UnitStateHealthy},
+							Component: component.Component{
+								ID: "test-component",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 200,
+			liveness:     true,
+			failon:       "heartbeat",
+		},
+		{
 			name: "degraded",
 			coord: mockCoordinator{
 				isUp: true,
@@ -136,7 +182,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 			failon:       "degraded",
 		},
 		{
-			name: "coord-only-healthy",
+			name: "coord-fail-only-healthy",
 			coord: mockCoordinator{
 				isUp: false,
 				state: coordinator.State{
@@ -156,10 +202,10 @@ func TestProcessHTTPHandler(t *testing.T) {
 			},
 			expectedCode: 503,
 			liveness:     true,
-			failon:       "coordinator",
+			failon:       "heartbeat",
 		},
 		{
-			name: "coord-only-failed",
+			name: "coord-fail-only-failed",
 			coord: mockCoordinator{
 				isUp: false,
 				state: coordinator.State{
@@ -179,7 +225,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 			},
 			expectedCode: 503,
 			liveness:     true,
-			failon:       "coordinator",
+			failon:       "heartbeat",
 		},
 		{
 			name: "degraded-coordinator-down",

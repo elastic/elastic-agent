@@ -27,7 +27,7 @@ func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
 		return LivenessFailConfig{}, fmt.Errorf("Error parsing form: %w", err)
 	}
 
-	defaultUserCfg := LivenessFailConfig{Degraded: false, Failed: true, Coordinator: true}
+	defaultUserCfg := LivenessFailConfig{Degraded: false, Failed: false, Coordinator: true}
 
 	for formKey := range req.Form {
 		if formKey != formValueKey {
@@ -37,12 +37,12 @@ func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
 
 	userConfig := req.Form.Get(formValueKey)
 	switch userConfig {
-	case "failed", "":
-		return defaultUserCfg, nil
+	case "failed":
+		return LivenessFailConfig{Degraded: false, Failed: true, Coordinator: true}, nil
 	case "degraded":
 		return LivenessFailConfig{Failed: true, Degraded: true, Coordinator: true}, nil
-	case "coordinator":
-		return LivenessFailConfig{Failed: false, Degraded: false, Coordinator: true}, nil
+	case "heartbeat", "":
+		return defaultUserCfg, nil
 	default:
 		return defaultUserCfg, fmt.Errorf("got unexpected value for `%s` attribute: %s", formValueKey, userConfig)
 	}
