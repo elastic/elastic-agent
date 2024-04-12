@@ -124,26 +124,26 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		5*time.Minute, 10*time.Second,
 		"agent never became healthy. Last status: %v", &stateBuff)
 
-	filebeat := "filebeat"
+	agentbeat := "agentbeat"
 	if runtime.GOOS == "windows" {
-		filebeat += ".exe"
+		agentbeat += ".exe"
 	}
 	wd := f.WorkDir()
-	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", filebeat)
+	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", agentbeat)
 	compPaths, err := filepath.Glob(glob)
-	require.NoErrorf(t, err, "failed to glob filebeat path pattern %q", glob)
+	require.NoErrorf(t, err, "failed to glob agentbeat path pattern %q", glob)
 	require.Lenf(t, compPaths, 1,
-		"glob pattern \"%s\": found %d paths to filebeat, can only have 1",
+		"glob pattern \"%s\": found %d paths to agentbeat, can only have 1",
 		glob, len(compPaths))
 
 	cmdVer := exec.Command(compPaths[0], "version")
 	output, err = cmdVer.CombinedOutput()
-	require.NoError(t, err, "failed to get filebeat version")
+	require.NoError(t, err, "failed to get agentbeat version")
 	outStr := string(output)
 
 	// version output example:
-	// filebeat version 8.13.0 (amd64), libbeat 8.13.0 [0baedd2518bd7e5b78e2280684580cbfdcab5ae8 built 2024-01-23 06:57:37 +0000 UTC
-	t.Log("parsing commit hash from filebeat version: ", outStr)
+	// agentbeat version 8.14.0 (amd64), libbeat 8.14.0 [0baedd2518bd7e5b78e2280684580cbfdcab5ae8 built 2024-01-23 06:57:37 +0000 UTC
+	t.Log("parsing commit hash from agentbeat version: ", outStr)
 	splits := strings.Split(outStr, "[")
 	require.Lenf(t, splits, 2,
 		"expected beats output version to be split into 2, it was split into %q",

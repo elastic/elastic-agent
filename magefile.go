@@ -1012,12 +1012,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 			// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
 			externalBinaries := map[string]string{
-				"auditbeat":             "beats",
-				"filebeat":              "beats",
-				"heartbeat":             "beats",
-				"metricbeat":            "beats",
-				"osquerybeat":           "beats",
-				"packetbeat":            "beats",
+				"agentbeat":             "beats",
 				"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
 				"cloud-defend":          "cloud-defend",
 				"apm-server":            "apm-server", // not supported on darwin/aarch64
