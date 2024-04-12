@@ -219,16 +219,19 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return fmt.Errorf("error validating Fleet client config: %w", err)
 	}
 
-	backupFleetClientCfg := h.config.Fleet.Client
-	// rollback in case of error
-	defer func() {
-		if err != nil {
-			h.config.Fleet.Client = backupFleetClientCfg
-		}
-	}()
+	if validatedConfig != nil {
+		// there's a change in the fleet client settings
+		backupFleetClientCfg := h.config.Fleet.Client
+		// rollback in case of error
+		defer func() {
+			if err != nil {
+				h.config.Fleet.Client = backupFleetClientCfg
+			}
+		}()
 
-	// modify runtime handler config before saving
-	h.config.Fleet.Client = *validatedConfig
+		// modify runtime handler config before saving
+		h.config.Fleet.Client = *validatedConfig
+	}
 
 	// persist configuration
 	err = saveConfig(h.agentInfo, h.config, h.store)
