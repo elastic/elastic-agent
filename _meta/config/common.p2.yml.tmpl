@@ -66,6 +66,19 @@ inputs:
 #   # The name of the output to use for monitoring data.
 #   use_output: monitoring
 #   # exposes agent metrics using http, by default sockets and named pipes are used
+#   #
+#   # `http` Also exposes a /liveness endpoint that will return an HTTP code depending on agent status:
+#   # 200: Agent is healthy
+#   # 500: A component or unit is in a failed state
+#   # 503: The agent coordinator is unresponsive
+#   #
+#   # You can pass a `failon` parameter to the /liveness endpoint to determine what component state will result in a 500.
+#   # For example: `curl 'localhost:6792/liveness?failon=degraded'` will return 500 if a component is in a degraded state.
+#   # The possible values for `failon` are:
+#   # `degraded`: return an error if a component is in a degraded state or failed state, or if the agent coordinator is unresponsive.
+#   # `failed`: return an error if a unit is in a failed state, or if the agent coordinator is unresponsive.
+#   # `heartbeat`: return an error only if the agent coordinator is unresponsive. 
+#   # If no `failon` parameter is provided, the default behavior is `failon=heartbeat`
 #   http:
 #       # enables http endpoint
 #       enabled: false

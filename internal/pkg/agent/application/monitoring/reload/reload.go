@@ -5,6 +5,8 @@
 package reload
 
 import (
+	"fmt"
+	"net"
 	"sync/atomic"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -18,13 +20,14 @@ import (
 type ServerController interface {
 	Start()
 	Stop() error
+	Addr() net.Addr
 }
-type serverConstructor func() (ServerController, error)
+type serverConstructor func(*monitoringCfg.MonitoringConfig) (ServerController, error)
 
 type ServerReloader struct {
-	s           ServerController
-	log         *logger.Logger
-	newServerFn serverConstructor
+	srvController ServerController
+	log           *logger.Logger
+	newServerFn   serverConstructor
 
 	config          *monitoringCfg.MonitoringConfig
 	isServerRunning atomic.Bool
@@ -41,26 +44,26 @@ func NewServerReloader(newServerFn serverConstructor, log *logger.Logger, mcfg *
 }
 
 func (sr *ServerReloader) Start() {
-	if sr.s != nil && sr.isServerRunning.Load() {
+	if sr.srvController != nil && sr.isServerRunning.Load() {
 		// server is already running
 		return
 	}
 
 	sr.log.Info("Starting server")
 	var err error
-	sr.s, err = sr.newServerFn()
+	sr.srvController, err = sr.newServerFn(sr.config)
 	if err != nil {
 		sr.log.Errorf("Failed creating a server: %v", err)
 		return
 	}
 
-	sr.s.Start()
+	sr.srvController.Start()
 	sr.log.Debugf("Server started")
 	sr.isServerRunning.Store(true)
 }
 
 func (sr *ServerReloader) Stop() error {
-	if sr.s == nil {
+	if sr.srvController == nil {
 		// stopping not started server
 		sr.isServerRunning.Store(false)
 		return nil
@@ -68,13 +71,22 @@ func (sr *ServerReloader) Stop() error {
 	sr.log.Info("Stopping server")
 
 	sr.isServerRunning.Store(false)
-	if err := sr.s.Stop(); err != nil {
+	if err := sr.srvController.Stop(); err != nil {
 		return err
 	}
 
 	sr.log.Debugf("Server stopped")
-	sr.s = nil
+	sr.srvController = nil
 	return nil
+}
+
+// Addr returns the address interface used by the underlying network listener
+func (sr *ServerReloader) Addr() net.Addr {
+	if sr.srvController != nil {
+		return sr.srvController.Addr()
+	}
+	// just return a "bare" Addr so we don't have to return a nil
+	return &net.TCPAddr{Port: 0, IP: net.IP{}}
 }
 
 func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
@@ -84,17 +96,24 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 	}
 
 	sr.config = newConfig.Settings.MonitoringConfig
+	var err error
 
-	shouldRunMetrics := sr.config.Enabled
-	if shouldRunMetrics && !sr.isServerRunning.Load() {
+	if sr.config != nil && sr.config.Enabled {
+		if sr.isServerRunning.Load() {
+			err = sr.Stop()
+			if err != nil {
+				return fmt.Errorf("error stopping monitoring server: %w", err)
+			}
+			sr.isServerRunning.Store(false)
+		}
+
 		sr.Start()
 
-		sr.isServerRunning.Store(true)
 		return nil
 	}
 
-	if !shouldRunMetrics && sr.isServerRunning.Load() {
-		sr.isServerRunning.Store(false)
+	if sr.config != nil && !sr.config.Enabled && sr.isServerRunning.Load() {
+
 		return sr.Stop()
 	}
 
