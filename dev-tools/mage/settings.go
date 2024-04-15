@@ -44,6 +44,8 @@ const (
 	// Env vars
 	// agent package version
 	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
+	//ManifestUrlEnvVar is the name fo the environment variable containing the Manifest URL to be used for packaging agent
+	ManifestUrlEnvVar = "MANIFEST_URL"
 
 	// Mapped functions
 	agentPackageVersionMappedFunc    = "agent_package_version"
@@ -152,7 +154,7 @@ func initGlobals() {
 
 	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
 
-	ManifestURL = EnvOr("ManifestURL", "")
+	ManifestURL = EnvOr(ManifestUrlEnvVar, "")
 	PackagingFromManifest = ManifestURL != ""
 }
 

@@ -5,8 +5,8 @@ set -euo pipefail
 _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
 
-if test -z "${ManifestURL=:""}"; then
-  echo "Missing variable ManifestURL, export it before use."
+if test -z "${MANIFEST_URL=:""}"; then
+  echo "Missing variable MANIFEST_URL, export it before use."
   exit 2
 fi
 
@@ -17,7 +17,7 @@ mkdir -p $AGENT_DROP_PATH
 mage clean downloadManifest package ironbank fixDRADockerArtifacts
 
 echo  "+++ Generate dependencies report"
-BEAT_VERSION_FULL=$(curl -s -XGET "${ManifestURL}" |jq '.version' -r )
+BEAT_VERSION_FULL=$(curl -s -XGET "${MANIFEST_URL}" |jq '.version' -r )
 bash "${_SELF}/../../../dev-tools/dependencies-report"
 mkdir -p build/distributions/reports
 mv dependencies.csv "build/distributions/reports/dependencies-${BEAT_VERSION_FULL}.csv"
