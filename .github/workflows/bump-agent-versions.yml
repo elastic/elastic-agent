@@ -61,5 +61,5 @@ jobs:
           url: ${{ secrets.VAULT_ADDR }}
           roleId: ${{ secrets.VAULT_ROLE_ID }}
           secretId: ${{ secrets.VAULT_SECRET_ID }}
-          message: "Update for Elastic Agent versions file has been created: ${{ steps.update.output.pr }}"
+          message: "Update for Elastic Agent versions file has been created: ${{ steps.update.outputs.pr }}"
           channel: "#ingest-notifications"
