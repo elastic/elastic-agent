@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	autodiscoverK8s "github.com/elastic/elastic-agent-autodiscover/kubernetes"
 
@@ -103,6 +104,8 @@ func TestNewLeaderElectionManager(t *testing.T) {
 	podNames := [2]string{"agent1", "agent2"}
 	cancelFuncs := [2]context.CancelFunc{}
 
+	done := make(chan int, 1)
+
 	// Create two leader election providers representing two agents running
 	for i := 0; i < 2; i++ {
 		p, err := ContextProviderBuilder(logger, cfg, true)
@@ -110,6 +113,8 @@ func TestNewLeaderElectionManager(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancelFuncs[i] = cancel
+		defer cancel()
+
 		comm := ctesting.NewContextComm(ctx)
 
 		err = os.Setenv("POD_NAME", podNames[i])
@@ -125,66 +130,99 @@ func TestNewLeaderElectionManager(t *testing.T) {
 		}
 
 		// We need to wait for the first agent to acquire the lease, so we can POD_NAME environment variable again
-		expectedLeader := leaderElectorPrefix + podNames[i]
-		for {
-			holder, err := getLeaseHolder(client)
-			require.NoError(t, err)
+		go func() {
+			expectedLeader := leaderElectorPrefix + podNames[i]
+			for {
+				holder, err := getLeaseHolder(client)
+				require.NoError(t, err)
 
-			if holder == expectedLeader {
-				break
+				if holder == expectedLeader {
+					done <- 1
+					break
+				}
 			}
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(time.Duration(leaseDuration+leaseRetryPeriod) * 30 * time.Second):
+			require.FailNow(t, "Timeout"+
+				" while waiting for the first pod to acquire the lease. This should not happen. Consider increasing "+
+				"the timeout.")
 		}
 	}
 
-	// At this point the current holder is agent1. Let's change it to agent2.
-	for {
-		// Force the lease to be applied again, so a new leader is elected.
-		intermediateHolder := "does-not-matter"
-		lease.Spec.HolderIdentity = &intermediateHolder
-		err = applyLease(client, lease, false)
-		require.NoError(t, err)
-
-		var currentHolder string
+	go func() {
+		// At this point the current holder is agent1. Let's change it to agent2.
 		for {
-			currentHolder, err = getLeaseHolder(client)
+			// Force the lease to be applied again, so a new leader is elected.
+			intermediateHolder := "does-not-matter"
+			lease.Spec.HolderIdentity = &intermediateHolder
+			err = applyLease(client, lease, false)
 			require.NoError(t, err)
 
-			// In this case, we already have an agent as holder
-			if currentHolder == leaderElectorPrefix+podNames[0] || currentHolder == leaderElectorPrefix+podNames[1] {
+			var currentHolder string
+			for {
+				currentHolder, err = getLeaseHolder(client)
+				require.NoError(t, err)
+
+				// In this case, we already have an agent as holder
+				if currentHolder == leaderElectorPrefix+podNames[0] || currentHolder == leaderElectorPrefix+podNames[1] {
+					break
+				}
+			}
+
+			if currentHolder == leaderElectorPrefix+podNames[1] {
+				done <- 1
 				break
 			}
 		}
+	}()
 
-		if currentHolder == leaderElectorPrefix+podNames[1] {
-			break
-		}
+	select {
+	case <-done:
+	case <-time.After(time.Duration(leaseDuration+leaseRetryPeriod) * 30 * time.Second):
+		require.FailNow(t, "Timeout "+
+			" while waiting for agent2 to acquire the lease. This should not happen. Consider increasing "+
+			"the timeout.")
 	}
 
 	// Now that the holder is agent2, let's wait for agent1 to be reelected.
 	// To avoid having to wait very long, the context of agent2 will be canceled so the leader elector will not be
 	// running anymore. This way there is only one instance fighting to acquire the lease.
 	cancelFuncs[1]()
-	for {
-		// Force the lease to be applied again, so a new leader is elected.
-		intermediateHolder := "does-not-matter"
-		lease.Spec.HolderIdentity = &intermediateHolder
-		err = applyLease(client, lease, false)
-		require.NoError(t, err)
-
-		var currentHolder string
+	go func() {
 		for {
-			currentHolder, err = getLeaseHolder(client)
+			// Force the lease to be applied again, so a new leader is elected.
+			intermediateHolder := "does-not-matter"
+			lease.Spec.HolderIdentity = &intermediateHolder
+			err = applyLease(client, lease, false)
 			require.NoError(t, err)
 
-			// In this case, we already have an agent as holder
-			if currentHolder == leaderElectorPrefix+podNames[0] || currentHolder == leaderElectorPrefix+podNames[1] {
+			var currentHolder string
+			for {
+				currentHolder, err = getLeaseHolder(client)
+				require.NoError(t, err)
+
+				// In this case, we already have an agent as holder
+				if currentHolder == leaderElectorPrefix+podNames[0] || currentHolder == leaderElectorPrefix+podNames[1] {
+					break
+				}
+			}
+
+			if currentHolder == leaderElectorPrefix+podNames[0] {
+				done <- 1
 				break
 			}
 		}
+	}()
 
-		if currentHolder == leaderElectorPrefix+podNames[0] {
-			break
-		}
+	select {
+	case <-done:
+	case <-time.After(time.Duration(leaseDuration+leaseRetryPeriod) * 30 * time.Second):
+		require.FailNow(t, "Timeout"+
+			" while waiting for agent1 to reacquire the lease. This should not happen. Consider increasing "+
+			"the timeout.")
 	}
 
 	cancelFuncs[0]()
