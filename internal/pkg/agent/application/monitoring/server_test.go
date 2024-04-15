@@ -24,7 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 )
 
-func TestConfigUpdateOnReload(t *testing.T) {
+func TestBasicLivenessConfig(t *testing.T) {
 	_ = logp.DevelopmentSetup()
 	testAPIConfig := api.Config{}
 	mockCoord := mockCoordinator{

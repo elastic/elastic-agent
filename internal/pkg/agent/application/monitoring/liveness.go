@@ -15,9 +15,9 @@ import (
 const formValueKey = "failon"
 
 type LivenessFailConfig struct {
-	Degraded    bool `yaml:"degraded" config:"degraded"`
-	Failed      bool `yaml:"failed" config:"failed"`
-	Coordinator bool `yaml:"coordinator" config:"coordinator"`
+	Degraded  bool `yaml:"degraded" config:"degraded"`
+	Failed    bool `yaml:"failed" config:"failed"`
+	Heartbeat bool `yaml:"heartbeat" config:"heartbeat"`
 }
 
 // process the form values we get via HTTP
@@ -27,7 +27,7 @@ func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
 		return LivenessFailConfig{}, fmt.Errorf("Error parsing form: %w", err)
 	}
 
-	defaultUserCfg := LivenessFailConfig{Degraded: false, Failed: false, Coordinator: true}
+	defaultUserCfg := LivenessFailConfig{Degraded: false, Failed: false, Heartbeat: true}
 
 	for formKey := range req.Form {
 		if formKey != formValueKey {
@@ -38,9 +38,9 @@ func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
 	userConfig := req.Form.Get(formValueKey)
 	switch userConfig {
 	case "failed":
-		return LivenessFailConfig{Degraded: false, Failed: true, Coordinator: true}, nil
+		return LivenessFailConfig{Degraded: false, Failed: true, Heartbeat: true}, nil
 	case "degraded":
-		return LivenessFailConfig{Failed: true, Degraded: true, Coordinator: true}, nil
+		return LivenessFailConfig{Failed: true, Degraded: true, Heartbeat: true}, nil
 	case "heartbeat", "":
 		return defaultUserCfg, nil
 	default:
@@ -54,6 +54,11 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 
 		state := coord.State()
 		isUp := coord.CoordinatorActive(time.Second * 10)
+		// the coordinator check is always on, so if that fails, always return false
+		if !isUp {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return nil
+		}
 
 		failConfig, err := handleFormValues(r)
 		if err != nil {
@@ -61,7 +66,7 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 		}
 
 		// if user has requested `coordinator` mode, just revert to that, skip everything else
-		if !failConfig.Degraded && !failConfig.Failed && failConfig.Coordinator {
+		if !failConfig.Degraded && !failConfig.Failed && failConfig.Heartbeat {
 			if !isUp {
 				w.WriteHeader(http.StatusServiceUnavailable)
 				return nil
@@ -75,9 +80,7 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 			}
 		}
 		// bias towards the coordinator check, since it can be otherwise harder to diagnose
-		if !isUp {
-			w.WriteHeader(http.StatusServiceUnavailable)
-		} else if unhealthyComponent {
+		if unhealthyComponent {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return nil
