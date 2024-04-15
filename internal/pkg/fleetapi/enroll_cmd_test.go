@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -58,7 +59,8 @@ func TestEnroll(t *testing.T) {
 				b, err := json.Marshal(response)
 				require.NoError(t, err)
 
-				w.Write(b)
+				_, err = w.Write(b)
+				assert.NoError(t, err)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -93,7 +95,8 @@ func TestEnroll(t *testing.T) {
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"statusCode": 500, "error":"Something is really bad here"}`))
+				_, err := w.Write([]byte(`{"statusCode": 500, "error":"Something is really bad here"}`))
+				assert.NoError(t, err)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -119,6 +122,41 @@ func TestEnroll(t *testing.T) {
 
 			require.True(t, strings.Index(err.Error(), "500") > 0)
 			require.True(t, strings.Index(err.Error(), "Something is really bad here") > 0)
+		},
+	))
+
+	t.Run("Returns temporary server errors", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				w.Header().Set("Content-Type", "application/json")
+				_, err := w.Write([]byte(`{"statusCode": 503, "error":"maintenance"}`))
+				assert.NoError(t, err)
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			cfg := config.MustNewConfigFrom(map[string]interface{}{
+				"host": host,
+			})
+
+			client, err := remote.NewWithRawConfig(nil, cfg, nil)
+			require.NoError(t, err)
+
+			req := &EnrollRequest{
+				Type:         PermanentEnroll,
+				EnrollAPIKey: "my-enrollment-api-key",
+				Metadata: Metadata{
+					Local:        testMetadata(),
+					UserProvided: make(map[string]interface{}),
+				},
+			}
+
+			cmd := &EnrollCmd{client: client}
+			_, err = cmd.Execute(context.Background(), req)
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrTemporaryServerError)
+			require.Contains(t, err.Error(), "code 503")
 		},
 	))
 }

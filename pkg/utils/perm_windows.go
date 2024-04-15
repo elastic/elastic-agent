@@ -6,11 +6,17 @@
 
 package utils
 
+import (
+	"os/user"
+)
+
 const (
 	// AdministratorSID is the SID for the Administrator user.
 	AdministratorSID = "S-1-5-32-544"
 	// SystemSID is the SID for the SYSTEM user.
 	SystemSID = "S-1-5-32-544"
+	// EveryoneSID is the SID for Everyone.
+	EveryoneSID = "S-1-1-0"
 )
 
 // FileOwner is the ownership a file should have.
@@ -20,11 +26,19 @@ type FileOwner struct {
 }
 
 // CurrentFileOwner returns the executing UID and GID of the current process.
+//
+// Note: Very unlikely for this to panic if this function is unable to get the current
+// user. Not being able to get the current user, is a critical problem and nothing
+// can continue so a panic is appropriate.
 func CurrentFileOwner() FileOwner {
-	// TODO(blakerouse): Make this return the current user and group on Windows.
+	u, err := user.Current()
+	if err != nil {
+		// should not fail; if it does then there is a big problem
+		panic(err)
+	}
 	return FileOwner{
-		UID: AdministratorSID,
-		GID: SystemSID,
+		UID: u.Uid,
+		GID: u.Gid,
 	}
 }
 

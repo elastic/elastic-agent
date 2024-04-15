@@ -106,7 +106,9 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	}
 
 	// For resolving manifest package name and version, just use the Major.Minor.Patch part of the version
-	majorMinorPatchVersion := fmt.Sprintf("%d.%d.%d", parsedManifestVersion.Major(), parsedManifestVersion.Minor(), parsedManifestVersion.Patch())
+	// for Staging builds, and Major.Minor.Patch-SNAPSHOT for snapshots.
+	// This eliminates the "+buildYYYYMMDDHHMM" suffix on Independent Agent Release builds
+	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
 
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
 	for component, pkgs := range componentSpec {
@@ -128,7 +130,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 						downloadTarget := filepath.Join(targetPath, pkgFilename)
 						if _, err := os.Stat(downloadTarget); err != nil {
 							errGrp.Go(func(ctx context.Context, url, target string) func() error {
-								return func() error { return downloadPackage(ctx, url, target) }
+								return func() error { return DownloadPackage(ctx, url, target) }
 							}(downloadsCtx, p, downloadTarget))
 						}
 					}
@@ -148,7 +150,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	return nil
 }
 
-func downloadPackage(ctx context.Context, downloadUrl string, target string) error {
+func DownloadPackage(ctx context.Context, downloadUrl string, target string) error {
 	parsedURL, errorUrl := url.Parse(downloadUrl)
 	if errorUrl != nil {
 		return errorInvalidManifestURL

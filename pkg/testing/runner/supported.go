@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	Rhel = "rhel"
 	// Ubuntu is a Linux distro.
 	Ubuntu = "ubuntu"
 )
@@ -69,6 +70,16 @@ var (
 			Version: "20.04",
 		},
 		Runner: DebianRunner{},
+	}
+	// RhelAMD64_8 - RedHat Enterprise Linux (amd64) 8
+	RhelAMD64_8 = SupportedOS{
+		OS: define.OS{
+			Type:    define.Linux,
+			Arch:    define.AMD64,
+			Distro:  Rhel,
+			Version: "8",
+		},
+		Runner: RhelRunner{},
 	}
 	// WindowsAMD64_2022 - Windows (amd64) Server 2022
 	WindowsAMD64_2022 = SupportedOS{
@@ -139,6 +150,7 @@ var supported = []SupportedOS{
 	UbuntuAMD64_2004,
 	UbuntuARM64_2204,
 	UbuntuARM64_2004,
+	RhelAMD64_8,
 	WindowsAMD64_2022,
 	WindowsAMD64_2022_Core,
 	WindowsAMD64_2019,

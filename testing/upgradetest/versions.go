@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -38,18 +37,34 @@ var (
 	Version_8_13_0_SNAPSHOT = version.NewParsedSemVer(8, 13, 0, "SNAPSHOT", "")
 	// Version_8_13_0 is the minimum version for proper unprivileged execution
 	Version_8_13_0 = version.NewParsedSemVer(8, 13, 0, "", "")
+
+	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
+	ErrNoSnapshot = errors.New("failed to find a snapshot on the version list")
+	// ErrNoPreviousMinor is returned when a requested previous minor is not on the version list.
+	ErrNoPreviousMinor = errors.New("failed to find a previous minor on the version list")
 )
+
+type VersionsFetcher interface {
+	FetchAgentVersions(ctx context.Context) (version.SortableParsedVersions, error)
+}
+
+type SnapshotFetcher interface {
+	FindLatestSnapshots(ctx context.Context, branches []string) (version.SortableParsedVersions, error)
+}
 
 // VersionRequirements is to set requirements for upgradable versions while fetching them.
 //
 // Keep in mind that requirements can overlap. For example 2 previous minors might already
 // cover 2 current majors, so the results would be combined.
+//
+// `SnapshotBranches` is a list of active release branches used for finding latest snapshots on them.
+// A branch might have no snapshot, in this case it's getting silently skipped.
 type VersionRequirements struct {
 	UpgradeToVersion string
 	CurrentMajors    int
 	PreviousMajors   int
 	PreviousMinors   int
-	RecentSnapshots  int
+	SnapshotBranches []string
 }
 
 const AgentVersionsFilename = ".agent-versions.json"
@@ -129,33 +144,29 @@ func GetUpgradableVersions() ([]*version.ParsedSemVer, error) {
 // Every version on the resulting list will meet the given requirements (by OR condition).
 // However, it's not guaranteed that the list contains the amount of versions per requirement.
 // For example, if only 2 previous minor versions exist but 5 requested, the list will have only 2.
-func FetchUpgradableVersions(ctx context.Context, aac *tools.ArtifactAPIClient, reqs VersionRequirements) ([]string, error) {
-	vList, err := aac.GetVersions(ctx)
+func FetchUpgradableVersions(ctx context.Context, vf VersionsFetcher, sf SnapshotFetcher, reqs VersionRequirements) ([]string, error) {
+	releaseVersions, err := vf.FetchAgentVersions(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving versions from Artifact API: %w", err)
+		return nil, fmt.Errorf("error retrieving release versions: %w", err)
 	}
-	if len(vList.Versions) == 0 {
-		return nil, errors.New("retrieved versions list from Artifact API is empty")
-	}
-
-	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
-	for _, v := range vList.Versions {
-		pv, err := version.ParseVersion(v)
-		if err != nil {
-			return nil, fmt.Errorf("invalid version %q retrieved from artifact API: %w", v, err)
-		}
-		sortedParsedVersions = append(sortedParsedVersions, pv)
+	if len(releaseVersions) == 0 {
+		return nil, errors.New("retrieved release versions list is empty")
 	}
 
-	if len(sortedParsedVersions) == 0 {
-		return nil, errors.New("parsed versions list is empty")
+	snapshotVersions, err := sf.FindLatestSnapshots(ctx, reqs.SnapshotBranches)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving snapshot versions: %w", err)
+	}
+	if len(snapshotVersions) == 0 {
+		return nil, errors.New("retrieved snapshot versions list is empty")
 	}
 
-	// normally the output of the versions returned by artifact API is already sorted in ascending order,
-	// we want to sort in descending orders, so we sort them
-	sort.Sort(sort.Reverse(sortedParsedVersions))
+	allVersions := append(releaseVersions, snapshotVersions...)
 
-	return findRequiredVersions(sortedParsedVersions, reqs)
+	// now sort the complete list
+	sort.Sort(sort.Reverse(allVersions))
+
+	return findRequiredVersions(allVersions, reqs)
 }
 
 // findRequiredVersions filters the version list according to the set requirements.
@@ -164,7 +175,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	if err != nil {
 		return nil, fmt.Errorf("upgradeToVersion %q is not a valid version string: %w", reqs.UpgradeToVersion, err)
 	}
-	upgradableVersions := make([]string, 0, reqs.CurrentMajors+reqs.PreviousMajors+reqs.PreviousMinors+reqs.RecentSnapshots)
+	upgradableVersions := make([]string, 0, reqs.CurrentMajors+reqs.PreviousMajors+reqs.PreviousMinors+len(reqs.SnapshotBranches))
 
 	currentMajor := parsedUpgradeToVersion.Major()
 	currentMinor := parsedUpgradeToVersion.Minor()
@@ -172,7 +183,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	currentMajorsToFind := reqs.CurrentMajors
 	previousMajorsToFind := reqs.PreviousMajors
 	previousMinorsToFind := reqs.PreviousMinors
-	recentSnapshotsToFind := reqs.RecentSnapshots
+	recentSnapshotsToFind := len(reqs.SnapshotBranches)
 
 	for _, version := range sortedParsedVersions {
 		switch {
@@ -216,24 +227,24 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 }
 
 // PreviousMinor returns the previous minor version available for upgrade.
-func PreviousMinor() (string, error) {
+func PreviousMinor() (*version.ParsedSemVer, error) {
 	versions, err := GetUpgradableVersions()
 	if err != nil {
-		return "", fmt.Errorf("failed to get upgradable versions: %w", err)
+		return nil, fmt.Errorf("failed to get upgradable versions: %w", err)
 	}
-
-	reqs := VersionRequirements{
-		UpgradeToVersion: define.Version(),
-		PreviousMinors:   1,
-	}
-	minors, err := findRequiredVersions(versions, reqs)
+	current, err := version.ParseVersion(define.Version())
 	if err != nil {
-		return "", fmt.Errorf("failed to find required versions: %w", err)
+		return nil, fmt.Errorf("failed to parse the current version %s: %w", define.Version(), err)
 	}
-	if len(minors) == 0 {
-		return "", fmt.Errorf("no previous minor on the list: %v", versions)
+	for _, v := range versions {
+		if v.Prerelease() != "" || v.BuildMetadata() != "" {
+			continue
+		}
+		if v.Major() == current.Major() && v.Minor() < current.Minor() {
+			return v, nil
+		}
 	}
-	return minors[0], nil
+	return nil, ErrNoPreviousMinor
 }
 
 // EnsureSnapshot ensures that the version string is a snapshot version.

@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -231,7 +232,9 @@ func TestDownloadWithRetries(t *testing.T) {
 	t.Run("download_timeout_expired", func(t *testing.T) {
 		testCaseSettings := settings
 		testCaseSettings.Timeout = 200 * time.Millisecond
-		testCaseSettings.RetrySleepInitDuration = 100 * time.Millisecond
+		testCaseSettings.RetrySleepInitDuration = 10 * time.Millisecond
+		// exponential backoff with 10ms init and 200ms timeout should fit at least 3 attempts.
+		minNmExpectedAttempts := 3
 
 		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
@@ -250,9 +253,10 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.Equal(t, "context deadline exceeded", err.Error())
 		require.Equal(t, "", path)
 
-		minNmExpectedAttempts := int(testCaseSettings.Timeout / testCaseSettings.RetrySleepInitDuration)
 		logs := obs.TakeAll()
-		require.GreaterOrEqual(t, len(logs), minNmExpectedAttempts*2)
+		logsJSON, err := json.MarshalIndent(logs, "", " ")
+		require.NoError(t, err)
+		require.GreaterOrEqualf(t, len(logs), minNmExpectedAttempts*2, "logs output: %s", logsJSON)
 		for i := 0; i < minNmExpectedAttempts; i++ {
 			require.Equal(t, fmt.Sprintf("download attempt %d", i+1), logs[(2*i)].Message)
 			require.Contains(t, logs[(2*i+1)].Message, "unable to download package: download failed; retrying")

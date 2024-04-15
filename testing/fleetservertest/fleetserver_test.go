@@ -274,6 +274,7 @@ func ExampleNewServer_enroll() {
 	//           "id": "agentID",
 	//           "log_level": "",
 	//           "snapshot": false,
+	//           "unprivileged": false,
 	//           "upgradeable": false,
 	//           "version": ""
 	//         }
@@ -339,7 +340,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 	fmt.Println(resp.Actions)
 
 	// 2nd subsequent call to nextAction() will return an error.
-	resp, _, err = cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	_, _, err = cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err == nil {
 		panic("expected an error, got none")
 	}
@@ -622,7 +623,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	fmt.Printf("[2nd ack] %#v\n", respAck)
 
 	// 2nd checkin: it will fail.
-	respCheckin, _, err = cmdCheckin.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	_, _, err = cmdCheckin.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err == nil {
 		panic("expected an error, got none")
 	}

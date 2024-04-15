@@ -16,7 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
-const agentSecretKey = "secret"
+const AgentSecretKey = "secret"
 
 // mutex for secret create calls
 var mxCreate sync.Mutex
@@ -29,7 +29,7 @@ type Secret struct {
 
 // CreateAgentSecret creates agent secret key if it doesn't exist
 func CreateAgentSecret(ctx context.Context, opts ...vault.OptionFunc) error {
-	return Create(ctx, agentSecretKey, opts...)
+	return Create(ctx, AgentSecretKey, opts...)
 }
 
 // Create creates secret and stores it in the vault under given key
@@ -69,13 +69,13 @@ func Create(ctx context.Context, key string, opts ...vault.OptionFunc) error {
 
 // GetAgentSecret read the agent secret from the vault
 func GetAgentSecret(ctx context.Context, opts ...vault.OptionFunc) (secret Secret, err error) {
-	return Get(ctx, agentSecretKey, opts...)
+	return Get(ctx, AgentSecretKey, opts...)
 }
 
 // SetAgentSecret saves the agent secret from the vault
 // This is needed for migration from 8.3.0-8.3.2 to higher versions
 func SetAgentSecret(ctx context.Context, secret Secret, opts ...vault.OptionFunc) error {
-	return Set(ctx, agentSecretKey, secret, opts...)
+	return Set(ctx, AgentSecretKey, secret, opts...)
 }
 
 // Get reads the secret key from the vault
