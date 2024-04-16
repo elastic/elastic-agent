@@ -35,8 +35,8 @@ RUN true && \
 {{- end }}
 {{- if contains .image_name "-cloud" }}
     mkdir -p /opt/filebeat /opt/metricbeat && \
-    cp -f {{ $beatHome }}/data/cloud_downloads/filebeat.sh /opt/filebeat && \
-    cp -f {{ $beatHome }}/data/cloud_downloads/metricbeat.sh /opt/metricbeat && \
+    cp -f {{ $beatHome }}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
+    cp -f {{ $beatHome }}/data/cloud_downloads/metricbeat.sh /opt/metricbeat/metricbeat && \
     tar xf {{ $beatHome }}/data/cloud_downloads/agentbeat-*.tar.gz -C /opt/agentbeat --strip-components=1 && \
     rm -rf {{ $beatHome }}/data/cloud_downloads && \
 {{- end }}
