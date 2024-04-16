@@ -60,6 +60,7 @@ steps:
       branch: agentbeat_triggered_build
 
   - label: download agentbeat artifacts
+    depends_on: trigger-agentbeat
     command: |
       buildkite-agent artifact download "x-pack/agentbeat/build/**/*"
       ls -lah x-pack/agentbeat/build/distributions/
