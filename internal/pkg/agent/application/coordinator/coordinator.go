@@ -279,11 +279,6 @@ type Coordinator struct {
 
 	// mx         sync.RWMutex
 	// protection protection.Config
-
-	// a sync channel that can be called by other components to check if the main coordinator
-	// loop in runLoopIteration() is active and listening.
-	// Should only be interacted with via CoordinatorActive() or runLoopIteration()
-	heartbeatChan chan struct{}
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -377,7 +372,6 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		logLevelCh:         make(chan logp.Level),
 		overrideStateChan:  make(chan *coordinatorOverrideState),
 		upgradeDetailsChan: make(chan *details.Details),
-		heartbeatChan:      make(chan struct{}),
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -416,22 +410,6 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 // Called by external goroutines.
 func (c *Coordinator) State() State {
 	return c.stateBroadcaster.Get()
-}
-
-// CoordinatorActive is a blocking method that waits for a channel response
-// from the coordinator loop. This can be used to as a basic health check,
-// as we'll timeout and return false if the coordinator run loop doesn't
-// respond to our channel.
-func (c *Coordinator) CoordinatorActive(timeout time.Duration) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	select {
-	case <-c.heartbeatChan:
-		return true
-	case <-ctx.Done():
-		return false
-	}
 }
 
 func (c *Coordinator) RegisterMonitoringServer(s configReloader) {
@@ -998,8 +976,6 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case upgradeDetails := <-c.upgradeDetailsChan:
 		c.setUpgradeDetails(upgradeDetails)
-
-	case c.heartbeatChan <- struct{}{}:
 
 	case componentState := <-c.managerChans.runtimeManagerUpdate:
 		// New component change reported by the runtime manager via
