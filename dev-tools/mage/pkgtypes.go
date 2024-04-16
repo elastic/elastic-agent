@@ -920,6 +920,9 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 
 		if slices.Contains(excludedFiles, info.Name()) {
 			// it's a file we have to exclude
+			if mg.Verbose() {
+				log.Printf("Skipping file %q...", path)
+			}
 			return nil
 		}
 
