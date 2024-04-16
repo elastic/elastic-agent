@@ -46,7 +46,6 @@ var fakeCoordCfg = mockCoordinator{
 func TestHTTPReloadEnableBehavior(t *testing.T) {
 	// see https://github.com/elastic/elastic-agent/issues/4582
 	// This tests how the reloader behaves depending on what config values are set.
-	logp.DevelopmentSetup()
 	type reloadCase struct {
 		name              string
 		initConfig        *config.MonitoringConfig
