@@ -31,6 +31,8 @@ type ServerReloader struct {
 
 	config          *monitoringCfg.MonitoringConfig
 	isServerRunning atomic.Bool
+	// is set based on the value of MonitoringConfig.HTTP.Enabled
+	httpIsRunning atomic.Bool
 }
 
 func NewServerReloader(newServerFn serverConstructor, log *logger.Logger, mcfg *monitoringCfg.MonitoringConfig) *ServerReloader {
@@ -60,6 +62,9 @@ func (sr *ServerReloader) Start() {
 	sr.srvController.Start()
 	sr.log.Debugf("Server started")
 	sr.isServerRunning.Store(true)
+	if sr.config.HTTP != nil && sr.config.HTTP.Enabled {
+		sr.httpIsRunning.Store(true)
+	}
 }
 
 func (sr *ServerReloader) Stop() error {
@@ -74,6 +79,8 @@ func (sr *ServerReloader) Stop() error {
 	if err := sr.srvController.Stop(); err != nil {
 		return err
 	}
+
+	sr.httpIsRunning.Store(false)
 
 	sr.log.Debugf("Server stopped")
 	sr.srvController = nil
@@ -95,6 +102,14 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 		return errors.New(err, "failed to unpack monitoring config during reload")
 	}
 
+	// see https://github.com/elastic/elastic-agent/issues/4582
+	// currently, fleet does not expect the monitoring to be reloadable.
+	// If it's currently running and the monitoring.http.enabled value hasn't been set,
+	// then pretend the HTTP monitoring is enabled
+	if sr.httpIsRunning.Load() && !newConfig.Settings.MonitoringConfig.HTTP.IsSet {
+		newConfig.Settings.MonitoringConfig.HTTP.Enabled = true
+	}
+
 	sr.config = newConfig.Settings.MonitoringConfig
 	var err error
 
@@ -104,7 +119,6 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 			if err != nil {
 				return fmt.Errorf("error stopping monitoring server: %w", err)
 			}
-			sr.isServerRunning.Store(false)
 		}
 
 		sr.Start()

@@ -67,6 +67,12 @@ agent.monitoring.enabled: false
 `,
 			false, false, false,
 		},
+		{
+			"remain-running-with-blank-config",
+			true, true, true,
+			``,
+			true, true, true,
+		},
 	}
 
 	for _, tc := range tcs {
