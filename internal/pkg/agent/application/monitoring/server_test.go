@@ -103,7 +103,8 @@ func TestHTTPReloadEnableBehavior(t *testing.T) {
 				waitOnReturnCode(t, http.StatusNotFound, "?failon=failed", serverReloader)
 			}
 
-			serverReloader.Reload(testCase.secondConfig)
+			err = serverReloader.Reload(testCase.secondConfig)
+			require.NoError(t, err)
 
 			if testCase.httpOnAfterReload {
 				waitOnReturnCode(t, http.StatusOK, "?failon=failed", serverReloader)
