@@ -77,6 +77,54 @@ func TestDownload(t *testing.T) {
 	}
 }
 
+func TestBadDownload(t *testing.T) {
+	targetDir, err := os.MkdirTemp(os.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log, _ := logger.New("", false)
+	timeout := 30 * time.Second
+	idleTimeout := 1 * time.Second
+	testCases := getTestCases()
+	server, _ := getElasticCoMalfunctioningServer(t)
+	elasticClient := getElasticCoClient(server)
+
+	config := &artifact.Config{
+		SourceURI:       source,
+		TargetDirectory: targetDir,
+		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+			Timeout:         timeout,
+			IdleConnTimeout: idleTimeout,
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	for _, testCase := range testCases {
+		testName := fmt.Sprintf("%s-binary-%s", testCase.system, testCase.arch)
+		t.Run(testName, func(t *testing.T) {
+			config.OperatingSystem = testCase.system
+			config.Architecture = testCase.arch
+
+			upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
+			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
+			artifactPath, err := testClient.Download(ctx, beatSpec, version)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = os.Stat(artifactPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			os.Remove(artifactPath)
+		})
+	}
+}
+
 func TestDownloadBodyError(t *testing.T) {
 	// This tests the scenario where the download encounters a network error
 	// part way through the download, while copying the response body.

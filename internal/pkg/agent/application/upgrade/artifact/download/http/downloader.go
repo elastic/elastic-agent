@@ -190,6 +190,8 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	}
 	defer destinationFile.Close()
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	resp, err := e.client.Do(req.WithContext(ctx))
 	if err != nil {
 		// return path, file already exists and needs to be cleaned up
@@ -213,7 +215,17 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
 	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver)
 	dp.Report(ctx)
-	_, err = io.Copy(destinationFile, io.TeeReader(resp.Body, dp))
+
+	var bodyReader io.Reader
+	if e.config.IdleConnTimeout != 0 {
+		bodyReader = NewNonIdleReader(resp.Body, e.config.HTTPTransportSettings.IdleConnTimeout, func() {
+			cancel()
+			resp.Body.Close()
+		})
+	} else {
+		bodyReader = resp.Body
+	}
+	_, err = io.Copy(destinationFile, io.TeeReader(bodyReader, dp))
 	if err != nil {
 		dp.ReportFailed(err)
 		// return path, file already exists and needs to be cleaned up
@@ -222,4 +234,29 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	dp.ReportComplete()
 
 	return fullPath, nil
+}
+
+type nonIdleReader struct {
+	reader  io.Reader
+	timeout time.Duration
+	stop    func()
+}
+
+func (r *nonIdleReader) Read(p []byte) (n int, err error) {
+	timer := time.NewTimer(r.timeout)
+	go func() {
+		<-timer.C
+		r.stop()
+	}()
+	n, err = r.reader.Read(p)
+	timer.Stop()
+	return n, err
+}
+
+func NewNonIdleReader(r io.Reader, idleTimeout time.Duration, stop func()) io.Reader {
+	return &nonIdleReader{
+		reader:  r,
+		timeout: idleTimeout,
+		stop:    stop,
+	}
 }

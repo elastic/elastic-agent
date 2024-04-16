@@ -14,7 +14,9 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -55,7 +57,7 @@ func getTestCases() []testCase {
 	}
 }
 
-func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
+func getHandler(t *testing.T) (handler http.HandlerFunc, pub []byte) {
 	correctValues := map[string]struct{}{
 		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "i386.deb"):             {},
 		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "amd64.deb"):            {},
@@ -73,7 +75,7 @@ func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
 	hash := sha512.Sum512(content)
 	pub, sig := pgptest.Sing(t, bytes.NewReader(content))
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		packageName := r.URL.Path[len(sourcePattern):]
 
 		ext := filepath.Ext(packageName)
@@ -106,7 +108,52 @@ func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
 		_, err := w.Write(resp)
 		assert.NoErrorf(t, err, "mock elastic.co server: failes writing response")
 	})
+	return handler, pub
+}
 
+// getElasticCoMalfunctioningServer returns a server that malfunctions in various ways.
+// The connection gets stuck, server returns 5xx errors, etc.
+// It is used to test the resilience of the artifact downloader.
+func getElasticCoMalfunctioningServer(t *testing.T) (*httptest.Server, []byte) {
+	handler, pub := getHandler(t)
+	counter := int32(0)
+	badHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cur := atomic.AddInt32(&counter, 1)
+		t.Logf("incoming request to malfunctioning server: counter %d, path %s", cur, r.URL.String())
+		if cur > 2 {
+			t.Log("handle as good response")
+			handler(w, r)
+			return
+		}
+		switch cur {
+		// stuck download
+		case 1:
+			t.Log("handle as a stuck download")
+			timer := time.NewTimer(5 * time.Minute)
+			t.Cleanup(func() {
+				timer.Stop()
+			})
+			w.Write([]byte("bad chunk"))
+			// Without this code, none of the idle timeout solutions work.
+			// Basically, if the server does not flush its buffer
+			// the client never gets to act on the connection (never gets unblocked)
+			// if f, ok := w.(http.Flusher); ok {
+			// 	f.Flush()
+			// }
+			<-timer.C
+			return
+		// 5xx
+		case 2:
+			t.Log("handle as a 502")
+			w.WriteHeader(http.StatusGatewayTimeout)
+			return
+		}
+	})
+	return httptest.NewServer(badHandler), pub
+}
+
+func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
+	handler, pub := getHandler(t)
 	return httptest.NewServer(handler), pub
 }
 

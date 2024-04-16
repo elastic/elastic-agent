@@ -193,6 +193,10 @@ func DefaultConfig() *Config {
 	// The HTTP download will log progress in the case that it is taking a while to download.
 	transport.Timeout = 120 * time.Minute
 
+	// Due to occasional issues with the CDN, a download might get stuck without any incoming data from the server.
+	// This parameters is to mitigate this issue.
+	transport.IdleConnTimeout = time.Minute
+
 	return &Config{
 		SourceURI:              DefaultSourceURI,
 		TargetDirectory:        paths.Downloads(),
