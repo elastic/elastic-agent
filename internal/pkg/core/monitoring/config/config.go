@@ -39,7 +39,7 @@ type MonitoringConfig struct {
 type MonitoringHTTPConfig struct {
 	Enabled bool          `yaml:"enabled" config:"enabled"`
 	Host    string        `yaml:"host" config:"host"`
-	Port    int           `yaml:"port" config:"port" validate:"min=0,max=65535,nonzero"`
+	Port    int           `yaml:"port" config:"port" validate:"min=0,max=65535"`
 	Buffer  *BufferConfig `yaml:"buffer" config:"buffer"`
 }
 
@@ -49,7 +49,7 @@ func (c *MonitoringHTTPConfig) Unpack(cfg *c.C) error {
 	tmp := struct {
 		Enabled bool          `yaml:"enabled" config:"enabled"`
 		Host    string        `yaml:"host" config:"host"`
-		Port    int           `yaml:"port" config:"port" validate:"min=0,max=65535,nonzero"`
+		Port    int           `yaml:"port" config:"port" validate:"min=0,max=65535"`
 		Buffer  *BufferConfig `yaml:"buffer" config:"buffer"`
 	}{
 		Enabled: c.Enabled,

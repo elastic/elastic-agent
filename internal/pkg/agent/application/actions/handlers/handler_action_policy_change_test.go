@@ -91,7 +91,7 @@ func TestPolicyAcked(t *testing.T) {
 	})
 }
 
-func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
+func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T) {
 	mockProxy := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, err := w.Write(nil)
@@ -158,7 +158,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"fleet.proxy_url": "http://some.proxy",
 				})
 
-			err := h.handleFleetServerHosts(context.Background(), cfg)
+			err := h.handlePolicyChange(context.Background(), cfg)
 			require.Error(t, err) // it needs to fail to rollback
 
 			assert.Equal(t, 0, setterCalledCount)
@@ -214,7 +214,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"fleet.proxy_url": "http://some.proxy",
 				})
 
-			err := h.handleFleetServerHosts(context.Background(), cfg)
+			err := h.handlePolicyChange(context.Background(), cfg)
 			require.Error(t, err) // it needs to fail to rollback
 
 			assert.Equal(t, 0, setterCalledCount)
@@ -260,7 +260,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 			map[string]interface{}{
 				"fleet.host": fleetServer.URL})
 
-		err := h.handleFleetServerHosts(context.Background(), cfg)
+		err := h.handlePolicyChange(context.Background(), cfg)
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, setterCalledCount)
@@ -301,7 +301,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 			map[string]interface{}{
 				"fleet.hosts": wantHosts})
 
-		err := h.handleFleetServerHosts(context.Background(), cfg)
+		err := h.handlePolicyChange(context.Background(), cfg)
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, setterCalledCount)
@@ -347,7 +347,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 				"fleet.proxy_url": mockProxy.URL,
 				"fleet.host":      fleetServer.URL})
 
-		err := h.handleFleetServerHosts(context.Background(), cfg)
+		err := h.handlePolicyChange(context.Background(), cfg)
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, setterCalledCount)
@@ -400,7 +400,7 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 					"fleet.proxy_url": "",
 					"fleet.host":      fleetServer.URL})
 
-			err = h.handleFleetServerHosts(context.Background(), cfg)
+			err = h.handlePolicyChange(context.Background(), cfg)
 			require.NoError(t, err)
 
 			assert.Equal(t, 1, setterCalledCount)
