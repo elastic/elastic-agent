@@ -103,7 +103,7 @@ metrics: true`,
 			require.NoError(t, err, "failed to unpack config")
 
 			assert.Equal(t, testCase.expectedEnabled, cfg.HTTP.Enabled, "enabled incorrect")
-			assert.Equal(t, testCase.expectedIsSet, cfg.HTTP.IsSet, "IsSet incorrect")
+			assert.Equal(t, testCase.expectedIsSet, cfg.HTTP.EnabledIsSet, "IsSet incorrect")
 		})
 	}
 }

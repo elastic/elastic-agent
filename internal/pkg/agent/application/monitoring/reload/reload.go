@@ -106,7 +106,7 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 	// currently, fleet does not expect the monitoring to be reloadable.
 	// If it's currently running and the monitoring.http.enabled value hasn't been set,
 	// then pretend the HTTP monitoring is enabled
-	if sr.httpIsRunning.Load() && !newConfig.Settings.MonitoringConfig.HTTP.IsSet {
+	if sr.httpIsRunning.Load() && !newConfig.Settings.MonitoringConfig.HTTP.EnabledIsSet {
 		newConfig.Settings.MonitoringConfig.HTTP.Enabled = true
 	}
 

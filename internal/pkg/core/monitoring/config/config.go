@@ -41,8 +41,9 @@ type MonitoringHTTPConfig struct {
 	Host    string        `yaml:"host" config:"host"`
 	Port    int           `yaml:"port" config:"port" validate:"min=0,max=65535"`
 	Buffer  *BufferConfig `yaml:"buffer" config:"buffer"`
-	// IsSet will be set to true if `enabled` was manually set in the raw YAML config
-	IsSet bool `yaml:"-" config:"-"`
+	// EnabledIsSet is set during the Unpack() operation, and will be set to true if `Enabled` has been manually set by the incoming yaml
+	// This is done so we can distinguish between a default value supplied by the code, and a user-supplied value
+	EnabledIsSet bool `yaml:"-" config:"-"`
 }
 
 // Unpack reads a config object into the settings.
@@ -78,10 +79,10 @@ func (c *MonitoringHTTPConfig) Unpack(cfg *c.C) error {
 	// This is needed in order to prevent a larger set of breaking changes where fleet doesn't expect the HTTP monitor to be live-reloadable
 	// see https://github.com/elastic/elastic-agent/issues/4582
 	if tmp.Enabled == nil {
-		set.IsSet = false
+		set.EnabledIsSet = false
 		set.Enabled = c.Enabled
 	} else {
-		set.IsSet = true
+		set.EnabledIsSet = true
 		set.Enabled = *tmp.Enabled
 	}
 
