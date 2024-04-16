@@ -74,7 +74,7 @@ func (c *MonitoringHTTPConfig) Unpack(cfg *c.C) error {
 		Buffer: tmp.Buffer,
 	}
 
-	// this logic is here to help us distingush between `http.enabled` being manually set after unpacking,
+	// this logic is here to help us distinguish between `http.enabled` being manually set after unpacking,
 	// and whatever a user-specified default may be.
 	// This is needed in order to prevent a larger set of breaking changes where fleet doesn't expect the HTTP monitor to be live-reloadable
 	// see https://github.com/elastic/elastic-agent/issues/4582
