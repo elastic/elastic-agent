@@ -500,7 +500,7 @@ func TestGenerateHintsMappingWithInfoandTypo(t *testing.T) {
 			},
 			"info": mapstr.M{
 				"enabled": true,
-				"period":  "info",
+				"period":  "5m",
 			},
 		},
 	}
