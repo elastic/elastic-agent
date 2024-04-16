@@ -36,6 +36,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	currentagtversion "github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -278,7 +279,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		versionedHome: unpackRes.VersionedHome,
 	}
 
-	previousParsedVersion := getParsedVersionWithFallback(u.log, release.VersionWithSnapshot(), agtversion.NewParsedSemVer(8, 13, 0, "", ""))
+	previousParsedVersion := currentagtversion.GetParsedAgentPackageVersion()
 	previous := agentInstall{
 		parsedVersion: previousParsedVersion,
 		version:       release.VersionWithSnapshot(),
@@ -322,15 +323,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	return cb, nil
-}
-
-func getParsedVersionWithFallback(log *logger.Logger, currentVersion string, fallbackVersion *agtversion.ParsedSemVer) *agtversion.ParsedSemVer {
-	previousParsedVersion, err := agtversion.ParseVersion(currentVersion)
-	if err != nil {
-		previousParsedVersion = fallbackVersion
-		log.Warnw(fmt.Sprintf("parsing of current version failed, watcher selection will fall back to comparing to %q", previousParsedVersion), "error.message", err)
-	}
-	return previousParsedVersion
 }
 
 func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
