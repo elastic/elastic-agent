@@ -1166,11 +1166,11 @@ SOFTWARE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.9.1
+Version: v0.9.4
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.9.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.9.4/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -26992,11 +26992,11 @@ Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.48
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/procfs
-Version: v0.12.0
+Version: v0.13.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/procfs@v0.12.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/procfs@v0.13.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -39678,11 +39678,11 @@ limitations under the License.
 
 --------------------------------------------------------------------------------
 Dependency : howett.net/plist
-Version: v1.0.0
+Version: v1.0.1
 Licence type (autodetected): BSD-2-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/howett.net/plist@v1.0.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/howett.net/plist@v1.0.1/LICENSE:
 
 Copyright (c) 2013, Dustin L. Howett. All rights reserved.
 
