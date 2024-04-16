@@ -17,7 +17,9 @@ import (
 	"go.elastic.co/apm/module/apmgorilla"
 
 	"github.com/elastic/elastic-agent-libs/api"
+	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/monitoring"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -30,7 +32,8 @@ func NewServer(
 	endpointConfig api.Config,
 	ns func(string) *monitoring.Namespace,
 	tracer *apm.Tracer,
-	coord CoordinatorState,
+	coord *coordinator.Coordinator,
+	enableProcessStats bool,
 	operatingSystem string,
 	mcfg *monitoringCfg.MonitoringConfig,
 ) (*reload.ServerReloader, error) {
@@ -39,54 +42,47 @@ func NewServer(
 		log.Warnf("failed to create monitoring drop: %v", err)
 	}
 
-	return exposeMetricsEndpoint(log, ns, tracer, coord, operatingSystem, mcfg)
+	if strings.TrimSpace(endpointConfig.Host) == "" {
+		endpointConfig.Host = monitoringCfg.DefaultHost
+	}
+
+	cfg, err := config.NewConfigFrom(endpointConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return exposeMetricsEndpoint(log, cfg, ns, tracer, coord, enableProcessStats, operatingSystem, mcfg)
 }
 
 func exposeMetricsEndpoint(
 	log *logger.Logger,
+	config *config.C,
 	ns func(string) *monitoring.Namespace,
 	tracer *apm.Tracer,
-	coord CoordinatorState,
+	coord *coordinator.Coordinator,
+	enableProcessStats bool,
 	operatingSystem string,
 	mcfg *monitoringCfg.MonitoringConfig,
 ) (*reload.ServerReloader, error) {
+	r := mux.NewRouter()
+	if tracer != nil {
+		r.Use(apmgorilla.Middleware(apmgorilla.WithTracer(tracer)))
+	}
+	statsHandler := statsHandler(ns("stats"))
+	r.Handle("/stats", createHandler(statsHandler))
 
-	newServerFn := func(cfg *monitoringCfg.MonitoringConfig) (reload.ServerController, error) {
-		r := mux.NewRouter()
-		if tracer != nil {
-			r.Use(apmgorilla.Middleware(apmgorilla.WithTracer(tracer)))
-		}
+	if enableProcessStats {
+		r.Handle("/processes", createHandler(processesHandler(coord)))
+		r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+		r.Handle("/processes/{componentID}/", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+		r.Handle("/processes/{componentID}/{metricsPath}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+	}
 
-		// This will probably only be nil in tests.
-		statNs := &monitoring.Namespace{}
-		if ns != nil {
-			statNs = ns("stats")
-		}
+	mux := http.NewServeMux()
+	mux.Handle("/", r)
 
-		statsHandler := statsHandler(statNs)
-		r.Handle("/stats", createHandler(statsHandler))
-
-		if isProcessStatsEnabled(cfg) {
-			r.Handle("/processes", createHandler(processesHandler(coord)))
-			r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
-			r.Handle("/processes/{componentID}/", createHandler(processHandler(coord, statsHandler, operatingSystem)))
-			r.Handle("/processes/{componentID}/{metricsPath}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
-
-			r.Handle("/liveness", createHandler(livenessHandler(coord)))
-		}
-
-		mux := http.NewServeMux()
-		mux.Handle("/", r)
-
-		if strings.TrimSpace(cfg.HTTP.Host) == "" {
-			cfg.HTTP.Host = monitoringCfg.DefaultHost
-		}
-
-		srvCfg := api.DefaultConfig()
-		srvCfg.Enabled = cfg.Enabled
-		srvCfg.Host = AgentMonitoringEndpoint(operatingSystem, cfg)
-		srvCfg.Port = cfg.HTTP.Port
-		apiServer, err := api.NewFromConfig(log, mux, srvCfg)
+	newServerFn := func() (reload.ServerController, error) {
+		apiServer, err := api.New(log, mux, config)
 		if err != nil {
 			return nil, errors.New(err, "failed to create api server")
 		}
@@ -124,8 +120,4 @@ func createAgentMonitoringDrop(drop string) error {
 func isHttpUrl(s string) bool {
 	u, err := url.Parse(strings.TrimSpace(s))
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
-}
-
-func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
-	return cfg != nil && cfg.HTTP.Enabled
 }
