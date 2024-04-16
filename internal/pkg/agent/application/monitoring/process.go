@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -43,7 +44,7 @@ var redirectableProcesses = []string{
 	profilingServicePrefix,
 }
 
-func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
+func processHandler(coord *coordinator.Coordinator, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
@@ -81,9 +82,8 @@ func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWrite
 
 		state := coord.State()
 
-		for iter, c := range state.Components {
-			// access the components array manually to avoid a memory aliasing error. This is fixed in go 1.22
-			if matchesCloudProcessID(&state.Components[iter].Component, componentID) {
+		for _, c := range state.Components {
+			if matchesCloudProcessID(&c.Component, componentID) {
 				data := struct {
 					State   string `json:"state"`
 					Message string `json:"message"`
