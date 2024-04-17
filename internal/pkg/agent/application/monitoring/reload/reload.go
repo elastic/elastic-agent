@@ -102,7 +102,8 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 	// currently, fleet does not expect the monitoring to be reloadable.
 	// If it was set in the original init config (which includes overrides), and it wasn't explicitly disabled
 	// then pretend the HTTP monitoring is enabled
-	if sr.originalHTTPState.Enabled && !newConfig.Settings.MonitoringConfig.HTTP.EnabledIsSet {
+	if sr.originalHTTPState != nil && sr.originalHTTPState.Enabled &&
+		newConfig.Settings.MonitoringConfig != nil && !newConfig.Settings.MonitoringConfig.HTTP.EnabledIsSet {
 		sr.log.Infof("http monitoring server is enabled in hard-coded config, but HTTP config is unset. Leaving enabled.")
 		newConfig.Settings.MonitoringConfig.HTTP = sr.originalHTTPState
 	}
