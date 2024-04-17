@@ -136,14 +136,14 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		"glob pattern \"%s\": found %d paths to agentbeat, can only have 1",
 		glob, len(compPaths))
 
-	cmdVer := exec.Command(compPaths[0], "version")
+	cmdVer := exec.Command(compPaths[0], "filebeat", "version")
 	output, err = cmdVer.CombinedOutput()
-	require.NoError(t, err, "failed to get agentbeat version")
+	require.NoError(t, err, "failed to get filebeat version")
 	outStr := string(output)
 
 	// version output example:
-	// agentbeat version 8.14.0 (amd64), libbeat 8.14.0 [0baedd2518bd7e5b78e2280684580cbfdcab5ae8 built 2024-01-23 06:57:37 +0000 UTC
-	t.Log("parsing commit hash from agentbeat version: ", outStr)
+	// filebeat version 8.14.0 (arm64), libbeat 8.14.0 [ab27a657e4f15976c181cf44c529bba6159f2c64 built 2024-04-17 18:13:16 +0000 UTC]
+	t.Log("parsing commit hash from filebeat version: ", outStr)
 	splits := strings.Split(outStr, "[")
 	require.Lenf(t, splits, 2,
 		"expected beats output version to be split into 2, it was split into %q",
