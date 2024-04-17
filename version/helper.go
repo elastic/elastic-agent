@@ -66,7 +66,7 @@ func InitVersionInformation() error {
 	parsedPackageVersion, err = version.ParseVersion(fileVersion)
 	if err != nil {
 		fallbackToDefaultVersion()
-		return fmt.Errorf("parsing version %q: %w", string(fileVersion), err)
+		return fmt.Errorf("parsing version %q: %w", fileVersion, err)
 	}
 	return nil
 }
