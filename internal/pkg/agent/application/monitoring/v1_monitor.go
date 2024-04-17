@@ -439,7 +439,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 			continue
 		}
 
-		fixedBinaryName := strings.ReplaceAll(strings.ReplaceAll(comp.InputSpec.BinaryName, "-", "_"), "/", "_") // conform with index naming policy
+		fixedBinaryName := strings.ReplaceAll(strings.ReplaceAll(comp.BinaryName(), "-", "_"), "/", "_") // conform with index naming policy
 		dataset := fmt.Sprintf("elastic_agent.%s", fixedBinaryName)
 		streams = append(streams, map[string]interface{}{
 			idKey:  fmt.Sprintf("%s-%s", monitoringFilesUnitsID, comp.ID),
@@ -475,7 +475,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 						"fields": map[string]interface{}{
 							"id":      comp.ID,
 							"type":    comp.InputSpec.InputType,
-							"binary":  comp.InputSpec.BinaryName,
+							"binary":  comp.BinaryName(),
 							"dataset": dataset,
 						},
 					},

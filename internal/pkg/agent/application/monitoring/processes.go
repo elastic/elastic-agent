@@ -53,7 +53,7 @@ func processesHandler(coord *coordinator.Coordinator) func(http.ResponseWriter, 
 				procs = append(procs, process{
 					ID:     expectedCloudProcessID(&c.Component),
 					PID:    c.LegacyPID,
-					Binary: c.Component.InputSpec.BinaryName,
+					Binary: c.Component.BinaryName(),
 					Source: sourceFromComponentID(c.Component.ID),
 				})
 			}
