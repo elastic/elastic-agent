@@ -15,11 +15,11 @@ const ManifestKind = "PackageManifest"
 const ManifestFileName = "manifest.yaml"
 
 type PackageDesc struct {
-	Version       string              `yaml:"version,omitempty" json:"version,omitempty"`
-	Snapshot      bool                `yaml:"snapshot,omitempty" json:"snapshot,omitempty"`
-	Hash          string              `yaml:"hash,omitempty" json:"hash,omitempty"`
-	VersionedHome string              `yaml:"versioned-home,omitempty" json:"versionedHome,omitempty"`
-	PathMappings  []map[string]string `yaml:"path-mappings,omitempty" json:"pathMappings,omitempty"`
+	Version       string              `yaml:"version" json:"version"`
+	Snapshot      bool                `yaml:"snapshot" json:"snapshot"`
+	Hash          string              `yaml:"hash" json:"hash"`
+	VersionedHome string              `yaml:"versioned-home" json:"versionedHome"`
+	PathMappings  []map[string]string `yaml:"path-mappings" json:"pathMappings"`
 }
 
 type PackageManifest struct {
