@@ -67,6 +67,7 @@ func exposeMetricsEndpoint(
 		r.Handle("/stats", createHandler(statsHandler))
 
 		if isProcessStatsEnabled(cfg) {
+			log.Infof("process monitoring is enabled, creating monitoring endpoints")
 			r.Handle("/processes", createHandler(processesHandler(coord)))
 			r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
 			r.Handle("/processes/{componentID}/", createHandler(processHandler(coord, statsHandler, operatingSystem)))
@@ -86,6 +87,7 @@ func exposeMetricsEndpoint(
 		srvCfg.Enabled = cfg.Enabled
 		srvCfg.Host = AgentMonitoringEndpoint(operatingSystem, cfg)
 		srvCfg.Port = cfg.HTTP.Port
+		log.Infof("creating monitoring API with cfg %#v", srvCfg)
 		apiServer, err := api.NewFromConfig(log, mux, srvCfg)
 		if err != nil {
 			return nil, errors.New(err, "failed to create api server")

@@ -31,17 +31,17 @@ type ServerReloader struct {
 
 	config          *monitoringCfg.MonitoringConfig
 	isServerRunning atomic.Bool
-	// is set based on the value of MonitoringConfig.HTTP.Enabled
-	httpIsRunning atomic.Bool
+	// the state of HTTP.Enabled when we call NewServerReloader
+	originalHTTPState bool
 }
 
 func NewServerReloader(newServerFn serverConstructor, log *logger.Logger, mcfg *monitoringCfg.MonitoringConfig) *ServerReloader {
 	sr := &ServerReloader{
-		log:         log,
-		config:      mcfg,
-		newServerFn: newServerFn,
+		log:               log,
+		config:            mcfg,
+		newServerFn:       newServerFn,
+		originalHTTPState: mcfg.HTTP.Enabled,
 	}
-
 	return sr
 }
 
@@ -51,7 +51,7 @@ func (sr *ServerReloader) Start() {
 		return
 	}
 
-	sr.log.Info("Starting server")
+	sr.log.Infof("Starting monitoring server with cfg %#v", sr.config)
 	var err error
 	sr.srvController, err = sr.newServerFn(sr.config)
 	if err != nil {
@@ -60,11 +60,9 @@ func (sr *ServerReloader) Start() {
 	}
 
 	sr.srvController.Start()
-	sr.log.Debugf("Server started")
+	sr.log.Debugf("Monitoring server started")
 	sr.isServerRunning.Store(true)
-	if sr.config.HTTP != nil && sr.config.HTTP.Enabled {
-		sr.httpIsRunning.Store(true)
-	}
+
 }
 
 func (sr *ServerReloader) Stop() error {
@@ -73,16 +71,14 @@ func (sr *ServerReloader) Stop() error {
 		sr.isServerRunning.Store(false)
 		return nil
 	}
-	sr.log.Info("Stopping server")
+	sr.log.Info("Stopping monitoring server")
 
 	sr.isServerRunning.Store(false)
 	if err := sr.srvController.Stop(); err != nil {
 		return err
 	}
 
-	sr.httpIsRunning.Store(false)
-
-	sr.log.Debugf("Server stopped")
+	sr.log.Debugf("Monitoring server stopped")
 	sr.srvController = nil
 	return nil
 }
@@ -104,9 +100,10 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 
 	// see https://github.com/elastic/elastic-agent/issues/4582
 	// currently, fleet does not expect the monitoring to be reloadable.
-	// If it's currently running and the monitoring.http.enabled value hasn't been set,
+	// If it was set in the original init config (which includes overrides), and it wasn't explicitly disabled
 	// then pretend the HTTP monitoring is enabled
-	if sr.httpIsRunning.Load() && !newConfig.Settings.MonitoringConfig.HTTP.EnabledIsSet {
+	if sr.originalHTTPState && !newConfig.Settings.MonitoringConfig.HTTP.EnabledIsSet {
+		sr.log.Infof("http monitoring server is enabled in hard-coded config, but HTTP config is unset. Leaving enabled.")
 		newConfig.Settings.MonitoringConfig.HTTP.Enabled = true
 	}
 
