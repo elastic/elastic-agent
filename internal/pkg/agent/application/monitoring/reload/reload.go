@@ -32,7 +32,7 @@ type ServerReloader struct {
 	config          *monitoringCfg.MonitoringConfig
 	isServerRunning atomic.Bool
 	// the state of HTTP.Enabled when we call NewServerReloader
-	originalHTTPState bool
+	originalHTTPState *monitoringCfg.MonitoringHTTPConfig
 }
 
 func NewServerReloader(newServerFn serverConstructor, log *logger.Logger, mcfg *monitoringCfg.MonitoringConfig) *ServerReloader {
@@ -40,7 +40,7 @@ func NewServerReloader(newServerFn serverConstructor, log *logger.Logger, mcfg *
 		log:               log,
 		config:            mcfg,
 		newServerFn:       newServerFn,
-		originalHTTPState: mcfg.HTTP.Enabled,
+		originalHTTPState: mcfg.HTTP,
 	}
 	return sr
 }
@@ -102,9 +102,9 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 	// currently, fleet does not expect the monitoring to be reloadable.
 	// If it was set in the original init config (which includes overrides), and it wasn't explicitly disabled
 	// then pretend the HTTP monitoring is enabled
-	if sr.originalHTTPState && !newConfig.Settings.MonitoringConfig.HTTP.EnabledIsSet {
+	if sr.originalHTTPState.Enabled && !newConfig.Settings.MonitoringConfig.HTTP.EnabledIsSet {
 		sr.log.Infof("http monitoring server is enabled in hard-coded config, but HTTP config is unset. Leaving enabled.")
-		newConfig.Settings.MonitoringConfig.HTTP.Enabled = true
+		newConfig.Settings.MonitoringConfig.HTTP = sr.originalHTTPState
 	}
 
 	sr.config = newConfig.Settings.MonitoringConfig
