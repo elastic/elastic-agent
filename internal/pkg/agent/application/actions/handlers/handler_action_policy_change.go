@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"sort"
-	"strings"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -31,7 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -278,16 +276,17 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 
 func validateLoggingConfig(cfg *config.Config) (*logger.Config, error) {
 
-	loggingConfig, err := lookupLoggingConfig(cfg)
+	parsedConfig, err := configuration.NewPartialFromConfigNoDefaults(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("lookin up logging config: %w", err)
+		return nil, fmt.Errorf("parsing fleet config: %w", err)
 	}
 
-	if loggingConfig == nil {
+	if parsedConfig == nil || parsedConfig.Settings == nil || parsedConfig.Settings.LoggingConfig == nil {
 		// no logging config, nothing to do
 		return nil, nil
 	}
 
+	loggingConfig := parsedConfig.Settings.LoggingConfig
 	logLevel := loggingConfig.Level
 	if logLevel < logp.DebugLevel || logLevel > logp.CriticalLevel {
 		return nil, fmt.Errorf("unrecognized log level %d", logLevel)
@@ -295,46 +294,6 @@ func validateLoggingConfig(cfg *config.Config) (*logger.Config, error) {
 
 	return loggingConfig, nil
 
-}
-
-func lookupLoggingConfig(cfg *config.Config) (*logger.Config, error) {
-	mapCfg, err := cfg.ToMapStr()
-	if err != nil {
-		return nil, fmt.Errorf("transforming config in a map: %w", err)
-	}
-
-	const agentLoggingConfigKey = "agent.logging"
-	const configKeyTokenSeparator = "."
-
-	var loggingConfigBlob any
-	loggingConfigBlob, err = utils.GetNestedMap(mapCfg, strings.Split(agentLoggingConfigKey, configKeyTokenSeparator)...)
-	if errors.Is(err, utils.ErrKeyNotFound) {
-		// No logging config found, nothing to do
-		return nil, nil
-	}
-	if err != nil {
-		// we had an error looking up the logging nested map
-		return nil, fmt.Errorf("looking up %q in config received from Fleet: %w", agentLoggingConfigKey, err)
-	}
-
-	loggingConfigMap, ok := loggingConfigBlob.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("entry with key %q is not a map", agentLoggingConfigKey)
-	}
-
-	// we found the logging config map, unpack and return
-	loggingConfig, err := config.NewConfigFrom(loggingConfigMap)
-	if err != nil {
-		return nil, fmt.Errorf("creating config from map: %w", err)
-	}
-
-	var loggingConfigStruct *logger.Config
-	err = loggingConfig.Unpack(loggingConfigStruct, config.DefaultOptions...)
-	if err != nil {
-		return nil, fmt.Errorf("unpacking from config: %w", err)
-	}
-
-	return loggingConfigStruct, nil
 }
 
 func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Config) error {
@@ -367,7 +326,7 @@ func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingCon
 		// there is a specific log level set at agent level, nothing to do
 		return nil
 	}
-
+	h.log.Errorf("Applying log level %v from policy", loggingConfig.Level)
 	return h.logLevelSetter.SetLogLevel(ctx, loggingConfig.Level)
 }
 

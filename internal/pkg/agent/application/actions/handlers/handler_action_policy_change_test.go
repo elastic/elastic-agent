@@ -484,7 +484,9 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 			},
 			args: args{
 				c: config.MustNewConfigFrom(map[string]interface{}{
-					"agent.logging.level": "debug",
+					"agent.logging": map[string]interface{}{
+						"level": "debug",
+					},
 				}),
 			},
 			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
@@ -568,8 +570,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 				}),
 			},
 			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
-				// we should not set a log level if we have the override from agent info
-				//setter.EXPECT().SetLogLevel(mock.Anything, logp.CriticalLevel).Return(nil).Times(0)
+				setter.EXPECT().SetLogLevel(mock.Anything, logp.CriticalLevel).Return(nil).Times(0)
 			},
 			wantErr: assert.NoError,
 		},
