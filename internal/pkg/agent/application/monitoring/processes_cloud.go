@@ -23,7 +23,7 @@ func expectedCloudProcessID(c *component.Component) string {
 	// Ensure that this is the ID we use, in agent v2 the ID is usually "apm-default".
 	// Otherwise apm-server won't be routable/accessible in cloud.
 	// https://github.com/elastic/elastic-agent/issues/1731#issuecomment-1325862913
-	if strings.Contains(c.InputSpec.BinaryName, "apm-server") {
+	if strings.Contains(c.BinaryName(), "apm-server") {
 		// cloud understands `apm-server-default` and does not understand `apm-default`
 		return strings.Replace(c.ID, "apm-", "apm-server-", 1)
 	}
@@ -36,7 +36,7 @@ func matchesCloudProcessID(c *component.Component, id string) bool {
 	// to find the APM server address. Rather than change all of the monitoring in cloud,
 	// it is easier to just make sure the existing ID maps to the APM server component.
 	if strings.Contains(id, "apm-server") {
-		if strings.Contains(c.InputSpec.BinaryName, "apm-server") {
+		if strings.Contains(c.BinaryName(), "apm-server") {
 			return true
 		}
 	}

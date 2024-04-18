@@ -24,16 +24,16 @@ import (
 )
 
 const (
-	sourcePattern = "/downloads/beats/filebeat/"
+	sourcePattern = "/downloads/beats/agentbeat/"
 	source        = "http://artifacts.elastic.co/downloads/"
 )
 
 var (
 	version  = agtversion.NewParsedSemVer(7, 5, 1, "", "")
 	beatSpec = artifact.Artifact{
-		Name:     "filebeat",
-		Cmd:      "filebeat",
-		Artifact: "beats/filebeat",
+		Name:     "agentbeat",
+		Cmd:      "agentbeat",
+		Artifact: "beats/agentbeat",
 	}
 )
 
