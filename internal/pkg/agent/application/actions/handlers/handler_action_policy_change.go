@@ -36,19 +36,19 @@ const (
 	apiStatusTimeout = 15 * time.Second
 )
 
-type logLevelSetter interface {
-	SetLogLevel(ctx context.Context, lvl logp.Level) error
+type policyLogLevelSetter interface {
+	SetPolicyLogLevel(ctx context.Context, lvl *logp.Level) error
 }
 
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
-	log            *logger.Logger
-	agentInfo      info.Agent
-	config         *configuration.Configuration
-	store          storage.Store
-	ch             chan coordinator.ConfigChange
-	setters        []actions.ClientSetter
-	logLevelSetter logLevelSetter
+	log                  *logger.Logger
+	agentInfo            info.Agent
+	config               *configuration.Configuration
+	store                storage.Store
+	ch                   chan coordinator.ConfigChange
+	setters              []actions.ClientSetter
+	policyLogLevelSetter policyLogLevelSetter
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 	// // Last known valid signature validation key
@@ -62,17 +62,17 @@ func NewPolicyChangeHandler(
 	config *configuration.Configuration,
 	store storage.Store,
 	ch chan coordinator.ConfigChange,
-	logLevelSetter logLevelSetter,
+	policyLogLevelSetter policyLogLevelSetter,
 	setters ...actions.ClientSetter,
 ) *PolicyChangeHandler {
 	return &PolicyChangeHandler{
-		log:            log,
-		agentInfo:      agentInfo,
-		config:         config,
-		store:          store,
-		ch:             ch,
-		setters:        setters,
-		logLevelSetter: logLevelSetter,
+		log:                  log,
+		agentInfo:            agentInfo,
+		config:               config,
+		store:                store,
+		ch:                   ch,
+		setters:              setters,
+		policyLogLevelSetter: policyLogLevelSetter,
 	}
 }
 
@@ -219,9 +219,9 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	// FIXME set it to debug level once implementation is done
 	cfgMap, err := c.ToMapStr()
 	if err != nil {
-		h.log.Errorf("Received policy change: %v", cfgMap)
-	} else {
 		h.log.Errorf("error converting policy change to map: %v", err)
+	} else {
+		h.log.Errorf("Received policy change: %v", cfgMap)
 	}
 
 	cfg, err := configuration.NewFromConfig(c)
@@ -326,17 +326,14 @@ func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Con
 
 func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingConfig *logger.Config) error {
 
-	if loggingConfig == nil {
-		// no logging config to set, nothing to do
-		return nil
+	var policyLogLevel *logger.Level
+	if loggingConfig != nil {
+		// we have logging config to set
+		policyLogLevel = &loggingConfig.Level
 	}
 
-	if h.agentInfo.LogLevel() != logger.DefaultLogLevel.String() {
-		// there is a specific log level set at agent level, nothing to do
-		return nil
-	}
-	h.log.Errorf("Applying log level %v from policy", loggingConfig.Level)
-	return h.logLevelSetter.SetLogLevel(ctx, loggingConfig.Level)
+	h.log.Errorf("Applying log level %v from policy", policyLogLevel)
+	return h.policyLogLevelSetter.SetPolicyLogLevel(ctx, policyLogLevel)
 }
 
 func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store) error {

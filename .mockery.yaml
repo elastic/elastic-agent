@@ -14,9 +14,9 @@ packages:
       diagnosticsProvider:
         config:
           mockname: "DiagnosticsProvider"
-      logLevelSetter:
+      policyLogLevelSetter:
         config:
-          mockname: "LogLevelSetter"
+          mockname: "PolicyLogLevelSetter"
   github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker:
     interfaces:
       Acker:
