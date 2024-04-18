@@ -134,15 +134,6 @@ func TestFakeComponent(t *testing.T) {
 
 func TestFakeIsolatedUnitsComponent(t *testing.T) {
 	define.Require(t, define.Requirements{
-		// // TODO: Support isolated units with shipper on Windows
-		// OS: []define.OS{
-		// 	{
-		// 		Type: define.Darwin,
-		// 	},
-		// 	{
-		// 		Type: define.Linux,
-		// 	},
-		// },
 		Group: Default,
 		Local: true,
 	})
