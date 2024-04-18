@@ -64,7 +64,7 @@ func getLeaseHolder(client kubernetes.Interface) (string, error) {
 
 // TestNewLeaderElectionManager will test the leader elector.
 // We will try to check if an instance can acquire the lease more than one time. This way, we will know that
-// the leader elector starts running again after it has stopped - which happens once a leader looses the lease.
+// the leader elector starts running again after it has stopped - which happens once a leader loses the lease.
 // To make sure that happens we will do the following:
 // 1. We will create the lease to be used by the leader elector.
 // 2. We will create two context providers - in the default context, this would mean two nodes, each one with an agent running.
