@@ -160,8 +160,13 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	diag := t.TempDir()
 	extractZipArchive(t, diagZip, diag)
 
-	stateYAML, err := os.Open(filepath.Join(diag, "state.yaml"))
+	stateFilePath := filepath.Join(diag, "state.yaml")
+	stateYAML, err := os.Open(stateFilePath)
 	require.NoError(t, err, "could not open diagnostics state.yaml")
+	defer func(stateYAML *os.File) {
+		err := stateYAML.Close()
+		assert.NoErrorf(t, err, "error closing %q", stateFilePath)
+	}(stateYAML)
 
 	state := struct {
 		Components []struct {
