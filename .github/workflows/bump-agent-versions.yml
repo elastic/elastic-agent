@@ -55,11 +55,11 @@ jobs:
           channel: "#ingest-notifications"
 
         # if a PR was created as a result of this job, we notify on the Slack channel
-      - if: ${{ startsWith(steps.update.output.pr, 'https') }}
+      - if: ${{ startsWith(steps.update.outputs.pr, 'https') }}
         uses: elastic/apm-pipeline-library/.github/actions/slack-message@current
         with:
           url: ${{ secrets.VAULT_ADDR }}
           roleId: ${{ secrets.VAULT_ROLE_ID }}
           secretId: ${{ secrets.VAULT_SECRET_ID }}
-          message: "Update for Elastic Agent versions file has been created: ${{ steps.update.output.pr }}"
+          message: "Update for Elastic Agent versions file has been created: ${{ steps.update.outputs.pr }}"
           channel: "#ingest-notifications"

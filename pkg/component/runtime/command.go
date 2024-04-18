@@ -497,13 +497,7 @@ func (c *commandRuntime) getSpecType() string {
 }
 
 func (c *commandRuntime) getSpecBinaryName() string {
-	if c.current.InputSpec != nil {
-		return c.current.InputSpec.BinaryName
-	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.BinaryName
-	}
-	return ""
+	return c.current.BinaryName()
 }
 
 func (c *commandRuntime) getSpecBinaryPath() string {

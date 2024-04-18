@@ -36,6 +36,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	currentagtversion "github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -272,12 +273,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// while the `previous` install is the currently executing elastic-agent that is no longer reachable via the symlink.
 	// After the restart at the end of the function, everything lines up correctly.
 	current := agentInstall{
+		parsedVersion: parsedVersion,
 		version:       version,
 		hash:          unpackRes.Hash,
 		versionedHome: unpackRes.VersionedHome,
 	}
 
+	previousParsedVersion := currentagtversion.GetParsedAgentPackageVersion()
 	previous := agentInstall{
+		parsedVersion: previousParsedVersion,
 		version:       release.VersionWithSnapshot(),
 		hash:          release.Commit(),
 		versionedHome: currentVersionedHome,
@@ -293,15 +297,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
-	minParsedVersionForNewUpdateMarker := agtversion.NewParsedSemVer(8, 13, 0, "", "")
-	var watcherExecutable string
-	if parsedVersion.Less(*minParsedVersionForNewUpdateMarker) {
-		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
-		watcherExecutable = paths.BinaryPath(paths.VersionedHome(paths.Top()), agentName)
-	} else {
-		// use the new agent executable as it should be able to parse the new update marker
-		watcherExecutable = paths.BinaryPath(filepath.Join(paths.Top(), unpackRes.VersionedHome), agentName)
-	}
+	var watcherExecutable = selectWatcherExecutable(paths.Top(), previous, current)
+
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
@@ -326,6 +323,17 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	return cb, nil
+}
+
+func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
+	// check if the upgraded version is less than the previous (currently installed) version
+	if current.parsedVersion.Less(*previous.parsedVersion) {
+		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
+		return paths.BinaryPath(filepath.Join(topDir, previous.versionedHome), agentName)
+	} else {
+		// use the new agent executable as it should be able to parse the new update marker
+		return paths.BinaryPath(filepath.Join(topDir, current.versionedHome), agentName)
+	}
 }
 
 func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
@@ -417,8 +425,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMet
 	} else {
 		// extract version info from the version string (we can ignore parsing errors as it would have never passed the download step)
 		parsedVersion, _ := agtversion.ParseVersion(upgradeVersion)
-		newVersion.version = strings.TrimSuffix(parsedVersion.VersionWithPrerelease(), snapshotSuffix)
-		newVersion.snapshot = parsedVersion.IsSnapshot()
+		newVersion.version, newVersion.snapshot = parsedVersion.ExtractSnapshotFromVersionString()
 	}
 	newVersion.hash = metadata.hash
 

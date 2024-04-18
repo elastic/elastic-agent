@@ -208,6 +208,26 @@ func (c *Component) Type() string {
 	return ""
 }
 
+// BinaryName returns the binary name used for the component.
+//
+// This can differ from the actual binary name that is on disk, when the input specification states that the
+// command has a different name.
+func (c *Component) BinaryName() string {
+	if c.InputSpec != nil {
+		if c.InputSpec.Spec.Command != nil && c.InputSpec.Spec.Command.Name != "" {
+			return c.InputSpec.Spec.Command.Name
+		}
+		return c.InputSpec.BinaryName
+	}
+	if c.ShipperSpec != nil {
+		if c.ShipperSpec.Spec.Command != nil && c.ShipperSpec.Spec.Command.Name != "" {
+			return c.ShipperSpec.Spec.Command.Name
+		}
+		return c.ShipperSpec.BinaryName
+	}
+	return ""
+}
+
 // Model is the components model with signed policy data
 // This replaces former top level []Components with the top Model that captures signed policy data.
 // The signed data is a part of the policy since 8.8.0 release and contains the signed policy fragments and the signature that can be validated.
@@ -275,9 +295,7 @@ func (r *RuntimeSpecs) ToComponents(
 		// binary name
 		binaryMapping := make(map[string]string)
 		for _, component := range components {
-			if spec := component.InputSpec; spec != nil {
-				binaryMapping[component.ID] = spec.BinaryName
-			}
+			binaryMapping[component.ID] = component.BinaryName()
 		}
 		monitoringCfg, err := monitoringInjector(policy, components, binaryMapping)
 		if err != nil {
