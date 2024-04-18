@@ -584,20 +584,20 @@ func (s *serviceRuntime) name() string {
 // check executes the service check command
 func (s *serviceRuntime) check(ctx context.Context) error {
 	if s.comp.InputSpec.Spec.Service.Operations.Check == nil {
-		s.log.Errorf("missing check spec for %s service", s.comp.InputSpec.BinaryName)
+		s.log.Errorf("missing check spec for %s service", s.comp.BinaryName())
 		return ErrOperationSpecUndefined
 	}
-	s.log.Debugf("check if the %s is installed", s.comp.InputSpec.BinaryName)
+	s.log.Debugf("check if the %s is installed", s.comp.BinaryName())
 	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Check)
 }
 
 // install executes the service install command
 func (s *serviceRuntime) install(ctx context.Context) error {
 	if s.comp.InputSpec.Spec.Service.Operations.Install == nil {
-		s.log.Errorf("missing install spec for %s service", s.comp.InputSpec.BinaryName)
+		s.log.Errorf("missing install spec for %s service", s.comp.BinaryName())
 		return ErrOperationSpecUndefined
 	}
-	s.log.Debugf("install %s service", s.comp.InputSpec.BinaryName)
+	s.log.Debugf("install %s service", s.comp.BinaryName())
 	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Install)
 }
 
@@ -645,7 +645,7 @@ func resolveUninstallTokenArg(uninstallSpec *component.ServiceOperationsCommandS
 
 func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, uninstallToken string, executeServiceCommandImpl executeServiceCommandFunc) error {
 	if comp.InputSpec.Spec.Service.Operations.Uninstall == nil {
-		log.Errorf("missing uninstall spec for %s service", comp.InputSpec.BinaryName)
+		log.Errorf("missing uninstall spec for %s service", comp.BinaryName())
 		return ErrOperationSpecUndefined
 	}
 
@@ -657,6 +657,6 @@ func uninstallService(ctx context.Context, log *logger.Logger, comp component.Co
 
 	uninstallSpec := resolveUninstallTokenArg(comp.InputSpec.Spec.Service.Operations.Uninstall, uninstallToken)
 
-	log.Debugf("uninstall %s service", comp.InputSpec.BinaryName)
+	log.Debugf("uninstall %s service", comp.BinaryName())
 	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, uninstallSpec)
 }
