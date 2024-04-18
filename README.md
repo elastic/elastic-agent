@@ -16,7 +16,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Developer docs
 
 The source files for the general Elastic Agent documentation are currently stored
-in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/main/docs/en/ingest-management) repository.
+in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/8.14/docs/en/ingest-management) repository.
 The following docs are only focused on getting developers started building code for Elastic Agent.
 
 ### Test Framework
@@ -26,8 +26,8 @@ For details on writing and running tests see the [Test Framework Developer Guide
 
 ### Changelog
 
-The changelog for the Elastic Agent is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool). Read the [installation](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/install.md)
-and [usage](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md#im-a-developer) instructions to get started.
+The changelog for the Elastic Agent is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool). Read the [installation](https://github.com/elastic/elastic-agent-changelog-tool/blob/8.14/docs/install.md)
+and [usage](https://github.com/elastic/elastic-agent-changelog-tool/blob/8.14/docs/usage.md#im-a-developer) instructions to get started.
 
 The changelog tool produces fragement files that are consolidated to generate a changelog for each release. Each PR containing a change with user
 impact (new feature, bug fix, etc.) must contain a changelog fragement describing the change. There is a GitHub action in CI that will fail
@@ -47,7 +47,7 @@ pr: https://github.com/elastic/elastic-agent/pull/823
 Prerequisites:
 - installed [mage](https://github.com/magefile/mage)
 - [Docker](https://docs.docker.com/get-docker/)
-- [X-pack](https://github.com/elastic/beats/tree/main/x-pack) to pre-exist in the parent folder of the local Git repository checkout
+- [X-pack](https://github.com/elastic/beats/tree/8.14/x-pack) to pre-exist in the parent folder of the local Git repository checkout
 - [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool) to add changelog fragments for changelog generation
 
 To build a local version of the agent for development, run the command below. The following platforms are supported:
@@ -100,10 +100,10 @@ for the standard variant.
 ### Testing Elastic Agent on Kubernetes
 
 #### Prerequisites
-- create kubernetes cluster using kind, check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
-- deploy kube-state-metrics, check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+- create kubernetes cluster using kind, check [here](https://github.com/elastic/beats/blob/8.14/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+- deploy kube-state-metrics, check [here](https://github.com/elastic/beats/blob/8.14/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
 - deploy required infrastructure:
-    - for elastic agent in standalone mode: EK stack or use [elastic cloud](https://cloud.elastic.co), check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+    - for elastic agent in standalone mode: EK stack or use [elastic cloud](https://cloud.elastic.co), check [here](https://github.com/elastic/beats/blob/8.14/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
     - for managed mode: use [elastic cloud](https://cloud.elastic.co) or bring up the stack on docker and then connect docker network with kubernetes kind nodes:
   ```
   elastic-package stack up -d -v
