@@ -124,25 +124,25 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		5*time.Minute, 10*time.Second,
 		"agent never became healthy. Last status: %v", &stateBuff)
 
-	filebeat := "filebeat"
+	agentbeat := "agentbeat"
 	if runtime.GOOS == "windows" {
-		filebeat += ".exe"
+		agentbeat += ".exe"
 	}
 	wd := f.WorkDir()
-	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", filebeat)
+	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", agentbeat)
 	compPaths, err := filepath.Glob(glob)
-	require.NoErrorf(t, err, "failed to glob filebeat path pattern %q", glob)
+	require.NoErrorf(t, err, "failed to glob agentbeat path pattern %q", glob)
 	require.Lenf(t, compPaths, 1,
-		"glob pattern \"%s\": found %d paths to filebeat, can only have 1",
+		"glob pattern \"%s\": found %d paths to agentbeat, can only have 1",
 		glob, len(compPaths))
 
-	cmdVer := exec.Command(compPaths[0], "version")
+	cmdVer := exec.Command(compPaths[0], "filebeat", "version")
 	output, err = cmdVer.CombinedOutput()
 	require.NoError(t, err, "failed to get filebeat version")
 	outStr := string(output)
 
 	// version output example:
-	// filebeat version 8.13.0 (amd64), libbeat 8.13.0 [0baedd2518bd7e5b78e2280684580cbfdcab5ae8 built 2024-01-23 06:57:37 +0000 UTC
+	// filebeat version 8.14.0 (arm64), libbeat 8.14.0 [ab27a657e4f15976c181cf44c529bba6159f2c64 built 2024-04-17 18:13:16 +0000 UTC]
 	t.Log("parsing commit hash from filebeat version: ", outStr)
 	splits := strings.Split(outStr, "[")
 	require.Lenf(t, splits, 2,
@@ -160,8 +160,13 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	diag := t.TempDir()
 	extractZipArchive(t, diagZip, diag)
 
-	stateYAML, err := os.Open(filepath.Join(diag, "state.yaml"))
+	stateFilePath := filepath.Join(diag, "state.yaml")
+	stateYAML, err := os.Open(stateFilePath)
 	require.NoError(t, err, "could not open diagnostics state.yaml")
+	defer func(stateYAML *os.File) {
+		err := stateYAML.Close()
+		assert.NoErrorf(t, err, "error closing %q", stateFilePath)
+	}(stateYAML)
 
 	state := struct {
 		Components []struct {

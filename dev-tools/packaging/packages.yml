@@ -260,12 +260,6 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
-      'data/cloud_downloads/metricbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/metricbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
-        mode: 0755
-      'data/cloud_downloads/filebeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/filebeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
-        mode: 0755
 
   - &agent_docker_arm_spec
     <<: *agent_docker_spec
@@ -278,6 +272,16 @@ shared:
     extra_vars:
       image_name: '{{.BeatName}}-cloud'
       repository: 'docker.elastic.co/beats-ci'
+    files:
+      'data/cloud_downloads/filebeat.sh':
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh'
+        mode: 0755
+      'data/cloud_downloads/metricbeat.sh':
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
+        mode: 0755
+      'data/cloud_downloads/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
+        mode: 0755
 
   - &agent_docker_complete_spec
     <<: *agent_docker_spec
