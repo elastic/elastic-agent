@@ -407,6 +407,7 @@ func newFakeShipperInput(logger zerolog.Logger, logLevel client.UnitLogLevel, ma
 		i.srv = srvCfg.Server
 		common.RegisterFakeEventProtocolServer(srv, i)
 		cSrv := &CachedServer{cfg: srvCfg, srv: srv, ref: 1}
+		// Launch the server in a goroutine
 		cSrv.wg.Go(func() error {
 			return srv.Serve(lis)
 		})
