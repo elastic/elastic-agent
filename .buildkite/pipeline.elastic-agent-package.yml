@@ -134,6 +134,8 @@ steps:
     depends_on: package
     agents:
       provider: "gcp"
+      machineType: "n2-standard-8"
+      diskSizeGb: 250
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
