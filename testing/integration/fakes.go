@@ -26,15 +26,15 @@ var fakeComponentPltfs = []string{
 	"windows/amd64",
 }
 
-// TODO: Support isolated units with shipper on Windows
-var fakeIsolatedUnitsComponentPltfs = []string{
-	"container/amd64",
-	"container/arm64",
-	"darwin/amd64",
-	"darwin/arm64",
-	"linux/amd64",
-	"linux/arm64",
-}
+// // TODO: Support isolated units with shipper on Windows
+// var fakeIsolatedUnitsComponentPltfs = []string{
+// 	"container/amd64",
+// 	"container/arm64",
+// 	"darwin/amd64",
+// 	"darwin/arm64",
+// 	"linux/amd64",
+// 	"linux/arm64",
+// }
 
 var fakeComponent = atesting.UsableComponent{
 	Name:       "fake",
@@ -74,7 +74,8 @@ var fakeComponent = atesting.UsableComponent{
 			{
 				Name:        "fake-isolated-units",
 				Description: "A fake isolated units input",
-				Platforms:   fakeIsolatedUnitsComponentPltfs,
+				Platforms:   fakeComponentPltfs,
+				// Platforms:   fakeIsolatedUnitsComponentPltfs,
 				Shippers: []string{
 					fakeShipperName,
 				},

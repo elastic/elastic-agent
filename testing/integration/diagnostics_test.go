@@ -154,15 +154,15 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 
 func TestIsolatedUnitsDiagnosticsOptionalValues(t *testing.T) {
 	define.Require(t, define.Requirements{
-		// TODO: Support isolated units with shipper on Windows
-		OS: []define.OS{
-			{
-				Type: define.Darwin,
-			},
-			{
-				Type: define.Linux,
-			},
-		},
+		// // TODO: Support isolated units with shipper on Windows
+		// OS: []define.OS{
+		// 	{
+		// 		Type: define.Darwin,
+		// 	},
+		// 	{
+		// 		Type: define.Linux,
+		// 	},
+		// },
 		Group: Default,
 		Local: false,
 	})
@@ -212,15 +212,15 @@ func TestDiagnosticsCommand(t *testing.T) {
 
 func TestIsolatedUnitsDiagnosticsCommand(t *testing.T) {
 	define.Require(t, define.Requirements{
-		// TODO: Support isolated units with shipper on Windows
-		OS: []define.OS{
-			{
-				Type: define.Darwin,
-			},
-			{
-				Type: define.Linux,
-			},
-		},
+		// // TODO: Support isolated units with shipper on Windows
+		// OS: []define.OS{
+		// 	{
+		// 		Type: define.Darwin,
+		// 	},
+		// 	{
+		// 		Type: define.Linux,
+		// 	},
+		// },
 		Group: Default,
 		Local: false,
 	})
