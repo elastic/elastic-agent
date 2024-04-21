@@ -351,18 +351,13 @@ func unitForShipperOutput(output outputI, id string, shipperType string) Unit {
 	}
 }
 
-// Collect all inputs of the given type going to the given output and return
-// the resulting Component. The returned Component may have no units if no
-// active inputs were found.
-func (r *RuntimeSpecs) componentForInputType(
-	inputType string,
+// createShipperReference creates a ShipperReference for the given output and input spec.
+func (r *RuntimeSpecs) createShipperReference(
 	output outputI,
-	featureFlags *features.Flags,
-	componentConfig *ComponentConfig,
-) Component {
-	componentID := fmt.Sprintf("%s-%s", inputType, output.name)
-
-	inputSpec, componentErr := r.GetInput(inputType)
+	inputSpec InputRuntimeSpec,
+	componentID string,
+	componentErr error,
+) (*ShipperReference, error) {
 	var shipperRef *ShipperReference
 	if componentErr == nil {
 		if output.shipperEnabled {
@@ -393,40 +388,113 @@ func (r *RuntimeSpecs) componentForInputType(
 			}
 		}
 	}
+
 	// If there's an error at this point we still proceed with assembling the
 	// policy into a component, we just attach the error to its Err field to
 	// indicate that it can't be run.
+	return shipperRef, componentErr
+}
 
-	var units []Unit
-	for _, input := range output.inputs[inputType] {
-		if input.enabled {
-			unitID := fmt.Sprintf("%s-%s", componentID, input.id)
-			units = append(units, unitForInput(input, unitID))
+// populateOutputUnitsForInput adds the output units to the given slice.
+func populateOutputUnitsForInput(
+	units *[]Unit,
+	output outputI,
+	componentID string,
+	componentErr error,
+	shipperRef *ShipperReference,
+) {
+	if shipperRef != nil {
+		// Shipper units are skipped if componentErr isn't nil, because in that
+		// case we generally don't have a valid shipper type to base it on.
+		if componentErr == nil {
+			*units = append(*units, unitForShipperOutput(output, componentID, shipperRef.ShipperType))
 		}
+	} else {
+		*units = append(*units, unitForOutput(output, componentID))
 	}
-	if len(units) > 0 {
-		if shipperRef != nil {
-			// Shipper units are skipped if componentErr isn't nil, because in that
-			// case we generally don't have a valid shipper type to base it on.
-			if componentErr == nil {
-				units = append(units,
-					unitForShipperOutput(output, componentID, shipperRef.ShipperType))
+}
+
+// Collect all inputs of the given type going to the given output and return
+// the resulting Components. The returned Components may have no units if no
+// active inputs were found.
+func (r *RuntimeSpecs) componentsForInputType(
+	inputType string,
+	output outputI,
+	featureFlags *features.Flags,
+	componentConfig *ComponentConfig,
+) []Component {
+	var components []Component
+	inputSpec, componentErr := r.GetInput(inputType)
+
+	// Treat as non isolated units component on error of reading the input spec
+	if componentErr != nil || !inputSpec.Spec.IsolateUnits {
+		componentID := fmt.Sprintf("%s-%s", inputType, output.name)
+		shipperRef, componentErr := r.createShipperReference(output, inputSpec, componentID, componentErr)
+
+		var units []Unit
+		for _, input := range output.inputs[inputType] {
+			if input.enabled {
+				unitID := fmt.Sprintf("%s-%s", componentID, input.id)
+				units = append(units, unitForInput(input, unitID))
 			}
-		} else {
-			units = append(units, unitForOutput(output, componentID))
+		}
+
+		if len(units) > 0 {
+			// Populate the output units for this component
+			populateOutputUnitsForInput(
+				&units,
+				output,
+				componentID,
+				componentErr,
+				shipperRef,
+			)
+		}
+
+		components = append(components, Component{
+			ID:         componentID,
+			Err:        componentErr,
+			InputSpec:  &inputSpec,
+			InputType:  inputType,
+			OutputType: output.outputType,
+			Units:      units,
+			Features:   featureFlags.AsProto(),
+			Component:  componentConfig.AsProto(),
+			ShipperRef: shipperRef,
+		})
+	} else {
+		for _, input := range output.inputs[inputType] {
+			// Units are being mapped to components, so we need a unique ID for each.
+			componentID := fmt.Sprintf("%s-%s-%s", inputType, output.name, input.id)
+			shipperRef, componentErr := r.createShipperReference(output, inputSpec, componentID, componentErr)
+
+			var units []Unit
+			if input.enabled {
+				unitID := fmt.Sprintf("%s-unit", componentID)
+				units = append(units, unitForInput(input, unitID))
+				// Populate the output units for this component
+				populateOutputUnitsForInput(
+					&units,
+					output,
+					componentID,
+					componentErr,
+					shipperRef,
+				)
+			}
+
+			components = append(components, Component{
+				ID:         componentID,
+				Err:        componentErr,
+				InputSpec:  &inputSpec,
+				InputType:  inputType,
+				OutputType: output.outputType,
+				Units:      units,
+				Features:   featureFlags.AsProto(),
+				Component:  componentConfig.AsProto(),
+				ShipperRef: shipperRef,
+			})
 		}
 	}
-	return Component{
-		ID:         componentID,
-		Err:        componentErr,
-		InputSpec:  &inputSpec,
-		InputType:  inputType,
-		OutputType: output.outputType,
-		Units:      units,
-		Features:   featureFlags.AsProto(),
-		Component:  componentConfig.AsProto(),
-		ShipperRef: shipperRef,
-	}
+	return components
 }
 
 func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *features.Flags, componentConfig *ComponentConfig) []Component {
@@ -434,17 +502,19 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 	shipperTypes := make(map[string]bool)
 	for inputType := range output.inputs {
 		// No need for error checking at this stage -- we are guaranteed
-		// to get a Component back. If there is an error that prevents it
+		// to get a Component/s back. If there is an error that prevents it/them
 		// from running then it will be in the Component's Err field and
-		// we will report it later. The only thing we skip is a component
+		// we will report it later. The only thing we skip is a component/s
 		// with no units.
-		component := r.componentForInputType(inputType, output, featureFlags, componentConfig)
-		if len(component.Units) > 0 {
-			if component.ShipperRef != nil {
-				// If this component uses a shipper, mark that shipper type as active
-				shipperTypes[component.ShipperRef.ShipperType] = true
+		typeComponents := r.componentsForInputType(inputType, output, featureFlags, componentConfig)
+		for _, component := range typeComponents {
+			if len(component.Units) > 0 {
+				if component.ShipperRef != nil {
+					// If this component uses a shipper, mark that shipper type as active
+					shipperTypes[component.ShipperRef.ShipperType] = true
+				}
+				components = append(components, component)
 			}
-			components = append(components, component)
 		}
 	}
 
