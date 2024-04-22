@@ -813,8 +813,8 @@ github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21 h1:YEetp8
 github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21/go.mod h1:+020luEh2TKB4/GOp8oxxtq0Daoen/Cii55CzbTV6DU=
 github.com/eapache/queue v1.1.0 h1:YOEu7KNc61ntiQlcEeUIoDTJ2o8mQznoNvUhiigpIqc=
 github.com/eapache/queue v1.1.0/go.mod h1:6eCeP0CKFpHLu8blIFXhExK/dRa7WDZfr6jVFPTqq+I=
-github.com/elastic/beats/v7 v7.17.18 h1:Jwk1dFqkbYYMmZV+NoI9u6NJos4NuHv2GtCc8QNzY6E=
-github.com/elastic/beats/v7 v7.17.18/go.mod h1:WheUDWAtQFQaSM78p0Jn+hY0mzPZQAcwRl3NT+4li5M=
+github.com/elastic/beats/v7 v7.17.20 h1:lmTxeQrM6IL6NOIsjEzOr0Vhy5q2BBXOpfRbpPXGCYA=
+github.com/elastic/beats/v7 v7.17.20/go.mod h1:T9G1ROe9BVTcahTQmsVsvTOrlnBA+Yq/U6857u0nCkY=
 github.com/elastic/e2e-testing v1.1.0 h1:Y+K215EWkf3ojAWmBK2JrxH/rITjkKM1zR8mnwIpvLw=
 github.com/elastic/e2e-testing v1.1.0/go.mod h1:8q2d8dmwavJXISowwaoreHFBnbR/uK4qanfRGhC/W9A=
 github.com/elastic/ecs v1.12.0 h1:u6WZ2AWtxv5vHvTQ4EuVZdWZ51mKHQ2UIltRePcta5U=
