@@ -10,10 +10,12 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
@@ -21,6 +23,8 @@ import (
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+const leaderElectorPrefix = "elastic-agent-leader-"
 
 func init() {
 	composable.Providers.MustAddContextProvider("kubernetes_leaderelection", ContextProviderBuilder)
@@ -45,11 +49,15 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 	return &contextProvider{logger, &cfg, nil}, nil
 }
 
+// This is needed to overwrite the Kubernetes client for the tests
+var getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
+	return kubernetes.GetKubernetesClient(kubeconfig, opt)
+}
+
 // Run runs the leaderelection provider.
 func (p *contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
-	client, err := kubernetes.GetKubernetesClient(p.config.KubeConfig, p.config.KubeClientOptions)
+	client, err := getK8sClientFunc(p.config.KubeConfig, p.config.KubeClientOptions)
 	if err != nil {
-		// info only; return nil (do nothing)
 		p.logger.Debugf("Kubernetes leaderelection provider skipped, unable to connect: %s", err)
 		return nil
 	}
@@ -61,9 +69,9 @@ func (p *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 	var id string
 	podName, found := os.LookupEnv("POD_NAME")
 	if found {
-		id = "elastic-agent-leader-" + podName
+		id = leaderElectorPrefix + podName
 	} else {
-		id = "elastic-agent-leader-" + agentInfo.AgentID()
+		id = leaderElectorPrefix + agentInfo.AgentID()
 	}
 
 	ns, err := kubernetes.InClusterNamespace()
@@ -104,9 +112,14 @@ func (p *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 		p.logger.Errorf("error while creating Leader Elector: %v", err)
 	}
 	p.logger.Debugf("Starting Leader Elector")
-	le.Run(comm)
-	p.logger.Debugf("Stopped Leader Elector")
-	return comm.Err()
+
+	for {
+		le.Run(ctx)
+		if ctx.Err() != nil {
+			p.logger.Debugf("Stopped Leader Elector")
+			return comm.Err()
+		}
+	}
 }
 
 func (p *contextProvider) startLeading(comm corecomp.ContextProviderComm) {
