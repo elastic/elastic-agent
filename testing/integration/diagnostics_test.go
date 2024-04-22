@@ -82,6 +82,45 @@ var componentSetup = map[string]integrationtest.ComponentState{
 	},
 }
 
+var isolatedUnitsComponentSetup = map[string]integrationtest.ComponentState{
+	"fake-isolated-units-default-fake-isolated-units": {
+		State: integrationtest.NewClientState(client.Healthy),
+		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-unit"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+		},
+	},
+	"fake-isolated-units-default-fake-isolated-units-1": {
+		State: integrationtest.NewClientState(client.Healthy),
+		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-isolated-units-default-fake-isolated-units-1"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1-unit"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+		},
+	},
+	"fake-shipper-default": {
+		State: integrationtest.NewClientState(client.Healthy),
+		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+		},
+	},
+}
+
 type componentAndUnitNames struct {
 	name      string
 	unitNames []string
@@ -108,9 +147,35 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 		Configure:  simpleConfig2,
 		AgentState: integrationtest.NewClientState(client.Healthy),
 		Components: componentSetup,
-		After:      testDiagnosticsFactory(t, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
+		After:      testDiagnosticsFactory(t, componentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
+	})
+	require.NoError(t, err)
+}
+
+func TestIsolatedUnitsDiagnosticsOptionalValues(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: Default,
+		Local: false,
 	})
 
+	fixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
+	require.NoError(t, err)
+
+	diagpprof := append(diagnosticsFiles, "cpu.pprof")
+	diagCompPprof := append(compDiagnosticsFiles, "cpu.pprof")
+
+	err = fixture.Run(ctx, integrationtest.State{
+		Configure:  complexIsolatedUnitsConfig,
+		AgentState: integrationtest.NewClientState(client.Healthy),
+		Components: isolatedUnitsComponentSetup,
+		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
+	})
+	require.NoError(t, err)
 }
 
 func TestDiagnosticsCommand(t *testing.T) {
@@ -131,12 +196,35 @@ func TestDiagnosticsCommand(t *testing.T) {
 		Configure:  simpleConfig2,
 		AgentState: integrationtest.NewClientState(client.Healthy),
 		Components: componentSetup,
-		After:      testDiagnosticsFactory(t, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+		After:      testDiagnosticsFactory(t, componentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 	})
 	assert.NoError(t, err)
 }
 
-func testDiagnosticsFactory(t *testing.T, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
+func TestIsolatedUnitsDiagnosticsCommand(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: Default,
+		Local: false,
+	})
+
+	f, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	require.NoError(t, err)
+
+	err = f.Run(ctx, integrationtest.State{
+		Configure:  complexIsolatedUnitsConfig,
+		AgentState: integrationtest.NewClientState(client.Healthy),
+		Components: isolatedUnitsComponentSetup,
+		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+	})
+	assert.NoError(t, err)
+}
+
+func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
 		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)
 
@@ -144,13 +232,13 @@ func testDiagnosticsFactory(t *testing.T, diagFiles []string, diagCompFiles []st
 		avi, err := getRunningAgentVersion(ctx, fix)
 		require.NoError(t, err)
 
-		verifyDiagnosticArchive(t, diagZip, diagFiles, diagCompFiles, avi)
+		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi)
 
 		return nil
 	}
 }
 
-func verifyDiagnosticArchive(t *testing.T, diagArchive string, diagFiles []string, diagCompFiles []string, avi *client.Version) {
+func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagArchive string, diagFiles []string, diagCompFiles []string, avi *client.Version) {
 	// check that the archive is not an empty file
 	stat, err := os.Stat(diagArchive)
 	require.NoErrorf(t, err, "stat file %q failed", diagArchive)
@@ -161,16 +249,8 @@ func verifyDiagnosticArchive(t *testing.T, diagArchive string, diagFiles []strin
 
 	extractZipArchive(t, diagArchive, extractionDir)
 
-	expectedDiagArchiveFilePatterns := compileExpectedDiagnosticFilePatterns(avi, diagFiles, diagCompFiles, []componentAndUnitNames{
-		{
-			name:      "fake-default",
-			unitNames: []string{"fake-default", "fake"},
-		},
-		{
-			name:      "fake-shipper-default",
-			unitNames: []string{"fake-shipper-default", "fake-default"},
-		},
-	})
+	compAndUnitNames := extractComponentAndUnitNames(compSetup)
+	expectedDiagArchiveFilePatterns := compileExpectedDiagnosticFilePatterns(avi, diagFiles, diagCompFiles, compAndUnitNames)
 
 	expectedExtractedFiles := map[string]struct{}{}
 	for _, filePattern := range expectedDiagArchiveFilePatterns {
@@ -203,6 +283,21 @@ func verifyDiagnosticArchive(t *testing.T, diagArchive string, diagFiles []strin
 	require.NoErrorf(t, err, "error walking output directory %q", extractionDir)
 
 	assert.ElementsMatch(t, extractKeysFromMap(expectedExtractedFiles), extractKeysFromMap(actualExtractedDiagFiles))
+}
+
+func extractComponentAndUnitNames(compSetup map[string]integrationtest.ComponentState) []componentAndUnitNames {
+	comps := make([]componentAndUnitNames, 0, len(compSetup))
+	for compName, compState := range compSetup {
+		unitNames := make([]string, 0, len(compState.Units))
+		for unitKey := range compState.Units {
+			unitNames = append(unitNames, unitKey.UnitID)
+		}
+		comps = append(comps, componentAndUnitNames{
+			name:      compName,
+			unitNames: unitNames,
+		})
+	}
+	return comps
 }
 
 func extractZipArchive(t *testing.T, zipFile string, dst string) {

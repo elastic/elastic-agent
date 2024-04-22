@@ -187,10 +187,10 @@ spec:
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       repository: elastic/elastic-agent
       schedules:
-        Daily main:
+        Every 4 hours:
           branch: main
-          cronline: "@daily"
-          message: Daily GCE cleanup
+          cronline: "0 0/4 * * *" # every 4th hour
+          message: GCE cleanup
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ

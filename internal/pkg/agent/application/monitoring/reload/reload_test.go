@@ -5,7 +5,6 @@
 package reload
 
 import (
-	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -60,12 +59,28 @@ agent.monitoring.enabled: false
 			false, false, true,
 		},
 		{
+			"do not stop when running, monitoring.metrics disabled",
+			true, true, true,
+			`
+agent.monitoring.metrics: false
+`,
+			true, false, false,
+		},
+		{
 			"stop stopped server",
 			false, false, false,
 			`
 agent.monitoring.enabled: false
 `,
 			false, false, false,
+		},
+		{
+			"start started server",
+			true, true, true,
+			`
+agent.monitoring.enabled: true
+`,
+			true, false, false,
 		},
 	}
 
@@ -78,7 +93,7 @@ agent.monitoring.enabled: false
 				MonitorMetrics: tc.currMetrics,
 			}
 			r := NewServerReloader(
-				func(mcfg *monitoringCfg.MonitoringConfig) (ServerController, error) {
+				func() (ServerController, error) {
 					return fsc, nil
 				},
 				log,
@@ -86,7 +101,7 @@ agent.monitoring.enabled: false
 			)
 			r.isServerRunning.Store(tc.currRunning)
 			if tc.currRunning {
-				r.srvController = fsc
+				r.s = fsc
 			}
 
 			newCfg := aConfig.MustNewConfigFrom(tc.newConfig)
@@ -112,8 +127,4 @@ func (fsc *fakeServerController) Stop() error {
 func (fsc *fakeServerController) Reset() {
 	fsc.startTriggered = false
 	fsc.stopTriggered = false
-}
-
-func (fsc *fakeServerController) Addr() net.Addr {
-	return nil
 }
