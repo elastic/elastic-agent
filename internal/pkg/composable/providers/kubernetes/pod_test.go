@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
+	"github.com/elastic/elastic-agent-autodiscover/utils"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
@@ -367,6 +368,62 @@ func TestEphemeralContainers(t *testing.T) {
 		fields := k["fields"]
 		assert.Equal(t, processors[target], fields)
 	}
+
+}
+
+func TestGenerateHints(t *testing.T) {
+	pod := &kubernetes.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testpod",
+			UID:       types.UID(uid),
+			Namespace: "testns",
+			Labels: map[string]string{
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
+			},
+			Annotations: map[string]string{
+				"app":                          "production",
+				"co.elastic.hints/host":        "${kubernetes.pod.ip}:6379",
+				"co.elastic.hints/package":     "redis",
+				"co.elastic.hints/metricspath": "/metrics",
+				"co.elastic.hints/period":      "42s",
+			},
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		Spec: kubernetes.PodSpec{
+			NodeName: "testnode",
+		},
+		Status: kubernetes.PodStatus{PodIP: "127.0.0.5"},
+	}
+
+	namespaceAnnotations := mapstr.M{
+		"nsa": "nsb",
+	}
+
+	data := generatePodData(pod, &podMeta{}, namespaceAnnotations)
+
+	hints_result := mapstr.M{
+		"hints": mapstr.M{
+			"host":        "${kubernetes.pod.ip}:6379",
+			"package":     "redis",
+			"metricspath": "/metrics", // on purpose we have introduced a typo
+			"period":      "42s",
+		},
+	}
+	incorrecthints_results := []string{"hints/metricspath"}
+
+	ann := data.mapping["annotations"]
+	annotations, _ := ann.(mapstr.M)
+	prefix := "co.elastic"
+	hints, incorrecthints := utils.GenerateHints(annotations, "", prefix, true, allSupportedHints)
+
+	assert.Equal(t, string(pod.GetUID()), data.uid)
+	assert.Equal(t, hints, hints_result)
+	assert.Equal(t, incorrecthints, incorrecthints_results)
 
 }
 
