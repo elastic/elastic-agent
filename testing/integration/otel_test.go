@@ -199,9 +199,11 @@ func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesti
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileProcessingConfig), 0600))
 
 	// check `elastic-agent otel validate` command works for otel config
-	out, err := fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath})
+	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"otel", "validate", "--config", cfgFilePath})
 	require.NoError(t, err)
-	require.Equal(t, 0, len(out)) // no error printed out
+
+	err = cmd.Run()
+	require.NoError(t, err)
 
 	// check feature gate works
 	out, err = fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath, "--feature-gates", "foo.bar"})
