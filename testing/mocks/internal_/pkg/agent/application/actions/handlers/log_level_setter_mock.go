@@ -10,7 +10,10 @@ import (
 	context "context"
 
 	logp "github.com/elastic/elastic-agent-libs/logp"
+<<<<<<< HEAD
 
+=======
+>>>>>>> 4c70881493 (define logLevelSetter interface)
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -28,7 +31,11 @@ func (_m *LogLevelSetter) EXPECT() *LogLevelSetter_Expecter {
 }
 
 // SetLogLevel provides a mock function with given fields: ctx, lvl
+<<<<<<< HEAD
 func (_m *LogLevelSetter) SetLogLevel(ctx context.Context, lvl logp.Level) error {
+=======
+func (_m *LogLevelSetter) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
+>>>>>>> 4c70881493 (define logLevelSetter interface)
 	ret := _m.Called(ctx, lvl)
 
 	if len(ret) == 0 {
@@ -36,7 +43,11 @@ func (_m *LogLevelSetter) SetLogLevel(ctx context.Context, lvl logp.Level) error
 	}
 
 	var r0 error
+<<<<<<< HEAD
 	if rf, ok := ret.Get(0).(func(context.Context, logp.Level) error); ok {
+=======
+	if rf, ok := ret.Get(0).(func(context.Context, *logp.Level) error); ok {
+>>>>>>> 4c70881493 (define logLevelSetter interface)
 		r0 = rf(ctx, lvl)
 	} else {
 		r0 = ret.Error(0)
@@ -52,14 +63,24 @@ type LogLevelSetter_SetLogLevel_Call struct {
 
 // SetLogLevel is a helper method to define mock.On call
 //   - ctx context.Context
+<<<<<<< HEAD
 //   - lvl logp.Level
+=======
+//   - lvl *logp.Level
+>>>>>>> 4c70881493 (define logLevelSetter interface)
 func (_e *LogLevelSetter_Expecter) SetLogLevel(ctx interface{}, lvl interface{}) *LogLevelSetter_SetLogLevel_Call {
 	return &LogLevelSetter_SetLogLevel_Call{Call: _e.mock.On("SetLogLevel", ctx, lvl)}
 }
 
+<<<<<<< HEAD
 func (_c *LogLevelSetter_SetLogLevel_Call) Run(run func(ctx context.Context, lvl logp.Level)) *LogLevelSetter_SetLogLevel_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(logp.Level))
+=======
+func (_c *LogLevelSetter_SetLogLevel_Call) Run(run func(ctx context.Context, lvl *logp.Level)) *LogLevelSetter_SetLogLevel_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*logp.Level))
+>>>>>>> 4c70881493 (define logLevelSetter interface)
 	})
 	return _c
 }
@@ -69,7 +90,11 @@ func (_c *LogLevelSetter_SetLogLevel_Call) Return(_a0 error) *LogLevelSetter_Set
 	return _c
 }
 
+<<<<<<< HEAD
 func (_c *LogLevelSetter_SetLogLevel_Call) RunAndReturn(run func(context.Context, logp.Level) error) *LogLevelSetter_SetLogLevel_Call {
+=======
+func (_c *LogLevelSetter_SetLogLevel_Call) RunAndReturn(run func(context.Context, *logp.Level) error) *LogLevelSetter_SetLogLevel_Call {
+>>>>>>> 4c70881493 (define logLevelSetter interface)
 	_c.Call.Return(run)
 	return _c
 }

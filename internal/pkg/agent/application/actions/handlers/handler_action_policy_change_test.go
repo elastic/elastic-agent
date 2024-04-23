@@ -212,7 +212,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				store:                &storage.NullStore{},
 				setters:              []actions.ClientSetter{&setter},
 				log:                  log,
-				policyLogLevelSetter: mockhandlers.NewPolicyLogLevelSetter(t),
+				policyLogLevelSetter: mockhandlers.NewLogLevelSetter(t),
 			}
 
 			cfg := config.MustNewConfigFrom(
@@ -480,7 +480,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 	tests := []struct {
 		name              string
 		args              args
-		setupExpectations func(setter *mockhandlers.PolicyLogLevelSetter)
+		setupExpectations func(setter *mockhandlers.LogLevelSetter)
 		wantErr           assert.ErrorAssertionFunc
 	}{
 		{
@@ -490,8 +490,8 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 					"agent.logging.level": "debug",
 				},
 			},
-			setupExpectations: func(setter *mockhandlers.PolicyLogLevelSetter) {
-				setter.EXPECT().SetPolicyLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.DebugLevel))).Return(nil).Once()
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
+				setter.EXPECT().SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.DebugLevel))).Return(nil).Once()
 			},
 			wantErr: assert.NoError,
 		},
@@ -502,9 +502,9 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 					"agent.logging.level": "info",
 				},
 			},
-			setupExpectations: func(setter *mockhandlers.PolicyLogLevelSetter) {
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
 				setter.EXPECT().
-					SetPolicyLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.InfoLevel))).
+					SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.InfoLevel))).
 					Return(nil).Once()
 			},
 			wantErr: assert.NoError,
@@ -516,9 +516,9 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 					"agent.logging.level": "warning",
 				},
 			},
-			setupExpectations: func(setter *mockhandlers.PolicyLogLevelSetter) {
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
 				setter.EXPECT().
-					SetPolicyLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.WarnLevel))).
+					SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.WarnLevel))).
 					Return(nil).Once()
 			},
 			wantErr: assert.NoError,
@@ -530,9 +530,9 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 					"agent.logging.level": "error",
 				},
 			},
-			setupExpectations: func(setter *mockhandlers.PolicyLogLevelSetter) {
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
 				setter.EXPECT().
-					SetPolicyLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.ErrorLevel))).
+					SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.ErrorLevel))).
 					Return(nil).Once()
 			},
 			wantErr: assert.NoError,
@@ -544,9 +544,9 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 					"agent.logging.level": "critical",
 				},
 			},
-			setupExpectations: func(setter *mockhandlers.PolicyLogLevelSetter) {
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
 				setter.EXPECT().
-					SetPolicyLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.CriticalLevel))).
+					SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.CriticalLevel))).
 					Return(nil).Once()
 			},
 			wantErr: assert.NoError,
@@ -558,7 +558,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 					"agent.logging.level": "asdasd",
 				},
 			},
-			// don't set any expectations on the PolicyLogLevelSetter mock because we don't expect any calls
+			// don't set any expectations on the LogLevelSetter mock because we don't expect any calls
 			setupExpectations: nil,
 			wantErr:           assert.Error,
 		},
@@ -567,7 +567,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			log, _ := logger.NewTesting(tt.name)
-			mockLogLevelSetter := mockhandlers.NewPolicyLogLevelSetter(t)
+			mockLogLevelSetter := mockhandlers.NewLogLevelSetter(t)
 
 			if tt.setupExpectations != nil {
 				tt.setupExpectations(mockLogLevelSetter)
@@ -586,11 +586,11 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 	}
 }
 
-func noLogLevelSet(t *testing.T) *mockhandlers.PolicyLogLevelSetter {
+func noLogLevelSet(t *testing.T) *mockhandlers.LogLevelSetter {
 	// nilLogLevel is a variable used to match nil policy log level being set
 	var nilLogLevel *logger.Level = nil
 
-	logLevelSetter := mockhandlers.NewPolicyLogLevelSetter(t)
-	logLevelSetter.EXPECT().SetPolicyLogLevel(mock.Anything, nilLogLevel).Return(nil).Once()
+	logLevelSetter := mockhandlers.NewLogLevelSetter(t)
+	logLevelSetter.EXPECT().SetLogLevel(mock.Anything, nilLogLevel).Return(nil).Once()
 	return logLevelSetter
 }

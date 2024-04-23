@@ -36,10 +36,6 @@ const (
 	apiStatusTimeout = 15 * time.Second
 )
 
-type policyLogLevelSetter interface {
-	SetPolicyLogLevel(ctx context.Context, lvl *logp.Level) error
-}
-
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
 	log                  *logger.Logger
@@ -48,7 +44,7 @@ type PolicyChangeHandler struct {
 	store                storage.Store
 	ch                   chan coordinator.ConfigChange
 	setters              []actions.ClientSetter
-	policyLogLevelSetter policyLogLevelSetter
+	policyLogLevelSetter logLevelSetter
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 	// // Last known valid signature validation key
@@ -62,7 +58,7 @@ func NewPolicyChangeHandler(
 	config *configuration.Configuration,
 	store storage.Store,
 	ch chan coordinator.ConfigChange,
-	policyLogLevelSetter policyLogLevelSetter,
+	policyLogLevelSetter logLevelSetter,
 	setters ...actions.ClientSetter,
 ) *PolicyChangeHandler {
 	return &PolicyChangeHandler{
@@ -251,6 +247,12 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return validationErr
 	}
 
+	// apply logging configuration
+	err = h.applyLoggingConfig(ctx, loggingConfig)
+	if err != nil {
+		return fmt.Errorf("applying logging config: %w", err)
+	}
+
 	if validatedConfig != nil {
 		// there's a change in the fleet client settings
 		backupFleetClientCfg := h.config.Fleet.Client
@@ -276,9 +278,6 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	if err != nil {
 		return fmt.Errorf("applying FleetClientConfig: %w", err)
 	}
-
-	// apply logging configuration
-	h.applyLoggingConfig(ctx, loggingConfig)
 
 	return nil
 }
@@ -333,7 +332,7 @@ func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingCon
 	}
 
 	h.log.Errorf("Applying log level %v from policy", policyLogLevel)
-	return h.policyLogLevelSetter.SetPolicyLogLevel(ctx, policyLogLevel)
+	return h.policyLogLevelSetter.SetLogLevel(ctx, policyLogLevel)
 }
 
 func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store) error {
