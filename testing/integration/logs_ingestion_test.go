@@ -12,19 +12,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/http/httputil"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"text/template"
 	"time"
-
-	"github.com/google/uuid"
-	"github.com/hectane/go-acl"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -37,6 +34,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/google/uuid"
+	"github.com/hectane/go-acl"
+
+	mockes "github.com/leehinman/mock-es"
+	"github.com/rcrowley/go-metrics"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLogIngestionFleetManaged(t *testing.T) {
@@ -238,6 +242,127 @@ func TestRpmLogIngestFleetManaged(t *testing.T) {
 	t.Run("Normal logs with flattened data_stream are shipped", func(t *testing.T) {
 		testFlattenedDatastreamFleetPolicy(t, ctx, info, policy)
 	})
+}
+
+var eventLogConfig = `
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - %s
+    protocol: http
+    preset: balanced
+
+inputs:
+  - type: filestream
+    id: your-input-id
+    streams:
+      - id: your-filestream-stream-id
+        data_stream:
+          dataset: generic
+        paths:
+          - %s
+
+# Disable monitoring so there are less Beats running and less logs being generated.
+agent.monitoring:
+  enabled: false
+  logs: false
+  metrics: false
+  pprof.enabled: false
+  use_output: default
+  http: # Needed if you already have an Elastic-Agent running on your machine
+    enabled: false
+    port: 7002
+
+agent.grpc: # Needed if you already have an Elastic-Agent running on your machine
+  address: localhost
+  port: 7001
+
+# This just reduces the amount of logs.
+agent.logging.metrics.enabled: false
+`
+
+func TestEventLogFile(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Stack: &define.Stack{},
+		Local: true,
+		Sudo:  false,
+	})
+
+	fmt.Println("Namespace:", info.Namespace)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	agentFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	esURL := startMockES(t)
+
+	logFilepath := path.Join(t.TempDir(), t.Name())
+	generateLogFile(t, logFilepath, time.Millisecond*100, 1)
+
+	cfg := fmt.Sprintf(eventLogConfig, esURL, logFilepath)
+
+	if err := agentFixture.Prepare(ctx); err != nil {
+		t.Fatalf("cannot prepare Elastic-Agent fixture: %s", err)
+	}
+
+	if err := agentFixture.Configure(ctx, []byte(cfg)); err != nil {
+		t.Fatalf("cannot configure Elastic-Agent fixture: %s", err)
+	}
+
+	cmd, err := agentFixture.PrepareAgentCommand(ctx, nil)
+	if err != nil {
+		t.Fatalf("cannot prepare Agent command: %s", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("could not start Elastic-Agent: %s", err)
+	}
+
+	// defer func() {
+	// 	for i := 0; i < 90; i++ {
+	// 		t.Log("sleeping after fail", i)
+	// 		time.Sleep(time.Second)
+	// 	}
+	// }()
+
+	// state := atesting.State{
+	// 	Configure: cfg,
+	// 	Reached: func(s *client.AgentState) bool {
+	// 		if s.State == client.Healthy {
+	// 			fmt.Println("==================== Agent is health")
+	// 			return true
+	// 		}
+	// 		return false
+	// 	},
+	// }
+	// if err := agentFixture.Run(ctx, state); err != nil {
+	// 	t.Fatalf("error running Elastic-Agent fixture: %s", err)
+	// }
+
+	for i := 0; i < 60*10; i++ {
+		t.Log("sleeping", i)
+		time.Sleep(time.Second)
+	}
+
+	cancel()
+	t.FailNow()
+}
+
+func startMockES(t *testing.T) string {
+	mux := http.NewServeMux()
+	registry := metrics.NewRegistry()
+	// go metrics.WriteJSON(metrics.DefaultRegistry, 5*time.Second, os.Stdout)
+	uid := uuid.New()
+	mux.Handle("/", mockes.NewAPIHandler(uid, registry, time.Now().Add(time.Hour), 0, 0, 100, 0))
+	s := httptest.NewServer(mux)
+	t.Log(s.URL)
+	t.Cleanup(s.Close)
+
+	return s.URL
 }
 
 func testMonitoringLogsAreShipped(
