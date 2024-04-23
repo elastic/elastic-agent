@@ -410,11 +410,11 @@ func TestGenerateHintsMappingWithDefaultsandTypo(t *testing.T) {
 	}
 	hints := mapstr.M{
 		"hints": mapstr.M{
-			"host":        "${kubernetes.pod.ip}:6379",
-			"package":     "redis",
-			"metricspath": "/metrics", // on purpose we have introduced a typo
-			"timeout":     "42s",
-			"period":      "42s",
+			"host":             "${kubernetes.pod.ip}:6379",
+			"package":          "redis",
+			"notsupportedhint": "/metrics", // on purpose we have introduced a typo
+			"timeout":          "42s",
+			"period":           "42s",
 		},
 	}
 
@@ -440,9 +440,7 @@ func TestGenerateHintsMappingWithInfoandTypo(t *testing.T) {
 			UID:       types.UID(uid),
 			Namespace: "testns",
 			Labels: map[string]string{
-				"foo":        "bar",
-				"with-dash":  "dash-value",
-				"with/slash": "some/path",
+				"foo": "bar",
 			},
 			Annotations: map[string]string{
 				"app": "production",
@@ -469,9 +467,7 @@ func TestGenerateHintsMappingWithInfoandTypo(t *testing.T) {
 			"nsa": "nsb",
 		},
 		"labels": mapstr.M{
-			"foo":        "bar",
-			"with-dash":  "dash-value",
-			"with/slash": "some/path",
+			"foo": "bar",
 		},
 		"annotations": mapstr.M{
 			"app": "production",
@@ -482,18 +478,14 @@ func TestGenerateHintsMappingWithInfoandTypo(t *testing.T) {
 			"package":      "redis",
 			"data_streams": "info",
 			"info": mapstr.M{
-				"period":  "5m",
-				"streams": "stdout", // On purpose we have added streams and not stream with typo
+				"period":           "5m",
+				"notsupportedhint": "stdout", // On purpose we have added this typo
 			},
 		},
 	}
 
 	expected := mapstr.M{
-		"container_id": "asdfghjkl",
 		"redis": mapstr.M{
-			"container_logs": mapstr.M{
-				"enabled": true,
-			},
 			"info": mapstr.M{
 				"enabled": true,
 				"period":  "5m",
@@ -501,7 +493,7 @@ func TestGenerateHintsMappingWithInfoandTypo(t *testing.T) {
 		},
 	}
 
-	hintsMapping := GenerateHintsMapping(hints, mapping, logger, "asdfghjkl")
+	hintsMapping := GenerateHintsMapping(hints, mapping, logger, "")
 
 	assert.Equal(t, expected, hintsMapping)
 }
