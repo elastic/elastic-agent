@@ -206,7 +206,7 @@ func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesti
 	require.NoError(t, err)
 
 	// check feature gate works
-	out, err = fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath, "--feature-gates", "foo.bar"})
+	out, err := fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath, "--feature-gates", "foo.bar"})
 	require.Error(t, err)
 	require.Contains(t, string(out), `no such feature gate "foo.bar"`)
 
