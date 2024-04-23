@@ -20,3 +20,6 @@ packages:
   github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker:
     interfaces:
       Acker:
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/info:
+    interfaces:
+      Agent:
