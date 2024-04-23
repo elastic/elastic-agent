@@ -375,9 +375,7 @@ func TestGenerateHintsMappingWithDefaultsandTypo(t *testing.T) {
 			UID:       types.UID(uid),
 			Namespace: "testns",
 			Labels: map[string]string{
-				"foo":        "bar",
-				"with-dash":  "dash-value",
-				"with/slash": "some/path",
+				"foo": "bar",
 			},
 			Annotations: map[string]string{
 				"app": "production",
@@ -404,9 +402,7 @@ func TestGenerateHintsMappingWithDefaultsandTypo(t *testing.T) {
 			"nsa": "nsb",
 		},
 		"labels": mapstr.M{
-			"foo":        "bar",
-			"with-dash":  "dash-value",
-			"with/slash": "some/path",
+			"foo": "bar",
 		},
 		"annotations": mapstr.M{
 			"app": "production",
