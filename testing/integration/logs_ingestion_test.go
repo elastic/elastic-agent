@@ -283,14 +283,12 @@ agent.logging.metrics.enabled: false
 `
 
 func TestEventLogFile(t *testing.T) {
-	info := define.Require(t, define.Requirements{
+	_ = define.Require(t, define.Requirements{
 		Group: Default,
 		Stack: &define.Stack{},
 		Local: true,
 		Sudo:  false,
 	})
-
-	fmt.Println("Namespace:", info.Namespace)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
@@ -322,34 +320,55 @@ func TestEventLogFile(t *testing.T) {
 		t.Fatalf("could not start Elastic-Agent: %s", err)
 	}
 
-	// defer func() {
-	// 	for i := 0; i < 90; i++ {
-	// 		t.Log("sleeping after fail", i)
-	// 		time.Sleep(time.Second)
-	// 	}
-	// }()
+	// Make sure the Elastic-Agent process is not running before
+	// exiting the test
+	t.Cleanup(func() {
+		_ = cmd.Wait()
+	})
 
-	// state := atesting.State{
-	// 	Configure: cfg,
-	// 	Reached: func(s *client.AgentState) bool {
-	// 		if s.State == client.Healthy {
-	// 			fmt.Println("==================== Agent is health")
-	// 			return true
-	// 		}
-	// 		return false
-	// 	},
-	// }
-	// if err := agentFixture.Run(ctx, state); err != nil {
-	// 	t.Fatalf("error running Elastic-Agent fixture: %s", err)
-	// }
+	// Now the Elastic-Agent is running, so validate the Event log file is there
 
-	for i := 0; i < 60*10; i++ {
-		t.Log("sleeping", i)
-		time.Sleep(time.Second)
+	entries, err := os.ReadDir(filepath.Join(agentFixture.WorkDir(), "data"))
+	if err != nil {
+		t.Fatalf("could not read test workdir: %s", err)
 	}
 
-	cancel()
-	t.FailNow()
+	var eaFolder string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+
+		if strings.HasPrefix(e.Name(), "elastic-agent") {
+			eaFolder = e.Name()
+			break
+		}
+	}
+	eventsLogFolder := filepath.Join(agentFixture.WorkDir(), "data", eaFolder, "logs", "events")
+
+	var logFileName string
+	require.Eventually(t, func() bool {
+		// We ignore this error because the folder might not be there.
+		// Once the folder and file are there, then this call should succeed
+		// and we can read the file.
+		// Because this error is expected and will happen in all test runs,
+		// we do not log it to avoid spamming the test output.
+		files, _ := os.ReadDir(eventsLogFolder)
+
+		if len(files) == 1 {
+			logFileName = filepath.Join(eventsLogFolder, files[0].Name())
+			return true
+		}
+
+		return false
+	}, time.Minute, time.Second, "could not find event log file")
+
+	logEntry, err := os.ReadFile(logFileName)
+	if err != nil {
+		t.Fatalf("cannot read file '%s': %s", logFileName, err)
+	}
+
+	strings.Contains(string(logEntry), "Cannot index event publisher.Event")
 }
 
 func startMockES(t *testing.T) string {
@@ -359,7 +378,6 @@ func startMockES(t *testing.T) string {
 	uid := uuid.New()
 	mux.Handle("/", mockes.NewAPIHandler(uid, registry, time.Now().Add(time.Hour), 0, 0, 100, 0))
 	s := httptest.NewServer(mux)
-	t.Log(s.URL)
 	t.Cleanup(s.Close)
 
 	return s.URL
