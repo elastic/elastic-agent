@@ -56,9 +56,15 @@ func newSettings(version string, configPaths []string) (*otelcol.CollectorSettin
 	converterSet := confmap.ConverterSettings{}
 	configProviderSettings := otelcol.ConfigProviderSettings{
 		ResolverSettings: confmap.ResolverSettings{
-			URIs:       configPaths,
-			Providers:  makeMapProvidersMap(fileprovider.New(), envprovider.New(), yamlprovider.New(), httpprovider.New(), httpsprovider.New()),
-			Converters: []confmap.Converter{expandconverter.New(converterSet)},
+			URIs: configPaths,
+			Providers: makeMapProvidersMap(
+				fileprovider.NewFactory().Create(confmap.ProviderSettings{}),
+				envprovider.NewFactory().Create(confmap.ProviderSettings{}),
+				yamlprovider.NewFactory().Create(confmap.ProviderSettings{}),
+				httpprovider.NewFactory().Create(confmap.ProviderSettings{}),
+				httpsprovider.NewFactory().Create(confmap.ProviderSettings{}),
+			),
+			Converters: []confmap.Converter{expandconverter.NewFactory().Create(converterSet)},
 		},
 	}
 	provider, err := otelcol.NewConfigProvider(configProviderSettings)
