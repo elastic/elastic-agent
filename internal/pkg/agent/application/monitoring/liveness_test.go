@@ -29,7 +29,7 @@ func (mc mockCoordinator) State() coordinator.State {
 	return mc.state
 }
 
-func (mc mockCoordinator) CoordinatorActive(_ time.Duration) bool {
+func (mc mockCoordinator) IsActive(_ time.Duration) bool {
 	return mc.isUp
 }
 

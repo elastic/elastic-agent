@@ -53,7 +53,7 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 		state := coord.State()
-		isUp := coord.CoordinatorActive(time.Second * 10)
+		isUp := coord.IsActive(time.Second * 10)
 		// the coordinator check is always on, so if that fails, always return false
 		if !isUp {
 			w.WriteHeader(http.StatusServiceUnavailable)
