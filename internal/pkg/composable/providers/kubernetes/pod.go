@@ -74,7 +74,7 @@ func NewPodEventer(
 		return nil, errors.New(err, "couldn't create kubernetes watcher")
 	}
 
-	var replicaSetWatcher, jobWatcher kubernetes.Watcher
+	var replicaSetWatcher, jobWatcher, namespaceWatcher, nodeWatcher kubernetes.Watcher
 
 	options := kubernetes.WatchOptions{
 		SyncTimeout: cfg.SyncPeriod,
@@ -82,15 +82,20 @@ func NewPodEventer(
 	}
 	metaConf := cfg.AddResourceMetadata
 
-	nodeWatcher, err := kubernetes.NewNamedWatcher("agent-node", client, &kubernetes.Node{}, options, nil)
-	if err != nil {
-		logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Node{}, err)
+	if metaConf.Node.Enabled() || cfg.Hints.Enabled {
+		nodeWatcher, err = kubernetes.NewNamedWatcher("agent-node", client, &kubernetes.Node{}, options, nil)
+		if err != nil {
+			logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Node{}, err)
+		}
 	}
-	namespaceWatcher, err := kubernetes.NewNamedWatcher("agent-namespace", client, &kubernetes.Namespace{}, kubernetes.WatchOptions{
-		SyncTimeout: cfg.SyncPeriod,
-	}, nil)
-	if err != nil {
-		logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
+
+	if metaConf.Namespace.Enabled() || cfg.Hints.Enabled {
+		namespaceWatcher, err = kubernetes.NewNamedWatcher("agent-namespace", client, &kubernetes.Namespace{}, kubernetes.WatchOptions{
+			SyncTimeout: cfg.SyncPeriod,
+		}, nil)
+		if err != nil {
+			logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
+		}
 	}
 
 	// Resource is Pod so we need to create watchers for Replicasets and Jobs that it might belong to
