@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -570,7 +571,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 	}
 
 	monitoringServer := &fakeMonitoringServer{}
-	newServerFn := func() (reload.ServerController, error) {
+	newServerFn := func(*monitoringCfg.MonitoringConfig) (reload.ServerController, error) {
 		return monitoringServer, nil
 	}
 	monitoringReloader := reload.NewServerReloader(newServerFn, logger, monitoringCfg.DefaultConfig())
@@ -1053,4 +1054,8 @@ func (fs *fakeMonitoringServer) Stop() error {
 func (fs *fakeMonitoringServer) Reset() {
 	fs.stopTriggered = false
 	fs.startTriggered = false
+}
+
+func (fs *fakeMonitoringServer) Addr() net.Addr {
+	return nil
 }
