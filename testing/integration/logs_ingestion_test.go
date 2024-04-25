@@ -270,16 +270,19 @@ agent.monitoring:
   metrics: false
   pprof.enabled: false
   use_output: default
-  http: # Needed if you already have an Elastic-Agent running on your machine
-    enabled: false
-    port: 7002
-
-agent.grpc: # Needed if you already have an Elastic-Agent running on your machine
-  address: localhost
-  port: 7001
 
 # This just reduces the amount of logs.
 agent.logging.metrics.enabled: false
+
+# Needed if you already have an Elastic-Agent running on your machine
+# That's very helpful for running the tests locally
+agent.monitoring:
+  http:
+    enabled: false
+    port: 7002
+agent.grpc:
+  address: localhost
+  port: 7001
 `
 
 func TestEventLogFile(t *testing.T) {
@@ -316,6 +319,10 @@ func TestEventLogFile(t *testing.T) {
 		t.Fatalf("cannot prepare Agent command: %s", err)
 	}
 
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("could not start Elastic-Agent: %s", err)
 	}
@@ -323,60 +330,59 @@ func TestEventLogFile(t *testing.T) {
 	// Make sure the Elastic-Agent process is not running before
 	// exiting the test
 	t.Cleanup(func() {
+		// Ignore the error because we cancelled the context,
+		// and that always returns an error
 		_ = cmd.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
 	})
 
-	// Now the Elastic-Agent is running, so validate the Event log file is there
-
-	entries, err := os.ReadDir(filepath.Join(agentFixture.WorkDir(), "data"))
-	if err != nil {
-		t.Fatalf("could not read test workdir: %s", err)
-	}
-
-	var eaFolder string
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-
-		if strings.HasPrefix(e.Name(), "elastic-agent") {
-			eaFolder = e.Name()
-			break
-		}
-	}
-	eventsLogFolder := filepath.Join(agentFixture.WorkDir(), "data", eaFolder, "logs", "events")
-
+	// Now the Elastic-Agent is running, so validate the Event log file.
+	// Because the path changes based on the Elastic-Agent version, we
+	// use glob to find the file
 	var logFileName string
 	require.Eventually(t, func() bool {
 		// We ignore this error because the folder might not be there.
 		// Once the folder and file are there, then this call should succeed
 		// and we can read the file.
-		// Because this error is expected and will happen in all test runs,
-		// we do not log it to avoid spamming the test output.
-		files, _ := os.ReadDir(eventsLogFolder)
+		glob := filepath.Join(agentFixture.WorkDir(), "data", "elastic-agent-*", "logs", "events", "*")
+		files, err := filepath.Glob(glob)
+		if err != nil {
+			t.Fatalf("could not scan for the events log file: %s", err)
+		}
 
 		if len(files) == 1 {
-			logFileName = filepath.Join(eventsLogFolder, files[0].Name())
+			logFileName = files[0]
 			return true
 		}
 
 		return false
+
 	}, time.Minute, time.Second, "could not find event log file")
 
-	logEntry, err := os.ReadFile(logFileName)
+	logEntryBytes, err := os.ReadFile(logFileName)
 	if err != nil {
 		t.Fatalf("cannot read file '%s': %s", logFileName, err)
 	}
 
-	strings.Contains(string(logEntry), "Cannot index event publisher.Event")
+	logEntry := string(logEntryBytes)
+	expectedStr := "Cannot index event publisher.Event"
+	if !strings.Contains(logEntry, expectedStr) {
+		t.Errorf("did not find the expected log entry ('%s') in the events log file", expectedStr)
+		t.Log("Event log file contents:")
+		t.Log(logEntry)
+	}
 }
 
 func startMockES(t *testing.T) string {
-	mux := http.NewServeMux()
 	registry := metrics.NewRegistry()
-	// go metrics.WriteJSON(metrics.DefaultRegistry, 5*time.Second, os.Stdout)
 	uid := uuid.New()
+
+	mux := http.NewServeMux()
 	mux.Handle("/", mockes.NewAPIHandler(uid, registry, time.Now().Add(time.Hour), 0, 0, 100, 0))
+
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)
 
