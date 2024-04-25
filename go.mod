@@ -1,6 +1,7 @@
 module github.com/elastic/elastic-agent
 
 go 1.21
+toolchain go1.22.2
 
 require (
 	github.com/Microsoft/go-winio v0.6.1
@@ -41,11 +42,11 @@ require (
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c
 	github.com/oklog/ulid v1.3.1
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.98.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.98.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.98.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.98.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.98.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.99.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.99.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.99.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.99.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.99.0
 	github.com/otiai10/copy v1.14.0
 	github.com/pierrre/gotestcover v0.0.0-20160517101806-924dca7d15f0
 	github.com/pkg/errors v0.9.1
@@ -125,7 +126,7 @@ require (
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
-	github.com/expr-lang/expr v1.16.4 // indirect
+	github.com/expr-lang/expr v1.16.5 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
@@ -178,12 +179,12 @@ require (
 	github.com/mostynb/go-grpc-compression v1.2.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.98.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.98.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.98.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.98.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.98.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.98.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.99.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.99.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.99.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.99.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.99.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.99.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
