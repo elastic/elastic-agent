@@ -22,6 +22,7 @@ import (
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"                                              // for putting backpressure when approach a memory limit
 
 	// Exporters:
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"                           // for dev
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
@@ -57,6 +58,7 @@ func components() (otelcol.Factories, error) {
 		otlpexporter.NewFactory(),
 		debugexporter.NewFactory(),
 		fileexporter.NewFactory(),
+		elasticsearchexporter.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
