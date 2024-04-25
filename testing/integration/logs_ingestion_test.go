@@ -23,6 +23,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/hectane/go-acl"
+
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -34,8 +37,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
-	"github.com/google/uuid"
-	"github.com/hectane/go-acl"
 
 	mockes "github.com/leehinman/mock-es"
 	"github.com/rcrowley/go-metrics"
