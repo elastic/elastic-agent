@@ -16,10 +16,11 @@ import (
 
 	// Processors:
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
-	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"     // for modifying resource attributes
-	transformprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor"   // for OTTL processing on logs
-	"go.opentelemetry.io/collector/processor/batchprocessor"                                                      // for batching events
-	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"                                              // for putting backpressure when approach a memory limit
+	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
+	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"   // for modifying resource attributes
+	transformprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor" // for OTTL processing on logs
+	"go.opentelemetry.io/collector/processor/batchprocessor"                                                    // for batching events
+	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"                                            // for putting backpressure when approach a memory limit
 
 	// Exporters:
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
@@ -47,6 +48,7 @@ func components() (otelcol.Factories, error) {
 		resourceprocessor.NewFactory(),
 		attributesprocessor.NewFactory(),
 		transformprocessor.NewFactory(),
+		filterprocessor.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

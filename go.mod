@@ -87,6 +87,7 @@ require (
 	// Do NOT upgrade the version beyond 0.97.0 until https://github.com/open-telemetry/opentelemetry-collector/issues/10031 is fixed!
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.97.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.97.0
