@@ -219,11 +219,18 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if !excludeEvents {
 		go func() {
 			logsDir := filepath.Join(logsDir, "events")
-			// uncomment for debugging
-			// fmt.Fprintf(streams.Err, "logs dir: %q", logsDir)
-			err := printLogs(cmd.Context(), streams.Out, logsDir, lines, follow, filter, modifier)
-			if err != nil {
-				errChan <- fmt.Errorf("failed to get logs: %w", err)
+			// The event log folder might not exist, so we keep trying every five seconds
+			for {
+				// uncomment for debugging
+				// fmt.Fprintf(streams.Err, "logs dir: %q", logsDir)
+				err := printLogs(cmd.Context(), streams.Out, logsDir, lines, follow, filter, modifier)
+				if err != nil {
+					if !strings.Contains(err.Error(), "logs/events: no such file or directory") {
+						errChan <- fmt.Errorf("failed to get event logs: %w", err)
+						return
+					}
+					time.Sleep(5 * time.Second)
+				}
 			}
 		}()
 	}
