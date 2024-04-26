@@ -487,7 +487,7 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvent
 				Modified: ts,
 			})
 			if err != nil {
-				return fmt.Errorf("unable to creatVe log directory in archive: %w", err)
+				return fmt.Errorf("unable to create log directory in archive: %w", err)
 			}
 			return nil
 		}

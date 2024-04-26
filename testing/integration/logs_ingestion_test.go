@@ -294,7 +294,10 @@ func TestEventLogFile(t *testing.T) {
 		Sudo:  false,
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(
+		t,
+		context.Background(),
+		time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	agentFixture, err := define.NewFixture(t, define.Version())
@@ -317,7 +320,7 @@ func TestEventLogFile(t *testing.T) {
 
 	cmd, err := agentFixture.PrepareAgentCommand(ctx, nil)
 	if err != nil {
-		t.Fatalf("cannot prepare Agent command: %s", err)
+		t.Fatalf("cannot prepare Elastic-Agent command: %s", err)
 	}
 
 	output := strings.Builder{}
@@ -348,7 +351,9 @@ func TestEventLogFile(t *testing.T) {
 		// We ignore this error because the folder might not be there.
 		// Once the folder and file are there, then this call should succeed
 		// and we can read the file.
-		glob := filepath.Join(agentFixture.WorkDir(), "data", "elastic-agent-*", "logs", "events", "*")
+		glob := filepath.Join(
+			agentFixture.WorkDir(),
+			"data", "elastic-agent-*", "logs", "events", "*")
 		files, err := filepath.Glob(glob)
 		if err != nil {
 			t.Fatalf("could not scan for the events log file: %s", err)
@@ -371,7 +376,9 @@ func TestEventLogFile(t *testing.T) {
 	logEntry := string(logEntryBytes)
 	expectedStr := "Cannot index event publisher.Event"
 	if !strings.Contains(logEntry, expectedStr) {
-		t.Errorf("did not find the expected log entry ('%s') in the events log file", expectedStr)
+		t.Errorf(
+			"did not find the expected log entry ('%s') in the events log file",
+			expectedStr)
 		t.Log("Event log file contents:")
 		t.Log(logEntry)
 	}
@@ -379,10 +386,26 @@ func TestEventLogFile(t *testing.T) {
 	// The diagnostics command is already tested by another test,
 	// here we just want to validate the events log behaviour
 	// extract the zip file into a temp folder
-	expectedLogFiles, expectedEventLogFiles := getLogFilenames(t, filepath.Join(agentFixture.WorkDir(), "data", "elastic-agent-*", "logs"))
+	expectedLogFiles, expectedEventLogFiles := getLogFilenames(
+		t,
+		filepath.Join(agentFixture.WorkDir(),
+			"data",
+			"elastic-agent-*",
+			"logs"))
 
-	collectDiagnosticsAndVeriflyLogs(t, ctx, agentFixture, []string{"diagnostics", "collect"}, append(expectedLogFiles, expectedEventLogFiles...))
-	collectDiagnosticsAndVeriflyLogs(t, ctx, agentFixture, []string{"diagnostics", "collect", "--exclude-events"}, expectedLogFiles)
+	collectDiagnosticsAndVeriflyLogs(
+		t,
+		ctx,
+		agentFixture,
+		[]string{"diagnostics", "collect"},
+		append(expectedLogFiles, expectedEventLogFiles...))
+
+	collectDiagnosticsAndVeriflyLogs(
+		t,
+		ctx,
+		agentFixture,
+		[]string{"diagnostics", "collect", "--exclude-events"},
+		expectedLogFiles)
 }
 
 func collectDiagnosticsAndVeriflyLogs(
@@ -399,13 +422,23 @@ func collectDiagnosticsAndVeriflyLogs(
 
 	extractionDir := t.TempDir()
 	extractZipArchive(t, diagPath, extractionDir)
-	diagLogFiles, diagEventLogFiles := getLogFilenames(t, filepath.Join(extractionDir, "logs", "elastic-agent*"))
+	diagLogFiles, diagEventLogFiles := getLogFilenames(
+		t,
+		filepath.Join(extractionDir, "logs", "elastic-agent*"))
 	allLogs := append(diagLogFiles, diagEventLogFiles...)
 
-	require.ElementsMatch(t, expectedFiles, allLogs, "expected: 'listA', got: 'listB'")
+	require.ElementsMatch(
+		t,
+		expectedFiles,
+		allLogs,
+		"expected: 'listA', got: 'listB'")
 }
 
-func getLogFilenames(t *testing.T, basepath string) (logFiles, eventLogFiles []string) {
+func getLogFilenames(
+	t *testing.T,
+	basepath string,
+) (logFiles, eventLogFiles []string) {
+
 	logFilesGlob := filepath.Join(basepath, "*.ndjson")
 	logFilesPath, err := filepath.Glob(logFilesGlob)
 	if err != nil {
@@ -434,7 +467,10 @@ func startMockES(t *testing.T) string {
 	uid := uuid.New()
 
 	mux := http.NewServeMux()
-	mux.Handle("/", mockes.NewAPIHandler(uid, registry, time.Now().Add(time.Hour), 0, 0, 100, 0))
+	mux.Handle("/", mockes.NewAPIHandler(
+		uid,
+		registry,
+		time.Now().Add(time.Hour), 0, 0, 100, 0))
 
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)
