@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	logFilePattern  = regexp.MustCompile(`elastic-agent-(\d+)(-\d+)?\.ndjson$`)
+	logFilePattern  = regexp.MustCompile(`elastic-agent(-event-log)?-(\d+)(-\d+)?\.ndjson$`)
 	errLineFiltered = errors.New("this line was filtered out")
 )
 
@@ -176,6 +176,7 @@ func newLogsCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.Flags().BoolP("follow", "f", false, "Do not stop when end of file is reached, but rather to wait for additional data to be appended to the log file.")
 	cmd.Flags().BoolP("no-color", "", false, "Do not apply colors to different log levels.")
 	cmd.Flags().IntP("number", "n", 10, "Maximum number of lines at the end of logs to output.")
+	cmd.Flags().Bool("exclude-events", false, "Excludes events log files")
 
 	cmd.Flags().StringP("component", "C", "", "Filter logs and output only logs for the given component ID.")
 
@@ -187,6 +188,7 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	lines, _ := cmd.Flags().GetInt("number")
 	follow, _ := cmd.Flags().GetBool("follow")
 	noColor, _ := cmd.Flags().GetBool("no-color")
+	excludeEvents, _ := cmd.Flags().GetBool("exclude-events")
 
 	var (
 		filter   filterFunc
@@ -205,9 +207,29 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	// uncomment for debugging
 	// fmt.Fprintf(streams.Err, "logs dir: %q", logsDir)
 
-	err := printLogs(cmd.Context(), streams.Out, logsDir, lines, follow, filter, modifier)
-	if err != nil {
-		return fmt.Errorf("failed to get logs: %w", err)
+	errChan := make(chan error)
+
+	go func() {
+		err := printLogs(cmd.Context(), streams.Out, logsDir, lines, follow, filter, modifier)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to get logs: %w", err)
+		}
+	}()
+
+	if !excludeEvents {
+		go func() {
+			logsDir := filepath.Join(logsDir, "events")
+			// uncomment for debugging
+			// fmt.Fprintf(streams.Err, "logs dir: %q", logsDir)
+			err := printLogs(cmd.Context(), streams.Out, logsDir, lines, follow, filter, modifier)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to get logs: %w", err)
+			}
+		}()
+	}
+
+	if err := <-errChan; err != nil {
+		return err
 	}
 
 	return nil
@@ -424,20 +446,20 @@ func sortLogFilenames(filenames []string) {
 		switch {
 
 		// e.g. elastic-agent-20230515-1.ndjson vs elastic-agent-20230515-2.ndjson
-		case iGroups[1] == jGroups[1] && iGroups[2] != "" && jGroups[2] != "":
-			return iGroups[2] < jGroups[2]
+		case iGroups[2] == jGroups[2] && iGroups[3] != "" && jGroups[3] != "":
+			return iGroups[3] < jGroups[3]
 
 		// e.g. elastic-agent-20230515.ndjson vs elastic-agent-20230515-1.ndjson
-		case iGroups[1] == jGroups[1] && iGroups[2] != "":
+		case iGroups[2] == jGroups[2] && iGroups[3] != "":
 			return false
 
 		// e.g. elastic-agent-20230515-1.ndjson vs elastic-agent-20230515.ndjson
-		case iGroups[1] == jGroups[1] && jGroups[2] != "":
+		case iGroups[2] == jGroups[2] && jGroups[3] != "":
 			return true
 
 		// e.g. elastic-agent-20230515.ndjson vs elastic-agent-20230516.ndjson
 		default:
-			return iGroups[1] < jGroups[1]
+			return iGroups[2] < jGroups[2]
 		}
 	})
 }
