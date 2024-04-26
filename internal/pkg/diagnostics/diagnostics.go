@@ -171,7 +171,14 @@ func CreateCPUProfile(ctx context.Context, period time.Duration) ([]byte, error)
 
 // ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics and local logs.
 // If any error is encountered when writing the contents of the archive it is returned.
-func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult, compDiags []client.DiagnosticComponentResult) error {
+func ZipArchive(
+	errOut,
+	w io.Writer,
+	agentDiag []client.DiagnosticFileResult,
+	unitDiags []client.DiagnosticUnitResult,
+	compDiags []client.DiagnosticComponentResult,
+	excludeEvents bool) error {
+
 	ts := time.Now().UTC()
 	zw := zip.NewWriter(w)
 	defer zw.Close()
@@ -291,7 +298,7 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 	}
 
 	// Gather Logs:
-	return zipLogs(zw, ts)
+	return zipLogs(zw, ts, excludeEvents)
 }
 
 func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
@@ -389,12 +396,12 @@ func redactKey(k string) bool {
 		strings.Contains(k, "key")
 }
 
-func zipLogs(zw *zip.Writer, ts time.Time) error {
+func zipLogs(zw *zip.Writer, ts time.Time, excludeEvents bool) error {
 	currentDir := filepath.Base(paths.Home())
 	if !paths.IsVersionHome() {
 		// running in a container with custom top path set
 		// logs are directly under top path
-		return zipLogsWithPath(paths.Home(), currentDir, true, zw, ts)
+		return zipLogsWithPath(paths.Home(), currentDir, true, excludeEvents, zw, ts)
 	}
 
 	dataDir, err := os.Open(paths.Data())
@@ -415,7 +422,7 @@ func zipLogs(zw *zip.Writer, ts time.Time) error {
 		}
 		collectServices := dir == currentDir
 		path := filepath.Join(paths.Data(), dir)
-		if err := zipLogsWithPath(path, dir, collectServices, zw, ts); err != nil {
+		if err := zipLogsWithPath(path, dir, collectServices, excludeEvents, zw, ts); err != nil {
 			return err
 		}
 	}
@@ -424,7 +431,7 @@ func zipLogs(zw *zip.Writer, ts time.Time) error {
 }
 
 // zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
-func zipLogsWithPath(pathsHome, commitName string, collectServices bool, zw *zip.Writer, ts time.Time) error {
+func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvents bool, zw *zip.Writer, ts time.Time) error {
 	_, err := zw.CreateHeader(&zip.FileHeader{
 		Name:     "logs/",
 		Method:   zip.Deflate,
@@ -466,6 +473,11 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices bool, zw *zip
 			return nil
 		}
 
+		// Skip events logs, if necessary
+		if excludeEvents && strings.HasPrefix(name, "events") {
+			return nil
+		}
+
 		name = filepath.Join(commitName, name)
 
 		if d.IsDir() {
@@ -475,7 +487,7 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices bool, zw *zip
 				Modified: ts,
 			})
 			if err != nil {
-				return fmt.Errorf("unable to create log directory in archive: %w", err)
+				return fmt.Errorf("unable to creatVe log directory in archive: %w", err)
 			}
 			return nil
 		}
