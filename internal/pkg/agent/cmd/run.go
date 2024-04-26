@@ -638,16 +638,12 @@ func setupMetrics(
 		Host:    monitoring.AgentMonitoringEndpoint(operatingSystem, cfg),
 	}
 
-	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg), operatingSystem, cfg)
+	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, operatingSystem, cfg)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}
 
 	return s, nil
-}
-
-func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
-	return cfg != nil && cfg.HTTP.Enabled
 }
 
 // handleUpgrade checks if agent is being run as part of an

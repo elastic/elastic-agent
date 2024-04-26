@@ -39,23 +39,25 @@ type MonitoringConfig struct {
 type MonitoringHTTPConfig struct {
 	Enabled bool          `yaml:"enabled" config:"enabled"`
 	Host    string        `yaml:"host" config:"host"`
-	Port    int           `yaml:"port" config:"port" validate:"min=0,max=65535,nonzero"`
+	Port    int           `yaml:"port" config:"port" validate:"min=0,max=65535"`
 	Buffer  *BufferConfig `yaml:"buffer" config:"buffer"`
+	// EnabledIsSet is set during the Unpack() operation, and will be set to true if `Enabled` has been manually set by the incoming yaml
+	// This is done so we can distinguish between a default value supplied by the code, and a user-supplied value
+	EnabledIsSet bool `yaml:"-" config:"-"`
 }
 
 // Unpack reads a config object into the settings.
 func (c *MonitoringHTTPConfig) Unpack(cfg *c.C) error {
 	// do not use MonitoringHTTPConfig, it will end up in a loop
 	tmp := struct {
-		Enabled bool          `yaml:"enabled" config:"enabled"`
+		Enabled *bool         `yaml:"enabled" config:"enabled"`
 		Host    string        `yaml:"host" config:"host"`
-		Port    int           `yaml:"port" config:"port" validate:"min=0,max=65535,nonzero"`
+		Port    int           `yaml:"port" config:"port" validate:"min=0,max=65535"`
 		Buffer  *BufferConfig `yaml:"buffer" config:"buffer"`
 	}{
-		Enabled: c.Enabled,
-		Host:    c.Host,
-		Port:    c.Port,
-		Buffer:  c.Buffer,
+		Host:   c.Host,
+		Port:   c.Port,
+		Buffer: c.Buffer,
 	}
 
 	if err := cfg.Unpack(&tmp); err != nil {
@@ -66,12 +68,25 @@ func (c *MonitoringHTTPConfig) Unpack(cfg *c.C) error {
 		tmp.Host = DefaultHost
 	}
 
-	*c = MonitoringHTTPConfig{
-		Enabled: tmp.Enabled,
-		Host:    tmp.Host,
-		Port:    tmp.Port,
-		Buffer:  tmp.Buffer,
+	set := MonitoringHTTPConfig{
+		Host:   tmp.Host,
+		Port:   tmp.Port,
+		Buffer: tmp.Buffer,
 	}
+
+	// this logic is here to help us distinguish between `http.enabled` being manually set after unpacking,
+	// and whatever a user-specified default may be.
+	// This is needed in order to prevent a larger set of breaking changes where fleet doesn't expect the HTTP monitor to be live-reloadable
+	// see https://github.com/elastic/elastic-agent/issues/4582
+	if tmp.Enabled == nil {
+		set.EnabledIsSet = false
+		set.Enabled = c.Enabled
+	} else {
+		set.EnabledIsSet = true
+		set.Enabled = *tmp.Enabled
+	}
+
+	*c = set
 
 	return nil
 }
