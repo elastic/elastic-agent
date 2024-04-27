@@ -43,6 +43,34 @@ inputs:
     message: Healthy
 `
 
+var simpleIsolatedUnitsConfig = `
+outputs:
+  default:
+    type: fake-action-output
+    shipper.enabled: true
+inputs:
+  - id: fake-isolated-units
+    type: fake-isolated-units
+    state: 1
+    message: Configuring
+`
+
+var complexIsolatedUnitsConfig = `
+outputs:
+  default:
+    type: fake-action-output
+    shipper.enabled: true
+inputs:
+  - id: fake-isolated-units
+    type: fake-isolated-units
+    state: 2
+    message: Healthy
+  - id: fake-isolated-units-1
+    type: fake-isolated-units
+    state: 2
+    message: Healthy
+`
+
 func TestFakeComponent(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
@@ -95,6 +123,81 @@ func TestFakeComponent(t *testing.T) {
 						State: atesting.NewClientState(client.Healthy),
 					},
 					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+}
+
+func TestFakeIsolatedUnitsComponent(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+	})
+
+	f, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	require.NoError(t, err)
+
+	err = f.Run(ctx, atesting.State{
+		Configure:  simpleIsolatedUnitsConfig,
+		AgentState: atesting.NewClientState(client.Healthy),
+		Components: map[string]atesting.ComponentState{
+			"fake-isolated-units-default-fake-isolated-units": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-unit"}: {
+						State: atesting.NewClientState(client.Configuring),
+					},
+				},
+			},
+		},
+	}, atesting.State{
+		Configure:  complexIsolatedUnitsConfig,
+		AgentState: atesting.NewClientState(client.Healthy),
+		Components: map[string]atesting.ComponentState{
+			"fake-isolated-units-default-fake-isolated-units": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-unit"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+				},
+			},
+			"fake-isolated-units-default-fake-isolated-units-1": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-isolated-units-default-fake-isolated-units-1"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1-unit"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+				},
+			},
+			"fake-shipper-default": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 				},

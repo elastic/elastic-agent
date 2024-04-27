@@ -85,7 +85,7 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 func DownloadComponentsFromManifest(manifest string, platforms []string, platformPackages map[string]string, dropPath string) error {
 	componentSpec := map[string][]string{
 		"apm-server":            {"apm-server"},
-		"beats":                 {"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat"},
+		"beats":                 {"agentbeat"},
 		"cloud-defend":          {"cloud-defend"},
 		"cloudbeat":             {"cloudbeat"},
 		"elastic-agent-shipper": {"elastic-agent-shipper"},
