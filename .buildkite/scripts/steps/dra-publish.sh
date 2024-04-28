@@ -8,6 +8,9 @@ COMMIT="${DRA_COMMIT:="${BUILDKITE_COMMIT:=""}"}"
 BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 PACKAGE_VERSION="${DRA_VERSION:="${BEAT_VERSION:=""}"}"
 
+# XXX DO NOT MERGE THIS
+BRANCH="8.13"
+
 # force main branch on PR's or it won't execute
 # because the PR branch does not have a project folder in release-manager
 if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
