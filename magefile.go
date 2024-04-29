@@ -42,7 +42,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
 	"github.com/elastic/elastic-agent/pkg/version"
 	bversion "github.com/elastic/elastic-agent/version"
 
