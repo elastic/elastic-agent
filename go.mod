@@ -1,6 +1,7 @@
 module github.com/elastic/elastic-agent
 
-go 1.21
+go 1.21.0
+
 toolchain go1.22.2
 
 require (
