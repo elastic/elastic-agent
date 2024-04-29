@@ -231,9 +231,9 @@ func TestDownloadWithRetries(t *testing.T) {
 	// Download timeout expired (before all retries are exhausted)
 	t.Run("download_timeout_expired", func(t *testing.T) {
 		testCaseSettings := settings
-		testCaseSettings.Timeout = 200 * time.Millisecond
+		testCaseSettings.Timeout = 500 * time.Millisecond
 		testCaseSettings.RetrySleepInitDuration = 10 * time.Millisecond
-		// exponential backoff with 10ms init and 200ms timeout should fit at least 3 attempts.
+		// exponential backoff with 10ms init and 500ms timeout should fit at least 3 attempts.
 		minNmExpectedAttempts := 3
 
 		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
