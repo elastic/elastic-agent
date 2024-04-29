@@ -36,7 +36,7 @@ require (
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901
 	github.com/josephspurrier/goversioninfo v0.0.0-20190209210621-63e6d1acd3dd
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
-	github.com/leehinman/mock-es v0.0.0-00010101000000-000000000000
+	github.com/leehinman/mock-es v0.0.0-20240429182736-ca60117f3957
 	github.com/magefile/mage v1.15.0
 	github.com/mitchellh/gox v1.0.1
 	github.com/mitchellh/hashstructure v1.1.0
@@ -296,5 +296,3 @@ replace (
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
-
-replace github.com/leehinman/mock-es => github.com/belimawr/mock-es v0.0.0-20240424124850-20abd99ad3f7
