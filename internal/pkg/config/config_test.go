@@ -78,6 +78,22 @@ func testToMapStr(t *testing.T) {
 	assert.True(t, reflect.DeepEqual(m, nm))
 }
 
+func TestCommaParsing(t *testing.T) {
+	_ = os.Setenv("testname", "motmot")
+	// test to make sure that we don't blow up the parsers when we have a `,` in a string
+	inMap := map[string]interface{}{
+		"test": "startsWith('${testname}','motmot')",
+	}
+	outMap := map[string]interface{}{
+		"test": "startsWith('motmot','motmot')",
+	}
+	c := MustNewConfigFrom(inMap)
+	parsedMap, err := c.ToMapStr()
+	require.NoError(t, err)
+	t.Logf("got :%#v", parsedMap)
+	require.Equal(t, outMap, parsedMap)
+}
+
 func testLoadFiles(t *testing.T) {
 	tmp, err := os.MkdirTemp("", "watch")
 	require.NoError(t, err)

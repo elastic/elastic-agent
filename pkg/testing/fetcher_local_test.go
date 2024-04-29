@@ -28,9 +28,13 @@ func TestLocalFetcher(t *testing.T) {
 	snapshotContentHash := []byte("snapshot contents hash")
 	noSnapshotContent := []byte("not snapshot contents")
 	noSnapshotContentHash := []byte("not snapshot contents hash")
+	pkgFormat := "targz"
+	if runtime.GOOS == "windows" {
+		pkgFormat = "zip"
+	}
 
 	testdata := t.TempDir()
-	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH)
+	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH, pkgFormat)
 	require.NoError(t, err)
 
 	snapshotPath := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s", baseVersion, suffix)
@@ -92,8 +96,12 @@ func TestLocalFetcher(t *testing.T) {
 		tmp := t.TempDir()
 
 		f := LocalFetcher(testdata, tc.opts...)
+		pkgFormat := "targz"
+		if runtime.GOOS == "windows" {
+			pkgFormat = "zip"
+		}
 		got, err := f.Fetch(
-			context.Background(), runtime.GOOS, runtime.GOARCH, tc.version)
+			context.Background(), runtime.GOOS, runtime.GOARCH, tc.version, pkgFormat)
 		require.NoError(t, err)
 
 		err = got.Fetch(context.Background(), t, tmp)

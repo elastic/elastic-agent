@@ -11,7 +11,7 @@ MAGE_SUBTARGET="${3:-""}"
 # Override the agent package version using a string with format <major>.<minor>.<patch>
 # NOTE: use only after version bump when the new version is not yet available, for example:
 # OVERRIDE_AGENT_PACKAGE_VERSION="8.10.3" otherwise OVERRIDE_AGENT_PACKAGE_VERSION="".
-OVERRIDE_AGENT_PACKAGE_VERSION=""
+OVERRIDE_AGENT_PACKAGE_VERSION="8.14.0"
 
 if [[ -n "$OVERRIDE_AGENT_PACKAGE_VERSION" ]]; then
   OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
@@ -19,7 +19,7 @@ else
  OVERRIDE_TEST_AGENT_VERSION=""
 fi
 # PACKAGE
-AGENT_PACKAGE_VERSION="${OVERRIDE_AGENT_PACKAGE_VERSION}" DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64,windows/amd64 PACKAGES=tar.gz,zip mage package
+AGENT_PACKAGE_VERSION="${OVERRIDE_AGENT_PACKAGE_VERSION}" DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64,windows/amd64 PACKAGES=tar.gz,zip,rpm,deb mage package
 
 # Run integration tests
 set +e

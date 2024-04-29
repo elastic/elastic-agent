@@ -121,7 +121,7 @@ func TestDownloadBodyError(t *testing.T) {
 	infoLogs := obs.FilterLevelExact(zapcore.InfoLevel).TakeAll()
 	warnLogs := obs.FilterLevelExact(zapcore.WarnLevel).TakeAll()
 
-	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/filebeat/filebeat", version, "linux-x86_64.tar.gz")
+	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/agentbeat/agentbeat", version, "linux-x86_64.tar.gz")
 	expectedMsg := fmt.Sprintf("download from %s failed at 0B @ NaNBps: unexpected EOF", expectedURL)
 	require.GreaterOrEqual(t, len(infoLogs), 1, "download error not logged at info level")
 	assert.True(t, containsMessage(infoLogs, expectedMsg))
@@ -173,7 +173,7 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
 
-	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/filebeat/filebeat", version, "linux-x86_64.tar.gz")
+	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/agentbeat/agentbeat", version, "linux-x86_64.tar.gz")
 	expectedProgressRegexp := regexp.MustCompile(
 		`^download progress from ` + expectedURL + `(.sha512)? is \S+/\S+ \(\d+\.\d{2}% complete\) @ \S+$`,
 	)
@@ -256,7 +256,7 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
 
-	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/filebeat/filebeat", version, "linux-x86_64.tar.gz")
+	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/agentbeat/agentbeat", version, "linux-x86_64.tar.gz")
 	expectedProgressRegexp := regexp.MustCompile(
 		`^download progress from ` + expectedURL + `(.sha512)? has fetched \S+ @ \S+$`,
 	)

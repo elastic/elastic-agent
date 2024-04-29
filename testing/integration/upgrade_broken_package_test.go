@@ -32,6 +32,8 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
+	t.Skip("Skip until the first 8.15.0-SNAPSHOT is available")
+
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -45,7 +47,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	require.NoError(t, err)
 	endFixture, err := atesting.NewFixture(
 		t,
-		upgradeToVersion,
+		upgradeToVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)

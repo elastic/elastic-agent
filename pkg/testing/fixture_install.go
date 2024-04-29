@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -64,20 +65,9 @@ type InstallOpts struct {
 	ProxyURL       string // --proxy-url
 	DelayEnroll    bool   // --delay-enroll
 
-	// Unprivileged by default installs the Elastic Agent as `--unprivileged` unless
-	// the platform being tested doesn't currently support it, or it's explicitly set
-	// to false.
-	Unprivileged *bool // --unprivileged
+	Privileged bool // inverse of --unprivileged (as false is the default)
 
 	EnrollOpts
-}
-
-func (i InstallOpts) IsUnprivileged(operatingSystem string) bool {
-	if i.Unprivileged == nil {
-		// not explicitly set, default to true on Linux only (until other platforms support it)
-		return operatingSystem == "linux"
-	}
-	return *i.Unprivileged
 }
 
 func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
@@ -100,23 +90,13 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	if i.DelayEnroll {
 		args = append(args, "--delay-enroll")
 	}
-
-	unprivileged := i.IsUnprivileged(operatingSystem)
-	if unprivileged {
-		if operatingSystem != "linux" {
-			return nil, fmt.Errorf("--unprivileged cannot be set to true unless testing is being done on Linux")
-		}
+	if !i.Privileged {
 		args = append(args, "--unprivileged")
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
 
 	return args, nil
-}
-
-// NewBool returns a boolean pointer.
-func NewBool(value bool) *bool {
-	return &value
 }
 
 // Install installs the prepared Elastic Agent binary and registers a t.Cleanup
@@ -132,11 +112,34 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	// check for running agents before installing, but proceed anyway
 	assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
 
-	installArgs := []string{"install"}
+	switch f.packageFormat {
+	case "targz", "zip":
+		return f.installNoPkgManager(ctx, installOpts, opts)
+	case "deb":
+		return f.installDeb(ctx, installOpts, opts)
+	case "rpm":
+		return f.installRpm(ctx, installOpts, opts)
+	default:
+		return nil, fmt.Errorf("package format %s isn't supported yet", f.packageFormat)
+	}
+}
+
+// installNoPkgManager installs the prepared Elastic Agent binary from
+// the tgz or zip archive and registers a t.Cleanup function to
+// uninstall the agent if it hasn't been uninstalled. It also takes
+// care of collecting a diagnostics when AGENT_COLLECT_DIAG=true or
+// the test has failed.
+// It returns:
+//   - the combined output of Install command stdout and stderr
+//   - an error if any.
+func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture installNoPkgManager function", f.t.Name())
 	if installOpts == nil {
 		// default options when not provided
 		installOpts = &InstallOpts{}
 	}
+
+	installArgs := []string{"install"}
 	installOptsArgs, err := installOpts.toCmdArgs(f.operatingSystem)
 	if err != nil {
 		return nil, err
@@ -162,7 +165,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 		// Windows uses a fixed named pipe, that is always the same.
 		// It is the same even running in unprivileged mode.
 		socketPath = paths.WindowsControlSocketInstalledPath
-	} else if installOpts.IsUnprivileged(f.operatingSystem) {
+	} else if !installOpts.Privileged {
 		// Unprivileged versions move the socket to inside the installed directory
 		// of the Elastic Agent.
 		socketPath = paths.ControlSocketFromPath(runtime.GOOS, f.workDir)
@@ -186,7 +189,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 			f.t.Logf("Dumping running processes in %s", filePath)
 			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 			if err != nil {
-				f.t.Logf("failed to dump process; failed to create output file %s root: %s", file.Name(), err)
+				f.t.Logf("failed to dump process; failed to create output file %s root: %s", filePath, err)
 				return
 			}
 			defer func(file *os.File) {
@@ -339,6 +342,155 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	return processes
 }
 
+// installDeb installs the prepared Elastic Agent binary from the deb
+// package and registers a t.Cleanup function to uninstall the agent if
+// it hasn't been uninstalled. It also takes care of collecting a
+// diagnostics when AGENT_COLLECT_DIAG=true or the test has failed.
+// It returns:
+//   - the combined output of Install command stdout and stderr
+//   - an error if any.
+func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
+	//Prepare so that the f.srcPackage string is populated
+	err := f.EnsurePrepared(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare: %w", err)
+	}
+
+	// sudo apt install the deb
+	out, err := exec.CommandContext(ctx, "sudo", "apt", "install", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	if err != nil {
+		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
+	}
+
+	f.t.Cleanup(func() {
+		f.t.Logf("[test %s] Inside fixture installDeb cleanup function", f.t.Name())
+		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer uninstallCancel()
+		// stop elastic-agent, non fatal if error, might have been stopped before this.
+		f.t.Logf("running 'sudo systemctl stop elastic-agent'")
+		out, err := exec.CommandContext(uninstallCtx, "sudo", "systemctl", "stop", "elastic-agent").CombinedOutput()
+		if err != nil {
+			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
+		}
+		// apt-get purge elastic-agent
+		f.t.Logf("running 'sudo apt-get -y -q purge elastic-agent'")
+		out, err = exec.CommandContext(uninstallCtx, "sudo", "apt-get", "-y", "-q", "purge", "elastic-agent").CombinedOutput()
+		if err != nil {
+			f.t.Logf("failed to apt-get purge elastic-agent: %s, output: %s", err, string(out))
+			f.t.FailNow()
+		}
+	})
+
+	// start elastic-agent
+	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+	}
+
+	// apt install doesn't enroll, so need to do that
+	enrollArgs := []string{"elastic-agent", "enroll"}
+	if installOpts.Force {
+		enrollArgs = append(enrollArgs, "--force")
+	}
+	if installOpts.Insecure {
+		enrollArgs = append(enrollArgs, "--insecure")
+	}
+	if installOpts.ProxyURL != "" {
+		enrollArgs = append(enrollArgs, "--proxy-url="+installOpts.ProxyURL)
+	}
+	if installOpts.DelayEnroll {
+		enrollArgs = append(enrollArgs, "--delay-enroll")
+	}
+	if installOpts.EnrollOpts.URL != "" {
+		enrollArgs = append(enrollArgs, "--url", installOpts.EnrollOpts.URL)
+	}
+	if installOpts.EnrollOpts.EnrollmentToken != "" {
+		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollOpts.EnrollmentToken)
+	}
+	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("elastic-agent enroll failed: %w, output: %s args: %v", err, string(out), enrollArgs)
+	}
+
+	return nil, nil
+}
+
+// installRpm installs the prepared Elastic Agent binary from the rpm
+// package and registers a t.Cleanup function to uninstall the agent if
+// it hasn't been uninstalled. It also takes care of collecting a
+// diagnostics when AGENT_COLLECT_DIAG=true or the test has failed.
+// It returns:
+//   - the combined output of Install command stdout and stderr
+//   - an error if any.
+func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture installRpm function", f.t.Name())
+	//Prepare so that the f.srcPackage string is populated
+	err := f.EnsurePrepared(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare: %w", err)
+	}
+
+	// sudo rpm -iv elastic-agent rpm
+	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-i", "-v", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	if err != nil {
+		return out, fmt.Errorf("rpm install failed: %w output:%s", err, string(out))
+	}
+
+	f.t.Cleanup(func() {
+		f.t.Logf("[test %s] Inside fixture installRpm cleanup function", f.t.Name())
+		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer uninstallCancel()
+		// stop elastic-agent, non fatal if error, might have been stopped before this.
+		f.t.Logf("running 'sudo systemctl stop elastic-agent'")
+		out, err := exec.CommandContext(uninstallCtx, "sudo", "systemctl", "stop", "elastic-agent").CombinedOutput()
+		if err != nil {
+			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
+		}
+		// rpm -e elastic-agent rpm
+		f.t.Logf("running 'sudo rpm -e elastic-agent'")
+		out, err = exec.CommandContext(uninstallCtx, "sudo", "rpm", "-e", "elastic-agent").CombinedOutput()
+		if err != nil {
+			f.t.Logf("failed to 'sudo rpm -e elastic-agent': %s, output: %s", err, string(out))
+			f.t.FailNow()
+		}
+	})
+
+	// start elastic-agent
+	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+	}
+
+	// rpm install doesn't enroll, so need to do that
+	enrollArgs := []string{"elastic-agent", "enroll"}
+	if installOpts.Force {
+		enrollArgs = append(enrollArgs, "--force")
+	}
+	if installOpts.Insecure {
+		enrollArgs = append(enrollArgs, "--insecure")
+	}
+	if installOpts.ProxyURL != "" {
+		enrollArgs = append(enrollArgs, "--proxy-url="+installOpts.ProxyURL)
+	}
+	if installOpts.DelayEnroll {
+		enrollArgs = append(enrollArgs, "--delay-enroll")
+	}
+	if installOpts.EnrollOpts.URL != "" {
+		enrollArgs = append(enrollArgs, "--url", installOpts.EnrollOpts.URL)
+	}
+	if installOpts.EnrollOpts.EnrollmentToken != "" {
+		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollOpts.EnrollmentToken)
+	}
+	// run sudo elastic-agent enroll
+	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("elastic-agent enroll failed: %w, output: %s args: %v", err, string(out), enrollArgs)
+	}
+
+	return nil, nil
+}
+
 type UninstallOpts struct {
 	Force          bool // --force
 	UninstallToken string
@@ -359,6 +511,45 @@ func (i UninstallOpts) toCmdArgs() []string {
 
 // Uninstall uninstalls the installed Elastic Agent binary
 func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, opts ...process.CmdOption) ([]byte, error) {
+	switch f.packageFormat {
+	case "targz", "zip":
+		return f.uninstallNoPkgManager(ctx, uninstallOpts, opts)
+	case "deb":
+		return f.uninstallDeb(ctx, uninstallOpts, opts)
+	case "rpm":
+		return f.uninstallRpm(ctx, uninstallOpts, opts)
+	default:
+		return nil, fmt.Errorf("uninstall of package format '%s' not supported yet", f.packageFormat)
+	}
+}
+
+func (f *Fixture) uninstallDeb(ctx context.Context, uninstallOpts *UninstallOpts, opts []process.CmdOption) ([]byte, error) {
+	// stop elastic-agent, non fatal if error, might have been stopped before this.
+	out, err := exec.CommandContext(ctx, "sudo", "systemctl", "stop", "elastic-agent").CombinedOutput()
+	if err != nil {
+		f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
+	}
+	out, err = exec.CommandContext(ctx, "sudo", "apt-get", "-y", "-q", "purge", "elastic-agent").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("error removing apt: %w", err)
+	}
+	return out, nil
+}
+
+func (f *Fixture) uninstallRpm(ctx context.Context, uninstallOpts *UninstallOpts, opts []process.CmdOption) ([]byte, error) {
+	// stop elastic-agent, non fatal if error, might have been stopped before this.
+	out, err := exec.CommandContext(ctx, "sudo", "systemctl", "stop", "elastic-agent").CombinedOutput()
+	if err != nil {
+		f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
+	}
+	out, err = exec.CommandContext(ctx, "sudo", "rpm", "-e", "elastic-agent").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("error running 'sudo rpm -e elastic-agent': %w", err)
+	}
+	return out, nil
+}
+
+func (f *Fixture) uninstallNoPkgManager(ctx context.Context, uninstallOpts *UninstallOpts, opts []process.CmdOption) ([]byte, error) {
 	if !f.installed {
 		return nil, ErrNotInstalled
 	}
@@ -433,7 +624,9 @@ func (f *Fixture) collectDiagnostics() {
 			f.t.Logf("retrying in 15 seconds due to connection error; possible Elastic Agent was not fully started")
 			time.Sleep(15 * time.Second)
 			output, err = f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
-			f.t.Logf("failed to collect diagnostics a second time at %s (%s): %s", outputPath, err, output)
+			if err != nil {
+				f.t.Logf("failed to collect diagnostics a second time at %s (%s): %s", outputPath, err, output)
+			}
 		}
 		if err != nil {
 			// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.

@@ -22,6 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -32,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/mocks"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 func Test_CopyFile(t *testing.T) {
@@ -693,7 +695,7 @@ func TestIsSameVersion(t *testing.T) {
 					manifest: nil,
 					hash:     "abcdef",
 				},
-				version: "1.2.3-repackaged-SNAPSHOT",
+				version: "1.2.3-SNAPSHOT.repackaged",
 			},
 			want: want{
 				same:       false,
@@ -748,27 +750,25 @@ func TestWaitForWatcher(t *testing.T) {
 	wantErrWatcherNotStarted := func(t assert.TestingT, err error, i ...interface{}) bool {
 		return assert.ErrorIs(t, err, ErrWatcherNotStarted, i)
 	}
+
 	tests := []struct {
-		name                     string
-		states                   []details.State
-		stateChangeInterval      time.Duration
-		timeout                  time.Duration
-		expirationAfterLastState time.Duration
-		wantErr                  assert.ErrorAssertionFunc
+		name                string
+		states              []details.State
+		stateChangeInterval time.Duration
+		cancelWaitContext   bool
+		wantErr             assert.ErrorAssertionFunc
 	}{
 		{
-			name:                     "Happy path: watcher is watching already",
-			states:                   []details.State{details.StateWatching},
-			stateChangeInterval:      1 * time.Millisecond,
-			timeout:                  500 * time.Millisecond,
-			expirationAfterLastState: 100 * time.Millisecond,
-			wantErr:                  assert.NoError,
+			name:                "Happy path: watcher is watching already",
+			states:              []details.State{details.StateWatching},
+			stateChangeInterval: 1 * time.Millisecond,
+			wantErr:             assert.NoError,
 		},
 		{
 			name:                "Sad path: watcher is never starting",
 			states:              []details.State{details.StateReplacing},
 			stateChangeInterval: 1 * time.Millisecond,
-			timeout:             50 * time.Millisecond,
+			cancelWaitContext:   true,
 			wantErr:             wantErrWatcherNotStarted,
 		},
 		{
@@ -782,16 +782,14 @@ func TestWaitForWatcher(t *testing.T) {
 				details.StateRestarting,
 				details.StateWatching,
 			},
-			stateChangeInterval:      1 * time.Millisecond,
-			timeout:                  500 * time.Millisecond,
-			expirationAfterLastState: 10 * time.Millisecond,
-			wantErr:                  assert.NoError,
+			stateChangeInterval: 1 * time.Millisecond,
+			wantErr:             assert.NoError,
 		},
 		{
 			name:                "Timeout: marker is never created",
 			states:              nil,
 			stateChangeInterval: 1 * time.Millisecond,
-			timeout:             50 * time.Millisecond,
+			cancelWaitContext:   true,
 			wantErr:             wantErrWatcherNotStarted,
 		},
 		{
@@ -805,8 +803,8 @@ func TestWaitForWatcher(t *testing.T) {
 				details.StateRestarting,
 			},
 
-			stateChangeInterval: 5 * time.Millisecond,
-			timeout:             20 * time.Millisecond,
+			stateChangeInterval: 1 * time.Millisecond,
+			cancelWaitContext:   true,
 			wantErr:             wantErrWatcherNotStarted,
 		},
 	}
@@ -817,18 +815,22 @@ func TestWaitForWatcher(t *testing.T) {
 			if !ok {
 				deadline = time.Now().Add(5 * time.Second)
 			}
-			testCtx, cancel := context.WithDeadline(context.TODO(), deadline)
-			defer cancel()
+			testCtx, testCancel := context.WithDeadline(context.Background(), deadline)
+			defer testCancel()
 
 			tmpDir := t.TempDir()
 			updMarkerFilePath := filepath.Join(tmpDir, markerFilename)
 
 			waitContext, waitCancel := context.WithCancel(testCtx)
+			defer waitCancel()
+
+			fakeTimeout := 30 * time.Second
+
 			// in order to take timing out of the equation provide a context that we can cancel manually
 			// still assert that the parent context and timeout passed are correct
 			var createContextFunc createContextWithTimeout = func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 				assert.Same(t, testCtx, ctx, "parent context should be the same as the waitForWatcherCall")
-				assert.Equal(t, tt.timeout, timeout, "timeout used in new context should be the same as testcase")
+				assert.Equal(t, fakeTimeout, timeout, "timeout used in new context should be the same as testcase")
 
 				return waitContext, waitCancel
 			}
@@ -848,6 +850,8 @@ func TestWaitForWatcher(t *testing.T) {
 
 			wg.Add(1)
 
+			// worker goroutine: writes out additional states while the test is blocked on waitOnWatcher() call and expires
+			// the wait context if cancelWaitContext is set to true. Timing of the goroutine is driven by stateChangeInterval.
 			go func() {
 				defer wg.Done()
 				tick := time.NewTicker(tt.stateChangeInterval)
@@ -860,16 +864,15 @@ func TestWaitForWatcher(t *testing.T) {
 						writeState(t, updMarkerFilePath, state)
 					}
 				}
-				<-time.After(tt.expirationAfterLastState)
-				waitCancel()
+				if tt.cancelWaitContext {
+					<-tick.C
+					waitCancel()
+				}
 			}()
 
 			log, _ := logger.NewTesting(tt.name)
 
-			tt.wantErr(t, waitForWatcherWithTimeoutCreationFunc(testCtx, log, updMarkerFilePath, tt.timeout, createContextFunc), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, tt.timeout))
-
-			// cancel context
-			cancel()
+			tt.wantErr(t, waitForWatcherWithTimeoutCreationFunc(testCtx, log, updMarkerFilePath, fakeTimeout, createContextFunc), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, fakeTimeout))
 
 			// wait for goroutines to finish
 			wg.Wait()
@@ -900,5 +903,82 @@ func writeState(t *testing.T, path string, state details.State) {
 	if assert.NoError(t, err, "error marshaling the test upgrade marker") {
 		err = os.WriteFile(path, bytes, 0770)
 		assert.NoError(t, err, "error writing out the test upgrade marker")
+	}
+}
+
+func Test_selectWatcherExecutable(t *testing.T) {
+	type args struct {
+		previous agentInstall
+		current  agentInstall
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Simple upgrade, we should launch the new (current) watcher",
+			args: args{
+				previous: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
+				},
+				current: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+				},
+			},
+			want: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+		},
+		{
+			name: "Simple downgrade, we should launch the currently installed (previous) watcher",
+			args: args{
+				previous: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+				},
+				current: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
+				},
+			},
+			want: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+		},
+		{
+			name: "Upgrade from snapshot to released version, we should launch the new (current) watcher",
+			args: args{
+				previous: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-somehash"),
+				},
+				current: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-someotherhash"),
+				},
+			},
+			want: filepath.Join("data", "elastic-agent-1.2.3-someotherhash"),
+		},
+		{
+			name: "Downgrade from released version to SNAPSHOT, we should launch the currently installed (previous) watcher",
+			args: args{
+				previous: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
+				},
+				current: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-someotherhash"),
+				},
+			},
+
+			want: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
+		},
+	}
+	// Just need a top dir path. This test does not make any operation on the filesystem, so a temp dir path is as good as any
+	fakeTopDir := filepath.Join(t.TempDir(), "Elastic", "Agent")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, paths.BinaryPath(filepath.Join(fakeTopDir, tt.want), agentName), selectWatcherExecutable(fakeTopDir, tt.args.previous, tt.args.current), "selectWatcherExecutable(%v, %v)", tt.args.previous, tt.args.current)
+		})
 	}
 }

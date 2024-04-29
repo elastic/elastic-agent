@@ -85,7 +85,7 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 func DownloadComponentsFromManifest(manifest string, platforms []string, platformPackages map[string]string, dropPath string) error {
 	componentSpec := map[string][]string{
 		"apm-server":            {"apm-server"},
-		"beats":                 {"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat"},
+		"beats":                 {"agentbeat"},
 		"cloud-defend":          {"cloud-defend"},
 		"cloudbeat":             {"cloudbeat"},
 		"elastic-agent-shipper": {"elastic-agent-shipper"},
@@ -130,7 +130,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 						downloadTarget := filepath.Join(targetPath, pkgFilename)
 						if _, err := os.Stat(downloadTarget); err != nil {
 							errGrp.Go(func(ctx context.Context, url, target string) func() error {
-								return func() error { return downloadPackage(ctx, url, target) }
+								return func() error { return DownloadPackage(ctx, url, target) }
 							}(downloadsCtx, p, downloadTarget))
 						}
 					}
@@ -150,7 +150,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	return nil
 }
 
-func downloadPackage(ctx context.Context, downloadUrl string, target string) error {
+func DownloadPackage(ctx context.Context, downloadUrl string, target string) error {
 	parsedURL, errorUrl := url.Parse(downloadUrl)
 	if errorUrl != nil {
 		return errorInvalidManifestURL

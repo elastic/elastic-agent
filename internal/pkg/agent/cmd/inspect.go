@@ -186,7 +186,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		binaryMapping := make(map[string]string)
 		for _, component := range components {
 			if spec := component.InputSpec; spec != nil {
-				binaryMapping[component.ID] = spec.BinaryName
+				binaryMapping[component.ID] = component.BinaryName()
 			}
 		}
 		monitorCfg, err := monitorFn(cfg, components, binaryMapping)
