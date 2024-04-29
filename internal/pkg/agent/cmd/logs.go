@@ -161,12 +161,15 @@ func newWrappedWriter(ctx context.Context, w io.Writer, filter filterFunc, modif
 }
 
 func newLogsCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
+	logsDir := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
+	eventLogsDir := filepath.Join(logsDir, "events")
+
 	cmd := &cobra.Command{
 		Use:   "logs",
 		Short: "Output Elastic Agent logs",
 		Long:  "This command allows to output, watch and filter Elastic Agent logs.",
 		Run: func(c *cobra.Command, _ []string) {
-			if err := logsCmd(streams, c); err != nil {
+			if err := logsCmd(streams, c, logsDir, eventLogsDir); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
@@ -183,7 +186,7 @@ func newLogsCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func logsCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
+func logsCmd(streams *cli.IOStreams, cmd *cobra.Command, logsDir, eventLogsDir string) error {
 	component, _ := cmd.Flags().GetString("component")
 	lines, _ := cmd.Flags().GetInt("number")
 	follow, _ := cmd.Flags().GetBool("follow")
@@ -203,7 +206,6 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		modifier = addColorModifier
 	}
 
-	logsDir := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
 	// uncomment for debugging
 	// fmt.Fprintf(streams.Err, "logs dir: %q", logsDir)
 
@@ -214,16 +216,14 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		if err != nil {
 			errChan <- fmt.Errorf("failed to get logs: %w", err)
 		}
+		errChan <- nil
 	}()
 
 	if !excludeEvents {
 		go func() {
-			logsDir := filepath.Join(logsDir, "events")
 			// The event log folder might not exist, so we keep trying every five seconds
 			for {
-				// uncomment for debugging
-				// fmt.Fprintf(streams.Err, "logs dir: %q", logsDir)
-				err := printLogs(cmd.Context(), streams.Out, logsDir, lines, follow, filter, modifier)
+				err := printLogs(cmd.Context(), streams.Out, eventLogsDir, lines, follow, filter, modifier)
 				if err != nil {
 					if !strings.Contains(err.Error(), "logs/events: no such file or directory") {
 						errChan <- fmt.Errorf("failed to get event logs: %w", err)
@@ -231,6 +231,8 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 					}
 					time.Sleep(5 * time.Second)
 				}
+
+				return
 			}
 		}()
 	}
