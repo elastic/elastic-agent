@@ -221,8 +221,9 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command, logsDir, eventLogsDir s
 
 	if !excludeEvents {
 		go func() {
+			done := false
 			// The event log folder might not exist, so we keep trying every five seconds
-			for {
+			for !done {
 				err := printLogs(cmd.Context(), streams.Out, eventLogsDir, lines, follow, filter, modifier)
 				if err != nil {
 					if !strings.Contains(err.Error(), "logs/events: no such file or directory") {
@@ -232,7 +233,7 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command, logsDir, eventLogsDir s
 					time.Sleep(5 * time.Second)
 				}
 
-				return
+				done = true
 			}
 		}()
 	}
