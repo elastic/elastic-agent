@@ -37,10 +37,10 @@ func TestStandaloneUpgrade(t *testing.T) {
 
 	for _, startVersion := range versionList {
 		unprivilegedAvailable := false
-		if runtime.GOOS == define.Linux && !startVersion.Less(*upgradetest.Version_8_13_0) && !endVersion.Less(*upgradetest.Version_8_13_0) {
+		if runtime.GOOS == define.Linux && !startVersion.Less(*upgradetest.Version_8_13_0_SNAPSHOT) && !endVersion.Less(*upgradetest.Version_8_13_0_SNAPSHOT) {
 			// unprivileged available if both versions are 8.13+ on Linux
 			unprivilegedAvailable = true
-		} else if !startVersion.Less(*upgradetest.Version_8_14_0) && !endVersion.Less(*upgradetest.Version_8_14_0) {
+		} else if !startVersion.Less(*upgradetest.Version_8_14_0_SNAPSHOT) && !endVersion.Less(*upgradetest.Version_8_14_0_SNAPSHOT) {
 			// always available if both versions are 8.14+
 			unprivilegedAvailable = true
 		}

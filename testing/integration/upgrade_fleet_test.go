@@ -215,18 +215,18 @@ func testUpgradeFleetManagedElasticAgent(
 	require.NoError(t, err)
 
 	if unprivileged {
-		if startParsedVersion.Less(*upgradetest.Version_8_13_0) {
-			t.Skipf("Starting version %s is less than 8.13 and doesn't support --unprivileged", startParsedVersion.String())
+		if startParsedVersion.Less(*upgradetest.Version_8_13_0_SNAPSHOT) {
+			t.Skipf("Starting version %s is less than 8.13-SNAPSHOT and doesn't support --unprivileged", startParsedVersion.String())
 		}
-		if endParsedVersion.Less(*upgradetest.Version_8_13_0) {
-			t.Skipf("Ending version %s is less than 8.13 and doesn't support --unprivileged", endParsedVersion.String())
+		if endParsedVersion.Less(*upgradetest.Version_8_13_0_SNAPSHOT) {
+			t.Skipf("Ending version %s is less than 8.13-SNAPSHOT and doesn't support --unprivileged", endParsedVersion.String())
 		}
 		if runtime.GOOS != define.Linux {
-			if startParsedVersion.Less(*upgradetest.Version_8_14_0) {
-				t.Skipf("Starting version %s is less than 8.14 and doesn't support --unprivileged on Windows", startParsedVersion.String())
+			if startParsedVersion.Less(*upgradetest.Version_8_14_0_SNAPSHOT) {
+				t.Skipf("Starting version %s is less than 8.14-SNAPSHOT and doesn't support --unprivileged on Windows", startParsedVersion.String())
 			}
-			if endParsedVersion.Less(*upgradetest.Version_8_14_0) {
-				t.Skipf("Ending version %s is less than 8.14 and doesn't support --unprivileged on Windows", endParsedVersion.String())
+			if endParsedVersion.Less(*upgradetest.Version_8_14_0_SNAPSHOT) {
+				t.Skipf("Ending version %s is less than 8.14-SNAPSHOT and doesn't support --unprivileged on Windows", endParsedVersion.String())
 			}
 		}
 	}

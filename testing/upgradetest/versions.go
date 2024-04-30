@@ -35,10 +35,8 @@ var (
 	Version_8_11_0_SNAPSHOT = version.NewParsedSemVer(8, 11, 0, "SNAPSHOT", "")
 	// Version_8_13_0_SNAPSHOT is the minimum version for testing upgrading agent with the same hash
 	Version_8_13_0_SNAPSHOT = version.NewParsedSemVer(8, 13, 0, "SNAPSHOT", "")
-	// Version_8_13_0 is the minimum version for proper unprivileged execution on Linux
-	Version_8_13_0 = version.NewParsedSemVer(8, 13, 0, "", "")
-	// Version_8_14_0 is the minimum version for proper unprivileged execution on all platforms
-	Version_8_14_0 = version.NewParsedSemVer(8, 14, 0, "", "")
+	// Version_8_14_0_SNAPSHOT is the minimum version for proper unprivileged execution on all platforms
+	Version_8_14_0_SNAPSHOT = version.NewParsedSemVer(8, 14, 0, "SNAPSHOT", "")
 
 	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
 	ErrNoSnapshot = errors.New("failed to find a snapshot on the version list")

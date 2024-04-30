@@ -54,10 +54,10 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 
 	unprivilegedAvailable := false
 	// This is probably redundant: see the skip statement above
-	if runtime.GOOS == define.Linux && !currentVersion.Less(*upgradetest.Version_8_13_0) {
+	if runtime.GOOS == define.Linux && !currentVersion.Less(*upgradetest.Version_8_13_0_SNAPSHOT) {
 		// only available if version is 8.13+ on Linux
 		unprivilegedAvailable = true
-	} else if !currentVersion.Less(*upgradetest.Version_8_14_0) {
+	} else if !currentVersion.Less(*upgradetest.Version_8_14_0_SNAPSHOT) {
 		// 8.14+ its always available
 		unprivilegedAvailable = true
 	}
