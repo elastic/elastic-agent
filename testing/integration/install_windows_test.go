@@ -7,9 +7,7 @@
 package integration
 
 import (
-	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -23,15 +21,4 @@ func checkPlatformUnprivileged(t *testing.T, f *atesting.Fixture, topPath string
 	require.NoErrorf(t, err, "failed to find %s user", install.ElasticUsername)
 	_, err = install.FindGID(install.ElasticGroupName)
 	require.NoError(t, err, "failed to find %s group", install.ElasticGroupName)
-
-	var output atesting.AgentStatusOutput
-	require.Eventuallyf(t, func() bool {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		output, err = f.ExecStatus(ctx)
-		return err == nil
-	}, 3*time.Minute, 10*time.Second, "never got the status")
-
-	require.False(t, output.IsZero(), "must have an agent ID")
-	require.True(t, output.Info.Unprivileged, "must be unprivileged")
 }

@@ -249,6 +249,17 @@ func checkInstallSuccess(t *testing.T, f *atesting.Fixture, topPath string, unpr
 		// Specific checks depending on the platform.
 		checkPlatformUnprivileged(t, f, topPath)
 	}
+
+	var output atesting.AgentStatusOutput
+	require.Eventuallyf(t, func() bool {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		output, err = f.ExecStatus(ctx)
+		return err == nil
+	}, 3*time.Minute, 10*time.Second, "never got the status")
+
+	require.False(t, output.IsZero(), "must have an agent ID")
+	require.Equal(t, unprivileged, output.Info.Unprivileged, "unprivileged state doesn't match")
 }
 
 func randStr(length int) string {
