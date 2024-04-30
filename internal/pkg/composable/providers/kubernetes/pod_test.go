@@ -385,11 +385,11 @@ func TestGenerateHints(t *testing.T) {
 				"foo": "bar",
 			},
 			Annotations: map[string]string{
-				"app":                          "production",
-				"co.elastic.hints/host":        "${kubernetes.pod.ip}:6379",
-				"co.elastic.hints/package":     "redis",
-				"co.elastic.hints/metricspath": "/metrics",
-				"co.elastic.hints/period":      "42s",
+				"app":                                "production",
+				"co.elastic.hints/host":              "${kubernetes.pod.ip}:6379",
+				"co.elastic.hints/package":           "redis",
+				"co.elastic.hints/metricssssssspath": "/metrics",
+				"co.elastic.hints/period":            "42s",
 			},
 		},
 		TypeMeta: metav1.TypeMeta{
