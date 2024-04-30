@@ -35,6 +35,15 @@ List here all the items you have verified BEFORE sending this PR. Please DO NOT 
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] I have added an entry in `./changelog/fragments` using the [changelog tool](https://github.com/elastic/elastic-agent#changelog)
 - [ ] I have added an integration test or an E2E test
+- [ ] If this PR introduces a breaking change, I've populated the Breaking Change Mitigations section below.
+
+## Breaking Change Mitigations
+
+<!--
+If this PR introduces a breaking change for end users, describe what changes they could make on
+their end to nullify or minimize the impacts of this change. Consider impacts in related systems, not
+just directly when using Elastic Agent.
+-->
 
 ## How to test this PR locally
 
