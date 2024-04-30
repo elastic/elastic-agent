@@ -210,7 +210,12 @@ func PerformUpgrade(
 	// in the case that its explicitly set then we ensure the version supports it
 	if upgradeOpts.unprivileged == nil {
 		if !startVersion.Less(*Version_8_13_0) && !endVersion.Less(*Version_8_13_0) && runtime.GOOS == define.Linux {
-			// both version support --unprivileged
+			// both version support --unprivileged on Linux
+			unprivileged := true
+			upgradeOpts.unprivileged = &unprivileged
+			logger.Logf("installation of Elastic Agent will use --unprivileged as both start and end version support --unprivileged mode on Linux")
+		} else if !startVersion.Less(*Version_8_14_0) && !endVersion.Less(*Version_8_14_0) {
+			// both version support --unprivileged on all platforms
 			unprivileged := true
 			upgradeOpts.unprivileged = &unprivileged
 			logger.Logf("installation of Elastic Agent will use --unprivileged as both start and end version support --unprivileged mode")

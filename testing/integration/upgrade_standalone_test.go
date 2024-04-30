@@ -36,14 +36,13 @@ func TestStandaloneUpgrade(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, startVersion := range versionList {
-		unprivilegedAvailable := true
-		if runtime.GOOS != define.Linux {
-			// only available on Linux at the moment
-			unprivilegedAvailable = false
-		}
-		if unprivilegedAvailable && (startVersion.Less(*upgradetest.Version_8_13_0) || endVersion.Less(*upgradetest.Version_8_13_0)) {
-			// only available if both versions are 8.13+
-			unprivilegedAvailable = false
+		unprivilegedAvailable := false
+		if runtime.GOOS == define.Linux && !startVersion.Less(*upgradetest.Version_8_13_0) && !endVersion.Less(*upgradetest.Version_8_13_0) {
+			// unprivileged available if both versions are 8.13+ on Linux
+			unprivilegedAvailable = true
+		} else if !startVersion.Less(*upgradetest.Version_8_14_0) && !endVersion.Less(*upgradetest.Version_8_14_0) {
+			// always available if both versions are 8.14+
+			unprivilegedAvailable = true
 		}
 		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
 			testStandaloneUpgrade(t, startVersion, define.Version(), false)
