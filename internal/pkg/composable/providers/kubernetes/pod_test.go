@@ -22,7 +22,6 @@ import (
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
-	"github.com/elastic/elastic-agent-autodiscover/utils"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	c "github.com/elastic/elastic-agent-libs/config"
@@ -403,26 +402,26 @@ func TestGenerateHints(t *testing.T) {
 		Status: kubernetes.PodStatus{PodIP: "127.0.0.5"},
 	}
 
-	namespaceAnnotations := mapstr.M{
-		"nsa": "nsb",
-	}
-
-	data := generatePodData(pod, &podMeta{}, namespaceAnnotations)
+	data := generatePodData(pod, &podMeta{}, mapstr.M{})
 
 	hints_result := mapstr.M{
 		"hints": mapstr.M{
-			"host":        "${kubernetes.pod.ip}:6379",
-			"package":     "redis",
-			"metricspath": "/metrics", // on purpose we have introduced a typo
-			"period":      "42s",
+			"host":              "${kubernetes.pod.ip}:6379",
+			"package":           "redis",
+			"metricssssssspath": "/metrics", // on purpose we have introduced a typo
+			"period":            "42s",
 		},
 	}
-	incorrecthints_results := []string{"hints/metricspath"}
+	incorrecthints_results := []string{"hints/metricssssssspath"}
 
 	ann := data.mapping["annotations"]
 	annotations, _ := ann.(mapstr.M)
 	prefix := "co.elastic"
-	hints, incorrecthints := utils.GenerateHints(annotations, "", prefix, true, allSupportedHints)
+
+	log, err := logger.New("hint-test", true)
+	assert.NoError(t, err)
+
+	hints, incorrecthints := hintsCheck(annotations, "", prefix, true, allSupportedHints, log, pod)
 
 	assert.Equal(t, string(pod.GetUID()), data.uid)
 	assert.Equal(t, hints, hints_result)
