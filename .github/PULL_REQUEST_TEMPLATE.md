@@ -39,9 +39,9 @@ List here all the items you have verified BEFORE sending this PR. Please DO NOT 
 ## Breaking Change Mitigations
 
 <!--
-If this PR introduces a breaking change for end users, describe what changes they could make on
-their end to nullify or minimize the impacts of this change. Consider impacts in related systems, not
-just directly when using Elastic Agent.
+Will the changes introduced by this PR cause disruption to users in any way? If so, please describe what changes users
+could make on their end to nullify or minimize this disruption. Consider impacts in related systems, not just directly
+when using Beats.
 -->
 
 ## How to test this PR locally
