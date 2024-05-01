@@ -36,7 +36,7 @@ List here all the items you have verified BEFORE sending this PR. Please DO NOT 
 - [ ] I have added an entry in `./changelog/fragments` using the [changelog tool](https://github.com/elastic/elastic-agent#changelog)
 - [ ] I have added an integration test or an E2E test
 
-## Breaking Change Mitigations
+## Disruptive User Impact
 
 <!--
 Will the changes introduced by this PR cause disruption to users in any way? If so, please describe what changes users
