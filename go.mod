@@ -84,7 +84,7 @@ require (
 require (
 	// open telemetry dependencies
 	// pinned to v0.97.0 due to issue with ports binding which causes our tests to fail
-	// ref: https://github.com/open-telemetry/opentelemetry-collector/issues/10031
+	// Do NOT upgrade the version beyond 0.97.0 until https://github.com/open-telemetry/opentelemetry-collector/issues/10031 is fixed!
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.97.0
