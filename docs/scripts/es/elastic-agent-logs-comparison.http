@@ -321,3 +321,19 @@ POST _reindex
     "index": "testmetrics-elastic_agent.metricbeat-updated"
   }
 }
+
+# Check indices disk usage
+
+## Logs
+POST /testlogs-elastic_agent-baseline/_disk_usage?run_expensive_tasks=true
+POST /testlogs-elastic_agent-updated/_disk_usage?run_expensive_tasks=true
+
+## Metrics
+POST /testmetrics-elastic_agent.elastic_agent-baseline/_disk_usage?run_expensive_tasks=true
+POST /testmetrics-elastic_agent.elastic_agent-updated/_disk_usage?run_expensive_tasks=true
+
+POST /testmetrics-elastic_agent.filebeat-baseline/_disk_usage?run_expensive_tasks=true
+POST /testmetrics-elastic_agent.filebeat-updated/_disk_usage?run_expensive_tasks=true
+
+POST /testmetrics-elastic_agent.metricbeat-baseline/_disk_usage?run_expensive_tasks=true
+POST /testmetrics-elastic_agent.metricbeat-updated/_disk_usage?run_expensive_tasks=true
