@@ -123,8 +123,8 @@ targets:
         - Dockerfile
         - Dockerfile.skaffold
       matchpattern: 'ARG GO_VERSION=\d+.\d+.\d+'
-  update-gomod:
-    name: "Update go.mod"
+  update-gomod-minor-version:
+    name: "Update go.mod minor version"
     sourceid: gomod
     scmid: githubConfig
     kind: file
@@ -132,3 +132,12 @@ targets:
       content: 'go {{ source "gomod" }}'
       file: go.mod
       matchpattern: 'go \d+.\d+'
+  update-gomod-toolchain-version:
+    name: "Update go.mod toolchain version"
+    sourceid: latestGoVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      content: 'toolchain go{{ source "latestGoVersion" }}'
+      file: go.mod
+      matchpattern: 'toolchain go\d+.\d+.\d+'
