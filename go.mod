@@ -93,6 +93,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.97.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.97.0
 	go.opentelemetry.io/collector/component v0.97.0
 	go.opentelemetry.io/collector/confmap v0.99.0
 	go.opentelemetry.io/collector/confmap/converter/expandconverter v0.97.0
@@ -171,7 +172,8 @@ require (
 	github.com/knadh/koanf/maps v0.1.1 // indirect
 	github.com/knadh/koanf/providers/confmap v0.1.0 // indirect
 	github.com/knadh/koanf/v2 v2.1.1 // indirect
-	github.com/leodido/ragel-machinery v0.0.0-20190525184631-5f46317e436b // indirect
+	github.com/leodido/ragel-machinery v0.0.0-20181214104525-299bdde78165 // indirect
+	github.com/leoluk/perflib_exporter v0.2.1 // indirect
 	github.com/lestrrat-go/strftime v1.0.6 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect

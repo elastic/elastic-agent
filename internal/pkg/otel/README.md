@@ -28,6 +28,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | filelogreceiver | v0.97.0|
+| hostmetricsreceiver | v0.97.0|
 | otlpreceiver | v0.97.0|
 
 
