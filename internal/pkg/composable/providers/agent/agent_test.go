@@ -35,4 +35,6 @@ func TestContextProvider(t *testing.T) {
 	assert.True(t, hasID, "missing id")
 	_, hasVersion := current["version"]
 	assert.True(t, hasVersion, "missing version")
+	_, hasUnprivileged := current["unprivileged"]
+	assert.True(t, hasUnprivileged, "missing unprivileged")
 }
