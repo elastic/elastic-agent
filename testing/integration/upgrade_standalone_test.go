@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"testing"
 	"time"
 
@@ -37,11 +36,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 
 	for _, startVersion := range versionList {
 		unprivilegedAvailable := false
-		if runtime.GOOS == define.Linux && !startVersion.Less(*upgradetest.Version_8_13_0_SNAPSHOT) && !endVersion.Less(*upgradetest.Version_8_13_0_SNAPSHOT) {
-			// unprivileged available if both versions are 8.13+ on Linux
-			unprivilegedAvailable = true
-		} else if !startVersion.Less(*upgradetest.Version_8_14_0_SNAPSHOT) && !endVersion.Less(*upgradetest.Version_8_14_0_SNAPSHOT) {
-			// always available if both versions are 8.14+
+		if upgradetest.SupportsUnprivileged(startVersion, endVersion) {
 			unprivilegedAvailable = true
 		}
 		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {

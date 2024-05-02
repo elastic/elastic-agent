@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -253,4 +254,17 @@ func EnsureSnapshot(version string) string {
 		version += "-SNAPSHOT"
 	}
 	return version
+}
+
+// SupportsUnprivileged returns true when the version supports unprivileged mode.
+func SupportsUnprivileged(versions ...*version.ParsedSemVer) bool {
+	for _, ver := range versions {
+		if ver.Less(*Version_8_13_0_SNAPSHOT) {
+			return false
+		}
+		if runtime.GOOS != define.Linux && ver.Less(*Version_8_14_0_SNAPSHOT) {
+			return false
+		}
+	}
+	return true
 }

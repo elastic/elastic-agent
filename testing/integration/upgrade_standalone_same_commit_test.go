@@ -18,7 +18,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -53,15 +52,9 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 	}
 
 	unprivilegedAvailable := false
-	// This is probably redundant: see the skip statement above
-	if runtime.GOOS == define.Linux && !currentVersion.Less(*upgradetest.Version_8_13_0_SNAPSHOT) {
-		// only available if version is 8.13+ on Linux
-		unprivilegedAvailable = true
-	} else if !currentVersion.Less(*upgradetest.Version_8_14_0_SNAPSHOT) {
-		// 8.14+ its always available
+	if upgradetest.SupportsUnprivileged(currentVersion) {
 		unprivilegedAvailable = true
 	}
-
 	unPrivilegedString := "unprivileged"
 	if !unprivilegedAvailable {
 		unPrivilegedString = "privileged"

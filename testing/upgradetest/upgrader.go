@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -21,7 +20,6 @@ import (
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -209,13 +207,7 @@ func PerformUpgrade(
 	// in the unprivileged is unset we adjust it to use unprivileged when the version allows it
 	// in the case that its explicitly set then we ensure the version supports it
 	if upgradeOpts.unprivileged == nil {
-		if !startVersion.Less(*Version_8_13_0_SNAPSHOT) && !endVersion.Less(*Version_8_13_0_SNAPSHOT) && runtime.GOOS == define.Linux {
-			// both version support --unprivileged on Linux
-			unprivileged := true
-			upgradeOpts.unprivileged = &unprivileged
-			logger.Logf("installation of Elastic Agent will use --unprivileged as both start and end version support --unprivileged mode on Linux")
-		} else if !startVersion.Less(*Version_8_14_0_SNAPSHOT) && !endVersion.Less(*Version_8_14_0_SNAPSHOT) {
-			// both version support --unprivileged on all platforms
+		if SupportsUnprivileged(startVersion, endVersion) {
 			unprivileged := true
 			upgradeOpts.unprivileged = &unprivileged
 			logger.Logf("installation of Elastic Agent will use --unprivileged as both start and end version support --unprivileged mode")
@@ -225,11 +217,8 @@ func PerformUpgrade(
 			upgradeOpts.unprivileged = &unprivileged
 		}
 	} else if *upgradeOpts.unprivileged {
-		if startVersion.Less(*Version_8_13_0_SNAPSHOT) {
-			return errors.New("cannot install starting version with --unprivileged (which is default) because the it is older than 8.13")
-		}
-		if endVersion.Less(*Version_8_13_0_SNAPSHOT) {
-			return errors.New("cannot upgrade to ending version as end version doesn't support running with --unprivileged (which is default) because it is older than 8.13")
+		if !SupportsUnprivileged(startVersion, endVersion) {
+			return fmt.Errorf("cannot install with forced --unprivileged because either start version %s or end version %s doesn't support --unprivileged mode", startVersion.String(), endVersion.String())
 		}
 	}
 
