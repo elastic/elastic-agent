@@ -39,6 +39,8 @@ const (
 	USER_UF_SCRIPT             = 1
 	USER_UF_NORMAL_ACCOUNT     = 512
 	USER_UF_DONT_EXPIRE_PASSWD = 65536
+
+	accountRightCreateSymbolicLink gowin32.AccountRightName = "SeCreateSymbolicLinkPrivilege"
 )
 
 // FindGID returns the group's GID on the machine.
@@ -150,6 +152,10 @@ func CreateUser(name string, _ string) (string, error) {
 	err = sp.AddAccountRight(sid, gowin32.AccountRightServiceLogon)
 	if err != nil {
 		return "", fmt.Errorf("failed to set service logon: %w", err)
+	}
+	err = sp.AddAccountRight(sid, accountRightCreateSymbolicLink)
+	if err != nil {
+		return "", fmt.Errorf("failed to add right to create symbolic link: %w", err)
 	}
 
 	return FindUID(name)
