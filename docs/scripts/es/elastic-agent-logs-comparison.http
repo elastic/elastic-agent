@@ -24,31 +24,134 @@
 # Cleanup
 
 # Test log indices and templates
-DELETE /logs-elastic_agent-disksize.baseline
-DELETE /logs-elastic_agent-disksize.updated
-DELETE /logs-elastic_agent.filebeat-disksize.baseline
-DELETE /logs-elastic_agent.filebeat-disksize.updated
-DELETE /logs-elastic_agent.metricbeat-disksize.baseline
-DELETE /logs-elastic_agent.metricbeat-disksize.updated
+DELETE /_data_stream/logs-elastic_agent-disksize.baseline
+DELETE /_data_stream/logs-elastic_agent-disksize.updated
+DELETE /_data_stream/logs-elastic_agent.filebeat-disksize.baseline
+DELETE /_data_stream/logs-elastic_agent.filebeat-disksize.updated
+DELETE /_data_stream/logs-elastic_agent.metricbeat-disksize.baseline
+DELETE /_data_stream/logs-elastic_agent.metricbeat-disksize.updated
 
 # Test metrics indices and templates
 DELETE /metrics-elastic_agent.elastic_agent-disksize.baseline
 DELETE /metrics-elastic_agent.elastic_agent-disksize.updated
+DELETE /_index_template/metrics-elastic_agent.elastic_agent-disksize
 
 DELETE /metrics-elastic_agent.filebeat-disksize.baseline
 DELETE /metrics-elastic_agent.filebeat-disksize.updated
+DELETE /_index_template/metrics-elastic_agent.filebeat-disksize
 
 DELETE /metrics-elastic_agent.metricbeat-disksize.baseline
 DELETE /metrics-elastic_agent.metricbeat-disksize.updated
+DELETE /_index_template/metrics-elastic_agent.metricbeat-disksize
 
 
 # Recreate index templates
 
 # Mappings we want to use in our test index templates
 # GET /_index_template/logs-elastic_agent
-# GET /_index_template/metrics-elastic_agent.elastic_agent 
+# GET /_index_template/metrics-elastic_agent.elastic_agent
 # GET /_index_template/metrics-elastic_agent.filebeat
 # GET /_index_template/metrics-elastic_agent.metricbeat
+
+
+PUT /_index_template/metrics-elastic_agent.elastic_agent-disksize
+{
+  "index_patterns": [
+    "metrics-elastic_agent.elastic_agent-disksize*"
+  ],
+  "template": {
+    "settings": {
+      "index": {
+        "mode": "time_series",
+        "routing_path": [
+          "component.id",
+          "agent.id",
+          "metricset.name"
+        ]
+      }
+    },
+    "mappings": {
+    }
+  },
+  "composed_of": [
+    "metrics@tsdb-settings",
+    "metrics-elastic_agent.elastic_agent@package",
+    "metrics-elastic_agent.elastic_agent@custom",
+    "ecs@mappings",
+    ".fleet_globals-1",
+    ".fleet_agent_id_verification-1"
+  ],
+  "priority": 201,
+  "ignore_missing_component_templates": [
+    "metrics-elastic_agent.elastic_agent@custom"
+  ]
+}
+
+PUT /_index_template/metrics-elastic_agent.filebeat-disksize
+{
+  "index_patterns": [
+    "metrics-elastic_agent.filebeat-disksize*"
+  ],
+  "template": {
+    "settings": {
+      "index": {
+        "mode": "time_series",
+        "routing_path": [
+          "component.id",
+          "agent.id",
+          "metricset.name"
+        ]
+      }
+    },
+    "mappings": {
+    }
+  },
+  "composed_of": [
+    "metrics@tsdb-settings",
+    "metrics-elastic_agent.filebeat@package",
+    "metrics-elastic_agent.filebeat@custom",
+    "ecs@mappings",
+    ".fleet_globals-1",
+    ".fleet_agent_id_verification-1"
+  ],
+  "priority": 201,
+  "ignore_missing_component_templates": [
+    "metrics-elastic_agent.filebeat@custom"
+  ]
+}
+
+PUT /_index_template/metrics-elastic_agent.metricbeat-disksize
+{
+  "index_patterns": [
+    "metrics-elastic_agent.metricbeat-disksize*"
+  ],
+  "template": {
+    "settings": {
+      "index": {
+        "mode": "time_series",
+        "routing_path": [
+          "component.id",
+          "agent.id",
+          "metricset.name"
+        ]
+      }
+    },
+    "mappings": {
+    }
+  },
+  "composed_of": [
+    "metrics@tsdb-settings",
+    "metrics-elastic_agent.metricbeat@package",
+    "metrics-elastic_agent.metricbeat@custom",
+    "ecs@mappings",
+    ".fleet_globals-1",
+    ".fleet_agent_id_verification-1"
+  ],
+  "priority": 201,
+  "ignore_missing_component_templates": [
+    "metrics-elastic_agent.metricbeat@custom"
+  ]
+}
 
 # Reindex a subset of the elastic-agent logs in the new indices
 POST _reindex
