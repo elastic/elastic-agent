@@ -97,7 +97,7 @@ func New(
 			}
 
 			// initialize with empty config, configuration file is not necessary in otel mode,
-			// best effor it fine
+			// best effort is fine
 			rawConfig = config.New()
 		}
 	}
