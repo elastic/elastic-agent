@@ -36,6 +36,7 @@ func (*contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderCo
 			"build_time": release.BuildTime().Format("2006-01-02 15:04:05 -0700 MST"),
 			"snapshot":   release.Snapshot(),
 		},
+		"unprivileged": a.Unprivileged(),
 	})
 	if err != nil {
 		return errors.New(err, "failed to set mapping", errors.TypeUnexpected)
