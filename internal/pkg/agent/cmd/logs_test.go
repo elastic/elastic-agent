@@ -16,9 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
+
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 const (
