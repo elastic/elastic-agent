@@ -137,7 +137,7 @@ func TestOtelFileProcessing(t *testing.T) {
 	require.NoError(t, err)
 
 	// remove elastic-agent.yml, otel should be independent
-	require.NoError(t, os.Remove(filpath.Join(fixture.WorkDir(), "elastic-agent.yml")))
+	require.NoError(t, os.Remove(filepath.Join(fixture.WorkDir(), "elastic-agent.yml")))
 
 	var fixtureWg sync.WaitGroup
 	fixtureWg.Add(1)
