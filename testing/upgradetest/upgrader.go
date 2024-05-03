@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/hectane/go-acl"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -568,7 +570,19 @@ func getSourceURI(ctx context.Context, f *atesting.Fixture, unprivileged bool) (
 	}
 	if unprivileged {
 		// move the file to temp directory
-		dir, err := os.MkdirTemp("", "agent-upgrade-*")
+		baseTmp := ""
+		if runtime.GOOS == "windows" {
+			// `elastic-agent-user` needs to have access to the file, default
+			// will place this in C:\Users\windows\AppData\Local\Temp\ which
+			// `elastic-agent-user` doesn't have access.
+
+			// create C:\Temp with world read/write to use for temp directory
+			baseTmp, err = windowsBaseTemp()
+			if err != nil {
+				return "", fmt.Errorf("failed to create windows base temp path: %w", err)
+			}
+		}
+		dir, err := os.MkdirTemp(baseTmp, "agent-upgrade-*")
 		if err != nil {
 			return "", fmt.Errorf("failed to create temp directory: %w", err)
 		}
@@ -589,4 +603,23 @@ func getSourceURI(ctx context.Context, f *atesting.Fixture, unprivileged bool) (
 		srcPkg = filepath.Join(dir, filepath.Base(srcPkg))
 	}
 	return "file://" + filepath.Dir(srcPkg), nil
+}
+
+func windowsBaseTemp() (string, error) {
+	baseTmp := "C:\\Temp"
+	_, err := os.Stat(baseTmp)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("failed to stat %s: %w", baseTmp, err)
+		}
+		err = os.Mkdir(baseTmp, 0777)
+		if err != nil {
+			return "", fmt.Errorf("failed to mkdir %s: %w", baseTmp, err)
+		}
+	}
+	err = acl.Chmod(baseTmp, 0777)
+	if err != nil {
+		return "", fmt.Errorf("failed to chmod %s: %w", baseTmp, err)
+	}
+	return baseTmp, nil
 }
