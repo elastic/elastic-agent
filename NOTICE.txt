@@ -3790,12 +3790,12 @@ freely, subject to the following restrictions:
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/belimawr/mock-es
-Version: v0.0.0-20240424124850-20abd99ad3f7
+Dependency : github.com/leehinman/mock-es
+Version: v0.0.0-20240429182736-ca60117f3957
 Licence type (autodetected): BSD-2-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/belimawr/mock-es@v0.0.0-20240424124850-20abd99ad3f7/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/leehinman/mock-es@v0.0.0-20240429182736-ca60117f3957/LICENSE:
 
 BSD 2-Clause License
 
@@ -16615,11 +16615,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-windows@v1.0
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/gosigar
-Version: v0.14.3
+Version: v0.14.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/gosigar@v0.14.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/gosigar@v0.14.2/LICENSE:
 
                               Apache License
                         Version 2.0, January 2004
