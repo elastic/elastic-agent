@@ -166,7 +166,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	defer cancel()
 
 	// Get path to agent executable.
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err, "could not create agent fixture")
 
 	t.Log("Enrolling the agent in Fleet")
@@ -226,7 +226,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 
 func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info, protected bool) {
 	// Get path to agent executable.
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
@@ -339,7 +339,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 
 func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, info *define.Info, protected bool) {
 	// Get path to agent executable.
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
@@ -511,7 +511,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	defer cn()
 
 	// Get path to agent executable.
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
@@ -589,7 +589,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 	defer cn()
 
 	// Get path to agent executable.
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
@@ -665,7 +665,7 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	defer cn()
 
 	// Get path to agent executable.
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")

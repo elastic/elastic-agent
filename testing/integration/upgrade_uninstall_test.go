@@ -40,7 +40,7 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	defer cancel()
 
 	// Upgrades to build under test.
-	endFixture, err := define.NewFixture(t, define.Version())
+	endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get end agent build version info")
