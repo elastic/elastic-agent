@@ -40,6 +40,7 @@ func (l *Loader) Load(files []string) (*Config, error) {
 			if l.isFileUnderInputsFolder(f) {
 				return nil, fmt.Errorf("failed to load external configuration file '%s': %w. Are you sure it contains an inputs section?", f, err)
 			}
+			panic(fmt.Errorf("5 failed to load configuration: %w", err))
 			return nil, fmt.Errorf("failed to load configuration file '%s': %w", f, err)
 		}
 		l.logger.Debugf("Loaded configuration from %s", f)
