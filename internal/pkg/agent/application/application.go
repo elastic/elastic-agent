@@ -92,7 +92,13 @@ func New(
 		log.Infof("Loading baseline config from %v", pathConfigFile)
 		rawConfig, err = config.LoadFile(pathConfigFile)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+			if !runAsOtel {
+				return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+			}
+
+			// initialize with empty config, configuration file is not necessary in otel mode,
+			// best effort is fine
+			rawConfig = config.New()
 		}
 	}
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
