@@ -272,9 +272,6 @@ agent.monitoring:
   pprof.enabled: false
   use_output: default
 
-# This just reduces the amount of logs.
-agent.logging.metrics.enabled: false
-
 # Needed if you already have an Elastic-Agent running on your machine
 # That's very helpful for running the tests locally
 agent.monitoring:
