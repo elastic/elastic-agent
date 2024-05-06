@@ -49,9 +49,8 @@ func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, 
 			return nil
 		}
 
+		v.log.Debugw("Verifier failed!", "verifier", verifier.Name(), "error", e)
 		err = multierror.Append(err, e)
-
-		v.log.Warnw("Verifier failed!", "verifier", verifier.Name(), "error", e)
 	}
 
 	return err
