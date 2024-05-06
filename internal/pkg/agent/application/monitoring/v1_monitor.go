@@ -349,6 +349,16 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 						},
 					},
 				},
+				// drop periodic metrics logs (those are useful mostly in diagnostic dumps where we collect log files)
+				map[string]interface{}{
+					"drop_event": map[string]interface{}{
+						"when": map[string]interface{}{
+							"regexp": map[string]interface{}{
+								"message": "^Non-zero metrics in the last",
+							},
+						},
+					},
+				},
 				// copy original dataset so we can drop the dataset field
 				map[string]interface{}{
 					"copy_fields": map[string]interface{}{
