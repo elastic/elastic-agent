@@ -158,7 +158,7 @@ func TestIsolatedUnitsDiagnosticsOptionalValues(t *testing.T) {
 		Local: false,
 	})
 
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -207,7 +207,7 @@ func TestIsolatedUnitsDiagnosticsCommand(t *testing.T) {
 		Local: false,
 	})
 
-	f, err := define.NewFixture(t, define.Version())
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
