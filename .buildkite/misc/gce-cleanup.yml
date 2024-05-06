@@ -18,7 +18,7 @@ scanners:
         filters:
           - type: "<"
             pointer: "/extra/creationTimestamp"
-            param: "${CREATION_DATE}"
+            param: "${DELETE_CREATED_AFTER_DATE}"
             converters:
               param: "date"
               value: "date"

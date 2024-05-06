@@ -67,7 +67,7 @@ func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, end
 	)
 	require.NoError(t, err, "error creating previous agent fixture")
 
-	endFixture, err := define.NewFixture(t, endVersion)
+	endFixture, err := define.NewFixtureFromLocalBuild(t, endVersion)
 	require.NoError(t, err)
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)

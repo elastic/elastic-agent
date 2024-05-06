@@ -74,6 +74,7 @@ type RuntimePreventionSpec struct {
 
 // CommandSpec is the specification for an input that executes as a subprocess.
 type CommandSpec struct {
+	Name                    string             `config:"name,omitempty" yaml:"name,omitempty"`
 	Args                    []string           `config:"args,omitempty" yaml:"args,omitempty"`
 	Env                     []CommandEnvSpec   `config:"env,omitempty" yaml:"env,omitempty"`
 	Timeouts                CommandTimeoutSpec `config:"timeouts,omitempty" yaml:"timeouts,omitempty"`

@@ -34,7 +34,7 @@ cat << EOF > $OUTPUT_FILE
  * 2.0; you may not use this file except in compliance with the Elastic License
  * 2.0.
  */
- 
+
 export const elasticAgentStandaloneManifest = \`---
 EOF
 
@@ -48,6 +48,7 @@ EOF
 
 cat $MANIFEST_PATH/$MANAGED >> $OUTPUT_FILE
 echo -n "\`;" >> $OUTPUT_FILE
+echo "" >> $OUTPUT_FILE
 
 #Replacing all occurencies of elastic-agent-standalone
 sed -i -e 's/elastic-agent-standalone/elastic-agent/g' $OUTPUT_FILE

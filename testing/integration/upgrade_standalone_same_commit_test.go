@@ -73,7 +73,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		defer cancel()
 
 		// ensure we use the same package version
-		startFixture, err := define.NewFixture(
+		startFixture, err := define.NewFixtureFromLocalBuild(
 			t,
 			currentVersion.String(),
 		)
@@ -89,7 +89,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 		defer cancel()
 
-		startFixture, err := define.NewFixture(
+		startFixture, err := define.NewFixtureFromLocalBuild(
 			t,
 			currentVersion.String(),
 		)
@@ -231,7 +231,7 @@ func hackTarGzPackage(t *testing.T, reader *tar.Reader, writer *tar.Writer, oldT
 		// tar format uses forward slash as path separator, make sure we use only "path" package for checking and manipulation
 		switch path.Base(f.Name) {
 		case v1.ManifestFileName:
-			//read old content and generate the new manifest based on that
+			// read old content and generate the new manifest based on that
 			newManifest := generateNewManifestContent(t, reader, newVersion)
 			newManifestBytes := []byte(newManifest)
 
@@ -317,7 +317,7 @@ func hackZipPackage(t *testing.T, reader *zip.ReadCloser, writer *zip.Writer, ol
 		// zip format uses forward slash as path separator, make sure we use only "path" package for checking and manipulation
 		switch path.Base(zippedFile.Name) {
 		case v1.ManifestFileName:
-			//read old content
+			// read old content
 			manifestReader, err := zippedFile.Open()
 			require.NoError(t, err, "error opening manifest file in zipped package")
 

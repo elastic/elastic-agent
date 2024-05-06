@@ -48,7 +48,7 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	)
 	require.NoError(t, err, "error creating previous agent fixture")
 
-	endFixture, err := define.NewFixture(t, define.Version())
+	endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err)

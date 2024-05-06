@@ -58,11 +58,11 @@ func SetupTest(t *testing.T) *ProxyURL {
 		proxytest.WithRequestLog("proxy-2", t.Logf),
 		proxytest.WithVerboseLog())
 
-	f, err := define.NewFixture(t,
+	f, err := define.NewFixtureFromLocalBuild(t,
 		p.agentVersion,
 		integrationtest.WithAllowErrors(),
 		integrationtest.WithLogOutput())
-	require.NoError(t, err, "SetupTest: NewFixture failed")
+	require.NoError(t, err, "SetupTest: NewFixtureFromLocalBuild failed")
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()

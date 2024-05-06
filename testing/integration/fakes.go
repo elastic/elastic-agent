@@ -61,6 +61,16 @@ var fakeComponent = atesting.UsableComponent{
 					},
 				},
 			},
+			{
+				Name:        "fake-isolated-units",
+				Description: "A fake isolated units input",
+				Platforms:   fakeComponentPltfs,
+				Shippers: []string{
+					fakeShipperName,
+				},
+				Command:      &component.CommandSpec{},
+				IsolateUnits: true,
+			},
 		},
 	},
 }

@@ -103,7 +103,7 @@ func (runner *ExtendedRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
-	fixture, err := define.NewFixture(runner.T(), define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(runner.T(), define.Version())
 	require.NoError(runner.T(), err)
 	runner.agentFixture = fixture
 
@@ -173,7 +173,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	// if the slope is increasing above a certain rate, fail the test
 	// A number of factors can change the slope during a test; shortened runtime (lots of handles allocated in the first few seconds, producing an upward slope),
 	// filebeat trying to open a large number of log files, etc
-	//handleSlopeFailure := 0.1
+	// handleSlopeFailure := 0.1
 	for _, mon := range runner.resourceWatchers {
 		handleSlopeFailure := 0.1
 
@@ -320,7 +320,7 @@ func (gm *goroutinesMonitor) Update(t *testing.T, fixture *atesting.Fixture) {
 }
 
 func (gm *goroutinesMonitor) GetSlopeHandlers() []tools.Slope {
-	//handleSlopeFailure := 0.1
+	// handleSlopeFailure := 0.1
 	slopes := []tools.Slope{}
 	for _, handle := range gm.handles {
 		slopes = append(slopes, handle.regGoroutines)
