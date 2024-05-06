@@ -171,7 +171,9 @@ func killNoneChildProcess(proc *os.Process) error {
 	if e != nil {
 		return os.NewSyscallError("OpenProcess", e)
 	}
-	defer syscall.CloseHandle(h)
+	defer func() {
+		_ = syscall.CloseHandle(h)
+	}()
 	e = syscall.TerminateProcess(h, 1)
 	return os.NewSyscallError("TerminateProcess", e)
 }
