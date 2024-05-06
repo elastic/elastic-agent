@@ -66,8 +66,8 @@ import (
 )
 
 const (
-	goLintRepo        = "golang.org/x/lint/golint"
-	goLicenserRepo    = "github.com/elastic/go-licenser"
+	goLintRepo        = "golang.org/x/lint/golint@latest"
+	goLicenserRepo    = "github.com/elastic/go-licenser@latest"
 	buildDir          = "build"
 	metaDir           = "_meta"
 	snapshotEnv       = "SNAPSHOT"
