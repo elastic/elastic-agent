@@ -14,7 +14,7 @@ Running command
 from unpacked Elastic Agent package will run Elastic-Agent as an OpenTelemetry Collector. The `--config` flag needs to point to [OpenTelemetry Collector Configuration file](https://opentelemetry.io/docs/collector/configuration/). Otel mode is available only using `otel` subcommand. Elastic Agent will not do any autodetection of configuration file passed when used without `otel` subcommand and will try to run normally.
 
 
-To validate otel configuration run `otel validate` subcommand:
+To validate OTel configuration run `otel validate` subcommand:
 
 ```bash
 ./elastic-agent otel validate --config otel.yml
