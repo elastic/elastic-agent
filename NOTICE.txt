@@ -619,11 +619,11 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v0.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/e2e-testing
-Version: v1.1.0
+Version: v1.2.0
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/e2e-testing@v1.1.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/e2e-testing@v1.2.0/LICENSE.txt:
 
 Elastic License 2.0
 
