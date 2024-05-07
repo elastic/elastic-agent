@@ -215,14 +215,8 @@ func testUpgradeFleetManagedElasticAgent(
 	require.NoError(t, err)
 
 	if unprivileged {
-		if startParsedVersion.Less(*upgradetest.Version_8_13_0) {
-			t.Skipf("Starting version %s is less than 8.13 and doesn't support --unprivileged", startParsedVersion.String())
-		}
-		if endParsedVersion.Less(*upgradetest.Version_8_13_0) {
-			t.Skipf("Ending version %s is less than 8.13 and doesn't support --unprivileged", endParsedVersion.String())
-		}
-		if runtime.GOOS != define.Linux {
-			t.Skip("Unprivileged mode is currently only supported on Linux")
+		if !upgradetest.SupportsUnprivileged(startParsedVersion, endParsedVersion) {
+			t.Skipf("Either starting version %s or ending version %s doesn't support --unprivileged", startParsedVersion.String(), endParsedVersion.String())
 		}
 	}
 
