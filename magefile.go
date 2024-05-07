@@ -562,7 +562,7 @@ func RunGo(args ...string) error {
 
 // GoInstall installs a tool by calling `go install <link>
 func GoInstall(link string) error {
-	_, err := sh.Exec(map[string]string{"GO111MODULE": "off"}, os.Stdout, os.Stderr, "go", "install", link)
+	_, err := sh.Exec(map[string]string{}, os.Stdout, os.Stderr, "go", "install", link)
 	return err
 }
 
