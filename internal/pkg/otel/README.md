@@ -56,7 +56,6 @@ This section provides a summary of components included in the Elastic Distributi
 | resourceprocessor | v0.97.0|
 | transformprocessor | v0.97.0|
 | batchprocessor | v0.97.0|
-| memorylimiterprocessor | v0.97.0|
 
 
 
