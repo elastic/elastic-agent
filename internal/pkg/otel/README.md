@@ -60,3 +60,10 @@ This section provides a summary of components included in the Elastic Distributi
 
 
 
+
+### Extensions
+
+| Component | Version |
+|---|---|
+| memorylimiterextension | v0.97.0|
+
