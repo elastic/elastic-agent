@@ -78,6 +78,22 @@ sudo elastic-agent install
 
 For basic use the agent binary can be run directly, with the `sudo elastic-agent run` command.
 
+#### Packaging for other architectures
+When packaging for an architecture different than the host machine,
+you might face the following error:
+```
+exec /crossbuild: exec format error
+```
+
+If that happens, enable
+[`multiarch/qemu-user-static`](https://github.com/multiarch/qemu-user-static)
+is to enable an execution of different multi-architecture containers
+by QEMU and binfmt_misc:
+
+```
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+```
+
 ### Docker
 
 Running Elastic Agent in a docker container is a common use case. To build the Elastic Agent and create a docker image run the following command:
