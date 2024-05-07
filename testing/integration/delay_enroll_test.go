@@ -36,7 +36,7 @@ func TestDelayEnroll(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	agentFixture, err := define.NewFixture(t, define.Version())
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	// 1. Create a policy in Fleet with monitoring enabled.

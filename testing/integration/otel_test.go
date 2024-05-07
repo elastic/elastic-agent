@@ -128,13 +128,16 @@ func TestOtelFileProcessing(t *testing.T) {
 	cfgFilePath := filepath.Join(tempDir, "otel.yml")
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileProcessingConfig), 0600))
 
-	fixture, err := define.NewFixture(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
+
+	// remove elastic-agent.yml, otel should be independent
+	require.NoError(t, os.Remove(filepath.Join(fixture.WorkDir(), "elastic-agent.yml")))
 
 	var fixtureWg sync.WaitGroup
 	fixtureWg.Add(1)
@@ -247,7 +250,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(apmConfig), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, fileName), []byte{}, 0600))
 
-	fixture, err := define.NewFixture(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))

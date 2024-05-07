@@ -38,7 +38,7 @@ func TestContainerCMD(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	agentFixture, err := define.NewFixture(t, define.Version())
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	createPolicyReq := kibana.AgentPolicy{

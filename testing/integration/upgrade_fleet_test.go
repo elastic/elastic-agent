@@ -69,7 +69,7 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool)
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
+	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	err = startFixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -171,7 +171,7 @@ func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bo
 			"It should not affect the connection to the stack. Host: %s, response body: %s",
 		stack.KibanaClient.URL, host, body)
 
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
