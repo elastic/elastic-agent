@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
@@ -114,6 +115,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	policy map[string]interface{},
 	components []component.Component,
 	componentIDToBinary map[string]string,
+	existingState []uint64,
 ) (map[string]interface{}, error) {
 	if !b.Enabled() {
 		return nil, nil
@@ -157,8 +159,9 @@ func (b *BeatsMonitor) MonitoringConfig(
 		}
 	}
 
+	// TODO: existingState will get passed here so we can fetch the PID
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, monitoringOutput, components); err != nil {
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, monitoringOutput, components, existingState); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -534,7 +537,7 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
-func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component) error {
+func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component, existingStateServicePids []uint64) error {
 	metricsCollectionIntervalString := metricsCollectionInterval.String()
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
@@ -617,6 +620,13 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				},
 			},
 		},
+	}
+
+	// TODO: this is test code, remove/clean up later
+	for _, comp := range existingStateServicePids {
+		if comp != 0 {
+			logp.L().Infof("Got non-zero pid %v, components are: %#v", componentIDToBinary)
+		}
 	}
 
 	//create a new map with the monitoring beats included

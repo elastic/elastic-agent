@@ -75,6 +75,8 @@ type ComponentState struct {
 
 	VersionInfo ComponentVersionInfo `yaml:"version_info"`
 
+	CheckinPid uint64
+
 	// internal
 	expectedUnits map[ComponentUnitKey]expectedUnitState
 
@@ -269,6 +271,12 @@ func (s *ComponentState) syncUnits(comp *component.Component) bool {
 
 func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 	changed := false
+
+	if s.CheckinPid != checkin.Pid {
+		changed = true
+		s.CheckinPid = checkin.Pid
+	}
+
 	touched := make(map[ComponentUnitKey]bool)
 	for _, unit := range checkin.Units {
 		key := ComponentUnitKey{

@@ -1004,7 +1004,7 @@ func (*testMonitoringManager) Prepare(_ string) error                           
 func (*testMonitoringManager) Cleanup(string) error                                  { return nil }
 func (*testMonitoringManager) Enabled() bool                                         { return false }
 func (*testMonitoringManager) Reload(rawConfig *config.Config) error                 { return nil }
-func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string) (map[string]interface{}, error) {
+func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string, _ []uint64) (map[string]interface{}, error) {
 	return nil, nil
 }
 

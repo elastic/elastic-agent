@@ -56,7 +56,7 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 		operatingSystem: runtime.GOOS,
 		agentInfo:       agentInfo,
 	}
-	got, err := b.MonitoringConfig(policy, nil, map[string]string{"foobeat": "filebeat"}) // put a componentID/binary mapping to have something in the beats monitoring input
+	got, err := b.MonitoringConfig(policy, nil, map[string]string{"foobeat": "filebeat"}, []uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
 	assert.NoError(t, err)
 
 	rawInputs, ok := got["inputs"]
@@ -146,7 +146,7 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 			},
 		},
 	}
-	monitoringConfig, err := b.MonitoringConfig(policy, components, map[string]string{"filestream-default": "filebeat"})
+	monitoringConfig, err := b.MonitoringConfig(policy, components, map[string]string{"filestream-default": "filebeat"}, []uint64{})
 	if err != nil {
 		t.Fatalf("cannot render monitoring configuration: %s", err)
 	}
