@@ -47,7 +47,7 @@ func TestStandaloneDowngradeToSpecificSnapshotBuild(t *testing.T) {
 
 	// start at the build version as we want to test the retry
 	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
+	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	startVersion, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err)

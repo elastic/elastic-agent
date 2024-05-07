@@ -77,7 +77,7 @@ func TestFakeComponent(t *testing.T) {
 		Local: true,
 	})
 
-	f, err := define.NewFixture(t, define.Version())
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -138,7 +138,7 @@ func TestFakeIsolatedUnitsComponent(t *testing.T) {
 		Local: true,
 	})
 
-	f, err := define.NewFixture(t, define.Version())
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))

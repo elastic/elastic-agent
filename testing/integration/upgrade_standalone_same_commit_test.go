@@ -18,7 +18,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -52,17 +51,10 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		t.Skipf("Minimum version for running this test is %q, current version: %q", *upgradetest.Version_8_13_0_SNAPSHOT, currentVersion)
 	}
 
-	unprivilegedAvailable := true
-	if runtime.GOOS != define.Linux {
-		// only available on Linux at the moment
-		unprivilegedAvailable = false
+	unprivilegedAvailable := false
+	if upgradetest.SupportsUnprivileged(currentVersion) {
+		unprivilegedAvailable = true
 	}
-	// This is probably redundant: see the skip statement above
-	if unprivilegedAvailable && currentVersion.Less(*upgradetest.Version_8_13_0) {
-		// only available if both versions are 8.13+
-		unprivilegedAvailable = false
-	}
-
 	unPrivilegedString := "unprivileged"
 	if !unprivilegedAvailable {
 		unPrivilegedString = "privileged"
@@ -73,7 +65,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		defer cancel()
 
 		// ensure we use the same package version
-		startFixture, err := define.NewFixture(
+		startFixture, err := define.NewFixtureFromLocalBuild(
 			t,
 			currentVersion.String(),
 		)
@@ -89,7 +81,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 		defer cancel()
 
-		startFixture, err := define.NewFixture(
+		startFixture, err := define.NewFixtureFromLocalBuild(
 			t,
 			currentVersion.String(),
 		)
@@ -231,7 +223,7 @@ func hackTarGzPackage(t *testing.T, reader *tar.Reader, writer *tar.Writer, oldT
 		// tar format uses forward slash as path separator, make sure we use only "path" package for checking and manipulation
 		switch path.Base(f.Name) {
 		case v1.ManifestFileName:
-			//read old content and generate the new manifest based on that
+			// read old content and generate the new manifest based on that
 			newManifest := generateNewManifestContent(t, reader, newVersion)
 			newManifestBytes := []byte(newManifest)
 
@@ -317,7 +309,7 @@ func hackZipPackage(t *testing.T, reader *zip.ReadCloser, writer *zip.Writer, ol
 		// zip format uses forward slash as path separator, make sure we use only "path" package for checking and manipulation
 		switch path.Base(zippedFile.Name) {
 		case v1.ManifestFileName:
-			//read old content
+			// read old content
 			manifestReader, err := zippedFile.Open()
 			require.NoError(t, err, "error opening manifest file in zipped package")
 
