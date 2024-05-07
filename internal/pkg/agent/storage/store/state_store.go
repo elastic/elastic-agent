@@ -75,13 +75,13 @@ type stateSerializer struct {
 }
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.
-func NewStateStoreWithMigration(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string) (*StateStore, error) {
-	err := migrateStateStore(ctx, log, actionStorePath, stateStorePath)
+func NewStateStoreWithMigration(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string, storageOpts ...storage.EncryptedOptionFunc) (*StateStore, error) {
+	err := migrateStateStore(ctx, log, actionStorePath, stateStorePath, storageOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	encryptedDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath)
+	encryptedDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath, storageOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
 	}
@@ -147,14 +147,14 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	}, nil
 }
 
-func migrateStateStore(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string) (err error) {
+func migrateStateStore(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string, storageOpts ...storage.EncryptedOptionFunc) (err error) {
 	log = log.Named("state_migration")
 	actionDiskStore, err := storage.NewDiskStore(actionStorePath)
 	if err != nil {
 		return fmt.Errorf("error creating disk store: %w", err)
 	}
 
-	stateDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath)
+	stateDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath, storageOpts...)
 	if err != nil {
 		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
 	}
