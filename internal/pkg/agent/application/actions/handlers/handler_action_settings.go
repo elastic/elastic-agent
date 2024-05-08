@@ -99,7 +99,10 @@ func (h *Settings) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
 	}
 
 	h.fallbackLogLevel = lvl
-	if h.agentInfo.RawLogLevel() == "" {
+	rawLogLevel := h.agentInfo.RawLogLevel()
+	h.log.Debugf("received fallback loglevel %s, raw loglevel %s", lvl, rawLogLevel)
+	if rawLogLevel == "" && lvl != nil {
+		h.log.Debugf("setting log level %s", lvl)
 		// set the runtime log level only if we don't have one set for the specific agent
 		return h.logLevelSetter.SetLogLevel(ctx, lvl)
 	}

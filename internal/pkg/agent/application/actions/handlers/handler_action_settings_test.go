@@ -53,6 +53,20 @@ func TestSettings_SetLogLevel(t *testing.T) {
 			wantFallbackLogLevel: &testWarnLevel,
 		},
 		{
+			name:   "Nil fallbackLogLevel without an override at agent level is not propagated",
+			fields: fields{},
+			args: args{
+				lvl: nil,
+			},
+			setupMocks: func(t *testing.T, setter *mockhandlers.LogLevelSetter, agent *mockinfo.Agent) {
+				agent.EXPECT().RawLogLevel().Return("").Once()
+				// we should never call the SetLogLevel with nil, for simplicity remove the expectation altogether
+				// setter.EXPECT().SetLogLevel(mock.Anything, nil).Return(nil).Times(0)
+			},
+			wantErr:              assert.NoError,
+			wantFallbackLogLevel: nil,
+		},
+		{
 			name:   "fallbackLogLevel set while there's an override at agent level",
 			fields: fields{},
 			args: args{
@@ -74,9 +88,12 @@ func TestSettings_SetLogLevel(t *testing.T) {
 				tt.setupMocks(t, mockLogLevelSetter, mockAgentInfo)
 			}
 
+			log, _ := logger.NewTesting(tt.name)
+
 			ctx := context.Background()
 
 			h := &Settings{
+				log:              log,
 				agentInfo:        mockAgentInfo,
 				fallbackLogLevel: tt.fields.fallbackLogLevel,
 				logLevelSetter:   mockLogLevelSetter,

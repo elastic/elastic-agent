@@ -211,15 +211,6 @@ func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config
 }
 
 func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) (err error) {
-
-	// FIXME set it to debug level once implementation is done
-	cfgMap, err := c.ToMapStr()
-	if err != nil {
-		h.log.Errorf("error converting policy change to map: %v", err)
-	} else {
-		h.log.Errorf("Received policy change: %v", cfgMap)
-	}
-
 	cfg, err := configuration.NewFromConfig(c)
 	if err != nil {
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
@@ -331,7 +322,7 @@ func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingCon
 		policyLogLevel = &loggingConfig.Level
 	}
 
-	h.log.Errorf("Applying log level %v from policy", policyLogLevel)
+	h.log.Infof("Setting fallback log level %v from policy", policyLogLevel)
 	return h.policyLogLevelSetter.SetLogLevel(ctx, policyLogLevel)
 }
 
