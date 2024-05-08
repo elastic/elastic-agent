@@ -90,6 +90,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.97.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.97.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.97.0
