@@ -1,6 +1,12 @@
 module github.com/elastic/elastic-agent
 
+<<<<<<< HEAD
 go 1.21
+=======
+go 1.21.0
+
+toolchain go1.21.10
+>>>>>>> 762ac455ad ([Automation] Bump Golang version to 1.21.10 (#4697))
 
 require (
 	github.com/Microsoft/go-winio v0.6.1
