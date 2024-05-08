@@ -218,6 +218,8 @@ func TestZipLogs(t *testing.T) {
 }
 
 func zipLogsAndAssertFiles(t *testing.T, excludeEvents bool, expected []zippedItem) {
+	t.Helper()
+
 	// Zip the logs directory.
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)

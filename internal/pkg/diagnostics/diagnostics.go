@@ -474,7 +474,10 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvent
 		}
 
 		// Skip events logs, if necessary
-		if excludeEvents && strings.HasPrefix(name, "events/") {
+		// name can either be the folder name 'events' or the folder plus
+		// the file name like 'events/elastic-agent-events-log.ndjson'
+		// we need to skip both.
+		if excludeEvents && strings.HasPrefix(name, "events") {
 			return nil
 		}
 
