@@ -17,12 +17,10 @@ summary: Log raw events to a separate log file
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
-  This commit introduces a new logger core, used when collecting logs
-  from sub process, that can be configured through logging.event_data
-  and is used to log any message that contains the whole event or
-  could contain any sensitive data. This is accomplished by adding
-  log.type: event to the log entry. The logger core is responsible for
-  filtering the log entries and directing them to the correct files.
+  Log entries from Elastic-Agent inputs containing event data are now
+  directed to a different file under the 'events' folder in the logs
+  directory. This file is not sent to the monitoring output, however
+  it can be retrieved by collecting a diagnostics.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
