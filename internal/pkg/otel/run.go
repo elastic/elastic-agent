@@ -56,10 +56,6 @@ func newSettings(version string, configPaths []string) (*otelcol.CollectorSettin
 	converterSet := confmap.ConverterSettings{}
 	configProviderSettings := otelcol.ConfigProviderSettings{
 		ResolverSettings: confmap.ResolverSettings{
-<<<<<<< HEAD
-			URIs:       configPaths,
-			Providers:  makeMapProvidersMap(fileprovider.New(), envprovider.New(), yamlprovider.New(), httpprovider.New(), httpsprovider.New()),
-=======
 			URIs: configPaths,
 			Providers: makeMapProvidersMap(
 				fileprovider.NewWithSettings(confmap.ProviderSettings{}),
@@ -68,7 +64,6 @@ func newSettings(version string, configPaths []string) (*otelcol.CollectorSettin
 				httpprovider.NewWithSettings(confmap.ProviderSettings{}),
 				httpsprovider.NewWithSettings(confmap.ProviderSettings{}),
 			),
->>>>>>> a3900f0324 (Use otel version 0.97.0 (#4638))
 			Converters: []confmap.Converter{expandconverter.New(converterSet)},
 		},
 	}
