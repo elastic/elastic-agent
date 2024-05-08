@@ -174,6 +174,7 @@ func CreateCPUProfile(ctx context.Context, period time.Duration) ([]byte, error)
 func ZipArchive(
 	errOut,
 	w io.Writer,
+	topPath string,
 	agentDiag []client.DiagnosticFileResult,
 	unitDiags []client.DiagnosticUnitResult,
 	compDiags []client.DiagnosticComponentResult,
@@ -298,7 +299,7 @@ func ZipArchive(
 	}
 
 	// Gather Logs:
-	return zipLogs(zw, ts, excludeEvents)
+	return zipLogs(zw, ts, topPath, excludeEvents)
 }
 
 func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
@@ -396,15 +397,17 @@ func redactKey(k string) bool {
 		strings.Contains(k, "key")
 }
 
-func zipLogs(zw *zip.Writer, ts time.Time, excludeEvents bool) error {
-	currentDir := filepath.Base(paths.Home())
+func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) error {
+	homePath := paths.HomeFrom(topPath)
+	dataPath := paths.DataFrom(topPath)
+	currentDir := filepath.Base(homePath)
 	if !paths.IsVersionHome() {
 		// running in a container with custom top path set
 		// logs are directly under top path
-		return zipLogsWithPath(paths.Home(), currentDir, true, excludeEvents, zw, ts)
+		return zipLogsWithPath(homePath, currentDir, true, excludeEvents, zw, ts)
 	}
 
-	dataDir, err := os.Open(paths.Data())
+	dataDir, err := os.Open(dataPath)
 	if err != nil {
 		return err
 	}
@@ -421,7 +424,7 @@ func zipLogs(zw *zip.Writer, ts time.Time, excludeEvents bool) error {
 			continue
 		}
 		collectServices := dir == currentDir
-		path := filepath.Join(paths.Data(), dir)
+		path := filepath.Join(dataPath, dir)
 		if err := zipLogsWithPath(path, dir, collectServices, excludeEvents, zw, ts); err != nil {
 			return err
 		}

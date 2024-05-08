@@ -16,6 +16,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 )
@@ -68,7 +69,7 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("failed collecting diagnostics: %w", err)
 	}
 
-	if err := diagnostics.ZipArchive(streams.Err, f, agentDiag, unitDiags, compDiags, excludeEvents); err != nil {
+	if err := diagnostics.ZipArchive(streams.Err, f, paths.Top(), agentDiag, unitDiags, compDiags, excludeEvents); err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", filepath, err)
 	}
 	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", filepath)

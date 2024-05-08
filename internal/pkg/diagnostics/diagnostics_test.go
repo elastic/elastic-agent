@@ -171,12 +171,12 @@ type zippedItem struct {
 }
 
 func TestZipLogs(t *testing.T) {
-	paths.SetTop(t.TempDir())
-	dir := filepath.Join(paths.Home(), "logs", "sub-dir")
+	topPath := t.TempDir()
+	dir := filepath.Join(paths.HomeFrom(topPath), "logs", "sub-dir")
 	require.NoError(t, os.MkdirAll(dir, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "log.ndjson"), []byte(".\n"), 0o600))
 
-	eventLogs := filepath.Join(paths.Home(), "logs", "events")
+	eventLogs := filepath.Join(paths.HomeFrom(topPath), "logs", "events")
 	require.NoError(t, os.MkdirAll(eventLogs, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(eventLogs, "elastic-agent-events-log.ndjson"), []byte(".\n"), 0o600))
 
@@ -212,18 +212,18 @@ func TestZipLogs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			zipLogsAndAssertFiles(t, tc.excludeEventsLog, tc.expectedItems)
+			zipLogsAndAssertFiles(t, topPath, tc.excludeEventsLog, tc.expectedItems)
 		})
 	}
 }
 
-func zipLogsAndAssertFiles(t *testing.T, excludeEvents bool, expected []zippedItem) {
+func zipLogsAndAssertFiles(t *testing.T, topPath string, excludeEvents bool, expected []zippedItem) {
 	t.Helper()
 
 	// Zip the logs directory.
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), excludeEvents))
+	require.NoError(t, zipLogs(w, time.Now(), topPath, excludeEvents))
 	require.NoError(t, w.Close())
 
 	// Read back the contents.
@@ -235,6 +235,17 @@ func zipLogsAndAssertFiles(t *testing.T, excludeEvents bool, expected []zippedIt
 	}
 
 	assert.Equal(t, expected, observed)
+	if t.Failed() {
+		t.Log("Expected")
+		for _, f := range expected {
+			t.Logf("name: %s, dir? %t", f.Name, f.IsDir)
+		}
+
+		t.Log("Got")
+		for _, f := range observed {
+			t.Logf("name: %s, dir? %t", f.Name, f.IsDir)
+		}
+	}
 }
 
 func TestGlobalHooks(t *testing.T) {

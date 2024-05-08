@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -67,15 +68,20 @@ type Diagnostics struct {
 	diagProvider diagnosticsProvider
 	limiter      *rate.Limiter
 	uploader     Uploader
+	topPath      string
 }
 
 // NewDiagnostics returns a new Diagnostics handler.
-func NewDiagnostics(log abstractLogger, coord diagnosticsProvider, cfg config.Limit, uploader Uploader) *Diagnostics {
+func NewDiagnostics(log abstractLogger, topPath string, coord diagnosticsProvider, cfg config.Limit, uploader Uploader) *Diagnostics {
+	if topPath == "" {
+		topPath = paths.Top()
+	}
 	return &Diagnostics{
 		log:          log,
 		diagProvider: coord,
 		limiter:      rate.NewLimiter(rate.Every(cfg.Interval), cfg.Burst),
 		uploader:     uploader,
+		topPath:      topPath,
 	}
 }
 
@@ -155,7 +161,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 				h.log.Warn(str)
 			}
 		}()
-		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag, cDiag, action.ExcludeEventsLog)
+		err := diagnostics.ZipArchive(&wBuf, &b, h.topPath, aDiag, uDiag, cDiag, action.ExcludeEventsLog)
 		if err != nil {
 			h.log.Errorw(
 				"diagnostics action handler failed generate zip archive",
@@ -344,7 +350,7 @@ func (h *Diagnostics) diagFile(
 			h.log.Warn(str)
 		}
 	}()
-	if err := diagnostics.ZipArchive(&wBuf, f, aDiag, uDiag, cDiag, excludeEvents); err != nil {
+	if err := diagnostics.ZipArchive(&wBuf, f, h.topPath, aDiag, uDiag, cDiag, excludeEvents); err != nil {
 		os.Remove(name)
 		return nil, 0, err
 	}
