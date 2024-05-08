@@ -474,7 +474,7 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvent
 		}
 
 		// Skip events logs, if necessary
-		if excludeEvents && strings.HasPrefix(name, "events") {
+		if excludeEvents && strings.HasPrefix(name, "events/") {
 			return nil
 		}
 

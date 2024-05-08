@@ -172,7 +172,7 @@ type zippedItem struct {
 
 func TestZipLogs(t *testing.T) {
 	paths.SetTop(t.TempDir())
-	dir := filepath.Join(paths.Home(), "logs/sub-dir")
+	dir := filepath.Join(paths.Home(), "logs", "sub-dir")
 	require.NoError(t, os.MkdirAll(dir, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "log.ndjson"), []byte(".\n"), 0o600))
 
