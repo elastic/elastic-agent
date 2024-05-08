@@ -334,13 +334,19 @@ func fleetServerRunning(state runtime.ComponentState) bool {
 }
 
 func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *handlers.PolicyChangeHandler {
+	settingsHandler := handlers.NewSettings(
+		m.log,
+		m.agentInfo,
+		m.coord,
+	)
+
 	policyChanger := handlers.NewPolicyChangeHandler(
 		m.log,
 		m.agentInfo,
 		m.cfg,
 		m.store,
 		m.ch,
-		m.coord,
+		settingsHandler,
 	)
 
 	m.dispatcher.MustRegister(
@@ -371,11 +377,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionSettings{},
-		handlers.NewSettings(
-			m.log,
-			m.agentInfo,
-			m.coord,
-		),
+		settingsHandler,
 	)
 
 	m.dispatcher.MustRegister(
