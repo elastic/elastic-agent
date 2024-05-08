@@ -1551,6 +1551,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.97.0 h1:
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.97.0/go.mod h1:BleH1EFM1PjhKy9geg/FVIsvc/v7hl+FqZlxAnzUHSk=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.97.0 h1:CeNd+aJaRCDb3bwNvC75ilP8uFRpWI3oD5rSJgmP7AY=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.97.0/go.mod h1:2YXD48xGbLZ2mk5ScmrDYzPXjZb4R+1c2723AWuz5Pw=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.97.0 h1:IfJ9EkykXHBYdwuvZd0qfFcCHAAOuTEaiIlTRw6R9g4=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.97.0/go.mod h1:uTs2ukYAG9tCkoUhW39J9bNQAqwpqHhE85eeRVm6zCM=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.97.0 h1:Fa3TvB9WKi6wF3N1Kn4oDeyrigAidK+0uQaAvRQUwLQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.97.0/go.mod h1:XKpJmOEQTVg6CdbWi9n1Gr+MYc3A6DtYX3uuYB7Q4so=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.97.0 h1:8UfxoSP0ZKkib+RWZVdCixHEjkz1VxspRAmHqmexO9M=
