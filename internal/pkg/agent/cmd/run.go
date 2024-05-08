@@ -492,7 +492,7 @@ func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) stri
 		return configuredLevel
 	}
 
-	return defaultLogLevel
+	return ""
 }
 
 func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider) (*configuration.Configuration, error) {
