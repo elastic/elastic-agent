@@ -95,3 +95,31 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 
 	return cmd
 }
+
+// NewCommand returns the default command for the agent.
+func NewOtelCommand() *cobra.Command {
+	return NewOtelCommandWithArgs(os.Args, cli.NewIOStreams())
+}
+
+// NewCommandWithArgs returns a new agent with the flags and the subcommand.
+func NewOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
+	cmd := newBaseOtelCommandWithArgs(args, streams)
+
+	// Init version information contained in package version file
+	// err := version.InitVersionError()
+	// if err != nil {
+	// 	cmd.PrintErrf("Error initializing version information: %v\n", err)
+	// }
+
+	// path flags
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home.unversioned"))
+
+	// logging flags
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("v"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("e"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("d"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("environment"))
+
+	return cmd
+}

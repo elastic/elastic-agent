@@ -64,6 +64,40 @@ func DefaultBuildArgs() BuildArgs {
 	return args
 }
 
+func DefaultElasticOtelBuildArgs() BuildArgs {
+	args := BuildArgs{
+		Name: "elastic-otel",
+		CGO:  build.Default.CgoEnabled,
+		Vars: map[string]string{
+			elasticAgentModulePath + "/version.buildTime": "{{ date }}",
+			elasticAgentModulePath + "/version.commit":    "{{ commit }}",
+		},
+		InputFiles: []string{
+			filepath.Join("pkg", "cmd", "otel", "main.go"),
+		},
+		WinMetadata: true,
+	}
+	if versionQualified {
+		args.Vars[elasticAgentModulePath+"/version.qualifier"] = "{{ .Qualifier }}"
+	}
+
+	if positionIndependentCodeSupported() {
+		args.ExtraFlags = append(args.ExtraFlags, "-buildmode", "pie")
+	}
+
+	if DevBuild {
+		// Disable optimizations (-N) and inlining (-l) for debugging.
+		args.ExtraFlags = append(args.ExtraFlags, `-gcflags=all=-N -l`)
+	} else {
+		// Strip all debug symbols from binary (does not affect Go stack traces).
+		args.LDFlags = append(args.LDFlags, "-s")
+		// Remove all file system paths from the compiled executable, to improve build reproducibility
+		args.ExtraFlags = append(args.ExtraFlags, "-trimpath")
+	}
+
+	return args
+}
+
 // positionIndependentCodeSupported checks if the target platform support position independent code (or ASLR).
 //
 // The list of supported platforms is compiled based on the Go release notes: https://golang.org/doc/devel/release.html

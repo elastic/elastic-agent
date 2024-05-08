@@ -218,6 +218,10 @@ func (Build) All() {
 	mg.Deps(Build.Binary)
 }
 
+func (Build) Otel() {
+	mg.Deps(Build.BinaryOtel)
+}
+
 // GenerateConfig generates the configuration from _meta/elastic-agent.yml
 func (Build) GenerateConfig() error {
 	mg.Deps(Mkdir(buildDir))
@@ -270,6 +274,17 @@ func (Build) Binary() error {
 	mg.Deps(Prepare.Env)
 
 	buildArgs := devtools.DefaultBuildArgs()
+	buildArgs.OutputDir = buildDir
+	injectBuildVars(buildArgs.Vars)
+
+	return devtools.Build(buildArgs)
+}
+
+// Binary build the elastic-otel artifact.
+func (Build) BinaryOtel() error {
+	mg.Deps(Prepare.Env)
+
+	buildArgs := devtools.DefaultElasticOtelBuildArgs()
 	buildArgs.OutputDir = buildDir
 	injectBuildVars(buildArgs.Vars)
 

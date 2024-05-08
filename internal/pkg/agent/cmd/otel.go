@@ -23,6 +23,32 @@ const (
 	setFlagName    = "set"
 )
 
+func newBaseOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "elastic-otel [subcomand]",
+		Short: "Start the Elastic Agent in otel mode",
+		Long:  "This command starts the Elastic Agent in otel mode.",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfgFiles, err := getConfigFiles(cmd, true)
+			if err != nil {
+				return err
+			}
+			return runCollector(cmd.Context(), cfgFiles)
+		},
+		PreRun: func(c *cobra.Command, args []string) {
+			// hide inherited flags not to bloat help with flags not related to otel
+			hideInheritedFlags(c)
+		},
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+
+	setupOtelFlags(cmd.Flags())
+	cmd.AddCommand(newValidateCommandWithArgs(args, streams))
+
+	return cmd
+}
+
 func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "otel",
