@@ -391,7 +391,7 @@ func killWatcher(pt *progressbar.ProgressBar) error {
 				errs = errors.Join(errs, fmt.Errorf("failed to load watcher process with pid %d: %w", pid, err))
 				continue
 			}
-			err = proc.Kill()
+			err = killNoneChildProcess(proc)
 			if err != nil && !errors.Is(err, os.ErrProcessDone) {
 				errs = errors.Join(errs, fmt.Errorf("failed to kill watcher process with pid %d: %w", pid, err))
 				continue

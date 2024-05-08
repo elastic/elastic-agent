@@ -66,9 +66,9 @@ func Version() string {
 	return ver
 }
 
-// NewFixture returns a new Elastic Agent testing fixture with a LocalFetcher and
+// NewFixtureFromLocalBuild returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
-func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+func NewFixtureFromLocalBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	buildsDir := os.Getenv("AGENT_BUILD_DIR")
 	if buildsDir == "" {
 		projectDir, err := findProjectRoot()
@@ -82,7 +82,7 @@ func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*ate
 
 }
 
-// NewFixture returns a new Elastic Agent testing fixture with a LocalFetcher and
+// NewFixtureWithBinary returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
 func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	ver, err := semver.ParseVersion(version)

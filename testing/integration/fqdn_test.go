@@ -42,7 +42,7 @@ func TestFQDN(t *testing.T) {
 		Sudo:  true,
 	})
 
-	agentFixture, err := define.NewFixture(t, define.Version())
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	externalIP, err := getExternalIP()

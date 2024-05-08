@@ -56,7 +56,7 @@ func TestAPMConfig(t *testing.T) {
 		Group: Default,
 		Stack: &define.Stack{},
 	})
-	f, err := define.NewFixture(t, define.Version())
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	deadline := time.Now().Add(10 * time.Minute)
@@ -88,7 +88,7 @@ func TestAPMConfig(t *testing.T) {
 			return count > 0
 		}, 1*time.Minute, time.Second)
 
-		//change the configuration with a new environment and check that the update has been processed
+		// change the configuration with a new environment and check that the update has been processed
 		environment = environment + "-changed"
 		modifiedAgentConfig := generateAgentConfigForAPM(t, agentConfigTemplateString, info, environment)
 		t.Logf("Rendered agent modified config:\n%s", modifiedAgentConfig)
@@ -178,8 +178,8 @@ func countAPMTraces(ctx context.Context, t *testing.T, esClient *elasticsearch.C
 		Count int
 	}
 
-	//decoder := json.NewDecoder(response.Body)
-	//err = decoder.Decode(&body)
+	// decoder := json.NewDecoder(response.Body)
+	// err = decoder.Decode(&body)
 	bodyBytes, _ := io.ReadAll(response.Body)
 
 	t.Logf("received ES response: %s", bodyBytes)

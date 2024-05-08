@@ -1,5 +1,6 @@
 {
   "testVersions": [
+    "8.14.0-SNAPSHOT",
     "8.13.3-SNAPSHOT",
     "8.13.2",
     "8.12.2",
