@@ -9,10 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-autodiscover/utils"
-
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
+	"github.com/elastic/elastic-agent-autodiscover/utils"
 	c "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -217,7 +216,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 		if !p.managed {
 			if ann, ok := data.mapping["annotations"]; ok {
 				annotations, _ := ann.(mapstr.M)
-				hints := utils.GenerateHints(annotations, "", p.config.Prefix)
+				hints, _ := hintsCheck(annotations, "", p.config.Prefix, true, allSupportedHints, p.logger, pod)
 				if len(hints) > 0 {
 					p.logger.Debugf("Extracted hints are :%v", hints)
 					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")
@@ -524,4 +523,13 @@ func updateProcessors(newprocessors []mapstr.M, processors []map[string]interfac
 	}
 
 	return processors
+}
+
+// HintsCheck geenrates hints from provided annotations of the pod and logs any possible incorrect annotations that have been provided in the pod
+func hintsCheck(annotations mapstr.M, container string, prefix string, validate bool, allSupportedHints []string, logger *logp.Logger, pod *kubernetes.Pod) (mapstr.M, []string) {
+	hints, incorrecthints := utils.GenerateHints(annotations, container, prefix, validate, allSupportedHints)
+	for _, value := range incorrecthints { //We check whether the provided annotation follows the supported format and vocabulary. The check happens for annotations that have prefix co.elastic
+		logger.Warnf("provided hint: %s/%s is not recognised as supported annotation for pod %s in namespace %s", prefix, value, pod.Name, pod.ObjectMeta.Namespace)
+	}
+	return hints, incorrecthints
 }
