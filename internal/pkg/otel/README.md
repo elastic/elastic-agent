@@ -53,12 +53,27 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | attributesprocessor | v0.97.0|
 | filterprocessor | v0.97.0|
 | resourceprocessor | v0.97.0|
 | transformprocessor | v0.97.0|
 | batchprocessor | v0.97.0|
 | memorylimiterprocessor | v0.97.0|
+=======
+| attributesprocessor | v0.100.0|
+| filterprocessor | v0.100.0|
+| resourceprocessor | v0.100.0|
+| transformprocessor | v0.100.0|
+| batchprocessor | v0.100.0|
+>>>>>>> 13a4157d11 (Replacing memory limiter processor with extension (#4689))
 
 
+
+
+### Extensions
+
+| Component | Version |
+|---|---|
+| memorylimiterextension | v0.100.0|
 
