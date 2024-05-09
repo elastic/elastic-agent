@@ -16,16 +16,21 @@ summary: Set log level from fleet policy
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: Enables setting agent logging level in policy. 
-  Setting a valid log level (same values allowed for setting log level on the specific agent)
-  in fleet policy under `agent.logging.level` key will cause the agent to change
-  its logging level, unless an override is set for the specific elastic-agent using
-  a `settings` action.
+description: >
+  Enables setting agent logging level in policy. Setting a valid
+  log level (same values allowed for setting log level on the specific agent)
+  in fleet policy under `agent.logging.level` key will cause the agent to
+  change its logging level, unless an override is set for the specific
+  elastic-agent using a `settings` action.
+  
   The order of priority of log level for a fleet managed agent is:
+  
   1. log level set specifically to the agent via settings action, if any
+  
   2. log level specified in fleet policy, if any
+  
   3. default hard-coded log level for elastic-agent
-
+  
 # Affected component; a word indicating the component this changeset affects.
 component: elastic-agent
 
