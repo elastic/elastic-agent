@@ -31,18 +31,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-<<<<<<< HEAD
-| filelogreceiver | v0.100.0|
-| otlpreceiver | v0.102.0|
-=======
-| filelogreceiver | v0.101.0|
-| otlpreceiver | v0.101.0|
->>>>>>> e401afe9d7 (Bump the otel-dependencies group with 49 updates (#4791))
-=======
 | filelogreceiver | v0.102.0|
 | otlpreceiver | v0.102.1|
->>>>>>> 17880c6b2a (Bump the otel-dependencies group across 1 directory with 49 updates (#4857))
 
 
 
@@ -63,28 +53,12 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-<<<<<<< HEAD
-| k8sattributesprocessor | v0.102.0|
-| attributesprocessor | v0.100.0|
-| filterprocessor | v0.100.0|
-| resourceprocessor | v0.100.0|
-| transformprocessor | v0.100.0|
-| batchprocessor | v0.100.0|
-=======
-| attributesprocessor | v0.101.0|
-| filterprocessor | v0.101.0|
-| resourceprocessor | v0.101.0|
-| transformprocessor | v0.101.0|
-| batchprocessor | v0.101.0|
->>>>>>> e401afe9d7 (Bump the otel-dependencies group with 49 updates (#4791))
-=======
+| k8sattributesprocessor | v0.100.0|
 | attributesprocessor | v0.102.0|
 | filterprocessor | v0.102.0|
 | resourceprocessor | v0.102.0|
 | transformprocessor | v0.102.0|
 | batchprocessor | v0.102.1|
->>>>>>> 17880c6b2a (Bump the otel-dependencies group across 1 directory with 49 updates (#4857))
 
 
 
