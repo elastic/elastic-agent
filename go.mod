@@ -57,8 +57,6 @@ require (
 	go.elastic.co/apm/module/apmgorilla v1.15.0
 	go.elastic.co/ecszap v1.0.1
 	go.elastic.co/go-licence-detector v0.5.0
-	go.opentelemetry.io/collector/extension v0.97.0
-	go.opentelemetry.io/collector/extension/memorylimiterextension v0.97.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.22.0
 	golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8
@@ -103,6 +101,8 @@ require (
 	go.opentelemetry.io/collector/exporter v0.97.0
 	go.opentelemetry.io/collector/exporter/debugexporter v0.97.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.97.0
+	go.opentelemetry.io/collector/extension v0.97.0
+	go.opentelemetry.io/collector/extension/memorylimiterextension v0.97.0
 	go.opentelemetry.io/collector/featuregate v1.6.0
 	go.opentelemetry.io/collector/otelcol v0.97.0
 	go.opentelemetry.io/collector/processor v0.97.0
