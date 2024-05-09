@@ -27,6 +27,7 @@ else
        --fill-first \
        --head "update-agent-versions-$GITHUB_RUN_ID" \
        --label 'Team:Elastic-Agent' \
+       --label 'Team:Elastic-Agent-Control-Plane' \
        --label 'update-versions' \
        --label 'skip-changelog' \
        --label 'backport-skip' \

@@ -38,7 +38,7 @@ func TestContainerCMD(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	agentFixture, err := define.NewFixture(t, define.Version())
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	createPolicyReq := kibana.AgentPolicy{
@@ -92,6 +92,18 @@ func TestContainerCMD(t *testing.T) {
 			if err := cmd.Process.Kill(); err != nil {
 				t.Fatalf("could not kill Elastic-Agent process: %s", err)
 			}
+
+			// Kill does not wait for the process to finish, so we wait here
+			state, err := cmd.Process.Wait()
+			if err != nil {
+				t.Errorf("Elastic-Agent exited with error after kill signal: %s", err)
+				t.Errorf("Elastic-Agent exited with status %d", state.ExitCode())
+				out, err := cmd.CombinedOutput()
+				if err == nil {
+					t.Log(string(out))
+				}
+			}
+
 			return
 		}
 		t.Log(">> cleaning up: no process to kill")

@@ -63,7 +63,7 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 	require.NoError(t, err, "failed to get start agent build version info")
 
 	// Upgrade to the build under test.
-	endFixture, err := define.NewFixture(t, define.Version())
+	endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, define.Version())
@@ -178,7 +178,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	require.NoError(t, err, "failed to get start agent build version info")
 
 	// Upgrade to the build under test.
-	endFixture, err := define.NewFixture(t, define.Version())
+	endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, define.Version())

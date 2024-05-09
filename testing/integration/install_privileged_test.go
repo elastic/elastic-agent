@@ -35,7 +35,7 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -87,7 +87,7 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
