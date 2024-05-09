@@ -16,7 +16,14 @@ exporters:
     sampling_initial: 10000
     sampling_thereafter: 10000
 
+extensions:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 700
+    spike_limit_mib: 180
+
 service:
+  extensions: [memory_limiter]
   pipelines:
     logs:
       receivers: [filelog]

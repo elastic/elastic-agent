@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -37,91 +38,30 @@ func TestNonDefaultSourceURI(t *testing.T) {
 
 }
 
-const artifactAPIElasticAgentSearchResponse = `
-{
-  "packages": {
-    "elastic-agent-1.2.3-SNAPSHOT-darwin-aarch64.tar.gz": {
-      "url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-darwin-aarch64.tar.gz",
-      "sha_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-darwin-aarch64.tar.gz.sha512",
-      "asc_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-darwin-aarch64.tar.gz.asc",
-      "type": "tar",
-      "architecture": "aarch64",
-      "os": [
-        "darwin"
-      ]
-    },
-    "elastic-agent-1.2.3-SNAPSHOT-windows-x86_64.zip": {
-      "url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-windows-x86_64.zip",
-      "sha_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-windows-x86_64.zip.sha512",
-      "asc_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-windows-x86_64.zip.asc",
-      "type": "zip",
-      "architecture": "x86_64",
-      "os": [
-        "windows"
-      ]
-    },
-    "elastic-agent-core-1.2.3-SNAPSHOT-linux-arm64.tar.gz": {
-      "url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/elastic-agent-core/elastic-agent-core-1.2.3-SNAPSHOT-linux-arm64.tar.gz",
-      "sha_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/elastic-agent-core/elastic-agent-core-1.2.3-SNAPSHOT-linux-arm64.tar.gz.sha512",
-      "asc_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/elastic-agent-core/elastic-agent-core-1.2.3-SNAPSHOT-linux-arm64.tar.gz.asc",
-      "type": "tar",
-      "architecture": "arm64",
-      "os": [
-        "linux"
-      ]
-    },
-    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz": {
-      "url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
-      "sha_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.sha512",
-      "asc_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.asc",
-      "type": "tar",
-      "architecture": "x86_64",
-      "os": [
-        "linux"
-      ]
-    },
-    "elastic-agent-1.2.3-SNAPSHOT-linux-arm64.tar.gz": {
-      "url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-arm64.tar.gz",
-      "sha_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-arm64.tar.gz.sha512",
-      "asc_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-arm64.tar.gz.asc",
-      "type": "tar",
-      "architecture": "arm64",
-      "os": [
-        "linux"
-      ]
-    },
-    "elastic-agent-1.2.3-SNAPSHOT-darwin-x86_64.tar.gz": {
-      "url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-darwin-x86_64.tar.gz",
-      "sha_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-darwin-x86_64.tar.gz.sha512",
-      "asc_url": "https://snapshots.elastic.co/1.2.3-33e8d7e1/downloads/beats/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-darwin-x86_64.tar.gz.asc",
-      "type": "tar",
-      "architecture": "x86_64",
-      "os": [
-        "darwin"
-      ]
-    }
-  },
-  "manifests": {
-    "last-update-time": "Tue, 05 Dec 2023 15:47:06 UTC",
-    "seconds-since-last-update": 201
-  }
-}
-`
-
 var agentSpec = artifact.Artifact{
 	Name:     "Elastic Agent",
 	Cmd:      "elastic-agent",
 	Artifact: "beat/elastic-agent",
 }
 
-type downloadHttpResponse struct {
-	statusCode int
-	headers    http.Header
-	Body       []byte
+func readFile(t *testing.T, name string) []byte {
+	bytes, err := os.ReadFile(name)
+	require.NoError(t, err)
+
+	return bytes
 }
 
 func TestDownloadVersion(t *testing.T) {
+	files := map[string][]byte{
+		// links for the latest snapshot
+		"/latest/8.14.0-SNAPSHOT.json": readFile(t, "./testdata/latest-snapshot.json"),
+		"/8.14.0-6d69ee76/downloads/beat/elastic-agent/elastic-agent-8.14.0-SNAPSHOT-linux-x86_64.tar.gz":        {},
+		"/8.14.0-6d69ee76/downloads/beat/elastic-agent/elastic-agent-8.14.0-SNAPSHOT-linux-x86_64.tar.gz.sha512": {},
 
+		// links for a specific build
+		"/8.13.3-76ce1a63/downloads/beat/elastic-agent/elastic-agent-8.13.3-SNAPSHOT-linux-x86_64.tar.gz":        {},
+		"/8.13.3-76ce1a63/downloads/beat/elastic-agent/elastic-agent-8.13.3-SNAPSHOT-linux-x86_64.tar.gz.sha512": {},
+	}
 	type fields struct {
 		config *artifact.Config
 	}
@@ -131,7 +71,6 @@ func TestDownloadVersion(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		files   map[string]downloadHttpResponse
 		fields  fields
 		args    args
 		want    string
@@ -139,51 +78,26 @@ func TestDownloadVersion(t *testing.T) {
 	}{
 		{
 			name: "happy path snapshot version",
-			files: map[string]downloadHttpResponse{
-				"/1.2.3-33e8d7e1/downloads/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz": {
-					statusCode: http.StatusOK,
-					Body:       []byte("This is a fake linux elastic agent archive"),
-				},
-				"/1.2.3-33e8d7e1/downloads/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.sha512": {
-					statusCode: http.StatusOK,
-					Body:       []byte("somesha512 elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz"),
-				},
-				"/v1/search/1.2.3-SNAPSHOT/elastic-agent": {
-					statusCode: http.StatusOK,
-					headers:    map[string][]string{"Content-Type": {"application/json"}},
-					Body:       []byte(artifactAPIElasticAgentSearchResponse),
-				},
-			},
 			fields: fields{
 				config: &artifact.Config{
 					OperatingSystem: "linux",
 					Architecture:    "64",
 				},
 			},
-			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")},
-			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
+			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(8, 14, 0, "SNAPSHOT", "")},
+			want:    "elastic-agent-8.14.0-SNAPSHOT-linux-x86_64.tar.gz",
 			wantErr: assert.NoError,
 		},
 		{
 			name: "happy path snapshot version with build metadata",
-			files: map[string]downloadHttpResponse{
-				"/1.2.3-buildid/downloads/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz": {
-					statusCode: http.StatusOK,
-					Body:       []byte("This is a fake linux elastic agent archive"),
-				},
-				"/1.2.3-buildid/downloads/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.sha512": {
-					statusCode: http.StatusOK,
-					Body:       []byte("somesha512 elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz"),
-				},
-			},
 			fields: fields{
 				config: &artifact.Config{
 					OperatingSystem: "linux",
 					Architecture:    "64",
 				},
 			},
-			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "buildid")},
-			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
+			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(8, 13, 3, "SNAPSHOT", "76ce1a63")},
+			want:    "elastic-agent-8.13.3-SNAPSHOT-linux-x86_64.tar.gz",
 			wantErr: assert.NoError,
 		},
 	}
@@ -195,21 +109,15 @@ func TestDownloadVersion(t *testing.T) {
 
 			handleDownload := func(rw http.ResponseWriter, req *http.Request) {
 				path := req.URL.Path
+				t.Logf("incoming request for %s", path)
 
-				resp, ok := tt.files[path]
+				file, ok := files[path]
 				if !ok {
 					rw.WriteHeader(http.StatusNotFound)
 					return
 				}
 
-				for k, values := range resp.headers {
-					for _, v := range values {
-						rw.Header().Set(k, v)
-					}
-				}
-
-				rw.WriteHeader(resp.statusCode)
-				_, err := io.Copy(rw, bytes.NewReader(resp.Body))
+				_, err := io.Copy(rw, bytes.NewReader(file))
 				assert.NoError(t, err, "error writing out response body")
 			}
 			server := httptest.NewTLSServer(http.HandlerFunc(handleDownload))
