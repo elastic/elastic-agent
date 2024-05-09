@@ -17,11 +17,13 @@ import (
 
 	// Processors:
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
-	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"     // for modifying resource attributes
-	transformprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor"   // for OTTL processing on logs
-	"go.opentelemetry.io/collector/processor/batchprocessor"                                                      // for batching events
+	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
+	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"   // for modifying resource attributes
+	transformprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor" // for OTTL processing on logs
+	"go.opentelemetry.io/collector/processor/batchprocessor"                                                    // for batching events
 
 	// Exporters:
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"                           // for dev
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
@@ -49,6 +51,7 @@ func components() (otelcol.Factories, error) {
 		resourceprocessor.NewFactory(),
 		attributesprocessor.NewFactory(),
 		transformprocessor.NewFactory(),
+		filterprocessor.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
@@ -59,6 +62,7 @@ func components() (otelcol.Factories, error) {
 		otlpexporter.NewFactory(),
 		debugexporter.NewFactory(),
 		fileexporter.NewFactory(),
+		elasticsearchexporter.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

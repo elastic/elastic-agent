@@ -55,7 +55,7 @@ func LoadFullAgentConfig(ctx context.Context, logger *logger.Logger, cfgPath str
 		return c, nil
 	}
 
-	fleetConfig, err := loadFleetConfig(ctx, logger)
+	fleetConfig, err := loadFleetConfig(ctx, logger, unprivileged)
 	if err != nil {
 		return nil, fmt.Errorf("error obtaining fleet config: %w", err)
 	} else if fleetConfig == nil {
@@ -115,8 +115,8 @@ func loadConfig(ctx context.Context, configPath string, unprivileged bool) (*con
 	return rawConfig, nil
 }
 
-func loadFleetConfig(ctx context.Context, l *logger.Logger) (map[string]interface{}, error) {
-	stateStore, err := store.NewStateStoreWithMigration(ctx, l, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
+func loadFleetConfig(ctx context.Context, l *logger.Logger, unprivileged bool) (map[string]interface{}, error) {
+	stateStore, err := store.NewStateStoreWithMigration(ctx, l, paths.AgentActionStoreFile(), paths.AgentStateStoreFile(), storage.WithUnprivileged(unprivileged))
 	if err != nil {
 		return nil, err
 	}
