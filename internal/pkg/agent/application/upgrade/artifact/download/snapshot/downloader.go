@@ -124,10 +124,20 @@ func snapshotURI(ctx context.Context, client *gohttp.Client, versionOverride *ag
 		version = versionOverride.CoreVersion()
 	}
 
-	artifactsURI := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s-SNAPSHOT/elastic-agent", version)
-	request, err := gohttp.NewRequestWithContext(ctx, gohttp.MethodGet, artifactsURI, nil)
+	// otherwise, if we don't know the exact build and we're trying to find the latest snapshot build
+	buildID, err := findLatestSnapshot(ctx, client, version)
 	if err != nil {
-		return "", fmt.Errorf("creating request to artifact api: %w", err)
+		return "", fmt.Errorf("failed to find snapshot information for version %q: %w", version, err)
+	}
+
+	return fmt.Sprintf(snapshotURIFormat, version, buildID), nil
+}
+
+func findLatestSnapshot(ctx context.Context, client *gohttp.Client, version string) (buildID string, err error) {
+	latestSnapshotURI := fmt.Sprintf("https://snapshots.elastic.co/latest/%s-SNAPSHOT.json", version)
+	request, err := gohttp.NewRequestWithContext(ctx, gohttp.MethodGet, latestSnapshotURI, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request to the snapshot API: %w", err)
 	}
 
 	resp, err := client.Do(request)
@@ -136,48 +146,28 @@ func snapshotURI(ctx context.Context, client *gohttp.Client, versionOverride *ag
 	}
 	defer resp.Body.Close()
 
-	body := struct {
-		Packages map[string]interface{} `json:"packages"`
-	}{}
+	switch resp.StatusCode {
+	case gohttp.StatusNotFound:
+		return "", fmt.Errorf("snapshot for version %q not found", version)
 
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&body); err != nil {
-		return "", err
+	case gohttp.StatusOK:
+		var info struct {
+			BuildID string `json:"build_id"`
+		}
+
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&info); err != nil {
+			return "", err
+		}
+
+		parts := strings.Split(info.BuildID, "-")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("wrong format for a build ID: %s", info.BuildID)
+		}
+
+		return parts[1], nil
+
+	default:
+		return "", fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
 	}
-
-	if len(body.Packages) == 0 {
-		return "", fmt.Errorf("no packages found in snapshot repo")
-	}
-
-	for k, pkg := range body.Packages {
-		pkgMap, ok := pkg.(map[string]interface{})
-		if !ok {
-			return "", fmt.Errorf("content of '%s' is not a map", k)
-		}
-
-		uriVal, found := pkgMap["url"]
-		if !found {
-			return "", fmt.Errorf("item '%s' does not contain url", k)
-		}
-
-		uri, ok := uriVal.(string)
-		if !ok {
-			return "", fmt.Errorf("uri is not a string")
-		}
-
-		// Because we're iterating over a map from the API response,
-		// the order is random and some elements there do not contain the
-		// `/beats/elastic-agent/` substring, so we need to go through the
-		// whole map before returning an error.
-		//
-		// One of the elements that might be there and do not contain this
-		// substring is the `elastic-agent-shipper`, whose URL is something like:
-		// https://snapshots.elastic.co/8.7.0-d050210c/downloads/elastic-agent-shipper/elastic-agent-shipper-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
-		index := strings.Index(uri, "/beats/elastic-agent/")
-		if index != -1 {
-			return uri[:index], nil
-		}
-	}
-
-	return "", fmt.Errorf("uri not detected")
 }

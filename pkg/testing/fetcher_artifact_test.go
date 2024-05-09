@@ -151,15 +151,15 @@ func newFakeHttpClient(t *testing.T) *fakeHttpClient {
 
 		// actual artifacts
 		// 8.12 release
-		"https://staging.elastic.co/8.12.0-xx1lc7my/downloads/beats/elastic-agent/elastic-agent-8.12.0-linux-x86_64.tar.gz": {
+		"https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-8.12.0-linux-x86_64.tar.gz": {
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewReader([]byte(binaryResponse))),
 		},
-		"https://staging.elastic.co/8.12.0-xx1lc7my/downloads/beats/elastic-agent/elastic-agent-8.12.0-linux-x86_64.tar.gz.sha512": {
+		"https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-8.12.0-linux-x86_64.tar.gz.sha512": {
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewReader([]byte(hashResponse))),
 		},
-		"https://staging.elastic.co/8.12.0-xx1lc7my/downloads/beats/elastic-agent/elastic-agent-8.12.0-linux-x86_64.tar.gz.asc": {
+		"https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-8.12.0-linux-x86_64.tar.gz.asc": {
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewReader([]byte(ascResponse))),
 		},
@@ -175,6 +175,10 @@ func newFakeHttpClient(t *testing.T) *fakeHttpClient {
 		"https://snapshots.elastic.co/8.13.0-yil7wib0/downloads/beats/elastic-agent/elastic-agent-8.13.0-SNAPSHOT-linux-x86_64.tar.gz.asc": {
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewReader([]byte(ascResponse))),
+		},
+		"https://snapshots.elastic.co/latest/8.13.0-SNAPSHOT.json": {
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewReader([]byte(`{"build_id":"8.13.0-yil7wib0"}`))),
 		},
 
 		// 8.13 build l5snflwr
