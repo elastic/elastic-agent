@@ -4,21 +4,9 @@
 
 //go:build !windows
 
-package install
+package upgradetest
 
 import "os"
-
-func isBlockingOnExe(_ error) bool {
-	return false
-}
-
-func removeBlockingExe(_ error) error {
-	return nil
-}
-
-func isRetryableError(_ error) bool {
-	return false
-}
 
 // killNoneChildProcess provides a way of killing a process that is not started as a child of this process.
 //

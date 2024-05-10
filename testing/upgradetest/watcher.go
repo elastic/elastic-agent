@@ -101,7 +101,7 @@ func WaitForNoWatcher(ctx context.Context, timeout time.Duration, interval time.
 			for _, pid := range pids {
 				proc, err := os.FindProcess(pid)
 				if err == nil {
-					_ = proc.Kill()
+					_ = killNoneChildProcess(proc)
 				}
 			}
 			// next interval ticker will check for no watcher and exit
