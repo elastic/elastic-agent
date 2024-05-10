@@ -235,6 +235,9 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 			logLvl = lvl
 			logger.SetLevel(lvl)
 		}
+	} else {
+		// Set the initial log level (either default or from config file)
+		logger.SetLevel(logLvl)
 	}
 
 	// initiate agent watcher
