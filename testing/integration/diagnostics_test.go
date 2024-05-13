@@ -31,6 +31,7 @@ const diagnosticsArchiveGlobPattern = "elastic-agent-diagnostics-*.zip"
 
 var diagnosticsFiles = []string{
 	"package.version",
+	"agent-info.yaml",
 	"allocs.pprof.gz",
 	"block.pprof.gz",
 	"components-actual.yaml",

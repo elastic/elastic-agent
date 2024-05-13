@@ -33,6 +33,7 @@ import (
 func TestCoordinatorExpectedDiagnosticHooks(t *testing.T) {
 
 	expected := []string{
+		"agent-info",
 		"local-config",
 		"pre-config",
 		"variables",
@@ -126,6 +127,39 @@ fleet:
 
 	result := hook.Hook(context.Background())
 	assert.YAMLEq(t, expectedCfg, string(result), "local-config diagnostic returned unexpected value")
+}
+
+func TestDiagnosticAgentInfo(t *testing.T) {
+	// Create a coordinator with an info.Agent and ensure its included in diagnostics.
+
+	coord := &Coordinator{agentInfo: fakeAgentInfo{
+		agentID: "agent-id",
+		headers: map[string]string{
+			"header1": "value1",
+			"header2": "value2",
+		},
+		logLevel:     "trace",
+		snapshot:     true,
+		version:      "8.14.0",
+		unprivileged: true,
+	}}
+
+	expected := `
+agent_id: agent-id
+headers:
+  header1: value1
+  header2: value2
+log_level: trace
+snapshot: true
+version: 8.14.0
+unprivileged: true
+`
+
+	hook, ok := diagnosticHooksMap(coord)["agent-info"]
+	require.True(t, ok, "diagnostic hooks should have an entry for agent-info")
+
+	result := hook.Hook(context.Background())
+	assert.YAMLEq(t, expected, string(result), "agent-info diagnostic returned unexpected value")
 }
 
 func TestDiagnosticPreConfig(t *testing.T) {
@@ -589,3 +623,39 @@ func mapFromRawYAML(t *testing.T, str string) map[string]interface{} {
 	require.NoError(t, err, "Parsing of YAML test string must succeed")
 	return result
 }
+
+type fakeAgentInfo struct {
+	agentID      string
+	headers      map[string]string
+	logLevel     string
+	snapshot     bool
+	version      string
+	unprivileged bool
+}
+
+func (a fakeAgentInfo) AgentID() string {
+	return a.agentID
+}
+
+func (a fakeAgentInfo) Headers() map[string]string {
+	return a.headers
+}
+
+func (a fakeAgentInfo) LogLevel() string {
+	return a.logLevel
+}
+
+func (a fakeAgentInfo) Snapshot() bool {
+	return a.snapshot
+}
+
+func (a fakeAgentInfo) Version() string {
+	return a.version
+}
+
+func (a fakeAgentInfo) Unprivileged() bool {
+	return a.unprivileged
+}
+
+func (a fakeAgentInfo) ReloadID(ctx context.Context) error                  { panic("implement me") }
+func (a fakeAgentInfo) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
