@@ -158,8 +158,6 @@ type DiagnosticComponentResult struct {
 }
 
 // Client communicates to Elastic Agent through the control protocol.
-//
-//go:generate mockery --name Client
 type Client interface {
 	// Connect connects to the running Elastic Agent.
 	Connect(ctx context.Context, opts ...grpc.DialOption) error

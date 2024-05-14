@@ -645,6 +645,10 @@ func (a fakeAgentInfo) LogLevel() string {
 	return a.logLevel
 }
 
+func (a fakeAgentInfo) RawLogLevel() string {
+	return a.logLevel
+}
+
 func (a fakeAgentInfo) Snapshot() bool {
 	return a.snapshot
 }
