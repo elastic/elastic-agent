@@ -235,6 +235,9 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 			logLvl = lvl
 			logger.SetLevel(lvl)
 		}
+	} else {
+		// Set the initial log level (either default or from config file)
+		logger.SetLevel(logLvl)
 	}
 
 	// initiate agent watcher
@@ -492,7 +495,7 @@ func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) stri
 		return configuredLevel
 	}
 
-	return defaultLogLevel
+	return ""
 }
 
 func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider) (*configuration.Configuration, error) {

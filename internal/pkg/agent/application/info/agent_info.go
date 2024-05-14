@@ -20,8 +20,11 @@ type Agent interface {
 	// Headers returns custom headers used to communicate with elasticsearch.
 	Headers() map[string]string
 
-	// LogLevel retrieves a log level.
+	// LogLevel retrieves a log level, returning a default if none is set
 	LogLevel() string
+
+	// RawLogLevel returns the set log level, no defaults
+	RawLogLevel() string
 
 	// ReloadID reloads agent info ID from configuration file.
 	ReloadID(ctx context.Context) error
@@ -85,9 +88,15 @@ func NewAgentInfo(ctx context.Context, createAgentID bool) (*AgentInfo, error) {
 
 // LogLevel retrieves a log level.
 func (i *AgentInfo) LogLevel() string {
-	if i.logLevel == "" {
+	rawLogLevel := i.RawLogLevel()
+	if rawLogLevel == "" {
 		return logger.DefaultLogLevel.String()
 	}
+	return rawLogLevel
+}
+
+// RawLogLevel retrieves a log level.
+func (i *AgentInfo) RawLogLevel() string {
 	return i.logLevel
 }
 

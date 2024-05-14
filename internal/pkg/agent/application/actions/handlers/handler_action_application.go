@@ -55,7 +55,7 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 	// https://github.com/elastic/security-team/issues/6501
 	//
 	// h.log.Debugf("handlerAppAction: validate action '%+v', for agentID %s", a, h.agentID)
-	// validated, err := protection.ValidateAction(*action, h.coord.Protection().SignatureValidationKey, h.agentID)
+	// validated, err := protection.ValidateAction(*action, h.logLevelSetter.Protection().SignatureValidationKey, h.agentID)
 	// if err != nil {
 	// 	action.StartedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	// 	action.CompletedAt = action.StartedAt

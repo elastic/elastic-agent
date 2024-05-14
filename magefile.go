@@ -203,14 +203,69 @@ func (Dev) Package() {
 	Package()
 }
 
+func mocksPath() (string, error) {
+	repositoryRoot, err := findRepositoryRoot()
+	if err != nil {
+		return "", fmt.Errorf("finding repository root: %w", err)
+	}
+	return filepath.Join(repositoryRoot, "testing", "mocks"), nil
+}
+
+func (Dev) CleanMocks() error {
+	mPath, err := mocksPath()
+	if err != nil {
+		return fmt.Errorf("retrieving mocks path: %w", err)
+	}
+	err = os.RemoveAll(mPath)
+	if err != nil {
+		return fmt.Errorf("removing mocks: %w", err)
+	}
+	return nil
+}
+
+func (Dev) RegenerateMocks() error {
+	mg.Deps(Dev.CleanMocks)
+	err := sh.Run("mockery")
+	if err != nil {
+		return fmt.Errorf("generating mocks: %w", err)
+	}
+
+	// change CWD
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("retrieving CWD: %w", err)
+	}
+	// restore the working directory when exiting the function
+	defer func() {
+		err := os.Chdir(workingDir)
+		if err != nil {
+			panic(fmt.Errorf("failed to restore working dir %q: %w", workingDir, err))
+		}
+	}()
+
+	mPath, err := mocksPath()
+	if err != nil {
+		return fmt.Errorf("retrieving mocks path: %w", err)
+	}
+
+	err = os.Chdir(mPath)
+	if err != nil {
+		return fmt.Errorf("changing current directory to %q: %w", mPath, err)
+	}
+
+	mg.Deps(devtools.AddLicenseHeaders)
+	mg.Deps(devtools.GoImports)
+	return nil
+}
+
 // InstallGoLicenser install go-licenser to check license of the files.
 func (Prepare) InstallGoLicenser() error {
-	return GoGet(goLicenserRepo)
+	return GoInstall(goLicenserRepo)
 }
 
 // InstallGoLint for the code.
 func (Prepare) InstallGoLint() error {
-	return GoGet(goLintRepo)
+	return GoInstall(goLintRepo)
 }
 
 // All build all the things for the current projects.
@@ -560,9 +615,9 @@ func RunGo(args ...string) error {
 	return sh.RunV(mg.GoCmd(), args...)
 }
 
-// GoGet fetch a remote dependencies.
-func GoGet(link string) error {
-	_, err := sh.Exec(map[string]string{"GO111MODULE": "off"}, os.Stdout, os.Stderr, "go", "get", link)
+// GoInstall installs a tool by calling `go install <link>
+func GoInstall(link string) error {
+	_, err := sh.Exec(map[string]string{}, os.Stdout, os.Stderr, "go", "install", link)
 	return err
 }
 

@@ -30,10 +30,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client/mocks"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
 func Test_CopyFile(t *testing.T) {
