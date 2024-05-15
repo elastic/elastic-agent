@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
@@ -273,6 +274,7 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 	changed := false
 
 	if s.CheckinPid != checkin.Pid {
+		logp.L().Infof("got updated pid %d for component %s", checkin.Pid, s.Component.String())
 		changed = true
 		s.CheckinPid = checkin.Pid
 	}

@@ -3552,7 +3552,7 @@ func TestToComponents(t *testing.T) {
 			require.NoError(t, err)
 
 			// TODO: figure out what to do with endpoint
-			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel, scenario.headers, []uint64{})
+			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel, scenario.headers, map[string]uint64{})
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
@@ -4063,7 +4063,7 @@ func TestFlattenedDataStream(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil, []uint64{})
+	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
@@ -4164,7 +4164,7 @@ func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil, []uint64{})
+	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}

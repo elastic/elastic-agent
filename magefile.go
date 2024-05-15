@@ -1160,7 +1160,7 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 				log.Printf(">>> Extracting %s to %s", m, versionedFlatPath)
 			}
 			if err := devtools.Extract(m, versionedFlatPath); err != nil {
-				panic(err)
+				panic(fmt.Errorf("error extracting %s: %s", m, err))
 			}
 		}
 

@@ -115,7 +115,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	policy map[string]interface{},
 	components []component.Component,
 	componentIDToBinary map[string]string,
-	existingState []uint64,
+	existingState map[string]uint64,
 ) (map[string]interface{}, error) {
 	if !b.Enabled() {
 		return nil, nil
@@ -537,7 +537,7 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
-func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component, existingStateServicePids []uint64) error {
+func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component, existingStateServicePids map[string]uint64) error {
 	metricsCollectionIntervalString := metricsCollectionInterval.String()
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
@@ -620,13 +620,6 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				},
 			},
 		},
-	}
-
-	// TODO: this is test code, remove/clean up later
-	for _, comp := range existingStateServicePids {
-		if comp != 0 {
-			logp.L().Infof("Got non-zero pid %v, components are: %#v", componentIDToBinary)
-		}
 	}
 
 	//create a new map with the monitoring beats included
@@ -916,6 +909,83 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			},
 			"streams": streams,
 		},
+	}
+
+	// If there's a checkin PID
+	for id, comp := range existingStateServicePids {
+		logp.L().Infof("component/pid monitoring map is: %#v", existingStateServicePids)
+		if comp != 0 && id == "elastic-endpoint" {
+			logp.L().Infof("creating system/process watcher for pid %d", comp)
+			// TODO: No idea if these metadata fields are correct
+			inputs = append(inputs, map[string]interface{}{
+				idKey:        fmt.Sprintf("%s-endpoint", monitoringMetricsUnitID),
+				"name":       fmt.Sprintf("%s-endpoint", monitoringMetricsUnitID),
+				"type":       "system/metrics",
+				useOutputKey: monitoringOutput,
+				"data_stream": map[string]interface{}{
+					"namespace": monitoringNamespace,
+				},
+				"streams": map[string]interface{}{
+					idKey: fmt.Sprintf("%s-", monitoringMetricsUnitID) + "endpoint",
+					"data_stream": map[string]interface{}{
+						"type":      "metrics",
+						"dataset":   "elastic_agent.endpoint",
+						"namespace": monitoringNamespace,
+					},
+					"metricsets":  []interface{}{"process"},
+					"period":      metricsCollectionIntervalString,
+					"index":       fmt.Sprintf("metrics-elastic_agent.endpoint-%s", monitoringNamespace),
+					"process.pid": comp,
+					"processors": []interface{}{
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "data_stream",
+								"fields": map[string]interface{}{
+									"type":      "metrics",
+									"dataset":   "elastic_agent.endpoint",
+									"namespace": monitoringNamespace,
+								},
+							},
+						},
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "event",
+								"fields": map[string]interface{}{
+									"dataset": "elastic_agent.endpoint",
+								},
+							},
+						},
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "elastic_agent",
+								"fields": map[string]interface{}{
+									"id":       b.agentInfo.AgentID(),
+									"version":  b.agentInfo.Version(),
+									"snapshot": b.agentInfo.Snapshot(),
+									"process":  "endpoint",
+								},
+							},
+						},
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "agent",
+								"fields": map[string]interface{}{
+									"id": b.agentInfo.AgentID(),
+								},
+							},
+						},
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "component",
+								"fields": map[string]interface{}{
+									"binary": "endpoint",
+								},
+							},
+						},
+					},
+				},
+			})
+		}
 	}
 
 	// if we have shipper data, inject the extra inputs

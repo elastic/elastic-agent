@@ -136,8 +136,14 @@ func (c *Coordinator) refreshState() {
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState) {
 	found := false
+	pidRequiresUpdate := false
 	for i, other := range c.state.Components {
 		if other.Component.ID == state.Component.ID {
+			//will this work?
+			c.logger.Infof("got updated component state with pid %d", state.State.CheckinPid)
+			if other.State.CheckinPid != state.State.CheckinPid {
+				pidRequiresUpdate = true
+			}
 			c.state.Components[i] = state
 			found = true
 			break
@@ -145,6 +151,9 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	}
 	if !found {
 		c.state.Components = append(c.state.Components, state)
+		if state.State.CheckinPid != 0 {
+			pidRequiresUpdate = true
+		}
 	}
 
 	// In the case that the component has stopped, it is now removed.
@@ -160,6 +169,11 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	}
 
 	c.stateNeedsRefresh = true
+
+	if pidRequiresUpdate {
+		c.logger.Infof("got pid update, refreshing config")
+		c.servicePidUpdate <- struct{}{}
+	}
 }
 
 // generateReportableState aggregates the internal state of the Coordinator

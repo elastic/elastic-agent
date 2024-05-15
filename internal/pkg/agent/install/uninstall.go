@@ -311,7 +311,7 @@ func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Confi
 		return nil, aerrors.New("failed to create a map from config", err)
 	}
 	// TODO: how should this handle endpoint?
-	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil, []uint64{})
+	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}

@@ -82,7 +82,7 @@ type MonitorManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// MonitoringConfig injects monitoring configuration into resolved ast tree.
-	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string, []uint64) (map[string]interface{}, error)
+	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string, map[string]uint64) (map[string]interface{}, error)
 }
 
 // Runner provides interface to run a manager and receive running errors.
@@ -284,6 +284,8 @@ type Coordinator struct {
 	// loop in runLoopIteration() is active and listening.
 	// Should only be interacted with via CoordinatorActive() or runLoopIteration()
 	heartbeatChan chan struct{}
+
+	servicePidUpdate chan struct{}
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -378,6 +380,7 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		overrideStateChan:  make(chan *coordinatorOverrideState),
 		upgradeDetailsChan: make(chan *details.Details),
 		heartbeatChan:      make(chan struct{}),
+		servicePidUpdate:   make(chan struct{}, 1),
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -1001,6 +1004,10 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case c.heartbeatChan <- struct{}{}:
 
+	case <-c.servicePidUpdate:
+		c.logger.Infof("got pid service update, refreshing config")
+		c.refreshComponentModel(ctx)
+
 	case componentState := <-c.managerChans.runtimeManagerUpdate:
 		// New component change reported by the runtime manager via
 		// Coordinator.watchRuntimeComponents(), merge it with the
@@ -1241,9 +1248,9 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	}
 
 	existingState := c.State()
-	var existingCompState = make([]uint64, len(existingState.Components))
-	for i, comp := range existingState.Components {
-		existingCompState[i] = comp.State.CheckinPid
+	var existingCompState = make(map[string]uint64, len(existingState.Components))
+	for _, comp := range existingState.Components {
+		existingCompState[comp.Component.ID] = comp.State.CheckinPid
 	}
 
 	comps, err := c.specs.ToComponents(

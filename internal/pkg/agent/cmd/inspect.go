@@ -190,7 +190,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			}
 		}
 		// TODO: how do we handle endpoint config?
-		monitorCfg, err := monitorFn(cfg, components, binaryMapping, []uint64{})
+		monitorCfg, err := monitorFn(cfg, components, binaryMapping, map[string]uint64{})
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring config: %w", err)
 		}
@@ -286,7 +286,7 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 
 	// Compute the components from the computed configuration.
 	// TODO: how to we deal with the endpoint state here?
-	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo, []uint64{})
+	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo, map[string]uint64{})
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
 	}
