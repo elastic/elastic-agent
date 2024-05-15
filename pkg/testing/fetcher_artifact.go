@@ -80,7 +80,7 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 
 	uri, err := findURI(ctx, f.doer, ver)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find snapshot URI for version %s: %w", ver, err)
+		return nil, fmt.Errorf("failed to find artifact URI for version %s: %w", ver, err)
 	}
 
 	// this remote path cannot have the build metadata in it
@@ -136,129 +136,62 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 	return nil
 }
 
-type projectResponse struct {
-	Packages map[string]interface{} `json:"packages"`
-}
-
-type projectsResponse struct {
-	ElasticPackage projectResponse `json:"elastic-agent-package"`
-}
-
-type manifestResponse struct {
-	Projects projectsResponse `json:"projects"`
-}
-
-func findBuild(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (*projectResponse, error) {
-	// e.g. https://snapshots.elastic.co/8.13.0-l5snflwr/manifest-8.13.0-SNAPSHOT.json
-	manifestURI := fmt.Sprintf("https://snapshots.elastic.co/%s-%s/manifest-%s-SNAPSHOT.json", version.CoreVersion(), version.BuildMetadata(), version.CoreVersion())
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, manifestURI, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := doer.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s; bad status: %s", manifestURI, resp.Status)
-	}
-
-	var body manifestResponse
-
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&body); err != nil {
-		return nil, err
-	}
-
-	return &body.Projects.ElasticPackage, nil
-}
-
-func findVersion(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (*projectResponse, error) {
-	artifactsURI := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/elastic-agent", version.VersionWithPrerelease())
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, artifactsURI, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := doer.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s; bad status: %s", artifactsURI, resp.Status)
-	}
-
-	var body projectResponse
-
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&body); err != nil {
-		return nil, err
-	}
-
-	return &body, nil
-}
-
 func findURI(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (string, error) {
-	var (
-		project *projectResponse
-		err     error
-	)
-
+	// if we know the exact build ID, we can build the URI right away
 	if version.BuildMetadata() != "" {
-		project, err = findBuild(ctx, doer, version)
-	} else {
-		project, err = findVersion(ctx, doer, version)
+		return fmt.Sprintf("https://snapshots.elastic.co/%s-%s/downloads/beats/elastic-agent/", version.CoreVersion(), version.BuildMetadata()), nil
 	}
 
+	// if it's the latest snapshot of a version, we can find a build ID and build the URI in the same manner
+	if version.IsSnapshot() {
+		buildID, err := findLatestSnapshot(ctx, doer, version.CoreVersion())
+		if err != nil {
+			return "", fmt.Errorf("failed to find snapshot information for version %q: %w", version, err)
+		}
+		return fmt.Sprintf("https://snapshots.elastic.co/%s-%s/downloads/beats/elastic-agent/", version.CoreVersion(), buildID), nil
+	}
+
+	// otherwise, we're looking for a publicly released version
+	return "https://artifacts.elastic.co/downloads/beats/elastic-agent/", nil
+}
+
+func findLatestSnapshot(ctx context.Context, doer httpDoer, version string) (buildID string, err error) {
+	latestSnapshotURI := fmt.Sprintf("https://snapshots.elastic.co/latest/%s-SNAPSHOT.json", version)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, latestSnapshotURI, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to find package URL: %w", err)
+		return "", fmt.Errorf("failed to create request to the snapshot API: %w", err)
 	}
 
-	if len(project.Packages) == 0 {
-		return "", fmt.Errorf("no packages found in repo")
+	resp, err := doer.Do(request)
+	if err != nil {
+		return "", err
 	}
+	defer resp.Body.Close()
 
-	for k, pkg := range project.Packages {
-		pkgMap, ok := pkg.(map[string]interface{})
-		if !ok {
-			return "", fmt.Errorf("content of '%s' is not a map", k)
+	switch resp.StatusCode {
+	case http.StatusNotFound:
+		return "", fmt.Errorf("snapshot for version %q not found", version)
+
+	case http.StatusOK:
+		var info struct {
+			BuildID string `json:"build_id"`
 		}
 
-		uriVal, found := pkgMap["url"]
-		if !found {
-			return "", fmt.Errorf("item '%s' does not contain url", k)
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&info); err != nil {
+			return "", err
 		}
 
-		uri, ok := uriVal.(string)
-		if !ok {
-			return "", fmt.Errorf("uri is not a string")
+		parts := strings.Split(info.BuildID, "-")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("wrong format for a build ID: %s", info.BuildID)
 		}
 
-		// Because we're iterating over a map from the API response,
-		// the order is random and some elements there do not contain the
-		// `/beats/elastic-agent/` substring, so we need to go through the
-		// whole map before returning an error.
-		//
-		// One of the elements that might be there and do not contain this
-		// substring is the `elastic-agent-shipper`, whose URL is something like:
-		// https://snapshots.elastic.co/8.7.0-d050210c/downloads/elastic-agent-shipper/elastic-agent-shipper-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
-		index := strings.Index(uri, "/beats/elastic-agent/")
-		if index != -1 {
-			if version.BuildMetadata() == "" {
-				// no build id, first is selected
-				return fmt.Sprintf("%s/beats/elastic-agent/", uri[:index]), nil
-			}
-			if strings.Contains(uri, fmt.Sprintf("%s-%s", version.CoreVersion(), version.BuildMetadata())) {
-				return fmt.Sprintf("%s/beats/elastic-agent/", uri[:index]), nil
-			}
-		}
+		return parts[1], nil
+
+	default:
+		return "", fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
 	}
-
-	if version.BuildMetadata() == "" {
-		return "", fmt.Errorf("uri for version %q not detected", version)
-	}
-	return "", fmt.Errorf("uri not detected with specific build ID %q", version.BuildMetadata())
 }
 
 func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {

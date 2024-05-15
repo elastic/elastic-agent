@@ -573,13 +573,16 @@ func (c *Coordinator) PerformComponentDiagnostics(ctx context.Context, additiona
 
 // SetLogLevel changes the entire log level for the running Elastic Agent.
 // Called from external goroutines.
-func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
+func (c *Coordinator) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
+	if lvl == nil {
+		return fmt.Errorf("logp.Level passed to Coordinator.SetLogLevel() must be not nil")
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case c.logLevelCh <- lvl:
+	case c.logLevelCh <- *lvl:
 		// set global once the level change has been taken by the channel
-		logger.SetLevel(lvl)
+		logger.SetLevel(*lvl)
 		return nil
 	}
 }
@@ -717,6 +720,34 @@ func (c *Coordinator) Run(ctx context.Context) error {
 // Called by external goroutines.
 func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 	return diagnostics.Hooks{
+		{
+			Name:        "agent-info",
+			Filename:    "agent-info.yaml",
+			Description: "current state of the agent information of the running Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				output := struct {
+					AgentID      string            `yaml:"agent_id"`
+					Headers      map[string]string `yaml:"headers"`
+					LogLevel     string            `yaml:"log_level"`
+					Snapshot     bool              `yaml:"snapshot"`
+					Version      string            `yaml:"version"`
+					Unprivileged bool              `yaml:"unprivileged"`
+				}{
+					AgentID:      c.agentInfo.AgentID(),
+					Headers:      c.agentInfo.Headers(),
+					LogLevel:     c.agentInfo.LogLevel(),
+					Snapshot:     c.agentInfo.Snapshot(),
+					Version:      c.agentInfo.Version(),
+					Unprivileged: c.agentInfo.Unprivileged(),
+				}
+				o, err := yaml.Marshal(output)
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
 		{
 			Name:        "local-config",
 			Filename:    "local-config.yaml",

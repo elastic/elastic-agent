@@ -48,7 +48,7 @@ check:
 ## check-go: download and run the go linter.
 .PHONY: check-go
 check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.44.2
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.55.2
 	@./bin/golangci-lint run -v
 
 ## check-no-changes : Check there is no local changes.
