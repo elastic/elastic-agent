@@ -93,6 +93,25 @@ func checkPlatform(_ *atesting.Fixture, topPath string, unprivileged bool) error
 				return fmt.Errorf("sudo -u %s elastic-agent status failed: %w (output: %s)", originalUser, err, output)
 			}
 		}
+	} else {
+		// Ensure that the top path is owned by root:root.
+		info, err := os.Stat(topPath)
+		if err != nil {
+			return fmt.Errorf("faield to stat %s: %w", topPath, err)
+		}
+		fs, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			return fmt.Errorf("failed to convert info.Sys() into *syscall.Stat_t")
+		}
+		if fs.Uid != 0 {
+			return fmt.Errorf("%s not owned by root user", topPath)
+		}
+		if fs.Gid != 0 {
+			return fmt.Errorf("%s not owned by root group", topPath)
+		}
+		if fs.Mode&0007 == 0 {
+			return fmt.Errorf("%s has world access", topPath)
+		}
 	}
 	return nil
 }
