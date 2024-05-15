@@ -375,6 +375,59 @@ func TestEphemeralContainers(t *testing.T) {
 
 }
 
+func TestGenerateHints(t *testing.T) {
+	pod := &kubernetes.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testpod",
+			UID:       types.UID(uid),
+			Namespace: "testns",
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+			Annotations: map[string]string{
+				"app":                                "production",
+				"co.elastic.hints/host":              "${kubernetes.pod.ip}:6379",
+				"co.elastic.hints/package":           "redis",
+				"co.elastic.hints/metricssssssspath": "/metrics",
+				"co.elastic.hints/period":            "42s",
+			},
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		Spec: kubernetes.PodSpec{
+			NodeName: "testnode",
+		},
+		Status: kubernetes.PodStatus{PodIP: "127.0.0.5"},
+	}
+
+	data := generatePodData(pod, &podMeta{}, mapstr.M{})
+
+	hints_result := mapstr.M{
+		"hints": mapstr.M{
+			"host":              "${kubernetes.pod.ip}:6379",
+			"package":           "redis",
+			"metricssssssspath": "/metrics", // on purpose we have introduced a typo
+			"period":            "42s",
+		},
+	}
+	incorrecthints_results := []string{"hints/metricssssssspath"}
+
+	ann := data.mapping["annotations"]
+	annotations, _ := ann.(mapstr.M)
+	prefix := "co.elastic"
+
+	log, err := logger.New("hint-test", true)
+	assert.NoError(t, err)
+
+	hints, incorrecthints := hintsCheck(annotations, "", prefix, true, allSupportedHints, log, pod)
+
+	assert.Equal(t, string(pod.GetUID()), data.uid)
+	assert.Equal(t, hints, hints_result)
+	assert.Equal(t, incorrecthints, incorrecthints_results)
+}
+
 func TestPodEventer_Namespace_Node_Watcher(t *testing.T) {
 	client := k8sfake.NewSimpleClientset()
 

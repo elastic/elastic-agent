@@ -7,6 +7,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -36,13 +38,13 @@ const (
 
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
-	log       *logger.Logger
-	agentInfo info.Agent
-	config    *configuration.Configuration
-	store     storage.Store
-	ch        chan coordinator.ConfigChange
-	setters   []actions.ClientSetter
-
+	log                  *logger.Logger
+	agentInfo            info.Agent
+	config               *configuration.Configuration
+	store                storage.Store
+	ch                   chan coordinator.ConfigChange
+	setters              []actions.ClientSetter
+	policyLogLevelSetter logLevelSetter
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 	// // Last known valid signature validation key
@@ -56,15 +58,17 @@ func NewPolicyChangeHandler(
 	config *configuration.Configuration,
 	store storage.Store,
 	ch chan coordinator.ConfigChange,
+	policyLogLevelSetter logLevelSetter,
 	setters ...actions.ClientSetter,
 ) *PolicyChangeHandler {
 	return &PolicyChangeHandler{
-		log:       log,
-		agentInfo: agentInfo,
-		config:    config,
-		store:     store,
-		ch:        ch,
-		setters:   setters,
+		log:                  log,
+		agentInfo:            agentInfo,
+		config:               config,
+		store:                store,
+		ch:                   ch,
+		setters:              setters,
+		policyLogLevelSetter: policyLogLevelSetter,
 	}
 }
 
@@ -212,11 +216,32 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
 
+	var validationErr error
+
 	// validate Fleet connectivity with the new configuration
 	var validatedConfig *remote.Config
 	validatedConfig, err = h.validateFleetServerHosts(ctx, cfg)
 	if err != nil {
-		return fmt.Errorf("error validating Fleet client config: %w", err)
+		validationErr = goerrors.Join(validationErr, fmt.Errorf("validating Fleet client config: %w", err))
+	}
+
+	// validate agent settings
+
+	// agent logging
+
+	loggingConfig, err := validateLoggingConfig(c)
+	if err != nil {
+		validationErr = goerrors.Join(validationErr, fmt.Errorf("validating logging config: %w", err))
+	}
+
+	if validationErr != nil {
+		return validationErr
+	}
+
+	// apply logging configuration
+	err = h.applyLoggingConfig(ctx, loggingConfig)
+	if err != nil {
+		return fmt.Errorf("applying logging config: %w", err)
 	}
 
 	if validatedConfig != nil {
@@ -236,16 +261,38 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	// persist configuration
 	err = saveConfig(h.agentInfo, h.config, h.store)
 	if err != nil {
-		return fmt.Errorf("saving FleetClientConfig: %w", err)
+		return fmt.Errorf("saving config: %w", err)
 	}
 
-	// apply the new configuration to the current clients
+	// apply the new Fleet client configuration to the current clients
 	err = h.applyFleetClientConfig(validatedConfig)
 	if err != nil {
 		return fmt.Errorf("applying FleetClientConfig: %w", err)
 	}
 
 	return nil
+}
+
+func validateLoggingConfig(cfg *config.Config) (*logger.Config, error) {
+
+	parsedConfig, err := configuration.NewPartialFromConfigNoDefaults(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("parsing fleet config: %w", err)
+	}
+
+	if parsedConfig == nil || parsedConfig.Settings == nil || parsedConfig.Settings.LoggingConfig == nil {
+		// no logging config, nothing to do
+		return nil, nil
+	}
+
+	loggingConfig := parsedConfig.Settings.LoggingConfig
+	logLevel := loggingConfig.Level
+	if logLevel < logp.DebugLevel || logLevel > logp.CriticalLevel {
+		return nil, fmt.Errorf("unrecognized log level %d", logLevel)
+	}
+
+	return loggingConfig, nil
+
 }
 
 func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Config) error {
@@ -265,6 +312,18 @@ func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Con
 	}
 
 	return nil
+}
+
+func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingConfig *logger.Config) error {
+
+	var policyLogLevel *logger.Level
+	if loggingConfig != nil {
+		// we have logging config to set
+		policyLogLevel = &loggingConfig.Level
+	}
+
+	h.log.Infof("Setting fallback log level %v from policy", policyLogLevel)
+	return h.policyLogLevelSetter.SetLogLevel(ctx, policyLogLevel)
 }
 
 func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store) error {

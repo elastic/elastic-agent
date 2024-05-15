@@ -6,6 +6,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,8 +15,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -28,6 +31,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
 )
 
 func TestPolicyChange(t *testing.T) {
@@ -48,7 +52,8 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch)
+
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, noLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -77,7 +82,7 @@ func TestPolicyAcked(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch)
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, noLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, tacker)
 		require.NoError(t, err)
@@ -198,14 +203,16 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 								},
 							}}},
 				},
-				Settings: configuration.DefaultSettingsConfig()}
+				Settings: configuration.DefaultSettingsConfig(),
+			}
 
 			h := PolicyChangeHandler{
-				agentInfo: &info.AgentInfo{},
-				config:    originalCfg,
-				store:     &storage.NullStore{},
-				setters:   []actions.ClientSetter{&setter},
-				log:       log,
+				agentInfo:            &info.AgentInfo{},
+				config:               originalCfg,
+				store:                &storage.NullStore{},
+				setters:              []actions.ClientSetter{&setter},
+				log:                  log,
+				policyLogLevelSetter: mockhandlers.NewLogLevelSetter(t),
 			}
 
 			cfg := config.MustNewConfigFrom(
@@ -249,11 +256,12 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			Settings: configuration.DefaultSettingsConfig()}
 
 		h := PolicyChangeHandler{
-			agentInfo: &info.AgentInfo{},
-			config:    originalCfg,
-			store:     &storage.NullStore{},
-			setters:   []actions.ClientSetter{&setter},
-			log:       log,
+			agentInfo:            &info.AgentInfo{},
+			config:               originalCfg,
+			store:                &storage.NullStore{},
+			setters:              []actions.ClientSetter{&setter},
+			log:                  log,
+			policyLogLevelSetter: noLogLevelSet(t),
 		}
 
 		cfg := config.MustNewConfigFrom(
@@ -289,11 +297,12 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			Settings: configuration.DefaultSettingsConfig()}
 
 		h := PolicyChangeHandler{
-			agentInfo: &info.AgentInfo{},
-			config:    originalCfg,
-			store:     &storage.NullStore{},
-			setters:   []actions.ClientSetter{&setter},
-			log:       log,
+			agentInfo:            &info.AgentInfo{},
+			config:               originalCfg,
+			store:                &storage.NullStore{},
+			setters:              []actions.ClientSetter{&setter},
+			log:                  log,
+			policyLogLevelSetter: noLogLevelSet(t),
 		}
 
 		wantHosts := []string{fleetServer.URL, fleetServer.URL}
@@ -335,11 +344,12 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			Settings: configuration.DefaultSettingsConfig()}
 
 		h := PolicyChangeHandler{
-			agentInfo: &info.AgentInfo{},
-			config:    originalCfg,
-			store:     &storage.NullStore{},
-			setters:   []actions.ClientSetter{&setter},
-			log:       log,
+			agentInfo:            &info.AgentInfo{},
+			config:               originalCfg,
+			store:                &storage.NullStore{},
+			setters:              []actions.ClientSetter{&setter},
+			log:                  log,
+			policyLogLevelSetter: noLogLevelSet(t),
 		}
 
 		cfg := config.MustNewConfigFrom(
@@ -388,11 +398,12 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				Settings: configuration.DefaultSettingsConfig()}
 
 			h := PolicyChangeHandler{
-				agentInfo: &info.AgentInfo{},
-				config:    originalCfg,
-				store:     &storage.NullStore{},
-				setters:   []actions.ClientSetter{&setter},
-				log:       log,
+				agentInfo:            &info.AgentInfo{},
+				config:               originalCfg,
+				store:                &storage.NullStore{},
+				setters:              []actions.ClientSetter{&setter},
+				log:                  log,
+				policyLogLevelSetter: noLogLevelSet(t),
 			}
 
 			cfg := config.MustNewConfigFrom(
@@ -450,4 +461,136 @@ type testSetter struct {
 
 func (s *testSetter) SetClient(c client.Sender) {
 	s.SetClientFn(c)
+}
+
+func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
+
+	matchLogLevel := func(expectedLevel logger.Level) func(*logger.Level) bool {
+		return func(level *logger.Level) bool {
+			if level == nil {
+				return false
+			}
+			return expectedLevel == *level
+		}
+	}
+
+	type args struct {
+		c map[string]any
+	}
+	tests := []struct {
+		name              string
+		args              args
+		setupExpectations func(setter *mockhandlers.LogLevelSetter)
+		wantErr           assert.ErrorAssertionFunc
+	}{
+		{
+			name: "set debug log level from policy",
+			args: args{
+				c: map[string]interface{}{
+					"agent.logging.level": "debug",
+				},
+			},
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
+				setter.EXPECT().SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.DebugLevel))).Return(nil).Once()
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "set info log level from policy",
+			args: args{
+				c: map[string]interface{}{
+					"agent.logging.level": "info",
+				},
+			},
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
+				setter.EXPECT().
+					SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.InfoLevel))).
+					Return(nil).Once()
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "set warning log level from policy",
+			args: args{
+				c: map[string]interface{}{
+					"agent.logging.level": "warning",
+				},
+			},
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
+				setter.EXPECT().
+					SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.WarnLevel))).
+					Return(nil).Once()
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "set error log level from policy",
+			args: args{
+				c: map[string]interface{}{
+					"agent.logging.level": "error",
+				},
+			},
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
+				setter.EXPECT().
+					SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.ErrorLevel))).
+					Return(nil).Once()
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "set critical log level from policy",
+			args: args{
+				c: map[string]interface{}{
+					"agent.logging.level": "critical",
+				},
+			},
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
+				setter.EXPECT().
+					SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.CriticalLevel))).
+					Return(nil).Once()
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Error: Wrong log level error in policy",
+			args: args{
+				c: map[string]interface{}{
+					"agent.logging.level": "asdasd",
+				},
+			},
+			// don't set any expectations on the LogLevelSetter mock because we don't expect any calls
+			setupExpectations: nil,
+			wantErr:           assert.Error,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			log, _ := logger.NewTesting(tt.name)
+			mockLogLevelSetter := mockhandlers.NewLogLevelSetter(t)
+
+			if tt.setupExpectations != nil {
+				tt.setupExpectations(mockLogLevelSetter)
+			}
+
+			h := &PolicyChangeHandler{
+				log:                  log,
+				agentInfo:            &info.AgentInfo{},
+				config:               configuration.DefaultConfiguration(),
+				store:                &storage.NullStore{},
+				policyLogLevelSetter: mockLogLevelSetter,
+			}
+
+			tt.wantErr(t, h.handlePolicyChange(context.Background(), config.MustNewConfigFrom(tt.args.c)), fmt.Sprintf("handlePolicyChange(ctx, %v)", tt.args.c))
+		})
+	}
+}
+
+func noLogLevelSet(t *testing.T) *mockhandlers.LogLevelSetter {
+	// nilLogLevel is a variable used to match nil policy log level being set
+	var nilLogLevel *logger.Level = nil
+
+	logLevelSetter := mockhandlers.NewLogLevelSetter(t)
+	logLevelSetter.EXPECT().SetLogLevel(mock.Anything, nilLogLevel).Return(nil).Once()
+	return logLevelSetter
 }
