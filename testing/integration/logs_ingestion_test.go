@@ -281,7 +281,7 @@ func testMonitoringLogsAreShipped(
 			"add_cloud_metadata: received error failed with http status code 404",                                                                                                                             // okay for the cloud metadata to not work
 			"add_cloud_metadata: received error failed fetching EC2 Identity Document: not found, Signing",                                                                                                    // okay for the cloud metadata to not work
 			"add_cloud_metadata: received error failed fetching EC2 Identity Document: operation error ec2imds: GetInstanceIdentityDocument, http response error StatusCode: 404, request to EC2 IMDS failed", // okay for the cloud metadata to not work
-			"failed to invoke rollback watcher: failed to start Upgrade Watcher: fork/exec /var/lib/elastic-agent/elastic-agent: no such file or directory",                                                   // on debian this happens probably need to fix.
+			"SDK 2024/05/15 17:49:30 WARN falling back to IMDSv1: operation error ec2imds: getToken, http response error StatusCode: 405, request to EC2 IMDS failed",                                         // okay for the cloud metadata to not work
 		})
 	})
 	t.Logf("error logs: Got %d documents", len(docs.Hits.Hits))
