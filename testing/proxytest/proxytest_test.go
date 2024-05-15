@@ -12,6 +12,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -24,181 +25,230 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestProxy_BasicScenario(t *testing.T) {
-	handlerF := func(writer http.ResponseWriter, request *http.Request) {
-		// always return HTTP 200
-		writer.WriteHeader(http.StatusOK)
-	}
+func TestProxy(t *testing.T) {
 
-	fakeBackendHTTPServer := httptest.NewServer(http.HandlerFunc(handlerF))
-	defer fakeBackendHTTPServer.Close()
-
-	serverURL, err := url.Parse(fakeBackendHTTPServer.URL)
-	require.NoErrorf(t, err, "failed to parse test HTTP server URL %q", fakeBackendHTTPServer.URL)
-
-	proxy := New(t, WithRewriteFn(func(u *url.URL) {
-		// redirect the requests on the proxy itself
-		u.Host = serverURL.Host
-	}))
-	proxy.Start()
-	defer proxy.Close()
-
-	proxyURL, err := url.Parse(proxy.URL)
-	require.NoErrorf(t, err, "failed to parse proxy URL %q", proxy.URL)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://somehost:1234/some/path/here", nil)
-	require.NoError(t, err, "error creating request")
-	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
-	resp, err := client.Do(req)
-	assert.NoError(t, err, "proxied request should not fail")
-	defer resp.Body.Close()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	require.NotEmpty(t, proxy.ProxiedRequests(), "proxy should have captured at least 1 request")
-	assert.Contains(t, proxy.ProxiedRequests()[0], serverURL.Host+"/some/path/here")
-}
-
-func TestProxy_BasicTLSScenario(t *testing.T) {
-	handlerF := func(writer http.ResponseWriter, request *http.Request) {
-		// always return HTTP 200
-		writer.WriteHeader(http.StatusOK)
-	}
-
-	fakeBackendHTTPServer := httptest.NewServer(http.HandlerFunc(handlerF))
-	defer fakeBackendHTTPServer.Close()
-
-	serverURL, err := url.Parse(fakeBackendHTTPServer.URL)
-	require.NoErrorf(t, err, "failed to parse test HTTP server URL %q", fakeBackendHTTPServer.URL)
-
-	// TLS setup with CA and server certificate
+	// Eagerly create objects for TLS setup with CA and server certificate
 	caCertificate, _, caPrivateKey, err := createCaCertificate()
 	require.NoError(t, err, "error creating CA cert and key")
 
-	serverCert, serverCertBytes, serverPrivateKey, err := createCertificate(caCertificate, caPrivateKey)
+	serverCert, serverCertBytes, serverPrivateKey, err := createCertificateSignedByCA(caCertificate, caPrivateKey)
 	require.NoError(t, err, "error creating server certificate")
 
 	caCertPool := x509.NewCertPool()
 	caCertPool.AddCert(caCertificate)
 
-	proxy := New(t, WithRewriteFn(func(u *url.URL) {
-		u.Host = serverURL.Host
-	}), WithServerTLSConfig(&tls.Config{
-		ClientCAs: caCertPool,
-		Certificates: []tls.Certificate{{
-			Certificate:                  [][]byte{serverCertBytes},
-			PrivateKey:                   serverPrivateKey,
-			SupportedSignatureAlgorithms: nil,
-			OCSPStaple:                   nil,
-			SignedCertificateTimestamps:  nil,
-			Leaf:                         serverCert,
-		}},
-		MinVersion: tls.VersionTLS12,
-	}))
-	proxy.StartTLS()
-	defer proxy.Close()
-
-	t.Logf("Proxy URL: %q", proxy.URL)
-
-	proxyURL, err := url.Parse(proxy.URL)
-	require.NoErrorf(t, err, "failed to parse proxy URL %q", proxy.URL)
-
-	// Add the root CA to the client as well
-	client := &http.Client{Transport: &http.Transport{
-		Proxy: http.ProxyURL(proxyURL),
-		TLSClientConfig: &tls.Config{
-			RootCAs:    caCertPool,
-			MinVersion: tls.VersionTLS12,
-		},
-	}}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://somehost:1234/some/path/here", nil)
-	require.NoError(t, err, "error creating request")
-	resp, err := client.Do(req)
-	assert.NoError(t, err, "proxied request should not fail")
-	defer resp.Body.Close()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	require.NotEmpty(t, proxy.ProxiedRequests(), "proxy should have captured at least 1 request")
-	assert.Contains(t, proxy.ProxiedRequests()[0], serverURL.Host+"/some/path/here")
-}
-
-func TestProxy_mTLSScenario(t *testing.T) {
-	handlerF := func(writer http.ResponseWriter, request *http.Request) {
-		// always return HTTP 200
-		writer.WriteHeader(http.StatusOK)
+	type setup struct {
+		fakeBackendServer      *httptest.Server
+		generateTestHttpClient func(t *testing.T, proxy *Proxy) *http.Client
+	}
+	type testRequest struct {
+		method string
+		url    string
+		body   io.Reader
+	}
+	type testcase struct {
+		name          string
+		setup         setup
+		proxyOptions  []Option
+		proxyStartTLS bool
+		request       testRequest
+		wantErr       assert.ErrorAssertionFunc
+		assertFunc    func(t *testing.T, proxy *Proxy, resp *http.Response)
 	}
 
-	fakeBackendHTTPServer := httptest.NewServer(http.HandlerFunc(handlerF))
-	defer fakeBackendHTTPServer.Close()
-
-	serverURL, err := url.Parse(fakeBackendHTTPServer.URL)
-	require.NoErrorf(t, err, "failed to parse test HTTP server URL %q", fakeBackendHTTPServer.URL)
-
-	// TLS setup with CA and server certificate
-	caCertificate, _, caPrivateKey, err := createCaCertificate()
-	require.NoError(t, err, "error creating CA cert and key")
-
-	serverCert, serverCertBytes, serverPrivateKey, err := createCertificate(caCertificate, caPrivateKey)
-	require.NoError(t, err, "error creating server certificate")
-
-	caCertPool := x509.NewCertPool()
-	caCertPool.AddCert(caCertificate)
-
-	proxy := New(t, WithRewriteFn(func(u *url.URL) {
-		u.Host = serverURL.Host
-	}), WithServerTLSConfig(&tls.Config{
-		ClientCAs:  caCertPool,
-		ClientAuth: tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{{
-			Certificate:                  [][]byte{serverCertBytes},
-			PrivateKey:                   serverPrivateKey,
-			SupportedSignatureAlgorithms: nil,
-			OCSPStaple:                   nil,
-			SignedCertificateTimestamps:  nil,
-			Leaf:                         serverCert,
-		}},
-		MinVersion: tls.VersionTLS12,
-	}))
-	proxy.StartTLS()
-	defer proxy.Close()
-
-	t.Logf("Proxy URL: %q", proxy.URL)
-
-	proxyURL, err := url.Parse(proxy.URL)
-	require.NoErrorf(t, err, "failed to parse proxy URL %q", proxy.URL)
-
-	// Client certificate
-	clientCert, clientCertBytes, clientPrivateKey, err := createCertificate(caCertificate, caPrivateKey)
-	require.NoError(t, err, "error creating client certificate")
-
-	// Add the root CA to the client as well
-	client := &http.Client{Transport: &http.Transport{
-		Proxy: http.ProxyURL(proxyURL),
-		TLSClientConfig: &tls.Config{
-			RootCAs: caCertPool,
-			Certificates: []tls.Certificate{
-				{
-					Certificate: [][]byte{clientCertBytes},
-					PrivateKey:  clientPrivateKey,
-					Leaf:        clientCert,
+	testcases := []testcase{
+		{
+			name: "Basic scenario, no TLS",
+			setup: setup{
+				fakeBackendServer: createFakeBackendServer(),
+				generateTestHttpClient: func(t *testing.T, proxy *Proxy) *http.Client {
+					proxyURL, err := url.Parse(proxy.URL)
+					require.NoErrorf(t, err, "failed to parse proxy URL %q", proxy.URL)
+					return &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 				},
 			},
-			MinVersion: tls.VersionTLS12,
+			proxyOptions:  nil,
+			proxyStartTLS: false,
+			request: testRequest{
+				method: http.MethodGet,
+				url:    "http://somehost:1234/some/path/here",
+				body:   nil,
+			},
+			wantErr: assert.NoError,
+			assertFunc: func(t *testing.T, proxy *Proxy, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
+				if assert.NotEmpty(t, proxy.ProxiedRequests(), "proxy should have captured at least 1 request") {
+					assert.Contains(t, proxy.ProxiedRequests()[0], "/some/path/here")
+				}
+			},
 		},
-	}}
+		{
+			name: "TLS scenario, server cert validation",
+			setup: setup{
+				fakeBackendServer: createFakeBackendServer(),
+				generateTestHttpClient: func(t *testing.T, proxy *Proxy) *http.Client {
+					proxyURL, err := url.Parse(proxy.URL)
+					require.NoErrorf(t, err, "failed to parse proxy URL %q", proxy.URL)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://somehost:1234/some/path/here", nil)
-	require.NoError(t, err, "error creating request")
-	resp, err := client.Do(req)
-	assert.NoError(t, err, "proxied request should not fail")
-	defer resp.Body.Close()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	require.NotEmpty(t, proxy.ProxiedRequests(), "proxy should have captured at least 1 request")
-	assert.Contains(t, proxy.ProxiedRequests()[0], serverURL.Host+"/some/path/here")
+					// Client trusting the proxy cert CA
+					return &http.Client{
+						Transport: &http.Transport{
+							Proxy: http.ProxyURL(proxyURL),
+							TLSClientConfig: &tls.Config{
+								RootCAs: caCertPool,
+							},
+						},
+					}
+				},
+			},
+			proxyOptions: []Option{
+				WithServerTLSConfig(&tls.Config{
+					ClientCAs: caCertPool,
+					Certificates: []tls.Certificate{{
+						Certificate:                  [][]byte{serverCertBytes},
+						PrivateKey:                   serverPrivateKey,
+						SupportedSignatureAlgorithms: nil,
+						OCSPStaple:                   nil,
+						SignedCertificateTimestamps:  nil,
+						Leaf:                         serverCert,
+					}},
+					MinVersion: tls.VersionTLS12,
+				}),
+			},
+			proxyStartTLS: true,
+			request: testRequest{
+				method: http.MethodGet,
+				url:    "http://somehost:1234/some/path/here",
+				body:   nil,
+			},
+			wantErr: assert.NoError,
+			assertFunc: func(t *testing.T, proxy *Proxy, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
+				if assert.NotEmpty(t, proxy.ProxiedRequests(), "proxy should have captured at least 1 request") {
+					assert.Contains(t, proxy.ProxiedRequests()[0], "/some/path/here")
+				}
+			},
+		},
+		{
+			name: "mTLS scenario, client and server cert validation",
+			setup: setup{
+				fakeBackendServer: createFakeBackendServer(),
+				generateTestHttpClient: func(t *testing.T, proxy *Proxy) *http.Client {
+					proxyURL, err := url.Parse(proxy.URL)
+					require.NoErrorf(t, err, "failed to parse proxy URL %q", proxy.URL)
+
+					// Client certificate
+					clientCert, clientCertBytes, clientPrivateKey, err := createCertificateSignedByCA(caCertificate, caPrivateKey)
+					require.NoError(t, err, "error creating client certificate")
+
+					// Client with its own certificate and trusting the proxy cert CA
+					return &http.Client{
+						Transport: &http.Transport{
+							Proxy: http.ProxyURL(proxyURL),
+							TLSClientConfig: &tls.Config{
+								RootCAs: caCertPool,
+								Certificates: []tls.Certificate{
+									{
+										Certificate: [][]byte{clientCertBytes},
+										PrivateKey:  clientPrivateKey,
+										Leaf:        clientCert,
+									},
+								},
+								MinVersion: tls.VersionTLS12,
+							},
+						}}
+				},
+			},
+			proxyOptions: []Option{
+				// require client authentication and verify cert
+				WithServerTLSConfig(&tls.Config{
+					ClientCAs:  caCertPool,
+					ClientAuth: tls.RequireAndVerifyClientCert,
+					Certificates: []tls.Certificate{{
+						Certificate:                  [][]byte{serverCertBytes},
+						PrivateKey:                   serverPrivateKey,
+						SupportedSignatureAlgorithms: nil,
+						OCSPStaple:                   nil,
+						SignedCertificateTimestamps:  nil,
+						Leaf:                         serverCert,
+					}},
+					MinVersion: tls.VersionTLS12,
+				}),
+			},
+			proxyStartTLS: true,
+			request: testRequest{
+				method: http.MethodGet,
+				url:    "http://somehost:1234/some/path/here",
+				body:   nil,
+			},
+			wantErr: assert.NoError,
+			assertFunc: func(t *testing.T, proxy *Proxy, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
+				if assert.NotEmpty(t, proxy.ProxiedRequests(), "proxy should have captured at least 1 request") {
+					assert.Contains(t, proxy.ProxiedRequests()[0], "/some/path/here")
+				}
+			},
+		},
+	}
+
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			var proxyOpts []Option
+
+			if tt.setup.fakeBackendServer != nil {
+				defer tt.setup.fakeBackendServer.Close()
+				serverURL, err := url.Parse(tt.setup.fakeBackendServer.URL)
+				require.NoErrorf(t, err, "failed to parse test HTTP server URL %q", tt.setup.fakeBackendServer.URL)
+				proxyOpts = append(proxyOpts, WithRewriteFn(func(u *url.URL) {
+					// redirect the requests on the proxy itself
+					u.Host = serverURL.Host
+				}))
+			}
+
+			proxyOpts = append(proxyOpts, tt.proxyOptions...)
+			proxy := New(t, proxyOpts...)
+
+			if tt.proxyStartTLS {
+				proxy.StartTLS()
+			} else {
+				proxy.Start()
+			}
+			defer proxy.Close()
+
+			proxyURL, err := url.Parse(proxy.URL)
+			require.NoErrorf(t, err, "failed to parse proxy URL %q", proxy.URL)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			req, err := http.NewRequestWithContext(ctx, tt.request.method, tt.request.url, tt.request.body)
+			require.NoError(t, err, "error creating request")
+
+			var client *http.Client
+			if tt.setup.generateTestHttpClient != nil {
+				client = tt.setup.generateTestHttpClient(t, proxy)
+			} else {
+				// basic HTTP client using the proxy
+				client = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+			}
+
+			resp, err := client.Do(req)
+			if tt.wantErr(t, err, "unexpected error return value") && tt.assertFunc != nil {
+				tt.assertFunc(t, proxy, resp)
+			}
+		})
+	}
+
+}
+
+func createFakeBackendServer() *httptest.Server {
+	handlerF := func(writer http.ResponseWriter, request *http.Request) {
+		// always return HTTP 200
+		writer.WriteHeader(http.StatusOK)
+	}
+
+	fakeBackendHTTPServer := httptest.NewServer(http.HandlerFunc(handlerF))
+	return fakeBackendHTTPServer
 }
 
 // utility function to create a CA cert and related key for tests. It returns certificate and key as PEM-encoded blocks
@@ -244,7 +294,7 @@ func createCaCertificate() (cert *x509.Certificate, certBytes []byte, privateKey
 
 // utility function to create a new certificate signed by a CA and related key for tests.
 // Both paramenters and returned certificate and key are PEM-encoded blocks.
-func createCertificate(caCert *x509.Certificate, caPrivateKey *rsa.PrivateKey) (cert *x509.Certificate, certBytes []byte, privateKey *rsa.PrivateKey, err error) {
+func createCertificateSignedByCA(caCert *x509.Certificate, caPrivateKey *rsa.PrivateKey) (cert *x509.Certificate, certBytes []byte, privateKey *rsa.PrivateKey, err error) {
 	certTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(2024),
 		Subject: pkix.Name{
