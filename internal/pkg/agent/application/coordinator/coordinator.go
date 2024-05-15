@@ -570,13 +570,16 @@ func (c *Coordinator) PerformComponentDiagnostics(ctx context.Context, additiona
 
 // SetLogLevel changes the entire log level for the running Elastic Agent.
 // Called from external goroutines.
-func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
+func (c *Coordinator) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
+	if lvl == nil {
+		return fmt.Errorf("logp.Level passed to Coordinator.SetLogLevel() must be not nil")
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case c.logLevelCh <- lvl:
+	case c.logLevelCh <- *lvl:
 		// set global once the level change has been taken by the channel
-		logger.SetLevel(lvl)
+		logger.SetLevel(*lvl)
 		return nil
 	}
 }
