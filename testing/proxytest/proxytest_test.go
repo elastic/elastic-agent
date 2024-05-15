@@ -60,12 +60,8 @@ func TestProxy(t *testing.T) {
 		{
 			name: "Basic scenario, no TLS",
 			setup: setup{
-				fakeBackendServer: createFakeBackendServer(),
-				generateTestHttpClient: func(t *testing.T, proxy *Proxy) *http.Client {
-					proxyURL, err := url.Parse(proxy.URL)
-					require.NoErrorf(t, err, "failed to parse proxy URL %q", proxy.URL)
-					return &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
-				},
+				fakeBackendServer:      createFakeBackendServer(),
+				generateTestHttpClient: nil,
 			},
 			proxyOptions:  nil,
 			proxyStartTLS: false,
@@ -95,7 +91,8 @@ func TestProxy(t *testing.T) {
 						Transport: &http.Transport{
 							Proxy: http.ProxyURL(proxyURL),
 							TLSClientConfig: &tls.Config{
-								RootCAs: caCertPool,
+								RootCAs:    caCertPool,
+								MinVersion: tls.VersionTLS12,
 							},
 						},
 					}
@@ -105,12 +102,9 @@ func TestProxy(t *testing.T) {
 				WithServerTLSConfig(&tls.Config{
 					ClientCAs: caCertPool,
 					Certificates: []tls.Certificate{{
-						Certificate:                  [][]byte{serverCertBytes},
-						PrivateKey:                   serverPrivateKey,
-						SupportedSignatureAlgorithms: nil,
-						OCSPStaple:                   nil,
-						SignedCertificateTimestamps:  nil,
-						Leaf:                         serverCert,
+						Certificate: [][]byte{serverCertBytes},
+						PrivateKey:  serverPrivateKey,
+						Leaf:        serverCert,
 					}},
 					MinVersion: tls.VersionTLS12,
 				}),
@@ -165,12 +159,9 @@ func TestProxy(t *testing.T) {
 					ClientCAs:  caCertPool,
 					ClientAuth: tls.RequireAndVerifyClientCert,
 					Certificates: []tls.Certificate{{
-						Certificate:                  [][]byte{serverCertBytes},
-						PrivateKey:                   serverPrivateKey,
-						SupportedSignatureAlgorithms: nil,
-						OCSPStaple:                   nil,
-						SignedCertificateTimestamps:  nil,
-						Leaf:                         serverCert,
+						Certificate: [][]byte{serverCertBytes},
+						PrivateKey:  serverPrivateKey,
+						Leaf:        serverCert,
 					}},
 					MinVersion: tls.VersionTLS12,
 				}),
@@ -233,6 +224,9 @@ func TestProxy(t *testing.T) {
 			}
 
 			resp, err := client.Do(req)
+			if resp != nil {
+				defer resp.Body.Close()
+			}
 			if tt.wantErr(t, err, "unexpected error return value") && tt.assertFunc != nil {
 				tt.assertFunc(t, proxy, resp)
 			}
