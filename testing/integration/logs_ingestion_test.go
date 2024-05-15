@@ -35,6 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 )
 
@@ -90,6 +91,9 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
+
+	// 3. Ensure installation is correct.
+	require.NoError(t, installtest.CheckSuccess(agentFixture, installOpts.BasePath, !installOpts.Privileged))
 
 	t.Run("Monitoring logs are shipped", func(t *testing.T) {
 		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
