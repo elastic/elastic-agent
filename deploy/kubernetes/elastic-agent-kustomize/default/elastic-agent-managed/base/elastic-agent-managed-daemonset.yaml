@@ -30,22 +30,27 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
-          image: docker.elastic.co/beats/elastic-agent:8.8.1
+          image: docker.elastic.co/beats/elastic-agent:8.14.0-SNAPSHOT
           env:
+            - name: FLEET_ENROLLMENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: elastic-agent-creds
+                  key: enrollment-token
             # Set to 1 for enrollment into Fleet server. If not set, Elastic Agent is run in standalone mode
             - name: FLEET_ENROLL
               value: "1"
             # Set to true to communicate with Fleet with either insecure HTTP or unverified HTTPS
             - name: FLEET_INSECURE
-              value: "false"
+              value: "true"
             # Fleet Server URL to enroll the Elastic Agent into
             # FLEET_URL can be found in Kibana, go to Management > Fleet > Settings
             - name: FLEET_URL
               value: "https://fleet-server:8220"
             # Elasticsearch API key used to enroll Elastic Agents in Fleet (https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html#fleet-enrollment-tokens)
             # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
-            - name: FLEET_ENROLLMENT_TOKEN
-              value: "token-id"
+            # - name: FLEET_ENROLLMENT_TOKEN
+            #   value: "token-id"
             - name: KIBANA_HOST
               value: "http://kibana:5601"
             # The basic authentication username used to connect to Kibana and retrieve a service_token to enable Fleet
@@ -114,8 +119,8 @@ spec:
               readOnly: true
             - name: sys-kernel-debug
               mountPath: /sys/kernel/debug
-            - name: elastic-agent-state
-              mountPath: /usr/share/elastic-agent/state
+            # - name: elastic-agent-state
+            #   mountPath: /usr/share/elastic-agent/state
             # If you are using the Universal Profiling integration, please uncomment these lines before applying.
             #- name: universal-profiling-cache
             #  mountPath: /var/cache/Elastic
@@ -155,10 +160,10 @@ spec:
             path: /sys/kernel/debug
         # Mount /var/lib/elastic-agent-managed/kube-system/state to store elastic-agent state
         # Update 'kube-system' with the namespace of your agent installation
-        - name: elastic-agent-state
-          hostPath:
-            path: /var/lib/elastic-agent-managed/kube-system/state
-            type: DirectoryOrCreate
+        # - name: elastic-agent-state
+        #   hostPath:
+        #     path: /var/lib/elastic-agent-managed/kube-system/state
+        #     type: DirectoryOrCreate
         # Mount required for Universal Profiling.
         # If you are using the Universal Profiling integration, please uncomment these lines before applying.
         #- name: universal-profiling-cache

@@ -3,6 +3,11 @@ kind: Kustomization
 
 namespace: kube-system
 
+secretGenerator:
+  - name: elastic-agent-creds
+    literals:
+    - enrollment-token=RmtsM2ZJOEJTbGZQX3pIR1Z2bks6WlBQQ0lDTnhTUDJGWkh3TVJwQndBQQ==
+
 resources:
   - elastic-agent-managed-daemonset.yaml
   - elastic-agent-managed-role-binding.yaml
