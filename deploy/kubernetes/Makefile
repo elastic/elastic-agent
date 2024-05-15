@@ -15,6 +15,8 @@ ELASTIC_AGENT_BRANCH=update-k8s-templates-$(shell date "+%Y%m%d%H%M%S")
 KUSTOMIZE=elastic-agent-kustomize
 KUSTOMIZE_DEFAULT=elastic-agent-kustomize/default
 KUSTOMIZE_KSM_AUTOSHARDING=elastic-agent-kustomize/ksm-autosharding
+KUSTOMIZE_DEFAULT_ONBOARDING=elastic-agent-kustomize/onboarding/default
+
 
 .PHONY: generate-k8s $(ALL)
 generate-k8s: $(ALL)
@@ -95,7 +97,7 @@ else
 endif
 
 
-## ci-create-kustomize-default : Create default kustomize folder 
+## ci-create-kustomize : Create default kustomize folder 
 .PHONY: ci-create-kustomize $(ALL)
 ci-create-kustomize: $(ALL)
 
@@ -119,5 +121,25 @@ $(ALL):
 
 else
 	echo "No KSM templates generated. Please run: GENERATEKUSTOMIZE=true make ci-create-kustomize "
+
+endif
+
+
+## ci-create-kustomize-onboarding : Create default kustomize folder only for onboarding
+.PHONY: ci-create-kustomize-onboarding $(ALL)
+ci-create-kustomize-onboarding: $(ALL)
+
+ifdef GENERATEKUSTOMIZE
+$(ALL):
+	@echo "Generating $@ kustomize-default files"
+	@for f in $(shell ls $@/*.yaml); do \
+		cp -r $$f  $(KUSTOMIZE_DEFAULT_ONBOARDING)/$@/base; \
+	done
+
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $@/$@-daemonset.yaml > $(KUSTOMIZE_DEFAULT_ONBOARDING)/$@/base/$@-daemonset.yaml
+
+	
+else
+	echo "No KSM templates generated. Please run: GENERATEKUSTOMIZE=true make ci-create-kustomize-onboarding "
 
 endif
