@@ -375,21 +375,17 @@ func CheckForErrorsInLogs(ctx context.Context, client elastictransport.Interface
 // CheckForErrorsInLogsWithContext checks to see if any error-level lines exist
 // excludeStrings can be used to remove any particular error strings from logs
 func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictransport.Interface, namespace string, excludeStrings []string) (Documents, error) {
-	queryRaw := map[string]interface{}{
-		"query": map[string]interface{}{
-			"bool": map[string]interface{}{
-				"must": []map[string]interface{}{
-					{
-						"match": map[string]interface{}{
-							"log.level": "error",
-						},
-					},
-					{
-						"term": map[string]interface{}{
-							"data_stream.namespace": map[string]interface{}{
-								"value": namespace,
-							},
-						},
+	filters := map[string]interface{}{
+		"must": []map[string]interface{}{
+			{
+				"match": map[string]interface{}{
+					"log.level": "error",
+				},
+			},
+			{
+				"term": map[string]interface{}{
+					"data_stream.namespace": map[string]interface{}{
+						"value": namespace,
 					},
 				},
 			},
@@ -405,27 +401,14 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 				},
 			})
 		}
-		queryRaw = map[string]interface{}{
-			"query": map[string]interface{}{
-				"bool": map[string]interface{}{
-					"must": []map[string]interface{}{
-						{
-							"match": map[string]interface{}{
-								"log.level": "error",
-							},
-						},
-						{
-							"term": map[string]interface{}{
-								"data_stream.namespace": map[string]interface{}{
-									"value": namespace,
-								},
-							},
-						},
-					},
-					"must_not": excludeStatements,
-				},
-			},
-		}
+
+		filters["must_not"] = excludeStatements
+	}
+
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": filters,
+		},
 	}
 
 	var buf bytes.Buffer
