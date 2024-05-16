@@ -20,7 +20,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
-func checkPlatform(_ *atesting.Fixture, topPath string, unprivileged bool) error {
+func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, unprivileged bool) error {
 	if unprivileged {
 		// Check that the elastic-agent user/group exist.
 		uid, err := install.FindUID(install.ElasticUsername)
@@ -41,7 +41,7 @@ func checkPlatform(_ *atesting.Fixture, topPath string, unprivileged bool) error
 
 		// Check that the socket is created with the correct permissions.
 		socketPath := filepath.Join(topPath, paths.ControlSocketName)
-		err = waitForNoError(context.Background(), func(_ context.Context) error {
+		err = waitForNoError(ctx, func(_ context.Context) error {
 			_, err = os.Stat(socketPath)
 			if err != nil {
 				return fmt.Errorf("failed to stat socket path %s: %w", socketPath, err)
@@ -65,7 +65,7 @@ func checkPlatform(_ *atesting.Fixture, topPath string, unprivileged bool) error
 
 		// Executing `elastic-agent status` as the `elastic-agent-user` user should work.
 		var output []byte
-		err = waitForNoError(context.Background(), func(_ context.Context) error {
+		err = waitForNoError(ctx, func(_ context.Context) error {
 			// #nosec G204 -- user cannot inject any parameters to this command
 			cmd := exec.Command("sudo", "-u", install.ElasticUsername, "elastic-agent", "status")
 			output, err = cmd.CombinedOutput()

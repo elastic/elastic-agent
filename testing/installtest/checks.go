@@ -5,6 +5,7 @@
 package installtest
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ func DefaultTopPath() string {
 	return filepath.Join(defaultBasePath, "Elastic", "Agent")
 }
 
-func CheckSuccess(f *atesting.Fixture, topPath string, unprivileged bool) error {
+func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, unprivileged bool) error {
 	// Use default topPath if one not defined.
 	if topPath == "" {
 		topPath = DefaultTopPath()
@@ -57,7 +58,7 @@ func CheckSuccess(f *atesting.Fixture, topPath string, unprivileged bool) error 
 	}
 
 	// Specific checks depending on the platform.
-	return checkPlatform(f, topPath, unprivileged)
+	return checkPlatform(ctx, f, topPath, unprivileged)
 }
 
 func exeOnWindows(filename string) string {

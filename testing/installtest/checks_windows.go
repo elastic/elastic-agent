@@ -7,6 +7,7 @@
 package installtest
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"syscall"
@@ -35,7 +36,7 @@ type accessAllowedAce struct {
 	SidStart   uint32
 }
 
-func checkPlatform(f *atesting.Fixture, topPath string, unprivileged bool) error {
+func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, unprivileged bool) error {
 	secInfo, err := windows.GetNamedSecurityInfo(topPath, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
 	if err != nil {
 		return fmt.Errorf("GetNamedSecurityInfo failed for %s: %w", topPath, err)
