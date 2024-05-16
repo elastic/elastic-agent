@@ -20,4 +20,4 @@ patches:
     version: v1
     kind: DaemonSet
     name: elastic-agent
-  path: fleet-enrollment-token-patch.yaml
+  path: api-key-patch.yaml

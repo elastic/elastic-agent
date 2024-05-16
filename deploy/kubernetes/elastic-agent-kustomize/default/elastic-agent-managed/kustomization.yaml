@@ -14,7 +14,7 @@ resources:
   - https://github.com/kubernetes/kube-state-metrics
 
 patches:
-- path: fleet-enrollment-token-remove.yaml
+- path: environmental-variables-remove.yaml
 - target:
     group: apps
     version: v1
