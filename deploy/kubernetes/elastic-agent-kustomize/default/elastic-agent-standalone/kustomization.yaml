@@ -6,7 +6,7 @@ namespace: kube-system
 secretGenerator:
     - name: elastic-agent-creds
       literals:
-        - host=${host}
+        - host=${es_host}
         - api_key=${api_key}
 
 resources:
