@@ -38,14 +38,14 @@ type accessAllowedAce struct {
 func checkPlatform(f *atesting.Fixture, topPath string, unprivileged bool) error {
 	secInfo, err := windows.GetNamedSecurityInfo(topPath, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
 	if err != nil {
-		return fmt.Errorf("GetNamedSecurityInfo failed for %s: %s", topPath, err)
+		return fmt.Errorf("GetNamedSecurityInfo failed for %s: %w", topPath, err)
 	}
 	if !secInfo.IsValid() {
 		return fmt.Errorf("GetNamedSecurityInfo result is not valid for %s: %w", topPath, err)
 	}
 	owner, _, err := secInfo.Owner()
 	if err != nil {
-		return fmt.Errorf("secInfo.Owner() failed for %s: %s", topPath, err)
+		return fmt.Errorf("secInfo.Owner() failed for %s: %w", topPath, err)
 	}
 	sids, err := getAllowedSIDs(secInfo)
 	if err != nil {
@@ -126,7 +126,7 @@ func hasWellKnownSID(sids []*windows.SID, m windows.WELL_KNOWN_SID_TYPE) bool {
 func getAllowedSIDs(secInfo *windows.SECURITY_DESCRIPTOR) ([]*windows.SID, error) {
 	dacl, _, err := secInfo.DACL()
 	if err != nil {
-		return nil, fmt.Errorf("secInfo.DACL() failed: %s", err)
+		return nil, fmt.Errorf("secInfo.DACL() failed: %w", err)
 	}
 	if dacl == nil {
 		return nil, fmt.Errorf("no DACL set")
