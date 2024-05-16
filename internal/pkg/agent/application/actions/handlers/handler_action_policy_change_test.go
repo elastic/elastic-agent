@@ -61,7 +61,7 @@ func TestPolicyChange(t *testing.T) {
 
 		cfg := configuration.DefaultConfiguration()
 
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, noLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -90,7 +90,7 @@ func TestPolicyAcked(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, noLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, tacker)
 		require.NoError(t, err)
@@ -245,7 +245,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					h.config.Fleet.Client.Transport.Proxy.URL)
 			})
 
-		t.Run("a new Host and no proxy changes the Host", func(t *testing.T) {
+		t.Run("a new Hosts and no proxy changes the remote config", func(t *testing.T) {
 			log, _ := logger.NewTesting("TestPolicyChangeHandler")
 			var setterCalledCount int
 			setter := testSetter{SetClientFn: func(c client.Sender) {
@@ -260,7 +260,8 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					},
 					AccessAPIKey: "ignore",
 					Client: remote.Config{
-						Host: "http://example.co"},
+						Host: "http://example.co",
+					},
 				},
 				Settings: configuration.DefaultSettingsConfig()}
 
@@ -270,20 +271,22 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				store:                &storage.NullStore{},
 				setters:              []actions.ClientSetter{&setter},
 				log:                  log,
-				policyLogLevelSetter: noLogLevelSet(t),
+				policyLogLevelSetter: nilLogLevelSet(t),
 			}
 
 			cfg := config.MustNewConfigFrom(
 				map[string]interface{}{
-					"fleet.host": fleetServer.URL})
+					"fleet.hosts": fleetServer.URL})
 
 			err := h.handlePolicyChange(context.Background(), cfg)
 			require.NoError(t, err)
 
 			assert.Equal(t, 1, setterCalledCount)
-			assert.Equal(t, fleetServer.URL, h.config.Fleet.Client.Host)
-			assert.Empty(t,
-				h.config.Fleet.Client.Transport.Proxy.URL)
+			assert.Empty(t, h.config.Fleet.Client.Host)
+			assert.Empty(t, h.config.Fleet.Client.Protocol)
+			assert.Empty(t, h.config.Fleet.Client.Path)
+			assert.Equal(t, []string{fleetServer.URL}, h.config.Fleet.Client.Hosts)
+			assert.Empty(t, h.config.Fleet.Client.Transport.Proxy.URL)
 		})
 
 		t.Run("a proxy changes the fleet client", func(t *testing.T) {
@@ -316,7 +319,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				store:                &storage.NullStore{},
 				setters:              []actions.ClientSetter{&setter},
 				log:                  log,
-				policyLogLevelSetter: noLogLevelSet(t),
+				policyLogLevelSetter: nilLogLevelSet(t),
 			}
 
 			cfg := config.MustNewConfigFrom(
@@ -370,7 +373,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					store:                &storage.NullStore{},
 					setters:              []actions.ClientSetter{&setter},
 					log:                  log,
-					policyLogLevelSetter: noLogLevelSet(t),
+					policyLogLevelSetter: nilLogLevelSet(t),
 				}
 
 				cfg := config.MustNewConfigFrom(
@@ -431,7 +434,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			_, err := w.Write(nil)
 			require.NoError(t, err)
 		}
-		fleetTLSServer := httptest.NewUnstartedServer(
+		fleetmTLSServer := httptest.NewUnstartedServer(
 			http.HandlerFunc(statusHandler))
 
 		fleetNomTLSServer := httptest.NewUnstartedServer(
@@ -445,7 +448,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		agentRootCertPool := x509.NewCertPool()
 		agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
 
-		fleetTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+		fleetmTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 			ClientCAs:    agentRootCertPool,
@@ -457,20 +460,21 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			Certificates: []tls.Certificate{cert},
 		}
 
-		fleetTLSServer.StartTLS()
-		defer fleetTLSServer.Close()
+		fleetmTLSServer.StartTLS()
+		defer fleetmTLSServer.Close()
 		fleetNomTLSServer.StartTLS()
 		defer fleetNomTLSServer.Close()
 
 		trueVar := true
 		tcs := []struct {
-			name                  string
-			originalCfg           *configuration.Configuration
-			newCfg                map[string]interface{}
-			setterCalledCount     int
-			wantCAs               []string
-			wantCertificateConfig tlscommon.CertificateConfig
-			assertErr             func(t *testing.T, err error)
+			name                     string
+			originalCfg              *configuration.Configuration
+			newCfg                   map[string]interface{}
+			setterCalledCount        int
+			wantCAs                  []string
+			wantCertificateConfig    tlscommon.CertificateConfig
+			assertErr                func(t *testing.T, err error)
+			customLogLevelSetterMock func(t *testing.T) *mockhandlers.LogLevelSetter
 		}{
 			{
 				name: "certificate_authorities is applied when present",
@@ -499,7 +503,10 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
-							Host: fleetTLSServer.URL,
+							// To the reviewers: this testcase was using the mTLS fleet server in the original PR
+							// https://github.com/elastic/elastic-agent/pull/4398/files#diff-09ced2f2269134a71e037d9fb1bd4a2f4a157c472f45c601b74b71ce5179d04fR491
+							// but there is no way for it to work without a certificate, switched it to TLS fleet server ¯\_(ツ)_/¯
+							Host: fleetNomTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{CAs: []string{string(fleetRootPair.Cert)}},
 							},
@@ -572,13 +579,17 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					assert.Error(t, err,
 						"bad fleet.ssl.certificate_authorities provided, it should have returned an error")
 				},
+				customLogLevelSetterMock: func(t *testing.T) *mockhandlers.LogLevelSetter {
+					// We don't expect any log level to be set if config is wrong
+					return mockhandlers.NewLogLevelSetter(t)
+				},
 			},
 			{
 				name: "certificate and key is applied when present",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
-							Host: fleetTLSServer.URL,
+							Host: fleetmTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									CAs: []string{string(fleetRootPair.Cert)},
@@ -610,7 +621,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
-							Host: fleetTLSServer.URL,
+							Host: fleetmTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									CAs: []string{string(fleetRootPair.Cert)},
@@ -644,7 +655,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
-							Host: fleetTLSServer.URL,
+							Host: fleetmTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									CAs: []string{string(fleetRootPair.Cert)},
@@ -678,7 +689,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
-							Host: fleetTLSServer.URL,
+							Host: fleetmTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									CAs: []string{string(fleetRootPair.Cert)},
@@ -714,7 +725,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
-							Host: fleetTLSServer.URL,
+							Host: fleetmTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									CAs: []string{string(fleetRootPair.Cert)},
@@ -746,7 +757,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
-							Host: fleetTLSServer.URL,
+							Host: fleetmTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									CAs: []string{string(fleetRootPair.Cert)},
@@ -776,12 +787,16 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					assert.Error(t, err,
 						"wrong fleet.ssl.certificate and key should cause an error")
 				},
+				customLogLevelSetterMock: func(t *testing.T) *mockhandlers.LogLevelSetter {
+					// We don't expect any log level to be set if config is wrong
+					return mockhandlers.NewLogLevelSetter(t)
+				},
 			},
 		}
 
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
-				log, logs := logger.NewTesting("")
+				log, logs := logger.NewTesting(tc.name)
 				defer func() {
 					if t.Failed() {
 						t.Log("test failed, see handler logs below:")
@@ -795,13 +810,20 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				setter := testSetter{SetClientFn: func(c client.Sender) {
 					setterCalledCount++
 				}}
+
+				var logLevelSetterMock *mockhandlers.LogLevelSetter
+				if tc.customLogLevelSetterMock != nil {
+					logLevelSetterMock = tc.customLogLevelSetterMock(t)
+				} else {
+					logLevelSetterMock = nilLogLevelSet(t)
+				}
 				h := PolicyChangeHandler{
 					agentInfo:            &info.AgentInfo{},
 					config:               tc.originalCfg,
 					store:                &storage.NullStore{},
 					setters:              []actions.ClientSetter{&setter},
 					log:                  log,
-					policyLogLevelSetter: noLogLevelSet(t),
+					policyLogLevelSetter: logLevelSetterMock,
 				}
 
 				cfg := config.MustNewConfigFrom(tc.newCfg)
@@ -989,7 +1011,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 	}
 }
 
-func noLogLevelSet(t *testing.T) *mockhandlers.LogLevelSetter {
+func nilLogLevelSet(t *testing.T) *mockhandlers.LogLevelSetter {
 	// nilLogLevel is a variable used to match nil policy log level being set
 	var nilLogLevel *logger.Level = nil
 
