@@ -3,11 +3,11 @@ kind: Kustomization
 
 namespace: kube-system
 
-secretGenerator:
-    - name: elastic-agent-creds
-      literals:
-      - host=${host}
-      - enrollment_token=${enrollment_token}
+# secretGenerator:
+#     - name: elastic-agent-creds
+#       literals:
+#       - host=${host}
+#       - enrollment_token=${enrollment_token}
 
 resources:
   - ./base
