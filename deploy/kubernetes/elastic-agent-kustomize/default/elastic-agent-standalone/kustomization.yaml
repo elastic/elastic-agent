@@ -5,8 +5,9 @@ namespace: kube-system
 
 secretGenerator:
     - name: elastic-agent-creds
-      envs:
-      - .env
+      literals:
+        - host=${host}
+        - api_key=${api_key}
 
 resources:
   - ./base
