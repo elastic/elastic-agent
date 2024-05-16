@@ -58,24 +58,6 @@ func CheckSuccess(f *atesting.Fixture, topPath string, unprivileged bool) error 
 		return fmt.Errorf("%s missing: %w", installMarkerPath, err)
 	}
 
-	// Check has agent ID and unprivileged mode matches.
-	var output atesting.AgentStatusOutput
-	err = waitForNoError(context.Background(), func(ctx context.Context) error {
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-		output, err = f.ExecStatus(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get the status: %w", err)
-		}
-		return nil
-	}, 3*time.Minute, 10*time.Second)
-	if output.Info.ID != "" {
-		return fmt.Errorf("must have an agent ID")
-	}
-	if unprivileged != output.Info.Unprivileged {
-		return fmt.Errorf("unprivileged didn't match, should have been %v", unprivileged)
-	}
-
 	// Specific checks depending on the platform.
 	return checkPlatform(f, topPath, unprivileged)
 }

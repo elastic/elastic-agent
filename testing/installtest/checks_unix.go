@@ -32,20 +32,11 @@ func checkPlatform(_ *atesting.Fixture, topPath string, unprivileged bool) error
 			return fmt.Errorf("failed to find %s group: %w", install.ElasticGroupName, err)
 		}
 
-		// Path should now exist as well as be owned by the correct user/group.
-		info, err := os.Stat(topPath)
+		// Ensure entire installation tree has the correct permissions.
+		err = validateFileTree(topPath, uint32(uid), uint32(gid))
 		if err != nil {
-			return fmt.Errorf("faield to stat %s: %w", topPath, err)
-		}
-		fs, ok := info.Sys().(*syscall.Stat_t)
-		if !ok {
-			return fmt.Errorf("failed to convert info.Sys() into *syscall.Stat_t")
-		}
-		if fs.Uid != uint32(uid) {
-			return fmt.Errorf("%s not owned by %s user", topPath, install.ElasticUsername)
-		}
-		if fs.Gid != uint32(gid) {
-			return fmt.Errorf("%s not owned by %s group", topPath, install.ElasticGroupName)
+			// context already added
+			return err
 		}
 
 		// Check that the socket is created with the correct permissions.
@@ -57,11 +48,11 @@ func checkPlatform(_ *atesting.Fixture, topPath string, unprivileged bool) error
 			}
 			return nil
 		}, 3*time.Minute, 1*time.Second)
-		info, err = os.Stat(socketPath)
+		info, err := os.Stat(socketPath)
 		if err != nil {
 			return fmt.Errorf("failed to stat socket path %s: %w", socketPath, err)
 		}
-		fs, ok = info.Sys().(*syscall.Stat_t)
+		fs, ok := info.Sys().(*syscall.Stat_t)
 		if !ok {
 			return fmt.Errorf("failed to convert info.Sys() into *syscall.Stat_t")
 		}
@@ -89,29 +80,43 @@ func checkPlatform(_ *atesting.Fixture, topPath string, unprivileged bool) error
 		if originalUser != "" {
 			cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
 			output, err := cmd.CombinedOutput()
-			if err != nil {
-				return fmt.Errorf("sudo -u %s elastic-agent status failed: %w (output: %s)", originalUser, err, output)
+			if err == nil {
+				return fmt.Errorf("sudo -u %s elastic-agent didn't fail: got output: %s", originalUser, output)
 			}
 		}
 	} else {
-		// Ensure that the top path is owned by root:root.
-		info, err := os.Stat(topPath)
+		// Ensure entire installation tree has the correct permissions.
+		err := validateFileTree(topPath, 0, 0)
 		if err != nil {
-			return fmt.Errorf("faield to stat %s: %w", topPath, err)
+			// context already added
+			return err
+		}
+	}
+	return nil
+}
+
+func validateFileTree(dir string, uid uint32, gid uint32) error {
+	return filepath.Walk(dir, func(file string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("error traversing the file tree: %w", err)
+		}
+		if info.Mode().Type() == os.ModeSymlink {
+			// symlink don't check permissions
+			return nil
 		}
 		fs, ok := info.Sys().(*syscall.Stat_t)
 		if !ok {
 			return fmt.Errorf("failed to convert info.Sys() into *syscall.Stat_t")
 		}
-		if fs.Uid != 0 {
-			return fmt.Errorf("%s not owned by root user", topPath)
+		if fs.Uid != uid {
+			return fmt.Errorf("%s doesn't have correct uid: has %d (expected %d)", file, fs.Uid, uid)
 		}
-		if fs.Gid != 0 {
-			return fmt.Errorf("%s not owned by root group", topPath)
+		if fs.Gid != gid {
+			return fmt.Errorf("%s doesn't have correct gid: has %d (expected %d)", file, fs.Gid, gid)
 		}
-		if fs.Mode&0007 == 0 {
-			return fmt.Errorf("%s has world access", topPath)
+		if fs.Mode&0007 != 0 {
+			return fmt.Errorf("%s has world access", file)
 		}
-	}
-	return nil
+		return nil
+	})
 }
