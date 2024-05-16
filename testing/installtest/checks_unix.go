@@ -122,3 +122,28 @@ func validateFileTree(dir string, uid uint32, gid uint32) error {
 		return nil
 	})
 }
+
+func waitForNoError(ctx context.Context, fun func(ctx context.Context) error, timeout time.Duration, interval time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	t := time.NewTicker(interval)
+	defer t.Stop()
+
+	var lastErr error
+	for {
+		select {
+		case <-ctx.Done():
+			if lastErr != nil {
+				return lastErr
+			}
+			return ctx.Err()
+		case <-t.C:
+			err := fun(ctx)
+			if err == nil {
+				return nil
+			}
+			lastErr = err
+		}
+	}
+}

@@ -5,15 +5,12 @@
 package installtest
 
 import (
-	"context"
 	"fmt"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"os"
 	"path/filepath"
 	"runtime"
-	"time"
-
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 func DefaultTopPath() string {
@@ -67,29 +64,4 @@ func exeOnWindows(filename string) string {
 		return filename + ".exe"
 	}
 	return filename
-}
-
-func waitForNoError(ctx context.Context, fun func(ctx context.Context) error, timeout time.Duration, interval time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	t := time.NewTicker(interval)
-	defer t.Stop()
-
-	var lastErr error
-	for {
-		select {
-		case <-ctx.Done():
-			if lastErr != nil {
-				return lastErr
-			}
-			return ctx.Err()
-		case <-t.C:
-			err := fun(ctx)
-			if err == nil {
-				return nil
-			}
-			lastErr = err
-		}
-	}
 }
