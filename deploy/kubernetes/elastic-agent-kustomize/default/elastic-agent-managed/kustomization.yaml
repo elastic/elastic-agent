@@ -6,7 +6,7 @@ namespace: kube-system
 secretGenerator:
     - name: elastic-agent-creds
       literals:
-      - host={host}
+      - host=${host}
       - enrollment_token=${enrollment_token}
 
 resources:
