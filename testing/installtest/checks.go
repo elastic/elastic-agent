@@ -6,11 +6,12 @@ package installtest
 
 import (
 	"fmt"
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"os"
 	"path/filepath"
 	"runtime"
+
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 func DefaultTopPath() string {
