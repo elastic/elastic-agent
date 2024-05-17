@@ -17,7 +17,7 @@ spec:
       containers:
         - name: elastic-agent-standalone
           env:
-            - $patch: delete
-              name: API_KEY
-            - $patch: delete
-              name: ES_HOST
+          - $patch: delete
+            name: API_KEY
+          - $patch: delete
+            name: ES_HOST

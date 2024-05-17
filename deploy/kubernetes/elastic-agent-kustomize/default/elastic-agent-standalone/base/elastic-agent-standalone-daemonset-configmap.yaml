@@ -14,7 +14,7 @@ data:
         hosts:
           - >-
             ${ES_HOST}
-          api_key: ${API_KEY}
+        api_key: ${API_KEY}
         # Uncomment username/password and remove api_key if you want to use alternative authentication method
         # username: ${ES_USERNAME}
         # password: ${ES_PASSWORD}
