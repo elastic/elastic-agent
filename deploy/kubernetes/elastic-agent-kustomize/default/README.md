@@ -24,10 +24,10 @@ secretGenerator:
         - api_key=${enrollment_token}
 ```
 
-For *Standalone Elastic Agent*, please update the following secrets inside main [kustomization.yaml](../elastic-agent-kustomize/default/elastic-agent-managed/kustomization.yaml):
+For *Standalone Elastic Agent*, please update the following secrets inside main [kustomization.yaml](./elastic-agent-managed/kustomization.yaml):
 
 - ${es_host}: The Elasticsearch host to communicate with
-- ${api_key}: The API Key with access privilleges to connect to Elasticsearch. https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent
+- ${api_key}: The API Key with access privilleges to connect to Elasticsearch. See [create-api-key-standalone-agent](https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent)
 
 
 ## Remote usage of kustomize templates
@@ -67,6 +67,6 @@ ${es_host}
 
 ## Updating kustomize templates
 
-The included kustomize templates are being produced based on [Makefile](deploy/kubernetes/Makefile) by running: `GENERATEKUSTOMIZE=true make ci-create-kustomize`
+The included kustomize templates are being produced based on [Makefile](../../Makefile) by running: `GENERATEKUSTOMIZE=true make ci-create-kustomize`
 
 The current templates are using patches as defined [here](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-managed/kustomization.yaml)
