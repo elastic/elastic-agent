@@ -280,9 +280,7 @@ func PerformUpgrade(
 	}
 
 	// validate installation is correct
-	// unprivileged mode checks can only run if the starting version is 8.14+, due to
-	// changes in how unprivileged mode changed between 8.13 and 8.14.
-	if installOpts.Privileged || !startVersion.Less(*Version_8_14_0_SNAPSHOT) {
+	if InstallChecksAllowed(installOpts.Privileged, startVersion) {
 		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, !installOpts.Privileged)
 		if err != nil {
 			return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
@@ -413,9 +411,7 @@ func PerformUpgrade(
 	}
 
 	// validate again that the installation is correct, upgrade should not have changed installation validation
-	// unprivileged mode checks can only run if the new running version is 8.14+, due to
-	// changes in how unprivileged mode changed between 8.13 and 8.14.
-	if installOpts.Privileged || !endVersion.Less(*Version_8_14_0_SNAPSHOT) {
+	if InstallChecksAllowed(installOpts.Privileged, startVersion, endVersion) {
 		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, !installOpts.Privileged)
 		if err != nil {
 			return fmt.Errorf("post-upgrade installation checks failed: %w", err)
