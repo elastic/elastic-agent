@@ -19,5 +19,5 @@ patches:
     group: apps
     version: v1
     kind: DaemonSet
-    name: elastic-agent
+    name: elastic-agent-standalone
   path: api-key-patch.yaml
