@@ -4,8 +4,8 @@ The list below includes the official [kustomize](https://github.com/kubernetes-s
 
 Agent Scenario | Description
 ---- | ----
-[Elastic Agent managed - Default ](../elastic-agent-kustomize/default/elastic-agent-managed/) | Default Elastic Agent managed by Fleet setup. Kube-state-metrics (KSM) is installed automatically.
-[Elastic Agent standalone Default ](../elastic-agent-kustomize/default/elastic-agent-standalone/) | Default Standalone Elastic Agent setup. Kube-state-metrics (KSM) is installed automatically.
+[Elastic Agent managed - Default ](./default/elastic-agent-managed/) | Default Elastic Agent managed by Fleet setup. Kube-state-metrics (KSM) is installed automatically.
+[Elastic Agent standalone Default ](./default/elastic-agent-standalone/) | Default Standalone Elastic Agent setup. Kube-state-metrics (KSM) is installed automatically.
 
 ## Using above templates
 
