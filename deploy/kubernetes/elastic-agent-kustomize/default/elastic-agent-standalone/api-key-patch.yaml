@@ -15,5 +15,5 @@
     valueFrom:
       secretKeyRef:
         name: elastic-agent-creds
-        key: es_host
+        key: host
 
