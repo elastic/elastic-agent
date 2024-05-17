@@ -3,12 +3,14 @@
 env:
   DOCKER_REGISTRY: "docker.elastic.co"
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
-  BEAT_NAME: "elastic-agent"
+
 steps:
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
-    concurrency_group: elastic-agent-extended-testing/integration
+    concurrency_group: elastic-agent-extended-testing/serverless-integration
     concurrency: 8
+    env:
+      BEAT_NAME: "elastic-agent"
     command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
     artifact_paths:
       - "build/TEST-**"
@@ -22,8 +24,10 @@ steps:
 
   - label: "Extended runtime leak tests"
     key: "extended-integration-tests"
-    concurrency_group: elastic-agent-extended-testing/integration
+    concurrency_group: elastic-agent-extended-testing/leak-tests
     concurrency: 8
+    env:
+      BEAT_NAME: "elastic-agent"
     command: ".buildkite/scripts/steps/integration_tests.sh stateful integration:TestForResourceLeaks"
     artifact_paths:
       - "build/TEST-**"
@@ -39,6 +43,8 @@ steps:
     key: "integration-tests"
     concurrency_group: elastic-agent-extended-testing/integration
     concurrency: 8
+    env:
+      BEAT_NAME: "elastic-agent"
     command: ".buildkite/scripts/steps/integration_tests.sh stateful"
     artifact_paths:
       - "build/TEST-**"
@@ -52,7 +58,7 @@ steps:
 
   - label: "Serverless Beats Tests"
     key: "serverless-beats-integration-tests"
-    concurrency_group: elastic-agent-extended-testing/integration
+    concurrency_group: elastic-agent-extended-testing/beats-integration
     concurrency: 8
     command: ".buildkite/scripts/steps/beats_tests.sh"
     # if: "build.env('CRON') == 'yes'"
