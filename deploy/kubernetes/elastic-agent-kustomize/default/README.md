@@ -69,4 +69,4 @@ ${es_host}
 
 The included kustomize templates are being produced based on [Makefile](deploy/kubernetes/Makefile) by running: `GENERATEKUSTOMIZE=true make ci-create-kustomize`
 
-The current templates are using patches as defined [here](../elastic-agent-kustomize/default/elastic-agent-managed/kustomization.yaml)
+The current templates are using patches as defined [here](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-managed/kustomization.yaml)
