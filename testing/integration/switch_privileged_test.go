@@ -8,7 +8,6 @@ package integration
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/testing/installtest"
 
 	"github.com/stretchr/testify/require"
 )
@@ -45,21 +45,6 @@ func TestSwitchPrivilegedWithoutBasePath(t *testing.T) {
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
-	// Check that default base path is clean
-	var defaultBasePath string
-	switch runtime.GOOS {
-	case "darwin":
-		defaultBasePath = `/Library`
-	case "linux":
-		defaultBasePath = `/opt`
-	case "windows":
-		defaultBasePath = `C:\Program Files`
-	}
-
-	topPath := filepath.Join(defaultBasePath, "Elastic", "Agent")
-	err = os.RemoveAll(topPath)
-	require.NoError(t, err, "failed to remove %q. The test requires this path not to exist.")
-
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	opts := &atesting.InstallOpts{Force: true, Privileged: false}
@@ -70,7 +55,7 @@ func TestSwitchPrivilegedWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path in unprivileged mode
-	checkInstallSuccess(t, fixture, topPath, true)
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, true))
 
 	// Switch to privileged mode
 	out, err = fixture.Exec(ctx, []string{"privileged", "-f"})
@@ -80,7 +65,7 @@ func TestSwitchPrivilegedWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent is running in default base path in privileged mode
-	checkInstallSuccess(t, fixture, topPath, false)
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, false))
 }
 
 func TestSwitchPrivilegedWithBasePath(t *testing.T) {
@@ -140,7 +125,7 @@ func TestSwitchPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path in unprivileged mode
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	checkInstallSuccess(t, fixture, topPath, true)
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, true))
 
 	// Switch to privileged mode
 	out, err = fixture.Exec(ctx, []string{"privileged", "-f"})
@@ -150,5 +135,5 @@ func TestSwitchPrivilegedWithBasePath(t *testing.T) {
 	}
 
 	// Check that Agent is running in the custom base path in privileged mode
-	checkInstallSuccess(t, fixture, topPath, false)
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, false))
 }
