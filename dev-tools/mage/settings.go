@@ -41,7 +41,7 @@ const (
 
 	elasticAgentModulePath = "github.com/elastic/elastic-agent"
 
-	defaultBeatName = "elastic-agent"
+	defaultName = "elastic-agent"
 
 	// Env vars
 	// agent package version
@@ -75,7 +75,7 @@ var (
 	// the crossbuild images at /go/pkg/mod, read-only,  when set to true.
 	CrossBuildMountModcache = true
 
-	BeatName        = EnvOr("BEAT_NAME", defaultBeatName)
+	BeatName        = EnvOr("BEAT_NAME", defaultName)
 	BeatServiceName = EnvOr("BEAT_SERVICE_NAME", BeatName)
 	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
 	BeatDescription = EnvOr("BEAT_DESCRIPTION", "")
