@@ -200,10 +200,15 @@ func TestProxy(t *testing.T) {
 			proxy := New(t, proxyOpts...)
 
 			if tt.proxyStartTLS {
-				proxy.StartTLS()
+				t.Log("Starting proxytest with TLS")
+				err = proxy.StartTLS()
 			} else {
-				proxy.Start()
+				t.Log("Starting proxytest without TLS")
+				err = proxy.Start()
 			}
+
+			require.NoError(t, err, "error starting proxytest")
+
 			defer proxy.Close()
 
 			proxyURL, err := url.Parse(proxy.URL)

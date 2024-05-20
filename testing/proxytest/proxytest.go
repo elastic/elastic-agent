@@ -154,30 +154,32 @@ func New(t *testing.T, optns ...Option) *Proxy {
 	return &p
 }
 
-func (p *Proxy) Start() {
+func (p *Proxy) Start() error {
 	p.Server.Start()
 	u, err := url.Parse(p.URL)
 	if err != nil {
-		panic(fmt.Sprintf("could parse fleet-server URL: %v", err))
+		return fmt.Errorf("could not parse fleet-server URL: %w", err)
 	}
 
 	p.Port = u.Port()
 	p.LocalhostURL = "http://localhost:" + p.Port
 
 	p.opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
+	return nil
 }
 
-func (p *Proxy) StartTLS() {
+func (p *Proxy) StartTLS() error {
 	p.Server.StartTLS()
 	u, err := url.Parse(p.URL)
 	if err != nil {
-		panic(fmt.Sprintf("could parse fleet-server URL: %v", err))
+		return fmt.Errorf("could not parse fleet-server URL: %w", err)
 	}
 
 	p.Port = u.Port()
 	p.LocalhostURL = "http://localhost:" + p.Port
 
 	p.opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
+	return nil
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
