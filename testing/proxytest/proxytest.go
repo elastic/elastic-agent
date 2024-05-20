@@ -5,6 +5,7 @@
 package proxytest
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
@@ -42,8 +43,9 @@ type options struct {
 	rewriteHost func(string) string
 	rewriteURL  func(u *url.URL)
 	// logFn if set will be used to log every request.
-	logFn   func(format string, a ...any)
-	verbose bool
+	logFn           func(format string, a ...any)
+	verbose         bool
+	serverTLSConfig *tls.Config
 }
 
 // WithAddress will set the address the server will listen on. The format is as
@@ -90,6 +92,12 @@ func WithRewriteFn(f func(u *url.URL)) Option {
 	}
 }
 
+func WithServerTLSConfig(tc *tls.Config) Option {
+	return func(o *options) {
+		o.serverTLSConfig = tc
+	}
+}
+
 // New returns a new Proxy ready for use. Use:
 //   - WithAddress to set the proxy's address,
 //   - WithRewrite or WithRewriteFn to rewrite the URL before forwarding the request.
@@ -114,10 +122,8 @@ func New(t *testing.T, optns ...Option) *Proxy {
 
 	p := Proxy{opts: opts}
 
-	p.Server = &httptest.Server{
-		Listener: l,
-		//nolint:gosec,nolintlint // it's a test
-		Config: &http.Server{Handler: http.HandlerFunc(func(ww http.ResponseWriter, r *http.Request) {
+	p.Server = httptest.NewUnstartedServer(
+		http.HandlerFunc(func(ww http.ResponseWriter, r *http.Request) {
 			w := &statusResponseWriter{w: ww}
 
 			requestID := uuid.New().String()
@@ -128,8 +134,13 @@ func New(t *testing.T, optns ...Option) *Proxy {
 
 			opts.logFn(fmt.Sprintf("[%s] DONE %d - %s %s %s %s\n",
 				requestID, w.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr))
-		})}}
-	p.Start()
+		}),
+	)
+	p.Server.Listener = l
+
+	if opts.serverTLSConfig != nil {
+		p.Server.TLS = opts.serverTLSConfig
+	}
 
 	u, err := url.Parse(p.URL)
 	if err != nil {
@@ -141,6 +152,34 @@ func New(t *testing.T, optns ...Option) *Proxy {
 
 	opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
 	return &p
+}
+
+func (p *Proxy) Start() error {
+	p.Server.Start()
+	u, err := url.Parse(p.URL)
+	if err != nil {
+		return fmt.Errorf("could not parse fleet-server URL: %w", err)
+	}
+
+	p.Port = u.Port()
+	p.LocalhostURL = "http://localhost:" + p.Port
+
+	p.opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
+	return nil
+}
+
+func (p *Proxy) StartTLS() error {
+	p.Server.StartTLS()
+	u, err := url.Parse(p.URL)
+	if err != nil {
+		return fmt.Errorf("could not parse fleet-server URL: %w", err)
+	}
+
+	p.Port = u.Port()
+	p.LocalhostURL = "http://localhost:" + p.Port
+
+	p.opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
+	return nil
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
