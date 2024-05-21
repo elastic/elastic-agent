@@ -10,7 +10,8 @@ steps:
     concurrency_group: elastic-agent-extended-testing/serverless-integration
     concurrency: 8
     env:
-      BEAT_NAME: "elastic-agent"
+      # we run each step in a different data center to spread the load
+      TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
     command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
     artifact_paths:
       - "build/TEST-**"
@@ -27,7 +28,7 @@ steps:
     concurrency_group: elastic-agent-extended-testing/leak-tests
     concurrency: 8
     env:
-      BEAT_NAME: "elastic-agent"
+      TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-b"
     command: ".buildkite/scripts/steps/integration_tests.sh stateful integration:TestForResourceLeaks"
     artifact_paths:
       - "build/TEST-**"
@@ -44,7 +45,7 @@ steps:
     concurrency_group: elastic-agent-extended-testing/integration
     concurrency: 8
     env:
-      BEAT_NAME: "elastic-agent"
+      TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-f"
     command: ".buildkite/scripts/steps/integration_tests.sh stateful"
     artifact_paths:
       - "build/TEST-**"
@@ -60,6 +61,8 @@ steps:
     key: "serverless-beats-integration-tests"
     concurrency_group: elastic-agent-extended-testing/beats-integration
     concurrency: 8
+    env:
+      TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
     command: ".buildkite/scripts/steps/beats_tests.sh"
     # if: "build.env('CRON') == 'yes'"
     agents:
