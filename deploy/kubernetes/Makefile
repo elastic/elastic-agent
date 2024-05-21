@@ -22,7 +22,7 @@ K8S_VERSION=1.52.0
 
 # variable for processor for elastic-agent-standalone
 define ELASTIC_PROCESSOR
-processors:\n            - add_fields:\n                fields:\n                elastic_agent_id: '$${elastic_agent_id}'
+processors:\n            - add_fields:\n                fields:\n                  elastic_agent_id: '%ELASTIC_AGENT_ID%'
 endef
 
 .PHONY: generate-k8s $(ALL)
@@ -42,14 +42,14 @@ ifdef WITHOUTCONFIG
 	@echo "Generating $@-kubernetes-without-configmap.yaml"
 	@rm -f $@-kubernetes-without-configmap.yaml
 	@for f in $(shell ls $@/*.yaml | grep -v configmap ); do \
-		sed -e "s/%VERSION%/VERSION/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "s/%K8S_VERSION%/${K8S_VERSION}/g" -e "s/%SYSTEM_VERSION%/${SYSTEM_VERSION}/g" $$f >> $@-kubernetes-without-configmap.yaml; \
+		sed -e "s/%VERSION%/VERSION/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $$f >> $@-kubernetes-without-configmap.yaml; \
 		echo --- >> $@-kubernetes-without-configmap.yaml; \
 	done
 else
 	@echo "Generating $@-kubernetes.yaml"
 	@rm -f $@-kubernetes.yaml
 	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-ksm); do \
-		sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "s/%K8S_VERSION%/${K8S_VERSION}/g" -e "s/%SYSTEM_VERSION%/${SYSTEM_VERSION}/g" $$f >> $@-kubernetes.yaml; \
+		sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $$f >> $@-kubernetes.yaml; \
 		echo --- >> $@-kubernetes.yaml; \
 	done
 endif

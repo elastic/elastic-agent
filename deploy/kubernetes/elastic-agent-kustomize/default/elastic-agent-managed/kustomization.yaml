@@ -6,12 +6,12 @@ namespace: kube-system
 secretGenerator:
   - name: elastic-agent-creds
     literals:
-      - enrollment_token=${enrollment_token}
+      - enrollment_token=%ENROLLMENT_TOKEN%
 
 configMapGenerator:
 - name: elastic-agent-configs
   literals:
-  - fleet_url=${FLEET_URL}
+  - host=%FLEET_URL%
 
 resources:
   - ./base

@@ -6,13 +6,13 @@ namespace: kube-system
 secretGenerator:
   - name: elastic-agent-creds
     literals:
-      - api_key=${API_KEY}
+      - api_key=%API_KEY%
 
 configMapGenerator:
 - name: elastic-agent-configs
   literals:
-  - host=${ES_HOST}
-  - ca_trusted= ${CA_TRUSTED}
+  - host=%ES_HOST%
+  - ca_trusted=%CA_TRUSTED%
   
 resources:
   - ./base
