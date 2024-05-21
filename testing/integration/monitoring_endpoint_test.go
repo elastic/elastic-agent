@@ -120,27 +120,27 @@ func genESQueryByBinary(agentID string, componentID string) map[string]interface
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
 				"must": []map[string]interface{}{
+					{
+						"match": map[string]interface{}{
+							"agent.id": agentID,
+						},
+					},
+					// will not work due to https://github.com/elastic/integrations/pull/9928
 					// {
 					// 	"match": map[string]interface{}{
-					// 		"agent.id": agentID,
+					// 		"component.id": componentID,
 					// 	},
 					// },
 					{
-						"match": map[string]interface{}{
-							"component.id": componentID,
+						"exists": map[string]interface{}{
+							"field": "system.process.cpu.total.value",
 						},
 					},
-					// make sure we fetch documents that have the metric field used by fleet monitoring
-					// {
-					// 	"exists": map[string]interface{}{
-					// 		"field": "system.process.cpu.total.value",
-					// 	},
-					// },
-					// {
-					// 	"exists": map[string]interface{}{
-					// 		"field": "system.process.memory.size",
-					// 	},
-					// },
+					{
+						"exists": map[string]interface{}{
+							"field": "system.process.memory.size",
+						},
+					},
 				},
 			},
 		},

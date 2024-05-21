@@ -139,8 +139,6 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	pidRequiresUpdate := false
 	for i, other := range c.state.Components {
 		if other.Component.ID == state.Component.ID {
-			//will this work?
-			c.logger.Infof("got updated component state with pid %d", state.State.CheckinPid)
 			if other.State.CheckinPid != state.State.CheckinPid {
 				pidRequiresUpdate = true
 			}
@@ -171,7 +169,6 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	c.stateNeedsRefresh = true
 
 	if pidRequiresUpdate {
-		c.logger.Infof("got pid update, refreshing config")
 		c.servicePidUpdate <- struct{}{}
 	}
 }
