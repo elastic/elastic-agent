@@ -59,7 +59,9 @@ func TestVerify(t *testing.T) {
 				u.Host = serverURL.Host
 			}),
 			proxytest.WithRequestLog("proxy", func(_ string, _ ...any) {}))
-
+		err = proxy.Start()
+		require.NoError(t, err, "error starting proxytest")
+		defer proxy.Close()
 		proxyURL, err := url.Parse(proxy.LocalhostURL)
 		require.NoError(t, err, "could not parse server URL \"%s\"",
 			server.URL)

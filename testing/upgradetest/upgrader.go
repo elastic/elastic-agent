@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/testing/installtest"
+
 	"github.com/hectane/go-acl"
 	"github.com/otiai10/copy"
 
@@ -277,6 +279,14 @@ func PerformUpgrade(
 		return err
 	}
 
+	// validate installation is correct
+	if InstallChecksAllowed(!installOpts.Privileged, startVersion) {
+		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, !installOpts.Privileged)
+		if err != nil {
+			return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
+		}
+	}
+
 	if upgradeOpts.preUpgradeHook != nil {
 		if err := upgradeOpts.preUpgradeHook(); err != nil {
 			return fmt.Errorf("pre upgrade hook failed: %w", err)
@@ -398,6 +408,14 @@ func PerformUpgrade(
 	if err != nil {
 		// error context added by CheckHealthyAndVersion
 		return err
+	}
+
+	// validate again that the installation is correct, upgrade should not have changed installation validation
+	if InstallChecksAllowed(!installOpts.Privileged, startVersion, endVersion) {
+		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, !installOpts.Privileged)
+		if err != nil {
+			return fmt.Errorf("post-upgrade installation checks failed: %w", err)
+		}
 	}
 
 	return nil
