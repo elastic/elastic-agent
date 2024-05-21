@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
