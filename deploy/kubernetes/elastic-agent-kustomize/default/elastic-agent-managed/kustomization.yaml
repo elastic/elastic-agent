@@ -4,10 +4,16 @@ kind: Kustomization
 namespace: kube-system
 
 secretGenerator:
-    - name: elastic-agent-creds
-      literals:
-        - host=${es_host}
-        - enrollment_token=${enrollment_token}
+  - name: elastic-agent-creds
+    literals:
+      - enrollment_token=${enrollment_token}
+
+configMapGenerator:
+- name: elastic-agent-configs
+  literals:
+  - host=${es_host}
+  - ca_trusted=${ca_trusted}
+  - k8s_integration_version={k8s_integration_version}
 
 resources:
   - ./base

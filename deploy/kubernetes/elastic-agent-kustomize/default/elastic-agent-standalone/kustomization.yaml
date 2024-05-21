@@ -4,10 +4,16 @@ kind: Kustomization
 namespace: kube-system
 
 secretGenerator:
-    - name: elastic-agent-creds
-      literals:
-        - host=${es_host}
-        - api_key=${api_key}
+  - name: elastic-agent-creds
+    literals:
+      - host=${es_host}
+      - api_key=${api_key}
+
+configMapGenerator:
+- name: special-config-2
+  literals:
+  - special.how=very
+  - special.type=charm
 
 resources:
   - ./base
