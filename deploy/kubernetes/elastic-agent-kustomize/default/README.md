@@ -11,24 +11,28 @@ Agent Scenario | Description
 
 Users can clone this repository to use the provided kustomize templates.
 
-For *Managed Elastic Agent*, please update the following secrets inside main kustomization.yaml:
+For *Managed Elastic Agent*, please update the following variables inside main kustomization.yaml:
 
-- ${fleet_url}: Fleet Server URL to enroll the Elastic Agent into. FLEET_URL can be found in Kibana, go to Management > Fleet > Settings
-- ${enrollment_token}: Elasticsearch API key used to [enroll Elastic Agents](https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html#fleet-enrollment-tokens) in Fleet.
+- %FLEET_URL%: Fleet Server URL to enroll the Elastic Agent into. FLEET_URL can be found in Kibana, go to Management > Fleet > Settings
+- %ENROLLMENT_TOKEN%: Elasticsearch API key used to [enroll Elastic Agents](https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html#fleet-enrollment-tokens) in Fleet. *This should be encoded as base64 value because it will be stored as Kubernetes secret*
+
+Eg.
 
 ```yaml
 secretGenerator:
-    - name: elastic-agent-creds
-      literals:
-        - host=${fleet_url}
-        - api_key=${enrollment_token}
+  - name: elastic-agent-creds
+    literals:
+      - enrollment_token=%ENROLLMENT_TOKEN%
 ```
+
+Comm
 
 For *Standalone Elastic Agent*, please update the following secrets inside main [kustomization.yaml](./elastic-agent-managed/kustomization.yaml):
 
-- ${es_host}: The Elasticsearch host to communicate with
-- ${api_key}: The API Key with access privilleges to connect to Elasticsearch. See [create-api-key-standalone-agent](https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent)
-
+- %ES_HOST%: The Elasticsearch host to communicate with
+- %API_KEY: The API Key with access privilleges to connect to Elasticsearch. See [create-api-key-standalone-agent](https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent). *This should be encoded as base64 value because it will be stored as Kubernetes secret*
+- %CA_TRUSTED%: The ssl.ca_trusted_fingerprint in order the elastic agent to be able to trust specific certificate
+- %ELASTIC_AGENT_ID%: A numeric ELASTIC_AGENT_ID that will be added as a new field. *By default, this will be added to state_pod dataset.*
 
 ## Remote usage of kustomize templates
 
@@ -37,32 +41,27 @@ Users can use following commands:
 Managed Elastic Agent:
 
 ```bash
-kubectl kustomize https://github.com/elastic/elastic-agent/deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-managed\?ref\=main | 
-sed -e 's/JHtlbnJvbGxtZW50X3Rva2VufQo=/<base64_fleet_enrollment_token>/g' -e 's/JHtmbGVldF91cmx9Cg==/<base64_fleet_url>/g'  | 
-kubectl apply -f-
+❯ kubectl https://github.com/elastic/elastic-agent/deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-maanged\?ref\=main | sed -e "s/JUVOUk9MTE1FTlRfVE9LRU4l/base64_ENCODED_ENROLLMENT_TOKEN/g" -e "s/%FLEET_URL%/https:\/\/localhost:9200/g" | kubectl apply -f-
+
 ```
 
 Standalone Elastic Agent:
 
 ```bash
-kubectl kustomize https://github.com/elastic/elastic-agent/deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-standalone\?ref\=main | 
-sed -e 's/JHthcGlfa2V5fQo=/<base64_api_key>/g' -e 's/JHtlc19ob3N0fQo=/<base64_es_host>/g'  | 
-kubectl apply -f-
+kubectl kustomize https://github.com/elastic/elastic-agent/deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-standalone\?ref\=main | sed -e "s/JUFQSV9LRVkl/<base64_encoded_APIKEY>/g" -e "s/%ES_HOST%/https:\/\/localhost:9200/g" -e "s/%CA_TRUSTED%/ca_trusted_fingerprint/g" -e "s/%ELASTIC_AGENT_ID%/12345/g" | kubectl apply -f-
 ```
 
 Examples of Base64 encoded values:
 
 ```bash
-❯ echo '${api_key}' | base64
-JHthcGlfa2V5fQo=
-❯ echo '${fleet_url}' | base64
-JHtmbGVldF91cmx9Cg==
->echo '${enrollment_token}' | base64
-JHtlbnJvbGxtZW50X3Rva2VufQo=
-❯ echo '${es_host}' | base64
-JHtlc19ob3N0fQo=
-❯ echo JHtlc19ob3N0fQo= | base64 -D
-${es_host}
+❯ echo %API_KEY | base64
+JUFQSV9LRVkK
+
+echo %ENROLLMENT_TOKEN% | base64
+JUVOUk9MTE1FTlRfVE9LRU4lCg==
+
+❯ echo JUVOUk9MTE1FTlRfVE9LRU4lCg== | base64 -D
+%ENROLLMENT_TOKEN%
 ```
 
 ## Updating kustomize templates
