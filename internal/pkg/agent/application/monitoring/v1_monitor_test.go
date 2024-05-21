@@ -22,6 +22,82 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
+func TestMonitoringWithEndpoint(t *testing.T) {
+
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	testMon := BeatsMonitor{
+		enabled: true,
+		config: &monitoringConfig{
+			C: &monitoringcfg.MonitoringConfig{
+				Enabled:        true,
+				MonitorMetrics: true,
+				HTTP: &monitoringcfg.MonitoringHTTPConfig{
+
+					Enabled: true,
+				},
+			},
+		},
+		agentInfo: agentInfo,
+	}
+
+	policy := map[string]any{
+		"agent": map[string]any{
+			"monitoring": map[string]any{
+				"metrics": true,
+				"http": map[string]any{
+					"enabled": false,
+				},
+			},
+		},
+		"outputs": map[string]any{
+			"default": map[string]any{},
+		},
+	}
+
+	// manually declaring all the MonitoringConfig() args since there's a lot of them, and this makes
+	// the test a little more self-describing
+
+	var compList []component.Component
+
+	compIdToBinary := map[string]string{
+		"endpoint-default": "endpoint-security",
+		"filebeat-default": "filebeat",
+	}
+	existingPidStateMap := map[string]uint64{
+		"endpoint-default": 1234,
+	}
+
+	outCfg, err := testMon.MonitoringConfig(policy, compList, compIdToBinary, existingPidStateMap)
+	require.NoError(t, err)
+
+	inputCfg := outCfg["inputs"].([]interface{})
+
+	foundConfig := false
+
+	for _, cfg := range inputCfg {
+		unwrappedCfg := cfg.(map[string]interface{})
+		if idName, ok := unwrappedCfg["id"]; ok && idName == "metrics-monitoring-endpoint_security" {
+			foundConfig = true
+			for compName, compCfg := range unwrappedCfg {
+				if compName == "streams" {
+					streamCfgUnwrapped := compCfg.([]interface{})
+					for _, streamCfg := range streamCfgUnwrapped {
+						streamValues := streamCfg.(map[string]interface{})
+						require.Equal(t, []interface{}{"process"}, streamValues["metricsets"])
+						require.Equal(t, "metrics-elastic_agent.endpoint_security-default", streamValues["index"])
+						require.Equal(t, uint64(1234), streamValues["process.pid"])
+					}
+				}
+
+			}
+		}
+	}
+
+	require.True(t, foundConfig)
+}
+
 func TestMonitoringConfigMetricsInterval(t *testing.T) {
 
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)

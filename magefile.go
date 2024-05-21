@@ -196,7 +196,7 @@ func (Dev) Package() {
 	os.Setenv(devEnv, "true")
 
 	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
-		devtools.ExternalBuild = true
+		devtools.ExternalBuild = "true"
 	}
 
 	devtools.DevBuild = true
@@ -813,7 +813,7 @@ func (Cloud) Image() {
 	devtools.SelectedPackageTypes = []devtools.PackageType{devtools.Docker}
 
 	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
-		devtools.ExternalBuild = true
+		devtools.ExternalBuild = "true"
 	}
 
 	Package()
@@ -1055,7 +1055,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 		os.Setenv(agentDropPath, dropPath)
 
-		if devtools.ExternalBuild == true {
+		if devtools.ExternalBuild == "true" {
 			// Map of binaries to download to their project name in the unified-release manager.
 			// The project names are used to generate the URLs when downloading binaries. For example:
 			//
@@ -1077,101 +1077,126 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 				"pf-elastic-symbolizer": "prodfiler",
 				"pf-host-agent":         "prodfiler",
 			}
-
-			// Only log fatal logs for logs produced using logrus. This is the global logger
-			// used by github.com/elastic/e2e-testing/pkg/downloads which can only be configured globally like this or via
-			// environment variables.
-			//
-			// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
-			// download artifacts on unsupported platforms and choose to ignore the errors.
-			//
-			// Change this to InfoLevel to see exactly what the downloader is doing.
-			logrus.SetLevel(logrus.FatalLevel)
-
-			errGroup, ctx := errgroup.WithContext(context.Background())
-			completedDownloads := &atomic.Int32{}
-			for binary, project := range externalBinaries {
-				for _, platform := range platforms {
-					reqPackage := platformPackages[platform]
-					targetPath := filepath.Join(archivePath, reqPackage)
-					os.MkdirAll(targetPath, 0755)
-					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
-					errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath, completedDownloads))
-				}
+			downloadFromExternalBuild(platforms, archivePath, packageVersion, externalBinaries)
+		} else if devtools.ExternalBuild == "agentbeat" {
+			// package agentbeat, then also pull external builds for non-agentbeat binaries
+			externalBinaries := map[string]string{
+				"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
+				"cloud-defend":          "cloud-defend",
+				"apm-server":            "apm-server", // not supported on darwin/aarch64
+				"endpoint-security":     "endpoint-dev",
+				"fleet-server":          "fleet-server",
+				"pf-elastic-collector":  "prodfiler",
+				"pf-elastic-symbolizer": "prodfiler",
+				"pf-host-agent":         "prodfiler",
 			}
+			downloadFromExternalBuild(platforms, archivePath, packageVersion, externalBinaries)
+			packageAgentBeat(packageVersion, archivePath, requiredPackages)
 
-			err = errGroup.Wait()
-			if err != nil {
-				panic(err)
-			}
-			if completedDownloads.Load() == 0 {
-				panic(fmt.Sprintf("No packages were successfully downloaded. You may be building against an invalid or unreleased version. version=%s. If this is an unreleased version, try SNAPSHOT=true or EXTERNAL=false", packageVersion))
-			}
 		} else {
-			packedBeats := []string{"agentbeat"}
-			// build from local repo, will assume beats repo is located on the same root level
-			for _, b := range packedBeats {
-				pwd, err := filepath.Abs(filepath.Join("../beats/x-pack", b))
-				if err != nil {
-					panic(err)
-				}
-
-				packagesCopied := 0
-
-				if !requiredPackagesPresent(pwd, b, packageVersion, requiredPackages) {
-					fmt.Printf("--- Package %s\n", pwd)
-					cmd := exec.Command("mage", "package")
-					cmd.Dir = pwd
-					cmd.Stdout = os.Stdout
-					cmd.Stderr = os.Stderr
-					cmd.Env = append(os.Environ(), fmt.Sprintf("PWD=%s", pwd), "AGENT_PACKAGING=on")
-					if envVar := selectedPackageTypes(); envVar != "" {
-						cmd.Env = append(cmd.Env, envVar)
-					}
-
-					if err := cmd.Run(); err != nil {
-						panic(err)
-					}
-				}
-
-				// copy to new drop
-				sourcePath := filepath.Join(pwd, "build", "distributions")
-				for _, rp := range requiredPackages {
-					files, err := filepath.Glob(filepath.Join(sourcePath, "*"+rp+"*"))
-					if err != nil {
-						panic(err)
-					}
-
-					targetPath := filepath.Join(archivePath, rp)
-					os.MkdirAll(targetPath, 0755)
-					for _, f := range files {
-						// safety check; if the user has an older version of the beats repo,
-						// for example right after a release where you've `git pulled` from on repo and not the other,
-						// they might end up with a mishmash of packages from different versions.
-						// check to see if we have mismatched versions.
-						if !strings.Contains(f, packageVersion) {
-							// if this panic hits weird edge cases where we don't want actual failures, revert to a printf statement.
-							panic(fmt.Sprintf("the file %s doesn't match agent version %s, beats repo might be out of date", f, packageVersion))
-						}
-
-						targetFile := filepath.Join(targetPath, filepath.Base(f))
-						packagesCopied += 1
-						if err := sh.Copy(targetFile, f); err != nil {
-							panic(err)
-						}
-					}
-				}
-				// a very basic footcannon protector; if packages are missing and we need to rebuild them, check to see if those files were copied
-				// if we needed to repackage beats but still somehow copied nothing, could indicate an issue. Usually due to beats and agent being at different versions.
-				if packagesCopied == 0 {
-					fmt.Println(">>> WARNING: no packages were copied, but we repackaged beats anyway. Check binary to see if intended beats are there.")
-				}
-			}
+			packageAgentBeat(packageVersion, archivePath, requiredPackages)
 		}
 	} else {
 		archivePath = movePackagesToArchive(dropPath, requiredPackages)
 	}
 	return archivePath, dropPath
+}
+
+// downloadFromExternalBuild downloads the component binaries and places them in the drop path for the rest of the build
+func downloadFromExternalBuild(platforms []string, archivePath string, packageVersion string, externalBinaries map[string]string) {
+
+	// Only log fatal logs for logs produced using logrus. This is the global logger
+	// used by github.com/elastic/e2e-testing/pkg/downloads which can only be configured globally like this or via
+	// environment variables.
+	//
+	// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
+	// download artifacts on unsupported platforms and choose to ignore the errors.
+	//
+	// Change this to InfoLevel to see exactly what the downloader is doing.
+	logrus.SetLevel(logrus.FatalLevel)
+
+	errGroup, ctx := errgroup.WithContext(context.Background())
+	completedDownloads := &atomic.Int32{}
+	for binary, project := range externalBinaries {
+		for _, platform := range platforms {
+			reqPackage := platformPackages[platform]
+			targetPath := filepath.Join(archivePath, reqPackage)
+			os.MkdirAll(targetPath, 0755)
+			newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
+			errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath, completedDownloads))
+		}
+	}
+
+	err := errGroup.Wait()
+	if err != nil {
+		panic(err)
+	}
+	if completedDownloads.Load() == 0 {
+		panic(fmt.Sprintf("No packages were successfully downloaded. You may be building against an invalid or unreleased version. version=%s. If this is an unreleased version, try SNAPSHOT=true or EXTERNAL=false", packageVersion))
+	}
+}
+
+// packageAgentBeat packages the beat from the local code in the beats path
+func packageAgentBeat(packageVersion string, archivePath string, requiredPackages []string) {
+	packedBeats := []string{"agentbeat"}
+	// build from local repo, will assume beats repo is located on the same root level
+	for _, b := range packedBeats {
+		pwd, err := filepath.Abs(filepath.Join("../beats/x-pack", b))
+		if err != nil {
+			panic(err)
+		}
+
+		packagesCopied := 0
+
+		if !requiredPackagesPresent(pwd, b, packageVersion, requiredPackages) {
+			fmt.Printf("--- Package %s\n", pwd)
+			cmd := exec.Command("mage", "package")
+			cmd.Dir = pwd
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Env = append(os.Environ(), fmt.Sprintf("PWD=%s", pwd), "AGENT_PACKAGING=on")
+			if envVar := selectedPackageTypes(); envVar != "" {
+				cmd.Env = append(cmd.Env, envVar)
+			}
+
+			if err := cmd.Run(); err != nil {
+				panic(err)
+			}
+		}
+
+		// copy to new drop
+		sourcePath := filepath.Join(pwd, "build", "distributions")
+		for _, rp := range requiredPackages {
+			files, err := filepath.Glob(filepath.Join(sourcePath, "*"+rp+"*"))
+			if err != nil {
+				panic(err)
+			}
+
+			targetPath := filepath.Join(archivePath, rp)
+			os.MkdirAll(targetPath, 0755)
+			for _, f := range files {
+				// safety check; if the user has an older version of the beats repo,
+				// for example right after a release where you've `git pulled` from on repo and not the other,
+				// they might end up with a mishmash of packages from different versions.
+				// check to see if we have mismatched versions.
+				if !strings.Contains(f, packageVersion) {
+					// if this panic hits weird edge cases where we don't want actual failures, revert to a printf statement.
+					panic(fmt.Sprintf("the file %s doesn't match agent version %s, beats repo might be out of date", f, packageVersion))
+				}
+
+				targetFile := filepath.Join(targetPath, filepath.Base(f))
+				packagesCopied += 1
+				if err := sh.Copy(targetFile, f); err != nil {
+					panic(err)
+				}
+			}
+		}
+		// a very basic footcannon protector; if packages are missing and we need to rebuild them, check to see if those files were copied
+		// if we needed to repackage beats but still somehow copied nothing, could indicate an issue. Usually due to beats and agent being at different versions.
+		if packagesCopied == 0 {
+			fmt.Println(">>> WARNING: no packages were copied, but we repackaged beats anyway. Check binary to see if intended beats are there.")
+		}
+	}
 }
 
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and

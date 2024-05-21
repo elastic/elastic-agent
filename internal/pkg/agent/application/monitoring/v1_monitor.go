@@ -115,7 +115,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	policy map[string]interface{},
 	components []component.Component,
 	componentIDToBinary map[string]string,
-	existingState map[string]uint64,
+	existingStatePidMap map[string]uint64,
 ) (map[string]interface{}, error) {
 	if !b.Enabled() {
 		return nil, nil
@@ -159,9 +159,8 @@ func (b *BeatsMonitor) MonitoringConfig(
 		}
 	}
 
-	// TODO: existingState will get passed here so we can fetch the PID
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, monitoringOutput, components, existingState); err != nil {
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, existingStatePidMap); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -537,7 +536,7 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
-func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component, existingStateServicePids map[string]uint64) error {
+func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, componentList []component.Component, existingStateServicePids map[string]uint64) error {
 	metricsCollectionIntervalString := metricsCollectionInterval.String()
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
@@ -911,74 +910,78 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 		},
 	}
 
-	// If there's a checkin PID
+	// add system/process metrics for services that can't be monitored via json/beats metrics
+	// If there's a checkin PID and it contains the "endpoint" string, assume we want to monitor it
 	for id, comp := range existingStateServicePids {
 		logp.L().Infof("component/pid monitoring map is: %#v", existingStateServicePids)
-		if comp != 0 && id == "elastic-endpoint" {
+		if comp != 0 && strings.Contains(id, "endpoint") {
 			logp.L().Infof("creating system/process watcher for pid %d", comp)
-			// TODO: No idea if these metadata fields are correct
 			inputs = append(inputs, map[string]interface{}{
-				idKey:        fmt.Sprintf("%s-endpoint", monitoringMetricsUnitID),
-				"name":       fmt.Sprintf("%s-endpoint", monitoringMetricsUnitID),
+				idKey:        fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
+				"name":       fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
 				"type":       "system/metrics",
 				useOutputKey: monitoringOutput,
 				"data_stream": map[string]interface{}{
 					"namespace": monitoringNamespace,
 				},
-				"streams": map[string]interface{}{
-					idKey: fmt.Sprintf("%s-", monitoringMetricsUnitID) + "endpoint",
-					"data_stream": map[string]interface{}{
-						"type":      "metrics",
-						"dataset":   "elastic_agent.endpoint",
-						"namespace": monitoringNamespace,
-					},
-					"metricsets":  []interface{}{"process"},
-					"period":      metricsCollectionIntervalString,
-					"index":       fmt.Sprintf("metrics-elastic_agent.endpoint-%s", monitoringNamespace),
-					"process.pid": comp,
-					"processors": []interface{}{
-						map[string]interface{}{
-							"add_fields": map[string]interface{}{
-								"target": "data_stream",
-								"fields": map[string]interface{}{
-									"type":      "metrics",
-									"dataset":   "elastic_agent.endpoint",
-									"namespace": monitoringNamespace,
+				"streams": []interface{}{
+					map[string]interface{}{
+						idKey: fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
+						"data_stream": map[string]interface{}{
+							"type":      "metrics",
+							"dataset":   "elastic_agent.endpoint_security",
+							"namespace": monitoringNamespace,
+						},
+						"metricsets":              []interface{}{"process"},
+						"period":                  metricsCollectionIntervalString,
+						"index":                   fmt.Sprintf("metrics-elastic_agent.endpoint_security-%s", monitoringNamespace),
+						"process.pid":             comp,
+						"process.cgroups.enabled": false,
+						"processors": []interface{}{
+							map[string]interface{}{
+								"add_fields": map[string]interface{}{
+									"target": "data_stream",
+									"fields": map[string]interface{}{
+										"type":      "metrics",
+										"dataset":   "elastic_agent.endpoint_security",
+										"namespace": monitoringNamespace,
+									},
 								},
 							},
-						},
-						map[string]interface{}{
-							"add_fields": map[string]interface{}{
-								"target": "event",
-								"fields": map[string]interface{}{
-									"dataset": "elastic_agent.endpoint",
+							map[string]interface{}{
+								"add_fields": map[string]interface{}{
+									"target": "event",
+									"fields": map[string]interface{}{
+										"dataset": "elastic_agent.endpoint_security",
+									},
 								},
 							},
-						},
-						map[string]interface{}{
-							"add_fields": map[string]interface{}{
-								"target": "elastic_agent",
-								"fields": map[string]interface{}{
-									"id":       b.agentInfo.AgentID(),
-									"version":  b.agentInfo.Version(),
-									"snapshot": b.agentInfo.Snapshot(),
-									"process":  "endpoint",
+							map[string]interface{}{
+								"add_fields": map[string]interface{}{
+									"target": "elastic_agent",
+									"fields": map[string]interface{}{
+										"id":       b.agentInfo.AgentID(),
+										"version":  b.agentInfo.Version(),
+										"snapshot": b.agentInfo.Snapshot(),
+										"process":  "endpoint_security",
+									},
 								},
 							},
-						},
-						map[string]interface{}{
-							"add_fields": map[string]interface{}{
-								"target": "agent",
-								"fields": map[string]interface{}{
-									"id": b.agentInfo.AgentID(),
+							map[string]interface{}{
+								"add_fields": map[string]interface{}{
+									"target": "agent",
+									"fields": map[string]interface{}{
+										"id": b.agentInfo.AgentID(),
+									},
 								},
 							},
-						},
-						map[string]interface{}{
-							"add_fields": map[string]interface{}{
-								"target": "component",
-								"fields": map[string]interface{}{
-									"binary": "endpoint",
+							map[string]interface{}{
+								"add_fields": map[string]interface{}{
+									"target": "component",
+									"fields": map[string]interface{}{
+										"binary": "endpoint_security",
+										"id":     id,
+									},
 								},
 							},
 						},
