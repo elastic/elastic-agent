@@ -39,7 +39,7 @@ jobs:
           version: v1.13.0
           install-only: true
 
-      - name: Update versions file
+      - name: Update versions
         id: update
         env:
           GH_TOKEN: ${{ env.GITHUB_TOKEN }}
@@ -51,7 +51,7 @@ jobs:
           url: ${{ secrets.VAULT_ADDR }}
           roleId: ${{ secrets.VAULT_ROLE_ID }}
           secretId: ${{ secrets.VAULT_SECRET_ID }}
-          message: ":traffic_cone: Elastic Agent versions file update failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          message: ":traffic_cone: Elastic Agent version update failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           channel: "#ingest-notifications"
 
         # if a PR was created as a result of this job, we notify on the Slack channel
@@ -61,5 +61,5 @@ jobs:
           url: ${{ secrets.VAULT_ADDR }}
           roleId: ${{ secrets.VAULT_ROLE_ID }}
           secretId: ${{ secrets.VAULT_SECRET_ID }}
-          message: "Update for Elastic Agent versions file has been created: ${{ steps.update.outputs.pr }}"
+          message: "Update for Elastic Agent versions has been created: ${{ steps.update.outputs.pr }}"
           channel: "#ingest-notifications"

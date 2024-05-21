@@ -42,7 +42,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 	// user gets grant based on the mask
 	var userSID *windows.SID
-	if o.ownership.UID != "" {
+	if o.mask&0700 != 0 && o.ownership.UID != "" {
 		userSID, err = windows.StringToSid(o.ownership.UID)
 		if err != nil {
 			return fmt.Errorf("failed to get user %s: %w", o.ownership.UID, err)
@@ -52,7 +52,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 	// group gets grant based on the mask
 	var groupSID *windows.SID
-	if o.ownership.GID != "" {
+	if o.mask&0070 != 0 && o.ownership.GID != "" {
 		groupSID, err = windows.StringToSid(o.ownership.GID)
 		if err != nil {
 			return fmt.Errorf("failed to get group %s: %w", o.ownership.GID, err)
@@ -61,11 +61,13 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	}
 
 	// everyone gets grant based on the mask
-	everyoneSID, err := windows.StringToSid(utils.EveryoneSID)
-	if err != nil {
-		return fmt.Errorf("failed to get Everyone SID: %w", err)
+	if o.mask&0007 != 0 {
+		everyoneSID, err := windows.StringToSid(utils.EveryoneSID)
+		if err != nil {
+			return fmt.Errorf("failed to get Everyone SID: %w", err)
+		}
+		grants = append(grants, acl.GrantSid(uint32(((o.mask&0007)<<29)|((o.mask&0002)<<15)), everyoneSID))
 	}
-	grants = append(grants, acl.GrantSid(uint32(((o.mask&0007)<<29)|((o.mask&0002)<<15)), everyoneSID))
 
 	// ownership can only be change to another user when running as Administrator
 	isAdmin, err := utils.HasRoot()

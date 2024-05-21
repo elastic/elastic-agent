@@ -35,6 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 )
 
@@ -90,6 +91,9 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
+
+	// 3. Ensure installation is correct.
+	require.NoError(t, installtest.CheckSuccess(ctx, agentFixture, installOpts.BasePath, !installOpts.Privileged))
 
 	t.Run("Monitoring logs are shipped", func(t *testing.T) {
 		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
@@ -274,21 +278,28 @@ func testMonitoringLogsAreShipped(
 			"Failed to initialize artifact",
 			"Failed to apply initial policy from on disk configuration",
 			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
-			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/instance-id\\\": dial tcp 169.254.169.254:443: connect: connection refused",                 // okay for the openstack metadata to not work
-			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/hostname\\\": dial tcp 169.254.169.254:443: connect: connection refused",                    // okay for the cloud metadata to not work
-			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/placement/availability-zone\\\": dial tcp 169.254.169.254:443: connect: connection refused", // okay for the cloud metadata to not work
-			"add_cloud_metadata: received error failed requesting openstack metadata: Get \\\"https://169.254.169.254/2009-04-04/meta-data/instance-type\\\": dial tcp 169.254.169.254:443: connect: connection refused",               // okay for the cloud metadata to not work
-			"add_cloud_metadata: received error failed with http status code 404",                                                                                                                             // okay for the cloud metadata to not work
-			"add_cloud_metadata: received error failed fetching EC2 Identity Document: not found, Signing",                                                                                                    // okay for the cloud metadata to not work
-			"add_cloud_metadata: received error failed fetching EC2 Identity Document: operation error ec2imds: GetInstanceIdentityDocument, http response error StatusCode: 404, request to EC2 IMDS failed", // okay for the cloud metadata to not work
-			"failed to invoke rollback watcher: failed to start Upgrade Watcher: fork/exec /var/lib/elastic-agent/elastic-agent: no such file or directory",                                                   // on debian this happens probably need to fix.
+			"add_cloud_metadata: received error failed requesting openstack metadata",        // okay for the cloud metadata to not work
+			"add_cloud_metadata: received error failed with http status code 404",            // okay for the cloud metadata to not work
+			"add_cloud_metadata: received error failed fetching EC2 Identity Document",       // okay for the cloud metadata to not work
+			"failed to invoke rollback watcher: failed to start Upgrade Watcher",             // on debian this happens probably need to fix.
+			"falling back to IMDSv1: operation error ec2imds: getToken",                      // okay for the cloud metadata to not work
 		})
 	})
 	t.Logf("error logs: Got %d documents", len(docs.Hits.Hits))
+	messages := make([]string, 0, len(docs.Hits.Hits))
 	for _, doc := range docs.Hits.Hits {
 		t.Logf("%#v", doc.Source)
+		message, ok := doc.Source["message"]
+		if !ok {
+			continue
+		}
+		messageStr, ok := message.(string)
+		if !ok {
+			continue
+		}
+		messages = append(messages, messageStr)
 	}
-	require.Empty(t, docs.Hits.Hits)
+	require.Emptyf(t, docs.Hits.Hits, "list of error messages is expected to be empty, found:\n%s", strings.Join(messages, ", \n"))
 
 	// Stage 3: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
