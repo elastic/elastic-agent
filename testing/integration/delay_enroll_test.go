@@ -100,7 +100,7 @@ func TestDelayEnrollUnprivileged(t *testing.T) {
 
 	// 1. Create a policy in Fleet with monitoring enabled.
 	// To ensure there are no conflicts with previous test runs against
-	// the same ESS stack, we add the current time at the end of the policy
+	// the same ESS stack, we add a UUID at the end of the policy
 	// name. This policy does not contain any integration.
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
