@@ -1037,7 +1037,12 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case <-c.servicePidUpdate:
 		c.logger.Infof("got pid service update, refreshing config")
-		c.refreshComponentModel(ctx)
+		err := c.refreshComponentModel(ctx)
+		if err != nil {
+			err = fmt.Errorf("error refreshing component model for PID update: %w", err)
+			c.setConfigManagerError(err)
+			c.logger.Errorf("%s", err)
+		}
 
 	case componentState := <-c.managerChans.runtimeManagerUpdate:
 		// New component change reported by the runtime manager via
