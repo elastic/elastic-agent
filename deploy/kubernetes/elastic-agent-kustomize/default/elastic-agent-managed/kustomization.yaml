@@ -11,9 +11,7 @@ secretGenerator:
 configMapGenerator:
 - name: elastic-agent-configs
   literals:
-  - host=${es_host}
-  - ca_trusted=${ca_trusted}
-  - k8s_integration_version={k8s_integration_version}
+  - fleet_url=${FLEET_URL}
 
 resources:
   - ./base

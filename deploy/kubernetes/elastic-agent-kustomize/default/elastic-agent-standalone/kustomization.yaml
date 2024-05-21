@@ -6,15 +6,14 @@ namespace: kube-system
 secretGenerator:
   - name: elastic-agent-creds
     literals:
-      - host=${es_host}
-      - api_key=${api_key}
+      - api_key=${API_KEY}
 
 configMapGenerator:
-- name: special-config-2
+- name: elastic-agent-configs
   literals:
-  - special.how=very
-  - special.type=charm
-
+  - host=${ES_HOST}
+  - ca_trusted= ${CA_TRUSTED}
+  
 resources:
   - ./base
   - https://github.com/kubernetes/kube-state-metrics/

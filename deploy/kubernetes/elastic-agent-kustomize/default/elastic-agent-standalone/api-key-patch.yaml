@@ -13,7 +13,15 @@
   value: 
     name: ES_HOST
     valueFrom:
-      secretKeyRef:
-        name: elastic-agent-creds
+      configMapKeyRef:
+        name: elastic-agent-configs
         key: host
 
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value: 
+    name: CA_TRUSTED
+    valueFrom:
+      configMapKeyRef:
+        name: elastic-agent-configs
+        key: ca_trusted

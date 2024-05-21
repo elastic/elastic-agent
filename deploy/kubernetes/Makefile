@@ -42,16 +42,14 @@ ifdef WITHOUTCONFIG
 	@echo "Generating $@-kubernetes-without-configmap.yaml"
 	@rm -f $@-kubernetes-without-configmap.yaml
 	@for f in $(shell ls $@/*.yaml | grep -v configmap ); do \
-		sed -e "s/%VERSION%/VERSION/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $$f >> $@-kubernetes-without-configmap.yaml; \
-		sed -e "s/%K8S_VERSION%/${K8S_VERSION}/g" -e "s/%SYSTEM_VERSION%/${SYSTEM_VERSION}/g" $$f >> $@-kubernetes-without-configmap.yaml; \
+		sed -e "s/%VERSION%/VERSION/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "s/%K8S_VERSION%/${K8S_VERSION}/g" -e "s/%SYSTEM_VERSION%/${SYSTEM_VERSION}/g" $$f >> $@-kubernetes-without-configmap.yaml; \
 		echo --- >> $@-kubernetes-without-configmap.yaml; \
 	done
 else
 	@echo "Generating $@-kubernetes.yaml"
 	@rm -f $@-kubernetes.yaml
 	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-ksm); do \
-		sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $$f >> $@-kubernetes.yaml; \
-		sed -e "s/%K8S_VERSION%/${K8S_VERSION}/g" -e "s/%SYSTEM_VERSION%/${SYSTEM_VERSION}/g" $$f >> $@-kubernetes-without-configmap.yaml; \
+		sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "s/%K8S_VERSION%/${K8S_VERSION}/g" -e "s/%SYSTEM_VERSION%/${SYSTEM_VERSION}/g" $$f >> $@-kubernetes.yaml; \
 		echo --- >> $@-kubernetes.yaml; \
 	done
 endif
@@ -109,8 +107,9 @@ endif
 ## ci-create-kustomize : Create default kustomize folder 
 .PHONY: ci-create-kustomize $(ALL)
 ci-create-kustomize: $(ALL)
-export ELASTIC_PROCESSOR
+
 ifdef GENERATEKUSTOMIZE
+export ELASTIC_PROCESSOR
 $(ALL):
 	@echo "Generating $@ kustomize-default files"
 	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-daemonset-configmap); do \
