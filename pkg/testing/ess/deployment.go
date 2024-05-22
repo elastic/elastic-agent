@@ -252,19 +252,18 @@ func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, tic
 	defer ticker.Stop()
 
 	statusCh := make(chan DeploymentStatus, 1)
-	errCh := make(chan error)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return false, ctx.Err()
 		case <-ticker.C:
-			statusCtx, statusCancel := context.WithTimeout(ctx, tick)
-			defer statusCancel()
 			go func() {
+				statusCtx, statusCancel := context.WithTimeout(ctx, tick)
+				defer statusCancel()
 				status, err := c.DeploymentStatus(statusCtx, deploymentID)
 				if err != nil {
-					errCh <- err
+					// ignore the error (most likely a transient HTTP error)
 					return
 				}
 				statusCh <- status.Overall
@@ -273,8 +272,6 @@ func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, tic
 			if status == DeploymentStatusStarted {
 				return true, nil
 			}
-		case err := <-errCh:
-			return false, err
 		}
 	}
 }
