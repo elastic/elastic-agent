@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -231,7 +230,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			defer func() {
 				if err != nil {
 					progBar.Describe("Stopping Service")
-					innerErr := install.StopService(topPath, 30*time.Second, 250*time.Millisecond)
+					innerErr := install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
 					if innerErr != nil {
 						progBar.Describe("Failed to Stop Service")
 					} else {

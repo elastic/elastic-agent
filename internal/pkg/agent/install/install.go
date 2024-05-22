@@ -32,6 +32,11 @@ const (
 
 	ElasticUsername  = "elastic-agent-user"
 	ElasticGroupName = "elastic-agent"
+
+	// DefaultStopTimeout is the default stop timeout that can be used to stop a running daemon.
+	DefaultStopTimeout = 30 * time.Second
+	// DefaultStopInterval is the check interval to determine if the service has stopped.
+	DefaultStopInterval = 250 * time.Millisecond
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.

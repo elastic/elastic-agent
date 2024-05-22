@@ -27,9 +27,9 @@ func newPrivilegedCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Com
 		Long: `This command converts the installed Elastic Agent from running unprivileged to running as privileged.
 
 By default this command will ask or a confirmation before making this change. You can bypass the confirmation request
-using the -f flag. This will always stop the running Elastic Agent (if running) before performing the switch it is
-possible that loss of metrics could occur during this small window of time. The command also always starts the
-Elastic Agent at the end (even if it was off to start). In the case that the Elastic Agent is already running
+using the -f flag. This is not a zero downtime operation and will always stop the running Elastic Agent (if running).
+It is possible that loss of metrics, logs, or data could occur during this window of time. The Elastic Agent
+daemon will always be started (even if it was off to start). In the case that the Elastic Agent is already running
 privileged it will still perform all the same work, including stopping and starting the Elastic Agent.
 `,
 		Args: cobra.ExactArgs(0),
@@ -42,7 +42,7 @@ privileged it will still perform all the same work, including stopping and start
 	}
 
 	cmd.Flags().BoolP("force", "f", false, "Do not prompt for confirmation")
-	cmd.Flags().DurationP("daemon-timeout", "", 0, "Timeout waiting for Elastic Agent daemon")
+	cmd.Flags().DurationP("daemon-timeout", "", 0, "Timeout waiting for Elastic Agent daemon restart after the change is applied (-1 = no wait)")
 
 	return cmd
 }
@@ -87,7 +87,11 @@ func privilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 		pt.Describe("Waiting for running service")
 		ctx := handleSignal(context.Background()) // allowed to be cancelled
 		err = wait.ForAgent(ctx, daemonTimeout)
-		if err != nil && !errors.Is(err, context.Canceled) {
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				pt.Describe("Cancelled waiting for running service")
+				return nil
+			}
 			pt.Describe("Failed waiting for running service")
 			return err
 		}

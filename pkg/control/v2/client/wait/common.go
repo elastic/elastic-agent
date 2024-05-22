@@ -13,15 +13,16 @@ import (
 )
 
 const (
-	daemonTimeout = 30 * time.Second // max amount of for communication to running Agent daemon
+	// DefaultDaemonTimeout is the default timeout to use for waiting for the daemon.
+	DefaultDaemonTimeout = 30 * time.Second // max amount of for communication to running Agent daemon
 )
 
 type waitResult struct {
 	err error
 }
 
-func getDaemonState(ctx context.Context) (*client.AgentState, error) {
-	ctx, cancel := context.WithTimeout(ctx, daemonTimeout)
+func getDaemonState(ctx context.Context, timeout time.Duration) (*client.AgentState, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	daemon := client.New()
 	err := daemon.Connect(ctx)

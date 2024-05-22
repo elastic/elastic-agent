@@ -33,7 +33,7 @@ func ForAgent(ctx context.Context, timeout time.Duration) error {
 		backOff := expBackoffWithContext(innerCtx, 1*time.Second, maxBackoff)
 		for {
 			backOff.Wait()
-			_, err := getDaemonState(innerCtx)
+			_, err := getDaemonState(innerCtx, DefaultDaemonTimeout)
 			if errors.Is(err, context.Canceled) {
 				resChan <- waitResult{err: err}
 				return
