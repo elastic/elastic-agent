@@ -179,7 +179,7 @@ const (
 			"ssl": {
 				"renegotiation": "{{ .SSL.Renegotiation }}",
 				"verification_mode": "{{ .SSL.VerificationMode }}",
-				"certificate_authorities": [{{ joinquoted .SSL.CertificateAuthorities "," }}],
+				"certificate_authorities": [{{ joinquoted .SSL.CertificateAuthorities ", " }}],
 				"certificate": "{{ .SSL.Certificate }}",
 				"key": "{{ .SSL.Key }}"
 			},
@@ -255,7 +255,7 @@ const (
 			"ssl": {
 				"renegotiation": "{{ .SSL.Renegotiation }}",
 				"verification_mode": "{{ .SSL.VerificationMode }}",
-				"certificate_authorities": ["{{ .SSL.CertificateAuthorities}}"],
+				"certificate_authorities": [{{ joinquoted .SSL.CertificateAuthorities ", " }}],
 				"certificate": "{{ .SSL.Certificate }}",
 				"key": "{{ .SSL.Key }}"
 			},
