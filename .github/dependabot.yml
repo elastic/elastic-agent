@@ -24,3 +24,15 @@ updates:
     reviewers:
       - "elastic/elastic-agent-control-plane"
     open-pull-requests-limit: 10
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    labels:
+      - automation
+      - skip-changelog
+      - Team:Elastic-Agent
+    reviewers:
+      - "elastic/elastic-agent-control-plane"
+    open-pull-requests-limit: 10
