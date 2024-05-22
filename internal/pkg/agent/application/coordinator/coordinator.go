@@ -1283,9 +1283,8 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
-	existingState := c.State()
-	var existingCompState = make(map[string]uint64, len(existingState.Components))
-	for _, comp := range existingState.Components {
+	var existingCompState = make(map[string]uint64, len(c.state.Components))
+	for _, comp := range c.state.Components {
 		existingCompState[comp.Component.ID] = comp.State.CheckinPid
 	}
 

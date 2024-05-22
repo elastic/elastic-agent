@@ -389,7 +389,6 @@ agent.download.sourceURI:
 	cfgChange := &configChange{cfg: cfg}
 	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
-
 	assert.True(t, cfgChange.failed, "Policy with invalid field should have reported failed config change")
 	require.ErrorContainsf(t,
 		cfgChange.err,
@@ -420,6 +419,7 @@ agent.download.sourceURI:
 	// (This check is based on a previous bug in which a vars update could
 	// discard active policy errors.)
 	varsChan <- emptyVars(t)
+	t.Logf("after emptyVars statement")
 	coord.runLoopIteration(ctx)
 
 	assert.Error(t, coord.configErr, "Vars update shouldn't affect configErr")
