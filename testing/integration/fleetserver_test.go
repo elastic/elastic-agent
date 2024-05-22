@@ -8,6 +8,8 @@ package integration
 
 import (
 	"context"
+	"crypto/tls"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -102,7 +104,31 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 	// checkInstallSuccess(t, fixture, topPath, true) // FIXME fails to build if this is uncommented, but the method is part of install_test.go
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 
-	// TODO check fleet-server status
+	// elastic-agent will self sign a cert to use with fleet-server if one is not passed
+	// in order to interact with the API we need to ignore the cert.
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	fleetOK := false
+	for i := 0; i < 10; i++ {
+		t.Log("Checking fleet-server status")
+		resp, err := client.Get("https://localhost:8220/api/status")
+		if err != nil {
+			t.Logf("fleet-server status check returned error: %v, retry in 10s...", err)
+			time.Sleep(10 * time.Second)
+			continue
+		}
+		if resp.StatusCode == http.StatusOK {
+			fleetOK = true
+			break
+		}
+		t.Logf("fleet-server status check returned incorrect status: %d, retry in 10s", resp.StatusCode)
+		time.Sleep(10 * time.Second)
+		continue
+	}
+	require.True(t, fleetOK, "expected fleet-server /api/status to return 200")
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {

@@ -1,18 +1,44 @@
 {
-  "name": "fleet_server-1",
-  "description": "",
-  "namespace": "",
-  "package": {
-    "name": "fleet_server",
-    "version": "1.5.0"
-  },
-  "inputs": {
-    "fleet_server-fleet-server": {
-      "enabled": true,
-      "vars": {
-        "custom": ""
-      },
-      "streams": {}
-    }
+  "item": {
+    "id": "3434b864-d135-4d03-a944-29ee7ad61ddd",
+    "version": "WzMwNywxXQ==",
+    "name": "fleet_server-1",
+    "namespace": "",
+    "description": "",
+    "package": {
+      "name": "fleet_server",
+      "title": "Fleet Server",
+      "version": "1.5.0"
+    },
+    "enabled": true,
+    "policy_id": "32d6348c-5ad6-4bb7-a1f1-d2a94623ae7d",
+    "inputs": [
+      {
+        "type": "fleet-server",
+        "policy_template": "fleet_server",
+        "enabled": true,
+        "streams": [],
+        "vars": {
+          "max_agents": {
+            "type": "integer"
+          },
+          "max_connections": {
+            "type": "integer"
+          },
+          "custom": {
+            "value": "",
+            "type": "yaml"
+          }
+        },
+        "compiled_input": {
+          "unused_key": "not_used"
+        }
+      }
+    ],
+    "revision": 1,
+    "created_at": "2024-05-22T16:13:09.177Z",
+    "created_by": "system",
+    "updated_at": "2024-05-22T16:13:09.177Z",
+    "updated_by": "system"
   }
 }
