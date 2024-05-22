@@ -6,7 +6,10 @@ package otel
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -33,7 +36,7 @@ func TestStartCollector(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.configFile, func(t *testing.T) {
-			configFiles := []string{"file:" + filepath.Join(".", "testdata", tc.configFile)}
+			configFiles := getConfigFiles(tc.configFile)
 			settings, err := newSettings("test", configFiles)
 			require.NoError(t, err)
 
@@ -53,6 +56,27 @@ func TestStartCollector(t *testing.T) {
 			assert.Equal(t, otelcol.StateClosed, collector.GetState())
 		})
 	}
+}
+
+// getConfigFiles returns a collection of config file paths for the collector to use.
+// In the simplest scenario, the collection will contains only one path.
+// In case there is an operating system-specific override file found, it will be added to the collection.
+// E.g. if the input file name is `all-components.yml` and a file named `all-components.windows.yml` exists,
+// the config path collection will have two elements on Windows, and only one element on other OSes.
+// Use `darwin` for MacOS, `linux` for Linux and `windows` for Windows.
+func getConfigFiles(configFileName string) []string {
+	// Add base file to the collection.
+	baseFilePath := filepath.Join(".", "testdata", configFileName)
+	configFiles := []string{"file:" + baseFilePath}
+
+	// Check if an os-specific override file exists; if it does, add it to the collection.
+	overrideFileName := strings.TrimSuffix(configFileName, filepath.Ext(configFileName)) + "." + runtime.GOOS + filepath.Ext(configFileName)
+	overrideFilePath := filepath.Join(".", "testdata", overrideFileName)
+	if _, err := os.Stat(overrideFilePath); err == nil {
+		configFiles = append(configFiles, "file:"+overrideFilePath)
+	}
+
+	return configFiles
 }
 
 func startCollector(ctx context.Context, t *testing.T, col *otelcol.Collector, expectedErrorMessage string) *sync.WaitGroup {
