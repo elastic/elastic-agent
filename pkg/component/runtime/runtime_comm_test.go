@@ -40,6 +40,7 @@ func (a agentInfoMock) Unprivileged() bool {
 
 func (a agentInfoMock) Headers() map[string]string                          { panic("implement me") }
 func (a agentInfoMock) LogLevel() string                                    { panic("implement me") }
+func (a agentInfoMock) RawLogLevel() string                                 { panic("implement me") }
 func (a agentInfoMock) ReloadID(ctx context.Context) error                  { panic("implement me") }
 func (a agentInfoMock) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
 

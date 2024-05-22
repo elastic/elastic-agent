@@ -203,6 +203,61 @@ func (Dev) Package() {
 	Package()
 }
 
+func mocksPath() (string, error) {
+	repositoryRoot, err := findRepositoryRoot()
+	if err != nil {
+		return "", fmt.Errorf("finding repository root: %w", err)
+	}
+	return filepath.Join(repositoryRoot, "testing", "mocks"), nil
+}
+
+func (Dev) CleanMocks() error {
+	mPath, err := mocksPath()
+	if err != nil {
+		return fmt.Errorf("retrieving mocks path: %w", err)
+	}
+	err = os.RemoveAll(mPath)
+	if err != nil {
+		return fmt.Errorf("removing mocks: %w", err)
+	}
+	return nil
+}
+
+func (Dev) RegenerateMocks() error {
+	mg.Deps(Dev.CleanMocks)
+	err := sh.Run("mockery")
+	if err != nil {
+		return fmt.Errorf("generating mocks: %w", err)
+	}
+
+	// change CWD
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("retrieving CWD: %w", err)
+	}
+	// restore the working directory when exiting the function
+	defer func() {
+		err := os.Chdir(workingDir)
+		if err != nil {
+			panic(fmt.Errorf("failed to restore working dir %q: %w", workingDir, err))
+		}
+	}()
+
+	mPath, err := mocksPath()
+	if err != nil {
+		return fmt.Errorf("retrieving mocks path: %w", err)
+	}
+
+	err = os.Chdir(mPath)
+	if err != nil {
+		return fmt.Errorf("changing current directory to %q: %w", mPath, err)
+	}
+
+	mg.Deps(devtools.AddLicenseHeaders)
+	mg.Deps(devtools.GoImports)
+	return nil
+}
+
 // InstallGoLicenser install go-licenser to check license of the files.
 func (Prepare) InstallGoLicenser() error {
 	return GoInstall(goLicenserRepo)
@@ -1987,6 +2042,34 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode JSON to file %s: %w", upgradetest.AgentVersionsFilename, err)
 	}
+	return nil
+}
+
+// UpdatePackageVersion update the file that contains the latest available snapshot version
+func (Integration) UpdatePackageVersion(ctx context.Context) error {
+	const packageVersionFilename = ".package-version"
+
+	sc := snapshots.NewSnapshotsClient()
+	versions, err := sc.FindLatestSnapshots(ctx, []string{"master"})
+	if err != nil {
+		return fmt.Errorf("failed to fetch a manifest for the latest snapshot: %w", err)
+	}
+	if len(versions) != 1 {
+		return fmt.Errorf("expected a single version, got %v", versions)
+	}
+	packageVersion := versions[0].CoreVersion()
+	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open %s for write: %w", packageVersionFilename, err)
+	}
+	defer file.Close()
+	_, err = file.WriteString(packageVersion)
+	if err != nil {
+		return fmt.Errorf("failed to write the package version file %s: %w", packageVersionFilename, err)
+	}
+
+	fmt.Println(packageVersion)
+
 	return nil
 }
 

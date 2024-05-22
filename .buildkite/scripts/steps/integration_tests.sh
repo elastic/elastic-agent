@@ -9,9 +9,9 @@ MAGE_SUBTARGET="${3:-""}"
 
 
 # Override the agent package version using a string with format <major>.<minor>.<patch>
-# NOTE: use only after version bump when the new version is not yet available, for example:
-# OVERRIDE_AGENT_PACKAGE_VERSION="8.10.3" otherwise OVERRIDE_AGENT_PACKAGE_VERSION="".
-OVERRIDE_AGENT_PACKAGE_VERSION="8.14.0"
+# There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
+# This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
+OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
 
 if [[ -n "$OVERRIDE_AGENT_PACKAGE_VERSION" ]]; then
   OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"

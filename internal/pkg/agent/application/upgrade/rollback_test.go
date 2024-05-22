@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client/mocks"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
 type hookFunc func(t *testing.T, topDir string)

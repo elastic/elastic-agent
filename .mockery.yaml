@@ -1,5 +1,25 @@
-inpackage: False
-testonly: False
 with-expecter: True
-keeptree: True
-case: underscore
+inpackage: false
+dir: testing/mocks/{{ replaceAll .InterfaceDirRelative "internal" "internal_"  }}
+mockname: "{{.InterfaceName}}"
+outpkg: "{{.PackageName}}"
+filename: "{{ snakecase .InterfaceName}}_mock.go"
+packages:
+  github.com/elastic/elastic-agent/pkg/control/v2/client:
+    interfaces:
+      Client:
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers:
+    interfaces:
+      Uploader:
+      diagnosticsProvider:
+        config:
+          mockname: "DiagnosticsProvider"
+      logLevelSetter:
+        config:
+          mockname: "LogLevelSetter"
+  github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker:
+    interfaces:
+      Acker:
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/info:
+    interfaces:
+      Agent:
