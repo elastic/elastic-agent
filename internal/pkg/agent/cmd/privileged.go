@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -54,12 +53,6 @@ func privilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform privileged command, not executed with %s permissions", utils.PermissionUser)
-	}
-
-	// TODO(blakerouse): More work to get this working on macOS.
-	// Need to switch the vault from keystore based to file based vault.
-	if runtime.GOOS == "darwin" {
-		return errors.New("unable to perform unprivileged on macOS (not supported)")
 	}
 
 	topPath := paths.Top()

@@ -45,7 +45,15 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 		}
 	}
 
+	// **start critical section**
+	// after this point changes will be made that can leave the installed Elastic Agent broken if they do not
+	// complete successfully
+
+	// perform platform specific work
+	err = switchPlatformMode(pt, ownership)
+
 	// fix all permissions to use the new ownership
+	pt.Describe("Adjusting permissions")
 	err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
 	if err != nil {
 		return fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
@@ -57,10 +65,7 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 		}
 	}
 
-	// **start critical section**
-	// the service has to be uninstalled, so it can be reinstalled any failure in this area will result
-	// in an installation with no Elastic Agent service.
-
+	// the service has to be uninstalled
 	pt.Describe("Removing service")
 	// error is ignored because it's possible that its already uninstalled
 	//

@@ -9,13 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
 
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
@@ -60,14 +60,8 @@ func unprivilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 		return fmt.Errorf("unable to perform unprivileged command, not executed with %s permissions", utils.PermissionUser)
 	}
 
-	// TODO(blakerouse): More work to get this working on macOS.
-	// Need to switch the vault from keystore based to file based vault.
-	if runtime.GOOS == "darwin" {
-		return errors.New("unable to perform unprivileged on macOS (not supported)")
-	}
-
-	// cannot switch to unprivileged when Elastic Defend exists in the policy
-	err = ensureNoElasticDefend()
+	// cannot switch to unprivileged when service components have issues
+	err = ensureNoServiceComponentIssues()
 	if err != nil {
 		// error already adds context
 		return err
@@ -112,20 +106,40 @@ func unprivilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 	return nil
 }
 
-func ensureNoElasticDefend() error {
+func ensureNoServiceComponentIssues() error {
 	ctx := context.Background()
 	l, err := newErrorLogger()
 	if err != nil {
 		return fmt.Errorf("failed to create error logger: %w", err)
 	}
-	comps, err := getComponentsFromPolicy(ctx, l, paths.ConfigFile(), 0)
+	// this forces the component calculation to always compute with no root
+	// this allows any runtime preventions to error for a component when it has a no root support
+	comps, err := getComponentsFromPolicy(ctx, l, paths.ConfigFile(), 0, forceNonRoot)
 	if err != nil {
 		return fmt.Errorf("failed to create component model from policy: %w", err)
 	}
+	var errs []error
 	for _, comp := range comps {
-		if comp.InputSpec != nil && comp.InputSpec.InputType == endpoint {
-			return errors.New("unable to switch to unprivileged mode because Elastic Defend exists in the policy")
+		if comp.InputSpec == nil {
+			// no spec (safety net)
+			continue
+		}
+		if comp.InputSpec.Spec.Service == nil {
+			// not a service component, allowed to exist (even if it needs root)
+			continue
+		}
+		if comp.Err != nil {
+			// service component has an error (most likely because it cannot run without root)
+			errs = append(errs, fmt.Errorf("%s -> %w", comp.ID, comp.Err))
 		}
 	}
+	if len(errs) > 0 {
+		return fmt.Errorf("unable to switch to unprivileged mode due to the following service based components having issues: %w", errors.Join(errs...))
+	}
 	return nil
+}
+
+func forceNonRoot(detail component.PlatformDetail) component.PlatformDetail {
+	detail.User.Root = false
+	return detail
 }

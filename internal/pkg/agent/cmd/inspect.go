@@ -318,10 +318,10 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 	return printComponents(allowed, blocked, streams)
 }
 
-func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath string, variablesWait time.Duration) ([]component.Component, error) {
+func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath string, variablesWait time.Duration, platformModifiers ...component.PlatformModifier) ([]component.Component, error) {
 	// Load the requirements before trying to load the configuration. These should always load
 	// even if the configuration is wrong.
-	platform, err := component.LoadPlatformDetail()
+	platform, err := component.LoadPlatformDetail(platformModifiers...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather system information: %w", err)
 	}
