@@ -32,7 +32,7 @@ func getFileOwnerFromCmd(cmd *cobra.Command) (utils.FileOwner, error) {
 	if err != nil {
 		return utils.FileOwner{}, err
 	}
-	ownership := utils.CurrentFileOwner()
+	var ownership utils.FileOwner
 	if userSID != nil {
 		ownership.UID = userSID.String()
 	}

@@ -1166,11 +1166,11 @@ SOFTWARE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.9.7
+Version: v0.9.8
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.9.7/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.9.8/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -1377,11 +1377,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-l
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-system-metrics
-Version: v0.9.2
+Version: v0.10.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.9.2/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.10.1/LICENSE.txt:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -12283,11 +12283,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/time
-Version: v0.3.0
+Version: v0.5.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/time@v0.3.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/time@v0.5.0/LICENSE:
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
@@ -14204,11 +14204,11 @@ Indirect dependencies
 
 --------------------------------------------------------------------------------
 Dependency : github.com/Azure/go-ansiterm
-Version: v0.0.0-20210617225240-d185dfc1b5a1
+Version: v0.0.0-20230124172434-306776ec8161
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!azure/go-ansiterm@v0.0.0-20210617225240-d185dfc1b5a1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!azure/go-ansiterm@v0.0.0-20230124172434-306776ec8161/LICENSE:
 
 The MIT License (MIT)
 
@@ -39291,11 +39291,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : gotest.tools/v3
-Version: v3.4.0
+Version: v3.5.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/gotest.tools/v3@v3.4.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/gotest.tools/v3@v3.5.1/LICENSE:
 
 Copyright 2018 gotest.tools authors
 
