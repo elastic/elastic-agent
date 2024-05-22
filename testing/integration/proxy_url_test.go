@@ -8,7 +8,6 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -432,7 +431,7 @@ func createBasicFleetPolicyData(t *testing.T, fleetHost string) (fleetservertest
 	policyData := fleetservertest.TmplPolicy{
 		AgentID:    agentID,
 		PolicyID:   t.Name() + policyID,
-		FleetHosts: fmt.Sprintf("%q", fleetHost),
+		FleetHosts: []string{fleetHost},
 		SourceURI:  "http://source.uri",
 		CreatedAt:  time.Now().Format(time.RFC3339),
 		Output: struct {

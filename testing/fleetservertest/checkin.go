@@ -10,6 +10,14 @@ import (
 	"text/template"
 )
 
+type SSL struct {
+	Renegotiation          string
+	VerificationMode       string
+	CertificateAuthorities []string
+	Certificate            string
+	Key                    string
+}
+
 // TmplPolicy is all the data used to create a policy. Therefore, all the properties
 // should be populated with valid JSON without the surrounding double quotes.
 // Check the actionPolicyChangeFakeComponentTmpl for details.
@@ -19,9 +27,10 @@ type TmplPolicy struct {
 	// FleetHosts should be a JSON array without the square brackets:
 	// - `"host1", "host2"`
 	// - `"host"`
-	FleetHosts string
+	FleetHosts []string
 	// AddFleetProxyURL bool
 	FleetProxyURL *string
+	SSL           *SSL
 	SourceURI     string
 	CreatedAt     string
 	Output        struct {
@@ -40,7 +49,7 @@ func NewCheckinResponse(ackToken string, actions ...string) string {
 
 // NewEmptyPolicy returns an policy without any input and monitoring disabled.
 func NewEmptyPolicy(data TmplPolicy) (string, error) {
-	t := template.Must(template.New("policyEmpryTmpl").
+	t := template.Must(template.New("policyEmpryTmpl").Funcs(funcMap).
 		Parse(policyEmpryTmpl))
 
 	buf := &strings.Builder{}
@@ -102,7 +111,7 @@ func NewAction(data ActionTmpl) (AckableAction, error) {
 // integration uses the fake component. All variable data in the policy
 // comes from the data parameter.
 func NewActionPolicyChangeWithFakeComponent(actionID string, data TmplPolicy) (AckableAction, error) {
-	t := template.Must(template.New("actionPolicyChangeFakeComponentTmpl").
+	t := template.Must(template.New("actionPolicyChangeFakeComponentTmpl").Funcs(funcMap).
 		Parse(actionPolicyChangeFakeComponentTmpl))
 
 	buf := &strings.Builder{}
@@ -117,6 +126,23 @@ func NewActionPolicyChangeWithFakeComponent(actionID string, data TmplPolicy) (A
 		Data:     buf.String(),
 		Type:     "POLICY_CHANGE",
 	})
+}
+
+// template functions
+var funcMap = map[string]any{"joinquoted": joinquoted}
+
+func joinquoted(array []string, sep string) string {
+	b := new(strings.Builder)
+	for i, s := range array {
+		if i != 0 {
+			// add separator to the intermediate terms
+			b.WriteString(sep)
+		}
+		b.WriteString(`"`)
+		b.WriteString(s)
+		b.WriteString(`"`)
+	}
+	return b.String()
 }
 
 const (
@@ -149,7 +175,16 @@ const (
             }
           },
           "fleet": {
-            "hosts": [{{.FleetHosts}}]
+			{{ if ne .SSL nil }}
+			"ssl": {
+				"renegotiation": "{{ .SSL.Renegotiation }}",
+				"verification_mode": "{{ .SSL.VerificationMode }}",
+				"certificate_authorities": [{{ joinquoted .SSL.CertificateAuthorities "," }}],
+				"certificate": "{{ .SSL.Certificate }}",
+				"key": "{{ .SSL.Key }}"
+			},
+			{{ end }}
+            "hosts": [{{ joinquoted .FleetHosts ", " }}]
           },
           "id": "{{.PolicyID}}",
           "inputs": [
@@ -216,7 +251,16 @@ const (
             {{ if ne .FleetProxyURL nil }}
             "proxy_url": "{{.FleetProxyURL}}",
             {{ end }}
-            "hosts": [{{.FleetHosts}}]
+			{{ if ne .SSL nil }}
+			"ssl": {
+				"renegotiation": "{{ .SSL.Renegotiation }}",
+				"verification_mode": "{{ .SSL.VerificationMode }}",
+				"certificate_authorities": ["{{ .SSL.CertificateAuthorities}}"],
+				"certificate": "{{ .SSL.Certificate }}",
+				"key": "{{ .SSL.Key }}"
+			},
+			{{ end }}
+            "hosts": [{{ joinquoted .FleetHosts ", "}}]
           },
           "id": "{{.PolicyID}}",
           "inputs": [],
