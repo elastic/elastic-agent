@@ -70,8 +70,8 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 	t.Log("Create fleet-server policy...")
 	policyResp, err := info.KibanaClient.CreatePolicy(ctx, fleetPolicy())
 	require.NoError(t, err, "failed creating policy")
-	policy = policyResp.AgentPolicy
-	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "fleet-server", "1.5.0", "fleet-server.json", uuid.New().String, policy.ID)
+	policy := policyResp.AgentPolicy
+	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "fleet-server", "1.5.0", "fleet-server.json", uuid.New().String(), policy.ID)
 	require.NoError(t, err, "failed creating fleet-server integration")
 
 	t.Log("Get fleet-server service token...")
@@ -93,7 +93,7 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 			Port:         8220,
 		},
 	}
-	out, err := fixture.Install(ctx, &opts)
+	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("Install output: %s", out)
 		require.NoError(t, err, "unable to install elastic-agent with fleet-server bootstrap options")
