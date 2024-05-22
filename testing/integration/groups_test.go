@@ -15,6 +15,9 @@ const (
 	// Fleet group of tests. Used for testing Elastic Agent with Fleet.
 	Fleet = "fleet"
 
+	// FleetBootstrap group of tests. Used for testing Elastic Agent when bootstrapping a local fleet-server.
+	FleetBootstrap = "fleet-bootstrap"
+
 	// FleetPrivileged group of tests. Used for testing Elastic Agent with Fleet installed privileged.
 	FleetPrivileged = "fleet-privileged"
 

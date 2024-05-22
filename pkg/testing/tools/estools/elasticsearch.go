@@ -201,6 +201,34 @@ func CreateAPIKey(ctx context.Context, client elastictransport.Interface, req AP
 	return parsed, nil
 }
 
+func CreateServiceToken(ctx context.Context, client elastictransport.Interface, service string) (string, error) {
+	req := esapi.SecurityCreateServiceTokenRequest{
+		Namespace: "elastic",
+		Service:   service,
+	}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return "", fmt.Errorf("error creating service token: %w", err)
+	}
+	defer resp.Body.Close()
+	resultBuf, err := handleResponseRaw(resp)
+	if err != nil {
+		return "", fmt.Errorf("error handling HTTP response: %w", err)
+	}
+
+	var parsed struct {
+		Token struct {
+			Value string `json:"value"`
+		} `json:"token"`
+	}
+	err = json.Unmarshal(resultBuf, &parsed)
+	if err != nil {
+		return "", fmt.Errorf("error unmarshaling json response: %w", err)
+	}
+	return parsed.Token.Value, nil
+
+}
+
 // FindMatchingLogLines returns any logs with message fields that match the given line
 func FindMatchingLogLines(ctx context.Context, client elastictransport.Interface, namespace, line string) (Documents, error) {
 	return FindMatchingLogLinesWithContext(ctx, client, namespace, line)
