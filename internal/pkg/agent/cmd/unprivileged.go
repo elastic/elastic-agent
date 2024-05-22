@@ -20,10 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-const (
-	endpoint = "endpoint"
-)
-
 func newUnprivilegedCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "unprivileged",
