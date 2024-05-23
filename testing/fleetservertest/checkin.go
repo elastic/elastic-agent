@@ -5,17 +5,18 @@
 package fleetservertest
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"text/template"
 )
 
 type SSL struct {
-	Renegotiation          string
-	VerificationMode       string
-	CertificateAuthorities []string
-	Certificate            string
-	Key                    string
+	Renegotiation          string   `json:"renegotiation,omitempty"`
+	VerificationMode       string   `json:"verification_mode"`
+	CertificateAuthorities []string `json:"certificate_authorities,omitempty"`
+	Certificate            string   `json:"certificate,omitempty"`
+	Key                    string   `json:"key,omitempty"`
 }
 
 // TmplPolicy is all the data used to create a policy. Therefore, all the properties
@@ -129,20 +130,13 @@ func NewActionPolicyChangeWithFakeComponent(actionID string, data TmplPolicy) (A
 }
 
 // template functions
-var funcMap = map[string]any{"joinquoted": joinquoted}
+var funcMap = map[string]any{"toJson": toJson}
 
-func joinquoted(array []string, sep string) string {
+func toJson(v any) (string, error) {
 	b := new(strings.Builder)
-	for i, s := range array {
-		if i != 0 {
-			// add separator to the intermediate terms
-			b.WriteString(sep)
-		}
-		b.WriteString(`"`)
-		b.WriteString(s)
-		b.WriteString(`"`)
-	}
-	return b.String()
+	encoder := json.NewEncoder(b)
+	err := encoder.Encode(v)
+	return b.String(), err
 }
 
 const (
@@ -175,16 +169,10 @@ const (
             }
           },
           "fleet": {
-			{{ if ne .SSL nil }}
-			"ssl": {
-				"renegotiation": "{{ .SSL.Renegotiation }}",
-				"verification_mode": "{{ .SSL.VerificationMode }}",
-				"certificate_authorities": [{{ joinquoted .SSL.CertificateAuthorities ", " }}],
-				"certificate": "{{ .SSL.Certificate }}",
-				"key": "{{ .SSL.Key }}"
-			},
-			{{ end }}
-            "hosts": [{{ joinquoted .FleetHosts ", " }}]
+            {{ if ne .SSL nil }}
+            "ssl": {{ toJson .SSL}},
+            {{ end }}
+            "hosts": {{ toJson .FleetHosts }}
           },
           "id": "{{.PolicyID}}",
           "inputs": [
@@ -251,16 +239,10 @@ const (
             {{ if ne .FleetProxyURL nil }}
             "proxy_url": "{{.FleetProxyURL}}",
             {{ end }}
-			{{ if ne .SSL nil }}
-			"ssl": {
-				"renegotiation": "{{ .SSL.Renegotiation }}",
-				"verification_mode": "{{ .SSL.VerificationMode }}",
-				"certificate_authorities": [{{ joinquoted .SSL.CertificateAuthorities ", " }}],
-				"certificate": "{{ .SSL.Certificate }}",
-				"key": "{{ .SSL.Key }}"
-			},
-			{{ end }}
-            "hosts": [{{ joinquoted .FleetHosts ", "}}]
+            {{ if ne .SSL nil }}
+            "ssl": {{ toJson .SSL}},
+            {{ end }}
+            "hosts": {{ toJson .FleetHosts }}
           },
           "id": "{{.PolicyID}}",
           "inputs": [],
