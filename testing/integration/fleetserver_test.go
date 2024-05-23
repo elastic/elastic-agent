@@ -82,12 +82,13 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 
 	esHost, ok := os.LookupEnv("ELASTICSEARCH_HOST")
 	require.True(t, ok, "environment var ELASTICSEARCH_HOST is empty")
+	t.Logf("fleet-server will enroll with es host: %q", esHost)
 
 	// Run `elastic-agent install` with fleet-server bootstrap options.
 	// We use `--force` to prevent interactive execution.
 	opts := &atesting.InstallOpts{
 		Force:      true,
-		Privileged: false,
+		Privileged: true,
 		FleetBootstrapOpts: atesting.FleetBootstrapOpts{
 			ESHost:       esHost,
 			ServiceToken: serviceToken,
