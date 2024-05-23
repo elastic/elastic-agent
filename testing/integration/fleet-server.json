@@ -1,5 +1,4 @@
 {
-  "item": {
     "id": "3434b864-d135-4d03-a944-29ee7ad61ddd",
     "version": "WzMwNywxXQ==",
     "name": "fleet_server-1",
@@ -11,7 +10,6 @@
       "version": "1.5.0"
     },
     "enabled": true,
-    "policy_id": "32d6348c-5ad6-4bb7-a1f1-d2a94623ae7d",
     "inputs": [
       {
         "type": "fleet-server",
@@ -40,5 +38,4 @@
     "created_by": "system",
     "updated_at": "2024-05-22T16:13:09.177Z",
     "updated_by": "system"
-  }
 }
