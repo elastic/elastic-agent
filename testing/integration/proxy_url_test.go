@@ -358,21 +358,20 @@ func TestProxyURL(t *testing.T) {
 			args: args{
 				// no proxy at enroll
 				enrollProxyName: "",
-				// have to install agent in privileged mode
-				// (there are some permission issues with reading the CA file even if I create it with t.TempDir() or with os.MkdirTemp())
-				installPrivileged: true,
 			},
 			setupF: func(ctx context.Context, t *testing.T, fleet *fleetservertest.Server, policyData *fleetservertest.TmplPolicy, checkinWithAcker *fleetservertest.CheckinActionsWithAcker) (proxies map[string]*proxytest.Proxy) {
 
 				// use os.MkdirTemp since we are installing agent unprivileged and t.TempDir() does not guarantee that the elastic-agent user has access
-				// tmpDir := t.TempDir()
 				tmpDir, err := os.MkdirTemp("", "TLSProxyWithCAInThePolicy*")
 				require.NoError(t, err, "error creating temp dir for TLS files")
-
 				t.Cleanup(func() {
 					cleanupErr := os.RemoveAll(tmpDir)
 					assert.NoErrorf(t, cleanupErr, "error cleaning up directory %q", tmpDir)
 				})
+
+				// fix permissions on temp dir
+				err = os.Chmod(tmpDir, 0o755&os.ModePerm)
+				require.NoError(t, err, "error setting temporary dir %q as world-readable", tmpDir)
 
 				caKey, caCert, pair, err := certutil.NewRootCA()
 				require.NoError(t, err, "failed creating fleet CA root")
@@ -457,14 +456,10 @@ func TestProxyURL(t *testing.T) {
 			args: args{
 				// no proxy at enroll
 				enrollProxyName: "",
-				// have to install agent in privileged mode
-				// (there are some permission issues with reading the CA file even if I create it with t.TempDir() or with os.MkdirTemp())
-				installPrivileged: true,
 			},
 			setupF: func(ctx context.Context, t *testing.T, fleet *fleetservertest.Server, policyData *fleetservertest.TmplPolicy, checkinWithAcker *fleetservertest.CheckinActionsWithAcker) (proxies map[string]*proxytest.Proxy) {
 
 				// use os.MkdirTemp since we are installing agent unprivileged and t.TempDir() does not guarantee that the elastic-agent user has access
-				// tmpDir := t.TempDir()
 				tmpDir, err := os.MkdirTemp("", "mTLSProxyInThePolicy*")
 				require.NoError(t, err, "error creating temp dir for TLS files")
 
@@ -472,6 +467,10 @@ func TestProxyURL(t *testing.T) {
 					cleanupErr := os.RemoveAll(tmpDir)
 					assert.NoErrorf(t, cleanupErr, "error cleaning up directory %q", tmpDir)
 				})
+
+				// fix permissions on temp dir
+				err = os.Chmod(tmpDir, 0o755&os.ModePerm)
+				require.NoError(t, err, "error setting temporary dir %q as world-readable", tmpDir)
 
 				caKey, caCert, pair, err := certutil.NewRootCA()
 				require.NoError(t, err, "failed creating fleet CA root")
