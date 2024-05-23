@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -369,7 +370,11 @@ func TestProxyURL(t *testing.T) {
 			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy) {
 
 				// use os.MkdirTemp since we are installing agent unprivileged and t.TempDir() does not guarantee that the elastic-agent user has access
-				tmpDir, err := os.MkdirTemp("", "TLSProxyWithCAInThePolicy*")
+				baseDir := ""
+				if runtime.GOOS == "windows" {
+					baseDir = "C:\\"
+				}
+				tmpDir, err := os.MkdirTemp(baseDir, "TLSProxyWithCAInThePolicy*")
 				require.NoError(t, err, "error creating temp dir for TLS files")
 				t.Cleanup(func() {
 					cleanupErr := os.RemoveAll(tmpDir)
@@ -466,7 +471,11 @@ func TestProxyURL(t *testing.T) {
 			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy) {
 
 				// use os.MkdirTemp since we are installing agent unprivileged and t.TempDir() does not guarantee that the elastic-agent user has access
-				tmpDir, err := os.MkdirTemp("", "mTLSProxyInThePolicy*")
+				baseDir := ""
+				if runtime.GOOS == "windows" {
+					baseDir = "C:\\"
+				}
+				tmpDir, err := os.MkdirTemp(baseDir, "mTLSProxyInThePolicy*")
 				require.NoError(t, err, "error creating temp dir for TLS files")
 
 				t.Cleanup(func() {
