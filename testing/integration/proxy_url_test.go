@@ -452,6 +452,125 @@ func TestProxyURL(t *testing.T) {
 				t.Logf("elastic-agent inspect output:\n%s\n", string(inspectOutput))
 			},
 		},
+		{
+			name: "NoEnrollProxy-mTLSProxyInThePolicy",
+			args: args{
+				// no proxy at enroll
+				enrollProxyName: "",
+				// have to install agent in privileged mode
+				// (there are some permission issues with reading the CA file even if I create it with t.TempDir() or with os.MkdirTemp())
+				installPrivileged: true,
+			},
+			setupF: func(ctx context.Context, t *testing.T, fleet *fleetservertest.Server, policyData *fleetservertest.TmplPolicy, checkinWithAcker *fleetservertest.CheckinActionsWithAcker) (proxies map[string]*proxytest.Proxy) {
+
+				// use os.MkdirTemp since we are installing agent unprivileged and t.TempDir() does not guarantee that the elastic-agent user has access
+				// tmpDir := t.TempDir()
+				tmpDir, err := os.MkdirTemp("", "mTLSProxyInThePolicy*")
+				require.NoError(t, err, "error creating temp dir for TLS files")
+
+				t.Cleanup(func() {
+					cleanupErr := os.RemoveAll(tmpDir)
+					assert.NoErrorf(t, cleanupErr, "error cleaning up directory %q", tmpDir)
+				})
+
+				caKey, caCert, pair, err := certutil.NewRootCA()
+				require.NoError(t, err, "failed creating fleet CA root")
+
+				caCertFile := filepath.Join(tmpDir, "ca.cert")
+				err = os.WriteFile(caCertFile, pair.Cert, 0o644&os.ModePerm)
+				require.NoError(t, err, "failed writing CA cert file %q", caCertFile)
+
+				caCertPool := x509.NewCertPool()
+				caCertPool.AddCert(caCert)
+
+				proxyCert, _, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, caKey, caCert)
+
+				// Create a fake proxy with mTLS config to be used in fleet policy
+				proxyFleetPolicy := proxytest.New(t,
+					proxytest.WithRequestLog("proxy-fleet-policy", t.Logf),
+					proxytest.WithVerboseLog(),
+					proxytest.WithServerTLSConfig(&tls.Config{
+						RootCAs: caCertPool,
+						Certificates: []tls.Certificate{
+							{
+								Certificate: proxyCert.Certificate,
+								PrivateKey:  proxyCert.PrivateKey,
+								Leaf:        proxyCert.Leaf,
+							},
+						},
+						// require client auth with a trusted Cert
+						ClientAuth: tls.RequireAndVerifyClientCert,
+						ClientCAs:  caCertPool,
+					}))
+				err = proxyFleetPolicy.StartTLS()
+				require.NoError(t, err, "error starting TLS-enabled proxy")
+				t.Cleanup(proxyFleetPolicy.Close)
+
+				// generate a certificate for elastic-agent from the same CA as the proxy
+				_, agentPair, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, caKey, caCert)
+
+				// Write out certificate file
+				agentCertFile := filepath.Join(tmpDir, "elastic-agent.cert")
+				err = os.WriteFile(agentCertFile, agentPair.Cert, 0o644&os.ModePerm)
+				require.NoError(t, err, "failed writing elastic-agent cert file %q", agentCertFile)
+
+				// Write out key file
+				agentKeyFile := filepath.Join(tmpDir, "elastic-agent.key")
+				err = os.WriteFile(agentKeyFile, agentPair.Key, 0o644&os.ModePerm)
+				require.NoError(t, err, "failed writing elastic-agent key file %q", agentCertFile)
+
+				policyData.FleetProxyURL = new(string)
+				*policyData.FleetProxyURL = proxyFleetPolicy.LocalhostURL
+				policyData.SSL = &fleetservertest.SSL{
+					CertificateAuthorities: []string{caCertFile},
+					Renegotiation:          "never",
+					Certificate:            agentCertFile,
+					Key:                    agentKeyFile,
+					// Not sure if we need to set something in VerificationMode (the field is present in policy but it doesn't really make sense for elastic-agent)
+					VerificationMode: "",
+				}
+				// now that we have fleet and the proxy running, we can add actions which
+				// depend on them.
+				action, err := fleetservertest.NewActionWithEmptyPolicyChange(
+					"actionID-TestValidProxyInThePolicy", *policyData)
+				require.NoError(t, err, "could not generate action with policy")
+
+				ackToken := "AckToken-TestValidProxyInThePolicy"
+				checkinWithAcker.AddCheckin(
+					ackToken,
+					0,
+					action,
+				)
+				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}
+			},
+			enrollmentURL: func(fleet *fleetservertest.Server) string {
+				return fleet.LocalhostURL
+			},
+			wantErr: assert.NoError,
+			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, policyData *fleetservertest.TmplPolicy, checkinWithAcker *fleetservertest.CheckinActionsWithAcker) {
+				// assert the agent is actually connected to fleet.
+				check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
+
+				// ensure the agent is communicating through the proxy set in the policy
+				if !assert.Eventually(t, func() bool {
+					for _, r := range proxies["proxyFleetPolicy"].ProxiedRequests() {
+						if strings.Contains(
+							r,
+							fleetservertest.NewPathCheckin(policyData.AgentID)) {
+							return true
+						}
+					}
+
+					return false
+				}, 5*time.Minute, 5*time.Second) {
+					t.Errorf("did not find requests to the proxy defined in the policy")
+				}
+
+				inspectOutput, err := fixture.Exec(ctx, []string{"inspect"})
+				assert.NoError(t, err, "error running elastic-agent inspect")
+				t.Logf("elastic-agent inspect output:\n%s\n", string(inspectOutput))
+			},
+		},
 	}
 
 	for _, tt := range testcases {
