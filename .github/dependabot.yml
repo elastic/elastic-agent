@@ -32,7 +32,7 @@ updates:
     labels:
       - automation
       - skip-changelog
-      - Team:Elastic-Agent
+      - Team:Elastic-Agent-Control-Plane
     reviewers:
       - "elastic/elastic-agent-control-plane"
     open-pull-requests-limit: 10
