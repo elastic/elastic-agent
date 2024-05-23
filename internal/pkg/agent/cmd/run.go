@@ -547,9 +547,18 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	if err != nil {
 		return nil, err
 	}
-	err = c.Execute(ctx, cli.NewIOStreams())
-	if err != nil {
-		return nil, err
+	// perform the enrollment in a loop, it should keep trying to enroll no matter what
+	// the enrollCmd has built in backoff so no need to wrap this in its own backoff as well
+	for {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		err = c.Execute(ctx, cli.NewIOStreams())
+		if err == nil {
+			// enrollment was successful
+			break
+		}
+		logger.Error(fmt.Errorf("failed to perform delayed enrollment (will try again): %w", err))
 	}
 	err = os.Remove(enrollPath)
 	if err != nil {
