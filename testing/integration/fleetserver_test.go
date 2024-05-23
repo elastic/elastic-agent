@@ -39,7 +39,7 @@ func fleetPolicy() kibana.AgentPolicy {
 
 func TestInstallFleetServerBootstrap(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: FleetBootstrap,
+		Group: FleetPrivileged,
 		Stack: &define.Stack{},
 		Sudo:  true,
 		Local: false,
