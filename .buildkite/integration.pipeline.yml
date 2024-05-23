@@ -21,7 +21,7 @@ steps:
       machineType: "n1-standard-8"
     notify:
       - github_commit_status:
-          context: "Serverless integration test"
+          context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
 
   - label: "Extended runtime leak tests"
     key: "extended-integration-tests"
@@ -38,7 +38,7 @@ steps:
       machineType: "n1-standard-8"
     notify:
       - github_commit_status:
-          context: "Extended runtime leak tests"
+          context: "buildkite/elastic-agent-extended-testing - Extended runtime leak tests"
 
   - label: "Integration tests"
     key: "integration-tests"
@@ -55,7 +55,7 @@ steps:
       machineType: "n1-standard-8"
     notify:
       - github_commit_status:
-          context: "Integration tests"
+          context: "buildkite/elastic-agent-extended-testing - Integration tests"
 
   - label: "Serverless Beats Tests"
     key: "serverless-beats-integration-tests"
@@ -73,4 +73,4 @@ steps:
         allowed: true
     notify:
       - github_commit_status:
-          context: "Serverless Beats Tests"
+          context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
