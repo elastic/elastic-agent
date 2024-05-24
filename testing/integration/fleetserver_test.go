@@ -31,6 +31,7 @@ func fleetPolicy() kibana.AgentPolicy {
 	policyUUID := uuid.New().String()
 
 	return kibana.AgentPolicy{
+		ID:          "test-fleet-policy-" + policyUUID,
 		Name:        "test-fleet-policy-" + policyUUID,
 		Namespace:   "default",
 		Description: "Test fleet policy " + policyUUID,
