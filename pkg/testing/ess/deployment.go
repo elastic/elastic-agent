@@ -9,6 +9,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -251,19 +252,19 @@ func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, tic
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 
+	var errs error
 	statusCh := make(chan DeploymentStatus, 1)
-
 	for {
 		select {
 		case <-ctx.Done():
-			return false, ctx.Err()
+			return false, errors.Join(errs, ctx.Err())
 		case <-ticker.C:
 			go func() {
 				statusCtx, statusCancel := context.WithTimeout(ctx, tick)
 				defer statusCancel()
 				status, err := c.DeploymentStatus(statusCtx, deploymentID)
 				if err != nil {
-					// ignore the error (most likely a transient HTTP error)
+					errs = errors.Join(errs, err)
 					return
 				}
 				statusCh <- status.Overall
