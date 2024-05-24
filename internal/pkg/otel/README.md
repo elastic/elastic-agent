@@ -55,6 +55,7 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | attributesprocessor | v0.100.0|
 | filterprocessor | v0.100.0|
+| resourcedetectionprocessor | v0.100.0|
 | resourceprocessor | v0.100.0|
 | transformprocessor | v0.100.0|
 | batchprocessor | v0.100.0|
