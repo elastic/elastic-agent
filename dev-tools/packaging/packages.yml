@@ -135,7 +135,7 @@ shared:
         config_mode: 0644
         skip_on_missing: true
   
-  - &linux_otel_files:
+  - &linux_otel_files
     'elastic-otel':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/elastic-otel.sh'
       mode: 0755
