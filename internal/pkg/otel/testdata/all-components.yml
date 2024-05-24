@@ -1,0 +1,87 @@
+exporters:
+  debug:
+  elasticsearch:
+    endpoints:
+      - localhost:9200
+  file:
+    path: /tmp/file-exporter-output.json
+  otlp:
+    endpoint: localhots:4317
+
+extensions:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 100
+
+processors:
+  attributes:
+    actions:
+      - action: insert
+        key: key1
+        value: value1
+  batch:
+  filter:
+  resource:
+    attributes:
+      - action: insert
+        key: key1
+        value: value1
+  transform:
+
+receivers:
+  filelog:
+    include:
+      - /filelog/path
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+service:
+  extensions:
+    - memory_limiter
+  pipelines:
+    logs:
+      exporters:
+        - debug
+        - elasticsearch
+        - file
+        - otlp
+      processors:
+        - attributes
+        - batch
+        - filter
+        - resource
+        - transform
+      receivers:
+        - filelog
+        - otlp
+
+    metrics:
+      exporters:
+        - debug
+        - file
+        - otlp
+      processors:
+        - attributes
+        - batch
+        - filter
+        - resource
+        - transform
+      receivers:
+        - otlp
+
+    traces:
+      exporters:
+        - debug
+        - elasticsearch
+        - file
+        - otlp
+      processors:
+        - attributes
+        - batch
+        - filter
+        - resource
+        - transform
+      receivers:
+        - otlp
