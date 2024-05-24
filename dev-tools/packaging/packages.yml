@@ -201,6 +201,12 @@ shared:
       content: >
         {{ agent_package_version }}
       mode: 0644
+    'elastic-otel':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/elastic-otel.sh'
+      mode: 0755
+    'data/{{.BeatName}}-{{ commit_short }}/elastic-otel':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/elastic-otel.sh'
+      mode: 0755
     <<: *agent_darwin_app_bundle_files
     <<: *agent_binary_common_files
 
