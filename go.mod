@@ -92,6 +92,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.100.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.100.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.100.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.100.0
 	go.opentelemetry.io/collector/component v0.100.0
 	go.opentelemetry.io/collector/confmap v0.100.0
 	go.opentelemetry.io/collector/confmap/converter/expandconverter v0.100.0
