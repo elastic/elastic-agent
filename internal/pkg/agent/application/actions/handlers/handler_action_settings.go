@@ -75,19 +75,21 @@ func (h *Settings) handleLogLevel(ctx context.Context, logLevel string, acker ac
 	} else if err := acker.Commit(ctx); err != nil {
 		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", action.ActionID)
 	}
-	h.log.Infof("Settings action done, setting agent log level to %s", logLevel)
 
 	if lvl != nil {
+		h.log.Infof("Settings action done, setting agent log level to %s", logLevel)
 		return h.logLevelSetter.SetLogLevel(ctx, lvl)
 	}
 
 	if h.fallbackLogLevel != nil {
+		h.log.Infof("Settings action done, setting agent log level to policy default %s", h.fallbackLogLevel)
 		// use fallback log level
 		return h.logLevelSetter.SetLogLevel(ctx, h.fallbackLogLevel)
 	}
 
 	// use default log level
 	defaultLogLevel := logger.DefaultLogLevel
+	h.log.Infof("Settings action done, setting agent log level to default %s", defaultLogLevel)
 	return h.logLevelSetter.SetLogLevel(ctx, &defaultLogLevel)
 }
 
