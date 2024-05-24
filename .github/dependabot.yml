@@ -8,7 +8,7 @@ updates:
     labels:
       - automation
       - skip-changelog
-      - Team:Elastic-Agent
+      - Team:Elastic-Agent-Control-Plane
     groups:
         otel-dependencies:
             exclude-patterns:
@@ -21,6 +21,18 @@ updates:
       - dependency-name: "github.com/elastic/*"
       - dependency-name: "go.opentelemetry.io/collector/*"
       - dependency-name: "github.com/open-telemetry/opentelemetry-collector-contrib/*"
+    reviewers:
+      - "elastic/elastic-agent-control-plane"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    labels:
+      - automation
+      - skip-changelog
+      - Team:Elastic-Agent-Control-Plane
     reviewers:
       - "elastic/elastic-agent-control-plane"
     open-pull-requests-limit: 10
