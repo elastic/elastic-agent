@@ -80,7 +80,7 @@ inputs:
     shippers: *shippers
     command: *command
     isolate_units: true
-    - name: cloudbeat/asset_inventory
+  - name: cloudbeat/asset_inventory_aws
     description: "AWS Asset Inventory Discovery"
     platforms: *platforms
     outputs: *outputs
