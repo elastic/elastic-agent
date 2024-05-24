@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -83,6 +84,23 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 
 	esHost, ok := os.LookupEnv("ELASTICSEARCH_HOST")
 	require.True(t, ok, "environment var ELASTICSEARCH_HOST is empty")
+	u, err := url.Parse(esHost)
+	require.NoError(t, err, "could not parse %q as a URL", esHost)
+	if u.Port() == "" {
+		switch u.Scheme {
+		case "":
+			u.Host += ":80"
+			u.Scheme = "http"
+		case "http":
+			u.Host += ":80"
+		case "https":
+			u.Host += ":443"
+		default:
+			require.Failf(t, "elasticsearch host has unknown scheme: %s", u.Scheme)
+		}
+		esHost = u.String()
+	}
+
 	t.Logf("fleet-server will enroll with es host: %q", esHost)
 
 	// Run `elastic-agent install` with fleet-server bootstrap options.
