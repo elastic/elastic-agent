@@ -25,6 +25,7 @@ import (
 const (
 	flagInstallBasePath     = "base-path"
 	flagInstallUnprivileged = "unprivileged"
+	flagInstallDevelopment  = "development"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -49,6 +50,8 @@ would like the Agent to operate.
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	cmd.Flags().Bool(flagInstallUnprivileged, false, "Installed Elastic Agent will create an 'elastic-agent' user and run as that user. (experimental)")
 	_ = cmd.Flags().MarkHidden(flagInstallUnprivileged) // Hidden until fully supported
+	cmd.Flags().Bool(flagInstallDevelopment, false, "Install Elastic Agent for development in an isolated base path. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
 	addEnrollFlags(cmd)
 
 	return cmd
@@ -79,6 +82,12 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if unprivileged {
 		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this is an experimental and currently unsupported feature.")
 	}
+
+	isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
+	if unprivileged {
+		fmt.Fprintln(streams.Out, "Development installation mode enabled; this is an experimental feature.")
+	}
+	paths.SetIsDevelopmentMode(isDevelopmentMode)
 
 	topPath := paths.InstallPath(basePath)
 
