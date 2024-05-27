@@ -27,8 +27,9 @@ const (
 	serviceName                = "Elastic Agent"
 	serviceNameDevelopmentMode = "Elastic Agent (Development)"
 
-	// ShellWrapperPath is the path to the installed shell wrapper.
-	ShellWrapperPath = "" // no wrapper on Windows
+	// shellWrapperPath is the path to the installed shell wrapper.
+	shellWrapperPath                = ""
+	shellWrapperPathDevelopmentMode = ""
 
 	// ShellWrapper is the wrapper that is installed.
 	ShellWrapper = "" // no wrapper on Windows

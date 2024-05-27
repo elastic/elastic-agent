@@ -22,8 +22,9 @@ const (
 	serviceName                = "co.elastic.elastic-agent"
 	serviceNameDevelopmentMode = "co.elastic.elastic-agent-development"
 
-	// ShellWrapperPath is the path to the installed shell wrapper.
-	ShellWrapperPath = "/usr/local/bin/elastic-agent"
+	// shellWrapperPath is the path to the installed shell wrapper.
+	shellWrapperPath                = "/usr/local/bin/elastic-agent"
+	shellWrapperPathDevelopmentMode = "/usr/local/bin/elastic-dev-agent"
 
 	// ShellWrapper is the wrapper that is installed.  The %s must
 	// be substituted with the appropriate top path.

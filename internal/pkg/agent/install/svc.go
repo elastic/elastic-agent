@@ -31,8 +31,8 @@ const (
 // ExecutablePath returns the path for the installed Agents executable.
 func ExecutablePath(topPath string) string {
 	exec := filepath.Join(topPath, paths.BinaryName)
-	if paths.ShellWrapperPath != "" {
-		exec = paths.ShellWrapperPath
+	if paths.ShellWrapperPath() != "" {
+		exec = paths.ShellWrapperPath()
 	}
 	return exec
 }

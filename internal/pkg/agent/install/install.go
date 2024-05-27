@@ -126,13 +126,13 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	pt.Describe("Successfully copied files")
 
 	// place shell wrapper, if present on platform
-	if paths.ShellWrapperPath != "" {
-		pathDir := filepath.Dir(paths.ShellWrapperPath)
+	if paths.ShellWrapperPath() != "" {
+		pathDir := filepath.Dir(paths.ShellWrapperPath())
 		err = os.MkdirAll(pathDir, 0755)
 		if err != nil {
 			return utils.FileOwner{}, errors.New(
 				err,
-				fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, paths.ShellWrapperPath),
+				fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, paths.ShellWrapperPath()),
 				errors.M("directory", pathDir))
 		}
 		// Install symlink for darwin instead of the wrapper script.
@@ -141,32 +141,32 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		// This is specifically important for osquery FDA permissions at the moment.
 		if runtime.GOOS == darwin {
 			// Check if previous shell wrapper or symlink exists and remove it so it can be overwritten
-			if _, err := os.Lstat(paths.ShellWrapperPath); err == nil {
-				if err := os.Remove(paths.ShellWrapperPath); err != nil {
+			if _, err := os.Lstat(paths.ShellWrapperPath()); err == nil {
+				if err := os.Remove(paths.ShellWrapperPath()); err != nil {
 					return utils.FileOwner{}, errors.New(
 						err,
-						fmt.Sprintf("failed to remove (%s)", paths.ShellWrapperPath),
-						errors.M("destination", paths.ShellWrapperPath))
+						fmt.Sprintf("failed to remove (%s)", paths.ShellWrapperPath()),
+						errors.M("destination", paths.ShellWrapperPath()))
 				}
 			}
-			err = os.Symlink(filepath.Join(topPath, paths.BinaryName), paths.ShellWrapperPath)
+			err = os.Symlink(filepath.Join(topPath, paths.BinaryName), paths.ShellWrapperPath())
 			if err != nil {
 				return utils.FileOwner{}, errors.New(
 					err,
-					fmt.Sprintf("failed to create elastic-agent symlink (%s)", paths.ShellWrapperPath),
-					errors.M("destination", paths.ShellWrapperPath))
+					fmt.Sprintf("failed to create elastic-agent symlink (%s)", paths.ShellWrapperPath()),
+					errors.M("destination", paths.ShellWrapperPath()))
 			}
 		} else {
 			// We use strings.Replace instead of fmt.Sprintf here because, with the
 			// latter, govet throws a false positive error here: "fmt.Sprintf call has
 			// arguments but no formatting directives".
 			shellWrapper := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
-			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
+			err = os.WriteFile(paths.ShellWrapperPath(), []byte(shellWrapper), 0755)
 			if err != nil {
 				return utils.FileOwner{}, errors.New(
 					err,
-					fmt.Sprintf("failed to write shell wrapper (%s)", paths.ShellWrapperPath),
-					errors.M("destination", paths.ShellWrapperPath))
+					fmt.Sprintf("failed to write shell wrapper (%s)", paths.ShellWrapperPath()),
+					errors.M("destination", paths.ShellWrapperPath()))
 			}
 		}
 	}
@@ -182,10 +182,10 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	if err != nil {
 		return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 	}
-	if paths.ShellWrapperPath != "" {
-		err = perms.FixPermissions(paths.ShellWrapperPath, perms.WithOwnership(ownership))
+	if paths.ShellWrapperPath() != "" {
+		err = perms.FixPermissions(paths.ShellWrapperPath(), perms.WithOwnership(ownership))
 		if err != nil {
-			return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath, err)
+			return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath(), err)
 		}
 	}
 

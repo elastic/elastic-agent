@@ -334,6 +334,13 @@ func ServiceName() string {
 	return serviceName
 }
 
+func ShellWrapperPath() string {
+	if isDevelopmentMode {
+		return shellWrapperPathDevelopmentMode
+	}
+	return shellWrapperPath
+}
+
 // InstallPath returns the top level directory Agent will be installed into.
 func InstallPath(basePath string) string {
 	elasticPath := filepath.Join(basePath, "Elastic")
