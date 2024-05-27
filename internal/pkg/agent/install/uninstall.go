@@ -60,20 +60,20 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 			pt.Describe("Failed to issue stop service")
 			return aerrors.New(
 				err,
-				fmt.Sprintf("failed to issue stop service (%s)", paths.ServiceName),
-				aerrors.M("service", paths.ServiceName))
+				fmt.Sprintf("failed to issue stop service (%s)", paths.ServiceName()),
+				aerrors.M("service", paths.ServiceName()))
 		}
 	}
 	// The kardianos service manager can't tell the difference
 	// between 'Stopped' and 'StopPending' on Windows, so make
 	// sure the service is stopped.
-	err = isStopped(30*time.Second, 250*time.Millisecond, paths.ServiceName)
+	err = isStopped(30*time.Second, 250*time.Millisecond, paths.ServiceName())
 	if err != nil {
 		pt.Describe("Failed to complete stop of service")
 		return aerrors.New(
 			err,
-			fmt.Sprintf("failed to complete stop service (%s)", paths.ServiceName),
-			aerrors.M("service", paths.ServiceName))
+			fmt.Sprintf("failed to complete stop service (%s)", paths.ServiceName()),
+			aerrors.M("service", paths.ServiceName()))
 	}
 
 	pt.Describe("Successfully stopped service")
@@ -99,8 +99,8 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 			if startErr := svc.Start(); startErr != nil {
 				return aerrors.New(
 					err,
-					fmt.Sprintf("failed to restart service (%s), after failed components uninstall: %v", paths.ServiceName, startErr),
-					aerrors.M("service", paths.ServiceName))
+					fmt.Sprintf("failed to restart service (%s), after failed components uninstall: %v", paths.ServiceName(), startErr),
+					aerrors.M("service", paths.ServiceName()))
 			}
 		}
 		return fmt.Errorf("error uninstalling components: %w", err)

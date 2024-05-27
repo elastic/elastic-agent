@@ -206,8 +206,8 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		pt.Describe("Failed to install service")
 		return ownership, errors.New(
 			err,
-			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+			fmt.Sprintf("failed to install service (%s)", paths.ServiceName()),
+			errors.M("service", paths.ServiceName()))
 	}
 	err = servicePostInstall(ownership)
 	if err != nil {
@@ -217,8 +217,8 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		_ = svc.Uninstall()
 		return ownership, errors.New(
 			err,
-			fmt.Sprintf("failed to configure service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+			fmt.Sprintf("failed to configure service (%s)", paths.ServiceName()),
+			errors.M("service", paths.ServiceName()))
 	}
 	pt.Describe("Installed service")
 
@@ -393,8 +393,8 @@ func StartService(topPath string) error {
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to start service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+			fmt.Sprintf("failed to start service (%s)", paths.ServiceName()),
+			errors.M("service", paths.ServiceName()))
 	}
 	return nil
 }
@@ -410,8 +410,8 @@ func StopService(topPath string) error {
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to stop service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+			fmt.Sprintf("failed to stop service (%s)", paths.ServiceName()),
+			errors.M("service", paths.ServiceName()))
 	}
 	return nil
 }
@@ -427,8 +427,8 @@ func RestartService(topPath string) error {
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to restart service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+			fmt.Sprintf("failed to restart service (%s)", paths.ServiceName()),
+			errors.M("service", paths.ServiceName()))
 	}
 	return nil
 }

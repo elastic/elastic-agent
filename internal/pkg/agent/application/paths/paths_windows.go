@@ -23,8 +23,9 @@ const (
 	// ControlSocketRunSymlink is not created on Windows.
 	ControlSocketRunSymlink = ""
 
-	// ServiceName is the service name when installed.
-	ServiceName = "Elastic Agent"
+	// serviceName is the service name when installed.
+	serviceName                = "Elastic Agent"
+	serviceNameDevelopmentMode = "Elastic Agent (Development)"
 
 	// ShellWrapperPath is the path to the installed shell wrapper.
 	ShellWrapperPath = "" // no wrapper on Windows

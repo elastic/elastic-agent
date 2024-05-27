@@ -14,8 +14,9 @@ const (
 	// for installing Elastic Agent's files.
 	DefaultBasePath = "/opt"
 
-	// ServiceName is the service name when installed.
-	ServiceName = "elastic-agent"
+	// serviceName is the service name when installed.
+	serviceName                = "elastic-agent"
+	serviceNameDevelopmentMode = "elastic-agent-development"
 
 	// ShellWrapperPath is the path to the installed shell wrapper.
 	ShellWrapperPath = "/usr/bin/elastic-agent"

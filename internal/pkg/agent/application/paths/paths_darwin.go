@@ -18,8 +18,9 @@ const (
 	// created to the control socket when Elastic Agent is running with root.
 	ControlSocketRunSymlink = "/var/run/elastic-agent.sock"
 
-	// ServiceName is the service name when installed.
-	ServiceName = "co.elastic.elastic-agent"
+	// serviceName is the service name when installed.
+	serviceName                = "co.elastic.elastic-agent"
+	serviceNameDevelopmentMode = "co.elastic.elastic-agent-development"
 
 	// ShellWrapperPath is the path to the installed shell wrapper.
 	ShellWrapperPath = "/usr/local/bin/elastic-agent"

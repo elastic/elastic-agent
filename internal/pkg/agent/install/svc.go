@@ -75,7 +75,7 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	}
 
 	cfg := &service.Config{
-		Name:             paths.ServiceName,
+		Name:             paths.ServiceName(),
 		DisplayName:      ServiceDisplayName,
 		Description:      ServiceDescription,
 		Executable:       ExecutablePath(topPath),
@@ -107,8 +107,8 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 
 		// Set the stdout and stderr logs to be inside the installation directory, ensures that the
 		// executing user for the service can write to the directory for the logs.
-		cfg.Option["StandardOutPath"] = filepath.Join(topPath, fmt.Sprintf("%s.out.log", paths.ServiceName))
-		cfg.Option["StandardErrorPath"] = filepath.Join(topPath, fmt.Sprintf("%s.err.log", paths.ServiceName))
+		cfg.Option["StandardOutPath"] = filepath.Join(topPath, fmt.Sprintf("%s.out.log", paths.ServiceName()))
+		cfg.Option["StandardErrorPath"] = filepath.Join(topPath, fmt.Sprintf("%s.err.log", paths.ServiceName()))
 	}
 
 	return service.New(nil, cfg)
