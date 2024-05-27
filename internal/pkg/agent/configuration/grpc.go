@@ -4,7 +4,11 @@
 
 package configuration
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+)
 
 // GRPCConfig is a configuration of GRPC server.
 type GRPCConfig struct {
@@ -16,9 +20,17 @@ type GRPCConfig struct {
 
 // DefaultGRPCConfig creates a default server configuration.
 func DefaultGRPCConfig() *GRPCConfig {
+	// In development mode bind to port zero to select a random free port to avoid collisions with
+	// any already installed Elastic Agent. Ideally we'd always bind to port zero, but this would be
+	// breaking for users that had to manually whitelist the gRPC port in local firewall rules.
+	defaultPort := uint16(6789)
+	if paths.IsDevelopmentMode() {
+		defaultPort = 0
+	}
+
 	return &GRPCConfig{
 		Address:                 "localhost",
-		Port:                    6789,
+		Port:                    defaultPort,
 		MaxMsgSize:              1024 * 1024 * 100, // grpc default 4MB is unsufficient for diagnostics
 		CheckinChunkingDisabled: false,             // on by default
 	}
