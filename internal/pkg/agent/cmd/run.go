@@ -307,23 +307,23 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// this provides backwards compatibility as the control socket was moved with the addition of --unprivileged
 	// option during installation
 	//
-	// Windows `paths.ControlSocketRunSymlink` is `""` so this is always skipped on Windows.
-	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink != "" {
+	// Windows `paths.ControlSocketRunSymlink()` is `""` so this is always skipped on Windows.
+	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink() != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
-		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
+		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink())
 		// ensure it doesn't exist before creating the symlink
-		if err := os.Remove(paths.ControlSocketRunSymlink); err != nil && !errors.Is(err, os.ErrNotExist) {
-			socketLog.Errorf("Failed to remove existing control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+		if err := os.Remove(paths.ControlSocketRunSymlink()); err != nil && !errors.Is(err, os.ErrNotExist) {
+			socketLog.Errorf("Failed to remove existing control socket symlink %s: %s", paths.ControlSocketRunSymlink(), err)
 		}
-		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
-			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", paths.ControlSocketRunSymlink, socketPath, err)
+		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink()); err != nil {
+			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", paths.ControlSocketRunSymlink(), socketPath, err)
 		} else {
-			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", paths.ControlSocketRunSymlink, socketPath, paths.ControlSocketRunSymlink)
+			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", paths.ControlSocketRunSymlink(), socketPath, paths.ControlSocketRunSymlink())
 		}
 		defer func() {
 			// delete the symlink on exit; ignore the error
-			if err := os.Remove(paths.ControlSocketRunSymlink); err != nil {
-				socketLog.Errorf("Failed to remove control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+			if err := os.Remove(paths.ControlSocketRunSymlink()); err != nil {
+				socketLog.Errorf("Failed to remove control socket symlink %s: %s", paths.ControlSocketRunSymlink(), err)
 			}
 		}()
 	}

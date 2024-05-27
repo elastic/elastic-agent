@@ -20,8 +20,9 @@ const (
 	// for installing Elastic Agent's files.
 	DefaultBasePath = `C:\Program Files`
 
-	// ControlSocketRunSymlink is not created on Windows.
-	ControlSocketRunSymlink = ""
+	// controlSocketRunSymlink is not created on Windows.
+	controlSocketRunSymlink                = ""
+	controlSocketRunSymlinkDevelopmentMode = ""
 
 	// serviceName is the service name when installed.
 	serviceName                = "Elastic Agent"

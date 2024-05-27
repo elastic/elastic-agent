@@ -28,9 +28,10 @@ const (
 exec %s/elastic-agent $@
 `
 
-	// ControlSocketRunSymlink is the path to the symlink that should be
+	// controlSocketRunSymlink is the path to the symlink that should be
 	// created to the control socket when Elastic Agent is running with root.
-	ControlSocketRunSymlink = "/run/elastic-agent.sock"
+	controlSocketRunSymlink                = "/run/elastic-agent.sock"
+	controlSocketRunSymlinkDevelopmentMode = "/run/elastic-agent-development.sock"
 )
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.

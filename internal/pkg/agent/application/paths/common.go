@@ -327,6 +327,7 @@ func IsDevelopmentMode() bool {
 	return isDevelopmentMode
 }
 
+// ServiceName returns the service name accounting for development mode.
 func ServiceName() string {
 	if isDevelopmentMode {
 		return serviceNameDevelopmentMode
@@ -334,6 +335,7 @@ func ServiceName() string {
 	return serviceName
 }
 
+// ShellWrapperPath returns the shell wrapper path accounting for development mode.
 func ShellWrapperPath() string {
 	if isDevelopmentMode {
 		return shellWrapperPathDevelopmentMode
@@ -341,7 +343,15 @@ func ShellWrapperPath() string {
 	return shellWrapperPath
 }
 
-// InstallPath returns the top level directory Agent will be installed into.
+// ControlSocketRunSymlink returns the shell wrapper path accounting for development mode.
+func ControlSocketRunSymlink() string {
+	if isDevelopmentMode {
+		return controlSocketRunSymlinkDevelopmentMode
+	}
+	return controlSocketRunSymlink
+}
+
+// InstallPath returns the top level directory Agent will be installed into, accounting for development mode.
 func InstallPath(basePath string) string {
 	elasticPath := filepath.Join(basePath, "Elastic")
 	if isDevelopmentMode {

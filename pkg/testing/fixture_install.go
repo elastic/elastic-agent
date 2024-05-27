@@ -186,7 +186,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	}
 
 	// we just installed agent, the control socket is at a well-known location
-	socketPath := fmt.Sprintf("unix://%s", paths.ControlSocketRunSymlink) // use symlink as that works for all versions
+	socketPath := fmt.Sprintf("unix://%s", paths.ControlSocketRunSymlink()) // use symlink as that works for all versions
 	if runtime.GOOS == "windows" {
 		// Windows uses a fixed named pipe, that is always the same.
 		// It is the same even running in unprivileged mode.
