@@ -102,7 +102,7 @@ func servicePostInstall(ownership utils.FileOwner) error {
 	}
 	err = windows.SetNamedSecurityInfo(paths.ServiceName(), windows.SE_SERVICE, windows.DACL_SECURITY_INFORMATION, nil, nil, dacl, nil)
 	if err != nil {
-		return fmt.Errorf("failed to set DACL for service(%s): %w", paths.ServiceName, err)
+		return fmt.Errorf("failed to set DACL for service(%s): %w", paths.ServiceName(), err)
 	}
 	return nil
 }
