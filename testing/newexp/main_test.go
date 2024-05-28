@@ -15,6 +15,8 @@ import (
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/releases"
 	"github.com/hashicorp/terraform-exec/tfexec"
+	tfjson "github.com/hashicorp/terraform-json"
+	"golang.org/x/crypto/ssh"
 )
 
 const flagPrefix = "integration."
@@ -38,7 +40,7 @@ func bindTestFlags(prefix string, flagSet *flag.FlagSet, opts *testOptions) {
 	if err != nil {
 		panic(fmt.Errorf("detecting CWD: %w", err))
 	}
-	flagSet.StringVar(&opts.terraformWorkDir, prefix+"terraform-dir", filepath.Join(cwd, "testdata", "terraform"), "Directory containing terraform files")
+	flagSet.StringVar(&opts.terraformWorkDir, prefix+"terraform-dir", filepath.Join(cwd, "terraform"), "Directory containing terraform files")
 }
 
 // Terraform globals
@@ -55,11 +57,11 @@ func TestMain(m *testing.M) {
 
 func innerRun(ctx context.Context, m *testing.M) int {
 	if err := setup(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "error running tests: %s", err)
-		os.Exit(1)
+		log.Printf("error running tests: %s", err)
+		return 1
 	}
 	defer tearDown(ctx)
-	fmt.Fprintf(os.Stderr, "go test args: %s\n", os.Args)
+	log.Printf("go test args: %s\n", os.Args)
 
 	return m.Run()
 }
@@ -71,47 +73,69 @@ func setup(ctx context.Context) error {
 		return fmt.Errorf("setup error: %w", err)
 	}
 
-	err = provisionMachines(ctx)
+	state, err := provision(ctx)
+
+	// SSH into the machine to push local changes and other stuff
+	privateKeyFile := state.Values.Outputs["private_key_file"].Value.(string)
+	privateKeyFile = filepath.Join(testOpts.terraformWorkDir, privateKeyFile)
+	pkBytes, err := os.ReadFile(privateKeyFile)
+	if err != nil {
+		return fmt.Errorf("reading private key file %q: %w", privateKeyFile, err)
+	}
+	privateKey, err := ssh.ParsePrivateKey(pkBytes)
+	if err != nil {
+		return fmt.Errorf("parsing private key from file %q: %w", privateKeyFile, err)
+	}
+	config := &ssh.ClientConfig{
+		User: "buildkite-agent",
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(privateKey),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	vmPublicAddress := state.Values.Outputs["vm_public_address"].Value.(string)
+	// Add SSH port
+	vmPublicAddress += ":22"
+	client, err := ssh.Dial("tcp", vmPublicAddress, config)
+	if err != nil {
+		return fmt.Errorf("connecting ssh %s@%s: %w", config.User, vmPublicAddress, err)
+	}
+
+	log.Printf("Connected via SSH to the machine as %s\n", client.User())
 
 	pkgVar = "This is not a drill."
 	return os.Setenv("TEST_ENV_VAR", "This is not a drill.")
 }
 
-func provisionMachines(ctx context.Context) error {
+func provision(ctx context.Context) (*tfjson.State, error) {
 	err := terraform.Init(ctx, tfexec.Upgrade(true))
 	if err != nil {
-		return fmt.Errorf("error running Init: %w", err)
+		return nil, fmt.Errorf("error running Init: %w", err)
 	}
 
-	planFilePath := filepath.Join(testOpts.terraformWorkDir, "main.tf.plan")
+	planFilePath := filepath.Join(testOpts.terraformWorkDir, "main.tfplan")
 	tfvarsFilePath := filepath.Join(testOpts.terraformWorkDir, "main.tfvars")
 	changesRequired, err := terraform.Plan(ctx, tfexec.VarFile(tfvarsFilePath), tfexec.Out(planFilePath))
 	if err != nil {
-		return fmt.Errorf("error running Plan: %w", err)
+		return nil, fmt.Errorf("error running Plan: %w", err)
 	}
 
 	if !changesRequired {
 		// there are no changes required
-		return nil
+		return terraform.Show(ctx)
 	}
 
-	plan, err := terraform.ShowPlanFile(ctx, planFilePath)
+	err = terraform.Apply(ctx, tfexec.DirOrPlan(planFilePath))
 	if err != nil {
-		return fmt.Errorf("error running Show: %w", err)
-	}
-	fmt.Fprintf(os.Stderr, "terraform plan:\n%+v\n", plan)
-	err = terraform.Apply(ctx, tfexec.VarFile(tfvarsFilePath))
-	if err != nil {
-		return fmt.Errorf("error running Apply: %w", err)
+		return nil, fmt.Errorf("error running Apply: %w", err)
 	}
 
 	state, err := terraform.Show(ctx)
 	if err != nil {
-		return fmt.Errorf("error running Show: %w", err)
+		return nil, fmt.Errorf("error running Show: %w", err)
 	}
 
-	fmt.Println(state.FormatVersion) // "0.1"
-	return nil
+	return state, nil
 }
 
 func tearDown(ctx context.Context) error {
@@ -139,9 +163,9 @@ func prepareTerraform(ctx context.Context) error {
 	}
 	terraformInstall = installer
 
-	fmt.Fprintf(os.Stderr, "Installed terraform, exec path: %s\n", execPath)
+	log.Printf("Installed terraform, exec path: %s\n", execPath)
 
-	fmt.Fprintf(os.Stderr, "working dir: %s\n", testOpts.terraformWorkDir)
+	log.Printf("working dir: %s\n", testOpts.terraformWorkDir)
 
 	tf, err := tfexec.NewTerraform(testOpts.terraformWorkDir, execPath)
 	if err != nil {

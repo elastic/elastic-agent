@@ -1,3 +1,4 @@
-id_ed25519*
+.ssh/
 .terraform.lock.hcl
 *.tfstate
+*.tfplan

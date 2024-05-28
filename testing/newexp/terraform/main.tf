@@ -1,9 +1,8 @@
 locals {
-  go_version = trimspace(file("${path.module}/../../../../.go-version"))
-  ssh_user = "paolo_chila"
-}
-
-resource "random_uuid" "test_run_id" {
+  #go_version = trimspace(file("${path.module}/../../../../.go-version"))
+  ssh_user = "buildkite-agent"
+  git_repo = "https://github.com/elastic/elastic-agent"
+  repo_dir = "/src/elastic-agent"
 }
 
 variable "project_id" {
@@ -22,6 +21,12 @@ variable "zone" {
   default = "us-central1-a"
 }
 
+variable "build_id" {
+  type        = string
+  description = "Build id associated with this run"
+  default = "nobuildid"
+}
+
 data "external" "golist_dump" {
   program = [
     "go", "list", "-json=Root", "github.com/elastic/elastic-agent"
@@ -35,7 +40,7 @@ provider "google" {
   default_labels = {
     team = "elastic-agent"
     integration-tests = "true"
-    run_id = random_uuid.test_run_id.id
+    build_id = var.build_id
   }
 }
 
@@ -67,16 +72,8 @@ provider "google" {
 
 resource "tls_private_key" "ssh_key" {
   algorithm = "ED25519"
-}
-
-output "private_key" {
-  value = tls_private_key.ssh_key.private_key_openssh
-  sensitive=true
-}
-
-output "public_key" {
-  value = tls_private_key.ssh_key.public_key_openssh
-  sensitive=true
+  lifecycle {
+  }
 }
 
 resource "local_sensitive_file" "private_ssh_key" {
@@ -91,6 +88,7 @@ resource "local_file" "public_ssh_key" {
   filename = "${path.module}/.ssh/id_ed25519.pub"
   file_permission = "0600"
   directory_permission = "0700"
+
 }
 
 resource "google_compute_instance" "vm_instance" {
@@ -98,7 +96,8 @@ resource "google_compute_instance" "vm_instance" {
   machine_type = "e2-standard-2"
   boot_disk {
     initialize_params {
-      image = "ubuntu-2204-lts"
+      #image = "ubuntu-2204-lts"
+      image = "elastic-images-prod/platform-ingest-beats-ubuntu-2204"
     }
   }
   network_interface {
@@ -123,20 +122,27 @@ resource "google_compute_instance" "vm_instance" {
 
   provisioner "remote-exec" {
     inline = [
-      "wget https://go.dev/dl/go${local.go_version}.linux-amd64.tar.gz",
-      "sudo tar -C /usr/local -xzf go${local.go_version}.linux-amd64.tar.gz",
-      "sudo mkdir -p /src/elastic-agent",
-      "sudo chown ${local.ssh_user}:${local.ssh_user} /src/elastic-agent"
+#      "wget https://go.dev/dl/go${local.go_version}.linux-amd64.tar.gz",
+#      "sudo tar -C /usr/local -xzf go${local.go_version}.linux-amd64.tar.gz",
+      "sudo mkdir -p /src",
+      "sudo chown ${local.ssh_user}:${local.ssh_user} /src",
+      "git clone --depth 1 ${local.git_repo} ${local.repo_dir}"
     ]
-  }
-
-  provisioner "file" {
-    source = data.external.golist_dump.result.Root
-    destination = "/src/elastic-agent"
   }
 }
 
-output "vm_address" {
-  value = google_compute_instance.vm_instance
-  sensitive = true
+output "vm_public_address" {
+  value = google_compute_instance.vm_instance.network_interface[0].access_config[0].nat_ip
+}
+
+output "ssh_user" {
+  value = local.ssh_user
+}
+
+output "private_key_file" {
+  value = local_sensitive_file.private_ssh_key.filename
+}
+
+output "repo_dir" {
+  value = local.repo_dir
 }
