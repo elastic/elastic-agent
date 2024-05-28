@@ -84,7 +84,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
-	if unprivileged {
+	if isDevelopmentMode {
 		fmt.Fprintln(streams.Out, "Development installation mode enabled; this is an experimental feature.")
 	}
 	paths.SetIsDevelopmentMode(isDevelopmentMode)
