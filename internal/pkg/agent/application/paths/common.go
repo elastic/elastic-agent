@@ -61,7 +61,6 @@ var (
 	installPath       string
 	controlSocketPath string
 	unversionedHome   bool
-	isDevelopmentMode bool
 	tmpCreator        sync.Once
 )
 
@@ -315,49 +314,6 @@ func binaryDir(baseDir string) string {
 // BinaryPath returns the application binary path that is concatenation of the directory and the agentName
 func BinaryPath(baseDir, agentName string) string {
 	return filepath.Join(binaryDir(baseDir), agentName)
-}
-
-// SetIsDevelopmentMode sets whether the agent is installed in development mode or not.
-func SetIsDevelopmentMode(developmentMode bool) {
-	isDevelopmentMode = developmentMode
-}
-
-// IsDevelopmentMode returns true if the agent is installed in development mode.
-func IsDevelopmentMode() bool {
-	return isDevelopmentMode
-}
-
-// ServiceName returns the service name accounting for development mode.
-func ServiceName() string {
-	if isDevelopmentMode {
-		return serviceNameDevelopmentMode
-	}
-	return serviceName
-}
-
-// ShellWrapperPath returns the shell wrapper path accounting for development mode.
-func ShellWrapperPath() string {
-	if isDevelopmentMode {
-		return shellWrapperPathDevelopmentMode
-	}
-	return shellWrapperPath
-}
-
-// ControlSocketRunSymlink returns the shell wrapper path accounting for development mode.
-func ControlSocketRunSymlink() string {
-	if isDevelopmentMode {
-		return controlSocketRunSymlinkDevelopmentMode
-	}
-	return controlSocketRunSymlink
-}
-
-// InstallPath returns the top level directory Agent will be installed into, accounting for development mode.
-func InstallPath(basePath string) string {
-	elasticPath := filepath.Join(basePath, "Elastic")
-	if isDevelopmentMode {
-		return filepath.Join(elasticPath, "DevelopmentAgent")
-	}
-	return filepath.Join(elasticPath, "Agent")
 }
 
 // TopBinaryPath returns the path to the Elastic Agent binary that is inside the Top directory.
