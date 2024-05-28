@@ -25,7 +25,7 @@ import (
 const (
 	flagInstallBasePath     = "base-path"
 	flagInstallUnprivileged = "unprivileged"
-	flagInstallDevelopment  = "development"
+	flagInstallDevelopment  = "develop"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
