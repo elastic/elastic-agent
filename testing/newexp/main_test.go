@@ -111,6 +111,8 @@ func innerRun(ctx context.Context, m *testing.M) (returnCode int) {
 		}
 		sb.WriteString("-" + flagPrefix + skipProvisioningFlag)
 
+		log.Printf("full command to run on remote host: %q", sb.String())
+
 		session, err := client.NewSession()
 		if err != nil {
 			log.Printf("initiating ssh session: %s", err)
