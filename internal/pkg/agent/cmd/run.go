@@ -58,6 +58,7 @@ import (
 const (
 	agentName            = "elastic-agent"
 	fleetInitTimeoutName = "FLEET_SERVER_INIT_TIMEOUT"
+	flagRunDevelopment   = "develop"
 )
 
 type cfgOverrider func(cfg *configuration.Configuration)
@@ -69,9 +70,15 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Short: "Start the Elastic Agent",
 		Long:  "This command starts the Elastic Agent.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// done very early so the encrypted store is never used
+			isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
+			if isDevelopmentMode {
+				fmt.Fprintln(streams.Out, "Development installation mode enabled; this is an experimental feature.")
+			}
+			paths.SetIsDevelopmentMode(isDevelopmentMode)
+
+			// done very early so the encrypted store is never used. Always done in development mode to remove the need to be root.
 			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
-			if disableEncryptedStore {
+			if disableEncryptedStore || isDevelopmentMode {
 				storage.DisableEncryptionDarwin()
 			}
 			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
@@ -101,6 +108,9 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 
 	cmd.Flags().Duration("fleet-init-timeout", envTimeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
 	_ = cmd.Flags().MarkHidden("testing-mode")
+
+	cmd.Flags().Bool(flagRunDevelopment, false, "Run agent in development mode. Allows running when there is already and installed Elastic Agent. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagRunDevelopment) // For internal use only.
 
 	return cmd
 }
