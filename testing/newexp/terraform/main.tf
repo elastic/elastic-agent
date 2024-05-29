@@ -126,7 +126,7 @@ resource "google_compute_instance" "vm_instance" {
       "sudo mkdir -p $(dirname ${local.repo_dir})",
       "sudo chown ${local.ssh_user}:${local.ssh_user} $(dirname ${local.repo_dir})",
       # fix shell of the user if it's not bash to have asdf working
-      "sudo sed -i 's/\\(${local.ssh_user}}:.*\\):\\/bin\\/sh/\\1:\\/bin\\/bash/g' /etc/passwd",
+      "sudo sed -i 's/\\(${local.ssh_user}:.*\\):\\/bin\\/sh/\\1:\\/bin\\/bash/g' /etc/passwd",
       "asdf global golang ${local.go_version}",
       "git clone --depth 1 ${local.git_repo} ${local.repo_dir}",
     ]
