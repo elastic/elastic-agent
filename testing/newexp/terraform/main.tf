@@ -1,5 +1,5 @@
 locals {
-  #go_version = trimspace(file("${path.module}/../../../../.go-version"))
+  go_version = trimspace(file("${path.module}/../../../.go-version"))
   ssh_user = "buildkite-agent"
   git_repo = "https://github.com/elastic/elastic-agent"
   repo_dir = "/src/elastic-agent"
@@ -72,8 +72,6 @@ provider "google" {
 
 resource "tls_private_key" "ssh_key" {
   algorithm = "ED25519"
-  lifecycle {
-  }
 }
 
 resource "local_sensitive_file" "private_ssh_key" {
@@ -94,9 +92,12 @@ resource "local_file" "public_ssh_key" {
 resource "google_compute_instance" "vm_instance" {
   name         = "tf-test-instance"
   machine_type = "e2-standard-2"
+  lifecycle {
+    ignore_changes = [metadata["ssh-keys"]]
+  }
   boot_disk {
     initialize_params {
-      #image = "ubuntu-2204-lts"
+#      image = "ubuntu-2204-lts"
       image = "elastic-images-prod/platform-ingest-beats-ubuntu-2204"
     }
   }
@@ -122,13 +123,31 @@ resource "google_compute_instance" "vm_instance" {
 
   provisioner "remote-exec" {
     inline = [
-#      "wget https://go.dev/dl/go${local.go_version}.linux-amd64.tar.gz",
-#      "sudo tar -C /usr/local -xzf go${local.go_version}.linux-amd64.tar.gz",
-      "sudo mkdir -p /src",
-      "sudo chown ${local.ssh_user}:${local.ssh_user} /src",
-      "git clone --depth 1 ${local.git_repo} ${local.repo_dir}"
+      "sudo mkdir -p $(dirname ${local.repo_dir})",
+      "sudo chown ${local.ssh_user}:${local.ssh_user} $(dirname ${local.repo_dir})",
+      # fix shell of the user if it's not bash to have asdf working
+      "sudo sed -i 's/\\(${local.ssh_user}}:.*\\):\\/bin\\/sh/\\1:\\/bin\\/bash/g' /etc/passwd",
+      "asdf global golang ${local.go_version}",
+      "git clone --depth 1 ${local.git_repo} ${local.repo_dir}",
     ]
   }
+
+# The provisioner below is for a plain linux image where we have to install go from scratch
+#  provisioner "remote-exec" {
+#    inline = [
+#      #      "wget https://go.dev/dl/go${local.go_version}.linux-amd64.tar.gz",
+#      #      "sudo tar -C /usr/local -xzf go${local.go_version}.linux-amd64.tar.gz",
+#
+#      "sudo mkdir -p /src",
+#      "sudo chown ${local.ssh_user}:${local.ssh_user} /src",
+#      "git clone --depth 1 ${local.git_repo} ${local.repo_dir}",
+#      "sudo touch /etc/profile.d/golang-path.sh && sudo chown ${local.ssh_user}:${local.ssh_user} /etc/profile.d/golang-path.sh"
+#    ]
+#  }
+#  provisioner "file" {
+#    content     = "export PATH=$PATH:/usr/local/go/bin"
+#    destination = "/etc/profile.d/golang-path.sh"
+#  }
 }
 
 output "vm_public_address" {
