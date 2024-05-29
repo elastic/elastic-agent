@@ -88,6 +88,7 @@ type InstallOpts struct {
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
 	DelayEnroll    bool   // --delay-enroll
+	Develop        bool   // --develop, not supported for DEB and RPM.
 
 	Privileged bool // inverse of --unprivileged (as false is the default)
 
@@ -117,6 +118,9 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	}
 	if !i.Privileged {
 		args = append(args, "--unprivileged")
+	}
+	if !i.Develop {
+		args = append(args, "--develop")
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)

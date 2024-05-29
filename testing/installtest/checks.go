@@ -15,7 +15,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
-func DefaultTopPath() string {
+func defaultBasePath() string {
 	var defaultBasePath string
 	switch runtime.GOOS {
 	case "darwin":
@@ -25,10 +25,23 @@ func DefaultTopPath() string {
 	case "windows":
 		defaultBasePath = `C:\Program Files`
 	}
-	return filepath.Join(defaultBasePath, "Elastic", "Agent")
+	return defaultBasePath
 }
 
-func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, unprivileged bool) error {
+func DefaultTopPath() string {
+	return filepath.Join(defaultBasePath(), "Elastic", "Agent")
+}
+
+func DevelopTopPath() string {
+	return filepath.Join(defaultBasePath(), "Elastic", "DevelopmentAgent")
+}
+
+type CheckOpts struct {
+	Unprivileged bool
+	Develop      bool
+}
+
+func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts *CheckOpts) error {
 	// Use default topPath if one not defined.
 	if topPath == "" {
 		topPath = DefaultTopPath()
@@ -58,7 +71,7 @@ func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, unpr
 	}
 
 	// Specific checks depending on the platform.
-	return checkPlatform(ctx, f, topPath, unprivileged)
+	return checkPlatform(ctx, f, topPath, opts)
 }
 
 func exeOnWindows(filename string) string {

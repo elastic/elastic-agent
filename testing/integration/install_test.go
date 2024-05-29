@@ -60,8 +60,28 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Check that Agent was installed in default base path
 	topPath := installtest.DefaultTopPath()
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, true))
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Unprivileged: true}))
+
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+
+	t.Run("check second agent installs with --develop", func(t *testing.T) {
+		// Get path to Elastic Agent executable
+		devFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+		require.NoError(t, err)
+
+		// Prepare the Elastic Agent so the binary is extracted and ready to use.
+		err = devFixture.Prepare(ctx)
+		require.NoError(t, err)
+
+		devOpts := &atesting.InstallOpts{Force: true, Privileged: false, Develop: true}
+		devOut, err := devFixture.Install(ctx, devOpts)
+		if err != nil {
+			t.Logf("install --develop output: %s", devOut)
+			require.NoError(t, err)
+		}
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, installtest.DevelopTopPath(), &installtest.CheckOpts{Unprivileged: false, Develop: true}))
+	})
+
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
 		cwd, err := os.Getwd()
@@ -75,7 +95,6 @@ func TestInstallWithoutBasePath(t *testing.T) {
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
-
 }
 
 func TestInstallWithBasePath(t *testing.T) {
@@ -136,7 +155,7 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, true))
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Unprivileged: true}))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -196,7 +215,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 			}
 
 			// Check that Agent was installed in default base path
-			require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, !opts.Privileged))
+			require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Unprivileged: !opts.Privileged}))
 			t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 			require.NoErrorf(t, err, "uninstall failed: %s", err)
