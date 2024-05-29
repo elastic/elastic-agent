@@ -79,7 +79,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 			t.Logf("install --develop output: %s", devOut)
 			require.NoError(t, err)
 		}
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, installtest.DevelopTopPath(), &installtest.CheckOpts{Unprivileged: false, Develop: true}))
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, installtest.DevelopTopPath(), &installtest.CheckOpts{Unprivileged: true, Develop: true}))
 	})
 
 	// Make sure uninstall from within the topPath fails on Windows

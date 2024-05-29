@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -119,7 +120,7 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	if !i.Privileged {
 		args = append(args, "--unprivileged")
 	}
-	if !i.Develop {
+	if i.Develop {
 		args = append(args, "--develop")
 	}
 
@@ -139,8 +140,10 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 
-	// check for running agents before installing, but proceed anyway
-	assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
+	// check for running agents before installing, but only if not using --develop whose point is allowing two agents at once.
+	if installOpts != nil && !installOpts.Develop {
+		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
+	}
 
 	switch f.packageFormat {
 	case "targz", "zip":
@@ -183,14 +186,19 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	f.installed = true
 	f.installOpts = installOpts
 
+	installDir := "Agent"
+	if installOpts.Develop {
+		installDir = "DevelopmentAgent"
+	}
+
 	if installOpts.BasePath == "" {
-		f.workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
+		f.workDir = filepath.Join(paths.DefaultBasePath, "Elastic", installDir)
 	} else {
-		f.workDir = filepath.Join(installOpts.BasePath, "Elastic", "Agent")
+		f.workDir = filepath.Join(installOpts.BasePath, "Elastic", installDir)
 	}
 
 	// we just installed agent, the control socket is at a well-known location
-	socketPath := fmt.Sprintf("unix://%s", paths.ControlSocketRunSymlink()) // use symlink as that works for all versions
+	socketPath := fmt.Sprintf("unix://%s", paths.ControlSocketRunSymlink(installOpts.Develop)) // use symlink as that works for all versions
 	if runtime.GOOS == "windows" {
 		// Windows uses a fixed named pipe, that is always the same.
 		// It is the same even running in unprivileged mode.
@@ -216,6 +224,12 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
 
 			filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-%s-%s-ProcessDump.json", sanitizedTestName, f.operatingSystem, f.architecture))
+			fileDir := path.Dir(filePath)
+			if err := os.MkdirAll(fileDir, 0777); err != nil {
+				f.t.Logf("failed to dump process; failed to create directory %s: %s", fileDir, err)
+				return
+			}
+
 			f.t.Logf("Dumping running processes in %s", filePath)
 			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 			if err != nil {
@@ -237,7 +251,19 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 
 	f.t.Cleanup(func() {
 		// check for running agents after uninstall had a chance to run
-		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at the end of the test")
+		processes := getElasticAgentProcesses(f.t)
+
+		// there can be a single agent left when using --develop mode
+		if f.installOpts != nil && f.installOpts.Develop {
+			assert.LessOrEqual(f.t, len(processes), 1, "More than one agent left running at the end of the test when --develop was used: %v", processes)
+			// However as a convention the agent left running has to be the non-development agent. The development agent should be uninstalled first as a convention.
+			if len(processes) > 0 {
+				assert.NotContains(f.t, processes[0].Cmdline, "DevelopmentAgent", "The agent installed with --develop was left running at the end of the test or was not uninstalled first: %v", processes)
+			}
+			return
+		}
+
+		assert.Empty(f.t, processes, "there should be no running agent at the end of the test")
 	})
 
 	f.t.Cleanup(func() {

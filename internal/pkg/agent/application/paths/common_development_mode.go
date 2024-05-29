@@ -55,8 +55,8 @@ func ShellWrapperPath() string {
 }
 
 // ControlSocketRunSymlink returns the shell wrapper path accounting for development mode.
-func ControlSocketRunSymlink() string {
-	if IsDevelopmentMode() {
+func ControlSocketRunSymlink(isDevelopmentMode bool) string {
+	if isDevelopmentMode {
 		return controlSocketRunSymlinkDevelopmentMode
 	}
 	return controlSocketRunSymlink
