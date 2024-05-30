@@ -139,25 +139,28 @@ resource "google_compute_instance" "vm_instance" {
     inline = [
       "wget https://go.dev/dl/go${local.go_version}.linux-amd64.tar.gz",
       "sudo tar -C /usr/local -xzf go${local.go_version}.linux-amd64.tar.gz",
-      "sudo mkdir -p $(dirname ${local.repo_dir})",
-      "sudo chown ${local.ssh_user}:${local.ssh_user} $(dirname ${local.repo_dir})",
-      "git clone --depth 1 ${local.git_repo} ${local.repo_dir}",
+      "sudo mkdir -p ${local.repo_dir}",
+      "sudo chown ${local.ssh_user}:${local.ssh_user} ${local.repo_dir}",
+      #"git clone --depth 1 ${local.git_repo} ${local.repo_dir}",
       #"sudo touch /etc/profile.d/golang-path.sh && sudo chown ${local.ssh_user}:${local.ssh_user} /etc/profile.d/golang-path.sh"
-      "sudo sh -c \"echo 'export PATH=$PATH:/usr/local/go/bin' > /etc/environment\""
+      "sudo sh -c \"echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/environment\""
     ]
   }
-#  provisioner "file" {
-#    content     = "export PATH=$PATH:/usr/local/go/bin"
-#    destination = "/etc/profile.d/golang-path.sh"
-#  }
 }
 
 resource "terraform_data" "sync_repo" {
-  connection {
-    user = local.ssh_user
-    host = google_compute_instance.vm_instance.network_interface[0].access_config[0].nat_ip
-    private_key = tls_private_key.ssh_key.private_key_openssh
+
+  # trick to always provision the resource
+  triggers_replace = [
+    uuid()
+  ]
+
+  provisioner "local-exec" {
+    command = "rsync -av -e \"ssh -i ${local_sensitive_file.private_ssh_key.filename}\" --exclude-from=${data.external.golist_dump.result.Root}/.rsync.exclude --delete ${data.external.golist_dump.result.Root} ${local.ssh_user}@${google_compute_instance.vm_instance.network_interface[0].access_config[0].nat_ip}:$(dirname ${local.repo_dir})"
   }
+  depends_on = [
+    google_compute_instance.vm_instance
+  ]
 }
 
 output "vm_public_address" {

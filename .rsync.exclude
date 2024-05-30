@@ -1,0 +1,9 @@
+.git
+.integration-cache
+.buildkite
+.agent-testing
+.terraform
+.ogc-cache
+.vagrant
+build
+deploy

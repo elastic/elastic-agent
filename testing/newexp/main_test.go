@@ -1,3 +1,5 @@
+//go:build integration
+
 package newexp
 
 import (
@@ -72,13 +74,8 @@ func TestMain(m *testing.M) {
 
 func innerRun(ctx context.Context, m *testing.M) (returnCode int) {
 
-	// SMALL setup for the test (this would need to be performed where the test runs)
-	pkgVar = "This is not a drill."
-	os.Setenv("TEST_ENV_VAR", "This is not a drill.")
-
 	log.Printf("go test args: %s\n", os.Args)
 
-	//FIXME: Having to define an ssh.Client here is already a smell, need a proper runner interface and implementations
 	if !testOpts.skipProvisioning {
 		// "Remote execution case"
 		defer func() {
@@ -94,24 +91,9 @@ func innerRun(ctx context.Context, m *testing.M) (returnCode int) {
 			return 1
 		}
 
-		sb := new(strings.Builder)
-		extraArgsFlagPresent := false
-		sb.WriteString("cd /src/elastic-agent && go test")
-		for _, arg := range os.Args[1:] {
-			if arg == "-args" {
-				extraArgsFlagPresent = true
-			}
-			sb.WriteString(" ")
-			sb.WriteString(arg)
-		}
+		cmdLine := buildRemoteTestCommand()
 
-		// Add the "no-provision" switch for the remote run
-		if !extraArgsFlagPresent {
-			sb.WriteString(" -args ")
-		}
-		sb.WriteString("-" + flagPrefix + skipProvisioningFlag)
-
-		log.Printf("full command to run on remote host: %q", sb.String())
+		log.Printf("full command to run on remote host: %q", cmdLine)
 
 		session, err := client.NewSession()
 		if err != nil {
@@ -119,7 +101,7 @@ func innerRun(ctx context.Context, m *testing.M) (returnCode int) {
 			return 1
 		}
 		defer session.Close()
-		output, err := session.CombinedOutput(sb.String())
+		output, err := session.CombinedOutput(cmdLine)
 		if err != nil {
 			log.Printf("error running tests on remote machine: %s", err)
 			returnCode = 1
@@ -127,10 +109,37 @@ func innerRun(ctx context.Context, m *testing.M) (returnCode int) {
 		log.Printf("Test run output:\n%s\n", string(output))
 	} else {
 		// Local execution case
+
+		// SMALL setup for the test (this would need to be performed where the test runs)
+		pkgVar = "This is not a drill."
+		os.Setenv("TEST_ENV_VAR", "This is not a drill.")
+
 		return m.Run()
 	}
 
 	return returnCode
+}
+
+func buildRemoteTestCommand() string {
+	sb := new(strings.Builder)
+	sb.WriteString("cd /src/elastic-agent && go test -tags integration")
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "-"+flagPrefix) {
+			// that's a flag for this test main, skip it
+			continue
+		}
+		sb.WriteString(" ")
+		sb.WriteString(arg)
+	}
+
+	// HACK to run the correct package
+	sb.WriteString(" github.com/elastic/elastic-agent/testing/newexp")
+
+	// Add the "no-provision" switch for the remote run
+	sb.WriteString(" -args ")
+	sb.WriteString("-" + flagPrefix + skipProvisioningFlag)
+
+	return sb.String()
 }
 
 func setup(ctx context.Context) (*ssh.Client, error) {
