@@ -556,6 +556,12 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		return errors.New(err, "acquiring metadata failed")
 	}
 
+	// Automatically add a "development" tag when enrolling in development mode.
+	// Ensures the development agent is differentiated from others when on the same host.
+	if paths.IsDevelopmentMode() {
+		c.options.Tags = append(c.options.Tags, "development")
+	}
+
 	r := &fleetapi.EnrollRequest{
 		EnrollAPIKey: c.options.EnrollAPIKey,
 		Type:         fleetapi.PermanentEnroll,
