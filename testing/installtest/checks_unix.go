@@ -21,7 +21,7 @@ import (
 )
 
 func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opts *CheckOpts) error {
-	if opts.Unprivileged {
+	if !opts.Privileged {
 		// Check that the elastic-agent user/group exist.
 		uid, err := install.FindUID(install.ElasticUsername)
 		if err != nil {

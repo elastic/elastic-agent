@@ -38,8 +38,8 @@ func DevelopTopPath() string {
 }
 
 type CheckOpts struct {
-	Unprivileged bool
-	Develop      bool
+	Privileged bool
+	Develop    bool
 }
 
 func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts *CheckOpts) error {

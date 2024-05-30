@@ -52,7 +52,7 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 	if err != nil {
 		return fmt.Errorf("failed to get allowed SID's for %s: %w", topPath, err)
 	}
-	if opts.Unprivileged {
+	if !opts.Privileged {
 		// Check that the elastic-agent user/group exist.
 		uid, err := install.FindUID(install.ElasticUsername)
 		if err != nil {
