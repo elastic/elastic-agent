@@ -169,7 +169,7 @@ func TestInstallWithBasePath(t *testing.T) {
 		err = devFixture.Prepare(ctx)
 		require.NoError(t, err)
 
-		devOpts := &atesting.InstallOpts{Force: true, Privileged: false, Develop: true}
+		devOpts := &atesting.InstallOpts{BasePath: basePath, Force: true, Privileged: false, Develop: true}
 		devOut, err := devFixture.Install(ctx, devOpts)
 		if err != nil {
 			t.Logf("install --develop output: %s", devOut)
