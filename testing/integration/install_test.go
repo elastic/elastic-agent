@@ -52,8 +52,8 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	opts := &atesting.InstallOpts{Force: true, Privileged: false}
-	out, err := fixture.Install(ctx, opts)
+	opts := atesting.InstallOpts{Force: true, Privileged: false}
+	out, err := fixture.Install(ctx, &opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
@@ -61,27 +61,10 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Check that Agent was installed in default base path
 	topPath := installtest.DefaultTopPath()
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Unprivileged: true}))
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Unprivileged: !opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-
-	t.Run("check second agent installs with --develop", func(t *testing.T) {
-		// Get path to Elastic Agent executable
-		devFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-		require.NoError(t, err)
-
-		// Prepare the Elastic Agent so the binary is extracted and ready to use.
-		err = devFixture.Prepare(ctx)
-		require.NoError(t, err)
-
-		devOpts := &atesting.InstallOpts{Force: true, Privileged: false, Develop: true}
-		devOut, err := devFixture.Install(ctx, devOpts)
-		if err != nil {
-			t.Logf("install --develop output: %s", devOut)
-			require.NoError(t, err)
-		}
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, installtest.DevelopTopPath(), &installtest.CheckOpts{Unprivileged: true, Develop: true}))
-	})
+	t.Run("check second agent installs with --develop", testDevelopmentAgentCanInstall(ctx, fixture, installtest.DevelopTopPath(), opts))
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -143,12 +126,12 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	opts := &atesting.InstallOpts{
+	opts := atesting.InstallOpts{
 		BasePath:   basePath,
 		Force:      true,
 		Privileged: false,
 	}
-	out, err := fixture.Install(ctx, opts)
+	out, err := fixture.Install(ctx, &opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
@@ -156,29 +139,11 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Unprivileged: true}))
+	devTopPath := filepath.Join(basePath, "Elastic", paths.DevelopmentInstallDirName)
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Unprivileged: !opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-
-	t.Run("check second agent installs with --develop", func(t *testing.T) {
-		// Get path to Elastic Agent executable
-		devFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-		require.NoError(t, err)
-
-		// Prepare the Elastic Agent so the binary is extracted and ready to use.
-		err = devFixture.Prepare(ctx)
-		require.NoError(t, err)
-
-		devOpts := &atesting.InstallOpts{BasePath: basePath, Force: true, Privileged: false, Develop: true}
-		devOut, err := devFixture.Install(ctx, devOpts)
-		if err != nil {
-			t.Logf("install --develop output: %s", devOut)
-			require.NoError(t, err)
-		}
-
-		devTopPath := filepath.Join(basePath, "Elastic", paths.DevelopmentInstallDirName)
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, devTopPath, &installtest.CheckOpts{Unprivileged: true, Develop: true}))
-	})
+	t.Run("check second agent installs with --develop", testDevelopmentAgentCanInstall(ctx, fixture, devTopPath, opts))
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -220,35 +185,18 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	opts := &atesting.InstallOpts{Force: true, Privileged: true}
-	out, err := fixture.Install(ctx, opts)
+	opts := atesting.InstallOpts{Force: true, Privileged: true}
+	out, err := fixture.Install(ctx, &opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
 	}
 
 	// Check that Agent was installed in default base path
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Unprivileged: false}))
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Unprivileged: !opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-
-	t.Run("check second agent installs with --develop", func(t *testing.T) {
-		// Get path to Elastic Agent executable
-		devFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-		require.NoError(t, err)
-
-		// Prepare the Elastic Agent so the binary is extracted and ready to use.
-		err = devFixture.Prepare(ctx)
-		require.NoError(t, err)
-
-		devOpts := &atesting.InstallOpts{Force: true, Privileged: true, Develop: true}
-		devOut, err := devFixture.Install(ctx, devOpts)
-		if err != nil {
-			t.Logf("install --develop output: %s", devOut)
-			require.NoError(t, err)
-		}
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, installtest.DevelopTopPath(), &installtest.CheckOpts{Unprivileged: false, Develop: true}))
-	})
+	t.Run("check second agent installs with --develop", testDevelopmentAgentCanInstall(ctx, fixture, installtest.DevelopTopPath(), opts))
 }
 
 func TestInstallPrivilegedWithBasePath(t *testing.T) {
@@ -281,12 +229,12 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	opts := &atesting.InstallOpts{
+	opts := atesting.InstallOpts{
 		BasePath:   randomBasePath,
 		Force:      true,
 		Privileged: true,
 	}
-	out, err := fixture.Install(ctx, opts)
+	out, err := fixture.Install(ctx, &opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
@@ -294,10 +242,15 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Unprivileged: false}))
+	devTopPath := filepath.Join(randomBasePath, "Elastic", paths.DevelopmentInstallDirName)
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Unprivileged: !opts.Privileged}))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+	t.Run("check second agent installs with --develop", testDevelopmentAgentCanInstall(ctx, fixture, devTopPath, opts))
+}
 
-	t.Run("check second agent installs with --develop", func(t *testing.T) {
+// Tests that a second agent for development purposes can be installed alongside the first one with the --develop option.
+func testDevelopmentAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, topPath string, installOpts atesting.InstallOpts) func(*testing.T) {
+	return func(t *testing.T) {
 		// Get path to Elastic Agent executable
 		devFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 		require.NoError(t, err)
@@ -306,16 +259,17 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 		err = devFixture.Prepare(ctx)
 		require.NoError(t, err)
 
-		devOpts := &atesting.InstallOpts{BasePath: randomBasePath, Force: true, Privileged: true, Develop: true}
-		devOut, err := devFixture.Install(ctx, devOpts)
+		installOpts.Develop = true
+		devOut, err := devFixture.Install(ctx, &installOpts)
 		if err != nil {
 			t.Logf("install --develop output: %s", devOut)
 			require.NoError(t, err)
 		}
-
-		devTopPath := filepath.Join(randomBasePath, "Elastic", paths.DevelopmentInstallDirName)
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, devTopPath, &installtest.CheckOpts{Unprivileged: false, Develop: true}))
-	})
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{
+			Unprivileged: !installOpts.Privileged,
+			Develop:      installOpts.Develop,
+		}))
+	}
 }
 
 // TestRepeatedInstallUninstall will install then uninstall the agent
