@@ -6,7 +6,9 @@ package paths
 
 import "path/filepath"
 
-const developmentInstallPathSuffix string = "DevelopmentAgent"
+// DevelopmentInstallDirName is the name of the directory agent will be installed to within the base path.
+// For example it is $BasePath/$DevelopmentInstallDirName, on MacOS it is /Library/Elastic/$DevelopmentInstallDirName.
+const DevelopmentInstallDirName string = "DevelopmentAgent"
 
 var isDevelopmentMode bool
 
@@ -23,7 +25,7 @@ func IsDevelopmentMode() bool {
 	}
 
 	// We are installed in development mode and have to infer it from the path.
-	if RunningInstalled() && filepath.Base(Top()) == developmentInstallPathSuffix {
+	if RunningInstalled() && filepath.Base(Top()) == DevelopmentInstallDirName {
 		return true
 	}
 
@@ -33,7 +35,7 @@ func IsDevelopmentMode() bool {
 // InstallPath returns the top level directory Agent will be installed into, accounting for development mode.
 func InstallPath(basePath string) string {
 	if IsDevelopmentMode() {
-		return filepath.Join(basePath, "Elastic", developmentInstallPathSuffix)
+		return filepath.Join(basePath, "Elastic", DevelopmentInstallDirName)
 	}
 	return filepath.Join(basePath, "Elastic", "Agent")
 }

@@ -188,7 +188,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 
 	installDir := "Agent"
 	if installOpts.Develop {
-		installDir = "DevelopmentAgent"
+		installDir = paths.DevelopmentInstallDirName
 	}
 
 	if installOpts.BasePath == "" {
@@ -256,9 +256,10 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 		// there can be a single agent left when using --develop mode
 		if f.installOpts != nil && f.installOpts.Develop {
 			assert.LessOrEqual(f.t, len(processes), 1, "More than one agent left running at the end of the test when --develop was used: %v", processes)
-			// However as a convention the agent left running has to be the non-development agent. The development agent should be uninstalled first as a convention.
+			// The agent left running has to be the non-development agent. The development agent should be uninstalled first as a convention.
 			if len(processes) > 0 {
-				assert.NotContains(f.t, processes[0].Cmdline, "DevelopmentAgent", "The agent installed with --develop was left running at the end of the test or was not uninstalled first: %v", processes)
+				assert.NotContains(f.t, processes[0].Cmdline, paths.DevelopmentInstallDirName,
+					"The agent installed with --develop was left running at the end of the test or was not uninstalled first: %v", processes)
 			}
 			return
 		}

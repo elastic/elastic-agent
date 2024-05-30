@@ -19,6 +19,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -156,7 +157,29 @@ func TestInstallWithBasePath(t *testing.T) {
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Unprivileged: true}))
+
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+
+	t.Run("check second agent installs with --develop", func(t *testing.T) {
+		// Get path to Elastic Agent executable
+		devFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+		require.NoError(t, err)
+
+		// Prepare the Elastic Agent so the binary is extracted and ready to use.
+		err = devFixture.Prepare(ctx)
+		require.NoError(t, err)
+
+		devOpts := &atesting.InstallOpts{Force: true, Privileged: false, Develop: true}
+		devOut, err := devFixture.Install(ctx, devOpts)
+		if err != nil {
+			t.Logf("install --develop output: %s", devOut)
+			require.NoError(t, err)
+		}
+
+		devTopPath := filepath.Join(basePath, "Elastic", paths.DevelopmentInstallDirName)
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, devTopPath, &installtest.CheckOpts{Unprivileged: true, Develop: true}))
+	})
+
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
 		cwd, err := os.Getwd()

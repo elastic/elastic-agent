@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
@@ -33,7 +34,7 @@ func DefaultTopPath() string {
 }
 
 func DevelopTopPath() string {
-	return filepath.Join(defaultBasePath(), "Elastic", "DevelopmentAgent")
+	return filepath.Join(defaultBasePath(), "Elastic", paths.DevelopmentInstallDirName)
 }
 
 type CheckOpts struct {
