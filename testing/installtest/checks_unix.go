@@ -66,7 +66,7 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		// Executing `elastic-agent status` as the `elastic-agent-user` user should work.
 		shellWrapperName := "elastic-agent"
 		if opts.Develop {
-			shellWrapperName = "elastic-dev-agent"
+			shellWrapperName = "elastic-development-agent"
 		}
 
 		var output []byte
