@@ -2,4 +2,4 @@
 
 BASEDIR=$(dirname "$0")
 
-exec $BASEDIR/elastic-agent otel $@
+exec "$BASEDIR/elastic-agent" otel "$@"
