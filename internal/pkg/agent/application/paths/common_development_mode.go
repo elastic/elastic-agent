@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// This file encapsulates the common paths that need to account for development installation.
 package paths
 
 import "path/filepath"
@@ -12,7 +13,7 @@ const DevelopmentInstallDirName string = "DevelopmentAgent"
 
 var isDevelopmentMode bool
 
-// SetIsDevelopmentMode sets whether the agent is installed in development mode or not.
+// SetIsDevelopmentMode sets whether the agent is currently in or is being installed in development mode.
 func SetIsDevelopmentMode(developmentMode bool) {
 	isDevelopmentMode = developmentMode
 }
@@ -57,6 +58,7 @@ func ShellWrapperPath() string {
 }
 
 // ControlSocketRunSymlink returns the shell wrapper path accounting for development mode.
+// Does not auto detect development mode because it is used outside of agent itself in the testing framework.
 func ControlSocketRunSymlink(isDevelopmentMode bool) string {
 	if isDevelopmentMode {
 		return controlSocketRunSymlinkDevelopmentMode
