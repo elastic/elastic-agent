@@ -363,6 +363,23 @@ func (_m *Agent) Unprivileged() bool {
 	return r0
 }
 
+func (_m *Agent) IsStandalone() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsStandalone")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // Agent_Unprivileged_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Unprivileged'
 type Agent_Unprivileged_Call struct {
 	*mock.Call

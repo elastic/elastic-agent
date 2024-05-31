@@ -631,6 +631,7 @@ type fakeAgentInfo struct {
 	snapshot     bool
 	version      string
 	unprivileged bool
+	isStandalone bool
 }
 
 func (a fakeAgentInfo) AgentID() string {
@@ -659,6 +660,10 @@ func (a fakeAgentInfo) Version() string {
 
 func (a fakeAgentInfo) Unprivileged() bool {
 	return a.unprivileged
+}
+
+func (a fakeAgentInfo) IsStandalone() bool {
+	return a.isStandalone
 }
 
 func (a fakeAgentInfo) ReloadID(ctx context.Context) error                  { panic("implement me") }
