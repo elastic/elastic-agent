@@ -31,8 +31,13 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | filelogreceiver | v0.100.0|
 | otlpreceiver | v0.102.0|
+=======
+| filelogreceiver | v0.101.0|
+| otlpreceiver | v0.101.0|
+>>>>>>> e401afe9d7 (Bump the otel-dependencies group with 49 updates (#4791))
 
 
 
@@ -41,10 +46,10 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| elasticsearchexporter | v0.100.0|
-| fileexporter | v0.100.0|
-| debugexporter | v0.100.0|
-| otlpexporter | v0.100.0|
+| elasticsearchexporter | v0.101.0|
+| fileexporter | v0.101.0|
+| debugexporter | v0.101.0|
+| otlpexporter | v0.101.0|
 
 
 
@@ -53,12 +58,20 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | k8sattributesprocessor | v0.102.0|
 | attributesprocessor | v0.100.0|
 | filterprocessor | v0.100.0|
 | resourceprocessor | v0.100.0|
 | transformprocessor | v0.100.0|
 | batchprocessor | v0.100.0|
+=======
+| attributesprocessor | v0.101.0|
+| filterprocessor | v0.101.0|
+| resourceprocessor | v0.101.0|
+| transformprocessor | v0.101.0|
+| batchprocessor | v0.101.0|
+>>>>>>> e401afe9d7 (Bump the otel-dependencies group with 49 updates (#4791))
 
 
 
@@ -67,5 +80,5 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| memorylimiterextension | v0.100.0|
+| memorylimiterextension | v0.101.0|
 
