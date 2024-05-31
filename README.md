@@ -51,9 +51,9 @@ DevelopmentAgent
 The `elastic-agent` command in the shell is replaced with `elastic-development-agent` to interact with the development agent:
 
 ```sh
-# For a priveleged agent
+# For a privileged agent
 sudo elastic-development-agent status
-# For an unpriveleged agent
+# For an unprivileged agent
 sudo -u elastic-agent-user elastic-development-agent status
 ```
 
