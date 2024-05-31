@@ -57,6 +57,12 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command: *command
+  - name: benchmark
+    description: "Benchmark Input"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
   - name: cel
     description: "Common Expression Language Input"
     platforms: *platforms
