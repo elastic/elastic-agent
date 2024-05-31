@@ -155,8 +155,6 @@ func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error
 	agentPID := os.Getpid()
 
 	go func() {
-		// TODO: This should probably be associated with a context?
-		// TODO: What happens if the agent is sent SIGKILL?
 		if err := cmd.Wait(); err != nil {
 			log.Infow("Upgrade Watcher exited with error", "agent.upgrade.watcher.process.pid", "agent.process.pid", agentPID, upgradeWatcherPID, "error.message", err)
 		}
