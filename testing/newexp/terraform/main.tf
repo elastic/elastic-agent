@@ -1,180 +1,27 @@
+terraform {
+  required_version = ">= 1.0.0"
+
+  required_providers {
+    ec = {
+      source  = "elastic/ec"
+      version = "0.7.0"
+    }
+  }
+}
+
 locals {
-  go_version = trimspace(file("${path.module}/../../../.go-version"))
+  # FIXME there is probably a nicer way to read the .go-version file content
+  go_version = trimspace(file("${data.external.golist_dump.result.Root}/.go-version"))
   ssh_user = "buildkite-agent"
   git_repo = "https://github.com/elastic/elastic-agent"
   repo_dir = "/src/elastic-agent"
 }
 
-variable "project_id" {
-  type        = string
-  description = "The GCP project where the VMs will be created"
-  default = "elastic-platform-ingest"
-}
-variable "region" {
-  type        = string
-  description = "The GCP region where the VMs will be created"
-  default = "us-central1"
-}
-variable "zone" {
-  type        = string
-  description = "The GCP zone where the VMs will be created"
-  default = "us-central1-a"
-}
-
-variable "build_id" {
-  type        = string
-  description = "Build id associated with this run"
-  default = "nobuildid"
-}
-
+# this is to locate exactly the root of the repo (needed to upload the current repo and to pinpoint files in specific locations within the repo)
 data "external" "golist_dump" {
   program = [
     "go", "list", "-json=Root", "github.com/elastic/elastic-agent"
   ]
 }
 
-provider "google" {
-  project = var.project_id
-  region  = var.region
-  zone    = var.zone
-  default_labels = {
-    team = "elastic-agent"
-    integration-tests = "true"
-    build_id = var.build_id
-  }
-}
 
-#resource "google_compute_network" "vpc_network" {
-#  name                    = "tf-test-network"
-#  auto_create_subnetworks = false
-#  delete_default_routes_on_create = true
-#}
-#
-#resource "google_compute_subnetwork" "private_network" {
-#  name          = "tf-test-private-network"
-#  ip_cidr_range = "10.2.0.0/16"
-#  network       = google_compute_network.vpc_network.self_link
-#}
-#
-#resource "google_compute_router" "router" {
-#  name    = "tf-test-router"
-#  network = google_compute_network.vpc_network.self_link
-#}
-#
-#resource "google_compute_route" "private_network_internet_route" {
-#  name             = "private-network-internet"
-#  dest_range       = "0.0.0.0/0"
-#  network          = google_compute_network.vpc_network.self_link
-#  next_hop_gateway = "default-internet-gateway"
-#  priority    = 100
-#}
-
-
-resource "tls_private_key" "ssh_key" {
-  algorithm = "ED25519"
-}
-
-resource "local_sensitive_file" "private_ssh_key" {
-  content  = tls_private_key.ssh_key.private_key_openssh
-  filename = "${path.module}/.ssh/id_ed25519"
-  file_permission = "0600"
-  directory_permission = "0700"
-}
-
-resource "local_file" "public_ssh_key" {
-  content  = tls_private_key.ssh_key.public_key_openssh
-  filename = "${path.module}/.ssh/id_ed25519.pub"
-  file_permission = "0600"
-  directory_permission = "0700"
-
-}
-
-resource "google_compute_instance" "vm_instance" {
-  name         = "tf-test-instance"
-  machine_type = "e2-standard-2"
-  lifecycle {
-    ignore_changes = [metadata["ssh-keys"]]
-  }
-  boot_disk {
-    initialize_params {
-      image = "ubuntu-2204-lts"
-#      image = "elastic-images-prod/platform-ingest-beats-ubuntu-2204"
-    }
-  }
-  network_interface {
-#    network = google_compute_network.default.self_link
-#    subnetwork = google_compute_subnetwork.private_network.self_link
-    network = "default"
-    access_config {}
-  }
-  metadata = {
-    "ssh-keys": <<EOF
-    ${local.ssh_user}:${local_file.public_ssh_key.content}
-    EOF
-  }
-  depends_on = [tls_private_key.ssh_key,local_file.public_ssh_key]
-
-  connection {
-    type = "ssh"
-    user = local.ssh_user
-    host = self.network_interface[0].access_config[0].nat_ip
-    private_key = tls_private_key.ssh_key.private_key_openssh
-  }
-
-
-#  # The provisioner below is for elastic linux image where we have asdf but it doesn't work with non-interactive ssh commands (we need a shell)
-#  provisioner "remote-exec" {
-#    inline = [
-#      "sudo mkdir -p $(dirname ${local.repo_dir})",
-#      "sudo chown ${local.ssh_user}:${local.ssh_user} $(dirname ${local.repo_dir})",
-#      # fix shell of the user if it's not bash to have asdf working
-#      "sudo sed -i 's/\\(${local.ssh_user}:.*\\):\\/bin\\/sh/\\1:\\/bin\\/bash/g' /etc/passwd",
-#      "asdf global golang ${local.go_version}",
-#      "git clone --depth 1 ${local.git_repo} ${local.repo_dir}",
-#    ]
-#  }
-
-  # The provisioner below is for a plain linux image where we have to install go from scratch
-  provisioner "remote-exec" {
-    inline = [
-      "wget https://go.dev/dl/go${local.go_version}.linux-amd64.tar.gz",
-      "sudo tar -C /usr/local -xzf go${local.go_version}.linux-amd64.tar.gz",
-      "sudo mkdir -p ${local.repo_dir}",
-      "sudo chown ${local.ssh_user}:${local.ssh_user} ${local.repo_dir}",
-      #"git clone --depth 1 ${local.git_repo} ${local.repo_dir}",
-      #"sudo touch /etc/profile.d/golang-path.sh && sudo chown ${local.ssh_user}:${local.ssh_user} /etc/profile.d/golang-path.sh"
-      "sudo sh -c \"echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/environment\""
-    ]
-  }
-}
-
-resource "terraform_data" "sync_repo" {
-
-  # trick to always provision the resource
-  triggers_replace = [
-    uuid()
-  ]
-
-  provisioner "local-exec" {
-    command = "rsync -av -e \"ssh -i ${local_sensitive_file.private_ssh_key.filename}\" --exclude-from=${data.external.golist_dump.result.Root}/.rsync.exclude --delete ${data.external.golist_dump.result.Root} ${local.ssh_user}@${google_compute_instance.vm_instance.network_interface[0].access_config[0].nat_ip}:$(dirname ${local.repo_dir})"
-  }
-  depends_on = [
-    google_compute_instance.vm_instance
-  ]
-}
-
-output "vm_public_address" {
-  value = google_compute_instance.vm_instance.network_interface[0].access_config[0].nat_ip
-}
-
-output "ssh_user" {
-  value = local.ssh_user
-}
-
-output "private_key_file" {
-  value = local_sensitive_file.private_ssh_key.filename
-}
-
-output "repo_dir" {
-  value = local.repo_dir
-}

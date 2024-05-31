@@ -57,7 +57,7 @@ func bindTestFlags(prefix string, flagSet *flag.FlagSet, opts *testOptions) erro
 }
 
 func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer cancel()
 	flag.Parse()
 

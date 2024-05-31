@@ -1,4 +1,5 @@
 .git
+.ssh
 .integration-cache
 .buildkite
 .agent-testing
