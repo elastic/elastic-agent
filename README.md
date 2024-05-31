@@ -22,7 +22,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Developing
 
-The following docs are only focused on getting developers started building code for Elastic Agent.
+The following are exclusively focused on getting developers started building code for Elastic Agent.
 
 ### Development Installations
 
@@ -33,14 +33,14 @@ This prevents you from installing the Elastic Agent a second time for developmen
 of friction, Elastic Agent has a development mode that permits installing the Elastic Agent on your machine a second time:
 
 ```sh
-# All other arguments to the install command are supported when --develop is specified.
+# All other arguments to the install command are still supported when --develop is specified.
 sudo ./elastic-agent install --develop
-# The run command also supports the --develop option to all running without installing when there is another agent on the machine.
+# The run command also supports the --develop option to allow running without installing when there is another agent on the machine.
 ./elastic-agent run -e --develop
 ```
 
 Using the `--develop` option will install the agent in an isolated `DevelopmentAgent` agent directory in the chosen base path.
-Development agents installed in Fleet will automatically have the `development` tag applied. Using the default base path on MacOS you will see:
+Development agents enrolled in Fleet will have the `development` tag added automatically. Using the default base path on MacOS you will see:
 
 ```sh
 sudo ls /Library/Elastic/
@@ -57,11 +57,11 @@ sudo elastic-development-agent status
 sudo -u elastic-agent-user elastic-development-agent status
 ```
 
-The primary restriction of `--develop` installations is that you cannot run Elastic Defend a second time on the same machine. Defend installations
-for development installations will fail with resource conflicts. All other integrations should be usable provided conflicting configurations are
-changed ahead of time. For example two agents cannot bind to the same `agent.monitoring.http.port` value to expose their monitoring servers.
+The primary restriction of `--develop` installations is that you cannot run Elastic Defend a second time on the same machine. Attempting to
+install Defend twice will fail with resource conflicts. All other integrations should be usable provided conflicting configurations are
+changed ahead of time. For example two agents cannot bind to the same `agent.monitoring.http.port` to expose their monitoring servers.
 
-To follow the changes made to support development mode, search for the IsDevelopmentMode() function in the source code.
+To follow the changes made to support development mode, search for the `IsDevelopmentMode()` function in the source code.
 
 ### Test Framework
 
