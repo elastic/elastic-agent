@@ -26,7 +26,7 @@ const (
 
 	// serviceName is the service name when installed.
 	serviceName                = "Elastic Agent"
-	serviceNameDevelopmentMode = "Elastic Agent (Development)"
+	serviceNameDevelopmentMode = "Elastic Agent (development)"
 
 	// shellWrapperPath is the path to the installed shell wrapper.
 	shellWrapperPath                = ""
