@@ -77,13 +77,13 @@ func innerRun(ctx context.Context, m *testing.M) (returnCode int) {
 			}
 		}()
 
-		client, err := setup(ctx)
+		client, _, essDeployment, err := setup(ctx)
 		if err != nil {
 			log.Printf("error during setup: %s", err)
 			return 1
 		}
 
-		cmdLine := buildRemoteTestCommand()
+		cmdLine := buildRemoteTestCommand(essDeployment)
 
 		log.Printf("full command to run on remote host: %q", cmdLine)
 
@@ -112,9 +112,32 @@ func innerRun(ctx context.Context, m *testing.M) (returnCode int) {
 	return returnCode
 }
 
-func buildRemoteTestCommand() string {
+func buildRemoteTestCommand(deployment *ESSDeployment) string {
 	sb := new(strings.Builder)
-	sb.WriteString("cd /src/elastic-agent && go test -tags integration")
+
+	sb.WriteString("cd /src/elastic-agent && ")
+
+	// FIXME Hack to have define directives work at runtime
+	sb.WriteString("TEST_DEFINE_PREFIX=aaaaaa ")
+	sb.WriteString(" ELASTICSEARCH_HOST=")
+	sb.WriteString(deployment.ElasticsearchHost)
+	sb.WriteString(" KIBANA_HOST=")
+	sb.WriteString(deployment.KibanaHost)
+	sb.WriteString(" ELASTICSEARCH_USERNAME=")
+	sb.WriteString(deployment.ESUser)
+	sb.WriteString(" ELASTICSEARCH_PASSWORD=")
+	sb.WriteString(deployment.ESPassword)
+	sb.WriteString(" KIBANA_USERNAME=")
+	sb.WriteString(deployment.ESUser)
+	sb.WriteString(" KIBANA_PASSWORD=")
+	sb.WriteString(deployment.ESPassword)
+
+	// Start with the test command
+	sb.WriteString(" go test ")
+
+	// HACK to run the correct package
+	sb.WriteString(" github.com/elastic/elastic-agent/testing/newexp ")
+	sb.WriteString("-tags integration")
 	for _, arg := range os.Args[1:] {
 		if strings.HasPrefix(arg, "-"+flagPrefix) {
 			// that's a flag for this test main, skip it
@@ -123,9 +146,6 @@ func buildRemoteTestCommand() string {
 		sb.WriteString(" ")
 		sb.WriteString(arg)
 	}
-
-	// HACK to run the correct package
-	sb.WriteString(" github.com/elastic/elastic-agent/testing/newexp")
 
 	// Add the "no-provision" switch for the remote run
 	sb.WriteString(" -args ")

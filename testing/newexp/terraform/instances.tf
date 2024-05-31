@@ -32,7 +32,7 @@ resource "local_file" "public_ssh_key" {
 
 }
 
-resource "google_compute_instance" "vm_instance" {
+resource "google_compute_instance" "ubuntu_2204_instance" {
   name         = "tf-test-instance"
   machine_type = "e2-standard-2"
   lifecycle {
@@ -101,10 +101,10 @@ resource "terraform_data" "sync_repo" {
   ]
 
   provisioner "local-exec" {
-    command = "rsync -av -e \"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${local_sensitive_file.private_ssh_key.filename}\" --exclude-from=${data.external.golist_dump.result.Root}/.rsync.exclude --timeout=30 --delete ${data.external.golist_dump.result.Root} ${local.ssh_user}@${google_compute_instance.vm_instance.network_interface[0].access_config[0].nat_ip}:$(dirname ${local.repo_dir})"
+    command = "rsync -av -e \"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${local_sensitive_file.private_ssh_key.filename}\" --exclude-from=${data.external.golist_dump.result.Root}/.rsync.exclude --timeout=30 --delete ${data.external.golist_dump.result.Root} ${local.ssh_user}@${google_compute_instance.ubuntu_2204_instance.network_interface[0].access_config[0].nat_ip}:$(dirname ${local.repo_dir})"
   }
   depends_on = [
-    google_compute_instance.vm_instance
+    google_compute_instance.ubuntu_2204_instance
   ]
 }
 
