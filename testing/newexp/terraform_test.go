@@ -24,7 +24,8 @@ var terraform *tfexec.Terraform
 
 func setup(ctx context.Context) (*ssh.Client, error) {
 	// Setup terraform instances
-	err := prepareTerraform(ctx)
+	var err error
+	terraform, err = prepareTerraform(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("setup error: %w", err)
 	}
@@ -102,7 +103,10 @@ func provision(ctx context.Context) (*tfjson.State, error) {
 		return nil, fmt.Errorf("error running Apply: %w", err)
 	}
 
+	// FIXME the command below shows sensitive output id stdout is set
+	terraform.SetStdout(nil)
 	state, err := terraform.Show(ctx)
+	terraform.SetStdout(os.Stderr)
 	if err != nil {
 		return nil, fmt.Errorf("error running Show: %w", err)
 	}
@@ -124,14 +128,14 @@ func tearDown(ctx context.Context) error {
 	return errors.Join(teardownError, terraformInstall.Remove(ctx))
 }
 
-func prepareTerraform(ctx context.Context) error {
+func prepareTerraform(ctx context.Context) (*tfexec.Terraform, error) {
 	installer := &releases.ExactVersion{
 		Product: product.Terraform,
 		Version: version.Must(version.NewVersion("1.8.4")),
 	}
 	execPath, err := installer.Install(ctx)
 	if err != nil {
-		return fmt.Errorf("error installing Terraform: %w", err)
+		return nil, fmt.Errorf("error installing Terraform: %w", err)
 	}
 	terraformInstall = installer
 
@@ -140,10 +144,11 @@ func prepareTerraform(ctx context.Context) error {
 	log.Printf("working dir: %s\n", testOpts.terraformWorkDir)
 
 	tf, err := tfexec.NewTerraform(testOpts.terraformWorkDir, execPath)
+	tf.SetLogger(log.Default())
+	tf.SetStdout(os.Stderr)
 	if err != nil {
 		log.Fatalf("error running NewTerraform: %s", err)
 	}
-	terraform = tf
 
-	return nil
+	return tf, nil
 }

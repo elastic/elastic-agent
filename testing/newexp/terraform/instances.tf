@@ -40,8 +40,8 @@ resource "google_compute_instance" "vm_instance" {
   }
   boot_disk {
     initialize_params {
-      image = "ubuntu-2204-lts"
-#      image = "elastic-images-prod/platform-ingest-beats-ubuntu-2204"
+#      image = "ubuntu-2204-lts"
+      image = "elastic-images-prod/platform-ingest-beats-ubuntu-2204"
     }
   }
   network_interface {
@@ -65,30 +65,31 @@ resource "google_compute_instance" "vm_instance" {
   }
 
 
-#  # The provisioner below is for elastic linux image where we have asdf but it doesn't work with non-interactive ssh commands (we need a shell)
-#  provisioner "remote-exec" {
-#    inline = [
-#      "sudo mkdir -p ${local.repo_dir}",
-#      "sudo chown ${local.ssh_user}:${local.ssh_user} ${local.repo_dir}",
-#      # fix shell of the user if it's not bash to have asdf working
-#      "sudo sed -i 's/\\(${local.ssh_user}:.*\\):\\/bin\\/sh/\\1:\\/bin\\/bash/g' /etc/passwd",
-#      "sudo sh -c \"echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/environment\"",
-#      "asdf global golang ${local.go_version}",
-#    ]
-#  }
+  # The provisioner below is for elastic linux image where we have asdf but it doesn't work with non-interactive ssh commands (we need a shell)
+  provisioner "remote-exec" {
+    inline = [
+      "sudo mkdir -p ${local.repo_dir}",
+      "sudo chown ${local.ssh_user}:${local.ssh_user} ${local.repo_dir}",
+      # fix shell of the user if it's not bash to have asdf working
+      "sudo sed -i 's/\\(${local.ssh_user}:.*\\):\\/bin\\/sh/\\1:\\/bin\\/bash/g' /etc/passwd",
+      "sudo sh -c \"echo 'export PATH=$PATH:/opt/buildkite-agent/.asdf/shims' >> /etc/environment\"",
+      "sudo sh -c \"echo 'export ASDF_DIR=/opt/buildkite-agent/.asdf' >> /etc/environment\"",
+      "sudo sh -c \"echo 'export ASDF_GOLANG_VERSION=${local.go_version}' >> /etc/environment\"",
+    ]
+  }
 
-    # The provisioner below is for a plain linux image where we have to install go from scratch
-    provisioner "remote-exec" {
-      inline = [
-        "wget https://go.dev/dl/go${local.go_version}.linux-amd64.tar.gz",
-        "sudo tar -C /usr/local -xzf go${local.go_version}.linux-amd64.tar.gz",
-        "sudo mkdir -p ${local.repo_dir}",
-        "sudo chown ${local.ssh_user}:${local.ssh_user} ${local.repo_dir}",
-        #"git clone --depth 1 ${local.git_repo} ${local.repo_dir}",
-        #"sudo touch /etc/profile.d/golang-path.sh && sudo chown ${local.ssh_user}:${local.ssh_user} /etc/profile.d/golang-path.sh"
-        "sudo sh -c \"echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/environment\""
-      ]
-    }
+#    # The provisioner below is for a plain linux image where we have to install go from scratch
+#    provisioner "remote-exec" {
+#      inline = [
+#        "wget https://go.dev/dl/go${local.go_version}.linux-amd64.tar.gz",
+#        "sudo tar -C /usr/local -xzf go${local.go_version}.linux-amd64.tar.gz",
+#        "sudo mkdir -p ${local.repo_dir}",
+#        "sudo chown ${local.ssh_user}:${local.ssh_user} ${local.repo_dir}",
+#        #"git clone --depth 1 ${local.git_repo} ${local.repo_dir}",
+#        #"sudo touch /etc/profile.d/golang-path.sh && sudo chown ${local.ssh_user}:${local.ssh_user} /etc/profile.d/golang-path.sh"
+#        "sudo sh -c \"echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/environment\""
+#      ]
+#    }
 }
 
 # This syncs local source code with the one on the VM
