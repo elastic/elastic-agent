@@ -915,7 +915,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 	}
 
 	// add system/process metrics for services that can't be monitored via json/beats metrics
-	// If there's a checkin PID and the corrisponding component has a service spec section, add a system/process config
+	// If there's a checkin PID and the corresponding component has a service spec section, add a system/process config
 	for _, compState := range componentList {
 		if compState.InputSpec != nil && compState.InputSpec.Spec.Service != nil {
 			if comp, ok := existingStateServicePids[compState.ID]; ok && comp != 0 {
