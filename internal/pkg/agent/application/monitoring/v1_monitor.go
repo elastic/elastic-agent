@@ -910,84 +910,89 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 		},
 	}
 
+	for _, comp := range componentList {
+		logp.L().Infof("input component %s: %#v", comp.ID, comp.InputSpec.Spec.Service)
+	}
+
 	// add system/process metrics for services that can't be monitored via json/beats metrics
-	// If there's a checkin PID and it contains the "endpoint" string, assume we want to monitor it
-	for id, comp := range existingStateServicePids {
-		logp.L().Infof("component/pid monitoring map is: %#v", existingStateServicePids)
-		if comp != 0 && strings.Contains(id, "endpoint") {
-			logp.L().Infof("creating system/process watcher for pid %d", comp)
-			inputs = append(inputs, map[string]interface{}{
-				idKey:        fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
-				"name":       fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
-				"type":       "system/metrics",
-				useOutputKey: monitoringOutput,
-				"data_stream": map[string]interface{}{
-					"namespace": monitoringNamespace,
-				},
-				"streams": []interface{}{
-					map[string]interface{}{
-						idKey: fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
-						"data_stream": map[string]interface{}{
-							"type":      "metrics",
-							"dataset":   "elastic_agent.endpoint_security",
-							"namespace": monitoringNamespace,
-						},
-						"metricsets":              []interface{}{"process"},
-						"period":                  metricsCollectionIntervalString,
-						"index":                   fmt.Sprintf("metrics-elastic_agent.endpoint_security-%s", monitoringNamespace),
-						"process.pid":             comp,
-						"process.cgroups.enabled": false,
-						"processors": []interface{}{
-							map[string]interface{}{
-								"add_fields": map[string]interface{}{
-									"target": "data_stream",
-									"fields": map[string]interface{}{
-										"type":      "metrics",
-										"dataset":   "elastic_agent.endpoint_security",
-										"namespace": monitoringNamespace,
+	// If there's a checkin PID and the corrisponding component has a service spec section, add a system/process config
+	for _, compState := range componentList {
+		if compState.InputSpec != nil && compState.InputSpec.Spec.Service != nil {
+			if comp, ok := existingStateServicePids[compState.ID]; ok && comp != 0 {
+				inputs = append(inputs, map[string]interface{}{
+					idKey:        fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
+					"name":       fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
+					"type":       "system/metrics",
+					useOutputKey: monitoringOutput,
+					"data_stream": map[string]interface{}{
+						"namespace": monitoringNamespace,
+					},
+					"streams": []interface{}{
+						map[string]interface{}{
+							idKey: fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
+							"data_stream": map[string]interface{}{
+								"type":      "metrics",
+								"dataset":   "elastic_agent.endpoint_security",
+								"namespace": monitoringNamespace,
+							},
+							"metricsets":              []interface{}{"process"},
+							"period":                  metricsCollectionIntervalString,
+							"index":                   fmt.Sprintf("metrics-elastic_agent.endpoint_security-%s", monitoringNamespace),
+							"process.pid":             comp,
+							"process.cgroups.enabled": false,
+							"processors": []interface{}{
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "data_stream",
+										"fields": map[string]interface{}{
+											"type":      "metrics",
+											"dataset":   "elastic_agent.endpoint_security",
+											"namespace": monitoringNamespace,
+										},
 									},
 								},
-							},
-							map[string]interface{}{
-								"add_fields": map[string]interface{}{
-									"target": "event",
-									"fields": map[string]interface{}{
-										"dataset": "elastic_agent.endpoint_security",
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "event",
+										"fields": map[string]interface{}{
+											"dataset": "elastic_agent.endpoint_security",
+										},
 									},
 								},
-							},
-							map[string]interface{}{
-								"add_fields": map[string]interface{}{
-									"target": "elastic_agent",
-									"fields": map[string]interface{}{
-										"id":       b.agentInfo.AgentID(),
-										"version":  b.agentInfo.Version(),
-										"snapshot": b.agentInfo.Snapshot(),
-										"process":  "endpoint_security",
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "elastic_agent",
+										"fields": map[string]interface{}{
+											"id":       b.agentInfo.AgentID(),
+											"version":  b.agentInfo.Version(),
+											"snapshot": b.agentInfo.Snapshot(),
+											"process":  "endpoint_security",
+										},
 									},
 								},
-							},
-							map[string]interface{}{
-								"add_fields": map[string]interface{}{
-									"target": "agent",
-									"fields": map[string]interface{}{
-										"id": b.agentInfo.AgentID(),
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "agent",
+										"fields": map[string]interface{}{
+											"id": b.agentInfo.AgentID(),
+										},
 									},
 								},
-							},
-							map[string]interface{}{
-								"add_fields": map[string]interface{}{
-									"target": "component",
-									"fields": map[string]interface{}{
-										"binary": "endpoint_security",
-										"id":     id,
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "component",
+										"fields": map[string]interface{}{
+											"binary": "endpoint_security",
+											"id":     compState.ID,
+										},
 									},
 								},
 							},
 						},
 					},
-				},
-			})
+				})
+			}
+
 		}
 	}
 

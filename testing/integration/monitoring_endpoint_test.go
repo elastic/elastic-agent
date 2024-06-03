@@ -135,16 +135,17 @@ func genESQueryByBinary(agentID string, componentID string) map[string]interface
 							"component.id": componentID,
 						},
 					},
-					{
-						"exists": map[string]interface{}{
-							"field": "system.process.cpu.total.value",
-						},
-					},
-					{
-						"exists": map[string]interface{}{
-							"field": "system.process.memory.size",
-						},
-					},
+					// see https://github.com/elastic/integrations/pull/10054
+					// {
+					// 	"exists": map[string]interface{}{
+					// 		"field": "system.process.cpu.total.value",
+					// 	},
+					// },
+					// {
+					// 	"exists": map[string]interface{}{
+					// 		"field": "system.process.memory.size",
+					// 	},
+					// },
 				},
 			},
 		},

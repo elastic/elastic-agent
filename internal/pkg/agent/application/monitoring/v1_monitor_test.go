@@ -23,7 +23,6 @@ import (
 )
 
 func TestMonitoringWithEndpoint(t *testing.T) {
-
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
 
@@ -59,7 +58,18 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 	// manually declaring all the MonitoringConfig() args since there's a lot of them, and this makes
 	// the test a little more self-describing
 
-	var compList []component.Component
+	compList := []component.Component{
+		{
+			ID: "endpoint-default",
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Service: &component.ServiceSpec{
+						CPort: 7688,
+					},
+				},
+			},
+		},
+	}
 
 	compIdToBinary := map[string]string{
 		"endpoint-default": "endpoint-security",

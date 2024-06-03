@@ -136,6 +136,7 @@ func (c *Coordinator) refreshState() {
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState) {
 	found := false
+	// check for any component updates to the PID, so we can update the component monitoring
 	pidRequiresUpdate := false
 	for i, other := range c.state.Components {
 		if other.Component.ID == state.Component.ID {
@@ -169,7 +170,7 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	c.stateNeedsRefresh = true
 
 	if pidRequiresUpdate {
-		c.compPidUpdate <- struct{}{}
+		c.componentPidRequiresUpdate.Store(true)
 	}
 }
 
