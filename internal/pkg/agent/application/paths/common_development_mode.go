@@ -9,7 +9,13 @@ import "path/filepath"
 
 // DevelopmentInstallDirName is the name of the directory agent will be installed to within the base path.
 // For example it is $BasePath/$DevelopmentInstallDirName, on MacOS it is /Library/Elastic/$DevelopmentInstallDirName.
-const DevelopmentInstallDirName string = "DevelopmentAgent"
+const (
+	DevelopmentInstallDirName = "DevelopmentAgent"
+
+	// Service display names. Must be different from the ServiceName() on Windows.
+	serviceDisplayName                = "Elastic Agent"
+	serviceDisplayNameDevelopmentMode = "Elastic Development Agent"
+)
 
 var isDevelopmentMode bool
 
@@ -47,6 +53,14 @@ func ServiceName() string {
 		return serviceNameDevelopmentMode
 	}
 	return serviceName
+}
+
+// ServiceDisplayName returns the service display name accounting for development mode.
+func ServiceDisplayName() string {
+	if IsDevelopmentMode() {
+		return serviceDisplayNameDevelopmentMode
+	}
+	return serviceDisplayName
 }
 
 // ShellWrapperPath returns the shell wrapper path accounting for development mode.
