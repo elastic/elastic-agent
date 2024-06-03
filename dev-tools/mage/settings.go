@@ -88,7 +88,7 @@ var (
 
 	Snapshot      bool
 	DevBuild      bool
-	ExternalBuild string
+	ExternalBuild bool
 
 	versionQualified bool
 	versionQualifier string
@@ -149,7 +149,10 @@ func initGlobals() {
 		panic(fmt.Errorf("failed to parse DEV env value: %w", err))
 	}
 
-	ExternalBuild = EnvOr("EXTERNAL", "false")
+	ExternalBuild, err = strconv.ParseBool(EnvOr("EXTERNAL", "false"))
+	if err != nil {
+		panic(fmt.Errorf("failed to parse EXTERNAL env value: %w", err))
+	}
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
