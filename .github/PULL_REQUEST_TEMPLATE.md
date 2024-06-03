@@ -72,8 +72,8 @@ Link related issues below. Insert the issue link or reference after the word "Cl
 
 <!-- CI Cheatsheet
 Trigger comments:
-/test             Triggers unit test pipeline
-/test extended    Triggers integration test pipeline
+/test             (Or `buildkite test this|it`) Triggers unit test pipeline
+/test extended    (Or `buildkite test extended`) Triggers integration test pipeline
 
 PR labels:
 skip-ci           Skips unit and integration tests
