@@ -13,7 +13,7 @@ import (
 
 // Config is the configuration for the client.
 type Config struct {
-	Protocol Protocol `config:"protocol" yaml:"protocol"`
+	Protocol Protocol `config:"protocol" yaml:"protocol,omitempty"`
 	SpaceID  string   `config:"space.id" yaml:"space.id,omitempty"`
 	Path     string   `config:"path" yaml:"path,omitempty"`
 	Host     string   `config:"host" yaml:"host,omitempty"`
