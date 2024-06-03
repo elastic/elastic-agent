@@ -285,7 +285,7 @@ type Coordinator struct {
 	// Should only be interacted with via CoordinatorActive() or runLoopIteration()
 	heartbeatChan chan struct{}
 
-	servicePidUpdate chan struct{}
+	compPidUpdate chan struct{}
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -380,7 +380,7 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		overrideStateChan:  make(chan *coordinatorOverrideState),
 		upgradeDetailsChan: make(chan *details.Details),
 		heartbeatChan:      make(chan struct{}),
-		servicePidUpdate:   make(chan struct{}, 1),
+		compPidUpdate:      make(chan struct{}, 1),
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -1035,8 +1035,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case c.heartbeatChan <- struct{}{}:
 
-	case <-c.servicePidUpdate:
-		c.logger.Infof("got pid service update, refreshing config")
+	case <-c.compPidUpdate:
 		err := c.refreshComponentModel(ctx)
 		if err != nil {
 			err = fmt.Errorf("error refreshing component model for PID update: %w", err)

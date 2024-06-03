@@ -169,7 +169,7 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	c.stateNeedsRefresh = true
 
 	if pidRequiresUpdate {
-		c.servicePidUpdate <- struct{}{}
+		c.compPidUpdate <- struct{}{}
 	}
 }
 
