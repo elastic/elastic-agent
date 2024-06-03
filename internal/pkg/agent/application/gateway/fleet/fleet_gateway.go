@@ -333,8 +333,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		// escMeta struct is incomplete: log a warning
 		f.log.Warnw("Agent ECSMetadata struct is missing/incomplete", "elastic_ecs_metadata", ecsMeta.Elastic)
 	} else {
-		// FIXME
-		f.log.Errorf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
+		f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
 		// Fix loglevel with the current log level used by coordinator
 		ecsMeta.Elastic.Agent.LogLevel = state.LogLevel.String()
 	}
