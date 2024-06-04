@@ -111,6 +111,7 @@ func TestCoordinatorReportsUnhealthyComponents(t *testing.T) {
 		managerChans: managerChans{
 			runtimeManagerUpdate: runtimeChan,
 		},
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
 	unhealthyComponent := runtime.ComponentComponentState{
@@ -187,6 +188,7 @@ func TestCoordinatorComponentStatesAreSeparate(t *testing.T) {
 		managerChans: managerChans{
 			runtimeManagerUpdate: runtimeChan,
 		},
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
 	comp1 := runtime.ComponentComponentState{
