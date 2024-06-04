@@ -8,5 +8,4 @@ package cmd
 
 // logExternal logs the error to an external log.  On non-windows systems this is a no-op.
 func logExternal(msg string) {
-	return
 }
