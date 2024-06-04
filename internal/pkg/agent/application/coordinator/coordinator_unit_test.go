@@ -59,6 +59,7 @@ func TestVarsManagerError(t *testing.T) {
 		managerChans: managerChans{
 			varsManagerError: varsErrorChan,
 		},
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 	// Send an error via the vars manager channel, and let Coordinator update
 	const errorStr = "force error"
