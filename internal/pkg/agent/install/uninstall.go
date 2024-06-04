@@ -89,6 +89,14 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 		pt.Describe("Successfully uninstalled service")
 	}
 
+	// Removing the external logger isn't fatal to uninstall
+	err = removeExternalLogger()
+	if err != nil {
+		pt.Describe(fmt.Sprintf("Failed to remove external logger: %s", err))
+	} else {
+		pt.Describe("Removed external logger")
+	}
+
 	// remove, if present on platform
 	if paths.ShellWrapperPath != "" {
 		err = os.Remove(paths.ShellWrapperPath)
@@ -221,7 +229,6 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 }
 
 func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, unprivileged bool) error {
-
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
 		return fmt.Errorf("failed to gather system information: %w", err)

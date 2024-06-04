@@ -26,3 +26,9 @@ func isRetryableError(_ error) bool {
 func killNoneChildProcess(proc *os.Process) error {
 	return proc.Kill()
 }
+
+// removeExternalLogger unregisters any external loggers, on non Windows
+// this is a no-op
+func removeExternalLogger() error {
+	return nil
+}
