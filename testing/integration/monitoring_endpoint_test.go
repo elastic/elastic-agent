@@ -8,6 +8,8 @@ package integration
 
 import (
 	"context"
+	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 
@@ -25,8 +27,9 @@ import (
 
 type EndpointMetricsMonRunner struct {
 	suite.Suite
-	info    *define.Info
-	fixture *atesting.Fixture
+	info       *define.Info
+	fixture    *atesting.Fixture
+	endpointID string
 }
 
 func TestEndpointAgentServiceMonitoring(t *testing.T) {
@@ -45,8 +48,9 @@ func TestEndpointAgentServiceMonitoring(t *testing.T) {
 	require.NoError(t, err, "could not create agent fixture")
 
 	runner := &EndpointMetricsMonRunner{
-		info:    info,
-		fixture: fixture,
+		info:       info,
+		fixture:    fixture,
+		endpointID: "endpoint-default",
 	}
 
 	suite.Run(t, runner)
@@ -98,6 +102,7 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 		time.Second,
 		"Endpoint component or units are not healthy.",
 	)
+
 }
 
 func (runner *EndpointMetricsMonRunner) TestEndpointMetrics() {
@@ -107,18 +112,107 @@ func (runner *EndpointMetricsMonRunner) TestEndpointMetrics() {
 	agentStatus, err := runner.fixture.ExecStatus(ctx)
 	require.NoError(runner.T(), err)
 
-	endpointID := "endpoint-default"
 	require.Eventually(runner.T(), func() bool {
 
-		query := genESQueryByBinary(agentStatus.Info.ID, endpointID)
+		query := genESQueryByBinary(agentStatus.Info.ID, runner.endpointID)
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
 		require.NoError(runner.T(), err)
-		runner.T().Logf("Fetched metrics for %s, got %d hits", endpointID, res.Hits.Total.Value)
+		runner.T().Logf("Fetched metrics for %s, got %d hits", runner.endpointID, res.Hits.Total.Value)
 		return res.Hits.Total.Value >= 1
-	}, time.Minute*10, time.Second*10, "could not fetch component metricsets for endpoint with ID %s and agent ID %s", endpointID, agentStatus.Info.ID)
+	}, time.Minute*10, time.Second*10, "could not fetch component metricsets for endpoint with ID %s and agent ID %s", runner.endpointID, agentStatus.Info.ID)
+
 }
 
-// TODO: move to helpers.go
+func (runner *EndpointMetricsMonRunner) TestEndpointMetricsAfterRestart() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*15)
+	defer cancel()
+	// once we've gotten the first round of metrics,forcably restart endpoint, see if we still get metrics
+	// This makes sure that the backend coordinator can deal with properly updating the metrics handlers if there's unexpected state changes
+
+	// confine this to linux; the behavior is platform-agnostic, and this way we have `pgrep`
+	if runtime.GOOS != "linux" {
+		return
+	}
+
+	// kill endpoint
+	cmd := exec.Command("pgrep", "-f", "endpoint")
+	pgrep, err := cmd.CombinedOutput()
+	runner.T().Logf("killing pid: %s", string(pgrep))
+
+	cmd = exec.Command("pkill", "--signal", "SIGKILL", "-f", "endpoint")
+	_, err = cmd.CombinedOutput()
+	require.NoError(runner.T(), err)
+
+	// wait for endpoint to come back up. We use `pgrep`
+	// since the agent health status won't imidately register that the endpoint process itself is gone.
+	require.Eventually(runner.T(), func() bool {
+		cmd := exec.Command("pgrep", "-f", "endpoint")
+		pgrep, err := cmd.CombinedOutput()
+		runner.T().Logf("found pid: %s", string(pgrep))
+		if err == nil {
+			return true
+		}
+		return false
+	}, time.Minute*2, time.Second)
+
+	// make sure agent still says we're healthy
+	agentClient := runner.fixture.Client()
+	err = agentClient.Connect(ctx)
+	require.NoError(runner.T(), err, "could not connect to local agent")
+
+	require.Eventually(runner.T(),
+		func() bool { return agentAndEndpointAreHealthy(runner.T(), ctx, agentClient) },
+		time.Minute*3,
+		time.Second,
+		"Endpoint component or units are not healthy.",
+	)
+
+	// catch the time endpoint is restarted, so we can filter for documents after a given time
+	endpointRestarted := time.Now()
+
+	agentStatus, err := runner.fixture.ExecStatus(ctx)
+	require.NoError(runner.T(), err)
+
+	// now query again, but make sure we're getting new metrics
+	require.Eventually(runner.T(), func() bool {
+		query := genESQueryByDate(agentStatus.Info.ID, runner.endpointID, endpointRestarted.Format(time.RFC3339))
+		res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
+		require.NoError(runner.T(), err)
+		runner.T().Logf("Fetched metrics for %s, got %d hits", runner.endpointID, res.Hits.Total.Value)
+		return res.Hits.Total.Value >= 1
+	}, time.Minute*10, time.Second*10, "could not fetch component metricsets for endpoint with ID %s and agent ID %s", runner.endpointID, agentStatus.Info.ID)
+}
+
+func genESQueryByDate(agentID string, componentID string, dateAfter string) map[string]interface{} {
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match": map[string]interface{}{
+							"agent.id": agentID,
+						},
+					},
+					{
+						"match": map[string]interface{}{
+							"component.id": componentID,
+						},
+					},
+					{
+						"range": map[string]interface{}{
+							"@timestamp": map[string]interface{}{
+								"gte": dateAfter,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return queryRaw
+}
+
 func genESQueryByBinary(agentID string, componentID string) map[string]interface{} {
 	// see https://github.com/elastic/kibana/blob/main/x-pack/plugins/fleet/server/services/agents/agent_metrics.ts
 	queryRaw := map[string]interface{}{
