@@ -88,3 +88,13 @@ Paste here output logs discovered while creating this PR, such as stack traces o
 - How are we going to debug this?
 - What are the metrics I should take care of?
 - ...
+
+<!-- CI Cheatsheet
+Trigger comments:
+/test             (Or `buildkite test this|it`) Triggers unit test pipeline
+/test extended    (Or `buildkite test extended`) Triggers integration test pipeline
+
+PR labels:
+skip-ci           Skips unit and integration tests
+skip-it           Skips integration tests
+-->

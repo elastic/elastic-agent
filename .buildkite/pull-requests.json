@@ -1,7 +1,7 @@
 {
     "jobs": [
         {
-            "enabled": true,
+            "enabled": true,            
             "pipelineSlug": "elastic-agent",
             "allow_org_users": true,
             "allowed_repo_permissions": ["admin", "write"],
@@ -11,9 +11,30 @@
             "build_on_comment": true,
             "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
             "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
-            "skip_ci_labels": [  ],
+            "skip_ci_labels": [ "skip-ci" ],
             "skip_target_branches": [ ],
+<<<<<<< HEAD
             "skip_ci_on_only_changed": [ ],
+=======
+            "skip_ci_on_only_changed": [ "^.ci/", "^.github/", "^changelog", "^docs/", "\\.md$", "^docker-compose.yml", "^.pre-commit-config.yaml", "skaffold.yaml", "^Dockerfile.skaffold", "^Dockerfile"],
+            "always_require_ci_on_changed": [ ]
+        },
+        {
+            "enabled": true,
+            "build_drafts": false,
+            "pipelineSlug": "elastic-agent-extended-testing",
+            "allow_org_users": true,
+            "allowed_repo_permissions": ["admin", "write"],
+            "allowed_list": ["dependabot[bot]", "mergify[bot]"],
+            "set_commit_status": true,
+            "build_on_commit": true,
+            "build_on_comment": true,
+            "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:extended))|^/test extended$",
+            "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:extended))|^/test extended$",
+            "skip_ci_labels": [ "skip-ci", "skip-it" ],
+            "skip_target_branches": [ ],
+            "skip_ci_on_only_changed": [ "^.ci/", "^.github/", "^changelog", "^docs/", "\\.md$", "^sonar-project.properties", "^docker-compose.yml", "^.pre-commit-config.yaml", "skaffold.yaml", "^Dockerfile.skaffold", "^Dockerfile"],
+>>>>>>> 0b99ccb922 ([CI] Trigger improvements (#4836))
             "always_require_ci_on_changed": [ ]
         },
         {
