@@ -150,9 +150,9 @@ func testLogLevelSetViaFleet(f *atesting.Fixture, fleetServerURL string, enrollm
 				t.Logf("error getting log level for agent %q from Fleet metadata: %v", agentID, err)
 				return false
 			}
-			t.Logf("Fleet metadata log level for agent %q: %q agent log level: %q", agentID, fleetMetadataLogLevel, policyLogLevel)
+			t.Logf("Fleet metadata log level for agent %q: %q agent log level: %q", agentID, fleetMetadataLogLevel, agentLogLevel)
 			return fleetMetadataLogLevel == agentLogLevel
-		}, 2*time.Minute, time.Second, "agent never communicated agent-specific log level %q to Fleet", policyLogLevel)
+		}, 2*time.Minute, time.Second, "agent never communicated agent-specific log level %q to Fleet", agentLogLevel)
 
 		// Step 3: Clear the agent-specific log level override, verify that we revert to policy log level
 		err = updateAgentLogLevel(ctx, info.KibanaClient, agentID, "")
@@ -192,8 +192,8 @@ func testLogLevelSetViaFleet(f *atesting.Fixture, fleetServerURL string, enrollm
 				return false
 			}
 			t.Logf("Agent log level: %q initial log level: %q", actualAgentLogLevel, initialLogLevel)
-			return actualAgentLogLevel == policyLogLevel.String()
-		}, 2*time.Minute, time.Second, "agent never reverted to initial log level %q", policyLogLevel)
+			return actualAgentLogLevel == initialLogLevel
+		}, 2*time.Minute, time.Second, "agent never reverted to initial log level %q", initialLogLevel)
 
 		// assert Fleet eventually receives the new log level from agent through checkin
 		assert.Eventuallyf(t, func() bool {
@@ -202,9 +202,9 @@ func testLogLevelSetViaFleet(f *atesting.Fixture, fleetServerURL string, enrollm
 				t.Logf("error getting log level for agent %q from Fleet metadata: %v", agentID, err)
 				return false
 			}
-			t.Logf("Fleet metadata log level for agent %q: %q initial log level: %q", agentID, fleetMetadataLogLevel, policyLogLevel)
-			return fleetMetadataLogLevel == policyLogLevel.String()
-		}, 2*time.Minute, time.Second, "agent never communicated initial log level %q to Fleet", policyLogLevel)
+			t.Logf("Fleet metadata log level for agent %q: %q initial log level: %q", agentID, fleetMetadataLogLevel, initialLogLevel)
+			return fleetMetadataLogLevel == initialLogLevel
+		}, 2*time.Minute, time.Second, "agent never communicated initial log level %q to Fleet", initialLogLevel)
 
 		return nil
 	}
@@ -214,7 +214,7 @@ func updateAgentLogLevel(ctx context.Context, kibanaClient *kibana.Client, agent
 	updateLogLevelTemplateString := `{
 		"action": {
 			"type": "SETTINGS",
-				"data": {
+			"data": {
 				"log_level": "{{ .logLevel }}"
 			}
 		}
@@ -243,12 +243,8 @@ func updatePolicyLogLevel(ctx context.Context, kibanaClient *kibana.Client, poli
 	updateLogLevelTemplateString := `{
 	   "name": "{{ .policyName }}",
 	   "namespace": "{{ .namespace }}",
-	   "overrides": {
-		   "agent":{
-			 "logging": {
-			   "level": "{{ .logLevel }}"
-			 }
-		   }
+	   "advanced_settings": {
+		"agent_logging_level": "{{ .logLevel }}"	
 	   }
 	}`
 	updateLogLevelTemplate, err := template.New("updatePolicyLogLevel").Parse(updateLogLevelTemplateString)
