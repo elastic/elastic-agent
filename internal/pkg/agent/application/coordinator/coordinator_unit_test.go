@@ -259,6 +259,7 @@ func TestCoordinatorReportsUnhealthyUnits(t *testing.T) {
 		managerChans: managerChans{
 			runtimeManagerUpdate: runtimeChan,
 		},
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
 	// Create a healthy component with healthy input and output units
@@ -378,8 +379,9 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		runtimeMgr: &fakeRuntimeManager{},
 
 		// Set valid but empty initial values for ast and vars
-		vars: emptyVars(t),
-		ast:  emptyAST(t),
+		vars:               emptyVars(t),
+		ast:                emptyAST(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
 	// Send an invalid config update and confirm that Coordinator reports
@@ -492,8 +494,9 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 		runtimeMgr: &fakeRuntimeManager{},
 
 		// Set valid but empty initial values for ast and vars
-		vars: emptyVars(t),
-		ast:  emptyAST(t),
+		vars:               emptyVars(t),
+		ast:                emptyAST(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
 	// This configuration produces a valid AST but its EQL condition is
@@ -586,8 +589,9 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 		managerChans: managerChans{
 			configManagerUpdate: configChan,
 		},
-		runtimeMgr: runtimeManager,
-		vars:       emptyVars(t),
+		runtimeMgr:         runtimeManager,
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 	coord.RegisterMonitoringServer(monitoringReloader)
 
@@ -714,8 +718,9 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
 		managerChans: managerChans{
 			configManagerUpdate: configChan,
 		},
-		runtimeMgr: runtimeManager,
-		vars:       emptyVars(t),
+		runtimeMgr:         runtimeManager,
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
 	// Create a policy with one input and one output
@@ -801,8 +806,9 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 			// manager, so it receives the update result.
 			runtimeManagerError: updateErrChan,
 		},
-		runtimeMgr: runtimeManager,
-		vars:       emptyVars(t),
+		runtimeMgr:         runtimeManager,
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
 	// Send an empty policy which should forward an empty component model to
@@ -863,8 +869,9 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 			configManagerUpdate: configChan,
 			varsManagerUpdate:   varsChan,
 		},
-		runtimeMgr: runtimeManager,
-		vars:       emptyVars(t),
+		runtimeMgr:         runtimeManager,
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
 	// Create a policy with one input and one output
@@ -939,7 +946,8 @@ func TestCoordinatorReportsOverrideState(t *testing.T) {
 		stateBroadcaster: &broadcaster.Broadcaster[State]{
 			InputChan: stateChan,
 		},
-		overrideStateChan: overrideStateChan,
+		overrideStateChan:  overrideStateChan,
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 	// Send an error via the vars manager channel, and let Coordinator update
 	overrideStateChan <- &coordinatorOverrideState{
