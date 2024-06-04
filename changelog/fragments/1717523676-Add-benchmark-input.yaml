@@ -19,7 +19,7 @@ summary: Add benchmark input
 #description:
 
 # Affected component; a word indicating the component this changeset affects.
-component: agent
+component: elastic-agent
 
 # PR URL; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
