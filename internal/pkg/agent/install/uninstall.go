@@ -89,14 +89,6 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 		pt.Describe("Successfully uninstalled service")
 	}
 
-	// Removing the external logger isn't fatal to uninstall
-	err = removeExternalLogger()
-	if err != nil {
-		pt.Describe(fmt.Sprintf("Failed to remove external logger: %s", err))
-	} else {
-		pt.Describe("Removed external logger")
-	}
-
 	// remove, if present on platform
 	if paths.ShellWrapperPath != "" {
 		err = os.Remove(paths.ShellWrapperPath)

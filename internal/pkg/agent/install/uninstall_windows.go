@@ -15,9 +15,6 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/svc/eventlog"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 func isBlockingOnExe(err error) bool {
@@ -179,10 +176,4 @@ func killNoneChildProcess(proc *os.Process) error {
 	}()
 	e = syscall.TerminateProcess(h, 1)
 	return os.NewSyscallError("TerminateProcess", e)
-}
-
-// removeExternalLogger unregisters any external loggers, on Windows
-// this means removing the registry entry
-func removeExternalLogger() error {
-	return eventlog.Remove(paths.ServiceName)
 }
