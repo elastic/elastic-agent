@@ -38,10 +38,11 @@ import (
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 
-	mockes "github.com/leehinman/mock-es"
 	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	mockes "github.com/elastic/mock-es/pkg/api"
 )
 
 func TestLogIngestionFleetManaged(t *testing.T) {
@@ -462,10 +463,12 @@ func getLogFilenames(
 func startMockES(t *testing.T) string {
 	registry := metrics.NewRegistry()
 	uid := uuid.New()
+	clusterUUID := uuid.New().String()
 
 	mux := http.NewServeMux()
 	mux.Handle("/", mockes.NewAPIHandler(
 		uid,
+		clusterUUID,
 		registry,
 		time.Now().Add(time.Hour), 0, 0, 100, 0))
 
