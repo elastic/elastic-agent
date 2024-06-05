@@ -205,6 +205,20 @@ func genESQueryByDate(agentID string, componentID string, dateAfter string) map[
 							},
 						},
 					},
+					{
+						"range": map[string]interface{}{
+							"system.process.cpu.total.value": map[string]interface{}{
+								"gt": 0,
+							},
+						},
+					},
+					{
+						"range": map[string]interface{}{
+							"system.process.memory.size": map[string]interface{}{
+								"gt": 0,
+							},
+						},
+					},
 				},
 			},
 		},
@@ -229,17 +243,20 @@ func genESQueryByBinary(agentID string, componentID string) map[string]interface
 							"component.id": componentID,
 						},
 					},
-					// see https://github.com/elastic/integrations/pull/10054
-					// {
-					// 	"exists": map[string]interface{}{
-					// 		"field": "system.process.cpu.total.value",
-					// 	},
-					// },
-					// {
-					// 	"exists": map[string]interface{}{
-					// 		"field": "system.process.memory.size",
-					// 	},
-					// },
+					{
+						"range": map[string]interface{}{
+							"system.process.cpu.total.value": map[string]interface{}{
+								"gt": 0,
+							},
+						},
+					},
+					{
+						"range": map[string]interface{}{
+							"system.process.memory.size": map[string]interface{}{
+								"gt": 0,
+							},
+						},
+					},
 				},
 			},
 		},
