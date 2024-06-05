@@ -46,6 +46,7 @@ var ogcSupported = []LayoutOS{
 		Username:     "ubuntu",
 		RemotePath:   "/home/ubuntu/agent",
 	},
+<<<<<<< HEAD
 	{
 		OS: define.OS{
 			Type:    define.Linux,
@@ -72,6 +73,37 @@ var ogcSupported = []LayoutOS{
 		Username:     "ubuntu",
 		RemotePath:   "/home/ubuntu/agent",
 	},
+=======
+	// These instance types are experimental on Google Cloud and very unstable
+	// We will wait until Google introduces new ARM instance types
+	// https://cloud.google.com/blog/products/compute/introducing-googles-new-arm-based-cpu
+	// {
+	// 	OS: define.OS{
+	// 		Type:    define.Linux,
+	// 		Arch:    define.ARM64,
+	// 		Distro:  runner.Ubuntu,
+	// 		Version: "22.04",
+	// 	},
+	// 	Provider:     Google,
+	// 	InstanceSize: "t2a-standard-4", // 4 arm64 cpus, 16 GB RAM
+	// 	RunsOn:       "ubuntu-2204-lts-arm64",
+	// 	Username:     "ubuntu",
+	// 	RemotePath:   "/home/ubuntu/agent",
+	// },
+	// {
+	// 	OS: define.OS{
+	// 		Type:    define.Linux,
+	// 		Arch:    define.ARM64,
+	// 		Distro:  runner.Ubuntu,
+	// 		Version: "20.04",
+	// 	},
+	// 	Provider:     Google,
+	// 	InstanceSize: "t2a-standard-4", // 4 arm64 cpus, 16 GB RAM
+	// 	RunsOn:       "ubuntu-2004-lts-arm64",
+	// 	Username:     "ubuntu",
+	// 	RemotePath:   "/home/ubuntu/agent",
+	// },
+>>>>>>> 3500a81f76 (Disable integration tests on ARM due to instability (#4852))
 	{
 		OS: define.OS{
 			Type:    define.Linux,
