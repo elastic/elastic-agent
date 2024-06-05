@@ -11,12 +11,12 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Removed beat state metricset from monitoring collect metrics are unused
+summary: Removed beat state metricset from monitoring metrics
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: Removing beat state metricsets reduces the document count of indices metrics-elastic_agent.*-* by 50%, saving around 13% disk space
 
 # Affected component; a word indicating the component this changeset affects.
 component: elastic-agent

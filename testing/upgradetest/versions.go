@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -35,8 +36,8 @@ var (
 	Version_8_11_0_SNAPSHOT = version.NewParsedSemVer(8, 11, 0, "SNAPSHOT", "")
 	// Version_8_13_0_SNAPSHOT is the minimum version for testing upgrading agent with the same hash
 	Version_8_13_0_SNAPSHOT = version.NewParsedSemVer(8, 13, 0, "SNAPSHOT", "")
-	// Version_8_13_0 is the minimum version for proper unprivileged execution
-	Version_8_13_0 = version.NewParsedSemVer(8, 13, 0, "", "")
+	// Version_8_14_0_SNAPSHOT is the minimum version for proper unprivileged execution on all platforms
+	Version_8_14_0_SNAPSHOT = version.NewParsedSemVer(8, 14, 0, "SNAPSHOT", "")
 
 	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
 	ErrNoSnapshot = errors.New("failed to find a snapshot on the version list")
@@ -253,4 +254,42 @@ func EnsureSnapshot(version string) string {
 		version += "-SNAPSHOT"
 	}
 	return version
+}
+
+// SupportsUnprivileged returns true when the version supports unprivileged mode.
+func SupportsUnprivileged(versions ...*version.ParsedSemVer) bool {
+	for _, ver := range versions {
+		if ver.Less(*Version_8_13_0_SNAPSHOT) {
+			return false
+		}
+		if runtime.GOOS != define.Linux && ver.Less(*Version_8_14_0_SNAPSHOT) {
+			return false
+		}
+	}
+	return true
+}
+
+// InstallChecksAllowed returns true when the upgrade test should verify installation.
+//
+// Unprivileged mode both versions must be 8.14+. This is because the older versions do not
+// create the same user that is created in 8.14+. pre-8.14 was experimental.
+//
+// Privileged mode requires 8.13+ because pre-8.13 didn't set the `.installed` file to not have world access.
+func InstallChecksAllowed(unprivileged bool, versions ...*version.ParsedSemVer) bool {
+	if unprivileged {
+		for _, ver := range versions {
+			if ver.Less(*Version_8_14_0_SNAPSHOT) {
+				// all versions must be 8.14+
+				return false
+			}
+		}
+		return true
+	}
+	for _, ver := range versions {
+		if ver.Less(*Version_8_13_0_SNAPSHOT) {
+			// all versions must be 8.13+
+			return false
+		}
+	}
+	return true
 }
