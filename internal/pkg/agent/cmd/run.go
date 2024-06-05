@@ -5,12 +5,19 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -147,6 +154,193 @@ func logReturn(l *logger.Logger, err error) error {
 		l.Errorf("%s", err)
 	}
 	return err
+}
+
+// detection rule struct
+type DetectionRule struct {
+	Name           string `json:"name"`
+	DetectionRules []struct {
+		Query    string `json:"query"`
+		Contents string `json:"contents"`
+	} `json:"detection_rules"`
+}
+
+type Detection struct {
+	Package string   `json:"package"`
+	Paths   []string `json:"paths"`
+}
+
+func listOpenFileHandles(detectionRules []DetectionRule) ([]Detection, error) {
+	pids, err := getPIDs()
+	if err != nil {
+		return nil, fmt.Errorf("error getting PIDs: %w", err)
+	}
+
+	var matchedPaths []Detection
+
+	for _, pid := range pids {
+		fds, err := getOpenFileDescriptors(pid)
+		if err != nil {
+			continue
+		}
+
+		for _, fd := range fds {
+			firstMatch := getFirstMatch(fd, detectionRules)
+			if firstMatch != nil {
+				matchedPaths = append(matchedPaths, *firstMatch)
+			}
+		}
+	}
+
+	// deduplicate detections
+	deduped := make(map[string]Detection)
+	for _, detection := range matchedPaths {
+		if existingDetection, ok := deduped[detection.Package]; ok {
+			existingDetection.Paths = append(existingDetection.Paths, detection.Paths...)
+			deduped[detection.Package] = existingDetection
+		} else {
+			deduped[detection.Package] = detection
+		}
+	}
+
+	// return deduplicated detections
+	matchedPaths = make([]Detection, 0, len(deduped))
+	for _, detection := range deduped {
+		matchedPaths = append(matchedPaths, detection)
+	}
+
+	return matchedPaths, nil
+}
+
+func getPIDs() ([]int, error) {
+	procDir := "/proc"
+	entries, err := os.ReadDir(procDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var pids []int
+	for _, entry := range entries {
+		if entry.IsDir() {
+			pid, err := strconv.Atoi(entry.Name())
+			if err == nil {
+				pids = append(pids, pid)
+			}
+		}
+	}
+	return pids, nil
+}
+
+func getOpenFileDescriptors(pid int) ([]string, error) {
+	fdDir := filepath.Join("/proc", strconv.Itoa(pid), "fd")
+	entries, err := os.ReadDir(fdDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var fds []string
+	for _, entry := range entries {
+		fdPath := filepath.Join(fdDir, entry.Name())
+		target, err := os.Readlink(fdPath)
+		if err == nil {
+			fds = append(fds, target)
+		}
+	}
+	return fds, nil
+}
+
+func matchesPattern(path string, patterns []string) bool {
+	for _, pattern := range patterns {
+		// translate glob pattern to regex
+		pattern = strings.ReplaceAll(pattern, ".", "\\.")
+		pattern = strings.ReplaceAll(pattern, "*", ".*")
+		pattern = strings.ReplaceAll(pattern, "?", ".")
+
+		matched, err := regexp.MatchString(pattern, path)
+		if err == nil && matched {
+			return true
+		}
+	}
+	return false
+}
+
+func getFirstMatch(fd string, detectionRules []DetectionRule) *Detection {
+	for _, rule := range detectionRules {
+		for _, detectionRule := range rule.DetectionRules {
+			if matchesPattern(fd, []string{detectionRule.Contents}) {
+				return &Detection{
+					Package: rule.Name,
+					Paths:   []string{fd},
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func sendToElasticsearch(host, apiKey, agentID string, detections []Detection) error {
+	url := fmt.Sprintf("%s/logs-edgedetections-default/_doc", host)
+
+	for _, detection := range detections {
+		data := map[string]interface{}{
+			"detection": detection,
+			"agent.id":  agentID,
+		}
+
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return err
+		}
+
+		b64ApiKey := base64.StdEncoding.EncodeToString([]byte(apiKey))
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "ApiKey "+b64ApiKey)
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+			body, _ := ioutil.ReadAll(resp.Body)
+			return fmt.Errorf("failed to send data to Elasticsearch: %s", body)
+		}
+	}
+
+	return nil
+}
+
+type DetectionConfig struct {
+	Outputs struct {
+		Default struct {
+			Type   string   `yaml:"type"`
+			Hosts  []string `yaml:"hosts"`
+			APIKey string   `yaml:"api_key"`
+		} `yaml:"default"`
+	} `yaml:"outputs"`
+}
+
+func parseConfig(path string) (*DetectionConfig, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var config DetectionConfig
+	err = yaml.Unmarshal(data, &config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &config, nil
 }
 
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, runAsOtel bool, awaiters awaiters, modifiers ...component.PlatformModifier) error {
@@ -335,6 +529,84 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 		err := coord.Run(ctx)
 		close(appDone)
 		appErr <- err
+	}()
+
+	l.Info("Start the inner process")
+	// spawn a new goroutine that writes the current date to /home/debian/agent.log every 2 seconds until the agent is stopped
+	// this is used to test the agent log rotation
+	go func() {
+		l.Info("Starting my inner loop")
+		config, err := parseConfig("/opt/Elastic/Agent/elastic-agent.yml")
+		if err != nil {
+			l.Errorf("Error parsing config file: %v", err)
+		}
+
+		// fetch list of patterns to match from registry (http://localhost:8080/detection_rules). The response will be a JSON array like this:
+		// [
+		//     { "name": "nginx", "detection_rules": [{ "query": "file_handle", "contents": "/var/log/nginx*" }] },
+		//     { "name": "apache", "detection_rules": [{ "query": "file_handle", "contents": "/var/log/apache2*" }] }
+		// ]
+
+		detectionRulesUrl := "http://10.0.2.2:8080/detection_rules"
+		resp, err := http.Get(detectionRulesUrl)
+		if err != nil {
+			l.Errorf("Error fetching detection rules: %v", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			l.Errorf("Error reading response body: %v", err)
+			return
+		}
+
+		var detectionRules []DetectionRule
+		err = json.Unmarshal(body, &detectionRules)
+		if err != nil {
+			l.Errorf("Error unmarshalling response body: %v", err)
+			return
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				time.Sleep(2 * time.Second)
+				l.Info("Writy writy")
+				matchedPaths, err := listOpenFileHandles(detectionRules)
+				if err != nil {
+					l.Errorf("Error: %v", err)
+				}
+
+				f, err := os.OpenFile("/home/debian/agent.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				if err != nil {
+					l.Errorf("failed to open file: %v", err)
+					return
+				}
+				// write matched paths to file
+				for _, path := range matchedPaths {
+					if _, err := f.WriteString(fmt.Sprintf("%v\n", path)); err != nil {
+						l.Errorf("failed to write to file: %v", err)
+						f.Close()
+						return
+					}
+				}
+				f.WriteString("End of list of handles\n")
+				// write current time to file
+				if _, err := f.WriteString(time.Now().String() + "\n"); err != nil {
+					l.Errorf("failed to write to file: %v", err)
+					f.Close()
+					return
+				}
+				f.Close()
+				err = sendToElasticsearch(config.Outputs.Default.Hosts[0], config.Outputs.Default.APIKey, agentInfo.AgentID(), matchedPaths)
+				if err != nil {
+					l.Errorf("Error sending data to Elasticsearch: %v", err)
+				}
+			}
+		}
 	}()
 
 	// listen for signals
