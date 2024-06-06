@@ -17,7 +17,7 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.7.0
 	github.com/elastic/elastic-agent-client/v7 v7.11.0
 	github.com/elastic/elastic-agent-libs v0.9.11
-	github.com/elastic/elastic-agent-system-metrics v0.10.1
+	github.com/elastic/elastic-agent-system-metrics v0.10.2
 	github.com/elastic/elastic-transport-go/v8 v8.5.0
 	github.com/elastic/go-elasticsearch/v8 v8.13.1
 	github.com/elastic/go-licenser v0.4.1

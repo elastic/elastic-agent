@@ -798,8 +798,8 @@ github.com/elastic/elastic-agent-client/v7 v7.11.0 h1:YpkFQyE3qPnVai2a2NiKTMpBXX
 github.com/elastic/elastic-agent-client/v7 v7.11.0/go.mod h1:/AeiwX9zxG99eUNrLhpApTpwmE71Qwuh4ozObn7a0ss=
 github.com/elastic/elastic-agent-libs v0.9.11 h1:J4aduNJhVeb699FxJIW/dD4BPREILqXgpWD41sCw8Uc=
 github.com/elastic/elastic-agent-libs v0.9.11/go.mod h1:TLFd0T/e1SHmxnx9pbdm/pqOV9y+VMvHikDyPN4Owkw=
-github.com/elastic/elastic-agent-system-metrics v0.10.1 h1:0v2Ltg43tJ9i3GUeB8AvWdy0IwEG1dlZuBahKU6Gz6I=
-github.com/elastic/elastic-agent-system-metrics v0.10.1/go.mod h1:0jJ2ARnzTTOEMmcRX9UNqSwbwguEluE/mK2HaM3GViI=
+github.com/elastic/elastic-agent-system-metrics v0.10.2 h1:AVW+YqgezR0mNOZ80NxPLH3tiYMenNGZ8SC/bIUf4Uc=
+github.com/elastic/elastic-agent-system-metrics v0.10.2/go.mod h1:0jJ2ARnzTTOEMmcRX9UNqSwbwguEluE/mK2HaM3GViI=
 github.com/elastic/elastic-integration-corpus-generator-tool v0.5.0/go.mod h1:uf9N86y+UACGybdEhZLpwZ93XHWVhsYZAA4c2T2v6YM=
 github.com/elastic/elastic-package v0.77.0/go.mod h1:Xeqx0OOVnKBfFoSHsHmKI74RxgRGiDhU6yXEu8BkJJM=
 github.com/elastic/elastic-transport-go/v8 v8.5.0 h1:v5membAl7lvQgBTexPRDBO/RdnlQX+FM9fUVDyXxvH0=
