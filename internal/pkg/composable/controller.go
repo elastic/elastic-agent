@@ -77,7 +77,7 @@ func New(log *logger.Logger, c *config.Config, managed bool, runAsOtel bool) (Co
 			continue
 		}
 		provider, err := builder(l, pCfg, managed, runAsOtel)
-		if err == corecomp.ErrUnsupportedProvider {
+		if errors.Is(err, corecomp.ErrUnsupportedProvider) {
 			continue
 		}
 
