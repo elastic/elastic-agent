@@ -65,8 +65,11 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 				} else {
 					for j, unit := range comp.Units {
 						if unit.Type == client.UnitTypeOutput && unit.Config.Type == elasticsearch {
-							unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), &serverCfg.Output.Elasticsearch)
+							unitCfgMap, err := toMapStr(unit.Config.Source.AsMap())
 							if err != nil {
+								return nil, err
+							}
+							if err := addBootstrapCfg(unitCfgMap, &serverCfg.Output.Elasticsearch); err != nil {
 								return nil, err
 							}
 							fixOutputMap(unitCfgMap)
@@ -98,6 +101,19 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 		}
 		return comps, nil
 	}
+}
+
+// addBootrapCfg will transform the passed configuration.Elasticsearch to a map and add it to dst under the bootstrap key.
+func addBootstrapCfg(dst map[string]interface{}, es *configuration.Elasticsearch) error {
+	if es == nil {
+		return fmt.Errorf("fleet-server bootstrap output config is undefined")
+	}
+	mp, err := toMapStr(es)
+	if err != nil {
+		return err
+	}
+	dst["bootstrap"] = mp
+	return nil
 }
 
 // InjectFleetConfigComponentModifier The modifier that injects the fleet configuration for the components
