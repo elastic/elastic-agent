@@ -3783,12 +3783,12 @@ SOFTWARE.
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/kardianos/service
-Version: v1.2.1-0.20210728001519-a323c3813bc7
+Dependency : github.com/elastic/kardianos-service
+Version: v0.0.0-20230215200102-9832e01049dd
 Licence type (autodetected): Zlib
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/kardianos/service@v1.2.1-0.20210728001519-a323c3813bc7/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/kardianos-service@v0.0.0-20230215200102-9832e01049dd/LICENSE:
 
 Copyright (c) 2015 Daniel Theophanes
 
