@@ -832,7 +832,10 @@ specs:
           'data/{{.BeatName}}-{{ commit_short }}/elastic-agent':
             template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/elastic-agent.tmpl'
             mode: 0755
-
+          '{{.BeatName}}{{.BinaryExt}}':
+              source: data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}
+              symlink: true
+              mode: 0755
 
     - os: linux
       types: [tgz]
@@ -1021,8 +1024,6 @@ specs:
         version: '{{ beat_version }}'
         qualifier: core
         files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
 
