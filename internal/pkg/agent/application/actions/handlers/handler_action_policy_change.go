@@ -206,9 +206,9 @@ func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config
 
 	if src.Transport.Proxy.URL == nil ||
 		src.Transport.Proxy.URL.String() == "" {
-		log.Debugw("proxy from fleet is empty or null, the proxy will not be changed", "current proxy", dst.Transport.Proxy.URL)
+		log.Debugw("proxy from fleet is empty or null, the proxy will not be changed", "current_proxy", dst.Transport.Proxy.URL)
 	} else {
-		log.Debugw("received proxy from fleet, applying it", "old proxy", dst.Transport.Proxy.URL, "new proxy", src.Transport.Proxy.URL)
+		log.Debugw("received proxy from fleet, applying it", "old_proxy", dst.Transport.Proxy.URL, "new_proxy", src.Transport.Proxy.URL)
 		// copy the proxy struct
 		dst.Transport.Proxy = src.Transport.Proxy
 
@@ -236,8 +236,7 @@ func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config
 			dst.Transport.TLS = &tlsCopy
 		}
 
-		emptyCertificate := tlscommon.CertificateConfig{}
-		if src.Transport.TLS.Certificate == emptyCertificate {
+		if src.Transport.TLS.Certificate == emptyCertificateConfig() {
 			log.Debug("TLS certificates from fleet are empty or null, the TLS config will not be changed")
 		} else {
 			dst.Transport.TLS.Certificate = src.Transport.TLS.Certificate
@@ -254,12 +253,11 @@ func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config
 	}
 }
 
-func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) (err error) {
-	//cfg, err := configuration.NewFromConfig(c)
-	//if err != nil {
-	//	return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
-	//}
+func emptyCertificateConfig() tlscommon.CertificateConfig {
+	return tlscommon.CertificateConfig{}
+}
 
+func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) (err error) {
 	var validationErr error
 
 	// validate Fleet connectivity with the new configuration
