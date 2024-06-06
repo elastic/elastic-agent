@@ -215,6 +215,7 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command, logsDir, eventLogsDir s
 		err := printLogs(cmd.Context(), streams.Out, logsDir, lines, follow, filter, modifier)
 		if err != nil {
 			errChan <- fmt.Errorf("failed to get logs: %w", err)
+			return
 		}
 		errChan <- nil
 	}()
