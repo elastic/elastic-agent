@@ -722,11 +722,11 @@ these terms.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-autodiscover
-Version: v0.6.14
+Version: v0.7.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-autodiscover@v0.6.14/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-autodiscover@v0.7.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -933,11 +933,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-a
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-client/v7
-Version: v7.9.0
+Version: v7.10.0
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.9.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.10.0/LICENSE.txt:
 
 ELASTIC LICENSE AGREEMENT
 
@@ -13350,11 +13350,11 @@ Contents of probable licence file $GOMODCACHE/gotest.tools/gotestsum@v1.9.0/LICE
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/api
-Version: v0.26.3
+Version: v0.29.5
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.26.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.29.5/LICENSE:
 
 
                                  Apache License
@@ -13562,11 +13562,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.26.3/LICENSE:
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/apimachinery
-Version: v0.26.3
+Version: v0.29.5
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.26.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.29.5/LICENSE:
 
 
                                  Apache License
@@ -13774,11 +13774,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.26.3/LICENS
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/client-go
-Version: v0.26.3
+Version: v0.29.5
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.26.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.29.5/LICENSE:
 
 
                                  Apache License
@@ -13986,11 +13986,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.26.3/LICENSE:
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/utils
-Version: v0.0.0-20221128185143-99ec85e7a448
+Version: v0.0.0-20230726121419-3b25d923346b
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/utils@v0.0.0-20221128185143-99ec85e7a448/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/utils@v0.0.0-20230726121419-3b25d923346b/LICENSE:
 
 
                                  Apache License
@@ -16782,49 +16782,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 --------------------------------------------------------------------------------
-Dependency : github.com/elazarl/goproxy
-Version: v0.0.0-20180725130230-947c36da3153
-Licence type (autodetected): BSD-3-Clause
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/elazarl/goproxy@v0.0.0-20180725130230-947c36da3153/LICENSE:
-
-Copyright (c) 2012 Elazar Leibovich. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-   * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-   * Neither the name of Elazar Leibovich. nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
---------------------------------------------------------------------------------
 Dependency : github.com/emicklei/go-restful/v3
-Version: v3.10.1
+Version: v3.11.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/emicklei/go-restful/v3@v3.10.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/emicklei/go-restful/v3@v3.11.0/LICENSE:
 
 Copyright (c) 2012,2013 Ernest Micklei
 
@@ -17459,11 +17422,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/jsonpointer
-Version: v0.19.5
+Version: v0.19.6
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/jsonpointer@v0.19.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/jsonpointer@v0.19.6/LICENSE:
 
 
                                  Apache License
@@ -17671,11 +17634,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/jsonpointer@
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/jsonreference
-Version: v0.20.0
+Version: v0.20.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/jsonreference@v0.20.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/jsonreference@v0.20.2/LICENSE:
 
 
                                  Apache License
@@ -18095,11 +18058,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag@v0.22.3
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-task/slim-sprig
-Version: v0.0.0-20210107165309-348f09dbbbc0
+Version: v0.0.0-20230315185526-52ccab3ef572
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-task/slim-sprig@v0.0.0-20210107165309-348f09dbbbc0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/go-task/slim-sprig@v0.0.0-20230315185526-52ccab3ef572/LICENSE.txt:
 
 Copyright (C) 2013-2020 Masterminds
 
@@ -18536,12 +18499,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/google/gnostic
-Version: v0.6.9
+Dependency : github.com/google/gnostic-models
+Version: v0.6.8
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/google/gnostic@v0.6.9/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/google/gnostic-models@v0.6.8/LICENSE:
 
 
                                  Apache License
@@ -23576,12 +23539,81 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/onsi/ginkgo/v2
-Version: v2.9.0
+Dependency : github.com/mxk/go-flowrate
+Version: v0.0.0-20140419014527-cca7078d478f
+Licence type (autodetected): BSD-3-Clause
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/github.com/mxk/go-flowrate@v0.0.0-20140419014527-cca7078d478f/LICENSE:
+
+Copyright (c) 2014 The Go-FlowRate Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+ * Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+ * Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the
+   distribution.
+
+ * Neither the name of the go-flowrate project nor the names of its
+   contributors may be used to endorse or promote products derived
+   from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--------------------------------------------------------------------------------
+Dependency : github.com/onsi/ginkgo
+Version: v1.16.4
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/onsi/ginkgo/v2@v2.9.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/onsi/ginkgo@v1.16.4/LICENSE:
+
+Copyright (c) 2013-2014 Onsi Fakhouri
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+--------------------------------------------------------------------------------
+Dependency : github.com/onsi/ginkgo/v2
+Version: v2.13.0
+Licence type (autodetected): MIT
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/github.com/onsi/ginkgo/v2@v2.13.0/LICENSE:
 
 Copyright (c) 2013-2014 Onsi Fakhouri
 
@@ -23607,11 +23639,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/onsi/gomega
-Version: v1.27.3
+Version: v1.29.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/onsi/gomega@v1.27.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/onsi/gomega@v1.29.0/LICENSE:
 
 Copyright (c) 2013-2014 Onsi Fakhouri
 
@@ -40255,11 +40287,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/klog/v2
-Version: v2.80.1
+Version: v2.110.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/klog/v2@v2.80.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/klog/v2@v2.110.1/LICENSE:
 
 Apache License
 Version 2.0, January 2004
@@ -40456,11 +40488,11 @@ third-party archives.
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/kube-openapi
-Version: v0.0.0-20221207184640-f3cff1453715
+Version: v0.0.0-20231010175941-2dd684a91f00
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/kube-openapi@v0.0.0-20221207184640-f3cff1453715/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/kube-openapi@v0.0.0-20231010175941-2dd684a91f00/LICENSE:
 
 
                                  Apache License
@@ -40916,11 +40948,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : sigs.k8s.io/structured-merge-diff/v4
-Version: v4.2.3
+Version: v4.4.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/sigs.k8s.io/structured-merge-diff/v4@v4.2.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/sigs.k8s.io/structured-merge-diff/v4@v4.4.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
