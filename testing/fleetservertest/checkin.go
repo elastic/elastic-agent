@@ -25,9 +25,8 @@ type SSL struct {
 type TmplPolicy struct {
 	AgentID  string
 	PolicyID string
-	// FleetHosts should be a JSON array without the square brackets:
-	// - `"host1", "host2"`
-	// - `"host"`
+	// FleetHosts should be a regular string array containing fleet hosts
+	// []string{"host1", "host2"}
 	FleetHosts []string
 	// AddFleetProxyURL bool
 	FleetProxyURL *string
@@ -50,8 +49,8 @@ func NewCheckinResponse(ackToken string, actions ...string) string {
 
 // NewEmptyPolicy returns an policy without any input and monitoring disabled.
 func NewEmptyPolicy(data TmplPolicy) (string, error) {
-	t := template.Must(template.New("policyEmpryTmpl").Funcs(funcMap).
-		Parse(policyEmpryTmpl))
+	t := template.Must(template.New("policyEmptyTmpl").Funcs(funcMap).
+		Parse(policyEmptyTmpl))
 
 	buf := &strings.Builder{}
 	err := t.Execute(buf, data)
@@ -214,7 +213,7 @@ const (
         }
       }`
 
-	policyEmpryTmpl = `
+	policyEmptyTmpl = `
     {
         "policy": {
           "agent": {
