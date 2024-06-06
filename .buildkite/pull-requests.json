@@ -1,11 +1,11 @@
 {
     "jobs": [
         {
-            "enabled": true,            
+            "enabled": true,
             "pipelineSlug": "elastic-agent",
             "allow_org_users": true,
             "allowed_repo_permissions": ["admin", "write"],
-            "allowed_list": ["dependabot[bot]", "mergify[bot]"],
+            "allowed_list": ["dependabot[bot]", "mergify[bot]", "github-actions[bot]"],
             "set_commit_status": true,
             "build_on_commit": true,
             "build_on_comment": true,
@@ -22,7 +22,7 @@
             "pipelineSlug": "elastic-agent-extended-testing",
             "allow_org_users": true,
             "allowed_repo_permissions": ["admin", "write"],
-            "allowed_list": ["dependabot[bot]", "mergify[bot]"],
+            "allowed_list": ["dependabot[bot]", "mergify[bot]", "github-actions[bot]"],
             "set_commit_status": true,
             "build_on_commit": true,
             "build_on_comment": true,
