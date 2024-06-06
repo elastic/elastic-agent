@@ -723,6 +723,7 @@ these terms.
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-autodiscover
 <<<<<<< HEAD
+<<<<<<< HEAD
 Version: v0.6.8
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
@@ -735,6 +736,13 @@ Licence type (autodetected): Apache-2.0
 
 Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-autodiscover@v0.6.14/LICENSE:
 >>>>>>> 894151eb7c (Bump github.com/elastic/elastic-agent-autodiscover from 0.6.8 to 0.6.14 (#4616))
+=======
+Version: v0.7.0
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-autodiscover@v0.7.0/LICENSE:
+>>>>>>> ec7b8820f8 (Bump github.com/elastic/elastic-agent-autodiscover from 0.6.14 to 0.7.0 (#4839))
 
                                  Apache License
                            Version 2.0, January 2004
@@ -13681,11 +13689,19 @@ Contents of probable licence file $GOMODCACHE/gotest.tools/gotestsum@v1.9.0/LICE
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/api
+<<<<<<< HEAD
 Version: v0.29.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.29.3/LICENSE:
+=======
+Version: v0.29.5
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.29.5/LICENSE:
+>>>>>>> ec7b8820f8 (Bump github.com/elastic/elastic-agent-autodiscover from 0.6.14 to 0.7.0 (#4839))
 
 
                                  Apache License
@@ -13893,11 +13909,19 @@ Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.29.3/LICENSE:
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/apimachinery
+<<<<<<< HEAD
 Version: v0.29.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.29.3/LICENSE:
+=======
+Version: v0.29.5
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.29.5/LICENSE:
+>>>>>>> ec7b8820f8 (Bump github.com/elastic/elastic-agent-autodiscover from 0.6.14 to 0.7.0 (#4839))
 
 
                                  Apache License
@@ -14105,11 +14129,19 @@ Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.29.3/LICENS
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/client-go
+<<<<<<< HEAD
 Version: v0.29.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.29.3/LICENSE:
+=======
+Version: v0.29.5
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.29.5/LICENSE:
+>>>>>>> ec7b8820f8 (Bump github.com/elastic/elastic-agent-autodiscover from 0.6.14 to 0.7.0 (#4839))
 
 
                                  Apache License
@@ -17083,6 +17115,39 @@ limitations under the License.
 
 
 --------------------------------------------------------------------------------
+<<<<<<< HEAD
+=======
+Dependency : github.com/elastic/pkcs8
+Version: v1.0.0
+Licence type (autodetected): MIT
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/github.com/elastic/pkcs8@v1.0.0/LICENSE:
+
+The MIT License (MIT)
+
+Copyright (c) 2014 youmark
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
+>>>>>>> ec7b8820f8 (Bump github.com/elastic/elastic-agent-autodiscover from 0.6.14 to 0.7.0 (#4839))
 Dependency : github.com/emicklei/go-restful/v3
 Version: v3.11.0
 Licence type (autodetected): MIT
