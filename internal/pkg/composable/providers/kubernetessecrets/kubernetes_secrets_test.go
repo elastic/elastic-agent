@@ -54,7 +54,7 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]string{"a": "b"})
 	require.NoError(t, err)
 
-	p, err := ContextProviderBuilder(logger, cfg, true)
+	p, err := ContextProviderBuilder(logger, cfg, true, false)
 	require.NoError(t, err)
 
 	fp, _ := p.(*contextProviderK8sSecrets)
@@ -122,7 +122,7 @@ func Test_K8sSecretsProvider_Fetch_Cache_Enabled(t *testing.T) {
 	cfg, err := config.NewConfigFrom(c)
 	require.NoError(t, err)
 
-	p, err := ContextProviderBuilder(logger, cfg, true)
+	p, err := ContextProviderBuilder(logger, cfg, true, false)
 	require.NoError(t, err)
 
 	fp, _ := p.(*contextProviderK8sSecrets)
@@ -241,7 +241,7 @@ func Test_K8sSecretsProvider_Fetch_Cache_Disabled(t *testing.T) {
 	cfg, err := config.NewConfigFrom(c)
 	require.NoError(t, err)
 
-	p, err := ContextProviderBuilder(logger, cfg, true)
+	p, err := ContextProviderBuilder(logger, cfg, true, false)
 	require.NoError(t, err)
 
 	fp, _ := p.(*contextProviderK8sSecrets)
@@ -311,7 +311,7 @@ func Test_MergeWitchCurrent(t *testing.T) {
 	cfg, err := config.NewConfigFrom(c)
 	require.NoError(t, err)
 
-	p, err := ContextProviderBuilder(logger, cfg, true)
+	p, err := ContextProviderBuilder(logger, cfg, true, false)
 	require.NoError(t, err)
 
 	fp, _ := p.(*contextProviderK8sSecrets)
@@ -427,7 +427,7 @@ func Test_UpdateCache(t *testing.T) {
 	cfg, err := config.NewConfigFrom(c)
 	require.NoError(t, err)
 
-	p, err := ContextProviderBuilder(logger, cfg, true)
+	p, err := ContextProviderBuilder(logger, cfg, true, false)
 	require.NoError(t, err)
 
 	fp, _ := p.(*contextProviderK8sSecrets)
@@ -555,7 +555,7 @@ func Test_Signal(t *testing.T) {
 	cfg, err := config.NewConfigFrom(c)
 	require.NoError(t, err)
 
-	p, err := ContextProviderBuilder(logger, cfg, true)
+	p, err := ContextProviderBuilder(logger, cfg, true, false)
 	require.NoError(t, err)
 
 	fp, _ := p.(*contextProviderK8sSecrets)

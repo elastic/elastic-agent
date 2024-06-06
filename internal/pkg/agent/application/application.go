@@ -185,7 +185,7 @@ func New(
 		}
 	}
 
-	composable, err := composable.New(log, rawConfig, composableManaged)
+	composable, err := composable.New(log, rawConfig, composableManaged, runAsOtel)
 	if err != nil {
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}

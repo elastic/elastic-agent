@@ -79,7 +79,7 @@ func TestController(t *testing.T) {
 
 	log, err := logger.New("", false)
 	require.NoError(t, err)
-	c, err := composable.New(log, cfg, false)
+	c, err := composable.New(log, cfg, false, false)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -217,7 +217,7 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 
 			log, err := logger.New("", false)
 			require.NoError(t, err)
-			c, err := composable.New(log, cfg, false)
+			c, err := composable.New(log, cfg, false, false)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -310,7 +310,7 @@ func TestCancellation(t *testing.T) {
 	timeout := 50 * time.Millisecond
 	for i := 1; i <= 10; i++ {
 		t.Run(fmt.Sprintf("test run %d", i), func(t *testing.T) {
-			c, err := composable.New(log, cfg, false)
+			c, err := composable.New(log, cfg, false, false)
 			require.NoError(t, err)
 			defer c.Close()
 
@@ -326,7 +326,7 @@ func TestCancellation(t *testing.T) {
 	}
 
 	t.Run("immediate cancellation", func(t *testing.T) {
-		c, err := composable.New(log, cfg, false)
+		c, err := composable.New(log, cfg, false, false)
 		require.NoError(t, err)
 		defer c.Close()
 

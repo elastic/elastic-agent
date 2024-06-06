@@ -50,7 +50,7 @@ type controller struct {
 }
 
 // New creates a new controller.
-func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error) {
+func New(log *logger.Logger, c *config.Config, managed bool, runAsOtel bool) (Controller, error) {
 	l := log.Named("composable")
 
 	var providersCfg Config
@@ -73,9 +73,14 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 		pCfg, ok := providersCfg.Providers[name]
 		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
 			// explicitly disabled; skipping
+			l.Infof("Provider %q is not supported", name)
 			continue
 		}
-		provider, err := builder(l, pCfg, managed)
+		provider, err := builder(l, pCfg, managed, runAsOtel)
+		if err == corecomp.ErrUnsupportedProvider {
+			continue
+		}
+
 		if err != nil {
 			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 		}

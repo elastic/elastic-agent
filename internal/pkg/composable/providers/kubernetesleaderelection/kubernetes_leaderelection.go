@@ -37,7 +37,11 @@ type contextProvider struct {
 }
 
 // ContextProviderBuilder builds the provider.
-func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed bool, runAsOtel bool) (corecomp.ContextProvider, error) {
+	if runAsOtel {
+		return nil, corecomp.ErrUnsupportedProvider // not supported in otel mode
+	}
+
 	var cfg Config
 	if c == nil {
 		c = config.New()

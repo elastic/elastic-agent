@@ -26,7 +26,7 @@ func TestContextProvider(t *testing.T) {
 	})
 	require.NoError(t, err)
 	builder, _ := composable.Providers.GetContextProvider("local")
-	provider, err := builder(nil, cfg, true)
+	provider, err := builder(nil, cfg, true, false)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())

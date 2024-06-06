@@ -4,7 +4,10 @@
 
 package composable
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // FetchContextProvider is the interface that a context provider uses allow variable values to be determined when the
 // configuration is rendered versus it being known in advanced.
@@ -42,3 +45,5 @@ type CloseableProvider interface {
 	// Close is called after all runs of the provider have finished.
 	Close() error
 }
+
+var ErrUnsupportedProvider = errors.New("unsupported provider")
