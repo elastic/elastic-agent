@@ -110,6 +110,16 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	// This eliminates the "+buildYYYYMMDDHHMM" suffix on Independent Agent Release builds
 	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
 
+	// For Independent Agent Releases, any opted-in projects will have a version that is
+	// one Patch version ahead since we are using the new bumped DRA artifacts for those projects.
+	// This is acceptable since it is being released only as bundled with Elastic Agent.
+	patchPlusOneString := fmt.Sprintf("%d.%d.%d", parsedManifestVersion.Major(), parsedManifestVersion.Minor(), parsedManifestVersion.Patch()+1)
+	parsedPatchPlusOneVersion, err := version.ParseVersion(patchPlusOneString)
+	if err != nil {
+		return fmt.Errorf("failed to parse bumped patch version for Ind Agent Release: [%s]", patchPlusOneString)
+	}
+	majorMinorPatchPlusOneVersion := parsedPatchPlusOneVersion.VersionWithPrerelease()
+
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
 	for component, pkgs := range componentSpec {
 		for _, platform := range platforms {
@@ -123,6 +133,11 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 			for _, pkg := range pkgs {
 				reqPackage := platformPackages[platform]
 				pkgURL := resolveManifestPackage(projects[component], pkg, reqPackage, majorMinorPatchVersion)
+				if pkgURL == nil {
+					// If the artifact doesn't match the manifest's version, check if it matches
+					// the Patch + 1 version that Independent Agent opted-in projects use
+					pkgURL = resolveManifestPackage(projects[component], pkg, reqPackage, majorMinorPatchPlusOneVersion)
+				}
 				if pkgURL != nil {
 					for _, p := range pkgURL {
 						log.Printf(">>>>>>>>> Downloading [%s] [%s] ", pkg, p)
