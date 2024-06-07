@@ -15,7 +15,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
@@ -908,10 +907,6 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			},
 			"streams": streams,
 		},
-	}
-
-	for _, comp := range componentList {
-		logp.L().Infof("input component %s: %#v", comp.ID, comp.InputSpec.Spec.Service)
 	}
 
 	// add system/process metrics for services that can't be monitored via json/beats metrics
