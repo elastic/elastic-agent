@@ -11,6 +11,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -39,11 +40,10 @@ func TestProxyURL(t *testing.T) {
 		Sudo:  true,
 	})
 
-	t.Skip("Currently flaky, see https://github.com/elastic/elastic-agent/issues/4861")
-
 	// Setup proxies and fake fleet server host we are gonna rewrite
 	unreachableFleetHost := "fleet.elastic.co"
 	unreachableFleetHttpURL := "http://" + unreachableFleetHost
+	unreachableFleetHttpsURL := "https://" + unreachableFleetHost
 
 	// mockFleetComponents is a struct that holds all the mock fleet stuff in a nice single unit (easier to pass around).
 	// all the fields are initialized in the main test loop
@@ -53,34 +53,33 @@ func TestProxyURL(t *testing.T) {
 		checkinWithAcker *fleetservertest.CheckinActionsWithAcker
 	}
 
-	// setupFunc is a hook used by testcases to set up proxies and add data/behaviors to fleet policy and checkinAcker
-	// the test will use one of the returned proxies if a proxy key is set in args.enrollProxyName
-	type setupFunc func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy)
+	type installArgs struct {
+		insecure               bool
+		enrollmentURL          string
+		certificateAuthorities []string
+		certificate            string
+		key                    string
+		proxyURL               string
+	}
 
-	// enrollmentURLFunc is a getter for the enrollmentURL so that each testcase can control what is used at install time
-	type enrollmentURLFunc func(fleet *fleetservertest.Server) string
+	// setupFunc is a hook used by testcases to set up proxies and add data/behaviors to fleet policy and checkinAcker
+	// the test will use the installArgs to pass arguments to the elastic-agent install command
+	type setupFunc func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs)
 
 	// assertFunc is the hook the main test loop calls for performing assertions after the agent has been installed and is healthy
 	type assertFunc func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents)
 
-	type args struct {
-		enrollProxyName string
-	}
-
 	type testcase struct {
-		name          string
-		args          args
-		setup         setupFunc
-		enrollmentURL enrollmentURLFunc
-		wantErr       assert.ErrorAssertionFunc
-		assertFunc    assertFunc
+		name       string
+		setup      setupFunc
+		wantErr    assert.ErrorAssertionFunc
+		assertFunc assertFunc
 	}
 
 	testcases := []testcase{
 		{
 			name: "EnrollWithProxy-NoProxyInPolicy",
-			args: args{enrollProxyName: "proxy"},
-			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy) {
+			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs) {
 
 				// Create and start fake proxy
 				proxy := proxytest.New(t,
@@ -105,11 +104,7 @@ func TestProxyURL(t *testing.T) {
 					action,
 				)
 
-				return map[string]*proxytest.Proxy{"proxy": proxy}
-			},
-			enrollmentURL: func(_ *fleetservertest.Server) string {
-				// returning a non-existing URL we make sure Fleet is only reachable through proxy
-				return unreachableFleetHttpURL
+				return map[string]*proxytest.Proxy{"proxy": proxy}, installArgs{insecure: true, proxyURL: proxy.LocalhostURL, enrollmentURL: unreachableFleetHttpURL}
 			},
 			wantErr: assert.NoError,
 			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, _ map[string]*proxytest.Proxy, _ *mockFleetComponents) {
@@ -118,8 +113,7 @@ func TestProxyURL(t *testing.T) {
 		},
 		{
 			name: "EnrollWithProxy-EmptyProxyInPolicy",
-			args: args{enrollProxyName: "proxy"},
-			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy) {
+			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs) {
 
 				// set FleetProxyURL to empty string in the policy
 				mockFleet.policyData.FleetProxyURL = new(string)
@@ -147,11 +141,7 @@ func TestProxyURL(t *testing.T) {
 					action,
 				)
 
-				return map[string]*proxytest.Proxy{"proxy": proxy}
-			},
-			enrollmentURL: func(_ *fleetservertest.Server) string {
-				// returning a non-existing URL we make sure Fleet is only reachable through proxy
-				return unreachableFleetHttpURL
+				return map[string]*proxytest.Proxy{"proxy": proxy}, installArgs{insecure: true, proxyURL: proxy.LocalhostURL, enrollmentURL: unreachableFleetHttpURL}
 			},
 			wantErr: assert.NoError,
 			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
@@ -160,8 +150,7 @@ func TestProxyURL(t *testing.T) {
 		},
 		{
 			name: "EnrollWithProxy-PolicyProxyTakesPrecedence",
-			args: args{enrollProxyName: "enroll"},
-			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy) {
+			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs) {
 
 				// We need 2 proxies: one for the initial enroll and another to specify in the policy
 				proxyEnroll := proxytest.New(t,
@@ -194,11 +183,7 @@ func TestProxyURL(t *testing.T) {
 					action,
 				)
 
-				return map[string]*proxytest.Proxy{"enroll": proxyEnroll, "policy": proxyFleetPolicy}
-			},
-			enrollmentURL: func(_ *fleetservertest.Server) string {
-				// returning a non-existing URL we make sure Fleet is only reachable through proxy
-				return unreachableFleetHttpURL
+				return map[string]*proxytest.Proxy{"enroll": proxyEnroll, "policy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: unreachableFleetHttpURL, proxyURL: proxyEnroll.LocalhostURL}
 			},
 			wantErr: assert.NoError,
 			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
@@ -221,20 +206,18 @@ func TestProxyURL(t *testing.T) {
 		},
 		{
 			name: "NoEnrollProxy-ProxyInThePolicy",
-			args: args{
-				// no proxy at enroll
-				enrollProxyName: "",
-			},
-			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy) {
+			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs) {
+
 				// Create a fake proxy to be used in fleet policy
 				proxyFleetPolicy := proxytest.New(t,
+					proxytest.WithRewrite(unreachableFleetHost, "localhost:"+mockFleet.fleetServer.Port), // this is needed as we pass an unreachable host in policy
 					proxytest.WithRequestLog("proxy-fleet-policy", t.Logf),
 					proxytest.WithVerboseLog())
 				proxyFleetPolicy.Start()
 				t.Cleanup(proxyFleetPolicy.Close)
 
-				mockFleet.policyData.FleetProxyURL = new(string)
-				*mockFleet.policyData.FleetProxyURL = proxyFleetPolicy.LocalhostURL
+				s := proxyFleetPolicy.LocalhostURL
+				mockFleet.policyData.FleetProxyURL = &s
 				// now that we have fleet and the proxy running, we can add actions which
 				// depend on them.
 				action, err := fleetservertest.NewActionWithEmptyPolicyChange(
@@ -247,10 +230,7 @@ func TestProxyURL(t *testing.T) {
 					0,
 					action,
 				)
-				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}
-			},
-			enrollmentURL: func(fleet *fleetservertest.Server) string {
-				return fleet.LocalhostURL
+				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
 			},
 			wantErr: assert.NoError,
 			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
@@ -275,11 +255,7 @@ func TestProxyURL(t *testing.T) {
 		},
 		{
 			name: "NoEnrollProxy-RemoveProxyFromThePolicy",
-			args: args{
-				// no proxy at enroll
-				enrollProxyName: "",
-			},
-			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy) {
+			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs) {
 				// Create a fake proxy to use in initial fleet policy
 				proxyFleetPolicy := proxytest.New(t,
 					proxytest.WithRewrite(unreachableFleetHost, "localhost:"+mockFleet.fleetServer.Port),
@@ -304,10 +280,7 @@ func TestProxyURL(t *testing.T) {
 					action,
 				)
 
-				return map[string]*proxytest.Proxy{"fleetProxy": proxyFleetPolicy}
-			},
-			enrollmentURL: func(fleet *fleetservertest.Server) string {
-				return fleet.LocalhostURL
+				return map[string]*proxytest.Proxy{"fleetProxy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
 			},
 			wantErr: assert.NoError,
 			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
@@ -364,27 +337,8 @@ func TestProxyURL(t *testing.T) {
 		},
 		{
 			name: "NoEnrollProxy-TLSProxyWithCAInThePolicy",
-			args: args{
-				// no proxy at enroll
-				enrollProxyName: "",
-			},
-			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy) {
-
-				// use os.MkdirTemp since we are installing agent unprivileged and t.TempDir() does not guarantee that the elastic-agent user has access
-				baseDir := ""
-				if runtime.GOOS == "windows" {
-					baseDir = "C:\\"
-				}
-				tmpDir, err := os.MkdirTemp(baseDir, "TLSProxyWithCAInThePolicy*")
-				require.NoError(t, err, "error creating temp dir for TLS files")
-				t.Cleanup(func() {
-					cleanupErr := os.RemoveAll(tmpDir)
-					assert.NoErrorf(t, cleanupErr, "error cleaning up directory %q", tmpDir)
-				})
-
-				// fix permissions on temp dir
-				err = os.Chmod(tmpDir, 0o755&os.ModePerm)
-				require.NoError(t, err, "error setting temporary dir %q as world-readable", tmpDir)
+			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs) {
+				tmpDir := createTempDir(t)
 
 				caKey, caCert, pair, err := certutil.NewRootCA()
 				require.NoError(t, err, "failed creating CA root")
@@ -434,10 +388,7 @@ func TestProxyURL(t *testing.T) {
 					0,
 					action,
 				)
-				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}
-			},
-			enrollmentURL: func(fleet *fleetservertest.Server) string {
-				return fleet.LocalhostURL
+				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
 			},
 			wantErr: assert.NoError,
 			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
@@ -466,28 +417,9 @@ func TestProxyURL(t *testing.T) {
 		},
 		{
 			name: "NoEnrollProxy-mTLSProxyInThePolicy",
-			args: args{
-				// no proxy at enroll
-				enrollProxyName: "",
-			},
-			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy) {
+			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs) {
 
-				// use os.MkdirTemp since we are installing agent unprivileged and t.TempDir() does not guarantee that the elastic-agent user has access
-				baseDir := ""
-				if runtime.GOOS == "windows" {
-					baseDir = "C:\\"
-				}
-				tmpDir, err := os.MkdirTemp(baseDir, "mTLSProxyInThePolicy*")
-				require.NoError(t, err, "error creating temp dir for TLS files")
-
-				t.Cleanup(func() {
-					cleanupErr := os.RemoveAll(tmpDir)
-					assert.NoErrorf(t, cleanupErr, "error cleaning up directory %q", tmpDir)
-				})
-
-				// fix permissions on temp dir
-				err = os.Chmod(tmpDir, 0o755&os.ModePerm)
-				require.NoError(t, err, "error setting temporary dir %q as world-readable", tmpDir)
+				tmpDir := createTempDir(t)
 
 				serverCAKey, serverCACert, serverPair, err := certutil.NewRootCA()
 				require.NoError(t, err, "failed creating root CA")
@@ -538,16 +470,6 @@ func TestProxyURL(t *testing.T) {
 				// generate a certificate for elastic-agent from the client CA
 				_, agentPair, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, clientCAKey, clientCACert)
 
-				//// Write out certificate file
-				//agentCertFile := filepath.Join(tmpDir, "elastic-agent.cert")
-				//err = os.WriteFile(agentCertFile, agentPair.Cert, 0o644&os.ModePerm)
-				//require.NoError(t, err, "failed writing elastic-agent cert file %q", agentCertFile)
-				//
-				//// Write out key file
-				//agentKeyFile := filepath.Join(tmpDir, "elastic-agent.key")
-				//err = os.WriteFile(agentKeyFile, agentPair.Key, 0o644&os.ModePerm)
-				//require.NoError(t, err, "failed writing elastic-agent key file %q", agentCertFile)
-
 				mockFleet.policyData.FleetProxyURL = &proxyFleetPolicy.LocalhostURL
 				mockFleet.policyData.SSL = &fleetservertest.SSL{
 					CertificateAuthorities: []string{string(serverPair.Cert)},
@@ -567,10 +489,152 @@ func TestProxyURL(t *testing.T) {
 					0,
 					action,
 				)
-				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}
+				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
 			},
-			enrollmentURL: func(fleet *fleetservertest.Server) string {
-				return fleet.LocalhostURL
+			wantErr: assert.NoError,
+			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
+				// assert the agent is actually connected to fleet.
+				check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
+
+				// ensure the agent is communicating through the proxy set in the policy
+				if !assert.Eventually(t, func() bool {
+					for _, r := range proxies["proxyFleetPolicy"].ProxiedRequests() {
+						if strings.Contains(
+							r,
+							fleetservertest.NewPathCheckin(mockFleet.policyData.AgentID)) {
+							return true
+						}
+					}
+
+					return false
+				}, 5*time.Minute, 5*time.Second) {
+					t.Errorf("did not find requests to the proxy defined in the policy")
+				}
+
+				inspectOutput, err := fixture.ExecInspect(ctx)
+				if assert.NoError(t, err, "error running elastic-agent inspect") {
+					inspectYaml, _ := yaml.Marshal(inspectOutput)
+					t.Logf("elastic-agent inspect output:\n%s\n", string(inspectYaml))
+				}
+
+			},
+		},
+		{
+			name: "TLSEnrollProxy-mTLSProxyInThePolicy",
+			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs) {
+
+				t.Skip("Currently skipped due to https -> http proxy issues")
+
+				tmpDir := createTempDir(t)
+
+				// Setups 2 proxies:
+				// - 1 enroll proxy with simple TLS enabled to be used for enrolling with certificate from enroll CA
+				// - 1 fleet proxy with mTLS enabled from policy CA to be included in the Policy along with the CAs, agent certificate and key
+
+				// enroll proxy CA
+				enrollProxyCAKey, enrollProxyCACert, enrollProxyPair, err := certutil.NewRootCA()
+				require.NoError(t, err, "failed creating enroll proxy root CA")
+
+				enrollProxyCACertFile := filepath.Join(tmpDir, "enroll_proxy_ca.cert")
+				err = os.WriteFile(enrollProxyCACertFile, enrollProxyPair.Cert, 0o644&os.ModePerm)
+				require.NoError(t, err, "failed writing enroll proxy CA cert file %q", enrollProxyCACertFile)
+
+				// Create a fake proxy with TLS config to be used during enroll
+				enrollProxyCert, _, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, enrollProxyCAKey, enrollProxyCACert)
+				require.NoError(t, err, "failed generating enroll proxy certificate")
+				proxyEnroll := proxytest.New(t,
+					proxytest.WithRewriteFn(func(u *url.URL) {
+						t.Logf("received URL: %+v", u)
+						if u.Host == unreachableFleetHost+":443" {
+							// mock fleet server works in http
+							u.Scheme = "http"
+							u.Host = "localhost:" + mockFleet.fleetServer.Port
+						}
+					}),
+					proxytest.WithRequestLog("enroll", t.Logf),
+					proxytest.WithVerboseLog(),
+					proxytest.WithServerTLSConfig(&tls.Config{
+						Certificates: []tls.Certificate{
+							{
+								Certificate: enrollProxyCert.Certificate,
+								PrivateKey:  enrollProxyCert.PrivateKey,
+								Leaf:        enrollProxyCert.Leaf,
+							},
+						},
+					}))
+				err = proxyEnroll.StartTLS()
+				require.NoError(t, err, "error starting TLS-enabled enroll proxy")
+				t.Cleanup(proxyEnroll.Close)
+
+				// fleet proxy CA
+				fleetProxyCAKey, fleetProxyCACert, fleetProxyPair, err := certutil.NewRootCA()
+				require.NoError(t, err, "failed creating fleet proxy root CA")
+
+				// client CA
+				clientCAKey, clientCACert, _, err := certutil.NewRootCA()
+				require.NoError(t, err, "failed creating root CA")
+
+				// the server must trust the client CA
+				clientCACertPool := x509.NewCertPool()
+				clientCACertPool.AddCert(clientCACert)
+
+				// Create a fake proxy with mTLS config to be used in fleet policy
+				fleetProxyCert, _, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, fleetProxyCAKey, fleetProxyCACert)
+				require.NoError(t, err, "failed generating fleet proxy certificate")
+				proxyFleetPolicy := proxytest.New(t,
+					proxytest.WithRewriteFn(func(u *url.URL) {
+						if u.Host == unreachableFleetHost+":443" {
+							// mock fleet server works in http
+							u.Scheme = "http"
+							u.Host = "localhost:" + mockFleet.fleetServer.Port
+						}
+					}),
+					proxytest.WithRequestLog("proxy-fleet-policy", t.Logf),
+					proxytest.WithVerboseLog(),
+					proxytest.WithServerTLSConfig(&tls.Config{
+						Certificates: []tls.Certificate{
+							{
+								Certificate: fleetProxyCert.Certificate,
+								PrivateKey:  fleetProxyCert.PrivateKey,
+								Leaf:        fleetProxyCert.Leaf,
+							},
+						},
+						// require client auth with a trusted Cert
+						ClientAuth: tls.RequireAndVerifyClientCert,
+						ClientCAs:  clientCACertPool,
+					}))
+				err = proxyFleetPolicy.StartTLS()
+				require.NoError(t, err, "error starting mTLS-enabled fleet proxy")
+				t.Cleanup(proxyFleetPolicy.Close)
+
+				// generate a certificate for elastic-agent from the client CA
+				_, agentPair, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, clientCAKey, clientCACert)
+
+				mockFleet.policyData.FleetProxyURL = &proxyFleetPolicy.LocalhostURL
+				mockFleet.policyData.SSL = &fleetservertest.SSL{
+					CertificateAuthorities: []string{string(enrollProxyPair.Cert), string(fleetProxyPair.Cert)},
+					Renegotiation:          "never",
+					Certificate:            string(agentPair.Cert),
+					Key:                    string(agentPair.Key),
+				}
+				// now that we have fleet and the proxy running, we can add actions which
+				// depend on them.
+				action, err := fleetservertest.NewActionWithEmptyPolicyChange(
+					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
+				require.NoError(t, err, "could not generate action with policy")
+
+				ackToken := "AckToken-TestValidProxyInThePolicy"
+				mockFleet.checkinWithAcker.AddCheckin(
+					ackToken,
+					0,
+					action,
+				)
+				return map[string]*proxytest.Proxy{"enroll": proxyEnroll, "proxyFleetPolicy": proxyFleetPolicy},
+					installArgs{
+						enrollmentURL:          unreachableFleetHttpsURL,
+						proxyURL:               proxyEnroll.LocalhostURL,
+						certificateAuthorities: []string{enrollProxyCACertFile},
+					}
 			},
 			wantErr: assert.NoError,
 			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
@@ -634,7 +698,7 @@ func TestProxyURL(t *testing.T) {
 			}
 
 			// Specific testcase setup and map of created proxies
-			proxies := tt.setup(t, mockFleet)
+			proxies, args := tt.setup(t, mockFleet)
 
 			fixture, err := define.NewFixtureFromLocalBuild(t,
 				define.Version(),
@@ -645,24 +709,18 @@ func TestProxyURL(t *testing.T) {
 			err = fixture.EnsurePrepared(ctx)
 			require.NoError(t, err, "SetupTest: fixture.Prepare failed")
 
-			installProxyURL := ""
-			if tt.args.enrollProxyName != "" {
-				require.Containsf(t, proxies, tt.args.enrollProxyName, "Proxy %q to be used for enrolling is missing from the map of proxies", tt.args.enrollProxyName)
-				installProxyURL = proxies[tt.args.enrollProxyName].LocalhostURL
-			}
-
-			require.NotNil(t, tt.enrollmentURL, "testcase must define an enrollmentURL getter")
-			enrollmentURL := tt.enrollmentURL(fleet)
-
 			out, err := fixture.Install(
 				ctx,
 				&integrationtest.InstallOpts{
-					Force:          true,
-					NonInteractive: true,
-					Insecure:       true,
-					ProxyURL:       installProxyURL,
+					Force:                  true,
+					NonInteractive:         true,
+					Insecure:               args.insecure,
+					ProxyURL:               args.proxyURL,
+					CertificateAuthorities: args.certificateAuthorities,
+					Certificate:            args.certificate,
+					Key:                    args.key,
 					EnrollOpts: integrationtest.EnrollOpts{
-						URL:             enrollmentURL,
+						URL:             args.enrollmentURL,
 						EnrollmentToken: "anythingWillDO",
 					}})
 			t.Logf("elastic-agent install output: \n%s\n", string(out))
@@ -672,6 +730,25 @@ func TestProxyURL(t *testing.T) {
 		})
 	}
 
+}
+
+func createTempDir(t *testing.T) string {
+	// use os.MkdirTemp since we are installing agent unprivileged and t.TempDir() does not guarantee that the elastic-agent user has access
+	baseDir := ""
+	if runtime.GOOS == "windows" {
+		baseDir = "C:\\"
+	}
+	tmpDir, err := os.MkdirTemp(baseDir, strings.ReplaceAll(t.Name(), "/", "-")+"*")
+	require.NoError(t, err, "error creating temp dir for TLS files")
+	t.Cleanup(func() {
+		cleanupErr := os.RemoveAll(tmpDir)
+		assert.NoErrorf(t, cleanupErr, "error cleaning up directory %q", tmpDir)
+	})
+
+	// fix permissions on temp dir
+	err = os.Chmod(tmpDir, 0o755&os.ModePerm)
+	require.NoError(t, err, "error setting temporary dir %q as world-readable", tmpDir)
+	return tmpDir
 }
 
 func createBasicFleetPolicyData(t *testing.T, fleetHost string) (fleetservertest.APIKey, fleetservertest.TmplPolicy) {

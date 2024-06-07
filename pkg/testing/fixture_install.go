@@ -91,6 +91,11 @@ type InstallOpts struct {
 
 	Privileged bool // inverse of --unprivileged (as false is the default)
 
+	// SSL/TLS options
+	CertificateAuthorities []string
+	Certificate            string
+	Key                    string
+
 	EnrollOpts
 	FleetBootstrapOpts
 }
@@ -117,6 +122,18 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	}
 	if !i.Privileged {
 		args = append(args, "--unprivileged")
+	}
+
+	if len(i.CertificateAuthorities) > 0 {
+		args = append(args, "--certificate-authorities="+strings.Join(i.CertificateAuthorities, ","))
+	}
+
+	if i.Certificate != "" {
+		args = append(args, "--elastic-agent-cert="+i.Certificate)
+	}
+
+	if i.Key != "" {
+		args = append(args, "--elastic-agent-cert-key="+i.Key)
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
