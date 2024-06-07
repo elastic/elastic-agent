@@ -1174,7 +1174,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 	return archivePath, dropPath
 }
 
-func getIndAgentGlobExpr(packageVersion string) string {
+func getIndAgentGlobExpr(versionedFlatPath string, packageVersion string) string {
 	parsedPackageVersion, err := version.ParseVersion(packageVersion)
 	if err != nil {
 		panic(err)
@@ -1182,7 +1182,7 @@ func getIndAgentGlobExpr(packageVersion string) string {
 
 	bumpedPatchNumber := parsedPackageVersion.Patch() + 1
 
-	globExpr := fmt.Sprintf("*%d.%d.[%d|%d]*", parsedPackageVersion.Major(), parsedPackageVersion.Minor(), parsedPackageVersion.Patch(), bumpedPatchNumber)
+	globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%d.%d.[%d|%d]*", parsedPackageVersion.Major(), parsedPackageVersion.Minor(), parsedPackageVersion.Patch(), bumpedPatchNumber))
 
 	return globExpr
 }
@@ -1233,7 +1233,7 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 		}
 
 		//globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
-		globExpr := getIndAgentGlobExpr(packageVersion)
+		globExpr := getIndAgentGlobExpr(versionedFlatPath, packageVersion)
 		if mg.Verbose() {
 			log.Printf("Finding files to copy with %s", globExpr)
 		}
