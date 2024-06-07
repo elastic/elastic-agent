@@ -1175,7 +1175,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 }
 
 func getIndAgentGlobExpr(packageVersion string) string {
-	parsedPackageVersion := semver.ParseVersion(packageVersion)
+	parsedPackageVersion := version.ParseVersion(packageVersion)
 
 	bumpedPatchNumber := parsedPackageVersion.Patch() + 1
 
