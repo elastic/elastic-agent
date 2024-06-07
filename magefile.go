@@ -1174,6 +1174,16 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 	return archivePath, dropPath
 }
 
+func getIndAgentGlobExpr(packageVersion string) string {
+	parsedPackageVersion := semver.ParseVersion(packageVersion)
+
+	bumpedPatchNumber := parsedPackageVersion.Patch() + 1
+
+	globExpr := fmt.Sprintf("*%d.%d.[%d|%d]*", parsedPackageVersion.Major(), parsedPackageVersion.Minor(), parsedPackageVersion.Patch(), bumpedPatchNumber)
+
+	return globExpr
+}
+
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
 func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string) {
@@ -1219,7 +1229,8 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 			}
 		}
 
-		globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
+		//globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
+		globExpr := getIndAgentGlobExpr(packageVersion)
 		if mg.Verbose() {
 			log.Printf("Finding files to copy with %s", globExpr)
 		}
