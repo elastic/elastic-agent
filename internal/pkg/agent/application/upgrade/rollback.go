@@ -163,6 +163,7 @@ func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error
 	log.Infow("Upgrade Watcher invoked", "agent.upgrade.watcher.process.pid", upgradeWatcherPID, "agent.process.pid", agentPID)
 
 	return cmd, nil
+
 }
 
 func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) error {

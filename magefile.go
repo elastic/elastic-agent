@@ -2049,8 +2049,13 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 func (Integration) UpdatePackageVersion(ctx context.Context) error {
 	const packageVersionFilename = ".package-version"
 
+	currentReleaseBranch, err := git.GetCurrentReleaseBranch(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to identify the current release branch: %w", err)
+	}
+
 	sc := snapshots.NewSnapshotsClient()
-	versions, err := sc.FindLatestSnapshots(ctx, []string{"master"})
+	versions, err := sc.FindLatestSnapshots(ctx, []string{currentReleaseBranch})
 	if err != nil {
 		return fmt.Errorf("failed to fetch a manifest for the latest snapshot: %w", err)
 	}
