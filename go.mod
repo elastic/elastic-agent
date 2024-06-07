@@ -297,7 +297,7 @@ replace (
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 
 	// The upstream fork at https://github.com/kardianos/service does not seem to be actively maintained.
-	github.com/kardianos/service => github.com/elastic/kardianos-service v0.0.0-20230215200102-9832e01049dd
+	github.com/kardianos/service => github.com/elastic/go-service v0.0.0-20230215200102-9832e01049dd
 )
 
 // Exclude this version because the version has an invalid checksum.

@@ -3783,12 +3783,12 @@ SOFTWARE.
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/elastic/kardianos-service
+Dependency : github.com/elastic/go-service
 Version: v0.0.0-20230215200102-9832e01049dd
 Licence type (autodetected): Zlib
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/kardianos-service@v0.0.0-20230215200102-9832e01049dd/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-service@v0.0.0-20230215200102-9832e01049dd/LICENSE:
 
 Copyright (c) 2015 Daniel Theophanes
 
