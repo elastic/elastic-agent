@@ -1175,7 +1175,10 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 }
 
 func getIndAgentGlobExpr(packageVersion string) string {
-	parsedPackageVersion := version.ParseVersion(packageVersion)
+	parsedPackageVersion, err := version.ParseVersion(packageVersion)
+	if err != nil {
+		return fmt.Errorf("failed to parse package version: [%s]", packageVersion)
+	}
 
 	bumpedPatchNumber := parsedPackageVersion.Patch() + 1
 
