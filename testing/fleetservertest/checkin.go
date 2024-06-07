@@ -13,7 +13,7 @@ import (
 
 type SSL struct {
 	Renegotiation          string   `json:"renegotiation,omitempty"`
-	VerificationMode       string   `json:"verification_mode"`
+	VerificationMode       string   `json:"verification_mode,omitempty"`
 	CertificateAuthorities []string `json:"certificate_authorities,omitempty"`
 	Certificate            string   `json:"certificate,omitempty"`
 	Key                    string   `json:"key,omitempty"`

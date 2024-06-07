@@ -223,33 +223,29 @@ func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config
 		// Proxy URL
 		urlCopy := *src.Transport.Proxy.URL
 		dst.Transport.Proxy.URL = &urlCopy
-
 	}
 
 	if src.Transport.TLS != nil {
 
-		if dst.Transport.TLS == nil {
-			dst.Transport.TLS = new(tlscommon.Config)
-		} else {
-			// copy the TLS struct
-			tlsCopy := *dst.Transport.TLS
-			dst.Transport.TLS = &tlsCopy
-		}
+		// copy the TLS struct
+		tlsCopy := *src.Transport.TLS
 
 		if src.Transport.TLS.Certificate == emptyCertificateConfig() {
 			log.Debug("TLS certificates from fleet are empty or null, the TLS config will not be changed")
 		} else {
-			dst.Transport.TLS.Certificate = src.Transport.TLS.Certificate
+			tlsCopy.Certificate = src.Transport.TLS.Certificate
 			log.Debug("received TLS certificate/key from fleet, applying it")
 		}
 
 		if len(src.Transport.TLS.CAs) == 0 {
 			log.Debug("TLS CAs from fleet are empty or null, the TLS config will not be changed")
 		} else {
-			dst.Transport.TLS.CAs = make([]string, len(src.Transport.TLS.CAs))
-			copy(dst.Transport.TLS.CAs, src.Transport.TLS.CAs)
+			tlsCopy.CAs = make([]string, len(src.Transport.TLS.CAs))
+			copy(tlsCopy.CAs, src.Transport.TLS.CAs)
 			log.Debug("received TLS CAs from fleet, applying it")
 		}
+
+		dst.Transport.TLS = &tlsCopy
 	}
 }
 

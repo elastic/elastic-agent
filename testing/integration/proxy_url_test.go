@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
@@ -399,6 +400,7 @@ func TestProxyURL(t *testing.T) {
 
 				// Create a fake proxy with TLS config to be used in fleet policy
 				proxyFleetPolicy := proxytest.New(t,
+					proxytest.WithRewrite(unreachableFleetHost, "localhost:"+mockFleet.fleetServer.Port),
 					proxytest.WithRequestLog("proxy-fleet-policy", t.Logf),
 					proxytest.WithVerboseLog(),
 					proxytest.WithServerTLSConfig(&tls.Config{
@@ -487,24 +489,36 @@ func TestProxyURL(t *testing.T) {
 				err = os.Chmod(tmpDir, 0o755&os.ModePerm)
 				require.NoError(t, err, "error setting temporary dir %q as world-readable", tmpDir)
 
-				caKey, caCert, pair, err := certutil.NewRootCA()
+				serverCAKey, serverCACert, serverPair, err := certutil.NewRootCA()
 				require.NoError(t, err, "failed creating root CA")
 
-				caCertFile := filepath.Join(tmpDir, "ca.cert")
-				err = os.WriteFile(caCertFile, pair.Cert, 0o644&os.ModePerm)
-				require.NoError(t, err, "failed writing CA cert file %q", caCertFile)
+				serverCACertFile := filepath.Join(tmpDir, "server_ca.cert")
+				err = os.WriteFile(serverCACertFile, serverPair.Cert, 0o644&os.ModePerm)
+				require.NoError(t, err, "failed writing Server CA cert file %q", serverCACertFile)
 
-				caCertPool := x509.NewCertPool()
-				caCertPool.AddCert(caCert)
+				clientCAKey, clientCACert, clientPair, err := certutil.NewRootCA()
+				require.NoError(t, err, "failed creating root CA")
 
-				proxyCert, _, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, caKey, caCert)
+				clientCACertFile := filepath.Join(tmpDir, "client_ca.cert")
+				err = os.WriteFile(clientCACertFile, clientPair.Cert, 0o644&os.ModePerm)
+				require.NoError(t, err, "failed writing Client CA cert file %q", clientCACertFile)
+
+				// server CA certpool
+				serverCACertPool := x509.NewCertPool()
+				serverCACertPool.AddCert(serverCACert)
+
+				// the server must trust the client CA
+				clientCACertPool := x509.NewCertPool()
+				clientCACertPool.AddCert(clientCACert)
+
+				proxyCert, _, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, serverCAKey, serverCACert)
 
 				// Create a fake proxy with mTLS config to be used in fleet policy
 				proxyFleetPolicy := proxytest.New(t,
+					proxytest.WithRewrite(unreachableFleetHost, "localhost:"+mockFleet.fleetServer.Port),
 					proxytest.WithRequestLog("proxy-fleet-policy", t.Logf),
 					proxytest.WithVerboseLog(),
 					proxytest.WithServerTLSConfig(&tls.Config{
-						RootCAs: caCertPool,
 						Certificates: []tls.Certificate{
 							{
 								Certificate: proxyCert.Certificate,
@@ -514,33 +528,32 @@ func TestProxyURL(t *testing.T) {
 						},
 						// require client auth with a trusted Cert
 						ClientAuth: tls.RequireAndVerifyClientCert,
-						ClientCAs:  caCertPool,
+						ClientCAs:  clientCACertPool,
+						RootCAs:    serverCACertPool,
 					}))
 				err = proxyFleetPolicy.StartTLS()
 				require.NoError(t, err, "error starting TLS-enabled proxy")
 				t.Cleanup(proxyFleetPolicy.Close)
 
-				// generate a certificate for elastic-agent from the same CA as the proxy
-				_, agentPair, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, caKey, caCert)
+				// generate a certificate for elastic-agent from the client CA
+				_, agentPair, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, clientCAKey, clientCACert)
 
-				// Write out certificate file
-				agentCertFile := filepath.Join(tmpDir, "elastic-agent.cert")
-				err = os.WriteFile(agentCertFile, agentPair.Cert, 0o644&os.ModePerm)
-				require.NoError(t, err, "failed writing elastic-agent cert file %q", agentCertFile)
-
-				// Write out key file
-				agentKeyFile := filepath.Join(tmpDir, "elastic-agent.key")
-				err = os.WriteFile(agentKeyFile, agentPair.Key, 0o644&os.ModePerm)
-				require.NoError(t, err, "failed writing elastic-agent key file %q", agentCertFile)
+				//// Write out certificate file
+				//agentCertFile := filepath.Join(tmpDir, "elastic-agent.cert")
+				//err = os.WriteFile(agentCertFile, agentPair.Cert, 0o644&os.ModePerm)
+				//require.NoError(t, err, "failed writing elastic-agent cert file %q", agentCertFile)
+				//
+				//// Write out key file
+				//agentKeyFile := filepath.Join(tmpDir, "elastic-agent.key")
+				//err = os.WriteFile(agentKeyFile, agentPair.Key, 0o644&os.ModePerm)
+				//require.NoError(t, err, "failed writing elastic-agent key file %q", agentCertFile)
 
 				mockFleet.policyData.FleetProxyURL = &proxyFleetPolicy.LocalhostURL
 				mockFleet.policyData.SSL = &fleetservertest.SSL{
-					CertificateAuthorities: []string{caCertFile},
+					CertificateAuthorities: []string{string(serverPair.Cert)},
 					Renegotiation:          "never",
-					Certificate:            agentCertFile,
-					Key:                    agentKeyFile,
-					// Not sure if we need to set something in VerificationMode (the field is present in policy but it doesn't really make sense for elastic-agent)
-					VerificationMode: "",
+					Certificate:            string(agentPair.Cert),
+					Key:                    string(agentPair.Key),
 				}
 				// now that we have fleet and the proxy running, we can add actions which
 				// depend on them.
@@ -579,9 +592,12 @@ func TestProxyURL(t *testing.T) {
 					t.Errorf("did not find requests to the proxy defined in the policy")
 				}
 
-				inspectOutput, err := fixture.Exec(ctx, []string{"inspect"})
-				assert.NoError(t, err, "error running elastic-agent inspect")
-				t.Logf("elastic-agent inspect output:\n%s\n", string(inspectOutput))
+				inspectOutput, err := fixture.ExecInspect(ctx)
+				if assert.NoError(t, err, "error running elastic-agent inspect") {
+					inspectYaml, _ := yaml.Marshal(inspectOutput)
+					t.Logf("elastic-agent inspect output:\n%s\n", string(inspectYaml))
+				}
+
 			},
 		},
 	}
