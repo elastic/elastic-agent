@@ -22,7 +22,7 @@ func WaitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config,
 	var cancel context.CancelFunc
 	var vars []*transpiler.Vars
 
-	composable, err := composable.New(l, cfg, false, false)
+	composable, err := composable.New(l, cfg, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create composable controller: %w", err)
 	}

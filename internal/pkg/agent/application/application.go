@@ -188,7 +188,7 @@ func New(
 	var varsManager composable.Controller
 	if !runAsOtel {
 		// no need for vars in otel mode
-		varsManager, err = composable.New(log, rawConfig, composableManaged, runAsOtel)
+		varsManager, err = composable.New(log, rawConfig, composableManaged)
 		if err != nil {
 			return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 		}
