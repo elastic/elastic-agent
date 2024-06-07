@@ -684,15 +684,15 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	defer close(c.stateBroadcaster.InputChan)
 
 	if c.varsMgr != nil {
-		// The usual state refresh happens in the main run loop in Coordinator.runner,
-		// so before/after the runner call we need to trigger state change broadcasts
-		// manually with refreshState.
 		c.setCoordinatorState(agentclient.Starting, "Waiting for initial configuration and composable variables")
 	} else {
 		// vars not initialized, go directly to running
 		c.setCoordinatorState(agentclient.Healthy, "Running")
 	}
 
+	// The usual state refresh happens in the main run loop in Coordinator.runner,
+	// so before/after the runner call we need to trigger state change broadcasts
+	// manually with refreshState.
 	c.refreshState()
 
 	err := c.runner(ctx)
