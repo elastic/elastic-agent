@@ -36,7 +36,7 @@ func TestContextProvider(t *testing.T) {
 	})
 	require.NoError(t, err)
 	builder, _ := composable.Providers.GetContextProvider("host")
-	provider, err := builder(log, c, true, false)
+	provider, err := builder(log, c, true)
 	require.NoError(t, err)
 
 	hostProvider, _ := provider.(*contextProvider)
@@ -103,7 +103,7 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	require.NoError(t, err)
 
 	builder, _ := composable.Providers.GetContextProvider("host")
-	provider, err := builder(log, c, true, false)
+	provider, err := builder(log, c, true)
 	require.NoError(t, err)
 
 	hostProvider, ok := provider.(*contextProvider)

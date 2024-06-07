@@ -20,7 +20,7 @@ func TestContextProvider(t *testing.T) {
 	testutils.InitStorage(t)
 
 	builder, _ := composable.Providers.GetContextProvider("agent")
-	provider, err := builder(nil, nil, true, false)
+	provider, err := builder(nil, nil, true)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -14,7 +14,7 @@ import (
 )
 
 // ContextProviderBuilder creates a new context provider based on the given config and returns it.
-type ContextProviderBuilder func(log *logger.Logger, config *config.Config, managed bool, runAsOtel bool) (corecomp.ContextProvider, error)
+type ContextProviderBuilder func(log *logger.Logger, config *config.Config, managed bool) (corecomp.ContextProvider, error)
 
 // MustAddContextProvider adds a new ContextProviderBuilder and panics if it AddContextProvider returns an error.
 func (r *providerRegistry) MustAddContextProvider(name string, builder ContextProviderBuilder) {

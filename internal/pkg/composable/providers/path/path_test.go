@@ -18,7 +18,7 @@ import (
 
 func TestContextProvider(t *testing.T) {
 	builder, _ := composable.Providers.GetContextProvider("path")
-	provider, err := builder(nil, nil, true, false)
+	provider, err := builder(nil, nil, true)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())

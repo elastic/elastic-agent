@@ -108,7 +108,7 @@ func TestNewLeaderElectionManager(t *testing.T) {
 
 	// Create two leader election providers representing two agents running
 	for i := 0; i < 2; i++ {
-		p, err := ContextProviderBuilder(logger, cfg, true, false)
+		p, err := ContextProviderBuilder(logger, cfg, true)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())

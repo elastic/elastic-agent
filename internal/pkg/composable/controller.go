@@ -76,7 +76,7 @@ func New(log *logger.Logger, c *config.Config, managed bool, runAsOtel bool) (Co
 			l.Infof("Provider %q is not supported", name)
 			continue
 		}
-		provider, err := builder(l, pCfg, managed, runAsOtel)
+		provider, err := builder(l, pCfg, managed)
 		if errors.Is(err, corecomp.ErrUnsupportedProvider) {
 			continue
 		}

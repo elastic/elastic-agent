@@ -33,7 +33,7 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 }
 
 // ContextProviderBuilder builds the context provider.
-func ContextProviderBuilder(_ *logger.Logger, c *config.Config, _ bool, _ bool) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(_ *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{}
 	if c != nil {
 		err := c.Unpack(p)
