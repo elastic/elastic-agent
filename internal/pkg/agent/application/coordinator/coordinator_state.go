@@ -141,7 +141,7 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	pidRequiresUpdate := false
 	for i, other := range c.state.Components {
 		if other.Component.ID == state.Component.ID {
-			if other.State.CheckinPid != state.State.CheckinPid {
+			if other.State.Pid != state.State.Pid {
 				pidRequiresUpdate = true
 			}
 			c.state.Components[i] = state
@@ -151,7 +151,7 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	}
 	if !found {
 		c.state.Components = append(c.state.Components, state)
-		if state.State.CheckinPid != 0 {
+		if state.State.Pid != 0 {
 			pidRequiresUpdate = true
 		}
 	}

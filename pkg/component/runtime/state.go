@@ -75,7 +75,10 @@ type ComponentState struct {
 
 	VersionInfo ComponentVersionInfo `yaml:"version_info"`
 
-	CheckinPid uint64
+	// The PID of the process, as obtained from the *from the Protobuf API*
+	// As of now, this is only used by Endpoint, as agent doesn't know the PID
+	// of the endpoint service. If you need the PID for beats, use the coordinator/communicator
+	Pid uint64
 
 	// internal
 	expectedUnits map[ComponentUnitKey]expectedUnitState
@@ -272,9 +275,9 @@ func (s *ComponentState) syncUnits(comp *component.Component) bool {
 func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 	changed := false
 
-	if s.CheckinPid != checkin.Pid {
+	if s.Pid != checkin.Pid {
 		changed = true
-		s.CheckinPid = checkin.Pid
+		s.Pid = checkin.Pid
 	}
 
 	touched := make(map[ComponentUnitKey]bool)

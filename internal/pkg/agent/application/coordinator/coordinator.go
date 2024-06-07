@@ -1299,7 +1299,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	var existingCompState = make(map[string]uint64, len(c.state.Components))
 	for _, comp := range c.state.Components {
-		existingCompState[comp.Component.ID] = comp.State.CheckinPid
+		existingCompState[comp.Component.ID] = comp.State.Pid
 	}
 
 	comps, err := c.specs.ToComponents(

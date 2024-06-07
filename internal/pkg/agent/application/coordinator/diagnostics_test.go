@@ -488,7 +488,7 @@ log_level: "warning"
 components:
   - id: "comp-1"
     state:
-      checkinpid: 0
+      pid: 0
       state: 3
       message: "degraded message"
       features_idx: 0
@@ -571,7 +571,7 @@ log_level: "warning"
 components:
   - id: "comp-1"
     state:
-      checkinpid: 0
+      pid: 0
       state: 3
       message: "degraded message"
       features_idx: 0
