@@ -32,7 +32,14 @@ type FleetServerOutputConfig struct {
 	Elasticsearch Elasticsearch `config:"elasticsearch" yaml:"elasticsearch"`
 }
 
-// Elasticsearch is the configuration for elasticsearch.
+// Elasticsearch is the configuration for fleet-server's connection to elasticsearch.
+// Note that these keys may be injected into policy output by fleet-server.
+// The following TLS options may be set in bootstrap:
+// - VerificationMode
+// - CAs
+// - CATrustedFingerprint
+// - CertificateConfig.Certificate AND CertificateConfig.Key
+// If an attribute is added to this struct, or another TLS attribute is passed  ensure that it is handled as part of the bootstrap config handler in fleet-server/internal/pkg/server/agent.go
 type Elasticsearch struct {
 	Protocol         string            `config:"protocol" yaml:"protocol"`
 	Hosts            []string          `config:"hosts" yaml:"hosts"`
