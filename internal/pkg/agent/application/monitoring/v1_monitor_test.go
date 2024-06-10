@@ -63,6 +63,9 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 			ID: "endpoint-default",
 			InputSpec: &component.InputRuntimeSpec{
 				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Name: "endpoint-security",
+					},
 					Service: &component.ServiceSpec{
 						CPort: 7688,
 					},
