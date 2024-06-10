@@ -8,12 +8,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"runtime"
 	"time"
 
 	"github.com/kardianos/service"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -51,10 +54,12 @@ type serviceRuntime struct {
 	state ComponentState
 
 	executeServiceCommandImpl executeServiceCommandFunc
+
+	isLocal bool // true if rpc is domain socket, or named pipe
 }
 
 // newServiceRuntime creates a new command runtime for the provided component.
-func newServiceRuntime(comp component.Component, logger *logger.Logger) (*serviceRuntime, error) {
+func newServiceRuntime(comp component.Component, logger *logger.Logger, isLocal bool) (*serviceRuntime, error) {
 	if comp.ShipperSpec != nil {
 		return nil, errors.New("service runtime not supported for a shipper specification")
 	}
@@ -76,6 +81,7 @@ func newServiceRuntime(comp component.Component, logger *logger.Logger) (*servic
 		statusCh:                  make(chan service.Status),
 		state:                     state,
 		executeServiceCommandImpl: executeServiceCommand,
+		isLocal:                   isLocal,
 	}
 
 	// Set initial state as STOPPED
@@ -214,7 +220,19 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 				// Start connection info
 				if cis == nil {
-					cis, err = newConnInfoServer(s.log, comm, s.comp.InputSpec.Spec.Service.CPort)
+					var address string
+					// [gRPC:8.15] Uncomment after 8.14 when Endpoint is ready for local gRPC
+					// isLocal := s.isLocal
+
+					// [gRPC:8.15] Set connection info to local socket always for 8.14. Remove when Endpoint is ready for local gRPC
+					isLocal := true
+					address, err = getConnInfoServerAddress(runtime.GOOS, isLocal, s.comp.InputSpec.Spec.Service.CPort, s.comp.InputSpec.Spec.Service.CSocket)
+					if err != nil {
+						err = fmt.Errorf("failed to create connection info service address for %s: %w", s.name(), err)
+						break
+					}
+					s.log.Infof("Creating connection info server for %s service, address: %v", s.name(), address)
+					cis, err = newConnInfoServer(s.log, comm, address)
 					if err != nil {
 						err = fmt.Errorf("failed to start connection info service %s: %w", s.name(), err)
 						break
@@ -273,6 +291,31 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			}
 		}
 	}
+}
+
+var errEmptySocketValue = errors.New("empty socket value")
+
+func getConnInfoServerAddress(os string, isLocal bool, port int, socket string) (string, error) {
+	if isLocal {
+		// Return an empty string if socket string is empty
+		// The connectionInfo server fails on empty address
+		if socket == "" {
+			return "", errEmptySocketValue
+		}
+
+		u := url.URL{}
+		u.Path = "/"
+
+		if os == "windows" {
+			u.Scheme = "npipe"
+			return u.JoinPath("/", socket).String(), nil
+		}
+
+		u.Scheme = "unix"
+		return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), socket).String(), nil
+	}
+
+	return fmt.Sprintf("127.0.0.1:%d", port), nil
 }
 
 func injectSigned(comp component.Component, signed *component.Signed) (component.Component, error) {
