@@ -58,6 +58,7 @@ func newComponentRuntime(
 	comp component.Component,
 	logger *logger.Logger,
 	monitor MonitoringManager,
+	isLocal bool,
 ) (componentRuntime, error) {
 	if comp.Err != nil {
 		return newFailedRuntime(comp)
@@ -67,7 +68,7 @@ func newComponentRuntime(
 			return newCommandRuntime(comp, logger, monitor)
 		}
 		if comp.InputSpec.Spec.Service != nil {
-			return newServiceRuntime(comp, logger)
+			return newServiceRuntime(comp, logger, isLocal)
 		}
 		return nil, errors.New("unknown component runtime")
 	}
@@ -99,12 +100,12 @@ type componentRuntimeState struct {
 	actions   map[string]func(*proto.ActionResponse)
 }
 
-func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor MonitoringManager, comp component.Component) (*componentRuntimeState, error) {
+func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor MonitoringManager, comp component.Component, isLocal bool) (*componentRuntimeState, error) {
 	comm, err := newRuntimeComm(logger, m.getListenAddr(), m.ca, m.agentInfo, m.grpcConfig.MaxMsgSize)
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := newComponentRuntime(comp, logger, monitor)
+	runtime, err := newComponentRuntime(comp, logger, monitor, isLocal)
 	if err != nil {
 		return nil, err
 	}

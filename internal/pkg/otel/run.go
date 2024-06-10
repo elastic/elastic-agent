@@ -68,15 +68,11 @@ func newSettings(version string, configPaths []string) (*otelcol.CollectorSettin
 			},
 		},
 	}
-	provider, err := otelcol.NewConfigProvider(configProviderSettings)
-	if err != nil {
-		return nil, err
-	}
 
 	return &otelcol.CollectorSettings{
-		Factories:      components,
-		BuildInfo:      buildInfo,
-		ConfigProvider: provider,
+		Factories:              components,
+		BuildInfo:              buildInfo,
+		ConfigProviderSettings: configProviderSettings,
 		// we're handling DisableGracefulShutdown via the cancelCtx being passed
 		// to the collector's Run method in the Run function
 		DisableGracefulShutdown: true,
