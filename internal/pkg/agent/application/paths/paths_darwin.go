@@ -16,20 +16,20 @@ const (
 
 	// controlSocketRunSymlink is the path to the symlink that should be
 	// created to the control socket when Elastic Agent is running with root.
-	controlSocketRunSymlink                = "/var/run/elastic-agent.sock"
-	controlSocketRunSymlinkDevelopmentMode = "/var/run/elastic-agent-development.sock"
+	controlSocketRunSymlink             = "/var/run/elastic-agent.sock"
+	controlSocketRunSymlinkNamespaceFmt = "/var/run/elastic-agent-%s.sock"
 
 	// serviceName is the service name when installed.
-	serviceName                = "co.elastic.elastic-agent"
-	serviceNameDevelopmentMode = "co.elastic.elastic-agent-development"
+	serviceName             = "co.elastic.elastic-agent"
+	serviceNameNamespaceFmt = "co.elastic.elastic-agent-%s"
 
 	// shellWrapperPath is the path to the installed shell wrapper.
-	shellWrapperPath                = "/usr/local/bin/elastic-agent"
-	shellWrapperPathDevelopmentMode = "/usr/local/bin/elastic-development-agent"
+	shellWrapperPath             = "/usr/local/bin/elastic-agent"
+	shellWrapperPathNamespaceFmt = "/usr/local/bin/elastic-%s-agent"
 
 	// ShellWrapper is the wrapper that is installed.  The %s must
 	// be substituted with the appropriate top path.
-	ShellWrapper = `#!/bin/sh
+	ShellWrapperFmt = `#!/bin/sh
 exec %s/elastic-agent $@
 `
 )

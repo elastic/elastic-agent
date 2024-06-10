@@ -39,13 +39,13 @@ sudo ./elastic-agent install --develop
 ./elastic-agent run -e --develop
 ```
 
-Using the `--develop` option will install the agent in an isolated `DevelopmentAgent` agent directory in the chosen base path.
-Development agents enrolled in Fleet will have the `development` tag added automatically. Using the default base path on MacOS you will see:
+Using the `--develop` option will install the agent in an isolated `Agent-Development` agent directory in the chosen base path.
+Development agents enrolled in Fleet will have the `Development` tag added automatically. Using the default base path on MacOS you will see:
 
 ```sh
 sudo ls /Library/Elastic/
 Agent
-DevelopmentAgent
+Agent-Development
 ```
 
 The `elastic-agent` command in the shell is replaced with `elastic-development-agent` to interact with the development agent:
@@ -60,8 +60,6 @@ sudo -u elastic-agent-user elastic-development-agent status
 The primary restriction of `--develop` installations is that you cannot run Elastic Defend a second time on the same machine. Attempting to
 install Defend twice will fail with resource conflicts. All other integrations should be usable provided conflicting configurations are
 changed ahead of time. For example two agents cannot bind to the same `agent.monitoring.http.port` to expose their monitoring servers.
-
-To follow the changes made to support development mode, search for the `IsDevelopmentMode()` function in the source code.
 
 ### Test Framework
 

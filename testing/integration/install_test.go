@@ -64,7 +64,8 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --develop", testDevelopmentAgentCanInstall(ctx, fixture, installtest.DevelopTopPath(), opts))
+	t.Run("check second agent installs with --develop",
+		testDevelopmentAgentCanInstall(ctx, fixture, installtest.NamespaceTopPath(paths.DevelopmentNamespace), opts))
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -139,7 +140,7 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	devTopPath := filepath.Join(basePath, "Elastic", paths.DevelopmentInstallDirName)
+	devTopPath := filepath.Join(basePath, "Elastic", paths.InstallDirNameForNamespace(paths.DevelopmentNamespace))
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
@@ -196,7 +197,8 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --develop", testDevelopmentAgentCanInstall(ctx, fixture, installtest.DevelopTopPath(), opts))
+	t.Run("check second agent installs with --develop",
+		testDevelopmentAgentCanInstall(ctx, fixture, installtest.NamespaceTopPath(paths.DevelopmentNamespace), opts))
 }
 
 func TestInstallPrivilegedWithBasePath(t *testing.T) {
@@ -242,7 +244,7 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-	devTopPath := filepath.Join(randomBasePath, "Elastic", paths.DevelopmentInstallDirName)
+	devTopPath := filepath.Join(randomBasePath, "Elastic", paths.InstallDirNameForNamespace(paths.DevelopmentNamespace))
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check second agent installs with --develop", testDevelopmentAgentCanInstall(ctx, fixture, devTopPath, opts))

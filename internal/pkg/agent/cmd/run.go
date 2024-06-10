@@ -73,8 +73,10 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
 			if isDevelopmentMode {
 				fmt.Fprintln(streams.Out, "Development installation mode enabled; this is an experimental feature.")
+				// For now, development mode only makes the agent behave as if it was running in a namespace to allow
+				// multiple agents on the same machine.
+				paths.SetInstallNamespace(paths.DevelopmentNamespace)
 			}
-			paths.SetIsDevelopmentMode(isDevelopmentMode)
 
 			// done very early so the encrypted store is never used. Always done in development mode to remove the need to be root.
 			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
@@ -322,7 +324,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// option during installation
 	//
 	// Windows `paths.ControlSocketRunSymlink()` is `""` so this is always skipped on Windows.
-	controlSocketRunSymlink := paths.ControlSocketRunSymlink(paths.IsDevelopmentMode())
+	controlSocketRunSymlink := paths.ControlSocketRunSymlink(paths.InstallNamespace())
 	if isRoot && paths.RunningInstalled() && controlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
 		socketLog := controlLog.With("path", socketPath).With("link", controlSocketRunSymlink)

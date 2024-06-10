@@ -556,10 +556,10 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		return errors.New(err, "acquiring metadata failed")
 	}
 
-	// Automatically add a "development" tag when enrolling in development mode.
+	// Automatically add the namespace as a tag when installed into a namepsace.
 	// Ensures the development agent is differentiated from others when on the same host.
-	if paths.IsDevelopmentMode() {
-		c.options.Tags = append(c.options.Tags, "development")
+	if namespace := paths.InstallNamespace(); namespace != "" {
+		c.options.Tags = append(c.options.Tags, namespace)
 	}
 
 	r := &fleetapi.EnrollRequest{

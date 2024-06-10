@@ -86,8 +86,9 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
 	if isDevelopmentMode {
 		fmt.Fprintln(streams.Out, "Development installation mode enabled; this is an experimental and currently unsupported feature.")
+		// For now, development mode only installs agent in a well known namespace to allow two agents on the same machine.
+		paths.SetInstallNamespace(paths.DevelopmentNamespace)
 	}
-	paths.SetIsDevelopmentMode(isDevelopmentMode)
 
 	topPath := paths.InstallPath(basePath)
 

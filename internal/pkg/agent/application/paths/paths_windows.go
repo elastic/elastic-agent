@@ -21,19 +21,19 @@ const (
 	DefaultBasePath = `C:\Program Files`
 
 	// controlSocketRunSymlink is not created on Windows.
-	controlSocketRunSymlink                = ""
-	controlSocketRunSymlinkDevelopmentMode = ""
+	controlSocketRunSymlink             = ""
+	controlSocketRunSymlinkNamespaceFmt = ""
 
 	// serviceName is the service name when installed.
-	serviceName                = "Elastic Agent"
-	serviceNameDevelopmentMode = "Elastic Development Agent"
+	serviceName             = "Elastic Agent"
+	serviceNameNamespaceFmt = "Elastic Agent - %s"
 
 	// shellWrapperPath is the path to the installed shell wrapper.
-	shellWrapperPath                = ""
-	shellWrapperPathDevelopmentMode = ""
+	shellWrapperPath             = ""
+	shellWrapperPathNamespaceFmt = ""
 
 	// ShellWrapper is the wrapper that is installed.
-	ShellWrapper = "" // no wrapper on Windows
+	ShellWrapperFmt = "" // no wrapper on Windows
 )
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.

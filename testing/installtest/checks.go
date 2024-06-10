@@ -33,8 +33,8 @@ func DefaultTopPath() string {
 	return filepath.Join(defaultBasePath(), "Elastic", "Agent")
 }
 
-func DevelopTopPath() string {
-	return filepath.Join(defaultBasePath(), "Elastic", paths.DevelopmentInstallDirName)
+func NamespaceTopPath(namespace string) string {
+	return filepath.Join(defaultBasePath(), "Elastic", paths.InstallDirNameForNamespace(namespace))
 }
 
 type CheckOpts struct {
@@ -56,7 +56,7 @@ func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts
 	// Check that a few expected installed files are present
 	installedBinPath := filepath.Join(topPath, exeOnWindows("elastic-agent"))
 	installedDataPath := filepath.Join(topPath, "data")
-	installMarkerPath := filepath.Join(topPath, ".installed")
+	installMarkerPath := filepath.Join(topPath, paths.MarkerFileName)
 
 	_, err = os.Stat(installedBinPath)
 	if err != nil {

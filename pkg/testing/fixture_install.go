@@ -187,8 +187,10 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	f.installOpts = installOpts
 
 	installDir := "Agent"
+	socketRunSymlink := paths.ControlSocketRunSymlink("")
 	if installOpts.Develop {
-		installDir = paths.DevelopmentInstallDirName
+		installDir = paths.InstallDirNameForNamespace(paths.DevelopmentNamespace)
+		socketRunSymlink = paths.ControlSocketRunSymlink(paths.DevelopmentNamespace)
 	}
 
 	if installOpts.BasePath == "" {
@@ -198,7 +200,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	}
 
 	// we just installed agent, the control socket is at a well-known location
-	socketPath := fmt.Sprintf("unix://%s", paths.ControlSocketRunSymlink(installOpts.Develop)) // use symlink as that works for all versions
+	socketPath := fmt.Sprintf("unix://%s", socketRunSymlink) // use symlink as that works for all versions
 	if runtime.GOOS == "windows" {
 		// Windows uses a fixed named pipe, that is always the same.
 		// It is the same even running in unprivileged mode.
@@ -258,7 +260,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			assert.LessOrEqual(f.t, len(processes), 1, "More than one agent left running at the end of the test when --develop was used: %v", processes)
 			// The agent left running has to be the non-development agent. The development agent should be uninstalled first as a convention.
 			if len(processes) > 0 {
-				assert.NotContains(f.t, processes[0].Cmdline, paths.DevelopmentInstallDirName,
+				assert.NotContains(f.t, processes[0].Cmdline, paths.InstallDirNameForNamespace(paths.DevelopmentNamespace),
 					"The agent installed with --develop was left running at the end of the test or was not uninstalled first: %v", processes)
 			}
 			return

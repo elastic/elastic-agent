@@ -20,21 +20,23 @@ type GRPCConfig struct {
 
 // DefaultGRPCConfig creates a default server configuration.
 func DefaultGRPCConfig() *GRPCConfig {
-	// In development mode bind to port zero to select a random free port to avoid collisions with
-	// any already installed Elastic Agent. Ideally we'd always bind to port zero, but this would be
-	// breaking for users that had to manually whitelist the gRPC port in local firewall rules.
+	// When in an installation namepspace, bind to port zero to select a random free port to avoid
+	// collisions with any already installed Elastic Agent. Ideally we'd always bind to port zero,
+	// but this would be breaking for users that had to manually whitelist the gRPC port in local
+	// firewall rules.
 	//
-	// Note: this uses local TCP by default. A port of -1 switches to unix domain sockets / named pipes.
-	// Using domain sockets by default is preferable but is currently blocked because the gRPC library
-	// endpoint security uses does not support Windows named pipes.
+	// Note: this uses local TCP by default. A port of -1 switches to unix domain sockets / named
+	// pipes. Using domain sockets by default is preferable but is currently blocked because the
+	// gRPC library endpoint security uses does not support Windows named pipes.
 	defaultPort := uint16(6789)
-	if paths.IsDevelopmentMode() {
+	if paths.InInstallNamespace() {
 		defaultPort = 0
 	}
 
 	return &GRPCConfig{
 		Port:                    defaultPort,
-		CheckinChunkingDisabled: false, // on by default
+		MaxMsgSize:              1024 * 1024 * 100, // grpc default 4MB is unsufficient for diagnostics
+		CheckinChunkingDisabled: false,             // on by default
 	}
 }
 
