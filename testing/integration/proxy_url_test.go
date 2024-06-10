@@ -32,6 +32,8 @@ func TestProxyURL(t *testing.T) {
 		Sudo:  true,
 	})
 
+	t.Skip("Currently flaky, see https://github.com/elastic/elastic-agent/issues/4861")
+
 	// Setup proxies and fake fleet server host we are gonna rewrite
 	unreachableFleetHost := "fleet.elastic.co"
 	unreachableFleetHttpURL := "http://" + unreachableFleetHost

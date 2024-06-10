@@ -16,6 +16,9 @@ else
         echo "Another PR for $GITHUB_REF_NAME is in review, skipping..."
         exit 0
     fi
+    # the mage target above requires to be on a release branch
+    # so, the new branch should not be created before the target is run
+    git checkout -b update-agent-versions-$GITHUB_RUN_ID
     git add .agent-versions.json .package-version
 
     nl=$'\n' # otherwise the new line character is not recognized properly
