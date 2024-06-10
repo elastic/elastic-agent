@@ -67,7 +67,8 @@ var (
 	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat", "pf-elastic-collector", "pf-elastic-symbolizer"}
 )
 
-// BeatsMonitor is providing V1 monitoring support for metrics and logs for endpoint-security only.
+// BeatsMonitor provides config values for monitoring of agent clients (beats, endpoint, etc)
+// by injecting the monitoring config into an existing fleet config
 type BeatsMonitor struct {
 	enabled         bool // feature flag disabling whole v1 monitoring story
 	config          *monitoringConfig
@@ -110,11 +111,16 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 }
 
 // MonitoringConfig adds monitoring inputs to a configuration based on retrieved list of components to run.
+// args:
+// policy: the existing config policy
+// components: a list of the expected running components
+// componentIDToBinary: a map of component IDs to binary names
+// componentIDPidMap: a map of component IDs to the PIDs of the running components.
 func (b *BeatsMonitor) MonitoringConfig(
 	policy map[string]interface{},
 	components []component.Component,
 	componentIDToBinary map[string]string,
-	existingStatePidMap map[string]uint64,
+	componentIDPidMap map[string]uint64,
 ) (map[string]interface{}, error) {
 	if !b.Enabled() {
 		return nil, nil
@@ -159,7 +165,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	}
 
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, existingStatePidMap); err != nil {
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, componentIDPidMap); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -299,6 +305,7 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 	return nil
 }
 
+// injectLogsInput adds logging configs for component monitoring to the `cfg` map
 func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []component.Component, monitoringOutput string) error {
 	monitoringNamespace := b.monitoringNamespace()
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
@@ -535,6 +542,7 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
+// injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.
 func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, componentList []component.Component, existingStateServicePids map[string]uint64) error {
 	metricsCollectionIntervalString := metricsCollectionInterval.String()
 	monitoringNamespace := b.monitoringNamespace()
