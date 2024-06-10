@@ -281,7 +281,11 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	if err != nil {
 		return logReturn(l, err)
 	}
-	defer composable.Close()
+	defer func() {
+		if composable != nil {
+			composable.Close()
+		}
+	}()
 
 	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
