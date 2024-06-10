@@ -83,6 +83,11 @@ type MonitorManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// MonitoringConfig injects monitoring configuration into resolved ast tree.
+	// args:
+	// - the existing config policy
+	// - a list of the expected running components
+	// - a map of component IDs to binary names
+	// - a map of component IDs to the PIDs of the running components.
 	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string, map[string]uint64) (map[string]interface{}, error)
 }
 
@@ -1054,8 +1059,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 	case <-c.componentPIDTicker.C:
 		// if we hit the ticker and we've got a new PID,
 		// reload the component model
-		if c.componentPidRequiresUpdate.Load() {
-			c.componentPidRequiresUpdate.Store(false)
+		if c.componentPidRequiresUpdate.Swap(false) {
 			err := c.refreshComponentModel(ctx)
 			if err != nil {
 				err = fmt.Errorf("error refreshing component model for PID update: %w", err)

@@ -922,9 +922,10 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 	for _, compState := range componentList {
 		if compState.InputSpec != nil && compState.InputSpec.Spec.Service != nil {
 			if comp, ok := existingStateServicePids[compState.ID]; ok && comp != 0 {
+				name := strings.ReplaceAll(strings.ReplaceAll(compState.BinaryName(), "-", "_"), "/", "_")
 				inputs = append(inputs, map[string]interface{}{
-					idKey:        fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
-					"name":       fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
+					idKey:        fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
+					"name":       fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
 					"type":       "system/metrics",
 					useOutputKey: monitoringOutput,
 					"data_stream": map[string]interface{}{
@@ -932,15 +933,15 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 					},
 					"streams": []interface{}{
 						map[string]interface{}{
-							idKey: fmt.Sprintf("%s-endpoint_security", monitoringMetricsUnitID),
+							idKey: fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
 							"data_stream": map[string]interface{}{
 								"type":      "metrics",
-								"dataset":   "elastic_agent.endpoint_security",
+								"dataset":   fmt.Sprintf("elastic_agent.%s", name),
 								"namespace": monitoringNamespace,
 							},
 							"metricsets":              []interface{}{"process"},
 							"period":                  metricsCollectionIntervalString,
-							"index":                   fmt.Sprintf("metrics-elastic_agent.endpoint_security-%s", monitoringNamespace),
+							"index":                   fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
 							"process.pid":             comp,
 							"process.cgroups.enabled": false,
 							"processors": []interface{}{
@@ -949,7 +950,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 										"target": "data_stream",
 										"fields": map[string]interface{}{
 											"type":      "metrics",
-											"dataset":   "elastic_agent.endpoint_security",
+											"dataset":   fmt.Sprintf("elastic_agent.%s", name),
 											"namespace": monitoringNamespace,
 										},
 									},
@@ -958,7 +959,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 									"add_fields": map[string]interface{}{
 										"target": "event",
 										"fields": map[string]interface{}{
-											"dataset": "elastic_agent.endpoint_security",
+											"dataset": fmt.Sprintf("elastic_agent.%s", name),
 										},
 									},
 								},
@@ -969,7 +970,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 											"id":       b.agentInfo.AgentID(),
 											"version":  b.agentInfo.Version(),
 											"snapshot": b.agentInfo.Snapshot(),
-											"process":  "endpoint_security",
+											"process":  name,
 										},
 									},
 								},
@@ -985,7 +986,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 									"add_fields": map[string]interface{}{
 										"target": "component",
 										"fields": map[string]interface{}{
-											"binary": "endpoint_security",
+											"binary": name,
 											"id":     compState.ID,
 										},
 									},

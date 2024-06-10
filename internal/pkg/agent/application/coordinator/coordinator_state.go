@@ -138,11 +138,10 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 
 	// check for any component updates to the known PID, so we can update the component monitoring
 	found := false
-	pidRequiresUpdate := false
 	for i, other := range c.state.Components {
 		if other.Component.ID == state.Component.ID {
 			if other.State.Pid != state.State.Pid {
-				pidRequiresUpdate = true
+				c.componentPidRequiresUpdate.Store(true)
 			}
 			c.state.Components[i] = state
 			found = true
@@ -152,7 +151,7 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	if !found {
 		c.state.Components = append(c.state.Components, state)
 		if state.State.Pid != 0 {
-			pidRequiresUpdate = true
+			c.componentPidRequiresUpdate.Store(true)
 		}
 	}
 
@@ -170,9 +169,6 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 
 	c.stateNeedsRefresh = true
 
-	if pidRequiresUpdate {
-		c.componentPidRequiresUpdate.Store(true)
-	}
 }
 
 // generateReportableState aggregates the internal state of the Coordinator
