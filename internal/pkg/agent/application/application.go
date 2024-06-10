@@ -184,12 +184,16 @@ func New(
 		}
 	}
 
-	composable, err := composable.New(log, rawConfig, composableManaged)
-	if err != nil {
-		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
+	var varsManager composable.Controller
+	if !runAsOtel {
+		// no need for vars in otel mode
+		varsManager, err = composable.New(log, rawConfig, composableManaged)
+		if err != nil {
+			return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
+		}
 	}
 
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, isManaged, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
@@ -211,7 +215,7 @@ func New(
 		return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 	}
 
-	return coord, configMgr, composable, nil
+	return coord, configMgr, varsManager, nil
 }
 
 func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
