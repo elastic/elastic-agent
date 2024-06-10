@@ -4,12 +4,13 @@
 
 //go:build windows
 
-package server
+package ipc
 
 import (
 	"fmt"
 	"net"
 	"os/user"
+	"strings"
 
 	"github.com/hectane/go-acl/api"
 	"golang.org/x/sys/windows"
@@ -17,25 +18,31 @@ import (
 	"github.com/elastic/elastic-agent-libs/api/npipe"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-// createListener creates a named pipe listener on Windows
-func createListener(log *logger.Logger) (net.Listener, error) {
+const schemeNpipePrefix = "npipe://"
+
+func IsLocal(address string) bool {
+	return strings.HasPrefix(address, schemeNpipePrefix)
+}
+
+// CreateListener creates net listener from address string
+// Shared for control and beats comms sockets
+func CreateListener(log *logger.Logger, address string) (net.Listener, error) {
 	sd, err := securityDescriptor(log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create security descriptor: %w", err)
 	}
-	lis, err := npipe.NewListener(npipe.TransformString(control.Address()), sd)
+	lis, err := npipe.NewListener(npipe.TransformString(address), sd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create npipe listener: %w", err)
 	}
 	return lis, nil
 }
 
-func cleanupListener(_ *logger.Logger) {
+func CleanupListener(log *logger.Logger, address string) {
 	// nothing to do on windows
 }
 
