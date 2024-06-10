@@ -701,8 +701,8 @@ func TestEndpointSecurityCannotSwitchToUnprivileged(t *testing.T) {
 	defer cancel()
 	output, err := fixture.Exec(performSwitchCtx, []string{"unprivileged", "-f"})
 	require.Errorf(t, err, "unprivileged command should have failed")
-	assert.Contains(t, output, []byte("unable to switch to unprivileged mode due to the following service based components having issues"))
-	assert.Contains(t, output, []byte("endpoint"))
+	assert.Contains(t, string(output), "unable to switch to unprivileged mode due to the following service based components having issues")
+	assert.Contains(t, string(output), "endpoint")
 }
 
 // TestEndpointLogsAreCollectedInDiagnostics tests that diagnostics archive contain endpoint logs
