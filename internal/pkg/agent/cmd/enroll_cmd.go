@@ -255,7 +255,18 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		if c.options.FleetServer.Host != "" {
 			return errors.New("--delay-enroll cannot be used with --fleet-server-es", errors.TypeConfig)
 		}
-		return c.writeDelayEnroll(streams)
+		err = c.writeDelayEnroll(streams)
+		if err != nil {
+			// context for error already provided in writeDelayEnroll
+			return err
+		}
+		if c.options.FixPermissions != nil {
+			err = perms.FixPermissions(paths.Top(), perms.WithOwnership(*c.options.FixPermissions))
+			if err != nil {
+				return errors.New(err, "failed to fix permissions")
+			}
+		}
+		return nil
 	}
 
 	err = c.enrollWithBackoff(ctx, persistentConfig)
