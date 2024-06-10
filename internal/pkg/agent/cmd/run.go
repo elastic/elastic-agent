@@ -237,6 +237,9 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 			logLvl = lvl
 			logger.SetLevel(lvl)
 		}
+	} else {
+		// Set the initial log level (either default or from config file)
+		logger.SetLevel(logLvl)
 	}
 
 	// initiate agent watcher
@@ -270,7 +273,11 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	if err != nil {
 		return logReturn(l, err)
 	}
-	defer composable.Close()
+	defer func() {
+		if composable != nil {
+			composable.Close()
+		}
+	}()
 
 	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
@@ -494,7 +501,7 @@ func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) stri
 		return configuredLevel
 	}
 
-	return defaultLogLevel
+	return ""
 }
 
 func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider) (*configuration.Configuration, error) {
@@ -546,9 +553,18 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	if err != nil {
 		return nil, err
 	}
-	err = c.Execute(ctx, cli.NewIOStreams())
-	if err != nil {
-		return nil, err
+	// perform the enrollment in a loop, it should keep trying to enroll no matter what
+	// the enrollCmd has built in backoff so no need to wrap this in its own backoff as well
+	for {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		err = c.Execute(ctx, cli.NewIOStreams())
+		if err == nil {
+			// enrollment was successful
+			break
+		}
+		logger.Error(fmt.Errorf("failed to perform delayed enrollment (will try again): %w", err))
 	}
 	err = os.Remove(enrollPath)
 	if err != nil {
@@ -640,16 +656,12 @@ func setupMetrics(
 		Host:    monitoring.AgentMonitoringEndpoint(operatingSystem, cfg),
 	}
 
-	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg), operatingSystem, cfg)
+	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, operatingSystem, cfg)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}
 
 	return s, nil
-}
-
-func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
-	return cfg != nil && cfg.HTTP.Enabled
 }
 
 // handleUpgrade checks if agent is being run as part of an

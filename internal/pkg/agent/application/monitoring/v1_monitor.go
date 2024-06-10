@@ -349,6 +349,16 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 						},
 					},
 				},
+				// drop periodic metrics logs (those are useful mostly in diagnostic dumps where we collect log files)
+				map[string]interface{}{
+					"drop_event": map[string]interface{}{
+						"when": map[string]interface{}{
+							"regexp": map[string]interface{}{
+								"message": "^Non-zero metrics in the last",
+							},
+						},
+					},
+				},
 				// copy original dataset so we can drop the dataset field
 				map[string]interface{}{
 					"copy_fields": map[string]interface{}{
@@ -439,7 +449,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 			continue
 		}
 
-		fixedBinaryName := strings.ReplaceAll(strings.ReplaceAll(comp.InputSpec.BinaryName, "-", "_"), "/", "_") // conform with index naming policy
+		fixedBinaryName := strings.ReplaceAll(strings.ReplaceAll(comp.BinaryName(), "-", "_"), "/", "_") // conform with index naming policy
 		dataset := fmt.Sprintf("elastic_agent.%s", fixedBinaryName)
 		streams = append(streams, map[string]interface{}{
 			idKey:  fmt.Sprintf("%s-%s", monitoringFilesUnitsID, comp.ID),
@@ -475,7 +485,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 						"fields": map[string]interface{}{
 							"id":      comp.ID,
 							"type":    comp.InputSpec.InputType,
-							"binary":  comp.InputSpec.BinaryName,
+							"binary":  comp.BinaryName(),
 							"dataset": dataset,
 						},
 					},
@@ -635,7 +645,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 					"dataset":   fmt.Sprintf("elastic_agent.%s", name),
 					"namespace": monitoringNamespace,
 				},
-				"metricsets": []interface{}{"stats", "state"},
+				"metricsets": []interface{}{"stats"},
 				"hosts":      endpoints,
 				"period":     metricsCollectionIntervalString,
 				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),

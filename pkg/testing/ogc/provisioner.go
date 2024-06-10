@@ -129,7 +129,7 @@ func (p *provisioner) Clean(ctx context.Context, cfg runner.Config, _ []runner.I
 func (p *provisioner) ogcPull(ctx context.Context) error {
 	args := []string{
 		"pull",
-		"docker.io/gorambo/ogc:blake", // switch back to :latest when ready
+		"docker.elastic.co/observability-ci/ogc:5.0.1",
 	}
 	var output bytes.Buffer
 	p.logger.Logf("Pulling latest ogc image")
@@ -273,7 +273,7 @@ func (p *provisioner) ogcRun(ctx context.Context, args []string, interactive boo
 		fmt.Sprintf("%s:%s", wd, wd),
 		"-w",
 		wd,
-		"docker.io/gorambo/ogc:blake", // switch back to :latest when ready
+		"docker.elastic.co/observability-ci/ogc:5.0.1",
 		"--",
 		"ogc",
 		"-v",

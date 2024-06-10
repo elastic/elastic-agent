@@ -56,6 +56,30 @@ func (e EnrollOpts) toCmdArgs() []string {
 	return args
 }
 
+type FleetBootstrapOpts struct {
+	ESHost       string // --fleet-server-es
+	ServiceToken string // --fleet-server-service-token
+	Policy       string // --fleet-server-policy
+	Port         int    // --fleet-server-port
+}
+
+func (f FleetBootstrapOpts) toCmdArgs() []string {
+	var args []string
+	if f.ESHost != "" {
+		args = append(args, "--fleet-server-es", f.ESHost)
+	}
+	if f.ServiceToken != "" {
+		args = append(args, "--fleet-server-service-token", f.ServiceToken)
+	}
+	if f.Policy != "" {
+		args = append(args, "--fleet-server-policy", f.Policy)
+	}
+	if f.Port > 0 {
+		args = append(args, "--fleet-server-port", fmt.Sprintf("%d", f.Port))
+	}
+	return args
+}
+
 // InstallOpts specifies the options for the install command
 type InstallOpts struct {
 	BasePath       string // --base-path
@@ -68,6 +92,7 @@ type InstallOpts struct {
 	Privileged bool // inverse of --unprivileged (as false is the default)
 
 	EnrollOpts
+	FleetBootstrapOpts
 }
 
 func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
@@ -95,6 +120,7 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
+	args = append(args, i.FleetBootstrapOpts.toCmdArgs()...)
 
 	return args, nil
 }

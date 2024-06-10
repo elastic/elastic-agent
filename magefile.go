@@ -203,14 +203,69 @@ func (Dev) Package() {
 	Package()
 }
 
+func mocksPath() (string, error) {
+	repositoryRoot, err := findRepositoryRoot()
+	if err != nil {
+		return "", fmt.Errorf("finding repository root: %w", err)
+	}
+	return filepath.Join(repositoryRoot, "testing", "mocks"), nil
+}
+
+func (Dev) CleanMocks() error {
+	mPath, err := mocksPath()
+	if err != nil {
+		return fmt.Errorf("retrieving mocks path: %w", err)
+	}
+	err = os.RemoveAll(mPath)
+	if err != nil {
+		return fmt.Errorf("removing mocks: %w", err)
+	}
+	return nil
+}
+
+func (Dev) RegenerateMocks() error {
+	mg.Deps(Dev.CleanMocks)
+	err := sh.Run("mockery")
+	if err != nil {
+		return fmt.Errorf("generating mocks: %w", err)
+	}
+
+	// change CWD
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("retrieving CWD: %w", err)
+	}
+	// restore the working directory when exiting the function
+	defer func() {
+		err := os.Chdir(workingDir)
+		if err != nil {
+			panic(fmt.Errorf("failed to restore working dir %q: %w", workingDir, err))
+		}
+	}()
+
+	mPath, err := mocksPath()
+	if err != nil {
+		return fmt.Errorf("retrieving mocks path: %w", err)
+	}
+
+	err = os.Chdir(mPath)
+	if err != nil {
+		return fmt.Errorf("changing current directory to %q: %w", mPath, err)
+	}
+
+	mg.Deps(devtools.AddLicenseHeaders)
+	mg.Deps(devtools.GoImports)
+	return nil
+}
+
 // InstallGoLicenser install go-licenser to check license of the files.
 func (Prepare) InstallGoLicenser() error {
-	return GoGet(goLicenserRepo)
+	return GoInstall(goLicenserRepo)
 }
 
 // InstallGoLint for the code.
 func (Prepare) InstallGoLint() error {
-	return GoGet(goLintRepo)
+	return GoInstall(goLintRepo)
 }
 
 // All build all the things for the current projects.
@@ -560,9 +615,9 @@ func RunGo(args ...string) error {
 	return sh.RunV(mg.GoCmd(), args...)
 }
 
-// GoGet fetch a remote dependencies.
-func GoGet(link string) error {
-	_, err := sh.Exec(map[string]string{"GO111MODULE": "off"}, os.Stdout, os.Stderr, "go", "get", link)
+// GoInstall installs a tool by calling `go install <link>
+func GoInstall(link string) error {
+	_, err := sh.Exec(map[string]string{}, os.Stdout, os.Stderr, "go", "install", link)
 	return err
 }
 
@@ -1012,12 +1067,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 			// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
 			// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
 			externalBinaries := map[string]string{
-				"auditbeat":             "beats",
-				"filebeat":              "beats",
-				"heartbeat":             "beats",
-				"metricbeat":            "beats",
-				"osquerybeat":           "beats",
-				"packetbeat":            "beats",
+				"agentbeat":             "beats",
 				"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
 				"cloud-defend":          "cloud-defend",
 				"apm-server":            "apm-server", // not supported on darwin/aarch64
@@ -1058,7 +1108,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 				panic(fmt.Sprintf("No packages were successfully downloaded. You may be building against an invalid or unreleased version. version=%s. If this is an unreleased version, try SNAPSHOT=true or EXTERNAL=false", packageVersion))
 			}
 		} else {
-			packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
+			packedBeats := []string{"agentbeat"}
 			// build from local repo, will assume beats repo is located on the same root level
 			for _, b := range packedBeats {
 				pwd, err := filepath.Abs(filepath.Join("../beats/x-pack", b))
@@ -1992,6 +2042,39 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode JSON to file %s: %w", upgradetest.AgentVersionsFilename, err)
 	}
+	return nil
+}
+
+// UpdatePackageVersion update the file that contains the latest available snapshot version
+func (Integration) UpdatePackageVersion(ctx context.Context) error {
+	const packageVersionFilename = ".package-version"
+
+	currentReleaseBranch, err := git.GetCurrentReleaseBranch(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to identify the current release branch: %w", err)
+	}
+
+	sc := snapshots.NewSnapshotsClient()
+	versions, err := sc.FindLatestSnapshots(ctx, []string{currentReleaseBranch})
+	if err != nil {
+		return fmt.Errorf("failed to fetch a manifest for the latest snapshot: %w", err)
+	}
+	if len(versions) != 1 {
+		return fmt.Errorf("expected a single version, got %v", versions)
+	}
+	packageVersion := versions[0].CoreVersion()
+	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open %s for write: %w", packageVersionFilename, err)
+	}
+	defer file.Close()
+	_, err = file.WriteString(packageVersion)
+	if err != nil {
+		return fmt.Errorf("failed to write the package version file %s: %w", packageVersionFilename, err)
+	}
+
+	fmt.Println(packageVersion)
+
 	return nil
 }
 

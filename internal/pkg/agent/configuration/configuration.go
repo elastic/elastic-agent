@@ -7,6 +7,7 @@ package configuration
 import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/go-ucfg"
 )
 
 // Configuration is a overall agent configuration
@@ -27,6 +28,17 @@ func DefaultConfiguration() *Configuration {
 func NewFromConfig(cfg *config.Config) (*Configuration, error) {
 	c := DefaultConfiguration()
 	if err := cfg.Unpack(c); err != nil {
+		return nil, errors.New(err, errors.TypeConfig)
+	}
+
+	return c, nil
+}
+
+// NewPartialFromConfigNoDefaults creates a configuration based on common Config.
+func NewPartialFromConfigNoDefaults(cfg *config.Config) (*Configuration, error) {
+	c := new(Configuration)
+	// Validator tag set to "validate_disable" is a hack to avoid validation errors on a partial config
+	if err := cfg.Unpack(c, ucfg.ValidatorTag("validate_disable")); err != nil {
 		return nil, errors.New(err, errors.TypeConfig)
 	}
 

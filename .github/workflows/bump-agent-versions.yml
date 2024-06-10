@@ -2,21 +2,17 @@
 name: update-agent-versions
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 0 * * *"
 
 jobs:
   update_versions:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
-      - name: Setup Git
-        uses: elastic/apm-pipeline-library/.github/actions/setup-git@current
-
-      - uses: elastic/apm-pipeline-library/.github/actions/github-token@current
-        with:
-          url: ${{ secrets.VAULT_ADDR }}
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,12 +22,14 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: 1.21
 
-      - name: Set up branch
-        run: git checkout -b update-agent-versions-$GITHUB_RUN_ID
+      - name: Set git config
+        run: |
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
 
       - name: Install mage
         uses: magefile/mage-action@v3
@@ -39,27 +37,51 @@ jobs:
           version: v1.13.0
           install-only: true
 
-      - name: Update versions file
+      - name: Update versions
         id: update
         env:
-          GH_TOKEN: ${{ env.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./.github/workflows/bump-agent-versions.sh
 
-      - if: ${{ failure() }}
-        uses: elastic/apm-pipeline-library/.github/actions/slack-message@current
+      - if: ${{ failure()  }}
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
-          url: ${{ secrets.VAULT_ADDR }}
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
-          message: ":traffic_cone: Elastic Agent versions file update failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          channel: "#ingest-notifications"
+          channel-id: '#ingest-notifications'
+          payload: |
+            {
+              "text": "${{ env.SLACK_MESSAGE }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ env.SLACK_MESSAGE }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_MESSAGE: ":traffic_cone: Elastic Agent version update failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
         # if a PR was created as a result of this job, we notify on the Slack channel
       - if: ${{ startsWith(steps.update.outputs.pr, 'https') }}
-        uses: elastic/apm-pipeline-library/.github/actions/slack-message@current
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
-          url: ${{ secrets.VAULT_ADDR }}
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
-          message: "Update for Elastic Agent versions file has been created: ${{ steps.update.output.pr }}"
-          channel: "#ingest-notifications"
+          channel-id: '#ingest-notifications'
+          payload: |
+            {
+              "text": "${{ env.SLACK_MESSAGE }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ env.SLACK_MESSAGE }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_MESSAGE: "Update for Elastic Agent versions has been created: ${{ steps.update.outputs.pr }}"

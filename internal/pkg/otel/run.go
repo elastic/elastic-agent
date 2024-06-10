@@ -53,33 +53,28 @@ func newSettings(version string, configPaths []string) (*otelcol.CollectorSettin
 		Description: buildDescription,
 		Version:     version,
 	}
-	converterSet := confmap.ConverterSettings{}
 	configProviderSettings := otelcol.ConfigProviderSettings{
 		ResolverSettings: confmap.ResolverSettings{
-			URIs:       configPaths,
-			Providers:  makeMapProvidersMap(fileprovider.New(), envprovider.New(), yamlprovider.New(), httpprovider.New(), httpsprovider.New()),
-			Converters: []confmap.Converter{expandconverter.New(converterSet)},
+			URIs: configPaths,
+			ProviderFactories: []confmap.ProviderFactory{
+				fileprovider.NewFactory(),
+				envprovider.NewFactory(),
+				yamlprovider.NewFactory(),
+				httpprovider.NewFactory(),
+				httpsprovider.NewFactory(),
+			},
+			ConverterFactories: []confmap.ConverterFactory{
+				expandconverter.NewFactory(),
+			},
 		},
-	}
-	provider, err := otelcol.NewConfigProvider(configProviderSettings)
-	if err != nil {
-		return nil, err
 	}
 
 	return &otelcol.CollectorSettings{
-		Factories:      components,
-		BuildInfo:      buildInfo,
-		ConfigProvider: provider,
+		Factories:              components,
+		BuildInfo:              buildInfo,
+		ConfigProviderSettings: configProviderSettings,
 		// we're handling DisableGracefulShutdown via the cancelCtx being passed
 		// to the collector's Run method in the Run function
 		DisableGracefulShutdown: true,
 	}, nil
-}
-
-func makeMapProvidersMap(providers ...confmap.Provider) map[string]confmap.Provider {
-	ret := make(map[string]confmap.Provider, len(providers))
-	for _, provider := range providers {
-		ret[provider.Scheme()] = provider
-	}
-	return ret
 }

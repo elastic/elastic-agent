@@ -279,6 +279,11 @@ type Coordinator struct {
 
 	// mx         sync.RWMutex
 	// protection protection.Config
+
+	// a sync channel that can be called by other components to check if the main coordinator
+	// loop in runLoopIteration() is active and listening.
+	// Should only be interacted with via CoordinatorActive() or runLoopIteration()
+	heartbeatChan chan struct{}
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -372,6 +377,7 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		logLevelCh:         make(chan logp.Level),
 		overrideStateChan:  make(chan *coordinatorOverrideState),
 		upgradeDetailsChan: make(chan *details.Details),
+		heartbeatChan:      make(chan struct{}),
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -410,6 +416,22 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 // Called by external goroutines.
 func (c *Coordinator) State() State {
 	return c.stateBroadcaster.Get()
+}
+
+// IsActive is a blocking method that waits for a channel response
+// from the coordinator loop. This can be used to as a basic health check,
+// as we'll timeout and return false if the coordinator run loop doesn't
+// respond to our channel.
+func (c *Coordinator) IsActive(timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	select {
+	case <-c.heartbeatChan:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 func (c *Coordinator) RegisterMonitoringServer(s configReloader) {
@@ -548,13 +570,16 @@ func (c *Coordinator) PerformComponentDiagnostics(ctx context.Context, additiona
 
 // SetLogLevel changes the entire log level for the running Elastic Agent.
 // Called from external goroutines.
-func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
+func (c *Coordinator) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
+	if lvl == nil {
+		return fmt.Errorf("logp.Level passed to Coordinator.SetLogLevel() must be not nil")
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case c.logLevelCh <- lvl:
+	case c.logLevelCh <- *lvl:
 		// set global once the level change has been taken by the channel
-		logger.SetLevel(lvl)
+		logger.SetLevel(*lvl)
 		return nil
 	}
 }
@@ -658,10 +683,16 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	// shutdown state.
 	defer close(c.stateBroadcaster.InputChan)
 
+	if c.varsMgr != nil {
+		c.setCoordinatorState(agentclient.Starting, "Waiting for initial configuration and composable variables")
+	} else {
+		// vars not initialized, go directly to running
+		c.setCoordinatorState(agentclient.Healthy, "Running")
+	}
+
 	// The usual state refresh happens in the main run loop in Coordinator.runner,
 	// so before/after the runner call we need to trigger state change broadcasts
 	// manually with refreshState.
-	c.setCoordinatorState(agentclient.Starting, "Waiting for initial configuration and composable variables")
 	c.refreshState()
 
 	err := c.runner(ctx)
@@ -692,6 +723,34 @@ func (c *Coordinator) Run(ctx context.Context) error {
 // Called by external goroutines.
 func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 	return diagnostics.Hooks{
+		{
+			Name:        "agent-info",
+			Filename:    "agent-info.yaml",
+			Description: "current state of the agent information of the running Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				output := struct {
+					AgentID      string            `yaml:"agent_id"`
+					Headers      map[string]string `yaml:"headers"`
+					LogLevel     string            `yaml:"log_level"`
+					Snapshot     bool              `yaml:"snapshot"`
+					Version      string            `yaml:"version"`
+					Unprivileged bool              `yaml:"unprivileged"`
+				}{
+					AgentID:      c.agentInfo.AgentID(),
+					Headers:      c.agentInfo.Headers(),
+					LogLevel:     c.agentInfo.LogLevel(),
+					Snapshot:     c.agentInfo.Snapshot(),
+					Version:      c.agentInfo.Version(),
+					Unprivileged: c.agentInfo.Unprivileged(),
+				}
+				o, err := yaml.Marshal(output)
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
 		{
 			Name:        "local-config",
 			Filename:    "local-config.yaml",
@@ -976,6 +1035,8 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case upgradeDetails := <-c.upgradeDetailsChan:
 		c.setUpgradeDetails(upgradeDetails)
+
+	case c.heartbeatChan <- struct{}{}:
 
 	case componentState := <-c.managerChans.runtimeManagerUpdate:
 		// New component change reported by the runtime manager via

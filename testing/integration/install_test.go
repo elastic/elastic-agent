@@ -22,6 +22,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/testing/installtest"
 )
 
 func TestInstallWithoutBasePath(t *testing.T) {
@@ -38,7 +39,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -47,21 +48,6 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
-
-	// Check that default base path is clean
-	var defaultBasePath string
-	switch runtime.GOOS {
-	case "darwin":
-		defaultBasePath = `/Library`
-	case "linux":
-		defaultBasePath = `/opt`
-	case "windows":
-		defaultBasePath = `C:\Program Files`
-	}
-
-	topPath := filepath.Join(defaultBasePath, "Elastic", "Agent")
-	err = os.RemoveAll(topPath)
-	require.NoError(t, err, "failed to remove %q. The test requires this path not to exist.")
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
@@ -73,7 +59,8 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path
-	checkInstallSuccess(t, fixture, topPath, true)
+	topPath := installtest.DefaultTopPath()
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, true))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -105,7 +92,7 @@ func TestInstallWithBasePath(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -149,7 +136,7 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	checkInstallSuccess(t, fixture, topPath, true)
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, true))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -188,19 +175,8 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 	for i := 0; i < iterations; i++ {
 		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
 
-			var defaultBasePath string
-			switch runtime.GOOS {
-			case "darwin":
-				defaultBasePath = `/Library`
-			case "linux":
-				defaultBasePath = `/opt`
-			case "windows":
-				defaultBasePath = `C:\Program Files`
-			}
-
-			topPath := filepath.Join(defaultBasePath, "Elastic", "Agent")
 			// Get path to Elastic Agent executable
-			fixture, err := define.NewFixture(t, define.Version())
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 			require.NoError(t, err)
 
 			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(maxRunTime))
@@ -220,34 +196,11 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 			}
 
 			// Check that Agent was installed in default base path
-			checkInstallSuccess(t, fixture, topPath, !opts.Privileged)
+			require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, !opts.Privileged))
 			t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 			require.NoErrorf(t, err, "uninstall failed: %s", err)
 		})
-	}
-}
-
-func checkInstallSuccess(t *testing.T, f *atesting.Fixture, topPath string, unprivileged bool) {
-	t.Helper()
-	_, err := os.Stat(topPath)
-	require.NoError(t, err)
-
-	// Check that a few expected installed files are present
-	installedBinPath := filepath.Join(topPath, exeOnWindows("elastic-agent"))
-	installedDataPath := filepath.Join(topPath, "data")
-	installMarkerPath := filepath.Join(topPath, ".installed")
-
-	_, err = os.Stat(installedBinPath)
-	require.NoError(t, err)
-	_, err = os.Stat(installedDataPath)
-	require.NoError(t, err)
-	_, err = os.Stat(installMarkerPath)
-	require.NoError(t, err)
-
-	if unprivileged {
-		// Specific checks depending on the platform.
-		checkPlatformUnprivileged(t, f, topPath)
 	}
 }
 
@@ -261,11 +214,4 @@ func randStr(length int) string {
 	}
 
 	return string(runes)
-}
-
-func exeOnWindows(filename string) string {
-	if runtime.GOOS == define.Windows {
-		return filename + ".exe"
-	}
-	return filename
 }

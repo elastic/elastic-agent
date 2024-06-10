@@ -106,14 +106,50 @@ type unitKey struct {
 	unitID   string
 }
 
+type CachedServer struct {
+	cfg common.FakeShipperConfig
+	srv *grpc.Server
+	wg  errgroup.Group
+	ref int
+}
+
+// inc increments the reference count of the server
+// it is used to keep the server running as long as there are units using it
+// the server is stopped when the reference count reaches 0
+// this is protected by the unitsMx mutex
+func (c *CachedServer) incRef() {
+	c.ref++
+}
+
+// dec decrements the reference count of the server and stops it if the reference count reaches 0
+// it returns true if the server was stopped and should be removed from the cache or false if the server is still in use
+// this is protected by the unitsMx mutex
+func (c *CachedServer) decRef() bool {
+	c.ref--
+	if c.ref == 0 {
+		// safeguard, should not happen
+		if c.srv != nil {
+			c.srv.Stop()
+			// left the previous implementation as is, without the error handling
+			_ = c.wg.Wait()
+		}
+		// remove the server from the cache
+		return true
+	}
+	// server is still in use
+	return false
+}
+
 type stateManager struct {
 	logger  zerolog.Logger
 	unitsMx sync.RWMutex
 	units   map[unitKey]runningUnit
+	// Protected from concurrent access by unitsMx mutex
+	serverCache map[string]*CachedServer
 }
 
 func newStateManager(logger zerolog.Logger) *stateManager {
-	return &stateManager{logger: logger, units: make(map[unitKey]runningUnit)}
+	return &stateManager{logger: logger, units: make(map[unitKey]runningUnit), serverCache: make(map[string]*CachedServer)}
 }
 
 func (s *stateManager) added(unit *client.Unit) {
@@ -329,8 +365,7 @@ type fakeShipperInput struct {
 	unit    *client.Unit
 	cfg     *proto.UnitExpectedConfig
 
-	srv *grpc.Server
-	wg  errgroup.Group
+	srv string
 }
 
 func newFakeShipperInput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *stateManager, unit *client.Unit, cfg *proto.UnitExpectedConfig) (*fakeShipperInput, error) {
@@ -348,24 +383,36 @@ func newFakeShipperInput(logger zerolog.Logger, logLevel client.UnitLogLevel, ma
 		return nil, err
 	}
 
-	logger.Info().Str("server", srvCfg.Server).Msg("starting GRPC fake shipper server")
-	lis, err := createListener(srvCfg.Server)
-	if err != nil {
-		return nil, err
+	// This access if protected by the unitsMx
+	cachedSrv, ok := manager.serverCache[srvCfg.Server]
+	if ok {
+		// Assuming that the server is already running and units are using the same TLS configuration
+		logger.Info().Str("server", srvCfg.Server).Msg("using existing GRPC fake shipper server")
+		cachedSrv.incRef()
+		i.srv = srvCfg.Server
+	} else {
+		logger.Info().Str("server", srvCfg.Server).Msg("starting GRPC fake shipper server")
+		lis, err := createListener(srvCfg.Server)
+		if err != nil {
+			return nil, err
+		}
+		if srvCfg.TLS == nil || srvCfg.TLS.Cert == "" || srvCfg.TLS.Key == "" {
+			return nil, fmt.Errorf("ssl configuration missing")
+		}
+		cert, err := tls.X509KeyPair([]byte(srvCfg.TLS.Cert), []byte(srvCfg.TLS.Key))
+		if err != nil {
+			return nil, err
+		}
+		srv := grpc.NewServer(grpc.Creds(credentials.NewServerTLSFromCert(&cert)))
+		i.srv = srvCfg.Server
+		common.RegisterFakeEventProtocolServer(srv, i)
+		cSrv := &CachedServer{cfg: srvCfg, srv: srv, ref: 1}
+		// Launch the server in a goroutine
+		cSrv.wg.Go(func() error {
+			return srv.Serve(lis)
+		})
+		manager.serverCache[srvCfg.Server] = cSrv
 	}
-	if srvCfg.TLS == nil || srvCfg.TLS.Cert == "" || srvCfg.TLS.Key == "" {
-		return nil, fmt.Errorf("ssl configuration missing")
-	}
-	cert, err := tls.X509KeyPair([]byte(srvCfg.TLS.Cert), []byte(srvCfg.TLS.Key))
-	if err != nil {
-		return nil, err
-	}
-	srv := grpc.NewServer(grpc.Creds(credentials.NewServerTLSFromCert(&cert)))
-	i.srv = srv
-	common.RegisterFakeEventProtocolServer(srv, i)
-	i.wg.Go(func() error {
-		return srv.Serve(lis)
-	})
 
 	logger.Trace().Msg("registering kill action for unit")
 	unit.RegisterAction(&killAction{logger})
@@ -394,10 +441,9 @@ func (f *fakeShipperInput) Update(u *client.Unit) error {
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
 
 		go func() {
-			if f.srv != nil {
-				f.srv.Stop()
-				_ = f.wg.Wait()
-				f.srv = nil
+			cSrv, ok := f.manager.serverCache[f.srv]
+			if ok && cSrv.decRef() {
+				delete(f.manager.serverCache, f.srv)
 			}
 			f.logger.Debug().
 				Str("state", client.UnitStateStopped.String()).
