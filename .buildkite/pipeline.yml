@@ -240,7 +240,8 @@ steps:
     #   (build.pull_request.id != null && !build.pull_request.draft && !(build.pull_request.labels includes "skip-it")) ||
     #   build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /extended/
 
-    if: "false"
+    if: |
+      !build.pull_request.draft
     plugins:
       - monorepo-diff#v1.0.1:
           diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
