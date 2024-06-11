@@ -523,7 +523,7 @@ func TestProxyURL(t *testing.T) {
 			name: "TLSEnrollProxy-mTLSProxyInThePolicy",
 			setup: func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs) {
 
-				t.Skip("Currently skipped due to https -> http proxy issues")
+				t.Skip("Currently skipped due to https proxy -> http fleet issues. See issues https://github.com/elastic/elastic-agent/issues/4896 and https://github.com/elastic/elastic-agent/issues/4903")
 
 				tmpDir := createTempDir(t)
 
