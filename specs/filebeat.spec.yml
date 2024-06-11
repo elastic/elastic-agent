@@ -39,6 +39,10 @@ inputs:
         - "gc_percent=${FILEBEAT_GOGC:100}"
         - "-E"
         - "filebeat.config.modules.enabled=false"
+        - "-E"
+        - "logging.event_data.to_stderr=true"
+        - "-E"
+        - "logging.event_data.to_files=false"
   - name: aws-s3
     description: "AWS S3"
     platforms: *platforms

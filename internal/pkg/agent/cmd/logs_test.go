@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
+
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 const (
@@ -671,5 +674,48 @@ func (cw *chanWriter) waitUntilMatch(
 		case <-timeoutChan:
 			require.FailNow(t, fmt.Sprintf("output does not match. got:\n%v\nexpected:\n%v", string(cw.result), expected))
 		}
+	}
+}
+
+func TestCobraCmd(t *testing.T) {
+	expectedLines := 10
+	testingStreams, _, out, _ := cli.NewTestingIOStreams()
+
+	cmd := newLogsCommandWithArgs(nil, testingStreams)
+	logsDir := t.TempDir()
+	eventLogsDir := filepath.Join(logsDir, "events")
+
+	if err := cmd.Flags().Set("number", "10"); err != nil {
+		t.Fatalf("could not set flags: %s", err)
+	}
+
+	filename := fmt.Sprintf("elastic-agent-%s.ndjson", time.Now().Format("20060102"))
+	createFileContent(t, logsDir, filename, bytes.NewBuffer([]byte(generateLines("foo", 1, 10))))
+
+	if err := os.MkdirAll(eventLogsDir, 0750); err != nil {
+		t.Fatalf("could not create folder for event log files: %s", err)
+	}
+
+	eventFilename := fmt.Sprintf("elastic-agent-event-log-%s.ndjson", time.Now().Format("20060102"))
+	createFileContent(t, eventLogsDir, eventFilename, bytes.NewBuffer([]byte(generateLines("event", 1, 10))))
+
+	if err := logsCmd(testingStreams, cmd, logsDir, eventLogsDir); err != nil {
+		t.Errorf("did not expect an error calling logsCmd: %s", err)
+	}
+
+	s := bufio.NewScanner(out)
+	count := 0
+	lines := []string{}
+	for s.Scan() {
+		lines = append(lines, s.Text())
+		count++
+	}
+
+	// The events log file might not be read, so if we get all the lines
+	// from the normal log file, we consider a success. Anything extra
+	// is a bonus
+	if count < expectedLines {
+		t.Errorf("expecting at least %d log lines, got %d instead", expectedLines, count)
+		t.Logf("Log lines:\n%s", strings.Join(lines, "\n"))
 	}
 }
