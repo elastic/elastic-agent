@@ -16,6 +16,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 )
@@ -35,6 +36,7 @@ func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringP("file", "f", "", "name of the output diagnostics zip archive")
 	cmd.Flags().BoolP("cpu-profile", "p", false, "wait to collect a CPU profile")
+	cmd.Flags().Bool("exclude-events", false, "do not collect events log file")
 
 	return cmd
 }
@@ -44,6 +46,11 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if filepath == "" {
 		ts := time.Now().UTC()
 		filepath = "elastic-agent-diagnostics-" + ts.Format("2006-01-02T15-04-05Z07-00") + ".zip" // RFC3339 format that replaces : with -, so it will work on Windows
+	}
+
+	excludeEvents, err := cmd.Flags().GetBool("exclude-events")
+	if err != nil {
+		return fmt.Errorf("cannot get 'exclude-events' flag: %w", err)
 	}
 
 	ctx := handleSignal(context.Background())
@@ -62,7 +69,7 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("failed collecting diagnostics: %w", err)
 	}
 
-	if err := diagnostics.ZipArchive(streams.Err, f, agentDiag, unitDiags, compDiags); err != nil {
+	if err := diagnostics.ZipArchive(streams.Err, f, paths.Top(), agentDiag, unitDiags, compDiags, excludeEvents); err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", filepath, err)
 	}
 	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", filepath)
