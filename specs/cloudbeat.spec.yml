@@ -37,6 +37,10 @@ inputs:
         - "logging.to_stderr=true"
         - "-E"
         - "gc_percent=${CLOUDBEAT_GOGC:100}"
+        - "-E"
+        - "logging.event_data.to_stderr=true"
+        - "-E"
+        - "logging.event_data.to_files=false"
     isolate_units: true
   - name: cloudbeat/cis_k8s
     description: "CIS Kubernetes monitoring"

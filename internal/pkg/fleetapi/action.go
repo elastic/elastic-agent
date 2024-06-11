@@ -437,6 +437,7 @@ type ActionDiagnostics struct {
 	ActionID          string   `json:"action_id"`
 	ActionType        string   `json:"type"`
 	AdditionalMetrics []string `json:"additional_metrics"`
+	ExcludeEventsLog  bool     `json:"exclude_events_log"`
 	UploadID          string   `json:"-"`
 	Err               error    `json:"-"`
 }
