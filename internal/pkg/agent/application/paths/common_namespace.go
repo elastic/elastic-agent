@@ -7,6 +7,7 @@
 package paths
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -71,8 +72,7 @@ func InstallDirNameForNamespace(namespace string) string {
 		return installDir
 	}
 
-	// Use strings.Replace() to avoid having to sanitize format specifiers in the namespace itself.
-	return strings.Replace(installDirNamespaceFmt, "%s", namespace, 1)
+	return fmt.Sprintf(installDirNamespaceFmt, namespace)
 }
 
 // InstallPath returns the top level directory Agent will be installed into, accounting for any namespace.
@@ -92,8 +92,7 @@ func ServiceName() string {
 		return serviceName
 	}
 
-	// Use strings.Replace() to avoid having to sanitize format specifiers in the namespace itself.
-	return strings.Replace(serviceNameNamespaceFmt, "%s", namespace, 1)
+	return fmt.Sprintf(serviceNameNamespaceFmt, namespace)
 }
 
 // ServiceDisplayName returns the service display name accounting for any namespace.
@@ -103,8 +102,7 @@ func ServiceDisplayName() string {
 		return serviceDisplayName
 	}
 
-	// Use strings.Replace() to avoid having to sanitize format specifiers in the namespace itself.
-	return strings.Replace(serviceDisplayNameNamespaceFmt, "%s", namespace, 1)
+	return fmt.Sprintf(serviceDisplayNameNamespaceFmt, namespace)
 }
 
 // ShellWrapperPath returns the shell wrapper path accounting for any namespace.
@@ -115,8 +113,7 @@ func ShellWrapperPath() string {
 		return shellWrapperPath
 	}
 
-	// Use strings.Replace() to avoid having to sanitize format specifiers in the namespace itself.
-	return strings.Replace(shellWrapperPathNamespaceFmt, "%s", strings.ToLower(namespace), 1)
+	return fmt.Sprintf(shellWrapperPathNamespaceFmt, strings.ToLower(namespace)) //nolint:govet // empty format string on Windows
 }
 
 // ControlSocketRunSymlink returns the shell wrapper path accounting for any namespace.
@@ -126,6 +123,5 @@ func ControlSocketRunSymlink(namespace string) string {
 		return controlSocketRunSymlink
 	}
 
-	// Use strings.Replace() to avoid having to sanitize format specifiers in the namespace itself.
-	return strings.Replace(controlSocketRunSymlinkNamespaceFmt, "%s", namespace, 1)
+	return fmt.Sprintf(controlSocketRunSymlinkNamespaceFmt, namespace) //nolint:govet // empty format string on Windows
 }

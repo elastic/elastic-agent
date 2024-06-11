@@ -18,8 +18,8 @@ func TestInstallNamespace(t *testing.T) {
 	assert.Equal(t, filepath.Join(basePath, "Elastic", fmt.Sprintf(installDirNamespaceFmt, namespace)), InstallPath(basePath))
 	assert.Equal(t, fmt.Sprintf(serviceNameNamespaceFmt, namespace), ServiceName())
 	assert.Equal(t, fmt.Sprintf(serviceDisplayNameNamespaceFmt, namespace), ServiceDisplayName())
-	assert.Equal(t, fmt.Sprintf(shellWrapperPathNamespaceFmt, namespace), ShellWrapperPath())                        //nolint:govet
-	assert.Equal(t, fmt.Sprintf(controlSocketRunSymlinkNamespaceFmt, namespace), ControlSocketRunSymlink(namespace)) //nolint:govet
+	assert.Equal(t, fmt.Sprintf(shellWrapperPathNamespaceFmt, namespace), ShellWrapperPath())                        //nolint:govet // empty format string on Windows
+	assert.Equal(t, fmt.Sprintf(controlSocketRunSymlinkNamespaceFmt, namespace), ControlSocketRunSymlink(namespace)) //nolint:govet // empty format string on Windows
 }
 
 func TestInstallNoNamespace(t *testing.T) {
