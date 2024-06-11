@@ -83,10 +83,6 @@ func InstallDirNameForNamespace(namespace string) string {
 // InstallPath returns the top level directory Agent will be installed into, accounting for any namespace.
 func InstallPath(basePath string) string {
 	namespace := InstallNamespace()
-	if namespace == "" {
-		return filepath.Join(basePath, "Elastic", installDir)
-	}
-
 	return filepath.Join(basePath, "Elastic", InstallDirNameForNamespace(namespace))
 }
 
