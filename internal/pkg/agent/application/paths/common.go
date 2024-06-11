@@ -119,10 +119,15 @@ func TempDir() string {
 
 // Home returns a directory where binary lives
 func Home() string {
+	return HomeFrom(topPath)
+}
+
+func HomeFrom(topDirPath string) string {
 	if unversionedHome {
-		return topPath
+		return topDirPath
 	}
-	return VersionedHome(topPath)
+
+	return VersionedHome(topDirPath)
 }
 
 // IsVersionHome returns true if the Home path is versioned based on build.
