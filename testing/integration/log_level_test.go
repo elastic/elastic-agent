@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
 	"strings"
 	"testing"
 	"text/template"
@@ -263,16 +262,18 @@ func updateAgentLogLevel(ctx context.Context, t *testing.T, kibanaClient *kibana
 
 	err = updateLogLevelTemplate.Execute(buf, templateData)
 	t.Logf("Updating agent-specific log level to %q", logLevel)
-	fleetResp, err := kibanaClient.SendWithContext(ctx, http.MethodPost, "/api/fleet/agents/"+agentID+"/actions", nil, nil, buf)
+	_, err = kibanaClient.SendWithContext(ctx, http.MethodPost, "/api/fleet/agents/"+agentID+"/actions", nil, nil, buf)
 	if err != nil {
 		return fmt.Errorf("error executing fleet request: %w", err)
 	}
-	respDump, err := httputil.DumpResponse(fleetResp, true)
-	if err != nil {
-		t.Logf("Error dumping Fleet response to updating agent-specific log level: %v", err)
-	} else {
-		t.Logf("Fleet response to updating agent-specific log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
-	}
+
+	// The log below is a bit spammy but it can be useful for debugging
+	//respDump, err := httputil.DumpResponse(fleetResp, true)
+	//if err != nil {
+	//	t.Logf("Error dumping Fleet response to updating agent-specific log level: %v", err)
+	//} else {
+	//	t.Logf("Fleet response to updating agent-specific log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
+	//}
 
 	return nil
 }
@@ -308,18 +309,19 @@ func updatePolicyLogLevel(ctx context.Context, t *testing.T, kibanaClient *kiban
 		return fmt.Errorf("error rendering policy update template: %w", err)
 	}
 
-	fleetResp, err := kibanaClient.SendWithContext(ctx, http.MethodPut, "/api/fleet/agent_policies/"+policy.ID, nil, nil, buf)
+	_, err = kibanaClient.SendWithContext(ctx, http.MethodPut, "/api/fleet/agent_policies/"+policy.ID, nil, nil, buf)
 
 	if err != nil {
 		return fmt.Errorf("error executing fleet request: %w", err)
 	}
 
-	respDump, err := httputil.DumpResponse(fleetResp, true)
-	if err != nil {
-		t.Logf("Error dumping Fleet response to updating policy log level: %v", err)
-	} else {
-		t.Logf("Fleet response to updating policy log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
-	}
+	// The log below is a bit spammy but it can be useful for debugging
+	//respDump, err := httputil.DumpResponse(fleetResp, true)
+	//if err != nil {
+	//	t.Logf("Error dumping Fleet response to updating policy log level: %v", err)
+	//} else {
+	//	t.Logf("Fleet response to updating policy log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
+	//}
 
 	return nil
 }
