@@ -148,10 +148,10 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	cDiag := h.diagComponents(ctx, action)
 
 	var r io.Reader
-	// attempt to create the a temporary diagnostics file on disk in order to avoid loading a
-	// potentially large file in memory.
+	// attempt to create a temporary diagnostics file on disk in order to avoid
+	// loading a potentially large file in memory.
 	// if on-disk creation fails an in-memory buffer is used.
-	f, s, err := h.diagFile(aDiag, uDiag, cDiag, action.ExcludeEventsLog)
+	f, s, err := h.diagFile(aDiag, uDiag, cDiag, action.Data.ExcludeEventsLog)
 	if err != nil {
 		var b bytes.Buffer
 		h.log.Warnw("Diagnostics action unable to use temporary file, using buffer instead.", "error.message", err)
@@ -161,7 +161,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 				h.log.Warn(str)
 			}
 		}()
-		err := diagnostics.ZipArchive(&wBuf, &b, h.topPath, aDiag, uDiag, cDiag, action.ExcludeEventsLog)
+		err := diagnostics.ZipArchive(&wBuf, &b, h.topPath, aDiag, uDiag, cDiag, action.Data.ExcludeEventsLog)
 		if err != nil {
 			h.log.Errorw(
 				"diagnostics action handler failed generate zip archive",
