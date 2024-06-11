@@ -233,7 +233,7 @@ steps:
   #               env:
   #                 - GH_VERSION=2.4.0
 
-  # Trigger for pull requests
+  # Trigger for pull requests c
   - label: "Trigger Integration tests for Pull request"
 
     if: |
