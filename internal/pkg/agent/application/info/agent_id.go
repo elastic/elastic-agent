@@ -97,13 +97,6 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, bool, e
 			errors.TypeFilesystem)
 	}
 
-	agentInfoSubMap, found := configMap[agentInfoKey]
-	if !found {
-		return &persistentAgentInfo{
-			LogLevel:       logLevel,
-			MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
-		}, false, nil
-	}
 	// check fleet config. This behavior emulates configuration.IsStandalone
 	fleetmode, fleetExists := configMap["fleet"]
 	isStandalone := true
@@ -116,7 +109,13 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, bool, e
 		}
 	}
 
-	logp.L().Infof("got fleet mode %v; fleet config: %#v", isStandalone, fleetmode)
+	agentInfoSubMap, found := configMap[agentInfoKey]
+	if !found {
+		return &persistentAgentInfo{
+			LogLevel:       logLevel,
+			MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
+		}, isStandalone, nil
+	}
 
 	cc, err := config.NewConfigFrom(agentInfoSubMap)
 	if err != nil {
@@ -210,6 +209,7 @@ func loadAgentInfoWithBackoff(ctx context.Context, forceUpdate bool, logLevel st
 	}
 
 	close(signal)
+	logp.L().Infof("in loadAgentInfoWithBackoff: %v", isStandalone)
 	return ai, isStandalone, err
 }
 
@@ -233,7 +233,7 @@ func loadAgentInfo(ctx context.Context, forceUpdate bool, logLevel string, creat
 	}
 
 	if agentInfo != nil && !forceUpdate && (agentInfo.ID != "" || !createAgentID) {
-		return agentInfo, false, nil
+		return agentInfo, isStandalone, nil
 	}
 
 	if err := updateID(agentInfo, diskStore); err != nil {
