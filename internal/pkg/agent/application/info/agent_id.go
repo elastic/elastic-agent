@@ -14,7 +14,6 @@ import (
 	"github.com/gofrs/uuid"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -209,7 +208,6 @@ func loadAgentInfoWithBackoff(ctx context.Context, forceUpdate bool, logLevel st
 	}
 
 	close(signal)
-	logp.L().Infof("in loadAgentInfoWithBackoff: %v", isStandalone)
 	return ai, isStandalone, err
 }
 
