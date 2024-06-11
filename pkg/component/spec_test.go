@@ -13,9 +13,10 @@ import (
 
 func TestSpec_Validation(t *testing.T) {
 	scenarios := []struct {
-		Name string
-		Spec string
-		Err  string
+		Name    string
+		Spec    string
+		Err     string
+		CheckFn func(t *testing.T, spec Spec)
 	}{
 		{
 			Name: "Empty",
@@ -30,126 +31,134 @@ func TestSpec_Validation(t *testing.T) {
 		{
 			Name: "No Command or Service",
 			Spec: `
-version: 2
-inputs:
-  - name: testing
-    description: Testing Input
-    platforms:
-      - linux/amd64
-    outputs:
-      - shipper
-`,
+        version: 2
+        inputs:
+          - name: testing
+            description: Testing Input
+            platforms:
+              - linux/amd64
+            outputs:
+              - shipper
+        `,
 			Err: "input 'testing' must define either command or service accessing 'inputs.0'",
 		},
 		{
 			Name: "Duplicate Platform",
 			Spec: `
-version: 2
-inputs:
-  - name: testing
-    description: Testing Input
-    platforms:
-      - linux/amd64
-      - linux/amd64
-    outputs:
-      - shipper
-    command: {}
-`,
+        version: 2
+        inputs:
+          - name: testing
+            description: Testing Input
+            platforms:
+              - linux/amd64
+              - linux/amd64
+            outputs:
+              - shipper
+            command: {}
+        `,
 			Err: "input 'testing' defines the platform 'linux/amd64' more than once accessing 'inputs.0'",
 		},
 		{
 			Name: "Unknown Platform",
 			Spec: `
-version: 2
-inputs:
-  - name: testing
-    description: Testing Input
-    platforms:
-      - unknown/amd64
-    outputs:
-      - shipper
-    command: {}
-`,
+        version: 2
+        inputs:
+          - name: testing
+            description: Testing Input
+            platforms:
+              - unknown/amd64
+            outputs:
+              - shipper
+            command: {}
+        `,
 			Err: "input 'testing' defines an unknown platform 'unknown/amd64' accessing 'inputs.0'",
 		},
 		{
 			Name: "Duplicate Output",
 			Spec: `
-version: 2
-inputs:
-  - name: testing
-    description: Testing Input
-    platforms:
-      - linux/amd64
-    outputs:
-      - shipper
-      - shipper
-    command: {}
-`,
+        version: 2
+        inputs:
+          - name: testing
+            description: Testing Input
+            platforms:
+              - linux/amd64
+            outputs:
+              - shipper
+              - shipper
+            command: {}
+        `,
 			Err: "input 'testing' defines the output 'shipper' more than once accessing 'inputs.0'",
 		},
 		{
 			Name: "Duplicate Platform Same Input Name",
 			Spec: `
-version: 2
-inputs:
-  - name: testing
-    description: Testing Input
-    platforms:
-      - linux/amd64
-    outputs:
-      - shipper
-    command: {}
-  - name: testing
-    description: Testing Input
-    platforms:
-      - linux/amd64
-    outputs:
-      - shipper
-    command: {}
-`,
+        version: 2
+        inputs:
+          - name: testing
+            description: Testing Input
+            platforms:
+              - linux/amd64
+            outputs:
+              - shipper
+            command: {}
+          - name: testing
+            description: Testing Input
+            platforms:
+              - linux/amd64
+            outputs:
+              - shipper
+            command: {}
+        `,
 			Err: "input 'testing' at inputs.1 defines the same platform as a previous definition accessing config",
 		},
 		{
 			Name: "Valid",
 			Spec: `
-version: 2
-inputs:
-  - name: testing
-    description: Testing Input
-    platforms:
-      - linux/amd64
-      - windows/amd64
-    outputs:
-      - shipper
-    command: {}
-  - name: testing
-    description: Testing Input
-    platforms:
-      - darwin/amd64
-    outputs:
-      - shipper
-    service:
-      name: "co.elastic.endpoint"
-      cport: 6788
-      operations:
-        install:
-          args: ["install"]
-        uninstall:
-          args: ["uninstall"]
-`,
+        version: 2
+        inputs:
+          - name: testing
+            description: Testing Input
+            platforms:
+              - linux/amd64
+              - windows/amd64
+            outputs:
+              - shipper
+            command: {}
+          - name: testing
+            description: Testing Input
+            platforms:
+              - darwin/amd64
+            outputs:
+              - shipper
+            service:
+              name: "co.elastic.endpoint"
+              cport: 6788
+              csocket: ".test.sock"
+              operations:
+                install:
+                  args: ["install"]
+                uninstall:
+                  args: ["uninstall"]
+    `,
 			Err: "",
+			CheckFn: func(t *testing.T, spec Spec) {
+				assert.Equal(t, spec.Inputs[1].Service.CPort, 6788)
+				assert.Equal(t, spec.Inputs[1].Service.CSocket, ".test.sock")
+			},
 		},
 	}
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
-			_, err := LoadSpec([]byte(scenario.Spec))
+			spec, err := LoadSpec([]byte(scenario.Spec))
 			if scenario.Err != "" {
 				require.Error(t, err)
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
 				require.NoError(t, err)
+				if scenario.CheckFn != nil {
+					scenario.CheckFn(t, spec)
+				}
 			}
 		})
 	}
