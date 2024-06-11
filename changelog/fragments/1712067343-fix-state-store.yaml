@@ -8,7 +8,7 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: feature
+kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
 summary: Fix the Elastic Agent state store
@@ -19,7 +19,7 @@ summary: Fix the Elastic Agent state store
 description: |
   This change fixes issues when loading data from the Agent's internal state store.
   Which include the error `error parsing version ""` the Agent would present after
-  when trying to execute a scheduled upgrade after a restart.
+  trying to execute a scheduled upgrade after a restart.
 
 # Affected component; a word indicating the component this changeset affects.
 component:
