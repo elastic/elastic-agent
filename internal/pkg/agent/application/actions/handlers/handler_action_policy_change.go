@@ -186,17 +186,17 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 	return nil
 }
 
-// updateFleetConfig copies the relevant Fleet client settings from src on dst. The destination struct is modified in-place
-func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config) {
+// updateFleetConfig copies the relevant Fleet client settings from policyConfig on agentConfig. The destination struct is modified in-place
+func updateFleetConfig(log *logger.Logger, policyConfig remote.Config, agentConfig *remote.Config) {
 
 	// Hosts is the only connectivity field sent Fleet, let's clear everything else aside from Hosts
-	if len(src.Hosts) > 0 {
-		dst.Hosts = make([]string, len(src.Hosts))
-		copy(dst.Hosts, src.Hosts)
+	if len(policyConfig.Hosts) > 0 {
+		agentConfig.Hosts = make([]string, len(policyConfig.Hosts))
+		copy(agentConfig.Hosts, policyConfig.Hosts)
 
-		dst.Host = ""
-		dst.Protocol = ""
-		dst.Path = ""
+		agentConfig.Host = ""
+		agentConfig.Protocol = ""
+		agentConfig.Path = ""
 	}
 
 	// Empty proxies from fleet are ignored. That way a proxy set by --proxy-url
@@ -204,48 +204,51 @@ func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config
 	// However, if there is a proxy sent by fleet-server, it'll take precedence.
 	// Therefore, it's not possible to remove a proxy once it's set.
 
-	if src.Transport.Proxy.URL == nil ||
-		src.Transport.Proxy.URL.String() == "" {
-		log.Debugw("proxy from fleet is empty or null, the proxy will not be changed", "current_proxy", dst.Transport.Proxy.URL)
+	if policyConfig.Transport.Proxy.URL == nil ||
+		policyConfig.Transport.Proxy.URL.String() == "" {
+		log.Debugw("proxy from fleet is empty or null, the proxy will not be changed", "current_proxy", agentConfig.Transport.Proxy.URL)
 	} else {
-		log.Debugw("received proxy from fleet, applying it", "old_proxy", dst.Transport.Proxy.URL, "new_proxy", src.Transport.Proxy.URL)
+		log.Debugw("received proxy from fleet, applying it", "old_proxy", agentConfig.Transport.Proxy.URL, "new_proxy", policyConfig.Transport.Proxy.URL)
 		// copy the proxy struct
-		dst.Transport.Proxy = src.Transport.Proxy
+		agentConfig.Transport.Proxy = policyConfig.Transport.Proxy
 
-		// replace in dst the attributes that are passed by reference within the proxy struct
+		// replace in agentConfig the attributes that are passed by reference within the proxy struct
 
 		// Headers map
-		dst.Transport.Proxy.Headers = map[string]string{}
-		for k, v := range src.Transport.Proxy.Headers {
-			dst.Transport.Proxy.Headers[k] = v
+		agentConfig.Transport.Proxy.Headers = map[string]string{}
+		for k, v := range policyConfig.Transport.Proxy.Headers {
+			agentConfig.Transport.Proxy.Headers[k] = v
 		}
 
 		// Proxy URL
-		urlCopy := *src.Transport.Proxy.URL
-		dst.Transport.Proxy.URL = &urlCopy
+		urlCopy := *policyConfig.Transport.Proxy.URL
+		agentConfig.Transport.Proxy.URL = &urlCopy
 	}
 
-	if src.Transport.TLS != nil {
+	if policyConfig.Transport.TLS != nil {
 
-		// copy the TLS struct
-		tlsCopy := *src.Transport.TLS
+		tlsCopy := tlscommon.Config{}
+		if agentConfig.Transport.TLS != nil {
+			// copy the TLS struct
+			tlsCopy = *agentConfig.Transport.TLS
+		}
 
-		if src.Transport.TLS.Certificate == emptyCertificateConfig() {
+		if policyConfig.Transport.TLS.Certificate == emptyCertificateConfig() {
 			log.Debug("TLS certificates from fleet are empty or null, the TLS config will not be changed")
 		} else {
-			tlsCopy.Certificate = src.Transport.TLS.Certificate
+			tlsCopy.Certificate = policyConfig.Transport.TLS.Certificate
 			log.Debug("received TLS certificate/key from fleet, applying it")
 		}
 
-		if len(src.Transport.TLS.CAs) == 0 {
+		if len(policyConfig.Transport.TLS.CAs) == 0 {
 			log.Debug("TLS CAs from fleet are empty or null, the TLS config will not be changed")
 		} else {
-			tlsCopy.CAs = make([]string, len(src.Transport.TLS.CAs))
-			copy(tlsCopy.CAs, src.Transport.TLS.CAs)
+			tlsCopy.CAs = make([]string, len(policyConfig.Transport.TLS.CAs))
+			copy(tlsCopy.CAs, policyConfig.Transport.TLS.CAs)
 			log.Debug("received TLS CAs from fleet, applying it")
 		}
 
-		dst.Transport.TLS = &tlsCopy
+		agentConfig.Transport.TLS = &tlsCopy
 	}
 }
 

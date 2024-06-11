@@ -252,8 +252,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	//         "/path/to/CA2"
 	//       ],
 	//       "key": "/path/to/key",
-	//       "renegotiation": "never",
-	//       "verification_mode": ""
+	//       "renegotiation": "never"
 	//     }
 	//   },
 	//   "id": "",
