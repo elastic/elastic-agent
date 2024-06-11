@@ -12,7 +12,8 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 
 	// Receivers:
-	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
+	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver"           // for collecting log files
+	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver" // for collecting log files
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
 	// Processors:
@@ -30,6 +31,7 @@ import (
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 
 	// Extensions
+	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 )
 
@@ -54,6 +56,7 @@ func components() (otelcol.Factories, error) {
 		transformprocessor.NewFactory(),
 		filterprocessor.NewFactory(),
 		k8sattributesprocessor.NewFactory(),
+		kubeletstatsreceiver.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
@@ -72,6 +75,7 @@ func components() (otelcol.Factories, error) {
 
 	factories.Extensions, err = extension.MakeFactoryMap(
 		memorylimiterextension.NewFactory(),
+		filestorage.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

@@ -32,6 +32,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | filelogreceiver | v0.102.0|
+| kubeletstatsreceiver | v0.102.0|
 | otlpreceiver | v0.102.1|
 
 
@@ -53,9 +54,9 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| k8sattributesprocessor | v0.102.0|
 | attributesprocessor | v0.102.0|
 | filterprocessor | v0.102.0|
+| k8sattributesprocessor | v0.102.0|
 | resourceprocessor | v0.102.0|
 | transformprocessor | v0.102.0|
 | batchprocessor | v0.102.1|
@@ -67,5 +68,6 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| storage/filestorage | v0.102.0|
 | memorylimiterextension | v0.102.1|
 
