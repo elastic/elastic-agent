@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -32,8 +34,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ipc"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -97,6 +102,7 @@ type Manager struct {
 	ca         *authority.CertificateAuthority
 	listenAddr string
 	listenPort int
+	isLocal    bool
 	agentInfo  info.Agent
 	tracer     *apm.Tracer
 	monitor    MonitoringManager
@@ -149,7 +155,6 @@ type Manager struct {
 func NewManager(
 	logger,
 	baseLogger *logger.Logger,
-	listenAddr string,
 	agentInfo info.Agent,
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
@@ -163,11 +168,21 @@ func NewManager(
 	if agentInfo == nil {
 		return nil, errors.New("agentInfo cannot be nil")
 	}
+
+	controlAddress := control.Address()
+	// [gRPC:8.15] For 8.14 this always returns local TCP address, until Endpoint is modified to support domain sockets gRPC
+	listenAddr, err := deriveCommsAddress(controlAddress, grpcConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive comms GRPC: %w", err)
+	}
+	logger.With("address", listenAddr).Infof("GRPC comms socket listening at %s", listenAddr)
+
 	m := &Manager{
 		logger:         logger,
 		baseLogger:     baseLogger,
 		ca:             ca,
 		listenAddr:     listenAddr,
+		isLocal:        ipc.IsLocal(listenAddr),
 		agentInfo:      agentInfo,
 		tracer:         tracer,
 		current:        make(map[string]*componentRuntimeState),
@@ -192,11 +207,25 @@ func NewManager(
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
-	listener, err := net.Listen("tcp", m.listenAddr)
+	var (
+		listener net.Listener
+		err      error
+	)
+	if m.isLocal {
+		listener, err = ipc.CreateListener(m.logger, m.listenAddr)
+	} else {
+		listener, err = net.Listen("tcp", m.listenAddr)
+	}
+
 	if err != nil {
 		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
 	}
-	m.listenPort = listener.Addr().(*net.TCPAddr).Port
+
+	if m.isLocal {
+		defer ipc.CleanupListener(m.logger, m.listenAddr)
+	} else {
+		m.listenPort = listener.Addr().(*net.TCPAddr).Port
+	}
 
 	certPool := x509.NewCertPool()
 	if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
@@ -796,7 +825,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 	for _, comp := range newComponents {
 		// new component; create its runtime
 		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-		state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
+		state, err := newComponentRuntimeState(m, logger, m.monitor, comp, m.isLocal)
 		if err != nil {
 			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 		}
@@ -968,6 +997,9 @@ func (m *Manager) getRuntimeFromComponent(comp component.Component) *componentRu
 }
 
 func (m *Manager) getListenAddr() string {
+	if m.isLocal {
+		return m.listenAddr
+	}
 	addr := strings.SplitN(m.listenAddr, ":", 2)
 	if len(addr) == 2 && addr[1] == "0" {
 		return fmt.Sprintf("%s:%d", addr[0], m.listenPort)
@@ -1053,4 +1085,33 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
 	}
 	return res.Diagnostic, nil
+}
+
+// deriveCommsAddress derives the comms socket/pipe path/name from given control address and GRPC config
+func deriveCommsAddress(controlAddress string, grpc *configuration.GRPCConfig) (string, error) {
+	if grpc.IsLocal() {
+		return deriveCommsSocketName(controlAddress)
+	}
+	return grpc.String(), nil
+}
+
+var errInvalidUri = errors.New("invalid uri")
+
+// deriveCommsSocketName derives the agent communication unix/npipe path
+// currently from the control socket path, since it's already set properly
+// matching the socket path length to meet the system limits of the platform
+func deriveCommsSocketName(uri string) (string, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return "", err
+	}
+
+	if len(u.Path) == 0 || (u.Scheme != "unix" && u.Scheme != "npipe") {
+		return "", fmt.Errorf("%w %s", errInvalidUri, uri)
+	}
+
+	// The base name without extension and use it as id argument for SocketURLWithFallback call
+	// THe idea it to use the same logic for the comms path as for the control socket/pipe path
+	base := strings.TrimSuffix(path.Base(u.Path), path.Ext(u.Path))
+	return utils.SocketURLWithFallback(base, path.Dir(u.Path)), nil
 }
