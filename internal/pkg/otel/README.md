@@ -31,8 +31,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| filelogreceiver | v0.100.0|
-| otlpreceiver | v0.100.0|
+| filelogreceiver | v0.102.0|
+| otlpreceiver | v0.102.1|
 
 
 
@@ -41,10 +41,10 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| elasticsearchexporter | v0.100.0|
-| fileexporter | v0.100.0|
-| debugexporter | v0.100.0|
-| otlpexporter | v0.100.0|
+| elasticsearchexporter | v0.102.0|
+| fileexporter | v0.102.0|
+| debugexporter | v0.102.1|
+| otlpexporter | v0.102.1|
 
 
 
@@ -53,11 +53,12 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| attributesprocessor | v0.100.0|
-| filterprocessor | v0.100.0|
-| resourceprocessor | v0.100.0|
-| transformprocessor | v0.100.0|
-| batchprocessor | v0.100.0|
+| k8sattributesprocessor | v0.102.0|
+| attributesprocessor | v0.102.0|
+| filterprocessor | v0.102.0|
+| resourceprocessor | v0.102.0|
+| transformprocessor | v0.102.0|
+| batchprocessor | v0.102.1|
 
 
 
@@ -66,5 +67,5 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| memorylimiterextension | v0.100.0|
+| memorylimiterextension | v0.102.1|
 

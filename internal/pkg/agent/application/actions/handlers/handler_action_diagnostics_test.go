@@ -75,16 +75,14 @@ var (
 )
 
 func TestDiagnosticHandlerHappyPathWithLogs(t *testing.T) {
-
 	tempAgentRoot := t.TempDir()
-	paths.SetTop(tempAgentRoot)
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
 	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
 	mockUploader := mockhandlers.NewUploader(t)
 	testLogger, observedLogs := logger.NewTesting("diagnostic-handler-test")
-	handler := NewDiagnostics(testLogger, mockDiagProvider, defaultRateLimit, mockUploader)
+	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{mockUnitDiagnostic})
@@ -165,7 +163,7 @@ func TestDiagnosticHandlerUploaderErrorWithLogs(t *testing.T) {
 	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
 	mockUploader := mockhandlers.NewUploader(t)
 	testLogger, observedLogs := logger.NewTesting("diagnostic-handler-test")
-	handler := NewDiagnostics(testLogger, mockDiagProvider, defaultRateLimit, mockUploader)
+	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{})
@@ -206,7 +204,7 @@ func TestDiagnosticHandlerZipArchiveErrorWithLogs(t *testing.T) {
 	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
 	mockUploader := mockhandlers.NewUploader(t)
 	testLogger, observedLogs := logger.NewTesting("diagnostic-handler-test")
-	handler := NewDiagnostics(testLogger, mockDiagProvider, defaultRateLimit, mockUploader)
+	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{})
@@ -242,7 +240,7 @@ func TestDiagnosticHandlerAckErrorWithLogs(t *testing.T) {
 	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
 	mockUploader := mockhandlers.NewUploader(t)
 	testLogger, observedLogs := logger.NewTesting("diagnostic-handler-test")
-	handler := NewDiagnostics(testLogger, mockDiagProvider, defaultRateLimit, mockUploader)
+	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{})
@@ -281,7 +279,7 @@ func TestDiagnosticHandlerCommitErrorWithLogs(t *testing.T) {
 	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
 	mockUploader := mockhandlers.NewUploader(t)
 	testLogger, observedLogs := logger.NewTesting("diagnostic-handler-test")
-	handler := NewDiagnostics(testLogger, mockDiagProvider, defaultRateLimit, mockUploader)
+	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{})
@@ -321,7 +319,7 @@ func TestDiagnosticHandlerContexteExpiredErrorWithLogs(t *testing.T) {
 	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
 	mockUploader := mockhandlers.NewUploader(t)
 	testLogger, observedLogs := logger.NewTesting("diagnostic-handler-test")
-	handler := NewDiagnostics(testLogger, mockDiagProvider, defaultRateLimit, mockUploader)
+	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
 
@@ -365,7 +363,7 @@ func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
 	mockUploader := mockhandlers.NewUploader(t)
 	testLogger, _ := logger.NewTesting("diagnostic-handler-test")
-	handler := NewDiagnostics(testLogger, mockDiagProvider, defaultRateLimit, mockUploader)
+	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{mockUnitDiagnostic})

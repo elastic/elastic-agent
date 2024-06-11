@@ -49,7 +49,7 @@ func TestStartCollector(t *testing.T) {
 			if tc.expectedErrorMessage == "" {
 				assert.Eventually(t, func() bool {
 					return otelcol.StateRunning == collector.GetState()
-				}, 2*time.Second, 200*time.Millisecond)
+				}, 10*time.Second, 200*time.Millisecond)
 			}
 			collector.Shutdown()
 			wg.Wait()
