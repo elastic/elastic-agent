@@ -34,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -774,6 +775,14 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	if statePath == "" {
 		statePath = defaultStateDirectory
 	}
+
+	// A Unix socket path needs to be < 104 characters long, so we ensure
+	// the statePath when concatenated with the socked name is going to
+	// be smaller than 104 characters.
+	if len(statePath) > 75 {
+		statePath = utils.SocketFallbackDirectory
+	}
+
 	topPath := filepath.Join(statePath, "data")
 	configPath = envWithDefault(configPath, "CONFIG_PATH")
 	if configPath == "" {

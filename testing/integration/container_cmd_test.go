@@ -10,6 +10,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -18,29 +20,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
-func TestContainerCMD(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Stack: &define.Stack{},
-		Local: false,
-		Sudo:  true,
-		OS: []define.OS{
-			{Type: define.Linux},
-		},
-		// This test runs the command we use when executing inside a container
-		// which leaves files under /usr/share/elastic-agent. Run it isolated
-		// to avoid interfering with other tests and better simulate a container
-		// environment we run it in isolation
-		Group: "container",
-	})
-	ctx := context.Background()
-
-	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
+func createPolicy(t *testing.T, ctx context.Context, agentFixture *atesting.Fixture, info *define.Info) string {
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
 		Namespace:   info.Namespace,
@@ -74,13 +59,10 @@ func TestContainerCMD(t *testing.T) {
 		t.Fatalf("unable to create enrolment API key: %s", err)
 	}
 
-	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
-	if err != nil {
-		t.Fatalf("could not get Fleet URL: %s", err)
-	}
+	return enrollmentToken.APIKey
+}
 
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-	defer cancel()
+func prepareContainerCMD(t *testing.T, ctx context.Context, agentFixture *atesting.Fixture, info *define.Info, env []string) *exec.Cmd {
 	cmd, err := agentFixture.PrepareAgentCommand(ctx, []string{"container"})
 	if err != nil {
 		t.Fatalf("could not prepare agent command: %s", err)
@@ -112,21 +94,51 @@ func TestContainerCMD(t *testing.T) {
 	agentOutput := strings.Builder{}
 	cmd.Stderr = &agentOutput
 	cmd.Stdout = &agentOutput
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(os.Environ(), env...)
+	return cmd
+}
+
+func TestContainerCMD(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Group: define.Default,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	if err != nil {
+		t.Fatalf("could not get Fleet URL: %s", err)
+	}
+
+	enrollmentToken := createPolicy(t, ctx, agentFixture, info)
+	env := []string{
 		"FLEET_ENROLL=1",
-		"FLEET_URL="+fleetURL,
-		"FLEET_ENROLLMENT_TOKEN="+enrollmentToken.APIKey,
+		"FLEET_URL=" + fleetURL,
+		"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
 		// As the agent isn't built for a container, it's upgradable, triggering
 		// the start of the upgrade watcher. If `STATE_PATH` isn't set, the
 		// upgrade watcher will commence from a different path within the
 		// container, distinct from the current execution path.
-		"STATE_PATH="+agentFixture.WorkDir(),
-	)
+		"STATE_PATH=" + agentFixture.WorkDir(),
+	}
 
+	cmd := prepareContainerCMD(t, ctx, agentFixture, info, env)
 	t.Logf(">> running binary with: %v", cmd.Args)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("error running container cmd: %s", err)
 	}
+
+	agentOutput := cmd.Stderr.(*strings.Builder)
 
 	require.Eventuallyf(t, func() bool {
 		// This will return errors until it connects to the agent,
@@ -140,6 +152,68 @@ func TestContainerCMD(t *testing.T) {
 	},
 		5*time.Minute, time.Second,
 		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
-		err, &agentOutput,
+		err, agentOutput,
+	)
+}
+
+func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Group: define.Default,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	if err != nil {
+		t.Fatalf("could not get Fleet URL: %s", err)
+	}
+
+	// We need a statePath that will make the unix socket path longer than 105 characters
+	// so we join the workdir and a 120 characters long string.
+	statePath := filepath.Join(agentFixture.WorkDir(), "de9a2a338c4fe10a466ee9fae57ce0c8a5b010dfcd6bd3f41d2c569ef5ed873193fd7d1966a070174f47f93ee667f921616c2d6d29efb6dbcc2b8b33")
+
+	enrollmentToken := createPolicy(t, ctx, agentFixture, info)
+	env := []string{
+		"FLEET_ENROLL=1",
+		"FLEET_URL=" + fleetURL,
+		"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
+		// As the agent isn't built for a container, it's upgradable, triggering
+		// the start of the upgrade watcher. If `STATE_PATH` isn't set, the
+		// upgrade watcher will commence from a different path within the
+		// container, distinct from the current execution path.
+		"STATE_PATH=" + statePath,
+	}
+
+	cmd := prepareContainerCMD(t, ctx, agentFixture, info, env)
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	agentOutput := cmd.Stderr.(*strings.Builder)
+
+	require.Eventuallyf(t, func() bool {
+		// This will return errors until it connects to the agent,
+		// they're mostly noise because until the agent starts running
+		// we will get connection errors. If the test fails
+		// the agent logs will be present in the error message
+		// which should help to explain why the agent was not
+		// healthy.
+		err = agentFixture.IsHealthy(ctx)
+		return err == nil
+	},
+		5*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
+		err, agentOutput,
 	)
 }
