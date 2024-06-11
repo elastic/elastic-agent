@@ -74,8 +74,10 @@ func NewStateStoreWithMigration(
 	ctx context.Context,
 	log *logger.Logger,
 	actionStorePath,
-	stateStorePath string) (*StateStore, error) {
-	stateDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath)
+	stateStorePath string,
+	storageOpts ...storage.EncryptedOptionFunc) (*StateStore, error) {
+	stateDiskStore, err := storage.NewEncryptedDiskStore(
+		ctx, stateStorePath, storageOpts...)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"could not create EncryptedDiskStore when creating StateStoreWithMigration: %w",

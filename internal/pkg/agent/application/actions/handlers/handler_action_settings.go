@@ -47,7 +47,7 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		return fmt.Errorf("invalid type, expected ActionSettings and received %T", a)
 	}
 
-	logLevel := action.LogLevel
+	logLevel := action.Data.LogLevel
 	return h.handleLogLevel(ctx, logLevel, acker, action)
 }
 
