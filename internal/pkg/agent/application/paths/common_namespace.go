@@ -48,7 +48,9 @@ func InstallNamespace() string {
 	}
 
 	if RunningInstalled() {
-		return parseNamespaceFromDir(filepath.Base(Top()))
+		// Parse the namespace from the directory once to ensure deterministic behavior from startup.
+		namespace := parseNamespaceFromDir(filepath.Base(Top()))
+		installNamespace = namespace
 	}
 
 	return ""
