@@ -237,7 +237,7 @@ steps:
   - label: "Trigger Integration tests for Pull request"
 
     if: |
-      (build.pull_request.id != null && !(build.pull_request.labels includes "skip-it")) ||
+      (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /extended/
 
     plugins:
