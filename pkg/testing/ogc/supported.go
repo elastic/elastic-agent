@@ -29,7 +29,7 @@ var ogcSupported = []LayoutOS{
 		},
 		Provider:     Google,
 		InstanceSize: "e2-standard-2", // 2 amd64 cpus, 8 GB RAM
-		RunsOn:       "ubuntu-2404-lts",
+		RunsOn:       "ubuntu-2404-lts-amd64",
 		Username:     "ubuntu",
 		RemotePath:   "/home/ubuntu/agent",
 	},
