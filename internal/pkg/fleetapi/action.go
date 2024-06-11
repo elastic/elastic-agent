@@ -480,6 +480,7 @@ type ActionDiagnostics struct {
 
 type ActionDiagnosticsData struct {
 	AdditionalMetrics []string `json:"additional_metrics"`
+	ExcludeEventsLog  bool     `json:"exclude_events_log"`
 }
 
 // ID returns the ID of the action.

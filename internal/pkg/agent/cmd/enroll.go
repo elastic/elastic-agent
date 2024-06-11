@@ -381,7 +381,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	cfg.Settings.LoggingConfig.ToFiles = false
 	cfg.Settings.LoggingConfig.ToStderr = true
 
-	logger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, false)
+	logger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, false)
 	if err != nil {
 		return err
 	}
