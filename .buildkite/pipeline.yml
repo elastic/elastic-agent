@@ -241,7 +241,7 @@ steps:
     #   build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /extended/
 
     if: |
-      !build.pull_request.draft
+      build.pull_request.draft == null
     plugins:
       - monorepo-diff#v1.0.1:
           diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
