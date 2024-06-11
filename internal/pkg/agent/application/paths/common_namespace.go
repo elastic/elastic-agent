@@ -12,14 +12,13 @@ import (
 	"strings"
 )
 
-// installNamespace is the name of the agent's current installation namepsace.
-var installNamespace string
-
 const (
 	// installDirNamespaceFmt is the format of the directory agent will be installed to within the base path when using an installation namepsace.
-	// For example it is $BasePath/$DevelopmentInstallDirName, on MacOS it is /Library/Elastic/$DevelopmentInstallDirName.
-	installDir             = "Agent"
-	installDirNamespaceFmt = "Agent-%s"
+	// It is $BasePath/Agent-$namespace.
+	installDir                = "Agent"
+	installDirNamespaceSep    = "-"
+	installDirNamespacePrefix = installDir + installDirNamespaceSep
+	installDirNamespaceFmt    = installDirNamespacePrefix + "%s"
 
 	// DevelopmentNamespace defines the "well known" development namespace.
 	DevelopmentNamespace = "Development"
@@ -29,9 +28,13 @@ const (
 	serviceDisplayNameNamespaceFmt = "Elastic Agent - %s"
 )
 
+// installNamespace is the name of the agent's current installation namepsace.
+var installNamespace string
+
 // SetInstallNamespace sets whether the agent is currently in or is being installed in an installation namespace.
+// Removes leading and trailing whitespace
 func SetInstallNamespace(namespace string) {
-	installNamespace = namespace
+	installNamespace = strings.TrimSpace(namespace)
 }
 
 // InstallNamespace returns the name of the current installation namespace. Returns the empty string
@@ -54,6 +57,8 @@ func InstallNamespace() string {
 func parseNamespaceFromDir(dir string) string {
 	parts := strings.SplitAfterN(dir, "-", 2)
 	if len(parts) <= 1 {
+		return ""
+	} else if parts[0] != installDirNamespacePrefix {
 		return ""
 	}
 

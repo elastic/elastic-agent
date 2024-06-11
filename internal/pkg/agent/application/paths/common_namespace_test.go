@@ -11,7 +11,9 @@ import (
 func TestInstallNamespace(t *testing.T) {
 	namespace := "testing"
 	basePath := filepath.Join("base", "path")
-	SetInstallNamespace(namespace)
+
+	// Add whitespace to ensure it gets removed.
+	SetInstallNamespace(" " + namespace + "\t   ")
 
 	assert.Equal(t, namespace, InstallNamespace())
 	assert.True(t, InInstallNamespace())
@@ -48,11 +50,12 @@ func TestParseNamespaceFromDirName(t *testing.T) {
 		{name: "dashes", dir: "Agent-With-Dashes", namespace: "With-Dashes"},
 		{name: "special", dir: "Agent-@!$%^&*()-_+=", namespace: "@!$%^&*()-_+="},
 		{name: "format", dir: "Agent-%s%d%v%t", namespace: "%s%d%v%t"},
+		{name: "spaces", dir: "Agent- Development \t", namespace: " Development \t"},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.namespace, parseNamespaceFromDir(tc.dir))
+			assert.Equalf(t, tc.namespace, parseNamespaceFromDir(tc.dir), "parsing %s", tc.dir)
 
 			// Special case: if the directory is empty the install dir is the default "Agent" not "Agent-"
 			wantDir := tc.dir
@@ -62,4 +65,8 @@ func TestParseNamespaceFromDirName(t *testing.T) {
 			assert.Equal(t, wantDir, InstallDirNameForNamespace(tc.namespace))
 		})
 	}
+}
+
+func TestParseNamespaceFromDirNameWithoutAgentPrefix(t *testing.T) {
+	assert.Equal(t, "", parseNamespaceFromDir("Beats-Development"))
 }
