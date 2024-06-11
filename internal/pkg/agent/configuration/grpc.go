@@ -20,7 +20,7 @@ type GRPCConfig struct {
 
 // DefaultGRPCConfig creates a default server configuration.
 func DefaultGRPCConfig() *GRPCConfig {
-	// When in an installation namepspace, bind to port zero to select a random free port to avoid
+	// When in an installation namespace, bind to port zero to select a random free port to avoid
 	// collisions with any already installed Elastic Agent. Ideally we'd always bind to port zero,
 	// but this would be breaking for users that had to manually whitelist the gRPC port in local
 	// firewall rules.
