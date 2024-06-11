@@ -780,7 +780,7 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	// the statePath when concatenated with the socked name is going to
 	// be smaller than 104 characters.
 	if len(statePath) > 75 {
-		statePath = utils.SocketFallbackDirectory
+		statePath = utils.SocketURLWithFallback(statePath, paths.TempDir())
 	}
 
 	topPath := filepath.Join(statePath, "data")

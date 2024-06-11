@@ -106,7 +106,7 @@ func TestContainerCMD(t *testing.T) {
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
-		Group: define.Default,
+		Group: "container",
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
@@ -164,7 +164,7 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
-		Group: define.Default,
+		Group: "container",
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
@@ -181,6 +181,15 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 	// We need a statePath that will make the unix socket path longer than 105 characters
 	// so we join the workdir and a 120 characters long string.
 	statePath := filepath.Join(agentFixture.WorkDir(), "de9a2a338c4fe10a466ee9fae57ce0c8a5b010dfcd6bd3f41d2c569ef5ed873193fd7d1966a070174f47f93ee667f921616c2d6d29efb6dbcc2b8b33")
+
+	// We know it will use the OS temp folder for the state path, so we try
+	// to clean it up at the end of the test.
+	t.Cleanup(func() {
+		defaultStatePath := "/tmp/elastic-agent"
+		if err := os.RemoveAll(defaultStatePath); err != nil {
+			t.Errorf("could not remove config path '%s': %s", defaultStatePath, err)
+		}
+	})
 
 	enrollmentToken := createPolicy(t, ctx, agentFixture, info)
 	env := []string{
