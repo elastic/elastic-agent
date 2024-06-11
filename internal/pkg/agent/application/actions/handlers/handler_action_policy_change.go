@@ -335,7 +335,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 }
 
 // eventLoggingHasChanged returns true if the output of the event logger has changed
-func (p *PolicyChangeHandler) eventLoggingHasChangsed(new *configuration.Configuration) bool {
+func (p *PolicyChangeHandler) eventLoggingHasChanged(new *configuration.Configuration) bool {
 	switch {
 	case p.config.Settings.EventLoggingConfig.ToFiles != new.Settings.EventLoggingConfig.ToFiles:
 		return true
