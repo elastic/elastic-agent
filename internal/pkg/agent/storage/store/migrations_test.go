@@ -78,10 +78,22 @@ func TestStoreMigrations(t *testing.T) {
 			ActionID:   "abc123",
 			ActionType: "POLICY_CHANGE",
 			Data: fleetapi.ActionPolicyChangeData{
-				Policy: map[string]interface{}{
+				Policy: map[string]any{
 					"hello":  "world",
 					"phi":    1.618,
-					"answer": 42.0, // YAML unmarshaller unmarshals int as float
+					"answer": 42.0,
+					"a_map": []any{
+						map[string]any{
+							"nested_map1": map[string]any{
+								"nested_map1_key1": "value1",
+								"nested_map1_key2": "value2",
+							}},
+						map[string]any{
+							"nested_map2": map[string]any{
+								"nested_map2_key1": "value1",
+								"nested_map2_key2": "value2",
+							}},
+					},
 				},
 			},
 		}
@@ -127,13 +139,25 @@ func TestStoreMigrations(t *testing.T) {
 			want := state{
 				Version: "1",
 				ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
-					ActionID:   "abc123",
+					ActionID:   "policy:POLICY-ID:1:1",
 					ActionType: "POLICY_CHANGE",
 					Data: fleetapi.ActionPolicyChangeData{
-						Policy: map[string]interface{}{
+						Policy: map[string]any{
 							"hello":  "world",
 							"phi":    1.618,
 							"answer": 42.0,
+							"a_map": []any{
+								map[string]any{
+									"nested_map1": map[string]any{
+										"nested_map1_key1": "value1",
+										"nested_map1_key2": "value2",
+									}},
+								map[string]any{
+									"nested_map2": map[string]any{
+										"nested_map2_key1": "value1",
+										"nested_map2_key2": "value2",
+									}},
+							},
 						},
 					},
 				}},
@@ -271,10 +295,22 @@ func TestStoreMigrations(t *testing.T) {
 				ActionID:   "abc123",
 				ActionType: "POLICY_CHANGE",
 				Data: fleetapi.ActionPolicyChangeData{
-					Policy: map[string]interface{}{
+					Policy: map[string]any{
 						"hello":  "world",
 						"phi":    1.618,
 						"answer": 42.0,
+						"a_map": []any{
+							map[string]any{
+								"nested_map1": map[string]any{
+									"nested_map1_key1": "value1",
+									"nested_map1_key2": "value2",
+								}},
+							map[string]any{
+								"nested_map2": map[string]any{
+									"nested_map2_key1": "value1",
+									"nested_map2_key2": "value2",
+								}},
+						},
 					},
 				},
 			}},
@@ -344,10 +380,22 @@ func TestStoreMigrations(t *testing.T) {
 				ActionID:   "abc123",
 				ActionType: "POLICY_CHANGE",
 				Data: fleetapi.ActionPolicyChangeData{
-					Policy: map[string]interface{}{
+					Policy: map[string]any{
 						"hello":  "world",
 						"phi":    1.618,
-						"answer": 42.0, // YAML unmarshaller unmarshals int as float
+						"answer": 42.0,
+						"a_map": []any{
+							map[string]any{
+								"nested_map1": map[string]any{
+									"nested_map1_key1": "value1",
+									"nested_map1_key2": "value2",
+								}},
+							map[string]any{
+								"nested_map2": map[string]any{
+									"nested_map2_key1": "value1",
+									"nested_map2_key2": "value2",
+								}},
+						},
 					},
 				},
 			}
@@ -387,13 +435,25 @@ func TestStoreMigrations(t *testing.T) {
 			want := state{
 				Version: "1",
 				ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
-					ActionID:   "abc123",
+					ActionID:   "policy:POLICY-ID:1:1",
 					ActionType: "POLICY_CHANGE",
 					Data: fleetapi.ActionPolicyChangeData{
-						Policy: map[string]interface{}{
+						Policy: map[string]any{
 							"hello":  "world",
 							"phi":    1.618,
 							"answer": 42.0,
+							"a_map": []any{
+								map[string]any{
+									"nested_map1": map[string]any{
+										"nested_map1_key1": "value1",
+										"nested_map1_key2": "value2",
+									}},
+								map[string]any{
+									"nested_map2": map[string]any{
+										"nested_map2_key1": "value1",
+										"nested_map2_key2": "value2",
+									}},
+							},
 						},
 					},
 				}},
@@ -459,10 +519,22 @@ func TestStoreMigrations(t *testing.T) {
 					ActionID:   "abc123",
 					ActionType: "POLICY_CHANGE",
 					Data: fleetapi.ActionPolicyChangeData{
-						Policy: map[string]interface{}{
+						Policy: map[string]any{
 							"hello":  "world",
 							"phi":    1.618,
 							"answer": 42.0,
+							"a_map": []any{
+								map[string]any{
+									"nested_map1": map[string]any{
+										"nested_map1_key1": "value1",
+										"nested_map1_key2": "value2",
+									}},
+								map[string]any{
+									"nested_map2": map[string]any{
+										"nested_map2_key1": "value1",
+										"nested_map2_key2": "value2",
+									}},
+							},
 						},
 					},
 				}},
