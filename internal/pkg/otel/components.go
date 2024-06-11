@@ -43,6 +43,7 @@ func components() (otelcol.Factories, error) {
 	factories.Receivers, err = receiver.MakeFactoryMap(
 		otlpreceiver.NewFactory(),
 		filelogreceiver.NewFactory(),
+		kubeletstatsreceiver.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
@@ -56,7 +57,6 @@ func components() (otelcol.Factories, error) {
 		transformprocessor.NewFactory(),
 		filterprocessor.NewFactory(),
 		k8sattributesprocessor.NewFactory(),
-		kubeletstatsreceiver.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
