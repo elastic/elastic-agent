@@ -189,7 +189,6 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 				binaryMapping[component.ID] = component.BinaryName()
 			}
 		}
-		// TODO: how do we handle endpoint config?
 		monitorCfg, err := monitorFn(cfg, components, binaryMapping, map[string]uint64{})
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring config: %w", err)
@@ -352,7 +351,7 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 	}
 
 	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo)
+	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
