@@ -47,7 +47,7 @@ pr: https://github.com/elastic/elastic-agent/pull/823
 Prerequisites:
 - installed [mage](https://github.com/magefile/mage)
 - [Docker](https://docs.docker.com/get-docker/)
-- [beats](https://github.com/elastic/beats) to pre-exist at ../beats if, and only if, packaging with `EXTERNAL=false` to package the beats as well
+- [beats](https://github.com/elastic/beats) to pre-exist in the parent folder of the local Git repository checkout if, and only if, packaging with `EXTERNAL=false` to package the beats as well
 - [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool) to add changelog fragments for changelog generation
 
 To build a local version of the agent for development, run the command below. The following platforms are supported:
