@@ -65,6 +65,7 @@ func newManagedConfigManager(
 	storeSaver storage.Store,
 	runtime *runtime.Manager,
 	fleetInitTimeout time.Duration,
+	topPath string,
 	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
@@ -86,7 +87,7 @@ func newManagedConfigManager(
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
 
-	actionDispatcher, err := dispatcher.New(log, handlers.NewDefault(log), actionQueue)
+	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
 	}
@@ -392,6 +393,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		&fleetapi.ActionDiagnostics{},
 		handlers.NewDiagnostics(
 			m.log,
+			paths.Top(), // TODO: stop using global state
 			m.coord,
 			m.cfg.Settings.MonitoringConfig.Diagnostics.Limit,
 			uploader.New(m.agentInfo.AgentID(), m.client, m.cfg.Settings.MonitoringConfig.Diagnostics.Uploader),

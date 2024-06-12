@@ -545,8 +545,12 @@ func TestToComponents(t *testing.T) {
 					InputType:  "endpoint",
 					OutputType: "elasticsearch",
 					ID:         "endpoint-default",
-					InputSpec:  &InputRuntimeSpec{},
-					Err:        NewErrInputRuntimeCheckFail("Elastic Defend doesn't support RHEL7 on arm64"),
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "endpoint",
+						BinaryName: "endpoint-security",
+						BinaryPath: filepath.Join("..", "..", "specs", "endpoint-security"),
+					},
+					Err: NewErrInputRuntimeCheckFail("Elastic Defend doesn't support RHEL7 on arm64"),
 					Units: []Unit{
 						{
 							ID:       "endpoint-default",

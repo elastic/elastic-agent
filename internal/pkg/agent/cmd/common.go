@@ -77,6 +77,8 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newUpgradeCommandWithArgs(args, streams))
 	cmd.AddCommand(newEnrollCommandWithArgs(args, streams))
 	cmd.AddCommand(newInspectCommandWithArgs(args, streams))
+	cmd.AddCommand(newPrivilegedCommandWithArgs(args, streams))
+	cmd.AddCommand(newUnprivilegedCommandWithArgs(args, streams))
 	cmd.AddCommand(newWatchCommandWithArgs(args, streams))
 	cmd.AddCommand(newContainerCommand(args, streams))
 	cmd.AddCommand(newStatusCommand(args, streams))
