@@ -24,20 +24,8 @@ func TestInstallNamespace(t *testing.T) {
 	assert.Equal(t, filepath.Join(basePath, "Elastic", fmt.Sprintf(installDirNamespaceFmt, namespace)), InstallPath(basePath))
 	assert.Equal(t, fmt.Sprintf(serviceNameNamespaceFmt, namespace), ServiceName())
 	assert.Equal(t, fmt.Sprintf(serviceDisplayNameNamespaceFmt, namespace), ServiceDisplayName())
-
-	// No shell wrapper path on Windows.
-	if shellWrapperPathNamespaceFmt == "" {
-		assert.Empty(t, ShellWrapperPath())
-	} else {
-		assert.Equal(t, fmt.Sprintf(shellWrapperPathNamespaceFmt, namespace), ShellWrapperPath())
-	}
-
-	// No control sicket run symlink on Windows.
-	if controlSocketRunSymlinkNamespaceFmt == "" {
-		assert.Empty(t, ShellWrapperPath())
-	} else {
-		assert.Equal(t, fmt.Sprintf(controlSocketRunSymlinkNamespaceFmt, namespace), ControlSocketRunSymlink(namespace))
-	}
+	assert.Equal(t, shellWrapperPathForNamespace(namespace), ShellWrapperPath())
+	assert.Equal(t, controlSocketRunSymlinkForNamespace(namespace), ControlSocketRunSymlink(namespace))
 }
 
 func TestInstallNoNamespace(t *testing.T) {

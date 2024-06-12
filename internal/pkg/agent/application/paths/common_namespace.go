@@ -114,12 +114,9 @@ func ShellWrapperPath() string {
 	namespace := InstallNamespace()
 	if namespace == "" {
 		return shellWrapperPath
-	} else if shellWrapperPathNamespaceFmt == "" {
-		// No shell wrapper path on Windows.
-		return ""
 	}
 
-	return fmt.Sprintf(shellWrapperPathNamespaceFmt, strings.ToLower(namespace))
+	return shellWrapperPathForNamespace(strings.ToLower(namespace))
 }
 
 // ControlSocketRunSymlink returns the shell wrapper path accounting for any namespace.
@@ -127,10 +124,7 @@ func ShellWrapperPath() string {
 func ControlSocketRunSymlink(namespace string) string {
 	if namespace == "" {
 		return controlSocketRunSymlink
-	} else if controlSocketRunSymlinkNamespaceFmt == "" {
-		// No control socket run symlink on Windows.
-		return ""
 	}
 
-	return fmt.Sprintf(controlSocketRunSymlinkNamespaceFmt, namespace)
+	return controlSocketRunSymlinkForNamespace(namespace)
 }

@@ -21,20 +21,30 @@ const (
 	DefaultBasePath = `C:\Program Files`
 
 	// controlSocketRunSymlink is not created on Windows.
-	controlSocketRunSymlink             = ""
-	controlSocketRunSymlinkNamespaceFmt = ""
+	controlSocketRunSymlink = ""
 
 	// serviceName is the service name when installed.
 	serviceName             = "Elastic Agent"
 	serviceNameNamespaceFmt = "Elastic Agent - %s"
 
 	// shellWrapperPath is the path to the installed shell wrapper.
-	shellWrapperPath             = ""
-	shellWrapperPathNamespaceFmt = ""
+	shellWrapperPath = ""
 
 	// ShellWrapper is the wrapper that is installed.
 	ShellWrapperFmt = "" // no wrapper on Windows
 )
+
+// shellWrapperPathForNamespace is a helper to work around not being able to use fmt.Sprintf
+// unconditionally since shellWrapperPath is empty on Windows.
+func shellWrapperPathForNamespace(namespace string) string {
+	return ""
+}
+
+// controlSocketRunSymlinkForNamespace is a helper to work around not being able to use fmt.Sprintf
+// unconditionally since controlSocketRunSymlink is empty on Windows.
+func controlSocketRunSymlinkForNamespace(namespace string) string {
+	return ""
+}
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
 func ArePathsEqual(expected, actual string) bool {

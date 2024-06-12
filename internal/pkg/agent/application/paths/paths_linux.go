@@ -6,6 +6,10 @@
 
 package paths
 
+import (
+	"fmt"
+)
+
 const (
 	// BinaryName is the name of the installed binary.
 	BinaryName = "elastic-agent"
@@ -33,6 +37,18 @@ exec %s/elastic-agent $@
 	controlSocketRunSymlink             = "/run/elastic-agent.sock"
 	controlSocketRunSymlinkNamespaceFmt = "/run/elastic-agent-%s.sock"
 )
+
+// shellWrapperPathForNamespace is a helper to work around not being able to use fmt.Sprintf
+// unconditionally since shellWrapperPathNamespaceFmt is empty on Windows.
+func shellWrapperPathForNamespace(namespace string) string {
+	return fmt.Sprintf(shellWrapperPathNamespaceFmt, namespace)
+}
+
+// controlSocketRunSymlinkForNamespace is a helper to work around not being able to use fmt.Sprintf
+// unconditionally since controlSocketRunSymlinkNamespaceFmt is empty on Windows.
+func controlSocketRunSymlinkForNamespace(namespace string) string {
+	return fmt.Sprintf(controlSocketRunSymlinkNamespaceFmt, namespace)
+}
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
 func ArePathsEqual(expected, actual string) bool {
