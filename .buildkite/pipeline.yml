@@ -233,12 +233,12 @@ steps:
   #               env:
   #                 - GH_VERSION=2.4.0
 
-  # Trigger for pull requests c
+  # Trigger for pull requests
   - label: "Trigger Integration tests for Pull request"
 
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
-      build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /extended/
+      build.env("GITHUB_PR_TRIGGER_COMMENT") =~ .*extended.*
 
     plugins:
       - monorepo-diff#v1.0.1:
