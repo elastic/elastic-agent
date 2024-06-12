@@ -39,6 +39,10 @@ inputs:
         - "gc_percent=${METRICBEAT_GOGC:100}"
         - "-E"
         - "metricbeat.config.modules.enabled=false"
+        - "-E"
+        - "logging.event_data.to_stderr=true"
+        - "-E"
+        - "logging.event_data.to_files=false"
   - name: docker/metrics
     description: "Docker metrics"
     platforms: *platforms

@@ -34,3 +34,7 @@ inputs:
         - "logging.to_stderr=true"
         - "-E"
         - "gc_percent=${OSQUERYBEAT_GOGC:100}"
+        - "-E"
+        - "logging.event_data.to_stderr=true"
+        - "-E"
+        - "logging.event_data.to_files=false"

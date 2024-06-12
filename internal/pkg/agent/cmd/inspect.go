@@ -252,41 +252,10 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return err
 	}
 
-	// Load the requirements before trying to load the configuration. These should always load
-	// even if the configuration is wrong.
-	platform, err := component.LoadPlatformDetail()
+	comps, err := getComponentsFromPolicy(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
-		return fmt.Errorf("failed to gather system information: %w", err)
-	}
-	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
-	if err != nil {
-		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
-	}
-
-	isAdmin, err := utils.HasRoot()
-	if err != nil {
-		return fmt.Errorf("error checking for root/Administrator privileges: %w", err)
-	}
-
-	m, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
-	if err != nil {
+		// error already includes the context
 		return err
-	}
-
-	monitorFn, err := getMonitoringFn(ctx, m)
-	if err != nil {
-		return fmt.Errorf("failed to get monitoring: %w", err)
-	}
-
-	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
-	if err != nil {
-		return fmt.Errorf("could not load agent info: %w", err)
-	}
-
-	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo)
-	if err != nil {
-		return fmt.Errorf("failed to render components: %w", err)
 	}
 
 	// Hide configuration unless toggled on.
@@ -347,6 +316,47 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 	}
 
 	return printComponents(allowed, blocked, streams)
+}
+
+func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath string, variablesWait time.Duration, platformModifiers ...component.PlatformModifier) ([]component.Component, error) {
+	// Load the requirements before trying to load the configuration. These should always load
+	// even if the configuration is wrong.
+	platform, err := component.LoadPlatformDetail(platformModifiers...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to gather system information: %w", err)
+	}
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
+	}
+
+	isAdmin, err := utils.HasRoot()
+	if err != nil {
+		return nil, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
+	}
+
+	m, lvl, err := getConfigWithVariables(ctx, l, cfgPath, variablesWait, !isAdmin)
+	if err != nil {
+		return nil, err
+	}
+
+	monitorFn, err := getMonitoringFn(ctx, m)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get monitoring: %w", err)
+	}
+
+	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
+	if err != nil {
+		return nil, fmt.Errorf("could not load agent info: %w", err)
+	}
+
+	// Compute the components from the computed configuration.
+	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render components: %w", err)
+	}
+
+	return comps, nil
 }
 
 func getMonitoringFn(ctx context.Context, cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {

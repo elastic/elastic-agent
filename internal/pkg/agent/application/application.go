@@ -120,7 +120,6 @@ func New(
 	runtime, err := runtime.NewManager(
 		log,
 		baseLogger,
-		cfg.Settings.GRPC.String(),
 		agentInfo,
 		tracer,
 		monitor,
@@ -177,7 +176,8 @@ func New(
 				EndpointSignedComponentModifier(),
 			)
 
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, upgrader)
+			// TODO: stop using global state
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
