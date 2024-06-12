@@ -238,7 +238,7 @@ steps:
 
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
-      build.env("GITHUB_PR_TRIGGER_COMMENT") =~ .*extended.*
+      build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
 
     plugins:
       - monorepo-diff#v1.0.1:
