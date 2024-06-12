@@ -709,6 +709,11 @@ func TestProxyURL(t *testing.T) {
 			err = fixture.EnsurePrepared(ctx)
 			require.NoError(t, err, "SetupTest: fixture.Prepare failed")
 
+			privileged := false
+			if runtime.GOOS == "windows" {
+				privileged = true
+			}
+
 			out, err := fixture.Install(
 				ctx,
 				&integrationtest.InstallOpts{
@@ -719,6 +724,7 @@ func TestProxyURL(t *testing.T) {
 					CertificateAuthorities: args.certificateAuthorities,
 					Certificate:            args.certificate,
 					Key:                    args.key,
+					Privileged:             privileged,
 					EnrollOpts: integrationtest.EnrollOpts{
 						URL:             args.enrollmentURL,
 						EnrollmentToken: "anythingWillDO",
