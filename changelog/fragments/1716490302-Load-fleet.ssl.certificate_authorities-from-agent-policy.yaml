@@ -17,7 +17,7 @@ summary: Load Certificate Authorities from Fleet policy
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: >
-  Loads Certificate Authorities (CA) file paths from Fleet policy's key `fleet.ssl.certificate_authorities` and pass it to
+  Loads Certificate Authorities (CA) from Fleet policy's key `fleet.ssl.certificate_authorities` and pass it to
   elastic-agent HTTP client used for connecting to Fleet server. The CAs will be used to validate server or proxy certificates
   presented when connecting to `HTTPs` endpoints.
 
