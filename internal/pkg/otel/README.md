@@ -31,6 +31,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| k8sclusterreceiver | v0.102.0|
 | filelogreceiver | v0.102.0|
 | kubeletstatsreceiver | v0.102.0|
 | otlpreceiver | v0.102.1|
