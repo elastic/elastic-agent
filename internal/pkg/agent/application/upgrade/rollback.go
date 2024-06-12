@@ -146,13 +146,6 @@ func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error
 	}
 
 	cmd := invokeCmd(agentExecutable)
-	defer func() {
-		if cmd.Process != nil {
-			log.Infof("releasing watcher %v", cmd.Process.Pid)
-			_ = cmd.Process.Release()
-		}
-	}()
-
 	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start Upgrade Watcher: %w", err)
@@ -160,9 +153,17 @@ func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error
 
 	upgradeWatcherPID := cmd.Process.Pid
 	agentPID := os.Getpid()
+
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			log.Infow("Upgrade Watcher exited with error", "agent.upgrade.watcher.process.pid", "agent.process.pid", agentPID, upgradeWatcherPID, "error.message", err)
+		}
+	}()
+
 	log.Infow("Upgrade Watcher invoked", "agent.upgrade.watcher.process.pid", upgradeWatcherPID, "agent.process.pid", agentPID)
 
 	return cmd, nil
+
 }
 
 func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) error {

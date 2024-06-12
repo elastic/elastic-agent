@@ -37,6 +37,7 @@ func TestGetSupported(t *testing.T) {
 				Distro: Ubuntu,
 			},
 			Results: []SupportedOS{
+				UbuntuAMD64_2404,
 				UbuntuAMD64_2204,
 				UbuntuAMD64_2004,
 			},

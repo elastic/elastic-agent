@@ -121,7 +121,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		success1 := &mockHandler{}
@@ -163,7 +163,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		action := &mockOtherAction{}
@@ -187,7 +187,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		def := &mockHandler{}
 		queue := &mockQueue{}
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		err = d.Register(&mockAction{}, success1)
@@ -207,7 +207,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 		queue.On("Add", mock.Anything, mock.Anything).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -242,7 +242,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -282,7 +282,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{action1}).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -309,7 +309,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -335,7 +335,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 		queue.On("Add", mock.Anything, mock.Anything).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockRetryableAction{}, def)
 		require.NoError(t, err)
@@ -369,7 +369,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -412,7 +412,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("Save").Return(nil).Times(2)
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Times(2)
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -464,7 +464,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 		queue.On("CancelType", mock.Anything).Return(1).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		var gotDetails *details.Details
@@ -514,7 +514,7 @@ func TestActionDispatcher(t *testing.T) {
 			Once()
 		queue.On("CancelType", mock.Anything).Return(1).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		var gotDetails *details.Details
@@ -556,7 +556,7 @@ func TestActionDispatcher(t *testing.T) {
 			Once()
 		queue.On("CancelType", mock.Anything).Return(1).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		wantDetail := &details.Details{
@@ -598,7 +598,7 @@ func TestActionDispatcher(t *testing.T) {
 			Once()
 		queue.On("CancelType", mock.Anything).Return(1).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		var gotDetails *details.Details
@@ -628,7 +628,7 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 
 	t.Run("no more attmpts", func(t *testing.T) {
 		queue := &mockQueue{}
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		action := &mockRetryableAction{}
@@ -645,7 +645,7 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("Add", mock.Anything, mock.Anything).Once()
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		action := &mockRetryableAction{}
@@ -734,7 +734,7 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 	def := &mockHandler{}
 
 	queue := &mockQueue{}
-	d, err := New(nil, def, queue)
+	d, err := New(nil, t.TempDir(), def, queue)
 	require.NoError(t, err, "could not create dispatcher")
 
 	for name, test := range cases {

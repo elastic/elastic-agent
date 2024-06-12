@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -201,6 +203,35 @@ func CreateAPIKey(ctx context.Context, client elastictransport.Interface, req AP
 	return parsed, nil
 }
 
+func CreateServiceToken(ctx context.Context, client elastictransport.Interface, service string) (string, error) {
+	req := esapi.SecurityCreateServiceTokenRequest{
+		Namespace: "elastic",
+		Service:   service,
+		Name:      uuid.New().String(), // FIXME(michel-laterman): We need to specify a random name until an upstream issue is fixed: https://github.com/elastic/go-elasticsearch/issues/861
+	}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return "", fmt.Errorf("error creating service token: %w", err)
+	}
+	defer resp.Body.Close()
+	resultBuf, err := handleResponseRaw(resp)
+	if err != nil {
+		return "", fmt.Errorf("error handling HTTP response: %w", err)
+	}
+
+	var parsed struct {
+		Token struct {
+			Value string `json:"value"`
+		} `json:"token"`
+	}
+	err = json.Unmarshal(resultBuf, &parsed)
+	if err != nil {
+		return "", fmt.Errorf("error unmarshaling json response: %w", err)
+	}
+	return parsed.Token.Value, nil
+
+}
+
 // FindMatchingLogLines returns any logs with message fields that match the given line
 func FindMatchingLogLines(ctx context.Context, client elastictransport.Interface, namespace, line string) (Documents, error) {
 	return FindMatchingLogLinesWithContext(ctx, client, namespace, line)
@@ -375,21 +406,17 @@ func CheckForErrorsInLogs(ctx context.Context, client elastictransport.Interface
 // CheckForErrorsInLogsWithContext checks to see if any error-level lines exist
 // excludeStrings can be used to remove any particular error strings from logs
 func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictransport.Interface, namespace string, excludeStrings []string) (Documents, error) {
-	queryRaw := map[string]interface{}{
-		"query": map[string]interface{}{
-			"bool": map[string]interface{}{
-				"must": []map[string]interface{}{
-					{
-						"match": map[string]interface{}{
-							"log.level": "error",
-						},
-					},
-					{
-						"term": map[string]interface{}{
-							"data_stream.namespace": map[string]interface{}{
-								"value": namespace,
-							},
-						},
+	filters := map[string]interface{}{
+		"must": []map[string]interface{}{
+			{
+				"match": map[string]interface{}{
+					"log.level": "error",
+				},
+			},
+			{
+				"term": map[string]interface{}{
+					"data_stream.namespace": map[string]interface{}{
+						"value": namespace,
 					},
 				},
 			},
@@ -405,27 +432,14 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 				},
 			})
 		}
-		queryRaw = map[string]interface{}{
-			"query": map[string]interface{}{
-				"bool": map[string]interface{}{
-					"must": []map[string]interface{}{
-						{
-							"match": map[string]interface{}{
-								"log.level": "error",
-							},
-						},
-						{
-							"term": map[string]interface{}{
-								"data_stream.namespace": map[string]interface{}{
-									"value": namespace,
-								},
-							},
-						},
-					},
-					"must_not": excludeStatements,
-				},
-			},
-		}
+
+		filters["must_not"] = excludeStatements
+	}
+
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": filters,
+		},
 	}
 
 	var buf bytes.Buffer

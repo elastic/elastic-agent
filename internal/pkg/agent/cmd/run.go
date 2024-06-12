@@ -159,7 +159,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	if cfg.Settings.LoggingConfig != nil {
 		logLvl = cfg.Settings.LoggingConfig.Level
 	}
-	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
+	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, true)
 	if err != nil {
 		return err
 	}
@@ -271,7 +271,11 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	if err != nil {
 		return logReturn(l, err)
 	}
-	defer composable.Close()
+	defer func() {
+		if composable != nil {
+			composable.Close()
+		}
+	}()
 
 	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
@@ -547,9 +551,18 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	if err != nil {
 		return nil, err
 	}
-	err = c.Execute(ctx, cli.NewIOStreams())
-	if err != nil {
-		return nil, err
+	// perform the enrollment in a loop, it should keep trying to enroll no matter what
+	// the enrollCmd has built in backoff so no need to wrap this in its own backoff as well
+	for {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		err = c.Execute(ctx, cli.NewIOStreams())
+		if err == nil {
+			// enrollment was successful
+			break
+		}
+		logger.Error(fmt.Errorf("failed to perform delayed enrollment (will try again): %w", err))
 	}
 	err = os.Remove(enrollPath)
 	if err != nil {
