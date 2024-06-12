@@ -971,9 +971,5 @@ func isContainer(detail component.PlatformDetail) component.PlatformDetail {
 func isStatePathTooLong(statePath string) bool {
 	// This replicates the logic from `setPaths`
 	socketPath := filepath.Join(statePath, "data", paths.ControlSocketName)
-	if len(socketPath) > 107 {
-		return true
-	}
-
-	return false
+	return len(socketPath) > 107
 }
