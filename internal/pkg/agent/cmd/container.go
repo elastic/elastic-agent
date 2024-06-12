@@ -34,7 +34,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
-	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -772,15 +771,8 @@ func logToStderr(cfg *configuration.Configuration) {
 
 func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
 	statePath = envWithDefault(statePath, "STATE_PATH")
-	if statePath == "" {
+	if isStatePathTooLong(statePath) || statePath == "" {
 		statePath = defaultStateDirectory
-	}
-
-	// A Unix socket path needs to be < 104 characters long, so we ensure
-	// the statePath when concatenated with the socked name is going to
-	// be smaller than 104 characters.
-	if len(statePath) > 75 {
-		statePath = utils.SocketURLWithFallback(statePath, paths.TempDir())
 	}
 
 	topPath := filepath.Join(statePath, "data")
@@ -970,4 +962,18 @@ func envIntWithDefault(defVal string, keys ...string) (int, error) {
 func isContainer(detail component.PlatformDetail) component.PlatformDetail {
 	detail.OS = component.Container
 	return detail
+}
+
+// isStatePathTooLong returns true if the final Unix socket path
+// will be too long and needs to be shortened.
+//
+// Source: https://www.man7.org/linux/man-pages/man7/unix.7.html
+func isStatePathTooLong(statePath string) bool {
+	// This replicates the logic from `setPaths`
+	socketPath := filepath.Join(statePath, "data", paths.ControlSocketName)
+	if len(socketPath) > 107 {
+		return true
+	}
+
+	return false
 }

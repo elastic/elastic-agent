@@ -167,62 +167,82 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-
-	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
 
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
 		t.Fatalf("could not get Fleet URL: %s", err)
 	}
 
-	// We need a statePath that will make the unix socket path longer than 105 characters
-	// so we join the workdir and a 120 characters long string.
-	statePath := filepath.Join(agentFixture.WorkDir(), "de9a2a338c4fe10a466ee9fae57ce0c8a5b010dfcd6bd3f41d2c569ef5ed873193fd7d1966a070174f47f93ee667f921616c2d6d29efb6dbcc2b8b33")
-
-	// We know it will use the OS temp folder for the state path, so we try
-	// to clean it up at the end of the test.
-	t.Cleanup(func() {
-		defaultStatePath := "/tmp/elastic-agent"
-		if err := os.RemoveAll(defaultStatePath); err != nil {
-			t.Errorf("could not remove config path '%s': %s", defaultStatePath, err)
-		}
-	})
-
-	enrollmentToken := createPolicy(t, ctx, agentFixture, info)
-	env := []string{
-		"FLEET_ENROLL=1",
-		"FLEET_URL=" + fleetURL,
-		"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
-		// As the agent isn't built for a container, it's upgradable, triggering
-		// the start of the upgrade watcher. If `STATE_PATH` isn't set, the
-		// upgrade watcher will commence from a different path within the
-		// container, distinct from the current execution path.
-		"STATE_PATH=" + statePath,
+	testCases := map[string]struct {
+		statePath         string
+		expectedStatePath string
+		expectError       bool
+	}{
+		"small path": { // Use the set path
+			statePath:         filepath.Join(os.TempDir(), "foo", "bar"),
+			expectedStatePath: filepath.Join(os.TempDir(), "foo", "bar"),
+		},
+		"no path set": { // Use the default path
+			statePath:         "",
+			expectedStatePath: "/usr/share/elastic-agent/state",
+		},
+		"107 characters path": { // Longest path that still works for creating a unix socket
+			statePath:         "/tmp/tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+			expectedStatePath: "/tmp/tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+		},
+		"long path": { // This will falback to the default path
+			statePath:         filepath.Join(os.TempDir(), "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			expectedStatePath: "/usr/share/elastic-agent/state",
+		},
 	}
 
-	cmd := prepareContainerCMD(t, ctx, agentFixture, info, env)
-	t.Logf(">> running binary with: %v", cmd.Args)
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("error running container cmd: %s", err)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err)
+
+			enrollmentToken := createPolicy(t, ctx, agentFixture, info)
+			env := []string{
+				"FLEET_ENROLL=1",
+				"FLEET_URL=" + fleetURL,
+				"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
+				"STATE_PATH=" + tc.statePath,
+			}
+
+			cmd := prepareContainerCMD(t, ctx, agentFixture, info, env)
+			t.Logf(">> running binary with: %v", cmd.Args)
+			if err := cmd.Start(); err != nil {
+				t.Fatalf("error running container cmd: %s", err)
+			}
+			agentOutput := cmd.Stderr.(*strings.Builder)
+
+			require.Eventuallyf(t, func() bool {
+				// This will return errors until it connects to the agent,
+				// they're mostly noise because until the agent starts running
+				// we will get connection errors. If the test fails
+				// the agent logs will be present in the error message
+				// which should help to explain why the agent was not
+				// healthy.
+				err = agentFixture.IsHealthy(ctx)
+				return err == nil
+			},
+				1*time.Minute, time.Second,
+				"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
+				err, agentOutput,
+			)
+
+			t.Cleanup(func() {
+				_ = os.RemoveAll(tc.expectedStatePath)
+			})
+
+			// Now that the Elastic-Agent is healthy, check that the control socket path
+			// is the expected one
+			expectedSocketPath := filepath.Join(tc.expectedStatePath, "data", "elastic-agent.sock")
+			if _, err := os.Stat(expectedSocketPath); err != nil {
+				t.Errorf("cannot stat expected socket ('%s'): %s", expectedSocketPath, err)
+			}
+		})
 	}
-
-	agentOutput := cmd.Stderr.(*strings.Builder)
-
-	require.Eventuallyf(t, func() bool {
-		// This will return errors until it connects to the agent,
-		// they're mostly noise because until the agent starts running
-		// we will get connection errors. If the test fails
-		// the agent logs will be present in the error message
-		// which should help to explain why the agent was not
-		// healthy.
-		err = agentFixture.IsHealthy(ctx)
-		return err == nil
-	},
-		5*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
 }
