@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -20,8 +21,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 )
 
-func TestAgentIDLoad(t *testing.T) {
-
+func TestAgentIDStandaloneWorks(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		// vault requres extra perms on mac
+		t.Skip()
+	}
 	// create a new encrypted disk store
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
