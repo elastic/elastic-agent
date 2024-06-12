@@ -37,6 +37,10 @@ inputs:
         - "gc_percent=${AUDITBEAT_GOGC:100}"
         - "-E"
         - "auditbeat.config.modules.enabled=false"
+        - "-E"
+        - "logging.event_data.to_stderr=true"
+        - "-E"
+        - "logging.event_data.to_files=false"
   - name: audit/file_integrity
     description: "Audit File Integrity"
     platforms: *platforms

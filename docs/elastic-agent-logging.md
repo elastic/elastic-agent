@@ -44,6 +44,16 @@ configuration is:
  - ECS/JSON encoded
  - UTC timestamps
 
+There is also a second file output for events that is configured via
+`agent.logging.event_data`. It shares the same log level as the main
+logger and can only be configured for standalone agents. For
+Fleet-Managed agents it will always use the default values:
+ - 5Mb per log file
+ - Maximum of 2 log files
+ - Do not rotate on startup
+ - ECS/JSON encoded
+ - UTC timestamps
+
 ## Default logging
 The default logger is the easiest to discover because it's user
 configurable, logs to the Agent's root directory and can output to

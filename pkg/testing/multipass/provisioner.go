@@ -54,7 +54,7 @@ func (p *provisioner) Supported(os define.OS) bool {
 	if os.Distro != Ubuntu {
 		return false
 	}
-	if os.Version != "20.04" && os.Version != "22.04" {
+	if os.Version != "20.04" && os.Version != "22.04" && os.Version != "24.04" {
 		return false
 	}
 	// multipass only supports the same architecture of the host

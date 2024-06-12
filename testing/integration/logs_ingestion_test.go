@@ -12,8 +12,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/http/httputil"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -23,8 +25,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hectane/go-acl"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -37,6 +37,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+
+	"github.com/rcrowley/go-metrics"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	mockes "github.com/elastic/mock-es/pkg/api"
 )
 
 func TestLogIngestionFleetManaged(t *testing.T) {
@@ -238,6 +244,238 @@ func TestRpmLogIngestFleetManaged(t *testing.T) {
 	t.Run("Normal logs with flattened data_stream are shipped", func(t *testing.T) {
 		testFlattenedDatastreamFleetPolicy(t, ctx, info, policy)
 	})
+}
+
+var eventLogConfig = `
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - %s
+    protocol: http
+    preset: balanced
+
+inputs:
+  - type: filestream
+    id: your-input-id
+    streams:
+      - id: your-filestream-stream-id
+        data_stream:
+          dataset: generic
+        paths:
+          - %s
+
+# Disable monitoring so there are less Beats running and less logs being generated.
+agent.monitoring:
+  enabled: false
+  logs: false
+  metrics: false
+  pprof.enabled: false
+  use_output: default
+
+# Needed if you already have an Elastic-Agent running on your machine
+# That's very helpful for running the tests locally
+agent.monitoring:
+  http:
+    enabled: false
+    port: 7002
+agent.grpc:
+  address: localhost
+  port: 7001
+`
+
+func TestEventLogFile(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: Default,
+		Stack: &define.Stack{},
+		Local: true,
+		Sudo:  false,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(
+		t,
+		context.Background(),
+		time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	esURL := startMockES(t)
+
+	logFilepath := path.Join(t.TempDir(), t.Name())
+	generateLogFile(t, logFilepath, time.Millisecond*100, 1)
+
+	cfg := fmt.Sprintf(eventLogConfig, esURL, logFilepath)
+
+	if err := agentFixture.Prepare(ctx); err != nil {
+		t.Fatalf("cannot prepare Elastic-Agent fixture: %s", err)
+	}
+
+	if err := agentFixture.Configure(ctx, []byte(cfg)); err != nil {
+		t.Fatalf("cannot configure Elastic-Agent fixture: %s", err)
+	}
+
+	cmd, err := agentFixture.PrepareAgentCommand(ctx, nil)
+	if err != nil {
+		t.Fatalf("cannot prepare Elastic-Agent command: %s", err)
+	}
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("could not start Elastic-Agent: %s", err)
+	}
+
+	// Make sure the Elastic-Agent process is not running before
+	// exiting the test
+	t.Cleanup(func() {
+		// Ignore the error because we cancelled the context,
+		// and that always returns an error
+		_ = cmd.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	// Now the Elastic-Agent is running, so validate the Event log file.
+	// Because the path changes based on the Elastic-Agent version, we
+	// use glob to find the file
+	var logFileName string
+	require.Eventually(t, func() bool {
+		// We ignore this error because the folder might not be there.
+		// Once the folder and file are there, then this call should succeed
+		// and we can read the file.
+		glob := filepath.Join(
+			agentFixture.WorkDir(),
+			"data", "elastic-agent-*", "logs", "events", "*")
+		files, err := filepath.Glob(glob)
+		if err != nil {
+			t.Fatalf("could not scan for the events log file: %s", err)
+		}
+
+		if len(files) == 1 {
+			logFileName = files[0]
+			return true
+		}
+
+		return false
+
+	}, time.Minute, time.Second, "could not find event log file")
+
+	logEntryBytes, err := os.ReadFile(logFileName)
+	if err != nil {
+		t.Fatalf("cannot read file '%s': %s", logFileName, err)
+	}
+
+	logEntry := string(logEntryBytes)
+	expectedStr := "Cannot index event publisher.Event"
+	if !strings.Contains(logEntry, expectedStr) {
+		t.Errorf(
+			"did not find the expected log entry ('%s') in the events log file",
+			expectedStr)
+		t.Log("Event log file contents:")
+		t.Log(logEntry)
+	}
+
+	// The diagnostics command is already tested by another test,
+	// here we just want to validate the events log behaviour
+	// extract the zip file into a temp folder
+	expectedLogFiles, expectedEventLogFiles := getLogFilenames(
+		t,
+		filepath.Join(agentFixture.WorkDir(),
+			"data",
+			"elastic-agent-*",
+			"logs"))
+
+	collectDiagnosticsAndVeriflyLogs(
+		t,
+		ctx,
+		agentFixture,
+		[]string{"diagnostics", "collect"},
+		append(expectedLogFiles, expectedEventLogFiles...))
+
+	collectDiagnosticsAndVeriflyLogs(
+		t,
+		ctx,
+		agentFixture,
+		[]string{"diagnostics", "collect", "--exclude-events"},
+		expectedLogFiles)
+}
+
+func collectDiagnosticsAndVeriflyLogs(
+	t *testing.T,
+	ctx context.Context,
+	agentFixture *atesting.Fixture,
+	cmd,
+	expectedFiles []string) {
+
+	diagPath, err := agentFixture.ExecDiagnostics(ctx, cmd...)
+	if err != nil {
+		t.Fatalf("could not execute diagnostics excluding events log: %s", err)
+	}
+
+	extractionDir := t.TempDir()
+	extractZipArchive(t, diagPath, extractionDir)
+	diagLogFiles, diagEventLogFiles := getLogFilenames(
+		t,
+		filepath.Join(extractionDir, "logs", "elastic-agent*"))
+	allLogs := append(diagLogFiles, diagEventLogFiles...)
+
+	require.ElementsMatch(
+		t,
+		expectedFiles,
+		allLogs,
+		"expected: 'listA', got: 'listB'")
+}
+
+func getLogFilenames(
+	t *testing.T,
+	basepath string,
+) (logFiles, eventLogFiles []string) {
+
+	logFilesGlob := filepath.Join(basepath, "*.ndjson")
+	logFilesPath, err := filepath.Glob(logFilesGlob)
+	if err != nil {
+		t.Fatalf("could not get log file names:%s", err)
+	}
+
+	for _, f := range logFilesPath {
+		logFiles = append(logFiles, filepath.Base(f))
+	}
+
+	eventLogFilesGlob := filepath.Join(basepath, "events", "*.ndjson")
+	eventLogFilesPath, err := filepath.Glob(eventLogFilesGlob)
+	if err != nil {
+		t.Fatalf("could not get log file names:%s", err)
+	}
+
+	for _, f := range eventLogFilesPath {
+		eventLogFiles = append(eventLogFiles, filepath.Base(f))
+	}
+
+	return logFiles, eventLogFiles
+}
+
+func startMockES(t *testing.T) string {
+	registry := metrics.NewRegistry()
+	uid := uuid.New()
+	clusterUUID := uuid.New().String()
+
+	mux := http.NewServeMux()
+	mux.Handle("/", mockes.NewAPIHandler(
+		uid,
+		clusterUUID,
+		registry,
+		time.Now().Add(time.Hour), 0, 0, 100, 0))
+
+	s := httptest.NewServer(mux)
+	t.Cleanup(s.Close)
+
+	return s.URL
 }
 
 func testMonitoringLogsAreShipped(
