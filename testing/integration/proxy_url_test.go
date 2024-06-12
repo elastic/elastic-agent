@@ -717,17 +717,17 @@ func TestProxyURL(t *testing.T) {
 			out, err := fixture.Install(
 				ctx,
 				&integrationtest.InstallOpts{
-					Force:                  true,
-					NonInteractive:         true,
-					Insecure:               args.insecure,
-					ProxyURL:               args.proxyURL,
-					CertificateAuthorities: args.certificateAuthorities,
-					Certificate:            args.certificate,
-					Key:                    args.key,
-					Privileged:             privileged,
+					Force:          true,
+					NonInteractive: true,
+					Insecure:       args.insecure,
+					ProxyURL:       args.proxyURL,
+					Privileged:     privileged,
 					EnrollOpts: integrationtest.EnrollOpts{
-						URL:             args.enrollmentURL,
-						EnrollmentToken: "anythingWillDO",
+						URL:                    args.enrollmentURL,
+						EnrollmentToken:        "anythingWillDO",
+						CertificateAuthorities: args.certificateAuthorities,
+						Certificate:            args.certificate,
+						Key:                    args.key,
 					}})
 			t.Logf("elastic-agent install output: \n%s\n", string(out))
 			if tt.wantErr(t, err, "elastic-agent install returned an unexpected error") {
