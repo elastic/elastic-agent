@@ -14,7 +14,7 @@ require (
 	github.com/elastic/e2e-testing v1.2.1
 	github.com/elastic/elastic-agent-autodiscover v0.7.0
 	github.com/elastic/elastic-agent-client/v7 v7.11.0
-	github.com/elastic/elastic-agent-libs v0.9.11
+	github.com/elastic/elastic-agent-libs v0.9.12
 	github.com/elastic/elastic-agent-system-metrics v0.10.2
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
@@ -133,7 +133,7 @@ require (
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/docker/docker v25.0.5+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
-	github.com/elastic/go-docappender/v2 v2.1.3 // indirect
+	github.com/elastic/go-docappender/v2 v2.1.4 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
