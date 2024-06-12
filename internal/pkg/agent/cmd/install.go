@@ -232,7 +232,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			err = install.StartService(topPath)
 			if err != nil {
 				progBar.Describe("Start Service failed, exiting...")
-				fmt.Fprintf(streams.Out, "Installation failed to start Elastic Agent service.\n")
+				fmt.Fprintf(streams.Out, "Installation failed to start '%s' service.\n", paths.ServiceName())
 				return fmt.Errorf("error starting service: %w", err)
 			}
 			progBar.Describe("Service Started")
