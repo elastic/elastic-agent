@@ -248,10 +248,13 @@ steps:
                 - dev-tools/
                 - pkg/
                 - testing/
+                - version/
+                - specs/
                 - .agent-versions.json
                 - .go-version
                 - .package-version
                 - go.mod
+                - go.sum
                 - magefile.go
                 - main.go
 
