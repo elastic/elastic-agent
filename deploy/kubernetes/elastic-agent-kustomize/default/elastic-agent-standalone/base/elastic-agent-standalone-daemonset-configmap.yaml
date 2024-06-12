@@ -207,7 +207,7 @@ data:
             processors:
             - add_fields:
                 fields:
-                  elastic_agent_id: '%ELASTIC_AGENT_ID%'
+                  dataset_id: '%DATASET_ID%'
             # Openshift:
             # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
             # and/or tls termination, then configuration below should be considered:

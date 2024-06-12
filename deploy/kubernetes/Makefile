@@ -22,7 +22,7 @@ K8S_VERSION=1.52.0
 
 # variable for processor for elastic-agent-standalone
 define ELASTIC_PROCESSOR
-processors:\n            - add_fields:\n                fields:\n                  elastic_agent_id: '%ELASTIC_AGENT_ID%'
+processors:\n            - add_fields:\n                fields:\n                  dataset_id: '%DATASET_ID%'
 endef
 
 .PHONY: generate-k8s $(ALL)
