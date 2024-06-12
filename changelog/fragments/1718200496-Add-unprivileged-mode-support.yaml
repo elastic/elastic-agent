@@ -17,8 +17,8 @@ summary: Add unprivileged mode support (beta)
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
-  Add new --unprivileged installation option. This option installs the Elastic Agent in a non-root or non-Administrator
-  that has limited permissions on the host.
+  Add new --unprivileged installation option. This option installs the Elastic Agent as a non-root or non-Administrator
+  user that has limited permissions on the host.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
