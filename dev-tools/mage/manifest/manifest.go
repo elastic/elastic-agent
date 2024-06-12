@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/magefile/mage/mg"
@@ -68,14 +69,34 @@ func DownloadManifest(manifest string) (tools.Build, error) {
 }
 
 func resolveManifestPackage(project tools.Project, pkg string, reqPackage string, version string) []string {
-	packageName := fmt.Sprintf("%s-%s-%s", pkg, version, reqPackage)
-	val, ok := project.Packages[packageName]
-	if !ok {
-		return nil
+	var val tools.Package
+	var ok = true
+
+	for pkgName, _ := range project.Packages {
+		if strings.HasPrefix(pkgName, pkg) {
+			log.Printf(">>>>>>>>>>> XXX Package: %s <<<<", pkgName)
+			firstSplit := strings.Split(pkgName, pkg+"-")
+			secondHalf := firstSplit[1]
+			if strings.Contains(secondHalf, reqPackage) {
+				log.Printf(">>>>>>>>>>> XXX Second Half: %s <<<<", secondHalf)
+				pkgVersion := strings.Split(secondHalf, "-"+reqPackage)[0]
+				log.Printf(">>>>>>>>>>> XXX Got Version: %s <<<<", pkgVersion)
+
+				foundPkgKey := fmt.Sprintf("%s-%s-%s", pkg, pkgVersion, reqPackage)
+				log.Printf(">>>>>>>>>>> XXX Found Pkg Key: %s <<<<", foundPkgKey)
+
+				val, ok = project.Packages[foundPkgKey]
+				if !ok {
+					return nil
+				}
+
+				if mg.Verbose() {
+					log.Printf(">>>>>>>>>>> Project branch/commit [%s, %s]", project.Branch, project.CommitHash)
+				}
+			}
+		}
 	}
-	if mg.Verbose() {
-		log.Printf(">>>>>>>>>>> Project branch/commit [%s, %s]", project.Branch, project.CommitHash)
-	}
+
 	return []string{val.URL, val.ShaURL, val.AscURL}
 
 }
@@ -113,12 +134,6 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	// For Independent Agent Releases, any opted-in projects will have a version that is
 	// one Patch version ahead since we are using the new bumped DRA artifacts for those projects.
 	// This is acceptable since it is being released only as bundled with Elastic Agent.
-	patchPlusOneString := fmt.Sprintf("%d.%d.%d", parsedManifestVersion.Major(), parsedManifestVersion.Minor(), parsedManifestVersion.Patch()+1)
-	parsedPatchPlusOneVersion, err := version.ParseVersion(patchPlusOneString)
-	if err != nil {
-		return fmt.Errorf("failed to parse bumped patch version for Ind Agent Release: [%s]", patchPlusOneString)
-	}
-	majorMinorPatchPlusOneVersion := parsedPatchPlusOneVersion.VersionWithPrerelease()
 
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
 	for component, pkgs := range componentSpec {
@@ -133,11 +148,6 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 			for _, pkg := range pkgs {
 				reqPackage := platformPackages[platform]
 				pkgURL := resolveManifestPackage(projects[component], pkg, reqPackage, majorMinorPatchVersion)
-				if pkgURL == nil {
-					// If the artifact doesn't match the manifest's version, check if it matches
-					// the Patch + 1 version that Independent Agent opted-in projects use
-					pkgURL = resolveManifestPackage(projects[component], pkg, reqPackage, majorMinorPatchPlusOneVersion)
-				}
 				if pkgURL != nil {
 					for _, p := range pkgURL {
 						log.Printf(">>>>>>>>> Downloading [%s] [%s] ", pkg, p)
