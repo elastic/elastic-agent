@@ -13,8 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/go-service"
+
 	"github.com/jaypipes/ghw"
-	"github.com/kardianos/service"
 	"github.com/otiai10/copy"
 	"github.com/schollz/progressbar/v3"
 

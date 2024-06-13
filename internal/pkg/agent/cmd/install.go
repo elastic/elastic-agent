@@ -48,10 +48,11 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current installation and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
-	cmd.Flags().Bool(flagInstallUnprivileged, false, "Installed Elastic Agent will create an 'elastic-agent' user and run as that user. (experimental)")
-	_ = cmd.Flags().MarkHidden(flagInstallUnprivileged) // Hidden until fully supported
+	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
+
 	cmd.Flags().Bool(flagInstallDevelopment, false, "Install an isolated Elastic Agent for development. Allows a non-development agent to be installed already. (experimental)")
 	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
+
 	addEnrollFlags(cmd)
 
 	return cmd
@@ -80,7 +81,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
 	if unprivileged {
-		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this is an experimental and currently unsupported feature.")
+		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this feature is currently in beta.")
 	}
 
 	isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)

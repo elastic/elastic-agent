@@ -329,6 +329,10 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components)
 
+	f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
+	// Fix loglevel with the current log level used by coordinator
+	ecsMeta.Elastic.Agent.LogLevel = state.LogLevel.String()
+
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{

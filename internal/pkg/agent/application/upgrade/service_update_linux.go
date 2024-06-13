@@ -12,7 +12,7 @@ import (
 
 	"gopkg.in/ini.v1"
 
-	"github.com/kardianos/service"
+	"github.com/elastic/go-service"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )

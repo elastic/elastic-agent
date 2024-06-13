@@ -7,8 +7,9 @@ package install
 import (
 	"fmt"
 
-	"github.com/kardianos/service"
 	"github.com/schollz/progressbar/v3"
+
+	"github.com/elastic/go-service"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
