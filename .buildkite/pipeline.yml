@@ -232,3 +232,51 @@ steps:
                   image: "family/core-ubuntu-2204"
                 env:
                   - GH_VERSION=2.4.0
+
+  # Trigger for pull requests
+  - label: "Trigger Integration tests for Pull request"
+    if: |
+      (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
+      build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
+
+    plugins:
+      - monorepo-diff#v1.0.1:
+          diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
+          watch:
+            - path:
+                - internal/
+                - dev-tools/
+                - pkg/
+                - testing/
+                - version/
+                - specs/
+                - .agent-versions.json
+                - .go-version
+                - .package-version
+                - go.mod
+                - go.sum
+                - magefile.go
+                - main.go
+
+                - .buildkite/integration.pipeline.yml
+                - .buildkite/pipeline.yml
+                - .buildkite/scripts/
+                - .buildkite/hooks/
+
+              config:
+                trigger: "elastic-agent-extended-testing"
+                build:
+                  commit: "${BUILDKITE_COMMIT}"
+                  branch: "${BUILDKITE_BRANCH}"
+                  env:
+                    - BUILDKITE_PULL_REQUEST=${BUILDKITE_PULL_REQUEST}
+                    - BUILDKITE_PULL_REQUEST_BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+                    - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
+
+  # Trigger for branches
+  - label: "Triggering Integration tests for branches"
+    if: build.pull_request.id == null
+    trigger: "elastic-agent-extended-testing"
+    build:
+      commit: "${BUILDKITE_COMMIT}"
+      branch: "${BUILDKITE_BRANCH}"
