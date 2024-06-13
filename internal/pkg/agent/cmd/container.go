@@ -25,6 +25,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -135,6 +136,11 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
   ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
 
+
+* Elastic-Agent event logging
+  If EVENTS_TO_STDERR is set to true log entries containing event data or whole raw events will be logged to stderr alongside
+all other log entries. If unset or set to false, the events will be logged to a separate file that is not collected alongside
+the monitoring logs, however they will be present in diagnostics.
 
 By default when this command starts it will check for an existing fleet.yml. If that file already exists then
 all the above actions will be skipped, because the Elastic Agent has already been enrolled. To ensure that enrollment
@@ -768,6 +774,16 @@ func logToStderr(cfg *configuration.Configuration) {
 		// when no LOGS_PATH defined the container should log to stderr
 		cfg.Settings.LoggingConfig.ToStderr = true
 		cfg.Settings.LoggingConfig.ToFiles = false
+	}
+
+	eventsToStderrEnv := envWithDefault("false", "EVENTS_TO_STDERR")
+	eventsToStderr, err := strconv.ParseBool(eventsToStderrEnv)
+	if err != nil {
+		logp.Warn("cannot parse EVENS_TO_STDERR='%s' as boolean, logging events to file'", eventsToStderrEnv)
+	}
+	if eventsToStderr {
+		cfg.Settings.EventLoggingConfig.ToFiles = false
+		cfg.Settings.EventLoggingConfig.ToStderr = true
 	}
 }
 
