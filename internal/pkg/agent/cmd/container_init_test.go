@@ -41,7 +41,7 @@ func Test_chownPaths(t *testing.T) {
 
 	require.EqualValues(t, distinctPaths{firstParentDir: {}, secondParentDir: {}}, pathsToChown)
 
-	err = pathsToChown.chown(os.Getuid(), os.Getpid())
+	err = pathsToChown.chown(os.Getuid(), os.Getgid())
 	require.NoError(t, err)
 }
 
