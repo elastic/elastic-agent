@@ -21,6 +21,7 @@ type agentInfoMock struct {
 	snapshot     bool
 	version      string
 	unprivileged bool
+	isStandalone bool
 }
 
 func (a agentInfoMock) AgentID() string {
@@ -36,6 +37,10 @@ func (a agentInfoMock) Version() string {
 
 func (a agentInfoMock) Unprivileged() bool {
 	return a.unprivileged
+}
+
+func (a agentInfoMock) IsStandalone() bool {
+	return a.isStandalone
 }
 
 func (a agentInfoMock) Headers() map[string]string                          { panic("implement me") }
