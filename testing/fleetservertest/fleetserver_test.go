@@ -209,7 +209,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 
 	fmt.Println(got.Actions)
 	if len(got.Actions) > 0 {
-		policy := got.Actions[0].(*fleetapi.ActionPolicyChange).Policy
+		policy := got.Actions[0].(*fleetapi.ActionPolicyChange).Data.Policy
 		b := new(strings.Builder)
 		encoder := json.NewEncoder(b)
 		encoder.SetIndent("", "  ")
