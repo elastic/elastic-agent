@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 
+	"golang.org/x/sys/unix"
 	"kernel.org/pub/linux/libs/security/libcap/cap"
 
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -33,34 +33,30 @@ var (
 // - chown all agent-related paths if DAC_OVERRIDE capability is not in the Effective set
 // If new binary capabilities are set then the returned cmd will be not nil. Note that it is up to caller to invoke
 // the returned cmd and spawn an agent instance with all the capabilities.
-func initContainer(streams *cli.IOStreams) (*exec.Cmd, error) {
+func initContainer(streams *cli.IOStreams) (shouldExit bool, err error) {
 	isRoot, _ := utils.HasRoot()
 	if !skipFileCapabilities && !isRoot {
 		executable, err := os.Executable()
 		if err != nil {
-			return nil, err
+			return true, err
 		}
 
 		logInfo(streams, "agent container initialisation - file capabilities")
 		updated, err := updateFileCapsFromBoundingSet(executable)
 		if err != nil {
-			return nil, err
+			return true, err
 		}
 
 		if updated {
 			// new capabilities were added thus we need to re-exec agent to pick them up
-			var args []string
+			args := []string{filepath.Base(executable)}
 			if len(os.Args) > 1 {
 				args = append(args, os.Args[1:]...)
 			}
 			// add skipFileCapabilitiesFlag flag to skip reapplying the file capabilities
 			args = append(args, fmt.Sprintf("--%s", skipFileCapabilitiesFlag))
 
-			cmd := exec.Command(executable, args...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			cmd.Env = os.Environ()
-			return cmd, nil
+			return true, unix.Exec(executable, args, os.Environ())
 		}
 	}
 
@@ -68,7 +64,7 @@ func initContainer(streams *cli.IOStreams) (*exec.Cmd, error) {
 		// if we are not root, we need to raise the ambient capabilities
 		logInfo(streams, "agent container initialisation - ambient capabilities")
 		if err := raiseAmbientCapabilities(); err != nil {
-			return nil, err
+			return true, err
 		}
 	}
 
@@ -78,18 +74,18 @@ func initContainer(streams *cli.IOStreams) (*exec.Cmd, error) {
 	procSet := capProc()
 	hasOverride, err := procSet.GetFlag(cap.Effective, cap.DAC_OVERRIDE)
 	if err != nil {
-		return nil, err
+		return true, err
 	}
 	if !hasOverride {
 		// we need to chown all paths
 		logInfo(streams, "agent container initialisation - chown paths")
 
 		if err = chownPaths(); err != nil {
-			return nil, err
+			return true, err
 		}
 	}
 
-	return nil, nil
+	return false, nil
 }
 
 // raiseAmbientCapabilities will attempt to raise all capabilities present in the Effective set of the running process

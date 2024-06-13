@@ -7,11 +7,9 @@
 package cmd
 
 import (
-	"os/exec"
-
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
-func initContainer(_ *cli.IOStreams) (cmd *exec.Cmd, err error) {
-	return nil, nil
+func initContainer(streams *cli.IOStreams) (shouldExit bool, err error) {
+	return false, nil
 }

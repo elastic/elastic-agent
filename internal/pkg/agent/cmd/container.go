@@ -165,12 +165,12 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 }
 
 func logContainerCmd(streams *cli.IOStreams) error {
-	cmd, err := initContainer(streams)
+	shouldExit, err := initContainer(streams)
 	if err != nil {
 		return err
 	}
-	if cmd != nil {
-		return cmd.Run()
+	if shouldExit {
+		return nil
 	}
 
 	logsPath := envWithDefault("", "LOGS_PATH")
