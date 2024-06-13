@@ -162,12 +162,8 @@ func updateFileCapsFromBoundingSet(executablePath string) (updated bool, err err
 		return false, fmt.Errorf("failed to chown %s: %w", executablePath, err)
 	}
 
-	var fileSet interface {
-		SetFile(pathString string) error
-	}
-
 	// create a new set based on the capabilities of Bounding set
-	fileSet, err = cap.FromText(capsText)
+	fileSet, err := cap.FromText(capsText)
 	if err != nil {
 		return false, fmt.Errorf("failed to parse caps text: %w", err)
 	}
