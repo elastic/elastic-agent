@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kardianos/service"
+	"github.com/elastic/go-service"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
