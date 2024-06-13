@@ -133,6 +133,7 @@ func (c *runtimeComm) WriteStartUpInfo(w io.Writer, services ...client.Service) 
 			Id:       c.agentInfo.AgentID(),
 			Version:  c.agentInfo.Version(),
 			Snapshot: c.agentInfo.Snapshot(),
+			Mode:     protoAgentMode(c.agentInfo),
 		},
 	}
 	infoBytes, err := protobuf.Marshal(startupInfo)
@@ -155,6 +156,7 @@ func (c *runtimeComm) CheckinExpected(
 			Id:       c.agentInfo.AgentID(),
 			Version:  c.agentInfo.Version(),
 			Snapshot: c.agentInfo.Snapshot(),
+			Mode:     protoAgentMode(c.agentInfo),
 		}
 	} else {
 		expected.AgentInfo = nil
@@ -432,4 +434,12 @@ func sendExpectedChunked(server proto.ElasticAgent_CheckinV2Server, msg *proto.C
 		}
 	}
 	return nil
+}
+
+// protoAgentMode converts the agent info mode bool to the AgentManagedMode enum
+func protoAgentMode(agent info.Agent) proto.AgentManagedMode {
+	if agent.IsStandalone() {
+		return proto.AgentManagedMode_STANDALONE
+	}
+	return proto.AgentManagedMode_MANAGED
 }
