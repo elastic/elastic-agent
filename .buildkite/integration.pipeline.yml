@@ -10,7 +10,7 @@ steps:
     concurrency_group: elastic-agent-extended-testing/serverless-integration
     concurrency: 8
     env:
-      # we run each step in a different data center to spread the load
+      # we run each step in a different data center to spread the load 123
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
     command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
     artifact_paths:
