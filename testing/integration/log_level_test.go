@@ -35,8 +35,9 @@ import (
 
 func TestSetLogLevelFleetManaged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Default,
+		Group: Fleet,
 		Stack: &define.Stack{},
+		Sudo:  true,
 	})
 
 	deadline := time.Now().Add(10 * time.Minute)
