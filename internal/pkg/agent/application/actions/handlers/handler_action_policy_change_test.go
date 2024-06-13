@@ -116,7 +116,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		}))
 
 	fleetServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "api/status" {
+		if r.URL.Path != "/api/status" {
 			w.WriteHeader(http.StatusNotFound)
 			_, err := w.Write(nil)
 			require.NoError(t, err)
@@ -430,7 +430,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		require.NoError(t, err, "failed creating root and child certs")
 
 		statusHandler := func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "api/status" {
+			if r.URL.Path != "/api/status" {
 				w.WriteHeader(http.StatusNotFound)
 				_, err := w.Write(nil)
 				require.NoError(t, err)
