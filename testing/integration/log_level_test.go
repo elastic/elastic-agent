@@ -53,21 +53,32 @@ func TestSetLogLevelFleetManaged(t *testing.T) {
 	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
 
-	cmd, err := f.PrepareAgentCommand(ctx, nil)
-	if err != nil {
-		t.Fatalf("cannot prepare Elastic-Agent command: %s", err)
-	}
+	//cmd, err := f.PrepareAgentCommand(ctx, nil)
+	//if err != nil {
+	//	t.Fatalf("cannot prepare Elastic-Agent command: %s", err)
+	//}
+	//
+	//output := strings.Builder{}
+	//cmd.Stderr = &output
+	//cmd.Stdout = &output
+	//
+	//if err = cmd.Start(); err != nil {
+	//	t.Fatalf("could not start Elastic-Agent: %s", err)
+	//}
+	//
+	//out, err := f.Exec(ctx, []string{"enroll", "--url", fleetServerURL, "--enrollment-token", enrollmentTokenResp.APIKey})
+	//require.NoErrorf(t, err, "error enrolling agent. Enroll command output:\n%s\n", string(out))
 
-	output := strings.Builder{}
-	cmd.Stderr = &output
-	cmd.Stdout = &output
+	installOutput, err := f.Install(ctx, &atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetServerURL,
+			EnrollmentToken: enrollmentTokenResp.APIKey,
+		},
+	})
 
-	if err = cmd.Start(); err != nil {
-		t.Fatalf("could not start Elastic-Agent: %s", err)
-	}
-
-	out, err := f.Exec(ctx, []string{"enroll", "--url", fleetServerURL, "--enrollment-token", enrollmentTokenResp.APIKey})
-	require.NoErrorf(t, err, "error enrolling agent. Enroll command output:\n%s\n", string(out))
+	assert.NoErrorf(t, err, "Error installing agent. Install output:\n%s\n", string(installOutput))
 
 	require.Eventuallyf(t, func() bool {
 		return waitForAgentAndFleetHealthy(ctx, t, f)
@@ -79,15 +90,15 @@ func TestSetLogLevelFleetManaged(t *testing.T) {
 
 	// Make sure the Elastic-Agent process is not running before
 	// exiting the test
-	t.Cleanup(func() {
-		// Ignore the error because we cancelled the context,
-		// and that always returns an error
-		_ = cmd.Wait()
-		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
-		}
-	})
+	//t.Cleanup(func() {
+	//	// Ignore the error because we cancelled the context,
+	//	// and that always returns an error
+	//	_ = cmd.Wait()
+	//	if t.Failed() {
+	//		t.Log("Elastic-Agent output:")
+	//		t.Log(output.String())
+	//	}
+	//})
 
 	testLogLevelSetViaFleet(ctx, f, agentID, t, info, policyResp)
 }
