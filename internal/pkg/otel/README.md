@@ -53,9 +53,9 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| k8sattributesprocessor | v0.102.0|
 | attributesprocessor | v0.102.0|
 | filterprocessor | v0.102.0|
+| k8sattributesprocessor | v0.102.0|
 | resourcedetectionprocessor | v0.102.0|
 | resourceprocessor | v0.102.0|
 | transformprocessor | v0.102.0|
