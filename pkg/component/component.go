@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // GenerateMonitoringCfgFn is a function that can inject information into the model generation process.
@@ -946,10 +945,6 @@ type outputI struct {
 // input specification runtime checks. This function should always be
 // edited in sync with the documentation in specs/README.md.
 func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
-	hasRoot, err := utils.HasRoot()
-	if err != nil {
-		return nil, err
-	}
 	return transpiler.NewVars("", map[string]interface{}{
 		"install": map[string]interface{}{
 			"in_default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)) || pkgmgr.InstalledViaExternalPkgMgr(),
@@ -964,7 +959,7 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 			"minor":       platform.Minor,
 		},
 		"user": map[string]interface{}{
-			"root": hasRoot,
+			"root": platform.User.Root,
 		},
 	}, nil)
 }

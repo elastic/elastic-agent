@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/svc/eventlog"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
@@ -75,24 +77,25 @@ func withServiceOptions(username string, groupName string) ([]serviceOpt, error)
 	return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
 }
 
-// servicePostInstall sets the security descriptor for the service
+// serviceConfigure sets the security descriptor for the service
 //
 // gives user the ability to control the service, needed when installed with --unprivileged or
 // ReExec is not possible on Windows.
-func servicePostInstall(ownership utils.FileOwner) error {
-	if ownership.UID == "" {
-		// no user, running with LOCAL SYSTEM (do nothing)
-		return nil
+func serviceConfigure(ownership utils.FileOwner) error {
+	// Modify registry to allow logging to eventlog as "Elastic Agent".
+	err := eventlog.InstallAsEventCreate(paths.ServiceName, eventlog.Info|eventlog.Warning|eventlog.Error)
+	if err != nil && !strings.Contains(err.Error(), "registry key already exists") {
+		return fmt.Errorf("unable to create registry key for logging: %w", err)
 	}
-
 	// https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/sddl-for-device-objects
-	securityDescriptor, err := windows.SecurityDescriptorFromString(
-		"D:(A;;GA;;;SY)" + // SDDL_LOCAL_SYSTEM -> SDDL_GENERIC_ALL
-			"(A;;GA;;;BA)" + // SDDL_BUILTIN_ADMINISTRATORS -> SDDL_GENERIC_ALL
-			"(A;;GR;;;WD)" + // SDDL_EVERYONE -> SDDL_GENERIC_READ
-			"(A;;GRGX;;;NS)" + // SDDL_NETWORK_SERVICE -> SDDL_GENERIC_READ|SDDL_GENERIC_EXECUTE
-			fmt.Sprintf("(A;;GA;;;%s)", ownership.UID), // Ownership UID -> SDDL_GENERIC_ALL
-	)
+	sddl := "D:(A;;GA;;;SY)" + // SDDL_LOCAL_SYSTEM -> SDDL_GENERIC_ALL
+		"(A;;GA;;;BA)" + // SDDL_BUILTIN_ADMINISTRATORS -> SDDL_GENERIC_ALL
+		"(A;;GR;;;WD)" + // SDDL_EVERYONE -> SDDL_GENERIC_READ
+		"(A;;GRGX;;;NS)" // SDDL_NETWORK_SERVICE -> SDDL_GENERIC_READ|SDDL_GENERIC_EXECUTE
+	if ownership.UID != "" {
+		sddl += fmt.Sprintf("(A;;GA;;;%s)", ownership.UID) // Ownership UID -> SDDL_GENERIC_ALL
+	}
+	securityDescriptor, err := windows.SecurityDescriptorFromString(sddl)
 	if err != nil {
 		return fmt.Errorf("failed to build security descriptor from SSDL: %w", err)
 	}

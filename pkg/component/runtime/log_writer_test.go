@@ -123,6 +123,33 @@ func TestLogWriter(t *testing.T) {
 			},
 		},
 		{
+			Name:      "multi empty text line",
+			LogLevel:  zapcore.InfoLevel,
+			LogSource: logSourceStdout,
+			Lines: []string{
+				"simple written line\r\n",
+				"\r\n",  // empty line
+				" \r\n", // empty line with space
+				"another line\n",
+			},
+			Wrote: []wrote{
+				{
+					entry: zapcore.Entry{
+						Level:   zapcore.InfoLevel,
+						Time:    time.Time{},
+						Message: "simple written line",
+					},
+				},
+				{
+					entry: zapcore.Entry{
+						Level:   zapcore.InfoLevel,
+						Time:    time.Time{},
+						Message: "another line",
+					},
+				},
+			},
+		},
+		{
 			Name:      "json log line split",
 			LogLevel:  zapcore.DebugLevel,
 			LogSource: logSourceStdout,

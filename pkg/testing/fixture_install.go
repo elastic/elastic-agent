@@ -43,6 +43,11 @@ type CmdOpts interface {
 type EnrollOpts struct {
 	URL             string // --url
 	EnrollmentToken string // --enrollment-token
+
+	// SSL/TLS options
+	CertificateAuthorities []string // --certificate-authorities
+	Certificate            string   // --elastic-agent-cert
+	Key                    string   // --elastic-agent-cert-key
 }
 
 func (e EnrollOpts) toCmdArgs() []string {
@@ -52,6 +57,18 @@ func (e EnrollOpts) toCmdArgs() []string {
 	}
 	if e.EnrollmentToken != "" {
 		args = append(args, "--enrollment-token", e.EnrollmentToken)
+	}
+
+	if len(e.CertificateAuthorities) > 0 {
+		args = append(args, "--certificate-authorities="+strings.Join(e.CertificateAuthorities, ","))
+	}
+
+	if e.Certificate != "" {
+		args = append(args, "--elastic-agent-cert="+e.Certificate)
+	}
+
+	if e.Key != "" {
+		args = append(args, "--elastic-agent-cert-key="+e.Key)
 	}
 	return args
 }

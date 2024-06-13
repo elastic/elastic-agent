@@ -26,7 +26,7 @@ type Proxy struct {
 	// Port is the port Server is listening on.
 	Port string
 
-	// LocalhostURL is the server URL as "http://localhost:PORT".
+	// LocalhostURL is the server URL as "http(s)://localhost:PORT".
 	LocalhostURL string
 
 	// proxiedRequests is a "request log" for every request the proxy receives.
@@ -176,7 +176,7 @@ func (p *Proxy) StartTLS() error {
 	}
 
 	p.Port = u.Port()
-	p.LocalhostURL = "http://localhost:" + p.Port
+	p.LocalhostURL = "https://localhost:" + p.Port
 
 	p.opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
 	return nil

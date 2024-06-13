@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -122,23 +123,33 @@ func (h *PolicyChangeHandler) Watch() <-chan coordinator.ConfigChange {
 	return h.ch
 }
 
-func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg *configuration.Configuration) (*remote.Config, error) {
+func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg *config.Config) (*remote.Config, error) {
 	// do not update fleet-server host from policy; no setters provided with local Fleet Server
 	if len(h.setters) == 0 {
 		return nil, nil
 	}
 
-	if clientEqual(h.config.Fleet.Client, cfg.Fleet.Client) {
+	parsedConfig, err := configuration.NewPartialFromConfigNoDefaults(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("parsing fleet config: %w", err)
+	}
+
+	if parsedConfig.Fleet == nil {
+		// there is no client config (weird)
+		return nil, nil
+	}
+
+	if clientEqual(h.config.Fleet.Client, parsedConfig.Fleet.Client) {
 		// already the same hosts
 		return nil, nil
 	}
 
-	// make a copy the current client config and apply the changes in place on this copy
+	// make a copy the current client config and apply the changes on this copy
 	newFleetClientConfig := h.config.Fleet.Client
-	updateFleetConfig(h.log, cfg.Fleet.Client, &newFleetClientConfig)
+	updateFleetConfig(h.log, parsedConfig.Fleet.Client, &newFleetClientConfig)
 
 	// Test new config
-	err := testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
+	err = testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
 	if err != nil {
 		return nil, fmt.Errorf("validating fleet client config: %w", err)
 	}
@@ -175,52 +186,82 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 	return nil
 }
 
-// updateFleetConfig copies the relevant Fleet client settings from src on dst. The destination struct is modified in-place
-func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config) {
-	dst.Protocol = src.Protocol
-	dst.Path = src.Path
-	dst.Host = src.Host
-	dst.Hosts = src.Hosts
+// updateFleetConfig copies the relevant Fleet client settings from policyConfig on agentConfig. The destination struct is modified in-place
+func updateFleetConfig(log *logger.Logger, policyConfig remote.Config, agentConfig *remote.Config) {
+
+	// Hosts is the only connectivity field sent Fleet, let's clear everything else aside from Hosts
+	if len(policyConfig.Hosts) > 0 {
+		agentConfig.Hosts = make([]string, len(policyConfig.Hosts))
+		copy(agentConfig.Hosts, policyConfig.Hosts)
+
+		agentConfig.Host = ""
+		agentConfig.Protocol = ""
+		agentConfig.Path = ""
+	}
 
 	// Empty proxies from fleet are ignored. That way a proxy set by --proxy-url
 	// it won't be overridden by an absent or empty proxy from fleet-server.
 	// However, if there is a proxy sent by fleet-server, it'll take precedence.
 	// Therefore, it's not possible to remove a proxy once it's set.
 
-	if src.Transport.Proxy.URL == nil ||
-		src.Transport.Proxy.URL.String() == "" {
-		log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
+	if policyConfig.Transport.Proxy.URL == nil ||
+		policyConfig.Transport.Proxy.URL.String() == "" {
+		log.Debugw("proxy from fleet is empty or null, the proxy will not be changed", "current_proxy", agentConfig.Transport.Proxy.URL)
 	} else {
+		log.Debugw("received proxy from fleet, applying it", "old_proxy", agentConfig.Transport.Proxy.URL, "new_proxy", policyConfig.Transport.Proxy.URL)
 		// copy the proxy struct
-		dst.Transport.Proxy = src.Transport.Proxy
+		agentConfig.Transport.Proxy = policyConfig.Transport.Proxy
 
-		// replace in dst the attributes that are passed by reference within the proxy struct
+		// replace in agentConfig the attributes that are passed by reference within the proxy struct
 
 		// Headers map
-		dst.Transport.Proxy.Headers = map[string]string{}
-		for k, v := range src.Transport.Proxy.Headers {
-			dst.Transport.Proxy.Headers[k] = v
+		agentConfig.Transport.Proxy.Headers = map[string]string{}
+		for k, v := range policyConfig.Transport.Proxy.Headers {
+			agentConfig.Transport.Proxy.Headers[k] = v
 		}
 
 		// Proxy URL
-		urlCopy := *src.Transport.Proxy.URL
-		dst.Transport.Proxy.URL = &urlCopy
+		urlCopy := *policyConfig.Transport.Proxy.URL
+		agentConfig.Transport.Proxy.URL = &urlCopy
+	}
 
-		log.Debug("received proxy from fleet, applying it")
+	if policyConfig.Transport.TLS != nil {
+
+		tlsCopy := tlscommon.Config{}
+		if agentConfig.Transport.TLS != nil {
+			// copy the TLS struct
+			tlsCopy = *agentConfig.Transport.TLS
+		}
+
+		if policyConfig.Transport.TLS.Certificate == emptyCertificateConfig() {
+			log.Debug("TLS certificates from fleet are empty or null, the TLS config will not be changed")
+		} else {
+			tlsCopy.Certificate = policyConfig.Transport.TLS.Certificate
+			log.Debug("received TLS certificate/key from fleet, applying it")
+		}
+
+		if len(policyConfig.Transport.TLS.CAs) == 0 {
+			log.Debug("TLS CAs from fleet are empty or null, the TLS config will not be changed")
+		} else {
+			tlsCopy.CAs = make([]string, len(policyConfig.Transport.TLS.CAs))
+			copy(tlsCopy.CAs, policyConfig.Transport.TLS.CAs)
+			log.Debug("received TLS CAs from fleet, applying it")
+		}
+
+		agentConfig.Transport.TLS = &tlsCopy
 	}
 }
 
-func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) (err error) {
-	cfg, err := configuration.NewFromConfig(c)
-	if err != nil {
-		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
-	}
+func emptyCertificateConfig() tlscommon.CertificateConfig {
+	return tlscommon.CertificateConfig{}
+}
 
+func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) (err error) {
 	var validationErr error
 
 	// validate Fleet connectivity with the new configuration
 	var validatedConfig *remote.Config
-	validatedConfig, err = h.validateFleetServerHosts(ctx, cfg)
+	validatedConfig, err = h.validateFleetServerHosts(ctx, c)
 	if err != nil {
 		validationErr = goerrors.Join(validationErr, fmt.Errorf("validating Fleet client config: %w", err))
 	}
@@ -352,6 +393,10 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 		return false
 	}
 	if k1.Path != k2.Path {
+		return false
+	}
+
+	if k1.Host != k2.Host {
 		return false
 	}
 
