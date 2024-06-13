@@ -54,8 +54,6 @@ var (
 	// Used to strip the appended ({uuid}) from the name of an enrollment token. This makes much easier for
 	// a container to reference a token by name, without having to know what the generated UUID is for that name.
 	tokenNameStrip = regexp.MustCompile(`\s\([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\)$`)
-
-	skipFileCapabilities bool
 )
 
 func newContainerCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -144,14 +142,14 @@ all the above actions will be skipped, because the Elastic Agent has already bee
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
 		Run: func(c *cobra.Command, args []string) {
-			if err := logContainerCmd(streams); err != nil {
+			if err := logContainerCmd(c, streams); err != nil {
 				logError(streams, err)
 				os.Exit(1)
 			}
 		},
 	}
 
-	cmd.Flags().BoolVar(&skipFileCapabilities, skipFileCapabilitiesFlag, false, "")
+	cmd.Flags().Bool(skipFileCapabilitiesFlag, false, "skip setting file capabilities")
 
 	return &cmd
 }
@@ -164,8 +162,13 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 	fmt.Fprintln(streams.Out, a...)
 }
 
-func logContainerCmd(streams *cli.IOStreams) error {
-	shouldExit, err := initContainer(streams)
+func logContainerCmd(cmd *cobra.Command, streams *cli.IOStreams) error {
+	skipFileCapabilities, err := cmd.Flags().GetBool(skipFileCapabilitiesFlag)
+	if err != nil {
+		return err
+	}
+
+	shouldExit, err := initContainer(streams, skipFileCapabilities)
 	if err != nil {
 		return err
 	}

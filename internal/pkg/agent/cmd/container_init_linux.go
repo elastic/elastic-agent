@@ -33,7 +33,7 @@ var (
 // - chown all agent-related paths if DAC_OVERRIDE capability is not in the Effective set
 // If new binary capabilities are set then the returned cmd will be not nil. Note that it is up to caller to invoke
 // the returned cmd and spawn an agent instance with all the capabilities.
-func initContainer(streams *cli.IOStreams) (shouldExit bool, err error) {
+func initContainer(streams *cli.IOStreams, skipFileCapabilities bool) (shouldExit bool, err error) {
 	isRoot, err := utils.HasRoot()
 	if err != nil {
 		return true, err
