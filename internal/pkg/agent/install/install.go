@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/go-service"
+
 	"github.com/jaypipes/ghw"
 	"github.com/otiai10/copy"
 	"github.com/schollz/progressbar/v3"
-
-	"github.com/elastic/go-service"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
