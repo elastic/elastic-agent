@@ -200,12 +200,7 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	return false
 }
 
-<<<<<<< HEAD
 func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
-
-=======
-func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, unprivileged bool) error {
->>>>>>> 6c20730d5c ([windows] if `elastic-agent run` fails, log error to Application EventLog (#4846))
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
 		return fmt.Errorf("failed to gather system information: %w", err)

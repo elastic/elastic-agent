@@ -79,11 +79,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
 			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-<<<<<<< HEAD
-
-=======
 				logExternal(fmt.Sprintf("%s run failed: %s", paths.BinaryName, err))
->>>>>>> 6c20730d5c ([windows] if `elastic-agent run` fails, log error to Application EventLog (#4846))
 				return err
 			}
 			return nil

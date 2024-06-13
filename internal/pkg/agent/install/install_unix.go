@@ -26,3 +26,8 @@ func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwne
 	}
 	return nil
 }
+
+// serviceConfigure is a no-op on unix
+func serviceConfigure(ownership utils.FileOwner) error {
+	return nil
+}
