@@ -43,6 +43,9 @@ const (
 	defaultRequestRetrySleep = "1s"                             // sleep 1 sec between retries for HTTP requests
 	defaultMaxRequestRetries = "30"                             // maximum number of retries for HTTP requests
 	defaultStateDirectory    = "/usr/share/elastic-agent/state" // directory that will hold the state data
+	agentBaseDirectory       = "/usr/share/elastic-agent"       // directory that holds all elastic-agent related files
+
+	skipFileCapabilitiesFlag = "skip-file-capabilities"
 
 	logsPathPerms = 0775
 )
@@ -51,6 +54,8 @@ var (
 	// Used to strip the appended ({uuid}) from the name of an enrollment token. This makes much easier for
 	// a container to reference a token by name, without having to know what the generated UUID is for that name.
 	tokenNameStrip = regexp.MustCompile(`\s\([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\)$`)
+
+	skipFileCapabilities bool
 )
 
 func newContainerCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -145,6 +150,9 @@ occurs on every start of the container set FLEET_FORCE to 1.
 			}
 		},
 	}
+
+	cmd.Flags().BoolVar(&skipFileCapabilities, skipFileCapabilitiesFlag, false, "")
+
 	return &cmd
 }
 
@@ -157,6 +165,14 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 }
 
 func logContainerCmd(streams *cli.IOStreams) error {
+	cmd, err := initContainer(streams)
+	if err != nil {
+		return err
+	}
+	if cmd != nil {
+		return cmd.Run()
+	}
+
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams

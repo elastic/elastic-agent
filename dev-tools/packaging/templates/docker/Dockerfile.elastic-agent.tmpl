@@ -144,6 +144,7 @@ RUN mkdir /app && \
 {{- end }}
 
 # Keep this after any chown command, chown resets any applied capabilities
+RUN setcap cap_setfcap,cap_chown=ep {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent
 RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
 {{- if .linux_capabilities }}
 # Since the beat is stored at the other end of a symlink we must follow the symlink first
@@ -216,6 +217,8 @@ RUN for iter in {1..10}; do \
     (exit $exit_code)
 
 {{- end }}
+# root group no more for elastic-agent user
+RUN gpasswd --delete {{ .user }} root
 USER {{ .user }}
 
 
