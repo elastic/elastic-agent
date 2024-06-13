@@ -202,7 +202,13 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
 			errors.M("service", paths.ServiceName))
 	}
-	serviceConfigure(ownership)
+	err = serviceConfigure(ownership)
+	if err != nil {
+		pt.Describe("Failed to configure service")
+		_ = svc.Uninstall()
+		return ownership, fmt.Errorf("failed to configure service (%s): %w", paths.ServiceName, err)
+	}
+
 	pt.Describe("Installed service")
 
 	return ownership, nil
