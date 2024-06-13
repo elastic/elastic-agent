@@ -34,6 +34,7 @@ func DefaultGRPCConfig() *GRPCConfig {
 	}
 
 	return &GRPCConfig{
+		Address:                 "localhost",
 		Port:                    defaultPort,
 		MaxMsgSize:              1024 * 1024 * 100, // grpc default 4MB is unsufficient for diagnostics
 		CheckinChunkingDisabled: false,             // on by default
