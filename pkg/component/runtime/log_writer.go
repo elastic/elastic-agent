@@ -106,6 +106,10 @@ func (r *logWriter) Write(p []byte) (int, error) {
 			continue
 		}
 		str := strings.TrimSpace(string(line))
+		if len(str) == 0 {
+			// empty line after trim
+			continue
+		}
 		// try to parse line as JSON
 		if str[0] == '{' && r.handleJSON(str) {
 			// handled as JSON
