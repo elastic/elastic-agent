@@ -308,6 +308,10 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		h.config.Fleet.Client = *validatedConfig
 	}
 
+	cfg, err := configuration.NewFromConfig(c)
+	if err != nil {
+		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
+	}
 	loggingHasChanged := h.eventLoggingHasChanged(cfg)
 	if loggingHasChanged {
 		h.config.Settings.EventLoggingConfig = cfg.Settings.EventLoggingConfig
