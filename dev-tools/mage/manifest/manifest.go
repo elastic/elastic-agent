@@ -72,6 +72,8 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 	var val tools.Package
 	var ok = true
 
+	log.Printf(">>>>>>>>>>>> XXX Looking for package [%s] of type [%s]", pkg, reqPackage)
+
 	for pkgName, _ := range project.Packages {
 		if strings.HasPrefix(pkgName, pkg) {
 			log.Printf(">>>>>>>>>>> XXX Package: %s <<<<", pkgName)

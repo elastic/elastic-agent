@@ -971,6 +971,8 @@ var platformPackages = map[string]string{
 
 func packageAgent(platforms []string, dependenciesVersion string, agentPackaging, agentBinaryTarget mg.Fn) {
 	fmt.Println("--- Package Elastic-Agent")
+	var manifestResponse tools.Build
+	var err error
 
 	requiredPackages := []string{}
 	for _, p := range platforms {
@@ -980,8 +982,26 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, requiredPackages)
 	}
 
+	if devtools.PackagingFromManifest {
+		if manifestResponse, err = manifest.DownloadManifest(devtools.ManifestURL); err != nil {
+			log.Panicf("failed to download remote manifest file %s", err)
+		} else {
+			if parsedVersion, err := version.ParseVersion(manifestResponse.Version); err != nil {
+				log.Panicf("the manifest version from manifest is not semver, got %s", manifestResponse.Version)
+			} else {
+				// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
+				// something that we use as an implicit parameter to various functions
+				if parsedVersion.IsSnapshot() {
+					os.Setenv(snapshotEnv, "true")
+					mage.Snapshot = true
+				}
+				os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
+			}
+		}
+	}
+
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, requiredPackages)
+	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, requiredPackages, manifestResponse)
 
 	// cleanup after build
 	defer os.RemoveAll(archivePath)
@@ -997,7 +1017,7 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(requiredPackages, dependenciesVersion, archivePath, dropPath, flatPath)
+	flattenDependencies(requiredPackages, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse)
 
 	// package agent
 	log.Println("--- Running packaging function")
@@ -1014,25 +1034,27 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 // NOTE: after the build is done the caller must:
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
-func collectPackageDependencies(platforms []string, packageVersion string, requiredPackages []string) (archivePath string, dropPath string) {
+func collectPackageDependencies(platforms []string, packageVersion string, requiredPackages []string, manifestResponse tools.Build) (archivePath string, dropPath string) {
 	// if we have defined a manifest URL to package Agent from, we should be using the same packageVersion of that manifest
-	if devtools.PackagingFromManifest {
-		if manifestResponse, err := manifest.DownloadManifest(devtools.ManifestURL); err != nil {
-			log.Panicf("failed to download remote manifest file %s", err)
-		} else {
-			if parsedVersion, err := version.ParseVersion(manifestResponse.Version); err != nil {
-				log.Panicf("the manifest version from manifest is not semver, got %s", manifestResponse.Version)
+	/*
+		if devtools.PackagingFromManifest {
+			if manifestResponse, err := manifest.DownloadManifest(devtools.ManifestURL); err != nil {
+				log.Panicf("failed to download remote manifest file %s", err)
 			} else {
-				// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
-				// something that we use as an implicit parameter to various functions
-				if parsedVersion.IsSnapshot() {
-					os.Setenv(snapshotEnv, "true")
-					mage.Snapshot = true
+				if parsedVersion, err := version.ParseVersion(manifestResponse.Version); err != nil {
+					log.Panicf("the manifest version from manifest is not semver, got %s", manifestResponse.Version)
+				} else {
+					// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
+					// something that we use as an implicit parameter to various functions
+					if parsedVersion.IsSnapshot() {
+						os.Setenv(snapshotEnv, "true")
+						mage.Snapshot = true
+					}
+					os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
 				}
-				os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
 			}
 		}
-	}
+	*/
 
 	dropPath, found := os.LookupEnv(agentDropPath)
 
@@ -1189,7 +1211,8 @@ func getIndAgentGlobExpr(versionedFlatPath string, packageVersion string) string
 
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
-func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string) {
+func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse tools.Build) {
+
 	for _, rp := range requiredPackages {
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
@@ -1197,6 +1220,8 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 		os.MkdirAll(targetPath, 0755)
 		os.MkdirAll(versionedFlatPath, 0755)
 		os.MkdirAll(versionedDropPath, 0755)
+
+		log.Printf(">>>>>>>>>>>> XXX flattenDeps: requiredPackage: [%s]", rp)
 
 		// untar all
 		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))
