@@ -649,6 +649,76 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 	}, 2*time.Minute, 10*time.Second, "Agent never became DEGRADED with root/Administrator install message")
 }
 
+// Tests that trying to switch from privileged to unprivileged with Elastic Defend fails.
+func TestEndpointSecurityCannotSwitchToUnprivileged(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+
+		// Only supports Linux at the moment.
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+			},
+		},
+	})
+
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cn()
+
+	// Get path to agent executable.
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	t.Log("Enrolling the agent in Fleet")
+	policyUUID := uuid.New().String()
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		Privileged:     true, // ensure always privileged
+	}
+	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
+
+	t.Log("Installing Elastic Defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	t.Log("Polling for endpoint-security to become Healthy")
+	healthyCtx, cancel := context.WithTimeout(ctx, endpointHealthPollingTimeout)
+	defer cancel()
+
+	agentClient := fixture.Client()
+	err = agentClient.Connect(healthyCtx)
+	require.NoError(t, err)
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, healthyCtx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy.",
+	)
+	t.Log("Verified endpoint component and units are healthy")
+
+	performSwitchCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	output, err := fixture.Exec(performSwitchCtx, []string{"unprivileged", "-f"})
+	require.Errorf(t, err, "unprivileged command should have failed")
+	assert.Contains(t, string(output), "unable to switch to unprivileged mode due to the following service based components having issues")
+	assert.Contains(t, string(output), "endpoint")
+}
+
 // TestEndpointLogsAreCollectedInDiagnostics tests that diagnostics archive contain endpoint logs
 func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	info := define.Require(t, define.Requirements{

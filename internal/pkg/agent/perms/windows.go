@@ -41,7 +41,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	grants = append(grants, acl.GrantSid(0xF10F0000, administratorsSID)) // full control of all acl's
 
 	// user gets grant based on the mask
-	var userSID *windows.SID
+	userSID := administratorsSID // defaults to owned by Administrators
 	if o.mask&0700 != 0 && o.ownership.UID != "" {
 		userSID, err = windows.StringToSid(o.ownership.UID)
 		if err != nil {
@@ -51,7 +51,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	}
 
 	// group gets grant based on the mask
-	var groupSID *windows.SID
+	groupSID := administratorsSID // defaults to owned by Administrators
 	if o.mask&0070 != 0 && o.ownership.GID != "" {
 		groupSID, err = windows.StringToSid(o.ownership.GID)
 		if err != nil {
