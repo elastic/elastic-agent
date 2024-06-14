@@ -57,7 +57,9 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tsg/go-daemon v0.0.0-20200207173439-e704b93fd89b
 	github.com/winlabs/gowin32 v0.0.0-20221003142512-0d265587d3c9
-	go.elastic.co/apm/module/apmgorilla v1.15.0
+	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
+	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0
+	go.elastic.co/apm/v2 v2.6.0
 	go.elastic.co/ecszap v1.0.1
 	go.elastic.co/go-licence-detector v0.5.0
 	go.uber.org/zap v1.27.0
@@ -222,10 +224,8 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.elastic.co/apm/module/apmhttp v1.15.0 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.6.0 // indirect
 	go.elastic.co/apm/module/apmzap/v2 v2.6.0 // indirect
-	go.elastic.co/apm/v2 v2.6.0 // indirect
 	go.elastic.co/fastjson v1.3.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/collector v0.102.1 // indirect
@@ -271,7 +271,6 @@ require (
 	gonum.org/v1/gonum v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240520151616-dc85e6b867a5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240520151616-dc85e6b867a5 // indirect
-	google.golang.org/grpc/examples v0.0.0-20220304170021-431ea809a767 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	howett.net/plist v1.0.1 // indirect
@@ -284,8 +283,7 @@ require (
 require (
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	go.elastic.co/apm v1.15.0
-	go.elastic.co/apm/module/apmgrpc v1.15.0
+	go.elastic.co/apm v1.15.0 // indirect
 	k8s.io/klog/v2 v2.110.1 // indirect
 )
 
