@@ -9,19 +9,11 @@
             "set_commit_status": true,
             "build_on_commit": true,
             "build_on_comment": true,
-<<<<<<< HEAD
             "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
             "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
             "skip_ci_labels": [  ],
             "skip_target_branches": [ ],
             "skip_ci_on_only_changed": [ ],
-=======
-            "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it|extended))|^/test\\W*(?:extended|)",
-            "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it|extended))|^/test\\W*(?:extended|)",
-            "skip_ci_labels": [ "skip-ci" ],
-            "skip_target_branches": [ ],
-            "skip_ci_on_only_changed": [ "^.ci/", "^changelog", "^docs/", "\\.md$", "^docker-compose.yml", "^.pre-commit-config.yaml", "skaffold.yaml", "^Dockerfile.skaffold", "^Dockerfile"],
->>>>>>> fd8d1ee1a0 ([CI] Monorepo diff plugin for integration tests (#4906))
             "always_require_ci_on_changed": [ ]
         },
         {
