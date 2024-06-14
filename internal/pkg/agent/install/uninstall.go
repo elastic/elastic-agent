@@ -15,9 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kardianos/service"
 	"github.com/schollz/progressbar/v3"
-
-	"github.com/elastic/go-service"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
