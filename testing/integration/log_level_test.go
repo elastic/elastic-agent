@@ -54,22 +54,6 @@ func TestSetLogLevelFleetManaged(t *testing.T) {
 	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
 
-	//cmd, err := f.PrepareAgentCommand(ctx, nil)
-	//if err != nil {
-	//	t.Fatalf("cannot prepare Elastic-Agent command: %s", err)
-	//}
-	//
-	//output := strings.Builder{}
-	//cmd.Stderr = &output
-	//cmd.Stdout = &output
-	//
-	//if err = cmd.Start(); err != nil {
-	//	t.Fatalf("could not start Elastic-Agent: %s", err)
-	//}
-	//
-	//out, err := f.Exec(ctx, []string{"enroll", "--url", fleetServerURL, "--enrollment-token", enrollmentTokenResp.APIKey})
-	//require.NoErrorf(t, err, "error enrolling agent. Enroll command output:\n%s\n", string(out))
-
 	installOutput, err := f.Install(ctx, &atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
@@ -88,18 +72,6 @@ func TestSetLogLevelFleetManaged(t *testing.T) {
 	// get the agent ID
 	agentID, err := getAgentID(ctx, f)
 	require.NoError(t, err, "error getting the agent ID")
-
-	// Make sure the Elastic-Agent process is not running before
-	// exiting the test
-	//t.Cleanup(func() {
-	//	// Ignore the error because we cancelled the context,
-	//	// and that always returns an error
-	//	_ = cmd.Wait()
-	//	if t.Failed() {
-	//		t.Log("Elastic-Agent output:")
-	//		t.Log(output.String())
-	//	}
-	//})
 
 	testLogLevelSetViaFleet(ctx, f, agentID, t, info, policyResp)
 }
