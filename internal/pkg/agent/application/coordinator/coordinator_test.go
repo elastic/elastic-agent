@@ -587,7 +587,6 @@ func TestCoordinator_StateSubscribeIsolatedUnits(t *testing.T) {
 				resultChan <- ctx.Err()
 				return
 			case state := <-subChan:
-				t.Logf("%+v", state)
 				if len(state.Components) == 3 {
 					compState0 := getComponentState(state.Components, "fake-isolated-units-default-fake-isolated-units-0")
 					compState1 := getComponentState(state.Components, "fake-isolated-units-default-fake-isolated-units-1")
@@ -599,6 +598,11 @@ func TestCoordinator_StateSubscribeIsolatedUnits(t *testing.T) {
 								(unit1.State == client.UnitStateHealthy && unit1.Message == "Healthy From Fake Isolated Units 1 Config") {
 								resultChan <- nil
 								return
+							} else if unit0.State == client.UnitStateFailed && unit1.State == client.UnitStateFailed {
+								// if you get a really strange failed state, check to make sure the mock binaries in
+								// elastic-agent/pkg/component/fake/ are updated
+								t.Fail()
+								t.Logf("got units with failed state: %#v / %#v", unit1, unit0)
 							}
 						}
 					}
@@ -1007,7 +1011,7 @@ func (*testMonitoringManager) Prepare(_ string) error                           
 func (*testMonitoringManager) Cleanup(string) error                                  { return nil }
 func (*testMonitoringManager) Enabled() bool                                         { return false }
 func (*testMonitoringManager) Reload(rawConfig *config.Config) error                 { return nil }
-func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string) (map[string]interface{}, error) {
+func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string, _ map[string]uint64) (map[string]interface{}, error) {
 	return nil, nil
 }
 
