@@ -168,7 +168,7 @@ func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (b
 // to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
 // seconds if it keeps getting that error.
 func RemovePath(path string) error {
-	const arbitraryTimeout = 30 * time.Second
+	const arbitraryTimeout = 60 * time.Second
 	start := time.Now()
 	var lastErr error
 	for time.Since(start) <= arbitraryTimeout {
