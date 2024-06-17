@@ -144,7 +144,7 @@ RUN mkdir /app && \
 {{- end }}
 
 # Keep this after any chown command, chown resets any applied capabilities
-RUN setcap cap_setfcap,cap_chown=ep {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent
+RUN setcap cap_setfcap,cap_chown,cap_setpcap=ep {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent
 RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
 {{- if .linux_capabilities }}
 # Since the beat is stored at the other end of a symlink we must follow the symlink first
