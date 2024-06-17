@@ -53,12 +53,22 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | attributesprocessor | v0.97.0|
 | filterprocessor | v0.97.0|
 | resourceprocessor | v0.97.0|
 | transformprocessor | v0.97.0|
 | batchprocessor | v0.97.0|
 | memorylimiterprocessor | v0.97.0|
+=======
+| attributesprocessor | v0.102.0|
+| filterprocessor | v0.102.0|
+| k8sattributesprocessor | v0.102.0|
+| resourcedetectionprocessor | v0.102.0|
+| resourceprocessor | v0.102.0|
+| transformprocessor | v0.102.0|
+| batchprocessor | v0.102.1|
+>>>>>>> a5a4a3bbc3 (Add Resource Detection processor to OTel mode (#4811))
 
 
 
