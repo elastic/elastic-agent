@@ -34,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -771,7 +772,7 @@ func logToStderr(cfg *configuration.Configuration) {
 
 func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
 	statePath = envWithDefault(statePath, "STATE_PATH")
-	if isStatePathTooLong(statePath) || statePath == "" {
+	if statePath == "" {
 		statePath = defaultStateDirectory
 	}
 
@@ -780,8 +781,14 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	if configPath == "" {
 		configPath = statePath
 	}
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(configPath, 0755); err != nil {
+			return fmt.Errorf("cannot create folders for config path '%s': %w", configPath, err)
+		}
+	}
+
 	if socketPath == "" {
-		socketPath = fmt.Sprintf("unix://%s", filepath.Join(topPath, paths.ControlSocketName))
+		socketPath = utils.SocketURLWithFallback(statePath, topPath)
 	}
 	// ensure that the directory and sub-directory data exists
 	if err := os.MkdirAll(topPath, 0755); err != nil {
