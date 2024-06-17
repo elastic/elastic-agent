@@ -166,7 +166,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 
 	// check for running agents before installing, but only if not installed into a namespace whose point is allowing two agents at once.
-	if installOpts != nil && installOpts.Namespace != "" {
+	if installOpts != nil && !installOpts.Develop && installOpts.Namespace == "" {
 		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
 	}
 

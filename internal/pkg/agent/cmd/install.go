@@ -51,7 +51,7 @@ would like the Agent to operate.
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
 
-	cmd.Flags().Bool(flagInstallNamespace, false, "Install into an isolated namespace. Allows multiple Elastic Agents to be installed at once. (experimental)")
+	cmd.Flags().String(flagInstallNamespace, "", "Install into an isolated namespace. Allows multiple Elastic Agents to be installed at once. (experimental)")
 	_ = cmd.Flags().MarkHidden(flagInstallNamespace) // For internal use only.
 
 	cmd.Flags().Bool(flagInstallDevelopment, false, "Install into a standardized development namespace, may enable development specific options. Allows multiple Elastic Agents to be installed at once. (experimental)")
