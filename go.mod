@@ -42,9 +42,19 @@ require (
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c
 	github.com/oklog/ulid v1.3.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.102.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.102.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.102.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.102.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.102.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.102.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.102.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.102.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.102.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.102.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.102.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.102.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.102.0
 	github.com/otiai10/copy v1.14.0
 	github.com/pierrre/gotestcover v0.0.0-20160517101806-924dca7d15f0
 	github.com/pkg/errors v0.9.1
@@ -62,6 +72,11 @@ require (
 	go.elastic.co/apm/module/apmgorilla v1.15.0
 	go.elastic.co/ecszap v1.0.1
 	go.elastic.co/go-licence-detector v0.5.0
+	go.opentelemetry.io/collector/exporter/debugexporter v0.102.1
+	go.opentelemetry.io/collector/exporter/otlpexporter v0.102.1
+	go.opentelemetry.io/collector/extension/memorylimiterextension v0.102.1
+	go.opentelemetry.io/collector/processor/batchprocessor v0.102.1
+	go.opentelemetry.io/collector/receiver/otlpreceiver v0.102.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.23.0
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
@@ -89,17 +104,6 @@ require (
 require (
 	github.com/cavaliercoder/badio v0.0.0-20160213150051-ce5280129e9e // indirect
 	github.com/distribution/reference v0.5.0 // indirect
-	// open telemetry dependencies
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.102.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.102.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.102.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.102.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.102.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.102.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.102.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.102.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.102.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.102.0
 	go.opentelemetry.io/collector/component v0.102.1
 	go.opentelemetry.io/collector/confmap v0.102.1
 	go.opentelemetry.io/collector/confmap/converter/expandconverter v0.102.1
@@ -109,16 +113,11 @@ require (
 	go.opentelemetry.io/collector/confmap/provider/httpsprovider v0.102.1
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v0.102.1
 	go.opentelemetry.io/collector/exporter v0.102.1
-	go.opentelemetry.io/collector/exporter/debugexporter v0.102.1
-	go.opentelemetry.io/collector/exporter/otlpexporter v0.102.1
 	go.opentelemetry.io/collector/extension v0.102.1
-	go.opentelemetry.io/collector/extension/memorylimiterextension v0.102.1
 	go.opentelemetry.io/collector/featuregate v1.9.0
 	go.opentelemetry.io/collector/otelcol v0.102.1
 	go.opentelemetry.io/collector/processor v0.102.1
-	go.opentelemetry.io/collector/processor/batchprocessor v0.102.1
 	go.opentelemetry.io/collector/receiver v0.102.1
-	go.opentelemetry.io/collector/receiver/otlpreceiver v0.102.1
 )
 
 require (
@@ -140,11 +139,11 @@ require (
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/docker/docker v25.0.5+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
-	github.com/elastic/go-docappender/v2 v2.1.4 // indirect
+	github.com/elastic/go-docappender/v2 v2.1.2 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
-	github.com/elastic/gosigar v0.14.2 // indirect
+	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect

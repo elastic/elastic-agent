@@ -22,7 +22,7 @@ import (
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor" // for adding k8s metadata
-	resourcedetectionprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor"
 	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"   // for modifying resource attributes
 	transformprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor" // for OTTL processing on logs
 	"go.opentelemetry.io/collector/processor/batchprocessor"                                                    // for batching events
@@ -61,6 +61,7 @@ func components() (otelcol.Factories, error) {
 		attributesprocessor.NewFactory(),
 		transformprocessor.NewFactory(),
 		filterprocessor.NewFactory(),
+		resourcedetectionprocessor.NewFactory(),
 		k8sattributesprocessor.NewFactory(),
 		resourcedetectionprocessor.NewFactory(),
 	)
