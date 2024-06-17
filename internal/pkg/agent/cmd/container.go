@@ -970,13 +970,3 @@ func isContainer(detail component.PlatformDetail) component.PlatformDetail {
 	detail.OS = component.Container
 	return detail
 }
-
-// isStatePathTooLong returns true if the final Unix socket path
-// will be too long and needs to be shortened.
-//
-// Source: https://www.man7.org/linux/man-pages/man7/unix.7.html
-func isStatePathTooLong(statePath string) bool {
-	// This replicates the logic from `setPaths`
-	socketPath := filepath.Join(statePath, "data", paths.ControlSocketName)
-	return len(socketPath) > 107
-}
