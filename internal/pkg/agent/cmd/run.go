@@ -153,6 +153,7 @@ func logReturn(l *logger.Logger, err error) error {
 }
 
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, runAsOtel bool, awaiters awaiters, modifiers ...component.PlatformModifier) error {
+	time.Sleep(time.Minute)
 	cfg, err := loadConfig(ctx, override, runAsOtel)
 	if err != nil {
 		return err
