@@ -221,7 +221,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	}
 
 	// Output:
-	// [action_id: anActionID, type: POLICY_CHANGE]
+	// [id: anActionID, type: POLICY_CHANGE]
 	// {
 	//   "agent": {
 	//     "download": {
