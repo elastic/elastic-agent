@@ -64,8 +64,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --develop",
-		testDevelopmentAgentCanInstall(ctx, fixture, installtest.NamespaceTopPath(paths.DevelopmentNamespace), opts))
+	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, "", true, opts))
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -140,11 +139,10 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	devTopPath := filepath.Join(basePath, "Elastic", paths.InstallDirNameForNamespace(paths.DevelopmentNamespace))
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --develop", testDevelopmentAgentCanInstall(ctx, fixture, devTopPath, opts))
+	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, basePath, false, opts))
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -197,8 +195,7 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --develop",
-		testDevelopmentAgentCanInstall(ctx, fixture, installtest.NamespaceTopPath(paths.DevelopmentNamespace), opts))
+	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, "", false, opts))
 }
 
 func TestInstallPrivilegedWithBasePath(t *testing.T) {
@@ -244,14 +241,13 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-	devTopPath := filepath.Join(randomBasePath, "Elastic", paths.InstallDirNameForNamespace(paths.DevelopmentNamespace))
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --develop", testDevelopmentAgentCanInstall(ctx, fixture, devTopPath, opts))
+	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, randomBasePath, true, opts))
 }
 
-// Tests that a second agent for development purposes can be installed alongside the first one with the --develop option.
-func testDevelopmentAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, topPath string, installOpts atesting.InstallOpts) func(*testing.T) {
+// Tests that a second agent can be installed in an isolated namespace, using either --develop or --namespace.
+func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, basePath string, develop bool, installOpts atesting.InstallOpts) func(*testing.T) {
 	return func(t *testing.T) {
 		// Get path to Elastic Agent executable
 		devFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -261,15 +257,27 @@ func testDevelopmentAgentCanInstall(ctx context.Context, fixture *atesting.Fixtu
 		err = devFixture.Prepare(ctx)
 		require.NoError(t, err)
 
-		installOpts.Develop = true
+		// If development mode was requested, the namespace will be automatically set to Development after Install().
+		// Otherwise, install into a test namespace.
+		installOpts.Develop = develop
+		if !installOpts.Develop {
+			installOpts.Namespace = "Testing"
+		}
+
 		devOut, err := devFixture.Install(ctx, &installOpts)
 		if err != nil {
-			t.Logf("install --develop output: %s", devOut)
+			t.Logf("install output: %s", devOut)
 			require.NoError(t, err)
 		}
+
+		topPath := installtest.NamespaceTopPath(installOpts.Namespace)
+		if basePath != "" {
+			topPath = filepath.Join(basePath, "Elastic", paths.InstallDirNameForNamespace(installOpts.Namespace))
+		}
+
 		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{
 			Privileged: installOpts.Privileged,
-			Develop:    installOpts.Develop,
+			Namespace:  installOpts.Namespace,
 		}))
 	}
 }

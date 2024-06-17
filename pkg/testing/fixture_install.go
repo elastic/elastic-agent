@@ -106,7 +106,8 @@ type InstallOpts struct {
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
 	DelayEnroll    bool   // --delay-enroll
-	Develop        bool   // --develop, not supported for DEB and RPM.
+	Develop        bool   // --develop, not supported for DEB and RPM. Calling Install() sets Namespace to the development namespace so that checking only for a Namespace is sufficient.
+	Namespace      string // --namespace, not supported for DEB and RPM.
 
 	Privileged bool // inverse of --unprivileged (as false is the default)
 
@@ -114,7 +115,7 @@ type InstallOpts struct {
 	FleetBootstrapOpts
 }
 
-func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
+func (i *InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	var args []string
 	if i.BasePath != "" {
 		args = append(args, "--base-path", i.BasePath)
@@ -137,8 +138,15 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	if !i.Privileged {
 		args = append(args, "--unprivileged")
 	}
+	if i.Namespace != "" {
+		args = append(args, "--namespace="+i.Namespace)
+	}
 	if i.Develop {
 		args = append(args, "--develop")
+		if i.Namespace == "" {
+			// If --namespace was used it will override the development namespace.
+			i.Namespace = paths.DevelopmentNamespace
+		}
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
@@ -157,8 +165,8 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 
-	// check for running agents before installing, but only if not using --develop whose point is allowing two agents at once.
-	if installOpts != nil && !installOpts.Develop {
+	// check for running agents before installing, but only if not installed into a namespace whose point is allowing two agents at once.
+	if installOpts != nil && installOpts.Namespace != "" {
 		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
 	}
 
@@ -205,9 +213,9 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 
 	installDir := "Agent"
 	socketRunSymlink := paths.ControlSocketRunSymlink("")
-	if installOpts.Develop {
-		installDir = paths.InstallDirNameForNamespace(paths.DevelopmentNamespace)
-		socketRunSymlink = paths.ControlSocketRunSymlink(paths.DevelopmentNamespace)
+	if installOpts.Namespace != "" {
+		installDir = paths.InstallDirNameForNamespace(installOpts.Namespace)
+		socketRunSymlink = paths.ControlSocketRunSymlink(installOpts.Namespace)
 	}
 
 	if installOpts.BasePath == "" {
@@ -273,12 +281,12 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 		processes := getElasticAgentProcesses(f.t)
 
 		// there can be a single agent left when using --develop mode
-		if f.installOpts != nil && f.installOpts.Develop {
-			assert.LessOrEqual(f.t, len(processes), 1, "More than one agent left running at the end of the test when --develop was used: %v", processes)
+		if f.installOpts != nil && f.installOpts.Namespace != "" {
+			assert.LessOrEqualf(f.t, len(processes), 1, "More than one agent left running at the end of the test when second agent in namespace %s was used: %v", f.installOpts.Namespace, processes)
 			// The agent left running has to be the non-development agent. The development agent should be uninstalled first as a convention.
 			if len(processes) > 0 {
-				assert.NotContains(f.t, processes[0].Cmdline, paths.InstallDirNameForNamespace(paths.DevelopmentNamespace),
-					"The agent installed with --develop was left running at the end of the test or was not uninstalled first: %v", processes)
+				assert.NotContainsf(f.t, processes[0].Cmdline, paths.InstallDirNameForNamespace(f.installOpts.Namespace),
+					"The agent installed into namespace %s was left running at the end of the test or was not uninstalled first: %v", f.installOpts.Namespace, processes)
 			}
 			return
 		}

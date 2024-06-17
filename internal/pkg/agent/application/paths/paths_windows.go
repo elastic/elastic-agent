@@ -34,9 +34,9 @@ const (
 	ShellWrapperFmt = "" // no wrapper on Windows
 )
 
-// shellWrapperPathForNamespace is a helper to work around not being able to use fmt.Sprintf
+// ShellWrapperPathForNamespace is a helper to work around not being able to use fmt.Sprintf
 // unconditionally since shellWrapperPath is empty on Windows.
-func shellWrapperPathForNamespace(namespace string) string {
+func ShellWrapperPathForNamespace(namespace string) string {
 	return ""
 }
 

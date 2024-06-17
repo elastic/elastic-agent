@@ -39,7 +39,7 @@ func NamespaceTopPath(namespace string) string {
 
 type CheckOpts struct {
 	Privileged bool
-	Develop    bool
+	Namespace  string
 }
 
 func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts *CheckOpts) error {

@@ -832,8 +832,8 @@ func (f *Fixture) binaryPath() string {
 	workDir := f.workDir
 	if f.installed {
 		installDir := "Agent"
-		if f.installOpts != nil && f.installOpts.Develop {
-			installDir = paths.InstallDirNameForNamespace(paths.DevelopmentNamespace)
+		if f.installOpts != nil && f.installOpts.Namespace != "" {
+			installDir = paths.InstallDirNameForNamespace(f.installOpts.Namespace)
 		}
 
 		if f.installOpts != nil && f.installOpts.BasePath != "" {

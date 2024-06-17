@@ -24,7 +24,7 @@ func TestInstallNamespace(t *testing.T) {
 	assert.Equal(t, filepath.Join(basePath, "Elastic", fmt.Sprintf(installDirNamespaceFmt, namespace)), InstallPath(basePath))
 	assert.Equal(t, fmt.Sprintf(serviceNameNamespaceFmt, namespace), ServiceName())
 	assert.Equal(t, fmt.Sprintf(serviceDisplayNameNamespaceFmt, namespace), ServiceDisplayName())
-	assert.Equal(t, shellWrapperPathForNamespace(namespace), ShellWrapperPath())
+	assert.Equal(t, ShellWrapperPathForNamespace(namespace), ShellWrapperPath())
 	assert.Equal(t, controlSocketRunSymlinkForNamespace(namespace), ControlSocketRunSymlink(namespace))
 }
 

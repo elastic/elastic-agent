@@ -116,7 +116,7 @@ func ShellWrapperPath() string {
 		return shellWrapperPath
 	}
 
-	return shellWrapperPathForNamespace(strings.ToLower(namespace))
+	return ShellWrapperPathForNamespace(namespace)
 }
 
 // ControlSocketRunSymlink returns the shell wrapper path accounting for any namespace.
