@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
+//go:build integration && linux
 
 package integration
 
@@ -176,25 +176,30 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		statePath         string
-		expectedStatePath string
-		expectError       bool
+		statePath          string
+		expectedStatePath  string
+		expectedSocketPath string
+		expectError        bool
 	}{
 		"small path": { // Use the set path
-			statePath:         filepath.Join(os.TempDir(), "foo", "bar"),
-			expectedStatePath: filepath.Join(os.TempDir(), "foo", "bar"),
+			statePath:          filepath.Join(os.TempDir(), "foo", "bar"),
+			expectedStatePath:  filepath.Join(os.TempDir(), "foo", "bar"),
+			expectedSocketPath: "/tmp/foo/bar/data/smp7BzlzcwgrLK4PUxpu7G1O5UwV4adr.sock",
 		},
 		"no path set": { // Use the default path
-			statePath:         "",
-			expectedStatePath: "/usr/share/elastic-agent/state",
+			statePath:          "",
+			expectedStatePath:  "/usr/share/elastic-agent/state",
+			expectedSocketPath: "/usr/share/elastic-agent/state/data/Td8I7R-Zby36_zF_IOd9QVNlFblNEro3.sock",
 		},
-		"107 characters path": { // Longest path that still works for creating a unix socket
-			statePath:         "/tmp/tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
-			expectedStatePath: "/tmp/tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+		"107 characters path": { // Longest path that still works for creating a unix socket, but will use /tmp/elastic-agent
+			statePath:          "/tmp/tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+			expectedStatePath:  "/tmp/tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+			expectedSocketPath: "/tmp/elastic-agent/oKUUJbxrLlGSh3z6wZWYleLeMuUN4P0_.sock",
 		},
-		"long path": { // This will falback to the default path
-			statePath:         filepath.Join(os.TempDir(), "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
-			expectedStatePath: "/usr/share/elastic-agent/state",
+		"long path": { // Path too long to create a unix socket, it will use /tmp/elastic-agent
+			statePath:          "/tmp/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			expectedStatePath:  "/tmp/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			expectedSocketPath: "/tmp/elastic-agent/Xegnlbb8QDcqNLPzyf2l8PhVHjWvlQgZ.sock",
 		},
 	}
 
@@ -239,9 +244,21 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 
 			// Now that the Elastic-Agent is healthy, check that the control socket path
 			// is the expected one
-			expectedSocketPath := filepath.Join(tc.expectedStatePath, "data", "elastic-agent.sock")
-			if _, err := os.Stat(expectedSocketPath); err != nil {
-				t.Errorf("cannot stat expected socket ('%s'): %s", expectedSocketPath, err)
+			if _, err := os.Stat(tc.expectedStatePath); err != nil {
+				t.Errorf("cannot stat expected state path ('%s'): %s", tc.expectedStatePath, err)
+			}
+			if _, err := os.Stat(tc.expectedSocketPath); err != nil {
+				t.Errorf("cannot stat expected socket path ('%s'): %s", tc.expectedSocketPath, err)
+			}
+
+			if t.Failed() {
+				containerPaths, err := os.ReadFile(filepath.Join(agentFixture.WorkDir(), "container-paths.yml"))
+				if err != nil {
+					t.Fatalf("could not read container-paths.yml: %s", err)
+				}
+
+				t.Log("contents of 'container-paths-yml'")
+				t.Log(string(containerPaths))
 			}
 		})
 	}
