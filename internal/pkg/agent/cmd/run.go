@@ -114,7 +114,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.Flags().Duration("fleet-init-timeout", envTimeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
 	_ = cmd.Flags().MarkHidden("testing-mode")
 
-	cmd.Flags().Bool(flagRunDevelopment, false, "Run agent in development mode. Allows running when there is already and installed Elastic Agent. (experimental)")
+	cmd.Flags().Bool(flagRunDevelopment, false, "Run agent in development mode. Allows running when there is already an installed Elastic Agent. (experimental)")
 	_ = cmd.Flags().MarkHidden(flagRunDevelopment) // For internal use only.
 
 	return cmd

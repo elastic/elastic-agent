@@ -26,6 +26,7 @@ const (
 	flagInstallBasePath     = "base-path"
 	flagInstallUnprivileged = "unprivileged"
 	flagInstallDevelopment  = "develop"
+	flagInstallNamespace    = "namespace"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -50,7 +51,10 @@ would like the Agent to operate.
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
 
-	cmd.Flags().Bool(flagInstallDevelopment, false, "Install an isolated Elastic Agent for development. Allows a non-development agent to be installed already. (experimental)")
+	cmd.Flags().Bool(flagInstallNamespace, false, "Install into an isolated namespace. Allows multiple Elastic Agents to be installed at once. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallNamespace) // For internal use only.
+
+	cmd.Flags().Bool(flagInstallDevelopment, false, "Install into a standardized development namespace, may enable development specific options. Allows multiple Elastic Agents to be installed at once. (experimental)")
 	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
 
 	addEnrollFlags(cmd)
@@ -86,9 +90,16 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
 	if isDevelopmentMode {
-		fmt.Fprintln(streams.Out, "Development installation mode enabled; this is an experimental and currently unsupported feature.")
+		fmt.Fprintln(streams.Out, "Installing into development namespace; this is an experimental and currently unsupported feature.")
 		// For now, development mode only installs agent in a well known namespace to allow two agents on the same machine.
 		paths.SetInstallNamespace(paths.DevelopmentNamespace)
+	}
+
+	namespace, _ := cmd.Flags().GetString(flagInstallNamespace)
+	if namespace != "" {
+		fmt.Fprintf(streams.Out, "Installing into namespace '%s'; this is an experimental and currently unsupported feature.\n", namespace)
+		// Overrides the development namespace if namespace was specified separately.
+		paths.SetInstallNamespace(namespace)
 	}
 
 	topPath := paths.InstallPath(basePath)
