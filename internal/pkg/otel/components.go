@@ -61,7 +61,6 @@ func components() (otelcol.Factories, error) {
 		attributesprocessor.NewFactory(),
 		transformprocessor.NewFactory(),
 		filterprocessor.NewFactory(),
-		resourcedetectionprocessor.NewFactory(),
 		k8sattributesprocessor.NewFactory(),
 		resourcedetectionprocessor.NewFactory(),
 	)
