@@ -15,9 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kardianos/service"
 	"github.com/schollz/progressbar/v3"
-
-	"github.com/elastic/go-service"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -301,7 +300,7 @@ func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Confi
 	if err != nil {
 		return nil, aerrors.New("failed to create a map from config", err)
 	}
-	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil)
+	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
