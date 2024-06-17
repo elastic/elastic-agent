@@ -1209,6 +1209,196 @@ func getIndAgentGlobExpr(versionedFlatPath string, packageVersion string) string
 	return globExpr
 }
 
+func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, packageVersion string) map[string]string {
+	log.Printf(">>>>>>>>>> XXX versionedFlatPath: [%s]", versionedFlatPath)
+	globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
+	//globExpr := getIndAgentGlobExpr(versionedFlatPath, packageVersion)
+	if mg.Verbose() {
+		log.Printf("Finding files to copy with %s", globExpr)
+	}
+	files, err := filepath.Glob(globExpr)
+	if err != nil {
+		panic(err)
+	}
+	if mg.Verbose() {
+		log.Printf(" XXX Validating checksums for %+v", files)
+		log.Printf("--- XXX Copying into %s: %v", versionedDropPath, files)
+	}
+
+	checksums := make(map[string]string)
+	for _, f := range files {
+		options := copy.Options{
+			OnSymlink: func(_ string) copy.SymlinkAction {
+				return copy.Shallow
+			},
+			Sync: true,
+		}
+		if mg.Verbose() {
+			log.Printf("> XXX prepare to copy %s into %s ", f, versionedDropPath)
+		}
+
+		info, err := os.Stat(f)
+		if err != nil {
+			panic(err)
+		}
+		if info.IsDir() {
+			log.Printf(">>> XXX DIR!! [%s]", f)
+		} else {
+			log.Printf(">>> XXX File! [%s]", f)
+		}
+
+		err = copy.Copy(f, versionedDropPath, options)
+		if err != nil {
+			panic(err)
+		}
+
+		// copy spec file for match
+		specName := filepath.Base(f)
+		log.Printf(">>>> XXX specName: [%s]", specName)
+		idx := strings.Index(specName, "-"+packageVersion)
+		if idx != -1 {
+			specName = specName[:idx]
+			log.Printf(">>>> XXX specName[:idx] [%s]", specName)
+		}
+		log.Printf(">>>> XXX specName final: [%s]", specName)
+
+		checksum, err := copyComponentSpecs(specName, versionedDropPath)
+		if err != nil {
+			panic(err)
+		}
+
+		checksums[specName+specSuffix] = checksum
+	}
+
+	return checksums
+}
+
+func getComponentVersion(componentName string, requiredPackage string, componentProject tools.Project, agentComponents map[string]string) string {
+	var componentVersion string
+	for pkgName, _ := range componentProject.Packages {
+		log.Printf(">>>>>>>>>>> XXX getComponentVersion Package: %s <<<<", pkgName)
+		pkgPrefix := agentComponents[componentName]
+		firstSplit := strings.Split(pkgName, pkgPrefix+"-")
+		if len(firstSplit) < 2 {
+			continue
+		}
+		secondHalf := firstSplit[1]
+		if len(secondHalf) < 2 {
+			continue
+		}
+		if strings.Contains(secondHalf, requiredPackage) {
+			log.Printf(">>>>>>>>>>> XXX Second Half: %s <<<<", secondHalf)
+			if strings.Contains(secondHalf, "docker-image") {
+				continue
+			}
+			if strings.Contains(secondHalf, "oss-") {
+				continue
+			}
+			componentVersion = strings.Split(secondHalf, "-"+requiredPackage)[0]
+			log.Printf(">>>>>>>>>>> XXX Got Version: %s <<<<", componentVersion)
+			break
+		}
+	}
+
+	return componentVersion
+}
+
+func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse tools.Build) map[string]string {
+
+	agentComponents := map[string]string{
+		"apm-server":   "apm-server",
+		"beats":        "metricbeat",
+		"cloud-defend": "cloud-defend",
+		"cloudbeat":    "cloudbeat",
+		//"elastic-agent-core": "elastic-agent-core",
+		"endpoint-dev": "endpoint-security",
+		"fleet-server": "fleet-server",
+		"prodfiler":    "pf-elastic-collector",
+	}
+	/*
+		externalBinaries := map[string]string{
+			"agentbeat":             "beats",
+			"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
+			"cloud-defend":          "cloud-defend",
+			"apm-server":            "apm-server", // not supported on darwin/aarch64
+			"endpoint-security":     "endpoint-dev",
+			"fleet-server":          "fleet-server",
+			"pf-elastic-collector":  "prodfiler",
+			"pf-elastic-symbolizer": "prodfiler",
+			"pf-host-agent":         "prodfiler",
+		}
+	*/
+
+	checksums := make(map[string]string)
+
+	projects := manifestResponse.Projects
+	//log.Printf(">>>>>>>>> XXX projects: [%s]", projects)
+	log.Printf(">>>>>>>> XXX in filehelperWithManifest")
+
+	for componentName, _ := range projects {
+		if _, ok := agentComponents[componentName]; !ok {
+			//log.Printf(">>>>>> XXX Ignoring component [%s]", componentName)
+			continue
+		}
+
+		log.Printf(">>>>>>>>> XXX Found componentName [%s]", componentName)
+
+		log.Printf(">>>>> XXX Checking for requiredPackage: [%s]", requiredPackage)
+		for pkgName, _ := range projects[componentName].Packages {
+			log.Printf(">>>>>>>> XXX Found pkgName: [%s]", pkgName)
+			if strings.Contains(pkgName, requiredPackage) {
+				log.Printf(">>>>>>> XXX Pkg [%s] matches requiredPackage [%s]", pkgName, requiredPackage)
+
+				componentVersion := getComponentVersion(componentName, requiredPackage, projects[componentName], agentComponents)
+				log.Printf(">>>>>>> XXX [%s] [%s] version is [%s]", componentName, requiredPackage, componentVersion)
+
+				fullPath := filepath.Join(versionedFlatPath, pkgName)
+				log.Printf(">>>>>> XXX fullPath [%s]", fullPath)
+
+				var dirToCopy string
+				if strings.HasSuffix(fullPath, ".tar.gz") {
+					dirToCopy = fullPath[:strings.LastIndex(fullPath, ".tar.gz")]
+				} else if strings.HasSuffix(fullPath, ".zip") {
+					dirToCopy = fullPath[:strings.LastIndex(fullPath, ".zip")]
+				} else {
+					dirToCopy = fullPath
+				}
+				log.Printf(">>>>>> XXX dirToCopy [%s]", dirToCopy)
+
+				options := copy.Options{
+					OnSymlink: func(_ string) copy.SymlinkAction {
+						return copy.Shallow
+					},
+					Sync: true,
+				}
+				log.Printf("> XXX ManURL prepare to copy %s into %s ", dirToCopy, versionedDropPath)
+
+				//log.Printf(">>>>> SLEEPING")
+				//time.Sleep(60 * time.Second)
+				//log.Printf(">>>>> DONE SLEEPING")
+
+				info, err := os.Stat(dirToCopy)
+				if err != nil {
+					panic(err)
+				}
+				if info.IsDir() {
+					log.Printf(">>> XXX DIR!! [%s]", dirToCopy)
+				} else {
+					log.Printf(">>> XXX File! [%s]", dirToCopy)
+				}
+
+				err = copy.Copy(dirToCopy, versionedDropPath, options)
+				if err != nil {
+					panic(err)
+				}
+
+			}
+		}
+	}
+
+	return checksums
+}
+
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
 func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse tools.Build) {
@@ -1237,6 +1427,8 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 		if mg.Verbose() {
 			log.Printf("--- Extracting into the flat dir: %v", matches)
 		}
+		log.Printf("--- XXX Extracting into the flat dir: %v", matches)
+
 		for _, m := range matches {
 			stat, err := os.Stat(m)
 			if os.IsNotExist(err) {
@@ -1252,59 +1444,28 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 			if mg.Verbose() {
 				log.Printf(">>> Extracting %s to %s", m, versionedFlatPath)
 			}
+			log.Printf(">>> XXX Extracting %s to %s", m, versionedFlatPath)
+
 			if err := devtools.Extract(m, versionedFlatPath); err != nil {
 				panic(err)
 			}
 		}
 
-		//globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
-		globExpr := getIndAgentGlobExpr(versionedFlatPath, packageVersion)
-		if mg.Verbose() {
-			log.Printf("Finding files to copy with %s", globExpr)
-		}
-		files, err := filepath.Glob(globExpr)
-		if err != nil {
-			panic(err)
-		}
-		if mg.Verbose() {
-			log.Printf("Validating checksums for %+v", files)
-			log.Printf("--- Copying into %s: %v", versionedDropPath, files)
-		}
 		checksums := make(map[string]string)
-		for _, f := range files {
-			options := copy.Options{
-				OnSymlink: func(_ string) copy.SymlinkAction {
-					return copy.Shallow
-				},
-				Sync: true,
-			}
-			if mg.Verbose() {
-				log.Printf("> prepare to copy %s ", f)
-			}
-			err = copy.Copy(f, versionedDropPath, options)
-			if err != nil {
-				panic(err)
-			}
-
-			// copy spec file for match
-			specName := filepath.Base(f)
-			idx := strings.Index(specName, "-"+packageVersion)
-			if idx != -1 {
-				specName = specName[:idx]
-			}
-
-			checksum, err := copyComponentSpecs(specName, versionedDropPath)
-			if err != nil {
-				panic(err)
-			}
-
-			checksums[specName+specSuffix] = checksum
+		if devtools.PackagingFromManifest {
+			checksums = fileHelperWithManifest(rp, versionedFlatPath, versionedDropPath, manifestResponse)
+		} else {
+			checksums = fileHelperNoManifest(versionedFlatPath, versionedDropPath, packageVersion)
 		}
 
 		if err := appendComponentChecksums(versionedDropPath, checksums); err != nil {
 			panic(err)
 		}
 	}
+
+	log.Printf(">>>> XXX Sleeping....")
+	//time.Sleep(60 * time.Second)
+	log.Printf(">>>> XXX Done Sleeping....")
 }
 
 // simple struct to deserialize branch information.
