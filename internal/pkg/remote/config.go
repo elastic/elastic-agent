@@ -34,8 +34,8 @@ const (
 
 // Unpack the protocol.
 func (p *Protocol) Unpack(from string) error {
-	if Protocol(from) != ProtocolHTTPS && Protocol(from) != ProtocolHTTP {
-		return fmt.Errorf("invalid protocol %s, accepted values are 'http' and 'https'", from)
+	if from != "" && Protocol(from) != ProtocolHTTPS && Protocol(from) != ProtocolHTTP {
+		return fmt.Errorf("invalid protocol %q, accepted values are 'http' and 'https'", from)
 	}
 
 	*p = Protocol(from)

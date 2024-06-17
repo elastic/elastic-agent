@@ -158,7 +158,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 				ad.scheduleRetry(ctx, rAction, acker)
 				continue
 			}
-			ad.log.Debugf("Failed to dispatch action '%+v', error: %+v", action, err)
+			ad.log.Errorf("Failed to dispatch action id %q of type %q, error: %+v", action.ID(), action.Type(), err)
 			reportedErr = err
 			continue
 		}

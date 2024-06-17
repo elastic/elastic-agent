@@ -117,6 +117,51 @@ func (_c *Agent_Headers_Call) RunAndReturn(run func() map[string]string) *Agent_
 	return _c
 }
 
+// IsStandalone provides a mock function with given fields:
+func (_m *Agent) IsStandalone() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsStandalone")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// Agent_IsStandalone_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsStandalone'
+type Agent_IsStandalone_Call struct {
+	*mock.Call
+}
+
+// IsStandalone is a helper method to define mock.On call
+func (_e *Agent_Expecter) IsStandalone() *Agent_IsStandalone_Call {
+	return &Agent_IsStandalone_Call{Call: _e.mock.On("IsStandalone")}
+}
+
+func (_c *Agent_IsStandalone_Call) Run(run func()) *Agent_IsStandalone_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Agent_IsStandalone_Call) Return(_a0 bool) *Agent_IsStandalone_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Agent_IsStandalone_Call) RunAndReturn(run func() bool) *Agent_IsStandalone_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LogLevel provides a mock function with given fields:
 func (_m *Agent) LogLevel() string {
 	ret := _m.Called()
