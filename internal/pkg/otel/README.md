@@ -32,6 +32,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | filelogreceiver | v0.102.0|
+| hostmetricsreceiver | v0.102.0|
 | otlpreceiver | v0.102.1|
 
 

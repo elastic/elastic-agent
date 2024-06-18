@@ -33,6 +33,17 @@ receivers:
   filelog:
     include:
       - /filelog/path
+  hostmetrics:
+    scrapers:
+      cpu:
+      disk:
+      filesystem:
+      load:
+      memory:
+      network:
+      paging:
+      process:
+      processes:
   otlp:
     protocols:
       grpc:
@@ -72,6 +83,7 @@ service:
         - resourcedetection
         - transform
       receivers:
+        - hostmetrics
         - otlp
 
     traces:
