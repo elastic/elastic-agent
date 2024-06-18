@@ -21,11 +21,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // GenerateMonitoringCfgFn is a function that can inject information into the model generation process.
-type GenerateMonitoringCfgFn func(map[string]interface{}, []Component, map[string]string) (map[string]interface{}, error)
+type GenerateMonitoringCfgFn func(map[string]interface{}, []Component, map[string]string, map[string]uint64) (map[string]interface{}, error)
 
 type HeadersProvider interface {
 	Headers() map[string]string
@@ -284,6 +283,7 @@ func (r *RuntimeSpecs) ToComponents(
 	monitoringInjector GenerateMonitoringCfgFn,
 	ll logp.Level,
 	headers HeadersProvider,
+	currentServiceCompInts map[string]uint64,
 ) ([]Component, error) {
 	components, err := r.PolicyToComponents(policy, ll, headers)
 	if err != nil {
@@ -297,7 +297,7 @@ func (r *RuntimeSpecs) ToComponents(
 		for _, component := range components {
 			binaryMapping[component.ID] = component.BinaryName()
 		}
-		monitoringCfg, err := monitoringInjector(policy, components, binaryMapping)
+		monitoringCfg, err := monitoringInjector(policy, components, binaryMapping, currentServiceCompInts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to inject monitoring: %w", err)
 		}
@@ -946,10 +946,6 @@ type outputI struct {
 // input specification runtime checks. This function should always be
 // edited in sync with the documentation in specs/README.md.
 func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
-	hasRoot, err := utils.HasRoot()
-	if err != nil {
-		return nil, err
-	}
 	return transpiler.NewVars("", map[string]interface{}{
 		"install": map[string]interface{}{
 			"in_default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)) || pkgmgr.InstalledViaExternalPkgMgr(),
@@ -964,7 +960,7 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 			"minor":       platform.Minor,
 		},
 		"user": map[string]interface{}{
-			"root": hasRoot,
+			"root": platform.User.Root,
 		},
 	}, nil)
 }

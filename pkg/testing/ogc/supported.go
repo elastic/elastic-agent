@@ -25,6 +25,19 @@ var ogcSupported = []LayoutOS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
 			Distro:  runner.Ubuntu,
+			Version: "24.04",
+		},
+		Provider:     Google,
+		InstanceSize: "e2-standard-2", // 2 amd64 cpus, 8 GB RAM
+		RunsOn:       "ubuntu-2404-lts-amd64",
+		Username:     "ubuntu",
+		RemotePath:   "/home/ubuntu/agent",
+	},
+	{
+		OS: define.OS{
+			Type:    define.Linux,
+			Arch:    define.AMD64,
+			Distro:  runner.Ubuntu,
 			Version: "22.04",
 		},
 		Provider:     Google,
@@ -49,6 +62,19 @@ var ogcSupported = []LayoutOS{
 	// These instance types are experimental on Google Cloud and very unstable
 	// We will wait until Google introduces new ARM instance types
 	// https://cloud.google.com/blog/products/compute/introducing-googles-new-arm-based-cpu
+	// {
+	// 	OS: define.OS{
+	// 		Type:    define.Linux,
+	// 		Arch:    define.ARM64,
+	// 		Distro:  runner.Ubuntu,
+	// 		Version: "24.04",
+	// 	},
+	// 	Provider:     Google,
+	// 	InstanceSize: "t2a-standard-4", // 4 arm64 cpus, 16 GB RAM
+	// 	RunsOn:       "ubuntu-2404-lts-arm64",
+	// 	Username:     "ubuntu",
+	// 	RemotePath:   "/home/ubuntu/agent",
+	// },
 	// {
 	// 	OS: define.OS{
 	// 		Type:    define.Linux,

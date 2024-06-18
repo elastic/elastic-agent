@@ -67,7 +67,8 @@ var (
 	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat", "pf-elastic-collector", "pf-elastic-symbolizer"}
 )
 
-// BeatsMonitor is providing V1 monitoring support for metrics and logs for endpoint-security only.
+// BeatsMonitor provides config values for monitoring of agent clients (beats, endpoint, etc)
+// by injecting the monitoring config into an existing fleet config
 type BeatsMonitor struct {
 	enabled         bool // feature flag disabling whole v1 monitoring story
 	config          *monitoringConfig
@@ -110,10 +111,16 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 }
 
 // MonitoringConfig adds monitoring inputs to a configuration based on retrieved list of components to run.
+// args:
+// policy: the existing config policy
+// components: a list of the expected running components
+// componentIDToBinary: a map of component IDs to binary names
+// componentIDPidMap: a map of component IDs to the PIDs of the running components.
 func (b *BeatsMonitor) MonitoringConfig(
 	policy map[string]interface{},
 	components []component.Component,
 	componentIDToBinary map[string]string,
+	componentIDPidMap map[string]uint64,
 ) (map[string]interface{}, error) {
 	if !b.Enabled() {
 		return nil, nil
@@ -158,7 +165,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	}
 
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, monitoringOutput, components); err != nil {
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, componentIDPidMap); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -298,6 +305,7 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 	return nil
 }
 
+// injectLogsInput adds logging configs for component monitoring to the `cfg` map
 func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []component.Component, monitoringOutput string) error {
 	monitoringNamespace := b.monitoringNamespace()
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
@@ -448,7 +456,6 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 			// only monitor service inputs that define a log path
 			continue
 		}
-
 		fixedBinaryName := strings.ReplaceAll(strings.ReplaceAll(comp.BinaryName(), "-", "_"), "/", "_") // conform with index naming policy
 		dataset := fmt.Sprintf("elastic_agent.%s", fixedBinaryName)
 		streams = append(streams, map[string]interface{}{
@@ -534,7 +541,8 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
-func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component) error {
+// injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.
+func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, componentList []component.Component, existingStateServicePids map[string]uint64) error {
 	metricsCollectionIntervalString := metricsCollectionInterval.String()
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
@@ -906,6 +914,89 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			},
 			"streams": streams,
 		},
+	}
+
+	// add system/process metrics for services that can't be monitored via json/beats metrics
+	// If there's a checkin PID and the corresponding component has a service spec section, add a system/process config
+	for _, compState := range componentList {
+		if compState.InputSpec != nil && compState.InputSpec.Spec.Service != nil {
+			if comp, ok := existingStateServicePids[compState.ID]; ok && comp != 0 {
+				name := strings.ReplaceAll(strings.ReplaceAll(compState.BinaryName(), "-", "_"), "/", "_")
+				inputs = append(inputs, map[string]interface{}{
+					idKey:        fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
+					"name":       fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
+					"type":       "system/metrics",
+					useOutputKey: monitoringOutput,
+					"data_stream": map[string]interface{}{
+						"namespace": monitoringNamespace,
+					},
+					"streams": []interface{}{
+						map[string]interface{}{
+							idKey: fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
+							"data_stream": map[string]interface{}{
+								"type":      "metrics",
+								"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+								"namespace": monitoringNamespace,
+							},
+							"metricsets":              []interface{}{"process"},
+							"period":                  metricsCollectionIntervalString,
+							"index":                   fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
+							"process.pid":             comp,
+							"process.cgroups.enabled": false,
+							"processors": []interface{}{
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "data_stream",
+										"fields": map[string]interface{}{
+											"type":      "metrics",
+											"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+											"namespace": monitoringNamespace,
+										},
+									},
+								},
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "event",
+										"fields": map[string]interface{}{
+											"dataset": fmt.Sprintf("elastic_agent.%s", name),
+										},
+									},
+								},
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "elastic_agent",
+										"fields": map[string]interface{}{
+											"id":       b.agentInfo.AgentID(),
+											"version":  b.agentInfo.Version(),
+											"snapshot": b.agentInfo.Snapshot(),
+											"process":  name,
+										},
+									},
+								},
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "agent",
+										"fields": map[string]interface{}{
+											"id": b.agentInfo.AgentID(),
+										},
+									},
+								},
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "component",
+										"fields": map[string]interface{}{
+											"binary": name,
+											"id":     compState.ID,
+										},
+									},
+								},
+							},
+						},
+					},
+				})
+			}
+
+		}
 	}
 
 	// if we have shipper data, inject the extra inputs

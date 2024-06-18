@@ -38,6 +38,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -335,7 +336,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 	if err != nil {
 		if !c.options.FleetServer.SpawnAgent {
 			// wait longer to try and communicate with the Elastic Agent
-			err = waitForAgent(ctx, c.options.DaemonTimeout)
+			err = wait.ForAgent(ctx, c.options.DaemonTimeout)
 			if err != nil {
 				return "", errors.New("failed to communicate with elastic-agent daemon; is elastic-agent running?")
 			}
@@ -720,54 +721,6 @@ func getDaemonState(ctx context.Context) (*client.AgentState, error) {
 type waitResult struct {
 	enrollmentToken string
 	err             error
-}
-
-func waitForAgent(ctx context.Context, timeout time.Duration) error {
-	if timeout == 0 {
-		timeout = 1 * time.Minute
-	}
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	maxBackoff := timeout
-	if maxBackoff <= 0 {
-		// indefinite timeout
-		maxBackoff = 10 * time.Minute
-	}
-
-	resChan := make(chan waitResult)
-	innerCtx, innerCancel := context.WithCancel(context.Background())
-	defer innerCancel()
-	go func() {
-		backOff := expBackoffWithContext(innerCtx, 1*time.Second, maxBackoff)
-		for {
-			backOff.Wait()
-			_, err := getDaemonState(innerCtx)
-			if errors.Is(err, context.Canceled) {
-				resChan <- waitResult{err: err}
-				return
-			}
-			if err == nil {
-				resChan <- waitResult{}
-				break
-			}
-		}
-	}()
-
-	var res waitResult
-	select {
-	case <-ctx.Done():
-		innerCancel()
-		res = <-resChan
-	case res = <-resChan:
-	}
-
-	if res.err != nil {
-		return res.err
-	}
-	return nil
 }
 
 func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessState, log *logger.Logger, timeout time.Duration) (string, error) {

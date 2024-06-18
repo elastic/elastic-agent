@@ -545,8 +545,12 @@ func TestToComponents(t *testing.T) {
 					InputType:  "endpoint",
 					OutputType: "elasticsearch",
 					ID:         "endpoint-default",
-					InputSpec:  &InputRuntimeSpec{},
-					Err:        NewErrInputRuntimeCheckFail("Elastic Defend doesn't support RHEL7 on arm64"),
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "endpoint",
+						BinaryName: "endpoint-security",
+						BinaryPath: filepath.Join("..", "..", "specs", "endpoint-security"),
+					},
+					Err: NewErrInputRuntimeCheckFail("Elastic Defend doesn't support RHEL7 on arm64"),
 					Units: []Unit{
 						{
 							ID:       "endpoint-default",
@@ -3551,7 +3555,7 @@ func TestToComponents(t *testing.T) {
 			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), scenario.Platform, SkipBinaryCheck())
 			require.NoError(t, err)
 
-			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel, scenario.headers)
+			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel, scenario.headers, map[string]uint64{})
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
@@ -4062,7 +4066,7 @@ func TestFlattenedDataStream(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil)
+	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
@@ -4163,7 +4167,7 @@ func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil)
+	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
