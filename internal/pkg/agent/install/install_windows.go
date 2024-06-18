@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/svc/eventlog"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
@@ -80,6 +82,12 @@ func withServiceOptions(username string, groupName string) ([]serviceOpt, error)
 // gives user the ability to control the service, needed when installed with --unprivileged or
 // ReExec is not possible on Windows.
 func servicePostInstall(ownership utils.FileOwner) error {
+	// Modify registry to allow logging to eventlog as "Elastic Agent".
+	err := eventlog.InstallAsEventCreate(paths.ServiceName, eventlog.Info|eventlog.Warning|eventlog.Error)
+	if err != nil && !strings.Contains(err.Error(), "registry key already exists") {
+		return fmt.Errorf("unable to create registry key for logging: %w", err)
+	}
+
 	if ownership.UID == "" {
 		// no user, running with LOCAL SYSTEM (do nothing)
 		return nil
