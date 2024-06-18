@@ -1303,95 +1303,112 @@ func getComponentVersion(componentName string, requiredPackage string, component
 	return componentVersion
 }
 
+func fixCloudDefendDirPath(dirPath string, componentVersion string, expectedArch string, actualArch string) string {
+	fixedDirPath := dirPath
+
+	cloudDefendExpectedDirName := fmt.Sprintf("cloud-defend-%s-linux-%s", componentVersion, expectedArch)
+	cloudDefendActualDirName := fmt.Sprintf("cloud-defend-%s-%s", componentVersion, actualArch)
+	if strings.Contains(fixedDirPath, cloudDefendExpectedDirName) {
+		fixedDirPath = strings.ReplaceAll(fixedDirPath, cloudDefendExpectedDirName, cloudDefendActualDirName)
+	}
+
+	return fixedDirPath
+}
+
 func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse tools.Build) map[string]string {
 
-	agentComponents := map[string]string{
-		"apm-server":   "apm-server",
-		"beats":        "metricbeat",
-		"cloud-defend": "cloud-defend",
-		"cloudbeat":    "cloudbeat",
-		//"elastic-agent-core": "elastic-agent-core",
-		"endpoint-dev": "endpoint-security",
-		"fleet-server": "fleet-server",
-		"prodfiler":    "pf-elastic-collector",
+	// Should move this elsewhere so there's only one location for it
+	externalBinaries := map[string]string{
+		"agentbeat":             "beats",
+		"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
+		"cloud-defend":          "cloud-defend",
+		"apm-server":            "apm-server", // not supported on darwin/aarch64
+		"endpoint-security":     "endpoint-dev",
+		"fleet-server":          "fleet-server",
+		"pf-elastic-collector":  "prodfiler",
+		"pf-elastic-symbolizer": "prodfiler",
+		"pf-host-agent":         "prodfiler",
 	}
-	/*
-		externalBinaries := map[string]string{
-			"agentbeat":             "beats",
-			"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
-			"cloud-defend":          "cloud-defend",
-			"apm-server":            "apm-server", // not supported on darwin/aarch64
-			"endpoint-security":     "endpoint-dev",
-			"fleet-server":          "fleet-server",
-			"pf-elastic-collector":  "prodfiler",
-			"pf-elastic-symbolizer": "prodfiler",
-			"pf-host-agent":         "prodfiler",
-		}
-	*/
 
 	checksums := make(map[string]string)
 
 	projects := manifestResponse.Projects
-	//log.Printf(">>>>>>>>> XXX projects: [%s]", projects)
 	log.Printf(">>>>>>>> XXX in filehelperWithManifest")
 
 	for componentName, _ := range projects {
-		if _, ok := agentComponents[componentName]; !ok {
-			//log.Printf(">>>>>> XXX Ignoring component [%s]", componentName)
-			continue
-		}
-
-		log.Printf(">>>>>>>>> XXX Found componentName [%s]", componentName)
 
 		log.Printf(">>>>> XXX Checking for requiredPackage: [%s]", requiredPackage)
 		for pkgName, _ := range projects[componentName].Packages {
 			log.Printf(">>>>>>>> XXX Found pkgName: [%s]", pkgName)
 			if strings.Contains(pkgName, requiredPackage) {
-				log.Printf(">>>>>>> XXX Pkg [%s] matches requiredPackage [%s]", pkgName, requiredPackage)
+				for filePrefix, _ := range externalBinaries {
+					if !strings.HasPrefix(pkgName, filePrefix) {
+						continue
+					}
+					log.Printf(">>>>>>> XXX Pkg [%s] matches requiredPackage [%s]", pkgName, requiredPackage)
 
-				componentVersion := getComponentVersion(componentName, requiredPackage, projects[componentName], agentComponents)
-				log.Printf(">>>>>>> XXX [%s] [%s] version is [%s]", componentName, requiredPackage, componentVersion)
+					componentVersion := getComponentVersion(componentName, requiredPackage, projects[componentName], agentComponents)
+					log.Printf(">>>>>>> XXX [%s] [%s] version is [%s]", componentName, requiredPackage, componentVersion)
 
-				fullPath := filepath.Join(versionedFlatPath, pkgName)
-				log.Printf(">>>>>> XXX fullPath [%s]", fullPath)
+					fullPath := filepath.Join(versionedFlatPath, pkgName)
+					log.Printf(">>>>>> XXX fullPath [%s]", fullPath)
 
-				var dirToCopy string
-				if strings.HasSuffix(fullPath, ".tar.gz") {
-					dirToCopy = fullPath[:strings.LastIndex(fullPath, ".tar.gz")]
-				} else if strings.HasSuffix(fullPath, ".zip") {
-					dirToCopy = fullPath[:strings.LastIndex(fullPath, ".zip")]
-				} else {
-					dirToCopy = fullPath
+					var dirToCopy string
+					if strings.HasSuffix(fullPath, ".tar.gz") {
+						dirToCopy = fullPath[:strings.LastIndex(fullPath, ".tar.gz")]
+					} else if strings.HasSuffix(fullPath, ".zip") {
+						dirToCopy = fullPath[:strings.LastIndex(fullPath, ".zip")]
+					} else {
+						dirToCopy = fullPath
+					}
+
+					// cloud-defend path exception
+					// When untarred, cloud defend untars to:
+					//    cloud-defend-8.14.0-arm64
+					// but the manifest (and most of this code) expects to be the same as
+					// the name in the manifest, which is:
+					//    cloud-defend-8.14.0-linux-x86_64
+					// So we have to do a bit of a transformation here
+					if strings.Contains(dirToCopy, "cloud-defend") {
+						if strings.Contains(dirToCopy, "x86_64") {
+							dirToCopy = fixCloudDefendDirPath(dirToCopy, componentVersion, "x86_64", "amd64")
+						}
+						if strings.Contains(dirToCopy, "arm64") {
+							// Not actually replacing the arch, but removing the "linux"
+							dirToCopy = fixCloudDefendDirPath(dirToCopy, componentVersion, "arm64", "arm64")
+						}
+					}
+
+					log.Printf(">>>>>> XXX dirToCopy [%s]", dirToCopy)
+
+					options := copy.Options{
+						OnSymlink: func(_ string) copy.SymlinkAction {
+							return copy.Shallow
+						},
+						Sync: true,
+					}
+					log.Printf("> XXX ManURL prepare to copy %s into %s ", dirToCopy, versionedDropPath)
+
+					info, err := os.Stat(dirToCopy)
+					if err != nil {
+						log.Printf(">>>>> SLEEPING")
+						time.Sleep(60 * time.Second)
+						log.Printf(">>>>> DONE SLEEPING")
+
+						panic(err)
+					}
+					if info.IsDir() {
+						log.Printf(">>> XXX DIR!! [%s]", dirToCopy)
+					} else {
+						log.Printf(">>> XXX File! [%s]", dirToCopy)
+					}
+
+					err = copy.Copy(dirToCopy, versionedDropPath, options)
+					if err != nil {
+						panic(err)
+					}
+
 				}
-				log.Printf(">>>>>> XXX dirToCopy [%s]", dirToCopy)
-
-				options := copy.Options{
-					OnSymlink: func(_ string) copy.SymlinkAction {
-						return copy.Shallow
-					},
-					Sync: true,
-				}
-				log.Printf("> XXX ManURL prepare to copy %s into %s ", dirToCopy, versionedDropPath)
-
-				//log.Printf(">>>>> SLEEPING")
-				//time.Sleep(60 * time.Second)
-				//log.Printf(">>>>> DONE SLEEPING")
-
-				info, err := os.Stat(dirToCopy)
-				if err != nil {
-					panic(err)
-				}
-				if info.IsDir() {
-					log.Printf(">>> XXX DIR!! [%s]", dirToCopy)
-				} else {
-					log.Printf(">>> XXX File! [%s]", dirToCopy)
-				}
-
-				err = copy.Copy(dirToCopy, versionedDropPath, options)
-				if err != nil {
-					panic(err)
-				}
-
 			}
 		}
 	}
@@ -1464,7 +1481,7 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 	}
 
 	log.Printf(">>>> XXX Sleeping....")
-	//time.Sleep(60 * time.Second)
+	time.Sleep(60 * time.Second)
 	log.Printf(">>>> XXX Done Sleeping....")
 }
 
