@@ -823,8 +823,8 @@ github.com/elastic/elastic-integration-corpus-generator-tool v0.5.0/go.mod h1:uf
 github.com/elastic/elastic-package v0.77.0/go.mod h1:Xeqx0OOVnKBfFoSHsHmKI74RxgRGiDhU6yXEu8BkJJM=
 github.com/elastic/elastic-transport-go/v8 v8.6.0 h1:Y2S/FBjx1LlCv5m6pWAF2kDJAHoSjSRSJCApolgfthA=
 github.com/elastic/elastic-transport-go/v8 v8.6.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
-github.com/elastic/go-docappender/v2 v2.1.2 h1:zkEh+g/CxpJdQR6BqdcApa/A4oRQiiG3iFiIhNCoovs=
-github.com/elastic/go-docappender/v2 v2.1.2/go.mod h1:oHi6MsHriWaG8W6T9iyJ/PkEo2+182HIzq+0RRAzzgA=
+github.com/elastic/go-docappender/v2 v2.1.4 h1:R6TN4udeC5pap+uA7Lrb3pzeOm03vx6K3+yQdczviH0=
+github.com/elastic/go-docappender/v2 v2.1.4/go.mod h1:eixVwyxvjJJLMditD/9630jjPbN6nHtSkVjae8nqJsY=
 github.com/elastic/go-elasticsearch/v7 v7.17.7/go.mod h1:OJ4wdbtDNk5g503kvlHLyErCgQwwzmDtaFC4XyOxXA4=
 github.com/elastic/go-elasticsearch/v7 v7.17.10 h1:TCQ8i4PmIJuBunvBS6bwT2ybzVFxxUhhltAs3Gyu1yo=
 github.com/elastic/go-elasticsearch/v7 v7.17.10/go.mod h1:OJ4wdbtDNk5g503kvlHLyErCgQwwzmDtaFC4XyOxXA4=

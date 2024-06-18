@@ -29,6 +29,10 @@ func TestECSMetadata(t *testing.T) {
 	metadata, err := agentInfo.ECSMetadata(l)
 	require.NoError(t, err)
 
+	if assert.NotNil(t, metadata.Elastic, "metadata.Elastic must not be nil") {
+		assert.NotNil(t, metadata.Elastic.Agent, "metadata.Elastic.Agent must not be nil")
+	}
+
 	sysInfo, err := sysinfo.Host()
 	require.NoError(t, err)
 
