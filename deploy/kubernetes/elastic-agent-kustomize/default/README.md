@@ -25,8 +25,6 @@ secretGenerator:
       - enrollment_token=%ENROLLMENT_TOKEN%
 ```
 
-Comm
-
 For *Standalone Elastic Agent*, please update the following secrets inside main [kustomization.yaml](./elastic-agent-managed/kustomization.yaml):
 
 - %ES_HOST%: The Elasticsearch host to communicate with
