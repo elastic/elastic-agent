@@ -220,7 +220,6 @@ RUN for iter in {1..10}; do \
     (exit $exit_code)
 
 {{- end }}
-# root group no more for elastic-agent user
 USER {{ .user }}
 
 
