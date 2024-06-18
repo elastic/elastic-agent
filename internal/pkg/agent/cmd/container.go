@@ -781,7 +781,7 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	if configPath == "" {
 		configPath = statePath
 	}
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
 		if err := os.MkdirAll(configPath, 0755); err != nil {
 			return fmt.Errorf("cannot create folders for config path '%s': %w", configPath, err)
 		}
