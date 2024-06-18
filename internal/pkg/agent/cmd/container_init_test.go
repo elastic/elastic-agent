@@ -173,13 +173,13 @@ func Test_getAmbientCapabilitiesFromEffectiveSet(t *testing.T) {
 	}{
 		{
 			name:         "no ambient caps",
-			procCaps:     []cap.Value{cap.CHOWN, cap.SETPCAP, cap.SETFCAP},
+			procCaps:     []cap.Value{cap.SETPCAP, cap.SETFCAP},
 			expectedCaps: []cap.Value(nil),
 		},
 		{
 			name:         "no ambient caps",
 			procCaps:     []cap.Value{cap.CHOWN, cap.SETPCAP, cap.SETFCAP, cap.BPF},
-			expectedCaps: []cap.Value{cap.BPF},
+			expectedCaps: []cap.Value{cap.CHOWN, cap.BPF},
 		},
 	}
 

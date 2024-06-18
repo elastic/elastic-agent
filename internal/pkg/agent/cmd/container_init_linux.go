@@ -120,7 +120,7 @@ func getAmbientCapabilitiesFromEffectiveSet() ([]cap.Value, error) {
 	for capVal := cap.Value(0); capVal < cap.MaxBits(); capVal++ {
 
 		switch capVal {
-		case cap.CHOWN, cap.SETPCAP, cap.SETFCAP:
+		case cap.SETPCAP, cap.SETFCAP:
 			// don't set these as they shouldn't be required by any exec'ed child process
 			continue
 		default:
