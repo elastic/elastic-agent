@@ -72,35 +72,72 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 	var val tools.Package
 	var ok bool
 
-	log.Printf(">>>>>>>>>>>> XXX Looking for package [%s] of type [%s]", pkg, reqPackage)
+	// Try the normal/easy case first
+	packageName := fmt.Sprintf("%s-%s-%s", pkg, version, reqPackage)
+	val, ok = project.Packages[packageName]
+	if !ok {
+		// If we didn't find it, it may be an Independent Agent Release, where
+		// the opted-in projects will have a patch version one higher than
+		// the rest of the projects, so we need to seek that out
+		if mg.Verbose() {
+			log.Printf(">>>>>>>>>>> Looking for package [%s] of type [%s]", pkg, reqPackage)
+		}
 
-	for pkgName := range project.Packages {
-		if strings.HasPrefix(pkgName, pkg) {
-			log.Printf(">>>>>>>>>>> XXX Package: %s <<<<", pkgName)
-			firstSplit := strings.Split(pkgName, pkg+"-")
-			secondHalf := firstSplit[1]
-			if strings.Contains(secondHalf, reqPackage) {
-				log.Printf(">>>>>>>>>>> XXX Second Half: %s <<<<", secondHalf)
-				pkgVersion := strings.Split(secondHalf, "-"+reqPackage)[0]
-				log.Printf(">>>>>>>>>>> XXX Got Version: %s <<<<", pkgVersion)
-
-				foundPkgKey := fmt.Sprintf("%s-%s-%s", pkg, pkgVersion, reqPackage)
-				log.Printf(">>>>>>>>>>> XXX Found Pkg Key: %s <<<<", foundPkgKey)
-
-				val, ok = project.Packages[foundPkgKey]
-				if !ok {
-					return nil
+		var foundIt bool
+		for pkgName := range project.Packages {
+			if strings.HasPrefix(pkgName, pkg) {
+				firstSplit := strings.Split(pkgName, pkg+"-")
+				if len(firstSplit) < 2 {
+					continue
 				}
 
-				if mg.Verbose() {
-					log.Printf(">>>>>>>>>>> Project branch/commit [%s, %s]", project.Branch, project.CommitHash)
+				secondHalf := firstSplit[1]
+				// Make sure we're finding one w/ the same required package type
+				if strings.Contains(secondHalf, reqPackage) {
+
+					// Split again after the version with the required package string
+					secondSplit := strings.Split(secondHalf, "-"+reqPackage)
+					if len(secondSplit) < 2 {
+						continue
+					}
+
+					// The first element after the split should normally be the version
+					pkgVersion := secondSplit[0]
+					if mg.Verbose() {
+						log.Printf(">>>>>>>>>>> Using derived version for package [%s]: %s ", pkgName, pkgVersion)
+					}
+
+					// Create a project/package key with the package, derived version, and required package
+					foundPkgKey := fmt.Sprintf("%s-%s-%s", pkg, pkgVersion, reqPackage)
+					if mg.Verbose() {
+						log.Printf(">>>>>>>>>>> Looking for project package key: [%s]", foundPkgKey)
+					}
+
+					// Get the package value, if it exists
+					val, ok = project.Packages[foundPkgKey]
+					if !ok {
+						continue
+					}
+
+					if mg.Verbose() {
+						log.Printf(">>>>>>>>>>> Found package key [%s]", foundPkgKey)
+					}
+
+					foundIt = true
 				}
 			}
 		}
+
+		if !foundIt {
+			return nil
+		}
+	}
+
+	if mg.Verbose() {
+		log.Printf(">>>>>>>>>>> Project branch/commit [%s, %s]", project.Branch, project.CommitHash)
 	}
 
 	return []string{val.URL, val.ShaURL, val.AscURL}
-
 }
 
 // DownloadComponentsFromManifest is going to download a set of components from the given manifest into the destination
