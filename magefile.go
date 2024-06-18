@@ -1273,30 +1273,34 @@ func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, pa
 	return checksums
 }
 
-func getComponentVersion(componentName string, requiredPackage string, componentProject tools.Project, agentComponents map[string]string) string {
+func getComponentVersion(componentName string, requiredPackage string, componentProject tools.Project, externalBinaries map[string]string) string {
 	var componentVersion string
 	for pkgName, _ := range componentProject.Packages {
 		log.Printf(">>>>>>>>>>> XXX getComponentVersion Package: %s <<<<", pkgName)
-		pkgPrefix := agentComponents[componentName]
-		firstSplit := strings.Split(pkgName, pkgPrefix+"-")
-		if len(firstSplit) < 2 {
-			continue
-		}
-		secondHalf := firstSplit[1]
-		if len(secondHalf) < 2 {
-			continue
-		}
-		if strings.Contains(secondHalf, requiredPackage) {
-			log.Printf(">>>>>>>>>>> XXX Second Half: %s <<<<", secondHalf)
-			if strings.Contains(secondHalf, "docker-image") {
+		for binaryPrefix, binaryComponent := range externalBinaries {
+			if componentName != binaryComponent {
 				continue
 			}
-			if strings.Contains(secondHalf, "oss-") {
+			firstSplit := strings.Split(pkgName, binaryPrefix+"-")
+			if len(firstSplit) < 2 {
 				continue
 			}
-			componentVersion = strings.Split(secondHalf, "-"+requiredPackage)[0]
-			log.Printf(">>>>>>>>>>> XXX Got Version: %s <<<<", componentVersion)
-			break
+			secondHalf := firstSplit[1]
+			if len(secondHalf) < 2 {
+				continue
+			}
+			if strings.Contains(secondHalf, requiredPackage) {
+				log.Printf(">>>>>>>>>>> XXX Second Half: %s <<<<", secondHalf)
+				if strings.Contains(secondHalf, "docker-image") {
+					continue
+				}
+				if strings.Contains(secondHalf, "oss-") {
+					continue
+				}
+				componentVersion = strings.Split(secondHalf, "-"+requiredPackage)[0]
+				log.Printf(">>>>>>>>>>> XXX Got Version: %s <<<<", componentVersion)
+				break
+			}
 		}
 	}
 
@@ -1347,7 +1351,7 @@ func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, ve
 					}
 					log.Printf(">>>>>>> XXX Pkg [%s] matches requiredPackage [%s]", pkgName, requiredPackage)
 
-					componentVersion := getComponentVersion(componentName, requiredPackage, projects[componentName], agentComponents)
+					componentVersion := getComponentVersion(componentName, requiredPackage, projects[componentName], externalBinaries)
 					log.Printf(">>>>>>> XXX [%s] [%s] version is [%s]", componentName, requiredPackage, componentVersion)
 
 					fullPath := filepath.Join(versionedFlatPath, pkgName)
@@ -1479,10 +1483,6 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 			panic(err)
 		}
 	}
-
-	log.Printf(">>>> XXX Sleeping....")
-	time.Sleep(60 * time.Second)
-	log.Printf(">>>> XXX Done Sleeping....")
 }
 
 // simple struct to deserialize branch information.
