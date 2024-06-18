@@ -1412,6 +1412,22 @@ func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, ve
 						panic(err)
 					}
 
+					// copy spec file for match
+					specName := filepath.Base(dirToCopy)
+					log.Printf(">>>> XXX manURL specName: [%s]", specName)
+					idx := strings.Index(specName, "-"+componentVersion)
+					if idx != -1 {
+						specName = specName[:idx]
+						log.Printf(">>>> XXX manURL specName[:idx] [%s]", specName)
+					}
+					log.Printf(">>>> XXX manURL specName final: [%s]", specName)
+
+					checksum, err := copyComponentSpecs(specName, versionedDropPath)
+					if err != nil {
+						panic(err)
+					}
+
+					checksums[specName+specSuffix] = checksum
 				}
 			}
 		}
