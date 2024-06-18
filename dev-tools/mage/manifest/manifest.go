@@ -70,11 +70,11 @@ func DownloadManifest(manifest string) (tools.Build, error) {
 
 func resolveManifestPackage(project tools.Project, pkg string, reqPackage string, version string) []string {
 	var val tools.Package
-	var ok = true
+	var ok bool
 
 	log.Printf(">>>>>>>>>>>> XXX Looking for package [%s] of type [%s]", pkg, reqPackage)
 
-	for pkgName, _ := range project.Packages {
+	for pkgName := range project.Packages {
 		if strings.HasPrefix(pkgName, pkg) {
 			log.Printf(">>>>>>>>>>> XXX Package: %s <<<<", pkgName)
 			firstSplit := strings.Split(pkgName, pkg+"-")
