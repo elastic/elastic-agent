@@ -45,8 +45,6 @@ const (
 	defaultStateDirectory    = "/usr/share/elastic-agent/state" // directory that will hold the state data
 	agentBaseDirectory       = "/usr/share/elastic-agent"       // directory that holds all elastic-agent related files
 
-	skipFileCapabilitiesFlag = "skip-file-capabilities"
-
 	logsPathPerms = 0775
 )
 
@@ -142,14 +140,12 @@ all the above actions will be skipped, because the Elastic Agent has already bee
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
 		Run: func(c *cobra.Command, args []string) {
-			if err := logContainerCmd(c, streams); err != nil {
+			if err := logContainerCmd(streams); err != nil {
 				logError(streams, err)
 				os.Exit(1)
 			}
 		},
 	}
-
-	cmd.Flags().Bool(skipFileCapabilitiesFlag, false, "skip setting file capabilities")
 
 	return &cmd
 }
@@ -162,13 +158,8 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 	fmt.Fprintln(streams.Out, a...)
 }
 
-func logContainerCmd(cmd *cobra.Command, streams *cli.IOStreams) error {
-	skipFileCapabilities, err := cmd.Flags().GetBool(skipFileCapabilitiesFlag)
-	if err != nil {
-		return err
-	}
-
-	shouldExit, err := initContainer(streams, skipFileCapabilities)
+func logContainerCmd(streams *cli.IOStreams) error {
+	shouldExit, err := initContainer(streams)
 	if err != nil {
 		return err
 	}

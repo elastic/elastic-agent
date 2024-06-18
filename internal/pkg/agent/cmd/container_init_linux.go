@@ -33,37 +33,34 @@ var (
 // - chown all agent-related paths if DAC_OVERRIDE capability is not in the Effective set
 // If new binary capabilities are set then the returned cmd will be not nil. Note that it is up to caller to invoke
 // the returned cmd and spawn an agent instance with all the capabilities.
-func initContainer(streams *cli.IOStreams, skipFileCapabilities bool) (shouldExit bool, err error) {
+func initContainer(streams *cli.IOStreams) (shouldExit bool, err error) {
 	isRoot, err := utils.HasRoot()
 	if err != nil {
 		return true, err
 	}
-	if !skipFileCapabilities && !isRoot {
+	if !isRoot {
 		executable, err := os.Executable()
 		if err != nil {
 			return true, err
 		}
 
-		logInfo(streams, "agent container initialisation - file capabilities")
+		logInfo(streams, "agent container initialisation - checking file capabilities")
 		updated, err := updateFileCapsFromBoundingSet(executable)
 		if err != nil {
 			return true, err
 		}
 
 		if updated {
+			logInfo(streams, "agent container initialisation - re-exec")
 			// new capabilities were added thus we need to re-exec agent to pick them up
 			args := []string{filepath.Base(executable)}
 			if len(os.Args) > 1 {
 				args = append(args, os.Args[1:]...)
 			}
-			// add skipFileCapabilitiesFlag flag to skip reapplying the file capabilities
-			args = append(args, fmt.Sprintf("--%s", skipFileCapabilitiesFlag))
 
 			return true, unix.Exec(executable, args, os.Environ())
 		}
-	}
 
-	if !isRoot {
 		// if we are not root, we need to raise the ambient capabilities
 		logInfo(streams, "agent container initialisation - ambient capabilities")
 		if err := raiseAmbientCapabilities(); err != nil {
