@@ -201,7 +201,6 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 }
 
 func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
-
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
 		return fmt.Errorf("failed to gather system information: %w", err)

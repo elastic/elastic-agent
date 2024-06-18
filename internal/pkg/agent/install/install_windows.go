@@ -7,8 +7,12 @@
 package install
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"golang.org/x/sys/windows/svc/eventlog"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -46,5 +50,15 @@ func postInstall(topPath string) error {
 
 func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
 	// TODO(blakerouse): Fix the market permissions on Windows.
+	return nil
+}
+
+// serviceConfigure sets registry to Log to EventLog
+func serviceConfigure(ownership utils.FileOwner) error {
+	// Modify registry to allow logging to eventlog as "Elastic Agent".
+	err := eventlog.InstallAsEventCreate(paths.ServiceName, eventlog.Info|eventlog.Warning|eventlog.Error)
+	if err != nil && !strings.Contains(err.Error(), "registry key already exists") {
+		return fmt.Errorf("unable to create registry key for logging: %w", err)
+	}
 	return nil
 }
