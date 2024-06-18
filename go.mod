@@ -134,7 +134,7 @@ require (
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/docker/docker v25.0.5+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
-	github.com/elastic/go-docappender/v2 v2.1.2 // indirect
+	github.com/elastic/go-docappender/v2 v2.1.4 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
