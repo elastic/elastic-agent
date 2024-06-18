@@ -102,6 +102,28 @@ var (
 	goIntegTestTimeout = 2 * time.Hour
 	// goProvisionAndTestTimeout is the timeout used for both provisioning and running tests.
 	goProvisionAndTestTimeout = goIntegTestTimeout + 30*time.Minute
+
+	// Map of binaries to download to their project name in the unified-release manager.
+	// The project names are used to generate the URLs when downloading binaries. For example:
+	//
+	// https://artifacts-snapshot.elastic.co/beats/latest/8.11.0-SNAPSHOT.json
+	// https://artifacts-snapshot.elastic.co/cloudbeat/latest/8.11.0-SNAPSHOT.json
+	// https://artifacts-snapshot.elastic.co/cloud-defend/latest/8.11.0-SNAPSHOT.json
+	// https://artifacts-snapshot.elastic.co/apm-server/latest/8.11.0-SNAPSHOT.json
+	// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
+	// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
+	// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
+	externalBinaries = map[string]string{
+		"agentbeat":             "beats",
+		"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
+		"cloud-defend":          "cloud-defend",
+		"apm-server":            "apm-server", // not supported on darwin/aarch64
+		"endpoint-security":     "endpoint-dev",
+		"fleet-server":          "fleet-server",
+		"pf-elastic-collector":  "prodfiler",
+		"pf-elastic-symbolizer": "prodfiler",
+		"pf-host-agent":         "prodfiler",
+	}
 )
 
 func init() {
@@ -1078,27 +1100,6 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 		os.Setenv(agentDropPath, dropPath)
 
 		if devtools.ExternalBuild == true {
-			// Map of binaries to download to their project name in the unified-release manager.
-			// The project names are used to generate the URLs when downloading binaries. For example:
-			//
-			// https://artifacts-snapshot.elastic.co/beats/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/cloudbeat/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/cloud-defend/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/apm-server/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
-			externalBinaries := map[string]string{
-				"agentbeat":             "beats",
-				"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
-				"cloud-defend":          "cloud-defend",
-				"apm-server":            "apm-server", // not supported on darwin/aarch64
-				"endpoint-security":     "endpoint-dev",
-				"fleet-server":          "fleet-server",
-				"pf-elastic-collector":  "prodfiler",
-				"pf-elastic-symbolizer": "prodfiler",
-				"pf-host-agent":         "prodfiler",
-			}
 
 			// Only log fatal logs for logs produced using logrus. This is the global logger
 			// used by github.com/elastic/e2e-testing/pkg/downloads which can only be configured globally like this or via
@@ -1196,23 +1197,8 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 	return archivePath, dropPath
 }
 
-func getIndAgentGlobExpr(versionedFlatPath string, packageVersion string) string {
-	parsedPackageVersion, err := version.ParseVersion(packageVersion)
-	if err != nil {
-		panic(err)
-	}
-
-	bumpedPatchNumber := parsedPackageVersion.Patch() + 1
-
-	globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%d.%d.[%d|%d]*", parsedPackageVersion.Major(), parsedPackageVersion.Minor(), parsedPackageVersion.Patch(), bumpedPatchNumber))
-
-	return globExpr
-}
-
 func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, packageVersion string) map[string]string {
-	log.Printf(">>>>>>>>>> XXX versionedFlatPath: [%s]", versionedFlatPath)
 	globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
-	//globExpr := getIndAgentGlobExpr(versionedFlatPath, packageVersion)
 	if mg.Verbose() {
 		log.Printf("Finding files to copy with %s", globExpr)
 	}
@@ -1221,8 +1207,8 @@ func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, pa
 		panic(err)
 	}
 	if mg.Verbose() {
-		log.Printf(" XXX Validating checksums for %+v", files)
-		log.Printf("--- XXX Copying into %s: %v", versionedDropPath, files)
+		log.Printf(" Validating checksums for %+v", files)
+		log.Printf("--- Copying into %s: %v", versionedDropPath, files)
 	}
 
 	checksums := make(map[string]string)
@@ -1234,17 +1220,7 @@ func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, pa
 			Sync: true,
 		}
 		if mg.Verbose() {
-			log.Printf("> XXX prepare to copy %s into %s ", f, versionedDropPath)
-		}
-
-		info, err := os.Stat(f)
-		if err != nil {
-			panic(err)
-		}
-		if info.IsDir() {
-			log.Printf(">>> XXX DIR!! [%s]", f)
-		} else {
-			log.Printf(">>> XXX File! [%s]", f)
+			log.Printf("> prepare to copy %s into %s ", f, versionedDropPath)
 		}
 
 		err = copy.Copy(f, versionedDropPath, options)
@@ -1254,13 +1230,13 @@ func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, pa
 
 		// copy spec file for match
 		specName := filepath.Base(f)
-		log.Printf(">>>> XXX specName: [%s]", specName)
 		idx := strings.Index(specName, "-"+packageVersion)
 		if idx != -1 {
 			specName = specName[:idx]
-			log.Printf(">>>> XXX specName[:idx] [%s]", specName)
 		}
-		log.Printf(">>>> XXX specName final: [%s]", specName)
+		if mg.Verbose() {
+			log.Printf(">>>> Looking to copy spec file: [%s]", specName)
+		}
 
 		checksum, err := copyComponentSpecs(specName, versionedDropPath)
 		if err != nil {
@@ -1273,7 +1249,11 @@ func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, pa
 	return checksums
 }
 
-func getComponentVersion(componentName string, requiredPackage string, componentProject tools.Project, externalBinaries map[string]string) string {
+// This function is used when building with a Manifest.  In that manifest, it's possible
+// for projects in an Independent Agent Release to have different versions since the opted-in
+// ones will be one patch version higher than the opted-out/previously released projects.
+// This function tries to find the versions from the package name
+func getComponentVersion(componentName string, requiredPackage string, componentProject tools.Project) string {
 	var componentVersion string
 	for pkgName, _ := range componentProject.Packages {
 		log.Printf(">>>>>>>>>>> XXX getComponentVersion Package: %s <<<<", pkgName)
@@ -1321,23 +1301,9 @@ func fixCloudDefendDirPath(dirPath string, componentVersion string, expectedArch
 
 func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse tools.Build) map[string]string {
 
-	// Should move this elsewhere so there's only one location for it
-	externalBinaries := map[string]string{
-		"agentbeat":             "beats",
-		"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
-		"cloud-defend":          "cloud-defend",
-		"apm-server":            "apm-server", // not supported on darwin/aarch64
-		"endpoint-security":     "endpoint-dev",
-		"fleet-server":          "fleet-server",
-		"pf-elastic-collector":  "prodfiler",
-		"pf-elastic-symbolizer": "prodfiler",
-		"pf-host-agent":         "prodfiler",
-	}
-
 	checksums := make(map[string]string)
 
 	projects := manifestResponse.Projects
-	log.Printf(">>>>>>>> XXX in filehelperWithManifest")
 
 	for componentName, _ := range projects {
 
@@ -1351,7 +1317,7 @@ func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, ve
 					}
 					log.Printf(">>>>>>> XXX Pkg [%s] matches requiredPackage [%s]", pkgName, requiredPackage)
 
-					componentVersion := getComponentVersion(componentName, requiredPackage, projects[componentName], externalBinaries)
+					componentVersion := getComponentVersion(componentName, requiredPackage, projects[componentName])
 					log.Printf(">>>>>>> XXX [%s] [%s] version is [%s]", componentName, requiredPackage, componentVersion)
 
 					fullPath := filepath.Join(versionedFlatPath, pkgName)
@@ -1395,10 +1361,6 @@ func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, ve
 
 					info, err := os.Stat(dirToCopy)
 					if err != nil {
-						log.Printf(">>>>> SLEEPING")
-						time.Sleep(60 * time.Second)
-						log.Printf(">>>>> DONE SLEEPING")
-
 						panic(err)
 					}
 					if info.IsDir() {
