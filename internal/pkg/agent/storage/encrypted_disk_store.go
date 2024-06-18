@@ -12,6 +12,8 @@ import (
 	"io/fs"
 	"os"
 	"runtime"
+	"syscall"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/file"
 
@@ -117,6 +119,13 @@ func (d *EncryptedDiskStore) ensureKey(ctx context.Context) error {
 // Save will write the encrypted storage to disk.
 // Specifically it will write to a .tmp file then rotate the file to the target name to ensure that an error does not corrupt the previously written file.
 func (d *EncryptedDiskStore) Save(in io.Reader) error {
+	if d.target == paths.AgentConfigFile() {
+		fmt.Fprintf(os.Stderr, "Save of %s started at %s", paths.AgentConfigFile(), time.Now())
+		defer func() {
+			fmt.Fprintf(os.Stderr, "Save of %s finished at %s", paths.AgentConfigFile(), time.Now())
+		}()
+	}
+
 	// Ensure has agent key
 	err := d.ensureKey(d.ctx)
 	if err != nil {
@@ -182,7 +191,24 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
+	if runtime.GOOS == "windows" && d.target == paths.AgentConfigFile() {
+		// dump file permissions and info about `fleet.enc`
+
+	}
+
 	if err := file.SafeFileRotate(d.target, tmpFile); err != nil {
+
+		if runtime.GOOS == "windows" {
+			stat, staterr := os.Stat(paths.AgentConfigFile())
+			if staterr != nil {
+				fmt.Fprintf(os.Stderr, "Error stat()ing %s: %s", paths.AgentConfigFile(), staterr)
+			} else {
+				fmt.Fprintf(os.Stderr, "%s stat:\n%+v\n", paths.AgentConfigFile(), stat)
+				fmt.Fprintf(os.Stderr, "%s win stat:\n%+v\n", paths.AgentConfigFile(), stat.Sys().(*syscall.Win32FileAttributeData))
+			}
+
+		}
+
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s", d.target),
 			errors.TypeFilesystem,
@@ -204,6 +230,13 @@ func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
 			fmt.Sprintf("could not open %s", d.target),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, d.target))
+	}
+
+	if d.target == paths.AgentConfigFile() {
+		fmt.Fprintf(os.Stderr, "Load of %s started at %s", paths.AgentConfigFile(), time.Now())
+		defer func() {
+			fmt.Fprintf(os.Stderr, "Load of %s finished at %s", paths.AgentConfigFile(), time.Now())
+		}()
 	}
 
 	// Close fd if there is an error upon return

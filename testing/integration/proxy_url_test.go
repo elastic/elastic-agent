@@ -710,11 +710,11 @@ func TestProxyURL(t *testing.T) {
 			require.NoError(t, err, "SetupTest: fixture.Prepare failed")
 
 			privileged := false
-			if runtime.GOOS == "windows" {
-				// On windows installing + enrolling mode leads to access denied error when updating fleet.enc (regardless of privileged/unprivileged)
-				// See https://github.com/elastic/elastic-agent/issues/4913
-				t.Skip("Skipped on windows until https://github.com/elastic/elastic-agent/issues/4913 is resolved")
-			}
+			//if runtime.GOOS == "windows" {
+			//	// On windows installing + enrolling mode leads to access denied error when updating fleet.enc (regardless of privileged/unprivileged)
+			//	// See https://github.com/elastic/elastic-agent/issues/4913
+			//	t.Skip("Skipped on windows until https://github.com/elastic/elastic-agent/issues/4913 is resolved")
+			//}
 
 			out, err := fixture.Install(
 				ctx,
