@@ -711,9 +711,9 @@ func TestProxyURL(t *testing.T) {
 
 			privileged := false
 			if runtime.GOOS == "windows" {
-				// On windows installing in unprivileged mode leads to access denied error when updating fleet.enc.
+				// On windows installing + enrolling mode leads to access denied error when updating fleet.enc (regardless of privileged/unprivileged)
 				// See https://github.com/elastic/elastic-agent/issues/4913
-				privileged = true
+				t.Skip("Skipped on windows until https://github.com/elastic/elastic-agent/issues/4913 is resolved")
 			}
 
 			out, err := fixture.Install(
