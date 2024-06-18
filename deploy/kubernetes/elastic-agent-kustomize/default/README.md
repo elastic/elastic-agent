@@ -28,7 +28,7 @@ secretGenerator:
 For *Standalone Elastic Agent*, please update the following secrets inside main [kustomization.yaml](./elastic-agent-managed/kustomization.yaml):
 
 - %ES_HOST%: The Elasticsearch host to communicate with
-- %API_KEY: The API Key with access privilleges to connect to Elasticsearch. See [create-api-key-standalone-agent](https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent). *This should be encoded as base64 value because it will be stored as Kubernetes secret*
+- %API_KEY: The API Key with access privileges to connect to Elasticsearch. See [create-api-key-standalone-agent](https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent). *This should be encoded as base64 value because it will be stored as Kubernetes secret*
 - %CA_TRUSTED%: The ssl.ca_trusted_fingerprint in order the elastic agent to be able to trust the certificate authority of the Elasticsearch output.
 - %DATASET_ID%: A string that will be added as a new field and will denote a specific installation. *By default, this will be added to state_pod dataset.*
 
