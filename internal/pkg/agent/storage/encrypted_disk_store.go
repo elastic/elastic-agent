@@ -12,7 +12,6 @@ import (
 	"io/fs"
 	"os"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/file"
@@ -191,23 +190,11 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
-	if runtime.GOOS == "windows" && d.target == paths.AgentConfigFile() {
-		// dump file permissions and info about `fleet.enc`
-
-	}
+	DumpFilesystemInfo(d.target, func(fmtString string, args ...any) { fmt.Fprintf(os.Stderr, fmtString, args) })
 
 	if err := file.SafeFileRotate(d.target, tmpFile); err != nil {
 
-		if runtime.GOOS == "windows" {
-			stat, staterr := os.Stat(paths.AgentConfigFile())
-			if staterr != nil {
-				fmt.Fprintf(os.Stderr, "Error stat()ing %s: %s", paths.AgentConfigFile(), staterr)
-			} else {
-				fmt.Fprintf(os.Stderr, "%s stat:\n%+v\n", paths.AgentConfigFile(), stat)
-				fmt.Fprintf(os.Stderr, "%s win stat:\n%+v\n", paths.AgentConfigFile(), stat.Sys().(*syscall.Win32FileAttributeData))
-			}
-
-		}
+		DumpFilesystemInfo(d.target, func(fmtString string, args ...any) { fmt.Fprintf(os.Stderr, fmtString, args) })
 
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s", d.target),
