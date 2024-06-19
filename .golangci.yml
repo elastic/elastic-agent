@@ -112,6 +112,7 @@ linters-settings:
       - github.com/dop251/goja
       - github.com/dop251/goja_nodejs
       - github.com/fsnotify/fsnotify
+      - github.com/leoluk/perflib_exporter/perflib
       - github.com/tonistiigi/fifo
 
   gosimple:
