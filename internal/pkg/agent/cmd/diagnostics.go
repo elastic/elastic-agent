@@ -36,6 +36,7 @@ func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringP("file", "f", "", "name of the output diagnostics zip archive")
 	cmd.Flags().BoolP("cpu-profile", "p", false, "wait to collect a CPU profile")
+	cmd.Flags().BoolP("skip-conn", "", false, "Skip connection request diagnostics")
 	cmd.Flags().Bool("exclude-events", false, "do not collect events log file")
 
 	return cmd
@@ -64,7 +65,8 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	defer f.Close()
 
 	cpuProfile, _ := cmd.Flags().GetBool("cpu-profile")
-	agentDiag, unitDiags, compDiags, err := collectDiagnostics(ctx, streams, cpuProfile)
+	connSkip, _ := cmd.Flags().GetBool("skip-conn")
+	agentDiag, unitDiags, compDiags, err := collectDiagnostics(ctx, streams, cpuProfile, connSkip)
 	if err != nil {
 		return fmt.Errorf("failed collecting diagnostics: %w", err)
 	}
@@ -77,7 +79,7 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	return nil
 }
 
-func collectDiagnostics(ctx context.Context, streams *cli.IOStreams, cpuProfile bool) ([]client.DiagnosticFileResult, []client.DiagnosticUnitResult, []client.DiagnosticComponentResult, error) {
+func collectDiagnostics(ctx context.Context, streams *cli.IOStreams, cpuProfile, connSkip bool) ([]client.DiagnosticFileResult, []client.DiagnosticUnitResult, []client.DiagnosticComponentResult, error) {
 	daemon := client.New()
 	err := daemon.Connect(ctx)
 	if err != nil {
@@ -86,10 +88,13 @@ func collectDiagnostics(ctx context.Context, streams *cli.IOStreams, cpuProfile 
 	defer daemon.Disconnect()
 
 	var additionalDiags []cproto.AdditionalDiagnosticRequest
+	if !connSkip {
+		additionalDiags = append(additionalDiags, cproto.AdditionalDiagnosticRequest_CONN)
+	}
 	if cpuProfile {
 		// console will just hang while we wait for the CPU profile; print something so user doesn't get confused
 		fmt.Fprintf(streams.Out, "Creating diagnostics archive, waiting for CPU profile...\n")
-		additionalDiags = []cproto.AdditionalDiagnosticRequest{cproto.AdditionalDiagnosticRequest_CPU}
+		additionalDiags = append(additionalDiags, cproto.AdditionalDiagnosticRequest_CPU)
 	}
 
 	agentDiag, err := daemon.DiagnosticAgent(ctx, additionalDiags)
