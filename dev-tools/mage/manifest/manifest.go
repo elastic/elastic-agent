@@ -170,10 +170,6 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	// This eliminates the "+buildYYYYMMDDHHMM" suffix on Independent Agent Release builds
 	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
 
-	// For Independent Agent Releases, any opted-in projects will have a version that is
-	// one Patch version ahead since we are using the new bumped DRA artifacts for those projects.
-	// This is acceptable since it is being released only as bundled with Elastic Agent.
-
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
 	for component, pkgs := range componentSpec {
 		for _, platform := range platforms {

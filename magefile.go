@@ -1005,6 +1005,8 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 	}
 
 	if devtools.PackagingFromManifest {
+		// If we're using a manifest, download it here, and pass in the manifestResponse
+		// to other functions that need to operate on the manifest
 		if manifestResponse, err = manifest.DownloadManifest(devtools.ManifestURL); err != nil {
 			log.Panicf("failed to download remote manifest file %s", err)
 		} else {
@@ -1057,26 +1059,6 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
 func collectPackageDependencies(platforms []string, packageVersion string, requiredPackages []string, manifestResponse tools.Build) (archivePath string, dropPath string) {
-	// if we have defined a manifest URL to package Agent from, we should be using the same packageVersion of that manifest
-	/*
-		if devtools.PackagingFromManifest {
-			if manifestResponse, err := manifest.DownloadManifest(devtools.ManifestURL); err != nil {
-				log.Panicf("failed to download remote manifest file %s", err)
-			} else {
-				if parsedVersion, err := version.ParseVersion(manifestResponse.Version); err != nil {
-					log.Panicf("the manifest version from manifest is not semver, got %s", manifestResponse.Version)
-				} else {
-					// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
-					// something that we use as an implicit parameter to various functions
-					if parsedVersion.IsSnapshot() {
-						os.Setenv(snapshotEnv, "true")
-						mage.Snapshot = true
-					}
-					os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
-				}
-			}
-		}
-	*/
 
 	dropPath, found := os.LookupEnv(agentDropPath)
 
@@ -1197,6 +1179,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 	return archivePath, dropPath
 }
 
+// This is a helper function for flattenDependencies that's used when not packaging from a manifest
 func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, packageVersion string) map[string]string {
 	globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
 	if mg.Verbose() {
@@ -1207,7 +1190,7 @@ func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, pa
 		panic(err)
 	}
 	if mg.Verbose() {
-		log.Printf(" Validating checksums for %+v", files)
+		log.Printf("Validating checksums for %+v", files)
 		log.Printf("--- Copying into %s: %v", versionedDropPath, files)
 	}
 
@@ -1255,38 +1238,62 @@ func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, pa
 // This function tries to find the versions from the package name
 func getComponentVersion(componentName string, requiredPackage string, componentProject tools.Project) string {
 	var componentVersion string
+	var foundIt bool
+	// Iterate over all the packages in the component project
 	for pkgName, _ := range componentProject.Packages {
-		log.Printf(">>>>>>>>>>> XXX getComponentVersion Package: %s <<<<", pkgName)
+		// Only care about the external binaries that we want to package
 		for binaryPrefix, binaryComponent := range externalBinaries {
+			// If the given component name doesn't match the external binary component, skip
 			if componentName != binaryComponent {
 				continue
 			}
+
+			// Split the package name on the binary name prefix plus a dash
 			firstSplit := strings.Split(pkgName, binaryPrefix+"-")
 			if len(firstSplit) < 2 {
 				continue
 			}
+
+			// Get the second part of the first split
 			secondHalf := firstSplit[1]
 			if len(secondHalf) < 2 {
 				continue
 			}
+
+			// Make sure the second half matches the required package
 			if strings.Contains(secondHalf, requiredPackage) {
-				log.Printf(">>>>>>>>>>> XXX Second Half: %s <<<<", secondHalf)
+				// ignore packages with names where this splitting doesn't results in proper version
 				if strings.Contains(secondHalf, "docker-image") {
 					continue
 				}
 				if strings.Contains(secondHalf, "oss-") {
 					continue
 				}
+
+				// The component version should be the first entry after splitting w/ the requiredPackage
 				componentVersion = strings.Split(secondHalf, "-"+requiredPackage)[0]
-				log.Printf(">>>>>>>>>>> XXX Got Version: %s <<<<", componentVersion)
+				foundIt = true
+				// break out of inner loop
 				break
 			}
 		}
+		if foundIt {
+			// break out of outer loop
+			break
+		}
+	}
+
+	if componentVersion == "" {
+		errMsg := fmt.Sprintf("Unable to determine component version for [%s]", componentName)
+		panic(errMsg)
 	}
 
 	return componentVersion
 }
 
+// This is a helper function for the cloud-defend package.
+// When it is untarred, it does not have the same dirname as the package name.
+// This adjusts for that and returns the actual path on disk for cloud-defend
 func fixCloudDefendDirPath(dirPath string, componentVersion string, expectedArch string, actualArch string) string {
 	fixedDirPath := dirPath
 
@@ -1299,30 +1306,44 @@ func fixCloudDefendDirPath(dirPath string, componentVersion string, expectedArch
 	return fixedDirPath
 }
 
+// This is a helper function for flattenDependencies that's used when building from a manifest
 func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse tools.Build) map[string]string {
 
 	checksums := make(map[string]string)
 
 	projects := manifestResponse.Projects
 
+	// Iterate over the component projects in the manifest
 	for componentName, _ := range projects {
-
-		log.Printf(">>>>> XXX Checking for requiredPackage: [%s]", requiredPackage)
+		// Iterate over the individual package files within each component project
 		for pkgName, _ := range projects[componentName].Packages {
-			log.Printf(">>>>>>>> XXX Found pkgName: [%s]", pkgName)
+			// Only care about packages that match the required package constraint (os/arch)
 			if strings.Contains(pkgName, requiredPackage) {
+				// Iterate over the external binaries that we care about for packaging agent
 				for filePrefix, _ := range externalBinaries {
+					// If the individual package doesn't match the expected prefix, then continue
 					if !strings.HasPrefix(pkgName, filePrefix) {
 						continue
 					}
-					log.Printf(">>>>>>> XXX Pkg [%s] matches requiredPackage [%s]", pkgName, requiredPackage)
 
+					if mg.Verbose() {
+						log.Printf(">>>>>>> Package [%s] matches requiredPackage [%s]", pkgName, requiredPackage)
+					}
+
+					// Get the version from the component based on the version in the package name
+					// This is useful in the case where it's an Independent Agent Release, where
+					// the opted-in projects will be one patch version ahead of the rest of the
+					// opted-out/previously-released projects
 					componentVersion := getComponentVersion(componentName, requiredPackage, projects[componentName])
-					log.Printf(">>>>>>> XXX [%s] [%s] version is [%s]", componentName, requiredPackage, componentVersion)
+					if mg.Verbose() {
+						log.Printf(">>>>>>> Component [%s]/[%s] version is [%s]", componentName, requiredPackage, componentVersion)
+					}
 
+					// Combine the package name w/ the versioned flat path
 					fullPath := filepath.Join(versionedFlatPath, pkgName)
-					log.Printf(">>>>>> XXX fullPath [%s]", fullPath)
 
+					// Eliminate the file extensions to get the proper directory
+					// name that we need to copy
 					var dirToCopy string
 					if strings.HasSuffix(fullPath, ".tar.gz") {
 						dirToCopy = fullPath[:strings.LastIndex(fullPath, ".tar.gz")]
@@ -1330,6 +1351,9 @@ func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, ve
 						dirToCopy = fullPath[:strings.LastIndex(fullPath, ".zip")]
 					} else {
 						dirToCopy = fullPath
+					}
+					if mg.Verbose() {
+						log.Printf(">>>>>>> Calculated directory to copy: [%s]", dirToCopy)
 					}
 
 					// cloud-defend path exception
@@ -1347,42 +1371,37 @@ func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, ve
 							// Not actually replacing the arch, but removing the "linux"
 							dirToCopy = fixCloudDefendDirPath(dirToCopy, componentVersion, "arm64", "arm64")
 						}
+						if mg.Verbose() {
+							log.Printf(">>>>>>> Adjusted cloud-defend directory to copy: [%s]", dirToCopy)
+						}
 					}
 
-					log.Printf(">>>>>> XXX dirToCopy [%s]", dirToCopy)
-
+					// Set copy options
 					options := copy.Options{
 						OnSymlink: func(_ string) copy.SymlinkAction {
 							return copy.Shallow
 						},
 						Sync: true,
 					}
-					log.Printf("> XXX ManURL prepare to copy %s into %s ", dirToCopy, versionedDropPath)
-
-					info, err := os.Stat(dirToCopy)
-					if err != nil {
-						panic(err)
-					}
-					if info.IsDir() {
-						log.Printf(">>> XXX DIR!! [%s]", dirToCopy)
-					} else {
-						log.Printf(">>> XXX File! [%s]", dirToCopy)
+					if mg.Verbose() {
+						log.Printf("> prepare to copy %s into %s ", dirToCopy, versionedDropPath)
 					}
 
-					err = copy.Copy(dirToCopy, versionedDropPath, options)
+					// Do the copy
+					err := copy.Copy(dirToCopy, versionedDropPath, options)
 					if err != nil {
 						panic(err)
 					}
 
 					// copy spec file for match
 					specName := filepath.Base(dirToCopy)
-					log.Printf(">>>> XXX manURL specName: [%s]", specName)
 					idx := strings.Index(specName, "-"+componentVersion)
 					if idx != -1 {
 						specName = specName[:idx]
-						log.Printf(">>>> XXX manURL specName[:idx] [%s]", specName)
 					}
-					log.Printf(">>>> XXX manURL specName final: [%s]", specName)
+					if mg.Verbose() {
+						log.Printf(">>>> Looking to copy spec file: [%s]", specName)
+					}
 
 					checksum, err := copyComponentSpecs(specName, versionedDropPath)
 					if err != nil {
@@ -1410,8 +1429,6 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 		os.MkdirAll(versionedFlatPath, 0755)
 		os.MkdirAll(versionedDropPath, 0755)
 
-		log.Printf(">>>>>>>>>>>> XXX flattenDeps: requiredPackage: [%s]", rp)
-
 		// untar all
 		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))
 		if err != nil {
@@ -1426,7 +1443,6 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 		if mg.Verbose() {
 			log.Printf("--- Extracting into the flat dir: %v", matches)
 		}
-		log.Printf("--- XXX Extracting into the flat dir: %v", matches)
 
 		for _, m := range matches {
 			stat, err := os.Stat(m)
@@ -1443,7 +1459,6 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 			if mg.Verbose() {
 				log.Printf(">>> Extracting %s to %s", m, versionedFlatPath)
 			}
-			log.Printf(">>> XXX Extracting %s to %s", m, versionedFlatPath)
 
 			if err := devtools.Extract(m, versionedFlatPath); err != nil {
 				panic(err)
@@ -1451,6 +1466,7 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 		}
 
 		checksums := make(map[string]string)
+		// Operate on the files depending on if we're packaging from a manifest or not
 		if devtools.PackagingFromManifest {
 			checksums = fileHelperWithManifest(rp, versionedFlatPath, versionedDropPath, manifestResponse)
 		} else {
