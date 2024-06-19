@@ -55,7 +55,7 @@ func TestLoadSpec_Components(t *testing.T) {
 		},
 		{
 			Name: "Filebeat",
-			Path: "filebeat.spec.yml",
+			Path: "testbeat.spec.yml",
 		},
 		{
 			Name: "Fleet Server",
