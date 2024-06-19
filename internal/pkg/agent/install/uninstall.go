@@ -37,7 +37,7 @@ import (
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
 func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
-	// Immediatly fail it tamper protection is enabled but no uninstallToken is specified
+	// Immediately fail it tamper protection is enabled but no uninstallToken is specified
 	if features.TamperProtection() && uninstallToken == "" {
 		return aerrors.New(
 			fmt.Errorf("missing uninstall token"),
