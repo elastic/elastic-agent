@@ -52,15 +52,17 @@ kubectl kustomize https://github.com/elastic/elastic-agent/deploy/kubernetes/ela
 Examples of Base64 encoded values:
 
 ```bash
-❯ echo %API_KEY | base64
-JUFQSV9LRVkK
+❯ echo -n %API_KEY% | base64
+JUFQSV9LRVkl
 
-echo %ENROLLMENT_TOKEN% | base64
-JUVOUk9MTE1FTlRfVE9LRU4lCg==
+echo -n %ENROLLMENT_TOKEN% | base64
+JUVOUk9MTE1FTlRfVE9LRU4l
 
-❯ echo JUVOUk9MTE1FTlRfVE9LRU4lCg== | base64 -D
-%ENROLLMENT_TOKEN%
+❯ echo -n JUVOUk9MTE1FTlRfVE9LRU4l | base64 -D
+%ENROLLMENT_TOKEN%%
 ```
+
+NOTE: `echo -n` flag needs to be provided in order to have correct base64 encoding. The echo command adds an extra line by default which needs to be avoided.
 
 ## Updating kustomize templates
 
