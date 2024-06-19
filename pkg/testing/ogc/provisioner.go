@@ -310,8 +310,8 @@ func osBatchToOGC(cacheDir string, batch runner.OSBatch) Layout {
 		Tags:          tags,
 		Labels: map[string]string{
 			"division": "engineering",
-			"org":      "platform",
-			"team":     "ingest",
+			"org":      "ingest",
+			"team":     "elastic-agent-control-plane",
 			"project":  "elastic-agent",
 		},
 		Scripts: "path", // not used; but required by OGC
