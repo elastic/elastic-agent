@@ -17,8 +17,8 @@ func TestOtelFlagsSetup(t *testing.T) {
 	setupOtelFlags(fs)
 
 	expectedFlags := []string{
-		configFlagName,
-		setFlagName,
+		otelConfigFlagName,
+		otelSetFlagName,
 		"feature-gates",
 	}
 
