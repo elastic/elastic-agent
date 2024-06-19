@@ -119,9 +119,9 @@ func (d *EncryptedDiskStore) ensureKey(ctx context.Context) error {
 // Specifically it will write to a .tmp file then rotate the file to the target name to ensure that an error does not corrupt the previously written file.
 func (d *EncryptedDiskStore) Save(in io.Reader) error {
 	if d.target == paths.AgentConfigFile() {
-		fmt.Fprintf(os.Stderr, "Save of %s started at %s", paths.AgentConfigFile(), time.Now())
+		fmt.Fprintf(os.Stderr, "Save of %s started at %s\n", paths.AgentConfigFile(), time.Now())
 		defer func() {
-			fmt.Fprintf(os.Stderr, "Save of %s finished at %s", paths.AgentConfigFile(), time.Now())
+			fmt.Fprintf(os.Stderr, "Save of %s finished at %s\n", paths.AgentConfigFile(), time.Now())
 		}()
 	}
 
