@@ -16,10 +16,6 @@ KUSTOMIZE=elastic-agent-kustomize
 KUSTOMIZE_DEFAULT=elastic-agent-kustomize/default
 KUSTOMIZE_KSM_AUTOSHARDING=elastic-agent-kustomize/ksm-autosharding
 
-#PACKAGE Versions
-SYSTEM_VERSION=1.20.4
-K8S_VERSION=1.52.0
-
 # variable for processor for elastic-agent-standalone
 define ELASTIC_PROCESSOR
 processors:\n            - add_fields:\n                fields:\n                  dataset_id: '%DATASET_ID%'
