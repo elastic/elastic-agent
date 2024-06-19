@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build !windows
+
 package cmd
 
 import (
@@ -16,11 +18,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
-)
-
-const (
-	configFlagName = "config"
-	setFlagName    = "set"
 )
 
 func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
