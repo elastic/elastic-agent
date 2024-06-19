@@ -18,6 +18,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
+const (
+	otelConfigFlagName = "config"
+	otelSetFlagName    = "set"
+)
+
 func setupOtelFlags(flags *pflag.FlagSet) {
 	flags.StringArray(otelConfigFlagName, []string{}, "Locations to the config file(s), note that only a"+
 		" single location can be set per flag entry e.g. `--config=file:/path/to/first --config=file:path/to/second`.")

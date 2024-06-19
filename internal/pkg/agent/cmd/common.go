@@ -21,11 +21,6 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
-const (
-	otelConfigFlagName = "config"
-	otelSetFlagName    = "set"
-)
-
 func troubleshootMessage() string {
 	v := strings.Split(release.Version(), ".")
 	version := strings.Join(v[:2], ".")
