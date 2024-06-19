@@ -37,6 +37,14 @@ import (
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
 func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
+	// Immediatly fail it tamper protection is enabled but no uninstallToken is specified
+	if features.TamperProtection() && uninstallToken == "" {
+		return aerrors.New(
+			fmt.Errorf("missing uninstall token"),
+			"tamper protection detected, elastic-agent uninstall command must be ran with a valid --uninstall-token arg",
+		)
+	}
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
