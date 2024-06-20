@@ -12,7 +12,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -29,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/appinit"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -109,22 +109,6 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
-var stopSvcChan = make(chan bool)
-var stopBeat = func() {
-	close(stopSvcChan)
-}
-
-var _ = func() int {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		wg.Done()
-		service.ProcessWindowsControlEvents(stopBeat)
-	}()
-	wg.Wait()
-	return 1
-}()
-
 func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
@@ -153,7 +137,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		_ = locker.Unlock()
 	}()
 
-	return runElasticAgent(ctx, cancel, override, stopSvcChan, testingMode, fleetInitTimeout, false, nil, modifiers...)
+	return runElasticAgent(ctx, cancel, override, appinit.StopSvcChan(), testingMode, fleetInitTimeout, false, nil, modifiers...)
 }
 
 func logReturn(l *logger.Logger, err error) error {
