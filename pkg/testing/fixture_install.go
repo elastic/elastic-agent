@@ -248,7 +248,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 
 			if runtime.GOOS == "windows" {
 				filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-%s-%s-EventLogs.json", sanitizedTestName, f.operatingSystem, f.architecture))
-				psCommand := `Get-EventLog -LogName Application -Source "Elastic Agent" -Newest 1000`
+				psCommand := `Get-EventLog -LogName Application -EntryType Error -Newest 1000`
 				out, err := exec.Command("powershell", "-NoProfile", psCommand).CombinedOutput()
 				if err != nil {
 					f.t.Logf("error executing command: %s with output %s", err, string(out))
