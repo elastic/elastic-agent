@@ -360,7 +360,83 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.Equal(t, ackToken, store.AckToken())
 	})
 
-	t.Run("state store is correctly loaded from disk", func(t *testing.T) {
+	t.Run("state store is loaded from disk", func(t *testing.T) {
+		t.Run("no store", func(t *testing.T) {
+			storePath := filepath.Join(t.TempDir(), "state.json")
+
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
+			stateStore, err := NewStateStore(log, s)
+			require.NoError(t, err, "could not create disk store")
+
+			assert.Empty(t, stateStore.Queue())
+			assert.Empty(t, stateStore.Action())
+			assert.Empty(t, stateStore.AckToken())
+		})
+
+		t.Run("empty store file", func(t *testing.T) {
+			storePath := filepath.Join(t.TempDir(), "state.json")
+			f, err := os.Create(storePath)
+			require.NoError(t, err, "could not create store file")
+			err = f.Close()
+			require.NoError(t, err, "could not close store file")
+
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
+			stateStore, err := NewStateStore(log, s)
+			require.NoError(t, err, "could not create disk store")
+
+			assert.Empty(t, stateStore.Queue())
+			assert.Empty(t, stateStore.Action())
+			assert.Empty(t, stateStore.AckToken())
+		})
+
+		t.Run("fails for invalid store content", func(t *testing.T) {
+			t.Run("wrong store version", func(t *testing.T) {
+				storePath := filepath.Join(t.TempDir(), "state.json")
+				require.NoError(t,
+					os.WriteFile(storePath, []byte(`{"version":"0"}`), 0600),
+					"could not create store file")
+
+				s, err := storage.NewDiskStore(storePath)
+				require.NoError(t, err, "failed creating DiskStore")
+
+				_, err = NewStateStore(log, s)
+				require.Errorf(t, err,
+					"state store creation should have failed with invalid store version")
+			})
+
+			t.Run("empty store version", func(t *testing.T) {
+				storePath := filepath.Join(t.TempDir(), "state.json")
+				require.NoError(t,
+					os.WriteFile(storePath, []byte(`{"version":""}`), 0600),
+					"could not create store file")
+
+				s, err := storage.NewDiskStore(storePath)
+				require.NoError(t, err, "failed creating DiskStore")
+
+				_, err = NewStateStore(log, s)
+				require.Errorf(t, err,
+					"state store creation should have failed with invalid store version")
+			})
+
+			t.Run("garbage data/invalid JSON", func(t *testing.T) {
+				storePath := filepath.Join(t.TempDir(), "state.json")
+				require.NoError(t,
+					os.WriteFile(storePath, []byte(`}`), 0600),
+					"could not create store file")
+
+				s, err := storage.NewDiskStore(storePath)
+				require.NoError(t, err, "failed creating DiskStore")
+
+				_, err = NewStateStore(log, s)
+				require.Errorf(t, err,
+					"state store creation should have failed")
+			})
+		})
+
 		t.Run("ActionPolicyChange", func(t *testing.T) {
 			storePath := filepath.Join(t.TempDir(), "state.json")
 			want := &fleetapi.ActionPolicyChange{
