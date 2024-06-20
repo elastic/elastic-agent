@@ -9,10 +9,11 @@ package cmd
 import (
 	"testing"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 func TestOtelFlagsSetup(t *testing.T) {
