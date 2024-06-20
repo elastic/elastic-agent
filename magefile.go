@@ -3215,7 +3215,8 @@ func getOtelDependencies() (*dependencies, error) {
 		l := strings.TrimSpace(scanner.Text())
 		// is otel
 		if !strings.Contains(l, "go.opentelemetry.io/") &&
-			!strings.Contains(l, "github.com/open-telemetry/") {
+			!strings.Contains(l, "github.com/open-telemetry/") &&
+			!strings.Contains(l, "github.com/elastic/opentelemetry-collector-components/") {
 			continue
 		}
 
