@@ -993,18 +993,18 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 		// to other functions that need to operate on the manifest
 		if manifestResponse, err = manifest.DownloadManifest(devtools.ManifestURL); err != nil {
 			log.Panicf("failed to download remote manifest file %s", err)
+		}
+
+		if parsedVersion, err := version.ParseVersion(manifestResponse.Version); err != nil {
+			log.Panicf("the manifest version from manifest is not semver, got %s", manifestResponse.Version)
 		} else {
-			if parsedVersion, err := version.ParseVersion(manifestResponse.Version); err != nil {
-				log.Panicf("the manifest version from manifest is not semver, got %s", manifestResponse.Version)
-			} else {
-				// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
-				// something that we use as an implicit parameter to various functions
-				if parsedVersion.IsSnapshot() {
-					os.Setenv(snapshotEnv, "true")
-					mage.Snapshot = true
-				}
-				os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
+			// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
+			// something that we use as an implicit parameter to various functions
+			if parsedVersion.IsSnapshot() {
+				os.Setenv(snapshotEnv, "true")
+				mage.Snapshot = true
 			}
+			os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
 		}
 	}
 
