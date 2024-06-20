@@ -611,13 +611,12 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// UnmarshalYAML prevents to decode actions from .
+// UnmarshalYAML prevents to unmarshal actions from YAML.
 func (a *Actions) UnmarshalYAML(_ func(interface{}) error) error {
-	// TODO(AndersonQ): we need this to migrate the store from YAML to JSON
 	return errors.New("Actions cannot be Unmarshalled from YAML")
 }
 
-// MarshalYAML attempts to decode yaml actions.
+// MarshalYAML prevents to marshal actions from YAML.
 func (a *Actions) MarshalYAML() (interface{}, error) {
-	return nil, errors.New("Actions cannot be Marshaled to YAML")
+	return nil, errors.New("Actions cannot be Marshaled into YAML")
 }
