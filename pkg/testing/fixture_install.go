@@ -245,6 +245,19 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			if err != nil {
 				f.t.Logf("error serializing processes: %s", err)
 			}
+
+			if runtime.GOOS == "windows" {
+				filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-%s-%s-EventLogs.json", sanitizedTestName, f.operatingSystem, f.architecture))
+				psCommand := `Get-EventLog -LogName Application -Source "Elatic Agent"`
+				out, err := exec.Command("powershell", "-NoProfile", psCommand).CombinedOutput()
+				if err != nil {
+					f.t.Logf("error executing command: %s", err)
+				} else {
+					if err := os.WriteFile(filePath, out, 0666); err != nil {
+						f.t.Logf("error wrting file %s: %s", filePath, err)
+					}
+				}
+			}
 		}
 	})
 
