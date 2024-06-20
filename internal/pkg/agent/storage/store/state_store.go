@@ -203,12 +203,17 @@ func (s *StateStore) SetQueue(q []fleetapi.ScheduledAction) {
 	s.dirty = true
 }
 
-// Save saves the actions into a state store.
-func (s *StateStore) Save() error {
+// Save saves the actions into the state store. If the action type is not
+// supported or if any error happens, it returns a non-nil error.
+func (s *StateStore) Save() (err error) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
-	defer func() { s.dirty = false }()
+	defer func() {
+		if err == nil {
+			s.dirty = false
+		}
+	}()
 	if !s.dirty {
 		return nil
 	}
@@ -225,7 +230,7 @@ func (s *StateStore) Save() error {
 			"ActionUnenroll or nil, but received %T", a)
 	}
 
-	reader, err := jsonToReader(&s.state)
+	reader, err = jsonToReader(&s.state)
 	if err != nil {
 		return err
 	}

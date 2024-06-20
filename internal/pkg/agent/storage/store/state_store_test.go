@@ -63,6 +63,39 @@ func createAgentVaultAndSecret(t *testing.T, ctx context.Context, tempDir string
 func runTestStateStore(t *testing.T, ackToken string) {
 	log, _ := logger.New("state_store", false)
 
+	t.Run("store is not dirty on successful save", func(t *testing.T) {
+		storePath := filepath.Join(t.TempDir(), "state.json")
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
+
+		store.dirty = true
+		err = store.Save()
+		require.NoError(t, err, "unexpected error when saving")
+
+		assert.False(t, store.dirty,
+			"the store should not be marked as dirty")
+	})
+
+	t.Run("store is dirty when save fails", func(t *testing.T) {
+		storePath := filepath.Join(t.TempDir(), "state.json")
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
+
+		store.dirty = true
+		store.state.ActionSerializer.Action = fleetapi.NewAction(fleetapi.ActionTypeUnknown)
+		err = store.Save()
+		require.Error(t, err, "expected and error when saving sore with invalid state")
+
+		assert.True(t, store.dirty,
+			"the store should be kept dirty when save fails")
+	})
+
 	t.Run("action returns empty when no action is saved on disk", func(t *testing.T) {
 		storePath := filepath.Join(t.TempDir(), "state.json")
 		s, err := storage.NewDiskStore(storePath)
