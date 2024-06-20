@@ -207,7 +207,7 @@ data:
             processors:
             - add_fields:
                 fields:
-                  dataset_id: '%DATASET_ID%'
+                  onboarding_id: '%ONBOARDING_ID%'
             # Openshift:
             # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
             # and/or tls termination, then configuration below should be considered:

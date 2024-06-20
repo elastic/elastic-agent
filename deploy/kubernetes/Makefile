@@ -18,7 +18,7 @@ KUSTOMIZE_KSM_AUTOSHARDING=elastic-agent-kustomize/ksm-autosharding
 
 # variable for processor for elastic-agent-standalone
 define ELASTIC_PROCESSOR
-processors:\n            - add_fields:\n                fields:\n                  dataset_id: '%DATASET_ID%'
+processors:\n            - add_fields:\n                fields:\n                  onboarding_id: '%ONBOARDING_ID%'
 endef
 
 .PHONY: generate-k8s $(ALL)
