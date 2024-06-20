@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/elastic/elastic-agent/internal/pkg/agent/appinit"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )

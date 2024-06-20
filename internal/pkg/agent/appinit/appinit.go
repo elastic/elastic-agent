@@ -11,18 +11,21 @@ import (
 )
 
 var stopSvcChan = make(chan bool)
+var once sync.Once
 var stopBeat = func() {
 	close(stopSvcChan)
 }
 
 func init() {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		wg.Done()
-		service.ProcessWindowsControlEvents(stopBeat)
-	}()
-	wg.Wait()
+	once.Do(func() {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			wg.Done()
+			service.ProcessWindowsControlEvents(stopBeat)
+		}()
+		wg.Wait()
+	})
 }
 
 func StopSvcChan() chan bool {
