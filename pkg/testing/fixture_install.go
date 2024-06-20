@@ -190,7 +190,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	installArgs = append(installArgs, installOptsArgs...)
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
-		return out, fmt.Errorf("error running agent install command: %w", err)
+		return out, fmt.Errorf("error running agent install command: %w with output: %s", err, string(out))
 	}
 
 	f.installed = true
@@ -616,7 +616,7 @@ func (f *Fixture) uninstallNoPkgManager(ctx context.Context, uninstallOpts *Unin
 	}
 	out, err := f.Exec(ctx, uninstallArgs, opts...)
 	if err != nil {
-		return out, fmt.Errorf("error running uninstall command: %w", err)
+		return out, fmt.Errorf("error running uninstall command: %w with output: %s", err, string(out))
 	}
 	f.installed = false
 
