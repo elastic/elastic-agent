@@ -251,7 +251,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 				psCommand := `Get-EventLog -LogName Application -Source "Elastic Agent" -Newest 1000`
 				out, err := exec.Command("powershell", "-NoProfile", psCommand).CombinedOutput()
 				if err != nil {
-					f.t.Logf("error executing command: %s", err)
+					f.t.Logf("error executing command: %s with output %s", err, string(out))
 				} else {
 					if err := os.WriteFile(filePath, out, 0666); err != nil {
 						f.t.Logf("error wrting file %s: %s", filePath, err)
