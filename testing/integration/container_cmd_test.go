@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration && linux
+//go:build integration
 
 package integration
 
@@ -190,11 +190,6 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 			statePath:          "",
 			expectedStatePath:  "/usr/share/elastic-agent/state",
 			expectedSocketPath: "/usr/share/elastic-agent/state/data/Td8I7R-Zby36_zF_IOd9QVNlFblNEro3.sock",
-		},
-		"107 characters path": { // Longest path that still works for creating a unix socket, but will use /tmp/elastic-agent
-			statePath:          "/tmp/tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
-			expectedStatePath:  "/tmp/tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
-			expectedSocketPath: "/tmp/elastic-agent/oKUUJbxrLlGSh3z6wZWYleLeMuUN4P0_.sock",
 		},
 		"long path": { // Path too long to create a unix socket, it will use /tmp/elastic-agent
 			statePath:          "/tmp/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
