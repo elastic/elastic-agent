@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
@@ -118,10 +119,16 @@ func (d *EncryptedDiskStore) ensureKey(ctx context.Context) error {
 // Save will write the encrypted storage to disk.
 // Specifically it will write to a .tmp file then rotate the file to the target name to ensure that an error does not corrupt the previously written file.
 func (d *EncryptedDiskStore) Save(in io.Reader) error {
+
+	l, logErr := logger.New("encrypted-disk-store-debug", true)
+	if logErr != nil {
+		fmt.Fprintf(os.Stderr, "error instantiating debug logger: %s", logErr)
+	}
+
 	if d.target == paths.AgentConfigFile() {
-		fmt.Fprintf(os.Stderr, "Save of %s started at %s\n", paths.AgentConfigFile(), time.Now())
+		l.Infof("Save of %s started at %s\n", paths.AgentConfigFile(), time.Now())
 		defer func() {
-			fmt.Fprintf(os.Stderr, "Save of %s finished at %s\n", paths.AgentConfigFile(), time.Now())
+			l.Infof("Save of %s finished at %s\n", paths.AgentConfigFile(), time.Now())
 		}()
 	}
 
@@ -190,11 +197,10 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
-	DumpFilesystemInfo(d.target, func(fmtString string, args ...any) { fmt.Fprintf(os.Stderr, fmtString, args) })
-
+	DumpFilesystemInfo(d.target, l.Infof)
 	if err := file.SafeFileRotate(d.target, tmpFile); err != nil {
 
-		DumpFilesystemInfo(d.target, func(fmtString string, args ...any) { fmt.Fprintf(os.Stderr, fmtString, args) })
+		DumpFilesystemInfo(d.target, l.Infof)
 
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s", d.target),
