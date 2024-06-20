@@ -536,20 +536,12 @@ func DownloadManifest() error {
 		return errAtLeastOnePlatform
 	}
 
-	platformPackages := map[string]string{
-		"darwin/amd64":  "darwin-x86_64.tar.gz",
-		"darwin/arm64":  "darwin-aarch64.tar.gz",
-		"linux/amd64":   "linux-x86_64.tar.gz",
-		"linux/arm64":   "linux-arm64.tar.gz",
-		"windows/amd64": "windows-x86_64.zip",
-	}
-
 	var requiredPackages []string
 	for _, p := range platforms {
-		requiredPackages = append(requiredPackages, platformPackages[p])
+		requiredPackages = append(requiredPackages, common.PlatformPackages[p])
 	}
 
-	if e := manifest.DownloadComponentsFromManifest(devtools.ManifestURL, platforms, platformPackages, dropPath); e != nil {
+	if e := manifest.DownloadComponentsFromManifest(devtools.ManifestURL, platforms, common.PlatformPackages, dropPath); e != nil {
 		return fmt.Errorf("failed to download the manifest file, %w", e)
 	}
 	log.Printf(">> Completed downloading packages from manifest into drop-in %s", dropPath)
@@ -983,14 +975,6 @@ func runAgent(env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-var platformPackages = map[string]string{
-	"darwin/amd64":  "darwin-x86_64.tar.gz",
-	"darwin/arm64":  "darwin-aarch64.tar.gz",
-	"linux/amd64":   "linux-x86_64.tar.gz",
-	"linux/arm64":   "linux-arm64.tar.gz",
-	"windows/amd64": "windows-x86_64.zip",
-}
-
 func packageAgent(platforms []string, dependenciesVersion string, agentPackaging, agentBinaryTarget mg.Fn) {
 	fmt.Println("--- Package Elastic-Agent")
 	var manifestResponse tools.Build
@@ -998,7 +982,7 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 
 	requiredPackages := []string{}
 	for _, p := range platforms {
-		requiredPackages = append(requiredPackages, platformPackages[p])
+		requiredPackages = append(requiredPackages, common.PlatformPackages[p])
 	}
 	if mg.Verbose() {
 		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, requiredPackages)
@@ -1097,7 +1081,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 			completedDownloads := &atomic.Int32{}
 			for binary, project := range externalBinaries {
 				for _, platform := range platforms {
-					reqPackage := platformPackages[platform]
+					reqPackage := common.PlatformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)

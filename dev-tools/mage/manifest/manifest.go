@@ -39,6 +39,17 @@ var errorNotAllowedManifestURL = errors.New("the provided ManifestURL is not all
 
 var AllowedManifestHosts = []string{"snapshots.elastic.co", "staging.elastic.co"}
 
+var ComponentSpec = map[string][]string{
+	"apm-server":            {"apm-server"},
+	"beats":                 {"agentbeat"},
+	"cloud-defend":          {"cloud-defend"},
+	"cloudbeat":             {"cloudbeat"},
+	"elastic-agent-shipper": {"elastic-agent-shipper"},
+	"endpoint-dev":          {"endpoint-security"},
+	"fleet-server":          {"fleet-server"},
+	"prodfiler":             {"pf-elastic-collector", "pf-elastic-symbolizer", "pf-host-agent"},
+}
+
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
 func DownloadManifest(manifest string) (tools.Build, error) {
 	manifestUrl, urlError := url.Parse(manifest)
@@ -143,17 +154,6 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 // DownloadComponentsFromManifest is going to download a set of components from the given manifest into the destination
 // dropPath folder in order to later use that folder for packaging
 func DownloadComponentsFromManifest(manifest string, platforms []string, platformPackages map[string]string, dropPath string) error {
-	componentSpec := map[string][]string{
-		"apm-server":            {"apm-server"},
-		"beats":                 {"agentbeat"},
-		"cloud-defend":          {"cloud-defend"},
-		"cloudbeat":             {"cloudbeat"},
-		"elastic-agent-shipper": {"elastic-agent-shipper"},
-		"endpoint-dev":          {"endpoint-security"},
-		"fleet-server":          {"fleet-server"},
-		"prodfiler":             {"pf-elastic-collector", "pf-elastic-symbolizer", "pf-host-agent"},
-	}
-
 	manifestResponse, err := DownloadManifest(manifest)
 	if err != nil {
 		return fmt.Errorf("failed to download remote manifest file %w", err)
@@ -171,7 +171,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
 
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
-	for component, pkgs := range componentSpec {
+	for component, pkgs := range ComponentSpec {
 		for _, platform := range platforms {
 			targetPath := filepath.Join(dropPath)
 			err := os.MkdirAll(targetPath, 0755)
