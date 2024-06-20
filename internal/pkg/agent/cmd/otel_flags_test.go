@@ -7,9 +7,9 @@
 package cmd
 
 import (
-	"strings"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,11 +54,10 @@ func TestGetConfigFilesWithDefault(t *testing.T) {
 	require.NoError(t, err)
 	cmd.Flag(otelSetFlagName).Value.Set(setVal)
 
+	expectedConfigFiles := append([]string{paths.OtelConfigFile()}, sets...)
 	configFiles, err := getConfigFiles(cmd, true)
-	require.Equal(t, 2, len(configFiles))
 	require.NoError(t, err)
-	require.Equal(t, sets, configFiles[1:])
-	require.Truef(t, strings.HasSuffix(configFiles[0], "otel.yml"), "Wrong suffix %q", configFiles[0])
+	require.Equal(t, expectedConfigFiles, configFiles)
 }
 
 func TestGetConfigErrorWhenNoConfig(t *testing.T) {
