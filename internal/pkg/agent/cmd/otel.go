@@ -18,11 +18,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 )
 
-const (
-	configFlagName = "config"
-	setFlagName    = "set"
-)
-
 func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "otel",

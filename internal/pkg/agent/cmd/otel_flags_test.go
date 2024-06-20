@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 func TestOtelFlagsSetup(t *testing.T) {
@@ -17,14 +19,51 @@ func TestOtelFlagsSetup(t *testing.T) {
 	setupOtelFlags(fs)
 
 	expectedFlags := []string{
-		configFlagName,
-		setFlagName,
+		otelConfigFlagName,
+		otelSetFlagName,
 		"feature-gates",
 	}
 
 	for _, expectedFlag := range expectedFlags {
 		require.NotNil(t, fs.Lookup(expectedFlag), "Flag %q is not present", expectedFlag)
 	}
+}
+
+func TestGetConfigFiles(t *testing.T) {
+	cmd := newOtelCommandWithArgs(nil, nil)
+	configFile := "sample.yaml"
+	require.NoError(t, cmd.Flag(otelConfigFlagName).Value.Set(configFile))
+
+	setVal := "set=val"
+	sets, err := getSets([]string{setVal})
+	require.NoError(t, err)
+	require.NoError(t, cmd.Flag(otelSetFlagName).Value.Set(setVal))
+
+	expectedConfigFiles := append([]string{configFile}, sets...)
+	configFiles, err := getConfigFiles(cmd, false)
+	require.NoError(t, err)
+	require.Equal(t, expectedConfigFiles, configFiles)
+}
+
+func TestGetConfigFilesWithDefault(t *testing.T) {
+	cmd := newOtelCommandWithArgs(nil, nil)
+
+	setVal := "set=val"
+	sets, err := getSets([]string{setVal})
+	require.NoError(t, err)
+	require.NoError(t, cmd.Flag(otelSetFlagName).Value.Set(setVal))
+
+	expectedConfigFiles := append([]string{paths.OtelConfigFile()}, sets...)
+	configFiles, err := getConfigFiles(cmd, true)
+	require.NoError(t, err)
+	require.Equal(t, expectedConfigFiles, configFiles)
+}
+
+func TestGetConfigErrorWhenNoConfig(t *testing.T) {
+	cmd := newOtelCommandWithArgs(nil, nil)
+
+	_, err := getConfigFiles(cmd, false)
+	require.Error(t, err)
 }
 
 func TestGetSets(t *testing.T) {
