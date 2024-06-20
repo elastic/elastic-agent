@@ -108,14 +108,15 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
-var stopSvcChan = make(chan bool, 0)
+var stopSvcChan = make(chan bool)
 var stopBeat = func() {
 	close(stopSvcChan)
 }
 
-func init() {
+var _ = func() int {
 	go service.ProcessWindowsControlEvents(stopBeat)
-}
+	return 1
+}()
 
 func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
 	// Windows: Mark service as stopped.
