@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/sys/windows"
@@ -27,16 +28,21 @@ func printFileInfo(info os.FileInfo) string {
 
 func printWindowsFileInfo(path string, logF loggerFunc) {
 
-	sd, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.GROUP_SECURITY_INFORMATION)
+	dumpSecurityDescriptor(path, logF)
+	dumpSecurityDescriptor(filepath.Dir(path), logF)
+}
+
+func dumpSecurityDescriptor(path string, logF loggerFunc) {
+	fileSD, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.GROUP_SECURITY_INFORMATION)
 	if err != nil {
 		panic(fmt.Errorf("getting security descriptor for %s: %w", path, err))
 	}
 
-	logF("%s security descriptor: %s", path, sd)
+	logF("%s security descriptor: %s", path, fileSD)
 
-	ownerSid, _, err := sd.Owner()
+	ownerSid, _, err := fileSD.Owner()
 	if err != nil {
-		panic(fmt.Errorf("getting owner from security descriptor %s: %w", sd, err))
+		panic(fmt.Errorf("getting owner from security descriptor %s: %w", fileSD, err))
 	}
 
 	account, domain, accType, err := ownerSid.LookupAccount("")
@@ -44,7 +50,7 @@ func printWindowsFileInfo(path string, logF loggerFunc) {
 		panic(fmt.Errorf("looking up account for %s: %w", ownerSid, err))
 	}
 
-	logF("owner for %s: %s\\%s account type %x", path, domain, account, accType)
+	logF("owner for %q: %s\\%s account type %x", path, domain, account, accType)
 }
 
 func DumpFilesystemInfo(path string, logF loggerFunc) {
