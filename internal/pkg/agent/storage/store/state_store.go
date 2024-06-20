@@ -31,13 +31,12 @@ type saveLoader interface {
 	Load() (io.ReadCloser, error)
 }
 
-// StateStore is a combined agent state storage initially derived from the former actionStore
-// and modified to allow persistence of additional agent specific state information.
-// The following is the original actionStore implementation description:
-// receives multiples actions to persist to disk, the implementation of the store only
-// take care of action policy change every other action are discarded. The store will only keep the
-// last good action on disk, we assume that the action is added to the store after it was ACK with
-// Fleet. The store is not thread safe.
+// StateStore stores the agent state:
+//   - the last fleet action (not all actions are stored, refer to Save for details)
+//   - a queue of scheduled actions
+//   - the ack token
+//
+// See each method documentation for details.
 type StateStore struct {
 	log   *logger.Logger
 	store saveLoader
@@ -141,7 +140,7 @@ func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 }
 
 // readState parsed the content from reader as JSON to state.
-// It's mostly to abstract the parsing of the date so different functions can
+// It's mostly to abstract the parsing of the data so different functions can
 // reuse this.
 func readState(reader io.ReadCloser) (state, error) {
 	st := state{}
@@ -171,6 +170,8 @@ func (s *StateStore) SetAction(a fleetapi.Action) {
 	defer s.mx.Unlock()
 
 	switch v := a.(type) {
+	// If any new action type is added, don't forget to update the method's
+	// description.
 	case *fleetapi.ActionPolicyChange, *fleetapi.ActionUnenroll:
 		// Only persist the action if the action is different.
 		if s.state.ActionSerializer.Action != nil &&
