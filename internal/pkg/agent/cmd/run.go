@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -114,7 +115,13 @@ var stopBeat = func() {
 }
 
 var _ = func() int {
-	go service.ProcessWindowsControlEvents(stopBeat)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		wg.Done()
+		service.ProcessWindowsControlEvents(stopBeat)
+	}()
+	wg.Wait()
 	return 1
 }()
 
