@@ -6,6 +6,9 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAgent(t *testing.T) {
@@ -29,4 +32,19 @@ func TestAgent(t *testing.T) {
 	// 	}
 	// 	assert.True(t, strings.Contains(string(contents), "Hello I am running"))
 	// })
+}
+
+func TestAddCommandIfNotNil(t *testing.T) {
+	cmd := &cobra.Command{}
+
+	parent := &cobra.Command{}
+	addCommandIfNotNil(parent, cmd)
+	require.Equal(t, 1, len(parent.Commands()))
+
+	parent = &cobra.Command{}
+	addCommandIfNotNil(parent, nil)
+	require.Equal(t, 0, len(parent.Commands()))
+
+	// this should not panic
+	addCommandIfNotNil(nil, cmd)
 }
