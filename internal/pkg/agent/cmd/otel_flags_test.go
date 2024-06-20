@@ -7,6 +7,7 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -27,6 +28,44 @@ func TestOtelFlagsSetup(t *testing.T) {
 	for _, expectedFlag := range expectedFlags {
 		require.NotNil(t, fs.Lookup(expectedFlag), "Flag %q is not present", expectedFlag)
 	}
+}
+
+func TestGetConfigFiles(t *testing.T) {
+	cmd := newOtelCommandWithArgs(nil, nil)
+	configFile := "sample.yaml"
+	cmd.Flag(otelConfigFlagName).Value.Set(configFile)
+
+	setVal := "set=val"
+	sets, err := getSets([]string{setVal})
+	require.NoError(t, err)
+	cmd.Flag(otelSetFlagName).Value.Set(setVal)
+
+	expectedConfigFiles := append([]string{configFile}, sets...)
+	configFiles, err := getConfigFiles(cmd, false)
+	require.NoError(t, err)
+	require.Equal(t, expectedConfigFiles, configFiles)
+}
+
+func TestGetConfigFilesWithDefault(t *testing.T) {
+	cmd := newOtelCommandWithArgs(nil, nil)
+
+	setVal := "set=val"
+	sets, err := getSets([]string{setVal})
+	require.NoError(t, err)
+	cmd.Flag(otelSetFlagName).Value.Set(setVal)
+
+	configFiles, err := getConfigFiles(cmd, true)
+	require.Equal(t, 2, len(configFiles))
+	require.NoError(t, err)
+	require.Equal(t, sets, configFiles[1:])
+	require.Truef(t, strings.HasSuffix(configFiles[0], "otel.yml"), "Wrong suffix %q", configFiles[0])
+}
+
+func TestGetConfigErrorWhenNoConfig(t *testing.T) {
+	cmd := newOtelCommandWithArgs(nil, nil)
+
+	_, err := getConfigFiles(cmd, false)
+	require.Error(t, err)
 }
 
 func TestGetSets(t *testing.T) {
