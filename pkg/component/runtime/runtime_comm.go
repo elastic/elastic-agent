@@ -295,6 +295,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 				close(recvDone)
 				return
 			}
+			c.logger.Infof("got checkin with pid %d", checkin.Pid)
 			c.checkinObserved <- checkin
 		}
 	}()

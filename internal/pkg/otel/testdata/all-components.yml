@@ -2,7 +2,7 @@ exporters:
   debug:
   elasticsearch:
     endpoints:
-      - localhost:9200
+      - http://localhost:9200
   file:
     path: /tmp/file-exporter-output.json
   otlp:
@@ -26,6 +26,7 @@ processors:
       - action: insert
         key: key1
         value: value1
+  resourcedetection:
   transform:
 
 receivers:
@@ -52,6 +53,7 @@ service:
         - batch
         - filter
         - resource
+        - resourcedetection
         - transform
       receivers:
         - filelog
@@ -67,6 +69,7 @@ service:
         - batch
         - filter
         - resource
+        - resourcedetection
         - transform
       receivers:
         - otlp
@@ -82,6 +85,7 @@ service:
         - batch
         - filter
         - resource
+        - resourcedetection
         - transform
       receivers:
         - otlp

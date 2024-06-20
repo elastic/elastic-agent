@@ -97,6 +97,7 @@ agent:
     http: null
     logs: false
     metrics: false
+    metrics_period: ""
     namespace: ""
     pprof: null
     traces: true
@@ -488,6 +489,7 @@ log_level: "warning"
 components:
   - id: "comp-1"
     state:
+      pid: 0
       state: 3
       message: "degraded message"
       features_idx: 0
@@ -570,6 +572,7 @@ log_level: "warning"
 components:
   - id: "comp-1"
     state:
+      pid: 0
       state: 3
       message: "degraded message"
       features_idx: 0
