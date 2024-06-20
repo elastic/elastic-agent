@@ -113,6 +113,7 @@ linters-settings:
       - github.com/dop251/goja_nodejs
       - github.com/fsnotify/fsnotify
       - github.com/tonistiigi/fifo
+      - github.com/leoluk/perflib_exporter/perflib
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
