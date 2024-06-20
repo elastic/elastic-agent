@@ -7,6 +7,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -76,10 +77,17 @@ func migrateActionStoreToStateStore(
 		return nil
 	}
 
-	if action.Type != fleetapi.ActionTypePolicyChange {
+	supportedActions := []string{
+		fleetapi.ActionTypePolicyChange,
+		// Unenroll action is supported for completeness as an unenrolled agent
+		// would not be upgraded.
+		fleetapi.ActionTypeUnenroll,
+	}
+	panic("TODO: double check why it does not need to load unenroll actions. I think 7.17 did not save them")
+	if !slices.Contains(supportedActions, action.Type) {
 		log.Warnf("unexpected action type when migrating from action store. "+
-			"Found %s, but only %s is suported. Ignoring action and proceeding.",
-			action.Type, fleetapi.ActionTypePolicyChange)
+			"Found %s, but only %v are suported. Ignoring action and proceeding.",
+			action.Type, supportedActions)
 		// If it isn't ignored, the agent will be stuck here and require manual
 		// intervention to fix the store.
 		return nil
