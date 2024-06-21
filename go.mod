@@ -15,7 +15,7 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.7.0
 	github.com/elastic/elastic-agent-client/v7 v7.11.0
 	github.com/elastic/elastic-agent-libs v0.9.12
-	github.com/elastic/elastic-agent-system-metrics v0.10.2
+	github.com/elastic/elastic-agent-system-metrics v0.10.3
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
 	github.com/elastic/go-licenser v0.4.2
@@ -237,7 +237,6 @@ require (
 	github.com/rs/cors v1.10.1 // indirect
 	github.com/santhosh-tekuri/jsonschema v1.2.4 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
-	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v4 v4.24.5 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
