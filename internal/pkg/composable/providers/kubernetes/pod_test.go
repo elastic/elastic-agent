@@ -12,15 +12,20 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+
+	c "github.com/elastic/elastic-agent-libs/config"
+
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
@@ -368,6 +373,90 @@ func TestEphemeralContainers(t *testing.T) {
 		assert.Equal(t, processors[target], fields)
 	}
 
+}
+
+func TestPodEventer_Namespace_Node_Watcher(t *testing.T) {
+	client := k8sfake.NewSimpleClientset()
+
+	log, err := logger.New("service-eventer-test", true)
+	assert.NoError(t, err)
+
+	providerDataChan := make(chan providerData, 1)
+
+	comm := MockDynamicComm{
+		context.TODO(),
+		providerDataChan,
+	}
+
+	tests := []struct {
+		namespaceEnabled bool
+		nodeEnabled      bool
+		hintsEnabled     bool
+		expectedNil      bool
+		name             string
+		msg              string
+	}{
+		{
+			namespaceEnabled: false,
+			nodeEnabled:      false,
+			hintsEnabled:     false,
+			expectedNil:      true,
+			name:             "add_resource_metadata.namespace and add_resource_metadata.node disabled and hints disabled.",
+			msg:              "Watcher should be nil.",
+		},
+		{
+			namespaceEnabled: false,
+			nodeEnabled:      false,
+			hintsEnabled:     true,
+			expectedNil:      false,
+			name:             "add_resource_metadata.namespace and add_resource_metadata.node disabled and hints enabled.",
+			msg:              "Watcher should not be nil.",
+		},
+		{
+			namespaceEnabled: true,
+			nodeEnabled:      true,
+			hintsEnabled:     false,
+			expectedNil:      false,
+			name:             "add_resource_metadata.namespace and add_resource_metadata.node enabled and hints disabled.",
+			msg:              "Watcher should not be nil.",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var cfg Config
+			cfg.InitDefaults()
+
+			nsCfg, err := c.NewConfigFrom(map[string]interface{}{
+				"enabled": test.namespaceEnabled,
+			})
+			assert.NoError(t, err)
+			nodeCfg, err := c.NewConfigFrom(map[string]interface{}{
+				"enabled": test.nodeEnabled,
+			})
+			assert.NoError(t, err)
+
+			cfg.AddResourceMetadata.Namespace = nsCfg
+			cfg.AddResourceMetadata.Node = nodeCfg
+			cfg.Hints.Enabled = test.hintsEnabled
+
+			eventer, err := NewPodEventer(&comm, &cfg, log, client, "cluster", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			namespaceWatcher := eventer.(*pod).namespaceWatcher
+			nodeWatcher := eventer.(*pod).nodeWatcher
+
+			if test.expectedNil {
+				assert.Equalf(t, nil, namespaceWatcher, "Namespace "+test.msg)
+				assert.Equalf(t, nil, nodeWatcher, "Node "+test.msg)
+			} else {
+				assert.NotEqualf(t, nil, namespaceWatcher, "Namespace "+test.msg)
+				assert.NotEqualf(t, nil, nodeWatcher, "Node "+test.msg)
+			}
+		})
+	}
 }
 
 // MockDynamicComm is used in tests.

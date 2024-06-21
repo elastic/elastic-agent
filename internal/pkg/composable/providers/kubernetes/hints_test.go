@@ -367,6 +367,137 @@ func TestGenerateHintsMappingWithLogStream(t *testing.T) {
 	assert.Equal(t, expected, hintsMapping)
 }
 
+func TestGenerateHintsMappingWithDefaultsandTypo(t *testing.T) {
+	logger := getLogger()
+	pod := &kubernetes.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testpod",
+			UID:       types.UID(uid),
+			Namespace: "testns",
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+			Annotations: map[string]string{
+				"app": "production",
+			},
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		Spec: kubernetes.PodSpec{
+			NodeName: "testnode",
+		},
+		Status: kubernetes.PodStatus{PodIP: "127.0.0.5"},
+	}
+
+	mapping := map[string]interface{}{
+		"namespace": pod.GetNamespace(),
+		"pod": mapstr.M{
+			"uid":  string(pod.GetUID()),
+			"name": pod.GetName(),
+			"ip":   pod.Status.PodIP,
+		},
+		"namespace_annotations": mapstr.M{
+			"nsa": "nsb",
+		},
+		"labels": mapstr.M{
+			"foo": "bar",
+		},
+		"annotations": mapstr.M{
+			"app": "production",
+		},
+	}
+	hints := mapstr.M{
+		"hints": mapstr.M{
+			"host":             "${kubernetes.pod.ip}:6379",
+			"package":          "redis",
+			"notsupportedhint": "/metrics", // on purpose we have introduced a typo
+			"timeout":          "42s",
+			"period":           "42s",
+		},
+	}
+
+	expected := mapstr.M{
+		"redis": mapstr.M{
+			"enabled": true,
+			"host":    "127.0.0.5:6379",
+			"timeout": "42s",
+			"period":  "42s",
+		},
+	}
+
+	hintsMapping := GenerateHintsMapping(hints, mapping, logger, "")
+
+	assert.Equal(t, expected, hintsMapping)
+}
+
+func TestGenerateHintsMappingWithInfoandTypo(t *testing.T) {
+	logger := getLogger()
+	pod := &kubernetes.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testpod",
+			UID:       types.UID(uid),
+			Namespace: "testns",
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+			Annotations: map[string]string{
+				"app": "production",
+			},
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		Spec: kubernetes.PodSpec{
+			NodeName: "testnode",
+		},
+		Status: kubernetes.PodStatus{PodIP: "127.0.0.5"},
+	}
+
+	mapping := map[string]interface{}{
+		"namespace": pod.GetNamespace(),
+		"pod": mapstr.M{
+			"uid":  string(pod.GetUID()),
+			"name": pod.GetName(),
+			"ip":   pod.Status.PodIP,
+		},
+		"namespace_annotations": mapstr.M{
+			"nsa": "nsb",
+		},
+		"labels": mapstr.M{
+			"foo": "bar",
+		},
+		"annotations": mapstr.M{
+			"app": "production",
+		},
+	}
+	hints := mapstr.M{
+		"hints": mapstr.M{
+			"package":      "redis",
+			"data_streams": "info",
+			"info": mapstr.M{
+				"period":           "5m",
+				"notsupportedhint": "stdout", // On purpose we have added this typo
+			},
+		},
+	}
+
+	expected := mapstr.M{
+		"redis": mapstr.M{
+			"info": mapstr.M{
+				"enabled": true,
+				"period":  "5m",
+			},
+		},
+	}
+
+	hintsMapping := GenerateHintsMapping(hints, mapping, logger, "")
+
+	assert.Equal(t, expected, hintsMapping)
+}
+
 func TestGenerateHintsMappingWithProcessors(t *testing.T) {
 	logger := getLogger()
 	pod := &kubernetes.Pod{
