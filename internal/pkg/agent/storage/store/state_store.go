@@ -327,7 +327,7 @@ func (aq *actionQueue) UnmarshalJSON(data []byte) error {
 	for _, a := range actions {
 		sa, ok := a.(fleetapi.ScheduledAction)
 		if !ok {
-			return fmt.Errorf("actionQueue: action %s isn't a ScheduledAction,"+
+			return fmt.Errorf("actionQueue: action %s isn't a ScheduledAction, "+
 				"cannot unmarshal it to actionQueue", a.Type())
 		}
 		scheduledActions = append(scheduledActions, sa)

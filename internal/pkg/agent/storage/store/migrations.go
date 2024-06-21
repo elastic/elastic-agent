@@ -83,7 +83,6 @@ func migrateActionStoreToStateStore(
 		// would not be upgraded.
 		fleetapi.ActionTypeUnenroll,
 	}
-	panic("TODO: double check why it does not need to load unenroll actions. I think 7.17 did not save them")
 	if !slices.Contains(supportedActions, action.Type) {
 		log.Warnf("unexpected action type when migrating from action store. "+
 			"Found %s, but only %v are suported. Ignoring action and proceeding.",
@@ -149,8 +148,9 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 		// it isn't a YAML store
 		return errors.Join(ErrInvalidYAML, err)
 	}
-
-	// Store was empty, nothing to migrate
+	// nil here would mean an empty store. However and empty file is a valid
+	// JSON store as well. Thus, it should never reach this point. Nevertheless,
+	// better to ensue it does not proceed if the store is nil.
 	if yamlStore == nil {
 		return nil
 	}
@@ -164,6 +164,8 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 			Data: fleetapi.ActionPolicyChangeData{
 				Policy: conv.YAMLMapToJSONMap(yamlStore.Action.Policy)},
 		}
+		// Unenroll action is supported for completeness as an unenrolled agent
+		// would not be upgraded.
 	case fleetapi.ActionTypeUnenroll:
 		action = &fleetapi.ActionUnenroll{
 			ActionID:   yamlStore.Action.ActionID,
@@ -177,6 +179,13 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 
 	var queue actionQueue
 	for _, a := range yamlStore.ActionQueue {
+		if a.Type != fleetapi.ActionTypeUpgrade {
+			log.Warnf(
+				"loaded a unsupported %s action from the deprecated YAML state store action queue, ignoring it",
+				yamlStore.Action.Type)
+			continue
+		}
+
 		queue = append(queue,
 			&fleetapi.ActionUpgrade{
 				ActionID:         a.ActionID,
