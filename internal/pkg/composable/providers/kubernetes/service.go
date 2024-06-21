@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/safemapstr"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 )
@@ -54,15 +55,21 @@ func NewServiceEventer(
 		return nil, errors.New(err, "couldn't create kubernetes watcher")
 	}
 
-	metaConf := metadata.GetDefaultResourceMetadataConfig()
-	namespaceWatcher, err := kubernetes.NewNamedWatcher("agent-namespace", client, &kubernetes.Namespace{}, kubernetes.WatchOptions{
-		SyncTimeout: cfg.SyncPeriod,
-		Namespace:   cfg.Namespace,
-	}, nil)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create watcher for %T due to error %w", &kubernetes.Namespace{}, err)
+	metaConf := cfg.AddResourceMetadata
+
+	var namespaceMeta metadata.MetaGen
+	var namespaceWatcher kubernetes.Watcher
+
+	if metaConf.Namespace.Enabled() || cfg.Hints.Enabled {
+		namespaceWatcher, err = kubernetes.NewNamedWatcher("agent-namespace", client, &kubernetes.Namespace{}, kubernetes.WatchOptions{
+			SyncTimeout: cfg.SyncPeriod,
+			Namespace:   cfg.Namespace,
+		}, nil)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create watcher for %T due to error %w", &kubernetes.Namespace{}, err)
+		}
+		namespaceMeta = metadata.NewNamespaceMetadataGenerator(metaConf.Namespace, namespaceWatcher.Store(), client)
 	}
-	namespaceMeta := metadata.NewNamespaceMetadataGenerator(metaConf.Namespace, namespaceWatcher.Store(), client)
 
 	rawConfig, err := config.NewConfigFrom(cfg)
 	if err != nil {
