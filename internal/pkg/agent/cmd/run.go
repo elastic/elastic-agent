@@ -58,6 +58,7 @@ import (
 const (
 	agentName            = "elastic-agent"
 	fleetInitTimeoutName = "FLEET_SERVER_INIT_TIMEOUT"
+	flagRunDevelopment   = "develop"
 )
 
 type (
@@ -71,9 +72,17 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Short: "Start the Elastic Agent",
 		Long:  "This command starts the Elastic Agent.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// done very early so the encrypted store is never used
+			isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
+			if isDevelopmentMode {
+				fmt.Fprintln(streams.Out, "Development installation mode enabled; this is an experimental feature.")
+				// For now, development mode only makes the agent behave as if it was running in a namespace to allow
+				// multiple agents on the same machine.
+				paths.SetInstallNamespace(paths.DevelopmentNamespace)
+			}
+
+			// done very early so the encrypted store is never used. Always done in development mode to remove the need to be root.
 			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
-			if disableEncryptedStore {
+			if disableEncryptedStore || isDevelopmentMode {
 				storage.DisableEncryptionDarwin()
 			}
 			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
@@ -104,6 +113,9 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 
 	cmd.Flags().Duration("fleet-init-timeout", envTimeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
 	_ = cmd.Flags().MarkHidden("testing-mode")
+
+	cmd.Flags().Bool(flagRunDevelopment, false, "Run agent in development mode. Allows running when there is already an installed Elastic Agent. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagRunDevelopment) // For internal use only.
 
 	return cmd
 }
@@ -314,23 +326,24 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// this provides backwards compatibility as the control socket was moved with the addition of --unprivileged
 	// option during installation
 	//
-	// Windows `paths.ControlSocketRunSymlink` is `""` so this is always skipped on Windows.
-	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink != "" {
+	// Windows `paths.ControlSocketRunSymlink()` is `""` so this is always skipped on Windows.
+	controlSocketRunSymlink := paths.ControlSocketRunSymlink(paths.InstallNamespace())
+	if isRoot && paths.RunningInstalled() && controlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
-		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
+		socketLog := controlLog.With("path", socketPath).With("link", controlSocketRunSymlink)
 		// ensure it doesn't exist before creating the symlink
-		if err := os.Remove(paths.ControlSocketRunSymlink); err != nil && !errors.Is(err, os.ErrNotExist) {
-			socketLog.Errorf("Failed to remove existing control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+		if err := os.Remove(controlSocketRunSymlink); err != nil && !errors.Is(err, os.ErrNotExist) {
+			socketLog.Errorf("Failed to remove existing control socket symlink %s: %s", controlSocketRunSymlink, err)
 		}
-		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
-			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", paths.ControlSocketRunSymlink, socketPath, err)
+		if err := os.Symlink(socketPath, controlSocketRunSymlink); err != nil {
+			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", controlSocketRunSymlink, socketPath, err)
 		} else {
-			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", paths.ControlSocketRunSymlink, socketPath, paths.ControlSocketRunSymlink)
+			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", controlSocketRunSymlink, socketPath, controlSocketRunSymlink)
 		}
 		defer func() {
 			// delete the symlink on exit; ignore the error
-			if err := os.Remove(paths.ControlSocketRunSymlink); err != nil {
-				socketLog.Errorf("Failed to remove control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+			if err := os.Remove(controlSocketRunSymlink); err != nil {
+				socketLog.Errorf("Failed to remove control socket symlink %s: %s", controlSocketRunSymlink, err)
 			}
 		}()
 	}

@@ -25,6 +25,8 @@ import (
 const (
 	flagInstallBasePath     = "base-path"
 	flagInstallUnprivileged = "unprivileged"
+	flagInstallDevelopment  = "develop"
+	flagInstallNamespace    = "namespace"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -48,6 +50,13 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
+
+	cmd.Flags().String(flagInstallNamespace, "", "Install into an isolated namespace. Allows multiple Elastic Agents to be installed at once. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallNamespace) // For internal use only.
+
+	cmd.Flags().Bool(flagInstallDevelopment, false, "Install into a standardized development namespace, may enable development specific options. Allows multiple Elastic Agents to be installed at once. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
+
 	addEnrollFlags(cmd)
 
 	return cmd
@@ -77,6 +86,20 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
 	if unprivileged {
 		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this feature is currently in beta.")
+	}
+
+	isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
+	if isDevelopmentMode {
+		fmt.Fprintln(streams.Out, "Installing into development namespace; this is an experimental and currently unsupported feature.")
+		// For now, development mode only installs agent in a well known namespace to allow two agents on the same machine.
+		paths.SetInstallNamespace(paths.DevelopmentNamespace)
+	}
+
+	namespace, _ := cmd.Flags().GetString(flagInstallNamespace)
+	if namespace != "" {
+		fmt.Fprintf(streams.Out, "Installing into namespace '%s'; this is an experimental and currently unsupported feature.\n", namespace)
+		// Overrides the development namespace if namespace was specified separately.
+		paths.SetInstallNamespace(namespace)
 	}
 
 	topPath := paths.InstallPath(basePath)
@@ -221,7 +244,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			err = install.StartService(topPath)
 			if err != nil {
 				progBar.Describe("Start Service failed, exiting...")
-				fmt.Fprintf(streams.Out, "Installation failed to start Elastic Agent service.\n")
+				fmt.Fprintf(streams.Out, "Installation failed to start '%s' service.\n", paths.ServiceName())
 				return fmt.Errorf("error starting service: %w", err)
 			}
 			progBar.Describe("Service Started")

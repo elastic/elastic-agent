@@ -47,6 +47,7 @@ const (
 	agentKey                   = "agent"
 	monitoringKey              = "monitoring"
 	useOutputKey               = "use_output"
+	monitoringMetricsPeriodKey = "metrics_period"
 	monitoringOutput           = "monitoring"
 	defaultMonitoringNamespace = "default"
 	agentName                  = "elastic-agent"
@@ -58,7 +59,7 @@ const (
 
 	// metricset execution period used for the monitoring metrics inputs
 	// we set this to 60s to reduce the load/data volume on the monitoring cluster
-	metricsCollectionInterval = 60 * time.Second
+	defaultMetricsCollectionInterval = 60 * time.Second
 )
 
 var (
@@ -129,6 +130,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	cfg := make(map[string]interface{})
 
 	monitoringOutputName := defaultOutputName
+	metricsCollectionIntervalString := b.config.C.MetricsPeriod
 	if agentCfg, found := policy[agentKey]; found {
 		// The agent section is required for feature flags
 		cfg[agentKey] = agentCfg
@@ -141,6 +143,12 @@ func (b *BeatsMonitor) MonitoringConfig(
 					if use, found := monitoringMap[useOutputKey]; found {
 						if useStr, ok := use.(string); ok {
 							monitoringOutputName = useStr
+						}
+					}
+
+					if metricsPeriod, found := monitoringMap[monitoringMetricsPeriodKey]; found {
+						if metricsPeriodStr, ok := metricsPeriod.(string); ok {
+							metricsCollectionIntervalString = metricsPeriodStr
 						}
 					}
 				}
@@ -165,7 +173,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	}
 
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, componentIDPidMap); err != nil {
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, componentIDPidMap, metricsCollectionIntervalString); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -542,8 +550,16 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 }
 
 // injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.
-func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, componentList []component.Component, existingStateServicePids map[string]uint64) error {
-	metricsCollectionIntervalString := metricsCollectionInterval.String()
+func (b *BeatsMonitor) injectMetricsInput(
+	cfg map[string]interface{},
+	componentIDToBinary map[string]string,
+	componentList []component.Component,
+	existingStateServicePids map[string]uint64,
+	metricsCollectionIntervalString string,
+) error {
+	if metricsCollectionIntervalString == "" {
+		metricsCollectionIntervalString = defaultMetricsCollectionInterval.String()
+	}
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 	beatsStreams := make([]interface{}, 0, len(componentIDToBinary))

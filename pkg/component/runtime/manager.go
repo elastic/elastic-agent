@@ -16,6 +16,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -28,7 +29,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/atomic"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -193,7 +193,7 @@ func NewManager(
 		errCh:          make(chan error),
 		monitor:        monitor,
 		grpcConfig:     grpcConfig,
-		serverReady:    atomic.NewBool(false),
+		serverReady:    &atomic.Bool{},
 		doneChan:       make(chan struct{}),
 	}
 	return m, nil

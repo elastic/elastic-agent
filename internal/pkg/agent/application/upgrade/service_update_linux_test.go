@@ -94,7 +94,7 @@ WantedBy=multi-user.target
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			unitFilePath := filepath.Join(t.TempDir(), paths.ServiceName+".service")
+			unitFilePath := filepath.Join(t.TempDir(), paths.ServiceName()+".service")
 			err := os.WriteFile(unitFilePath, []byte(test.unitFileInitialContents), 0644)
 			require.NoError(t, err)
 
