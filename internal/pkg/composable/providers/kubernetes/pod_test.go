@@ -19,11 +19,12 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
+	k8sfake "k8s.io/client-go/kubernetes/fake"
+
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
 func getLogger() *logger.Logger {
