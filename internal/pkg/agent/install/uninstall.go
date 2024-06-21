@@ -37,14 +37,6 @@ import (
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
 func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
-	// Immediately fail it tamper protection is enabled but no uninstallToken is specified
-	if features.TamperProtection() && uninstallToken == "" {
-		return aerrors.New(
-			fmt.Errorf("missing uninstall token"),
-			"tamper protection detected, elastic-agent uninstall command must be ran with a valid --uninstall-token arg",
-		)
-	}
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
@@ -52,6 +44,34 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 
 	if runtime.GOOS == "windows" && paths.HasPrefix(cwd, topPath) {
 		return fmt.Errorf("uninstall must be run from outside the installed path '%s'", topPath)
+	}
+
+	ctx := context.Background()
+
+	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
+	unprivileged, err := checkForUnprivilegedVault(ctx)
+	if err != nil {
+		return fmt.Errorf("error checking for unprivileged vault: %w", err)
+	}
+
+	// Load config so we can check the tamper protection feature
+	cfg, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
+	if err != nil {
+		return fmt.Errorf("error loading agent config: %w", err)
+	}
+	cfg, err = applyDynamics(ctx, log, cfg)
+	if err != nil {
+		return fmt.Errorf("error applying dynamic inputs: %w", err)
+	}
+	if err := features.Apply(cfg); err != nil {
+		return fmt.Errorf("could not parse and apply feature flags config: %w", err)
+	}
+	// Fail if tamper protection is enabled but no uninstallToken is specified
+	if features.TamperProtection() && uninstallToken == "" {
+		return aerrors.New(
+			fmt.Errorf("missing uninstall token"),
+			"tamper protection detected, elastic-agent uninstall command must be ran with a valid --uninstall-token arg",
+		)
 	}
 
 	// ensure service is stopped
@@ -64,14 +84,6 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	// kill any running watcher
 	if err := killWatcher(pt); err != nil {
 		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
-	}
-
-	ctx := context.Background()
-
-	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
-	unprivileged, err := checkForUnprivilegedVault(ctx)
-	if err != nil {
-		return fmt.Errorf("error checking for unprivileged vault: %w", err)
 	}
 
 	// Uninstall components first
