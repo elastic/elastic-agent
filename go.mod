@@ -85,12 +85,9 @@ require (
 )
 
 require (
-<<<<<<< HEAD
-=======
 	github.com/cavaliercoder/badio v0.0.0-20160213150051-ce5280129e9e // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.103.0
->>>>>>> 5664fa47b8 (Added `httpcheckreceiver`, `otlphttpexporter` and `spanmetricsconnector` (#4977))
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.103.0
@@ -102,10 +99,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.103.0
-<<<<<<< HEAD
-=======
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver v0.103.0
->>>>>>> 5664fa47b8 (Added `httpcheckreceiver`, `otlphttpexporter` and `spanmetricsconnector` (#4977))
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.103.0
 	go.opentelemetry.io/collector/component v0.103.0
@@ -120,10 +114,7 @@ require (
 	go.opentelemetry.io/collector/exporter v0.103.0
 	go.opentelemetry.io/collector/exporter/debugexporter v0.103.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.103.0
-<<<<<<< HEAD
-=======
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.103.0
->>>>>>> 5664fa47b8 (Added `httpcheckreceiver`, `otlphttpexporter` and `spanmetricsconnector` (#4977))
 	go.opentelemetry.io/collector/extension v0.103.0
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.103.0
 	go.opentelemetry.io/collector/featuregate v1.10.0
@@ -147,11 +138,9 @@ require (
 	github.com/aws/aws-sdk-go v1.53.11 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
-	github.com/cavaliercoder/badio v0.0.0-20160213150051-ce5280129e9e // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/distribution/reference v0.5.0 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/docker/docker v25.0.5+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
