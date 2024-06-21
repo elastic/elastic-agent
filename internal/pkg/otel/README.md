@@ -33,6 +33,7 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | filelogreceiver | v0.103.0|
 | hostmetricsreceiver | v0.103.0|
+| httpcheckreceiver | v0.103.0|
 | k8sclusterreceiver | v0.103.0|
 | kubeletstatsreceiver | v0.103.0|
 | otlpreceiver | v0.103.0|
@@ -48,6 +49,7 @@ This section provides a summary of components included in the Elastic Distributi
 | fileexporter | v0.103.0|
 | debugexporter | v0.103.0|
 | otlpexporter | v0.103.0|
+| otlphttpexporter | v0.103.0|
 
 
 
@@ -73,4 +75,13 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | storage/filestorage | v0.103.0|
 | memorylimiterextension | v0.103.0|
+
+
+
+
+### Connectors
+
+| Component | Version |
+|---|---|
+| spanmetricsconnector | v0.103.0|
 
