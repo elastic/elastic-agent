@@ -96,7 +96,6 @@ service:
     metrics:
       exporters:
         - debug
-        - file
         - otlp
       processors:
         - attributes
@@ -115,7 +114,6 @@ service:
       exporters:
         - debug
         - elasticsearch
-        - file
         - otlp
         - otlphttp
         - spanmetrics
