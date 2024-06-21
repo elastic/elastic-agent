@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -32,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/pgptest"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -125,6 +128,118 @@ func TestFleetAirGappedUpgradePrivileged(t *testing.T) {
 		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
 	})
 	testFleetAirGappedUpgrade(t, stack, false)
+}
+
+func TestFleetPRBuildSelfSigned(t *testing.T) {
+	stack := define.Require(t, define.Requirements{
+		Group: Fleet,
+		Stack: &define.Stack{},
+		OS:    []define.OS{{Type: define.Linux}}, // The test uses /etc/hosts.
+		Sudo:  true,                              // The test uses /etc/hosts.
+		Local: false,                             // The test requires Agent installation
+	})
+
+	ctx := context.Background()
+	rootDir := t.TempDir()
+	downloadDir := filepath.Join(rootDir, "downloads", "beats", "elastic-agent")
+	err := os.MkdirAll(downloadDir, 0644)
+	require.NoError(t, err, `could not create download directory`)
+
+	// start file server
+	fs := http.FileServer(http.Dir(rootDir))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fs.ServeHTTP(w, r)
+	}))
+
+	// PR build
+	toFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err, "failed to get fixture with PR build")
+
+	path, err := toFixture.SrcPackage(ctx)
+	require.NoError(t, err, "could not get path to PR build artifact")
+
+	// copy PR build to file server
+	_, filename := filepath.Split(path)
+	copyFile(t, path, filepath.Join(downloadDir, filename))
+
+	agentPkg, err := os.Open(path)
+	require.NoError(t, err, "could not open PR build artifact")
+
+	// sign the build
+	pubKey, ascData := pgptest.Sing(t, agentPkg)
+
+	// add the PGP key to file server
+	err = os.WriteFile(
+		filepath.Join(rootDir, "GPG-KEY-elastic-agent"), pubKey, 0o600)
+	require.NoError(t, err, "could not write GPG-KEY-elastic-agent to disk")
+
+	// add package signature to file server
+	err = os.WriteFile(
+		filepath.Join(downloadDir, filename+".asc"), ascData, 0o600)
+	require.NoError(t, err, "could not write agent .asc file to disk")
+
+	// impersonate https://artifacts.elastic.co/GPG-KEY-elastic-agent
+	ercHostEntry := fmt.Sprintf("\n%server\t%server", server.URL, "artifacts.elastic.co")
+	appendToFile(t, "/etc/hosts", []byte(ercHostEntry))
+
+	downloadSource := kibana.DownloadSource{
+		Name:      "self-signed-" + uuid.Must(uuid.NewV4()).String(),
+		Host:      server.URL + "/downloads/",
+		IsDefault: false, // other tests reuse the stack, let's not mess things up
+	}
+
+	t.Logf("creating download source %q, using %q.",
+		downloadSource.Name, downloadSource.Host)
+	src, err := stack.KibanaClient.CreateDownloadSource(ctx, downloadSource)
+	require.NoError(t, err, "could not create download source")
+	policy := defaultPolicy()
+	policy.DownloadSourceID = src.Item.ID
+
+	// prepare last release
+	versions, err := upgradetest.GetUpgradableVersions()
+	require.NoError(t, err, "could not get upgradable versions")
+
+	sortedVers := version.SortableParsedVersions(versions)
+	sort.Sort(sort.Reverse(sortedVers))
+
+	t.Logf("upgradable versions: %v", versions)
+	var latestRelease version.ParsedSemVer
+	for _, v := range versions {
+		if !v.IsSnapshot() {
+			latestRelease = *v
+			break
+		}
+	}
+	fromFixture, err := atesting.NewFixture(t, latestRelease.String())
+	require.NoError(t, err, "could not create fixture for latest release")
+
+	testUpgradeFleetManagedElasticAgent(
+		ctx, t, stack, fromFixture, toFixture, defaultPolicy(), true)
+}
+
+func copyFile(t *testing.T, srcPath, dstPath string) {
+	src, err := os.Open(srcPath)
+	require.NoError(t, err, "Failed to open source file")
+	defer src.Close()
+
+	dst, err := os.Create(dstPath)
+	require.NoError(t, err, "Failed to create destination file")
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	require.NoError(t, err, "Failed to copy file")
+
+	err = dst.Sync()
+	require.NoError(t, err, "Failed to sync dst file")
+}
+
+func appendToFile(t *testing.T, name string, data []byte) {
+	f, err := os.OpenFile(name, os.O_WRONLY|os.O_APPEND, 0o644)
+	require.NoError(t, err, "could not open file for append")
+
+	_, err = f.Write(data)
+	require.NoError(t, err, "could not write data to file")
+	require.NoError(t, f.Close(), "could not close file")
 }
 
 func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bool) {
