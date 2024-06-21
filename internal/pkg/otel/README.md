@@ -31,8 +31,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| filelogreceiver | v0.97.0|
-| otlpreceiver | v0.97.0|
+| filelogreceiver | v0.100.0|
+| otlpreceiver | v0.100.0|
 
 
 
@@ -41,10 +41,10 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| elasticsearchexporter | v0.97.0|
-| fileexporter | v0.97.0|
-| debugexporter | v0.97.0|
-| otlpexporter | v0.97.0|
+| elasticsearchexporter | v0.100.0|
+| fileexporter | v0.100.0|
+| debugexporter | v0.100.0|
+| otlpexporter | v0.100.0|
 
 
 
@@ -53,20 +53,11 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-| attributesprocessor | v0.97.0|
-| filterprocessor | v0.97.0|
-| resourceprocessor | v0.97.0|
-| transformprocessor | v0.97.0|
-| batchprocessor | v0.97.0|
-| memorylimiterprocessor | v0.97.0|
-=======
 | attributesprocessor | v0.100.0|
 | filterprocessor | v0.100.0|
 | resourceprocessor | v0.100.0|
 | transformprocessor | v0.100.0|
 | batchprocessor | v0.100.0|
->>>>>>> 13a4157d11 (Replacing memory limiter processor with extension (#4689))
 
 
 
