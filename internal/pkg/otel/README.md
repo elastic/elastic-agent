@@ -31,16 +31,11 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-| filelogreceiver | v0.97.0|
-| otlpreceiver | v0.97.0|
-=======
 | filelogreceiver | v0.103.0|
 | hostmetricsreceiver | v0.103.0|
 | k8sclusterreceiver | v0.103.0|
 | kubeletstatsreceiver | v0.103.0|
 | otlpreceiver | v0.103.0|
->>>>>>> 6b7879127d (Added k8s components to otel distribution (#4908))
 
 
 
@@ -49,17 +44,10 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-| elasticsearchexporter | v0.97.0|
-| fileexporter | v0.97.0|
-| debugexporter | v0.97.0|
-| otlpexporter | v0.97.0|
-=======
 | elasticsearchexporter | v0.103.0|
 | fileexporter | v0.103.0|
 | debugexporter | v0.103.0|
 | otlpexporter | v0.103.0|
->>>>>>> 6b7879127d (Added k8s components to otel distribution (#4908))
 
 
 
@@ -68,24 +56,12 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-| attributesprocessor | v0.97.0|
-| filterprocessor | v0.97.0|
-| resourceprocessor | v0.97.0|
-| transformprocessor | v0.97.0|
-| batchprocessor | v0.97.0|
-| memorylimiterprocessor | v0.97.0|
-
-
-
-=======
 | attributesprocessor | v0.103.0|
 | filterprocessor | v0.103.0|
-| k8sattributesprocessor | v0.103.0|
-| resourcedetectionprocessor | v0.103.0|
 | resourceprocessor | v0.103.0|
 | transformprocessor | v0.103.0|
 | batchprocessor | v0.103.0|
+| memorylimiterprocessor | v0.103.0|
 
 
 
@@ -97,4 +73,3 @@ This section provides a summary of components included in the Elastic Distributi
 | storage/filestorage | v0.103.0|
 | memorylimiterextension | v0.103.0|
 
->>>>>>> 6b7879127d (Added k8s components to otel distribution (#4908))

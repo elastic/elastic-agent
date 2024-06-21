@@ -72,20 +72,6 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	run := newRunCommandWithArgs(args, streams)
 	cmd.AddCommand(basecmd.NewDefaultCommandsWithArgs(args, streams)...)
 	cmd.AddCommand(run)
-<<<<<<< HEAD
-	cmd.AddCommand(newInstallCommandWithArgs(args, streams))
-	cmd.AddCommand(newUninstallCommandWithArgs(args, streams))
-	cmd.AddCommand(newUpgradeCommandWithArgs(args, streams))
-	cmd.AddCommand(newEnrollCommandWithArgs(args, streams))
-	cmd.AddCommand(newInspectCommandWithArgs(args, streams))
-	cmd.AddCommand(newWatchCommandWithArgs(args, streams))
-	cmd.AddCommand(newContainerCommand(args, streams))
-	cmd.AddCommand(newStatusCommand(args, streams))
-	cmd.AddCommand(newDiagnosticsCommand(args, streams))
-	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
-	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
-	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
-=======
 
 	addCommandIfNotNil(cmd, newInstallCommandWithArgs(args, streams))
 	addCommandIfNotNil(cmd, newUninstallCommandWithArgs(args, streams))
@@ -101,7 +87,6 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	addCommandIfNotNil(cmd, newComponentCommandWithArgs(args, streams))
 	addCommandIfNotNil(cmd, newLogsCommandWithArgs(args, streams))
 	addCommandIfNotNil(cmd, newOtelCommandWithArgs(args, streams))
->>>>>>> 6b7879127d (Added k8s components to otel distribution (#4908))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)

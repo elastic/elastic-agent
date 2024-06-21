@@ -32,13 +32,10 @@ import (
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"                           // for dev
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
-<<<<<<< HEAD
-=======
 
 	// Extensions
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
->>>>>>> 6b7879127d (Added k8s components to otel distribution (#4908))
 )
 
 func components() (otelcol.Factories, error) {
@@ -65,11 +62,8 @@ func components() (otelcol.Factories, error) {
 		attributesprocessor.NewFactory(),
 		transformprocessor.NewFactory(),
 		filterprocessor.NewFactory(),
-<<<<<<< HEAD
-=======
 		k8sattributesprocessor.NewFactory(),
 		resourcedetectionprocessor.NewFactory(),
->>>>>>> 6b7879127d (Added k8s components to otel distribution (#4908))
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
@@ -86,8 +80,6 @@ func components() (otelcol.Factories, error) {
 		return otelcol.Factories{}, err
 	}
 
-<<<<<<< HEAD
-=======
 	factories.Extensions, err = extension.MakeFactoryMap(
 		memorylimiterextension.NewFactory(),
 		filestorage.NewFactory(),
@@ -96,6 +88,5 @@ func components() (otelcol.Factories, error) {
 		return otelcol.Factories{}, err
 	}
 
->>>>>>> 6b7879127d (Added k8s components to otel distribution (#4908))
 	return factories, err
 }
