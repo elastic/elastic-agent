@@ -33,20 +33,18 @@ func migrateActionStoreToStateStore(
 
 	stateStoreExists, err := stateDiskStore.Exists()
 	if err != nil {
-		log.Errorf("failed to check if state store exists: %v", err)
-		return err
+		return fmt.Errorf("failed to check if state store exists: %w", err)
 	}
 
 	// do not migrate if the state store already exists
 	if stateStoreExists {
-		log.Debugf("not attempting to migrare from action store: state store already exists")
+		log.Debugf("not attempting to migrate from action store: state store already exists")
 		return nil
 	}
 
 	actionStoreExists, err := actionDiskStore.Exists()
 	if err != nil {
-		log.Errorf("failed to check if action store %s exists: %v", actionStorePath, err)
-		return err
+		return fmt.Errorf("failed to check if action store %s exists: %w", actionStorePath, err)
 	}
 
 	// nothing to migrate if the action store doesn't exist
@@ -66,9 +64,8 @@ func migrateActionStoreToStateStore(
 
 	action, err := migrations.LoadActionStore(actionDiskStore)
 	if err != nil {
-		log.Errorf("failed to load action store for migration %s: %v",
+		return fmt.Errorf("failed to load action store for migration %s: %w",
 			actionStorePath, err)
-		return err
 	}
 
 	// no actions stored nothing to migrate
