@@ -90,13 +90,13 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	}
 
 	// remove, if present on platform
-	if paths.ShellWrapperPath != "" {
-		err = os.Remove(paths.ShellWrapperPath)
+	if paths.ShellWrapperPath() != "" {
+		err = os.Remove(paths.ShellWrapperPath())
 		if !os.IsNotExist(err) && err != nil {
 			return aerrors.New(
 				err,
-				fmt.Sprintf("failed to remove shell wrapper (%s)", paths.ShellWrapperPath),
-				aerrors.M("destination", paths.ShellWrapperPath))
+				fmt.Sprintf("failed to remove shell wrapper (%s)", paths.ShellWrapperPath()),
+				aerrors.M("destination", paths.ShellWrapperPath()))
 		}
 	}
 

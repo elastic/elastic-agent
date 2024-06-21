@@ -97,6 +97,7 @@ agent:
     http: null
     logs: false
     metrics: false
+    metrics_period: ""
     namespace: ""
     pprof: null
     traces: true

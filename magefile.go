@@ -108,7 +108,7 @@ func init() {
 	common.RegisterCheckDeps(Update, Check.All)
 	test.RegisterDeps(UnitTest)
 	devtools.BeatLicense = "Elastic License"
-	devtools.BeatDescription = "Agent manages other beats based on configuration provided."
+	devtools.BeatDescription = "Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host."
 
 	devtools.Platforms = devtools.Platforms.Filter("!linux/386")
 	devtools.Platforms = devtools.Platforms.Filter("!windows/386")

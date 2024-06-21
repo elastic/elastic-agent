@@ -2,7 +2,7 @@ exporters:
   debug:
   elasticsearch:
     endpoints:
-      - localhost:9200
+      - http://localhost:9200
   file:
     path: /tmp/file-exporter-output.json
   otlp:
