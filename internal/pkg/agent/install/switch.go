@@ -58,10 +58,10 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 	if err != nil {
 		return fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 	}
-	if paths.ShellWrapperPath != "" {
-		err = perms.FixPermissions(paths.ShellWrapperPath, perms.WithOwnership(ownership))
+	if paths.ShellWrapperPath() != "" {
+		err = perms.FixPermissions(paths.ShellWrapperPath(), perms.WithOwnership(ownership))
 		if err != nil {
-			return fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath, err)
+			return fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath(), err)
 		}
 	}
 

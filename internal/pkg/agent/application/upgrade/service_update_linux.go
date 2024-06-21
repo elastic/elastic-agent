@@ -23,7 +23,7 @@ import (
 func EnsureServiceConfigUpToDate() error {
 	switch service.ChosenSystem().String() {
 	case "linux-systemd":
-		unitFilePath := "/etc/systemd/system/" + paths.ServiceName + ".service"
+		unitFilePath := "/etc/systemd/system/" + paths.ServiceName() + ".service"
 		updated, err := ensureSystemdServiceConfigUpToDate(unitFilePath)
 		if err != nil {
 			return err
