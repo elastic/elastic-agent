@@ -6,6 +6,7 @@ package otel
 
 import (
 	"go.opentelemetry.io/collector/exporter"
+	"go.opentelemetry.io/collector/extension"
 	"go.opentelemetry.io/collector/otelcol"
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/collector/receiver"
@@ -27,6 +28,9 @@ import (
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"                           // for dev
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
+
+	// Extensions
+	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 )
 
 func components() (otelcol.Factories, error) {
@@ -45,7 +49,6 @@ func components() (otelcol.Factories, error) {
 	// Processors
 	factories.Processors, err = processor.MakeFactoryMap(
 		batchprocessor.NewFactory(),
-		memorylimiterprocessor.NewFactory(),
 		resourceprocessor.NewFactory(),
 		attributesprocessor.NewFactory(),
 		transformprocessor.NewFactory(),
@@ -62,6 +65,13 @@ func components() (otelcol.Factories, error) {
 		debugexporter.NewFactory(),
 		fileexporter.NewFactory(),
 		elasticsearchexporter.NewFactory(),
+	)
+	if err != nil {
+		return otelcol.Factories{}, err
+	}
+
+	factories.Extensions, err = extension.MakeFactoryMap(
+		memorylimiterextension.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
