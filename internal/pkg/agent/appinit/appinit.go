@@ -5,6 +5,7 @@
 package appinit
 
 import (
+	"os"
 	"sync"
 
 	"github.com/elastic/elastic-agent-libs/service"
@@ -17,15 +18,17 @@ var stopBeat = func() {
 }
 
 func init() {
-	once.Do(func() {
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			wg.Done()
-			service.ProcessWindowsControlEvents(stopBeat)
-		}()
-		wg.Wait()
-	})
+	if len(os.Args) > 1 && os.Args[1] == "run" {
+		once.Do(func() {
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				wg.Done()
+				service.ProcessWindowsControlEvents(stopBeat)
+			}()
+			wg.Wait()
+		})
+	}
 }
 
 func StopSvcChan() chan bool {
