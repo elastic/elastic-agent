@@ -3153,6 +3153,7 @@ type dependencies struct {
 	Exporters  []dependency
 	Processors []dependency
 	Extensions []dependency
+	Connectors []dependency
 }
 
 func (d dependency) Clean(sep string) dependency {
@@ -3209,7 +3210,7 @@ func getOtelDependencies() (*dependencies, error) {
 	scanner := bufio.NewScanner(readFile)
 
 	scanner.Split(bufio.ScanLines)
-	var receivers, extensions, exporters, processors []dependency
+	var receivers, extensions, exporters, processors, connectors []dependency
 	// process imports
 	for scanner.Scan() {
 		l := strings.TrimSpace(scanner.Text())
@@ -3248,6 +3249,8 @@ func getOtelDependencies() (*dependencies, error) {
 			exporters = append(exporters, d.Clean("/exporter/"))
 		} else if strings.Contains(l, "/extension/") {
 			extensions = append(extensions, d.Clean("/extension/"))
+		} else if strings.Contains(l, "/connector/") {
+			connectors = append(connectors, d.Clean("/connector/"))
 		}
 	}
 
@@ -3256,5 +3259,6 @@ func getOtelDependencies() (*dependencies, error) {
 		Exporters:  exporters,
 		Processors: processors,
 		Extensions: extensions,
+		Connectors: connectors,
 	}, nil
 }
