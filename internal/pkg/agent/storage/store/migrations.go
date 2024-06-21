@@ -178,7 +178,7 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 	for _, a := range yamlStore.ActionQueue {
 		if a.Type != fleetapi.ActionTypeUpgrade {
 			log.Warnf(
-				"loaded a unsupported %s action from the deprecated YAML state store action queue, ignoring it",
+				"loaded a unsupported %s action from the deprecated YAML state store action queue, it will be dropped",
 				yamlStore.Action.Type)
 			continue
 		}

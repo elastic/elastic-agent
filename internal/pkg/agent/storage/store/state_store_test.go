@@ -90,7 +90,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		store.dirty = true
 		store.state.ActionSerializer.Action = fleetapi.NewAction(fleetapi.ActionTypeUnknown)
 		err = store.Save()
-		require.Error(t, err, "expected and error when saving sore with invalid state")
+		require.Error(t, err, "expected an error when saving store with invalid state")
 
 		assert.True(t, store.dirty,
 			"the store should be kept dirty when save fails")
