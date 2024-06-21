@@ -128,8 +128,8 @@ func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 
 	if st.Version != Version {
 		return nil, fmt.Errorf(
-			"invalid state store version, got %q isntead of %s",
-			st.Version, Version)
+			"invalid state store version, current version is %q loaded store verion is %q",
+			Version, st.Version)
 	}
 
 	return &StateStore{
@@ -180,6 +180,10 @@ func (s *StateStore) SetAction(a fleetapi.Action) {
 		}
 		s.dirty = true
 		s.state.ActionSerializer.Action = a
+	default:
+		s.log.Debugw("trying to set invalid action type on the state store, ignoring the action",
+			"action.type", a.Type(),
+			"action.id", a.ID())
 	}
 }
 
