@@ -29,6 +29,8 @@ import (
 	transformprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor" // for OTTL processing on logs
 	"go.opentelemetry.io/collector/processor/batchprocessor"                                                    // for batching events
 
+	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
+
 	// Exporters:
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
@@ -64,6 +66,7 @@ func components() (otelcol.Factories, error) {
 		transformprocessor.NewFactory(),
 		filterprocessor.NewFactory(),
 		k8sattributesprocessor.NewFactory(),
+		elasticinframetricsprocessor.NewFactory(),
 		resourcedetectionprocessor.NewFactory(),
 	)
 	if err != nil {
