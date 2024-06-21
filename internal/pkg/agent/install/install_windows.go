@@ -83,7 +83,7 @@ func withServiceOptions(username string, groupName string) ([]serviceOpt, error)
 // ReExec is not possible on Windows.
 func serviceConfigure(ownership utils.FileOwner) error {
 	// Modify registry to allow logging to eventlog as "Elastic Agent".
-	err := eventlog.InstallAsEventCreate(paths.ServiceName, eventlog.Info|eventlog.Warning|eventlog.Error)
+	err := eventlog.InstallAsEventCreate(paths.ServiceName(), eventlog.Info|eventlog.Warning|eventlog.Error)
 	if err != nil && !strings.Contains(err.Error(), "registry key already exists") {
 		return fmt.Errorf("unable to create registry key for logging: %w", err)
 	}
@@ -103,9 +103,9 @@ func serviceConfigure(ownership utils.FileOwner) error {
 	if err != nil {
 		return fmt.Errorf("failed to get DACL from security descriptor: %w", err)
 	}
-	err = windows.SetNamedSecurityInfo(paths.ServiceName, windows.SE_SERVICE, windows.DACL_SECURITY_INFORMATION, nil, nil, dacl, nil)
+	err = windows.SetNamedSecurityInfo(paths.ServiceName(), windows.SE_SERVICE, windows.DACL_SECURITY_INFORMATION, nil, nil, dacl, nil)
 	if err != nil {
-		return fmt.Errorf("failed to set DACL for service(%s): %w", paths.ServiceName, err)
+		return fmt.Errorf("failed to set DACL for service(%s): %w", paths.ServiceName(), err)
 	}
 	return nil
 }

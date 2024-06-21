@@ -557,6 +557,12 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		return errors.New(err, "acquiring metadata failed")
 	}
 
+	// Automatically add the namespace as a tag when installed into a namepsace.
+	// Ensures the development agent is differentiated from others when on the same host.
+	if namespace := paths.InstallNamespace(); namespace != "" {
+		c.options.Tags = append(c.options.Tags, namespace)
+	}
+
 	r := &fleetapi.EnrollRequest{
 		EnrollAPIKey: c.options.EnrollAPIKey,
 		Type:         fleetapi.PermanentEnroll,

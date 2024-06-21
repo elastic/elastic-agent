@@ -6,9 +6,8 @@ package http
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
-
-	"github.com/elastic/elastic-agent-libs/atomic"
 )
 
 type downloadProgressReporter struct {
@@ -17,7 +16,7 @@ type downloadProgressReporter struct {
 	warnTimeout time.Duration
 	length      float64
 
-	downloaded atomic.Int
+	downloaded atomic.Int64
 	started    time.Time
 
 	progressObservers []progressObserver
@@ -42,7 +41,7 @@ func newDownloadProgressReporter(sourceURI string, timeout time.Duration, length
 
 func (dp *downloadProgressReporter) Write(b []byte) (int, error) {
 	n := len(b)
-	dp.downloaded.Add(n)
+	dp.downloaded.Add(int64(n))
 	return n, nil
 }
 

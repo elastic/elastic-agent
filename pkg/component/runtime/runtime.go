@@ -8,10 +8,10 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/atomic"
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -188,11 +188,10 @@ func (s *componentRuntimeState) start() error {
 }
 
 func (s *componentRuntimeState) stop(teardown bool, signed *component.Signed) error {
-	if s.shuttingDown.Load() {
+	if !s.shuttingDown.CompareAndSwap(false, true) {
 		// already stopping
 		return nil
 	}
-	s.shuttingDown.Store(true)
 	if teardown {
 		return s.runtime.Teardown(signed)
 	}

@@ -321,11 +321,6 @@ func BinaryPath(baseDir, agentName string) string {
 	return filepath.Join(binaryDir(baseDir), agentName)
 }
 
-// InstallPath returns the top level directory Agent will be installed into.
-func InstallPath(basePath string) string {
-	return filepath.Join(basePath, "Elastic", "Agent")
-}
-
 // TopBinaryPath returns the path to the Elastic Agent binary that is inside the Top directory.
 //
 // This always points to the symlink that points to the latest Elastic Agent version.
