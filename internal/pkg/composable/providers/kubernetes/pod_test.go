@@ -15,6 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	c "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
 func getLogger() *logger.Logger {
@@ -370,8 +372,6 @@ func TestEphemeralContainers(t *testing.T) {
 
 }
 
-<<<<<<< HEAD
-=======
 func TestGenerateHints(t *testing.T) {
 	pod := &kubernetes.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -509,7 +509,6 @@ func TestPodEventer_Namespace_Node_Watcher(t *testing.T) {
 	}
 }
 
->>>>>>> 62958d0da2 ([Elastic Agent]-PR- Introduce log message for not supported annotations for Hints based autodiscover (#4360))
 // MockDynamicComm is used in tests.
 type MockDynamicComm struct {
 	context.Context
