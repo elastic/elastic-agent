@@ -2,7 +2,7 @@ exporters:
   debug:
   elasticsearch:
     endpoints:
-      - localhost:9200
+      - http://localhost:9200
   file:
     path: /tmp/file-exporter-output.json
   otlp:
@@ -20,6 +20,7 @@ processors:
         key: key1
         value: value1
   batch:
+  elasticinframetrics:
   filter:
   resource:
     attributes:
@@ -67,6 +68,7 @@ service:
       processors:
         - attributes
         - batch
+        - elasticinframetrics
         - filter
         - resource
         - resourcedetection
