@@ -7,6 +7,8 @@ exporters:
     path: /tmp/file-exporter-output.json
   otlp:
     endpoint: localhots:4317
+  otlphttp:
+    endpoint: https://localhost.com:4318
 
 extensions:
   memory_limiter:
@@ -38,6 +40,37 @@ receivers:
     protocols:
       grpc:
       http:
+  httpcheck:
+    targets:
+      - endpoint: http://localhost:80
+        method: GET
+    collection_interval: 10s
+
+connectors: 
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
+    dimensions:
+      - name: http.method
+        default: GET
+      - name: http.status_code
+    exemplars:
+      enabled: true
+    exclude_dimensions: ['status.code']
+    dimensions_cache_size: 1000
+    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"    
+    metrics_flush_interval: 15s
+    metrics_expiration: 5m
+    events:
+      enabled: true
+      dimensions:
+        - name: exception.type
+        - name: exception.message
+    resource_metrics_key_attributes:
+      - service.name
+      - telemetry.sdk.language
+      - telemetry.sdk.name
 
 service:
   extensions:
@@ -63,7 +96,6 @@ service:
     metrics:
       exporters:
         - debug
-        - file
         - otlp
       processors:
         - attributes
@@ -75,13 +107,16 @@ service:
         - transform
       receivers:
         - otlp
+        - httpcheck
+        - spanmetrics
 
     traces:
       exporters:
         - debug
         - elasticsearch
-        - file
         - otlp
+        - otlphttp
+        - spanmetrics
       processors:
         - attributes
         - batch

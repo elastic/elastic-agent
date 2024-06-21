@@ -61,3 +61,12 @@ This section provides a summary of components included in the Elastic Distributi
 {{ range .Extensions }}| {{ .Name }} | {{ .Version -}} |
 {{ end }}
 {{ end }}
+
+{{ if .Connectors }}
+### Connectors
+
+| Component | Version |
+|---|---|
+{{ range .Connectors }}| {{ .Name }} | {{ .Version -}} |
+{{ end }}
+{{ end }}
