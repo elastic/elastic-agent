@@ -99,7 +99,7 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
 
 	// 3. Ensure installation is correct.
-	require.NoError(t, installtest.CheckSuccess(ctx, agentFixture, installOpts.BasePath, !installOpts.Privileged))
+	require.NoError(t, installtest.CheckSuccess(ctx, agentFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged}))
 
 	t.Run("Monitoring logs are shipped", func(t *testing.T) {
 		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
