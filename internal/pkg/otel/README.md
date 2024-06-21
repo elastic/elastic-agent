@@ -58,6 +58,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| elasticinframetricsprocessor | v0.2.0|
 | attributesprocessor | v0.103.0|
 | filterprocessor | v0.103.0|
 | k8sattributesprocessor | v0.103.0|
