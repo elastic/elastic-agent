@@ -20,8 +20,8 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
-func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, unprivileged bool) error {
-	if unprivileged {
+func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opts *CheckOpts) error {
+	if !opts.Privileged {
 		// Check that the elastic-agent user/group exist.
 		uid, err := install.FindUID(install.ElasticUsername)
 		if err != nil {
@@ -64,10 +64,15 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, unp
 		}
 
 		// Executing `elastic-agent status` as the `elastic-agent-user` user should work.
+		shellWrapperName := "elastic-agent"
+		if opts.Namespace != "" {
+			shellWrapperName = paths.ShellWrapperPathForNamespace(opts.Namespace)
+		}
+
 		var output []byte
 		err = waitForNoError(ctx, func(_ context.Context) error {
 			// #nosec G204 -- user cannot inject any parameters to this command
-			cmd := exec.Command("sudo", "-u", install.ElasticUsername, "elastic-agent", "status")
+			cmd := exec.Command("sudo", "-u", install.ElasticUsername, shellWrapperName, "status")
 			output, err = cmd.CombinedOutput()
 			if err != nil {
 				return fmt.Errorf("elastic-agent status failed: %w (output: %s)", err, output)
@@ -80,7 +85,7 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, unp
 		originalUser := os.Getenv("SUDO_USER")
 		if originalUser != "" {
 			// #nosec G204 -- user cannot inject any parameters to this command
-			cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
+			cmd := exec.Command("sudo", "-u", originalUser, shellWrapperName, "status")
 			output, err := cmd.CombinedOutput()
 			if err == nil {
 				return fmt.Errorf("sudo -u %s elastic-agent didn't fail: got output: %s", originalUser, output)
