@@ -62,11 +62,6 @@ require (
 	go.elastic.co/apm/v2 v2.6.0
 	go.elastic.co/ecszap v1.0.2
 	go.elastic.co/go-licence-detector v0.6.0
-	go.opentelemetry.io/collector/exporter/debugexporter v0.103.0
-	go.opentelemetry.io/collector/exporter/otlpexporter v0.103.0
-	go.opentelemetry.io/collector/extension/memorylimiterextension v0.103.0
-	go.opentelemetry.io/collector/processor/batchprocessor v0.103.0
-	go.opentelemetry.io/collector/receiver/otlpreceiver v0.103.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.24.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
