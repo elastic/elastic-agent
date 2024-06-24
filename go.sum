@@ -853,8 +853,8 @@ github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f h1:qo0Nn9G+p7HbG+C
 github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f/go.mod h1:mVdKBYYwt30xRFjCegbcURHh+3LWOCkQM33fgWbUiRI=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.2.0 h1:hNc32QRR4oSpDWdB0CotjS57i0Cy22N4+TcUCCYP+Vs=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.2.0/go.mod h1:5VmwVI4VxoS5mM16eeculPuWbjNdnCqDGvWfipi6yXs=
-github.com/elastic/opentelemetry-lib v0.3.0 h1:5wmnCqEajieIae71vh4oET0P0LX6Tb+pY09D9dDv1wA=
-github.com/elastic/opentelemetry-lib v0.3.0/go.mod h1:/kKvHbJLVo/NcKMPHI8/RZKL64fushmnRUzn+arQpjg=
+github.com/elastic/opentelemetry-lib v0.4.0 h1:e+N00oKXnv8EIXDVjHXPjkxox98JVm1b4kHVMp1NcTA=
+github.com/elastic/opentelemetry-lib v0.4.0/go.mod h1:/kKvHbJLVo/NcKMPHI8/RZKL64fushmnRUzn+arQpjg=
 github.com/elastic/package-spec/v2 v2.6.0/go.mod h1:ks9/FaVOS+vCrGRQcDvXAd2FlmB84mrLikbRiO6ACuk=
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
 github.com/elastic/pkcs8 v1.0.0/go.mod h1:ipsZToJfq1MxclVTwpG7U/bgeDtf+0HkUiOxebk95+0=
