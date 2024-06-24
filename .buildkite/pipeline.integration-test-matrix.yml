@@ -6,7 +6,7 @@ env:
 
 steps:
   - label: "Integration test matrix"
-    key: "integration-matrix"
+    key: "integration-tests-matrix"
     command: ".buildkite/scripts/steps/integration_tests.sh stateful integration:matrix"
     artifact_paths:
       - "build/TEST-**"
