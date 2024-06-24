@@ -5,6 +5,7 @@
 package logger
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -48,7 +49,8 @@ var internalLevelEnabler *zap.AtomicLevel
 // New returns a configured ECS Logger
 func New(name string, logInternal bool) (*Logger, error) {
 	defaultCfg := DefaultLoggingConfig()
-	return new(name, defaultCfg, logInternal)
+	defaultEventLogCfg := DefaultEventLoggingConfig()
+	return new(name, defaultCfg, defaultEventLogCfg, logInternal)
 }
 
 // NewWithLogpLevel returns a configured logp Logger with specified level.
@@ -56,13 +58,16 @@ func NewWithLogpLevel(name string, level logp.Level, logInternal bool) (*Logger,
 	defaultCfg := DefaultLoggingConfig()
 	defaultCfg.Level = level
 
-	return new(name, defaultCfg, logInternal)
+	defaultEventLogCfg := DefaultEventLoggingConfig()
+	defaultEventLogCfg.Level = level
+
+	return new(name, defaultCfg, defaultEventLogCfg, logInternal)
 }
 
 // NewFromConfig takes the user configuration and generate the right logger.
 // We should finish implementation, need support on the library that we use.
-func NewFromConfig(name string, cfg *Config, logInternal bool) (*Logger, error) {
-	return new(name, cfg, logInternal)
+func NewFromConfig(name string, cfg, eventLogCfg *Config, logInternal bool) (*Logger, error) {
+	return new(name, cfg, eventLogCfg, logInternal)
 }
 
 // NewWithoutConfig returns a new logger without having a configuration.
@@ -72,6 +77,31 @@ func NewWithoutConfig(name string) *Logger {
 	return logp.NewLogger(name)
 }
 
+// NewInMemory returns a new in-memory logger along with the buffer to which i
+// logs.
+// encCfg configures the log format, use logp.ConsoleEncoderConfig for console
+// format, logp.JSONEncoderConfig for JSON or any other valid zapcore.EncoderConfig.
+func NewInMemory(selector string, encCfg zapcore.EncoderConfig) (*Logger, *bytes.Buffer) {
+	buff := bytes.Buffer{}
+
+	encoderConfig := ecszap.ECSCompatibleEncoderConfig(encCfg)
+	encoderConfig.EncodeTime = UtcTimestampEncode
+	encoder := zapcore.NewConsoleEncoder(encoderConfig)
+
+	core := zapcore.NewCore(
+		encoder,
+		zapcore.AddSync(&buff),
+		zap.NewAtomicLevelAt(zap.DebugLevel))
+	ecszap.ECSCompatibleEncoderConfig(logp.ConsoleEncoderConfig())
+
+	logger := logp.NewLogger(
+		selector,
+		zap.WrapCore(func(in zapcore.Core) zapcore.Core {
+			return core
+		}))
+	return logger, &buff
+}
+
 // AddCallerSkip returns new logger with incremented stack frames to skip.
 // This is needed in order to correctly report the log file lines when the logging statement
 // is wrapped in some convenience wrapping function for example.
@@ -79,10 +109,10 @@ func AddCallerSkip(l *Logger, skip int) *Logger {
 	return l.WithOptions(zap.AddCallerSkip(skip))
 }
 
-func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
+func new(name string, cfg, eventLoggerCfg *Config, logInternal bool) (*Logger, error) {
 	commonCfg, err := ToCommonConfig(cfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not convert log config: %w", err)
 	}
 
 	var outputs []zapcore.Core
@@ -95,9 +125,15 @@ func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
 		outputs = append(outputs, internal)
 	}
 
-	if err := configure.LoggingWithOutputs("", commonCfg, outputs...); err != nil {
+	eventLoggercommonCfg, err := ToCommonConfig(eventLoggerCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert event log config: %w", err)
+	}
+
+	if err := configure.LoggingWithTypedOutputs("", commonCfg, eventLoggercommonCfg, "log.type", "event", outputs...); err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
+
 	return logp.NewLogger(name), nil
 }
 
@@ -147,7 +183,24 @@ func DefaultLoggingConfig() *Config {
 	return &cfg
 }
 
-// makeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
+// DefaultLoggingConfig returns default configuration for agent logging.
+func DefaultEventLoggingConfig() *Config {
+	cfg := logp.DefaultEventConfig(logp.DefaultEnvironment)
+
+	// That's the same path useb by MakeInternalFileOutput
+	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory, "events")
+	cfg.Files.Name = agentName + "-event-log"
+
+	root, _ := utils.HasRoot() // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		cfg.Files.Permissions = 0660
+	}
+
+	return &cfg
+}
+
+// MakeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
 //
 // This is the logger that the spawned filebeat expects to read the log file from and ship to ES.
 func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {

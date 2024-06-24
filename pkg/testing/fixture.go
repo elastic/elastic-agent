@@ -831,13 +831,18 @@ func (f *Fixture) EnsurePrepared(ctx context.Context) error {
 func (f *Fixture) binaryPath() string {
 	workDir := f.workDir
 	if f.installed {
+		installDir := "Agent"
+		if f.installOpts != nil && f.installOpts.Namespace != "" {
+			installDir = paths.InstallDirNameForNamespace(f.installOpts.Namespace)
+		}
+
 		if f.installOpts != nil && f.installOpts.BasePath != "" {
-			workDir = filepath.Join(f.installOpts.BasePath, "Elastic", "Agent")
+			workDir = filepath.Join(f.installOpts.BasePath, "Elastic", installDir)
 		} else {
-			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
+			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", installDir)
 		}
 	}
-	if f.packageFormat == "deb" {
+	if f.packageFormat == "deb" || f.packageFormat == "rpm" {
 		workDir = "/usr/bin"
 	}
 	defaultBin := "elastic-agent"
@@ -1162,11 +1167,13 @@ func performConfigure(ctx context.Context, c client.Client, cfg string, timeout 
 
 type AgentStatusOutput struct {
 	Info struct {
-		ID        string `json:"id"`
-		Version   string `json:"version"`
-		Commit    string `json:"commit"`
-		BuildTime string `json:"build_time"`
-		Snapshot  bool   `json:"snapshot"`
+		ID           string `json:"id"`
+		Version      string `json:"version"`
+		Commit       string `json:"commit"`
+		BuildTime    string `json:"build_time"`
+		Snapshot     bool   `json:"snapshot"`
+		PID          int32  `json:"pid"`
+		Unprivileged bool   `json:"unprivileged"`
 	} `json:"info"`
 	State      int    `json:"state"`
 	Message    string `json:"message"`

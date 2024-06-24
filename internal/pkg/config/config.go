@@ -38,6 +38,7 @@ var DefaultOptions = []interface{}{
 	ucfg.ResolveEnv,
 	ucfg.VarExp,
 	VarSkipKeys("inputs"),
+	ucfg.IgnoreCommas,
 }
 
 // Config custom type over a ucfg.Config to add new methods on the object.
@@ -155,9 +156,8 @@ func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 	}
 	ucfgOpts, local, err := getOptions(opts...)
 	if err != nil {
-		return nil, fmt.Errorf("error unpacking logs: %w", err)
+		return nil, fmt.Errorf("error unpacking config: %w", err)
 	}
-
 	// remove and unpack each skip keys into its own map with no resolve
 	// so that variables are not substituted
 	skippedKeys := map[string]interface{}{}

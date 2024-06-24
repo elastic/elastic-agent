@@ -41,9 +41,15 @@ const (
 
 	elasticAgentModulePath = "github.com/elastic/elastic-agent"
 
+	defaultName = "elastic-agent"
+
 	// Env vars
 	// agent package version
 	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
+	//ManifestUrlEnvVar is the name fo the environment variable containing the Manifest URL to be used for packaging agent
+	ManifestUrlEnvVar = "MANIFEST_URL"
+	// AgentCommitHashEnvVar allows to override agent commit hash string during packaging
+	AgentCommitHashEnvVar
 
 	// Mapped functions
 	agentPackageVersionMappedFunc    = "agent_package_version"
@@ -69,7 +75,7 @@ var (
 	// the crossbuild images at /go/pkg/mod, read-only,  when set to true.
 	CrossBuildMountModcache = true
 
-	BeatName        = EnvOr("BEAT_NAME", filepath.Base(CWD()))
+	BeatName        = EnvOr("BEAT_NAME", defaultName)
 	BeatServiceName = EnvOr("BEAT_SERVICE_NAME", BeatName)
 	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
 	BeatDescription = EnvOr("BEAT_DESCRIPTION", "")
@@ -152,7 +158,7 @@ func initGlobals() {
 
 	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
 
-	ManifestURL = EnvOr("ManifestURL", "")
+	ManifestURL = EnvOr(ManifestUrlEnvVar, "")
 	PackagingFromManifest = ManifestURL != ""
 }
 
@@ -281,7 +287,12 @@ var (
 func CommitHash() (string, error) {
 	var err error
 	commitHashOnce.Do(func() {
-		commitHash, err = sh.Output("git", "rev-parse", "HEAD")
+		// Check commit hash override first
+		commitHash = EnvOr(AgentCommitHashEnvVar, "")
+		if commitHash == "" {
+			// no override found, get the hash from HEAD
+			commitHash, err = sh.Output("git", "rev-parse", "HEAD")
+		}
 	})
 	return commitHash, err
 }

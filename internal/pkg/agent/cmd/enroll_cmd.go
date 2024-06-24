@@ -20,16 +20,13 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -41,6 +38,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -54,6 +52,8 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
+	enrollBackoffInit              = time.Second
+	enrollBackoffMax               = 10 * time.Second
 )
 
 var (
@@ -119,7 +119,7 @@ type enrollCmdOption struct {
 	ProxyHeaders         map[string]string          `yaml:"proxy_headers,omitempty"`
 	DaemonTimeout        time.Duration              `yaml:"daemon_timeout,omitempty"`
 	UserProvidedMetadata map[string]interface{}     `yaml:"-"`
-	FixPermissions       bool                       `yaml:"-"`
+	FixPermissions       *utils.FileOwner           `yaml:"-"`
 	DelayEnroll          bool                       `yaml:"-"`
 	FleetServer          enrollCmdFleetServerOption `yaml:"-"`
 	SkipCreateSecret     bool                       `yaml:"-"`
@@ -166,35 +166,8 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	return cfg, nil
 }
 
-// newEnrollCmd creates a new enroll command that will registers the current beats to the remote
-// system.
+// newEnrollCmd creates a new enrollment with the given store.
 func newEnrollCmd(
-	ctx context.Context,
-	log *logger.Logger,
-	options *enrollCmdOption,
-	configPath string,
-) (*enrollCmd, error) {
-
-	encryptedDiskStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
-	if err != nil {
-		return nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
-	}
-	store := storage.NewReplaceOnSuccessStore(
-		configPath,
-		application.DefaultAgentFleetConfig,
-		encryptedDiskStore,
-	)
-
-	return newEnrollCmdWithStore(
-		log,
-		options,
-		configPath,
-		store,
-	)
-}
-
-// newEnrollCmdWithStore creates a new enrollment and accept a custom store.
-func newEnrollCmdWithStore(
 	log *logger.Logger,
 	options *enrollCmdOption,
 	configPath string,
@@ -227,7 +200,11 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 
 	// Create encryption key from the agent before touching configuration
 	if !c.options.SkipCreateSecret {
-		err = secret.CreateAgentSecret(ctx, vault.WithUnprivileged(!hasRoot))
+		opts := []vault.OptionFunc{vault.WithUnprivileged(!hasRoot)}
+		if c.options.FixPermissions != nil {
+			opts = append(opts, vault.WithVaultOwnership(*c.options.FixPermissions))
+		}
+		err = secret.CreateAgentSecret(ctx, opts...)
 		if err != nil {
 			return err
 		}
@@ -279,7 +256,18 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		if c.options.FleetServer.Host != "" {
 			return errors.New("--delay-enroll cannot be used with --fleet-server-es", errors.TypeConfig)
 		}
-		return c.writeDelayEnroll(streams)
+		err = c.writeDelayEnroll(streams)
+		if err != nil {
+			// context for error already provided in writeDelayEnroll
+			return err
+		}
+		if c.options.FixPermissions != nil {
+			err = perms.FixPermissions(paths.Top(), perms.WithOwnership(*c.options.FixPermissions))
+			if err != nil {
+				return errors.New(err, "failed to fix permissions")
+			}
+		}
+		return nil
 	}
 
 	err = c.enrollWithBackoff(ctx, persistentConfig)
@@ -287,8 +275,8 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		return fmt.Errorf("fail to enroll: %w", err)
 	}
 
-	if c.options.FixPermissions {
-		err = install.FixPermissions(paths.Top(), utils.CurrentFileOwner())
+	if c.options.FixPermissions != nil {
+		err = perms.FixPermissions(paths.Top(), perms.WithOwnership(*c.options.FixPermissions))
 		if err != nil {
 			return errors.New(err, "failed to fix permissions")
 		}
@@ -348,7 +336,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 	if err != nil {
 		if !c.options.FleetServer.SpawnAgent {
 			// wait longer to try and communicate with the Elastic Agent
-			err = waitForAgent(ctx, c.options.DaemonTimeout)
+			err = wait.ForAgent(ctx, c.options.DaemonTimeout)
 			if err != nil {
 				return "", errors.New("failed to communicate with elastic-agent daemon; is elastic-agent running?")
 			}
@@ -533,16 +521,10 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 		return nil
 	}
 
-	const deadline = 10 * time.Minute
-	const frequency = 60 * time.Second
-
-	c.log.Infof("1st enrollment attempt failed, retrying for %s, every %s enrolling to URL: %s",
-		deadline,
-		frequency,
-		c.client.URI())
+	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", c.client.URI(), enrollBackoffInit, enrollBackoffMax)
 	signal := make(chan struct{})
 	defer close(signal)
-	backExp := backoff.NewExpBackoff(signal, frequency, deadline)
+	backExp := backoff.NewExpBackoff(signal, enrollBackoffInit, enrollBackoffMax)
 
 	for {
 		retry := false
@@ -551,6 +533,9 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 			retry = true
 		} else if errors.Is(err, fleetapi.ErrConnRefused) {
 			c.log.Warn("Remote server is not ready to accept connections, will retry in a moment.")
+			retry = true
+		} else if errors.Is(err, fleetapi.ErrTemporaryServerError) {
+			c.log.Warn("Remote server failed to handle the request, will retry in a moment.")
 			retry = true
 		}
 		if !retry {
@@ -570,6 +555,12 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 	metadata, err := info.Metadata(ctx, c.log)
 	if err != nil {
 		return errors.New(err, "acquiring metadata failed")
+	}
+
+	// Automatically add the namespace as a tag when installed into a namepsace.
+	// Ensures the development agent is differentiated from others when on the same host.
+	if namespace := paths.InstallNamespace(); namespace != "" {
+		c.options.Tags = append(c.options.Tags, namespace)
 	}
 
 	r := &fleetapi.EnrollRequest{
@@ -736,54 +727,6 @@ func getDaemonState(ctx context.Context) (*client.AgentState, error) {
 type waitResult struct {
 	enrollmentToken string
 	err             error
-}
-
-func waitForAgent(ctx context.Context, timeout time.Duration) error {
-	if timeout == 0 {
-		timeout = 1 * time.Minute
-	}
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	maxBackoff := timeout
-	if maxBackoff <= 0 {
-		// indefinite timeout
-		maxBackoff = 10 * time.Minute
-	}
-
-	resChan := make(chan waitResult)
-	innerCtx, innerCancel := context.WithCancel(context.Background())
-	defer innerCancel()
-	go func() {
-		backOff := expBackoffWithContext(innerCtx, 1*time.Second, maxBackoff)
-		for {
-			backOff.Wait()
-			_, err := getDaemonState(innerCtx)
-			if errors.Is(err, context.Canceled) {
-				resChan <- waitResult{err: err}
-				return
-			}
-			if err == nil {
-				resChan <- waitResult{}
-				break
-			}
-		}
-	}()
-
-	var res waitResult
-	select {
-	case <-ctx.Done():
-		innerCancel()
-		res = <-resChan
-	case res = <-resChan:
-	}
-
-	if res.err != nil {
-		return res.err
-	}
-	return nil
 }
 
 func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessState, log *logger.Logger, timeout time.Duration) (string, error) {

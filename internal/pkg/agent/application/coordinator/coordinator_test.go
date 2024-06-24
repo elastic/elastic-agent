@@ -61,6 +61,19 @@ var (
 			},
 		},
 	}
+	fakeIsolatedUnitsInputSpec = component.InputSpec{
+		Name:      "fake-isolated-units",
+		Platforms: []string{fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH)},
+		Shippers:  []string{"fake-shipper"},
+		Command: &component.CommandSpec{
+			Timeouts: component.CommandTimeoutSpec{
+				Checkin: 30 * time.Second,
+				Restart: 10 * time.Millisecond, // quick restart during tests
+				Stop:    30 * time.Second,
+			},
+		},
+		IsolateUnits: true,
+	}
 	fakeShipperSpec = component.ShipperSpec{
 		Name:      "fake-shipper",
 		Platforms: []string{fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH)},
@@ -547,6 +560,98 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCoordinator_StateSubscribeIsolatedUnits(t *testing.T) {
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, WithComponentInputSpec(fakeIsolatedUnitsInputSpec))
+	go func() {
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	resultChan := make(chan error)
+	go func() {
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		subChan := coord.StateSubscribe(ctx, 32)
+		for {
+			select {
+			case <-ctx.Done():
+				resultChan <- ctx.Err()
+				return
+			case state := <-subChan:
+				if len(state.Components) == 3 {
+					compState0 := getComponentState(state.Components, "fake-isolated-units-default-fake-isolated-units-0")
+					compState1 := getComponentState(state.Components, "fake-isolated-units-default-fake-isolated-units-1")
+					if compState0 != nil && compState1 != nil {
+						unit0, ok0 := compState0.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-0-unit"}]
+						unit1, ok1 := compState1.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1-unit"}]
+						if ok0 && ok1 {
+							if (unit0.State == client.UnitStateHealthy && unit0.Message == "Healthy From Fake Isolated Units 0 Config") &&
+								(unit1.State == client.UnitStateHealthy && unit1.Message == "Healthy From Fake Isolated Units 1 Config") {
+								resultChan <- nil
+								return
+							} else if unit0.State == client.UnitStateFailed && unit1.State == client.UnitStateFailed {
+								// if you get a really strange failed state, check to make sure the mock binaries in
+								// elastic-agent/pkg/component/fake/ are updated
+								t.Fail()
+								t.Logf("got units with failed state: %#v / %#v", unit1, unit0)
+							}
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	// no vars used by the config
+	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
+
+	// set the configuration to run a fake input
+	cfg, err := config.NewConfigFrom(map[string]interface{}{
+		"outputs": map[string]interface{}{
+			"default": map[string]interface{}{
+				"type": "fake-action-output",
+				"shipper": map[string]interface{}{
+					"enabled": true,
+				},
+			},
+		},
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"id":         "fake-isolated-units-0",
+				"type":       "fake-isolated-units",
+				"use_output": "default",
+				"state":      client.UnitStateHealthy,
+				"message":    "Healthy From Fake Isolated Units 0 Config",
+			},
+			map[string]interface{}{
+				"id":         "fake-isolated-units-1",
+				"type":       "fake-isolated-units",
+				"use_output": "default",
+				"state":      client.UnitStateHealthy,
+				"message":    "Healthy From Fake Isolated Units 1 Config",
+			},
+		},
+	})
+	require.NoError(t, err)
+	cfgMgr.Config(ctx, cfg)
+
+	err = <-resultChan
+	require.NoError(t, err)
+	cancel()
+
+	err = <-coordCh
+	require.NoError(t, err)
+}
+
 func TestCollectManagerErrorsTimeout(t *testing.T) {
 	handlerChan, _, _, _, _ := setupManagerShutdownChannels(time.Millisecond)
 	// Don't send anything to the shutdown channels, causing a timeout
@@ -757,6 +862,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 type createCoordinatorOpts struct {
 	managed        bool
 	upgradeManager UpgradeManager
+	compInputSpec  component.InputSpec
 }
 
 type CoordinatorOpt func(o *createCoordinatorOpts)
@@ -773,13 +879,21 @@ func WithUpgradeManager(upgradeManager UpgradeManager) CoordinatorOpt {
 	}
 }
 
+func WithComponentInputSpec(spec component.InputSpec) CoordinatorOpt {
+	return func(o *createCoordinatorOpts) {
+		o.compInputSpec = spec
+	}
+}
+
 // createCoordinator creates a coordinator that using a fake config manager and a fake vars manager.
 //
 // The runtime specifications is set up to use both the fake component and fake shipper.
 func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt) (*Coordinator, *fakeConfigManager, *fakeVarsManager) {
 	t.Helper()
 
-	o := &createCoordinatorOpts{}
+	o := &createCoordinatorOpts{
+		compInputSpec: fakeInputSpec,
+	}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -793,7 +907,7 @@ func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt
 		InputType:  "fake",
 		BinaryName: "",
 		BinaryPath: testBinary(t, "component"),
-		Spec:       fakeInputSpec,
+		Spec:       o.compInputSpec,
 	}
 	shipperSpec := component.ShipperRuntimeSpec{
 		ShipperType: "fake-shipper",
@@ -808,7 +922,7 @@ func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
-	rm, err := runtime.NewManager(l, l, "localhost:0", ai, apmtest.DiscardTracer, monitoringMgr, configuration.DefaultGRPCConfig())
+	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
@@ -841,7 +955,10 @@ func newErrorLogger(t *testing.T) *logger.Logger {
 	loggerCfg := logger.DefaultLoggingConfig()
 	loggerCfg.Level = logp.ErrorLevel
 
-	log, err := logger.NewFromConfig("", loggerCfg, false)
+	eventLoggerCfg := logger.DefaultEventLoggingConfig()
+	eventLoggerCfg.Level = loggerCfg.Level
+
+	log, err := logger.NewFromConfig("", loggerCfg, eventLoggerCfg, false)
 	require.NoError(t, err)
 	return log
 }
@@ -894,7 +1011,7 @@ func (*testMonitoringManager) Prepare(_ string) error                           
 func (*testMonitoringManager) Cleanup(string) error                                  { return nil }
 func (*testMonitoringManager) Enabled() bool                                         { return false }
 func (*testMonitoringManager) Reload(rawConfig *config.Config) error                 { return nil }
-func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string) (map[string]interface{}, error) {
+func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string, _ map[string]uint64) (map[string]interface{}, error) {
 	return nil, nil
 }
 

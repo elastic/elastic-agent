@@ -12,15 +12,18 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/testing/installtest"
+
+	"github.com/hectane/go-acl"
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -208,8 +211,7 @@ func PerformUpgrade(
 	// in the unprivileged is unset we adjust it to use unprivileged when the version allows it
 	// in the case that its explicitly set then we ensure the version supports it
 	if upgradeOpts.unprivileged == nil {
-		if !startVersion.Less(*Version_8_13_0) && !endVersion.Less(*Version_8_13_0) && runtime.GOOS == define.Linux {
-			// both version support --unprivileged
+		if SupportsUnprivileged(startVersion, endVersion) {
 			unprivileged := true
 			upgradeOpts.unprivileged = &unprivileged
 			logger.Logf("installation of Elastic Agent will use --unprivileged as both start and end version support --unprivileged mode")
@@ -219,11 +221,8 @@ func PerformUpgrade(
 			upgradeOpts.unprivileged = &unprivileged
 		}
 	} else if *upgradeOpts.unprivileged {
-		if startVersion.Less(*Version_8_13_0) {
-			return errors.New("cannot install starting version with --unprivileged (which is default) because the it is older than 8.13")
-		}
-		if endVersion.Less(*Version_8_13_0) {
-			return errors.New("cannot upgrade to ending version as end version doesn't support running with --unprivileged (which is default) because it is older than 8.13")
+		if !SupportsUnprivileged(startVersion, endVersion) {
+			return fmt.Errorf("cannot install with forced --unprivileged because either start version %s or end version %s doesn't support --unprivileged mode", startVersion.String(), endVersion.String())
 		}
 	}
 
@@ -260,7 +259,7 @@ func PerformUpgrade(
 	installOpts := atesting.InstallOpts{
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
-		Unprivileged:   upgradeOpts.unprivileged,
+		Privileged:     !(*upgradeOpts.unprivileged),
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	if err != nil {
@@ -278,6 +277,14 @@ func PerformUpgrade(
 	if err != nil {
 		// context added by WaitHealthyAndVersion
 		return err
+	}
+
+	// validate installation is correct
+	if InstallChecksAllowed(!installOpts.Privileged, startVersion) {
+		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+		if err != nil {
+			return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
+		}
 	}
 
 	if upgradeOpts.preUpgradeHook != nil {
@@ -325,7 +332,15 @@ func PerformUpgrade(
 
 	upgradeOutput, err := startFixture.Exec(ctx, upgradeCmdArgs)
 	if err != nil {
-		return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
+		// Sometimes the gRPC server shuts down before replying to the command which is expected
+		// we can determine this state by the EOF error coming from the server.
+		// If the server is just unavailable/not running, we should not succeed.
+		// Starting with version 8.13.2, this is handled by the upgrade command itself.
+		outputString := string(upgradeOutput)
+		isConnectionInterrupted := strings.Contains(outputString, "Unavailable") && strings.Contains(outputString, "EOF")
+		if !isConnectionInterrupted {
+			return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
+		}
 	}
 
 	// wait for the watcher to show up
@@ -393,6 +408,14 @@ func PerformUpgrade(
 	if err != nil {
 		// error context added by CheckHealthyAndVersion
 		return err
+	}
+
+	// validate again that the installation is correct, upgrade should not have changed installation validation
+	if InstallChecksAllowed(!installOpts.Privileged, startVersion, endVersion) {
+		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+		if err != nil {
+			return fmt.Errorf("post-upgrade installation checks failed: %w", err)
+		}
 	}
 
 	return nil
@@ -565,7 +588,19 @@ func getSourceURI(ctx context.Context, f *atesting.Fixture, unprivileged bool) (
 	}
 	if unprivileged {
 		// move the file to temp directory
-		dir, err := os.MkdirTemp("", "agent-upgrade-*")
+		baseTmp := ""
+		if runtime.GOOS == "windows" {
+			// `elastic-agent-user` needs to have access to the file, default
+			// will place this in C:\Users\windows\AppData\Local\Temp\ which
+			// `elastic-agent-user` doesn't have access.
+
+			// create C:\Temp with world read/write to use for temp directory
+			baseTmp, err = windowsBaseTemp()
+			if err != nil {
+				return "", fmt.Errorf("failed to create windows base temp path: %w", err)
+			}
+		}
+		dir, err := os.MkdirTemp(baseTmp, "agent-upgrade-*")
 		if err != nil {
 			return "", fmt.Errorf("failed to create temp directory: %w", err)
 		}
@@ -586,4 +621,23 @@ func getSourceURI(ctx context.Context, f *atesting.Fixture, unprivileged bool) (
 		srcPkg = filepath.Join(dir, filepath.Base(srcPkg))
 	}
 	return "file://" + filepath.Dir(srcPkg), nil
+}
+
+func windowsBaseTemp() (string, error) {
+	baseTmp := "C:\\Temp"
+	_, err := os.Stat(baseTmp)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("failed to stat %s: %w", baseTmp, err)
+		}
+		err = os.Mkdir(baseTmp, 0777)
+		if err != nil {
+			return "", fmt.Errorf("failed to mkdir %s: %w", baseTmp, err)
+		}
+	}
+	err = acl.Chmod(baseTmp, 0777)
+	if err != nil {
+		return "", fmt.Errorf("failed to chmod %s: %w", baseTmp, err)
+	}
+	return baseTmp, nil
 }

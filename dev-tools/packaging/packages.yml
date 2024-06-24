@@ -134,6 +134,14 @@ shared:
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
+  
+  - &linux_otel_files
+    'otelcol':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
+      mode: 0755
+    'data/{{.BeatName}}-{{ commit_short }}/otelcol':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
+      mode: 0755
 
   - &agent_binary_common_files
     LICENSE.txt:
@@ -201,6 +209,12 @@ shared:
       content: >
         {{ agent_package_version }}
       mode: 0644
+    'otelcol':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
+      mode: 0755
+    'data/{{.BeatName}}-{{ commit_short }}/otelcol':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
+      mode: 0755
     <<: *agent_darwin_app_bundle_files
     <<: *agent_binary_common_files
 
@@ -217,6 +231,7 @@ shared:
     files:
       <<: *agent_binary_files
       <<: *agent_components
+      <<: *linux_otel_files
 
 
   - &agent_darwin_binary_spec
@@ -235,6 +250,12 @@ shared:
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
+      'otelcol.ps1':
+        source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
+        mode: 0755
+      'data/{{.BeatName}}-{{ commit_short }}/otelcol.ps1':
+        source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
+        mode: 0755
 
   - &agent_docker_spec
     <<: *agent_binary_spec
@@ -260,12 +281,6 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
-      'data/cloud_downloads/metricbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/metricbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
-        mode: 0755
-      'data/cloud_downloads/filebeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/filebeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
-        mode: 0755
 
   - &agent_docker_arm_spec
     <<: *agent_docker_spec
@@ -278,6 +293,16 @@ shared:
     extra_vars:
       image_name: '{{.BeatName}}-cloud'
       repository: 'docker.elastic.co/beats-ci'
+    files:
+      'data/cloud_downloads/filebeat.sh':
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh'
+        mode: 0755
+      'data/cloud_downloads/metricbeat.sh':
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
+        mode: 0755
+      'data/cloud_downloads/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
+        mode: 0755
 
   - &agent_docker_complete_spec
     <<: *agent_docker_spec

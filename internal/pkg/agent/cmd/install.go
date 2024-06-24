@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -26,6 +25,8 @@ import (
 const (
 	flagInstallBasePath     = "base-path"
 	flagInstallUnprivileged = "unprivileged"
+	flagInstallDevelopment  = "develop"
+	flagInstallNamespace    = "namespace"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -48,8 +49,14 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current installation and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
-	cmd.Flags().Bool(flagInstallUnprivileged, false, "Installed Elastic Agent will create an 'elastic-agent' user and run as that user. (experimental)")
-	_ = cmd.Flags().MarkHidden(flagInstallUnprivileged) // Hidden until fully supported
+	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
+
+	cmd.Flags().String(flagInstallNamespace, "", "Install into an isolated namespace. Allows multiple Elastic Agents to be installed at once. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallNamespace) // For internal use only.
+
+	cmd.Flags().Bool(flagInstallDevelopment, false, "Install into a standardized development namespace, may enable development specific options. Allows multiple Elastic Agents to be installed at once. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
+
 	addEnrollFlags(cmd)
 
 	return cmd
@@ -76,13 +83,23 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
 
-	// only support Linux and MacOS at the moment
 	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
-	if unprivileged && (runtime.GOOS != "linux" && runtime.GOOS != "darwin") {
-		return fmt.Errorf("unable to perform install command, unprivileged is currently only supported on Linux and MacOSß")
-	}
 	if unprivileged {
-		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this is an experimental and currently unsupported feature.")
+		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this feature is currently in beta.")
+	}
+
+	isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
+	if isDevelopmentMode {
+		fmt.Fprintln(streams.Out, "Installing into development namespace; this is an experimental and currently unsupported feature.")
+		// For now, development mode only installs agent in a well known namespace to allow two agents on the same machine.
+		paths.SetInstallNamespace(paths.DevelopmentNamespace)
+	}
+
+	namespace, _ := cmd.Flags().GetString(flagInstallNamespace)
+	if namespace != "" {
+		fmt.Fprintf(streams.Out, "Installing into namespace '%s'; this is an experimental and currently unsupported feature.\n", namespace)
+		// Overrides the development namespace if namespace was specified separately.
+		paths.SetInstallNamespace(namespace)
 	}
 
 	topPath := paths.InstallPath(basePath)
@@ -193,28 +210,13 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	progBar := install.CreateAndStartNewSpinner(streams.Out, "Installing Elastic Agent...")
 
-	logCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	logCfg.Level = logp.DebugLevel
-	// Using in memory logger, so we don't write logs to the
-	// directory we are trying to delete
-	logp.ToObserverOutput()(&logCfg)
-
-	err = logp.Configure(logCfg)
-	if err != nil {
-		return fmt.Errorf("error creating logging config: %w", err)
-	}
-
-	log := logger.NewWithoutConfig("")
-
+	log, logBuff := logger.NewInMemory("install", logp.ConsoleEncoderConfig())
 	defer func() {
 		if err == nil {
 			return
 		}
-		oLogs := logp.ObserverLogs().TakeAll()
 		fmt.Fprintf(os.Stderr, "Error uninstalling. Printing logs\n")
-		for _, oLog := range oLogs {
-			fmt.Fprintf(os.Stderr, "%v\n", oLog.Entry)
-		}
+		fmt.Fprint(os.Stderr, logBuff.String())
 	}()
 
 	var ownership utils.FileOwner
@@ -242,7 +244,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			err = install.StartService(topPath)
 			if err != nil {
 				progBar.Describe("Start Service failed, exiting...")
-				fmt.Fprintf(streams.Out, "Installation failed to start Elastic Agent service.\n")
+				fmt.Fprintf(streams.Out, "Installation failed to start '%s' service.\n", paths.ServiceName())
 				return fmt.Errorf("error starting service: %w", err)
 			}
 			progBar.Describe("Service Started")
@@ -250,7 +252,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			defer func() {
 				if err != nil {
 					progBar.Describe("Stopping Service")
-					innerErr := install.StopService(topPath)
+					innerErr := install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
 					if innerErr != nil {
 						progBar.Describe("Failed to Stop Service")
 					} else {

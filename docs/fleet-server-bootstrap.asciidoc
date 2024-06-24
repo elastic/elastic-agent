@@ -88,3 +88,61 @@ its API key to use for communication. The new `fleet.yml` still includes the `fl
 but this time the `fleet.server.bootstrap: false` is set.
 . `enroll` command then either restarts the running Elatic Agent daemon if one was running
 from Step 2, or it stops the spawned `run` subprocess and returns.
+
+=== Elasticsearch output
+
+The options passed that are used to specify fleet-server initially connects to elasticsearch are:
+
+- `--fleet-server-es`
+- `--fleet-server-es-ca`
+- `--fleet-server-es-ca-trusted-fingerprint`
+- `--fleet-server-es-insecure`
+- `--fleet-server-es-cert`
+- `--fleet-server-es-cert-key`
+- `--fleet-server-es-service-token`
+- `--fleet-server-es-service-token-path`
+- `--proxy-url`
+- `--proxy-disabled`
+- `--proxy-header`
+
+These options are always passed under a `bootstrap` attribute in the output when elastic-agent is passing config to fleet-server.
+When the fleet-server recieves an output block, it will inject any keys that are missing from the top level output but are specified in the `bootstrap` block
+After injecting the keys from bootstrap, fleet-server will test connecting the Elasticsearch with the output.
+If the test fails, the values under the `bootstrap` attribute are used as the output and fleet-server will periodically retest the output in case the error was caused by a temporary network issue.
+Note that if `--fleet-server-es-insecure` is specified, and the output in the policy contains one or more CA, or a CA fingerprint, the `--fleet-server-es-insecure` flag is ignored.
+
+An example of this sequence is sequence is:
+
+1) elastic-agent starts fleet-server and sends an output block that looks similar to:
+```yaml
+output:
+  bootstrap:
+    service_token: VALUE
+    hosts: ["HOST"]
+```
+
+2) fleet-server injects attributes into the top level from bootstrap if they are missing, resulting in
+```yaml
+output:
+  service_token: VALUE
+  hosts: ["HOST"]
+```
+
+3) fleet-server connects to Elasticsearch with the output block
+4) elastic-agent enrolls and recieves its policy
+5) elastic-agent sends configuration generated from the policy to fleet-server, this may result in the output as follows:
+```yaml
+output:
+  hosts: ["HOST", "HOST2"]
+  bootstrap:
+    service_token: VALUE
+    hosts: ["HOST"]
+```
+
+6) fleet-server will inject missing values resulting in:
+```yaml
+output:
+  service_token: VALUE
+  hosts: ["HOST", "HOST2"]
+```
+ 7) fleet-server tests and uses the resulting output block.

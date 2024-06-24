@@ -181,20 +181,40 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			return fmt.Errorf("failed to get binary mappings: %w", err)
 		}
 
+		// service units like endpoint are special; they require a PID to monitor.
+		// however, `inspect` doesn't talk to the coordinator backend, which means it can't know their actual PID from this point in the code
+		// instead, we look for service units and create a fake PID, so we print the monitoring config anyway.
+		serviceUnitExists := false
+		fakeServicePids := map[string]uint64{}
+
 		// The monitoring config depends on a map from component id to
 		// binary name.
 		binaryMapping := make(map[string]string)
 		for _, component := range components {
 			if spec := component.InputSpec; spec != nil {
-				binaryMapping[component.ID] = spec.BinaryName
+				binaryMapping[component.ID] = component.BinaryName()
+				if spec.Spec.Service != nil {
+					serviceUnitExists = true
+					fakeServicePids[component.ID] = 1234
+				}
 			}
 		}
-		monitorCfg, err := monitorFn(cfg, components, binaryMapping)
+		monitorCfg, err := monitorFn(cfg, components, binaryMapping, fakeServicePids)
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring config: %w", err)
 		}
 
 		if monitorCfg != nil {
+
+			// see above comment; because we don't know endpoint's actual PID, we need to make a fake one. Warn the user.
+			if serviceUnitExists {
+				keys := make([]string, 0, len(fakeServicePids))
+				for k := range fakeServicePids {
+					keys = append(keys, k)
+				}
+				fmt.Fprintf(streams.Err, "WARNING: the inspect command can't accurately produce monitoring configs for service units: %v. Use the diagnostics command to get the real config used for monitoring these components\n", keys)
+			}
+
 			rawCfg := config.MustNewConfigFrom(cfg)
 
 			if err := rawCfg.Merge(monitorCfg); err != nil {
@@ -205,7 +225,9 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			if err != nil {
 				return fmt.Errorf("failed to convert monitoring config: %w", err)
 			}
+
 		}
+
 	}
 
 	return printMapStringConfig(cfg, streams)
@@ -252,41 +274,10 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return err
 	}
 
-	// Load the requirements before trying to load the configuration. These should always load
-	// even if the configuration is wrong.
-	platform, err := component.LoadPlatformDetail()
+	comps, err := getComponentsFromPolicy(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
-		return fmt.Errorf("failed to gather system information: %w", err)
-	}
-	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
-	if err != nil {
-		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
-	}
-
-	isAdmin, err := utils.HasRoot()
-	if err != nil {
-		return fmt.Errorf("error checking for root/Administrator privileges: %w", err)
-	}
-
-	m, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
-	if err != nil {
+		// error already includes the context
 		return err
-	}
-
-	monitorFn, err := getMonitoringFn(ctx, m)
-	if err != nil {
-		return fmt.Errorf("failed to get monitoring: %w", err)
-	}
-
-	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
-	if err != nil {
-		return fmt.Errorf("could not load agent info: %w", err)
-	}
-
-	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo)
-	if err != nil {
-		return fmt.Errorf("failed to render components: %w", err)
 	}
 
 	// Hide configuration unless toggled on.
@@ -347,6 +338,47 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 	}
 
 	return printComponents(allowed, blocked, streams)
+}
+
+func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath string, variablesWait time.Duration, platformModifiers ...component.PlatformModifier) ([]component.Component, error) {
+	// Load the requirements before trying to load the configuration. These should always load
+	// even if the configuration is wrong.
+	platform, err := component.LoadPlatformDetail(platformModifiers...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to gather system information: %w", err)
+	}
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
+	}
+
+	isAdmin, err := utils.HasRoot()
+	if err != nil {
+		return nil, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
+	}
+
+	m, lvl, err := getConfigWithVariables(ctx, l, cfgPath, variablesWait, !isAdmin)
+	if err != nil {
+		return nil, err
+	}
+
+	monitorFn, err := getMonitoringFn(ctx, m)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get monitoring: %w", err)
+	}
+
+	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
+	if err != nil {
+		return nil, fmt.Errorf("could not load agent info: %w", err)
+	}
+
+	// Compute the components from the computed configuration.
+	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo, map[string]uint64{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to render components: %w", err)
+	}
+
+	return comps, nil
 }
 
 func getMonitoringFn(ctx context.Context, cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {

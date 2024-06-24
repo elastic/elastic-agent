@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -904,13 +905,25 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 
 // addFileToTar adds a file (or directory) to a tar archive.
 func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
+	excludedFiles := []string{
+		"cloud-defend",
+		"cloud-defend.spec.yml",
+	}
+
 	return filepath.Walk(pkgFile.Source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
 				return nil
 			}
-
 			return err
+		}
+
+		if slices.Contains(excludedFiles, info.Name()) {
+			// it's a file we have to exclude
+			if mg.Verbose() {
+				log.Printf("Skipping file %q...", path)
+			}
+			return nil
 		}
 
 		header, err := tar.FileInfoHeader(info, info.Name())

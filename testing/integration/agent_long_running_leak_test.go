@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -98,14 +97,13 @@ func (runner *ExtendedRunner) SetupSuite() {
 	require.NoError(runner.T(), err, "got out: %s", string(out))
 
 	policyUUID := uuid.New().String()
-	unpr := false
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Unprivileged:   &unpr,
+		Privileged:     true,
 	}
 
-	fixture, err := define.NewFixture(runner.T(), define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(runner.T(), define.Version())
 	require.NoError(runner.T(), err)
 	runner.agentFixture = fixture
 
@@ -122,33 +120,12 @@ func (runner *ExtendedRunner) SetupSuite() {
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
-	// install system package
-	runner.InstallPackage(ctx, "system", "1.53.1", "agent_long_test_base_system_integ.json", uuid.New().String(), policyResp.ID)
-
-	// install cef
-	runner.InstallPackage(ctx, "apache", "1.17.0", "agent_long_test_apache.json", uuid.New().String(), policyResp.ID)
-
-}
-
-func (runner *ExtendedRunner) InstallPackage(ctx context.Context, name string, version string, cfgFile string, policyUUID string, policyID string) {
-	installPackage := kibana.PackagePolicyRequest{}
-
-	jsonRaw, err := os.ReadFile(cfgFile)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", "1.53.1", "agent_long_test_base_system_integ.json", uuid.New().String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
-	err = json.Unmarshal(jsonRaw, &installPackage)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "apache", "1.17.0", "agent_long_test_apache.json", uuid.New().String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
-	installPackage.Package.Version = version
-	installPackage.ID = policyUUID
-	installPackage.PolicyID = policyID
-	installPackage.Namespace = "default"
-	installPackage.Name = fmt.Sprintf("%s-long-test-%s", name, policyUUID)
-	installPackage.Vars = map[string]interface{}{}
-
-	runner.T().Logf("Installing %s package....", name)
-	_, err = runner.info.KibanaClient.InstallFleetPackage(ctx, installPackage)
-	require.NoError(runner.T(), err, "error creating fleet package")
 }
 
 func (runner *ExtendedRunner) TestHandleLeak() {
@@ -196,7 +173,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	// if the slope is increasing above a certain rate, fail the test
 	// A number of factors can change the slope during a test; shortened runtime (lots of handles allocated in the first few seconds, producing an upward slope),
 	// filebeat trying to open a large number of log files, etc
-	//handleSlopeFailure := 0.1
+	// handleSlopeFailure := 0.1
 	for _, mon := range runner.resourceWatchers {
 		handleSlopeFailure := 0.1
 
@@ -343,7 +320,7 @@ func (gm *goroutinesMonitor) Update(t *testing.T, fixture *atesting.Fixture) {
 }
 
 func (gm *goroutinesMonitor) GetSlopeHandlers() []tools.Slope {
-	//handleSlopeFailure := 0.1
+	// handleSlopeFailure := 0.1
 	slopes := []tools.Slope{}
 	for _, handle := range gm.handles {
 		slopes = append(slopes, handle.regGoroutines)

@@ -32,10 +32,12 @@ func TestGetSupported(t *testing.T) {
 		{
 			Name: "ubuntu/not specific",
 			OS: define.OS{
-				Type: define.Linux,
-				Arch: define.AMD64,
+				Type:   define.Linux,
+				Arch:   define.AMD64,
+				Distro: Ubuntu,
 			},
 			Results: []SupportedOS{
+				UbuntuAMD64_2404,
 				UbuntuAMD64_2204,
 				UbuntuAMD64_2004,
 			},
@@ -75,6 +77,29 @@ func TestGetSupported(t *testing.T) {
 			},
 			Results: []SupportedOS{
 				UbuntuAMD64_2004,
+			},
+		},
+		{
+			Name: "rhel/not specific",
+			OS: define.OS{
+				Type:   define.Linux,
+				Arch:   define.AMD64,
+				Distro: Rhel,
+			},
+			Results: []SupportedOS{
+				RhelAMD64_8,
+			},
+		},
+		{
+			Name: "rhel/specific",
+			OS: define.OS{
+				Type:    define.Linux,
+				Arch:    define.AMD64,
+				Distro:  Rhel,
+				Version: "8",
+			},
+			Results: []SupportedOS{
+				RhelAMD64_8,
 			},
 		},
 	}

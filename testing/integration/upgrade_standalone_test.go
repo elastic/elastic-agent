@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"testing"
 	"time"
 
@@ -36,14 +35,9 @@ func TestStandaloneUpgrade(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, startVersion := range versionList {
-		unprivilegedAvailable := true
-		if runtime.GOOS != define.Linux {
-			// only available on Linux at the moment
-			unprivilegedAvailable = false
-		}
-		if unprivilegedAvailable && (startVersion.Less(*upgradetest.Version_8_13_0) || endVersion.Less(*upgradetest.Version_8_13_0)) {
-			// only available if both versions are 8.13+
-			unprivilegedAvailable = false
+		unprivilegedAvailable := false
+		if upgradetest.SupportsUnprivileged(startVersion, endVersion) {
+			unprivilegedAvailable = true
 		}
 		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
 			testStandaloneUpgrade(t, startVersion, define.Version(), false)
@@ -67,7 +61,7 @@ func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, end
 	)
 	require.NoError(t, err, "error creating previous agent fixture")
 
-	endFixture, err := define.NewFixture(t, endVersion)
+	endFixture, err := define.NewFixtureFromLocalBuild(t, endVersion)
 	require.NoError(t, err)
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)

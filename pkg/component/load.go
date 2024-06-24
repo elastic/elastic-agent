@@ -289,10 +289,9 @@ func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 		return InputRuntimeSpec{}, ErrInputNotSupportedOnPlatform
 	}
 	err := validateRuntimeChecks(&runtimeSpec.Spec.Runtime, r.platform)
-	if err != nil {
-		return InputRuntimeSpec{}, err
-	}
-	return runtimeSpec, nil
+	// runtimeSpec is always returned so the caller know which runtime would have been used
+	// even if the runtime checks return an error
+	return runtimeSpec, err
 }
 
 // ShippersForOutputType returns the shippers that support the outputType.

@@ -167,6 +167,8 @@ message StateAgentInfo {
   bool snapshot = 5;
   // Current running PID.
   int32 pid = 6;
+  // True when running as unprivileged.
+  bool unprivileged = 7;
 }
 
 // StateResponse is the current state of Elastic Agent.
@@ -258,6 +260,7 @@ message DiagnosticAgentRequest {
 // DiagnosticAgentRequestAdditional is an enum of additional diagnostic metrics that can be requested from Elastic Agent.
 enum AdditionalDiagnosticRequest {
   CPU = 0;
+  CONN = 1;
 }
 
 // DiagnosticComponentsRequest is the message to request diagnostics from individual components.

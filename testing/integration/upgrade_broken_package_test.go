@@ -37,7 +37,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
+	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	// Upgrade to an old build.

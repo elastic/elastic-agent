@@ -58,10 +58,13 @@ import (
 const (
 	agentName            = "elastic-agent"
 	fleetInitTimeoutName = "FLEET_SERVER_INIT_TIMEOUT"
+	flagRunDevelopment   = "develop"
 )
 
-type cfgOverrider func(cfg *configuration.Configuration)
-type awaiters []<-chan struct{}
+type (
+	cfgOverrider func(cfg *configuration.Configuration)
+	awaiters     []<-chan struct{}
+)
 
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -69,16 +72,24 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Short: "Start the Elastic Agent",
 		Long:  "This command starts the Elastic Agent.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// done very early so the encrypted store is never used
+			isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
+			if isDevelopmentMode {
+				fmt.Fprintln(streams.Out, "Development installation mode enabled; this is an experimental feature.")
+				// For now, development mode only makes the agent behave as if it was running in a namespace to allow
+				// multiple agents on the same machine.
+				paths.SetInstallNamespace(paths.DevelopmentNamespace)
+			}
+
+			// done very early so the encrypted store is never used. Always done in development mode to remove the need to be root.
 			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
-			if disableEncryptedStore {
+			if disableEncryptedStore || isDevelopmentMode {
 				storage.DisableEncryptionDarwin()
 			}
 			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
 			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-
+				logExternal(fmt.Sprintf("%s run failed: %s", paths.BinaryName, err))
 				return err
 			}
 			return nil
@@ -102,6 +113,9 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 
 	cmd.Flags().Duration("fleet-init-timeout", envTimeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
 	_ = cmd.Flags().MarkHidden("testing-mode")
+
+	cmd.Flags().Bool(flagRunDevelopment, false, "Run agent in development mode. Allows running when there is already an installed Elastic Agent. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagRunDevelopment) // For internal use only.
 
 	return cmd
 }
@@ -133,7 +147,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	// register as a service
 	stop := make(chan bool)
 	ctx, cancel := context.WithCancel(context.Background())
-	var stopBeat = func() {
+	stopBeat := func() {
 		close(stop)
 	}
 
@@ -141,6 +155,13 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	go service.ProcessWindowsControlEvents(stopBeat)
 
 	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, false, nil, modifiers...)
+}
+
+func logReturn(l *logger.Logger, err error) error {
+	if err != nil && !errors.Is(err, context.Canceled) {
+		l.Errorf("%s", err)
+	}
+	return err
 }
 
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, runAsOtel bool, awaiters awaiters, modifiers ...component.PlatformModifier) error {
@@ -153,7 +174,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	if cfg.Settings.LoggingConfig != nil {
 		logLvl = cfg.Settings.LoggingConfig.Level
 	}
-	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
+	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, true)
 	if err != nil {
 		return err
 	}
@@ -165,19 +186,20 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 		"source": agentName,
 	})
 
-	l.Infow("Elastic Agent started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion())
-
 	// try early to check if running as root
 	isRoot, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("failed to check for root/Administrator privileges: %w", err)
+		return logReturn(l, fmt.Errorf("failed to check for root/Administrator privileges: %w", err))
 	}
+
+	l.Infow("Elastic Agent started",
+		"process.pid", os.Getpid(),
+		"agent.version", version.GetAgentPackageVersion(),
+		"agent.unprivileged", !isRoot)
 
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
-		err = errors.New(err, "failed to perform delayed enrollment")
-		l.Error(err)
-		return err
+		return logReturn(l, errors.New(err, "failed to perform delayed enrollment"))
 	}
 	pathConfigFile := paths.AgentConfigFile()
 
@@ -193,7 +215,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
 	err = secret.CreateAgentSecret(ctx, vault.WithUnprivileged(!isRoot))
 	if err != nil {
-		return fmt.Errorf("failed to read/write secrets: %w", err)
+		return logReturn(l, fmt.Errorf("failed to read/write secrets: %w", err))
 	}
 
 	// Migrate .yml files if the corresponding .enc does not exist
@@ -201,21 +223,21 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// the encrypted config does not exist but the unencrypted file does
 	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentConfigYmlFile(), paths.AgentConfigFile())
 	if err != nil {
-		return errors.New(err, "error migrating fleet config")
+		return logReturn(l, errors.New(err, "error migrating fleet config"))
 	}
 
 	// the encrypted state does not exist but the unencrypted file does
 	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
 	if err != nil {
-		return errors.New(err, "error migrating agent state")
+		return logReturn(l, errors.New(err, "error migrating agent state"))
 	}
 
 	agentInfo, err := info.NewAgentInfoWithLog(ctx, defaultLogLevel(cfg, logLvl.String()), createAgentID)
 	if err != nil {
-		return errors.New(err,
+		return logReturn(l, errors.New(err,
 			"could not load agent info",
 			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile))
+			errors.M(errors.MetaKeyPath, pathConfigFile)))
 	}
 
 	// Ensure that the log level now matches what is configured in the agentInfo.
@@ -228,6 +250,9 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 			logLvl = lvl
 			logger.SetLevel(lvl)
 		}
+	} else {
+		// Set the initial log level (either default or from config file)
+		logger.SetLevel(logLvl)
 	}
 
 	// initiate agent watcher
@@ -238,14 +263,14 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 
 	execPath, err := reexecPath()
 	if err != nil {
-		return err
+		return logReturn(l, fmt.Errorf("failed to get reexec path: %w", err))
 	}
 	rexLogger := l.Named("reexec")
 	rex := reexec.NewManager(rexLogger, execPath)
 
 	tracer, err := initTracer(agentName, release.Version(), cfg.Settings.MonitoringConfig)
 	if err != nil {
-		return fmt.Errorf("could not initiate APM tracer: %w", err)
+		return logReturn(l, fmt.Errorf("could not initiate APM tracer: %w", err))
 	}
 	if tracer != nil {
 		l.Info("APM instrumentation enabled")
@@ -259,13 +284,17 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 
 	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), runAsOtel, modifiers...)
 	if err != nil {
-		return err
+		return logReturn(l, err)
 	}
-	defer composable.Close()
+	defer func() {
+		if composable != nil {
+			composable.Close()
+		}
+	}()
 
 	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
-		return err
+		return logReturn(l, err)
 	}
 	coord.RegisterMonitoringServer(monitoringServer)
 	defer func() {
@@ -289,7 +318,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 
 	// start the control listener
 	if err := control.Start(); err != nil {
-		return err
+		return logReturn(l, err)
 	}
 	defer control.Stop()
 
@@ -297,23 +326,24 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// this provides backwards compatibility as the control socket was moved with the addition of --unprivileged
 	// option during installation
 	//
-	// Windows `paths.ControlSocketRunSymlink` is `""` so this is always skipped on Windows.
-	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink != "" {
+	// Windows `paths.ControlSocketRunSymlink()` is `""` so this is always skipped on Windows.
+	controlSocketRunSymlink := paths.ControlSocketRunSymlink(paths.InstallNamespace())
+	if isRoot && paths.RunningInstalled() && controlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
-		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
+		socketLog := controlLog.With("path", socketPath).With("link", controlSocketRunSymlink)
 		// ensure it doesn't exist before creating the symlink
-		if err := os.Remove(paths.ControlSocketRunSymlink); err != nil && !errors.Is(err, os.ErrNotExist) {
-			socketLog.Errorf("Failed to remove existing control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+		if err := os.Remove(controlSocketRunSymlink); err != nil && !errors.Is(err, os.ErrNotExist) {
+			socketLog.Errorf("Failed to remove existing control socket symlink %s: %s", controlSocketRunSymlink, err)
 		}
-		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
-			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", paths.ControlSocketRunSymlink, socketPath, err)
+		if err := os.Symlink(socketPath, controlSocketRunSymlink); err != nil {
+			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", controlSocketRunSymlink, socketPath, err)
 		} else {
-			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", paths.ControlSocketRunSymlink, socketPath, paths.ControlSocketRunSymlink)
+			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", controlSocketRunSymlink, socketPath, controlSocketRunSymlink)
 		}
 		defer func() {
 			// delete the symlink on exit; ignore the error
-			if err := os.Remove(paths.ControlSocketRunSymlink); err != nil {
-				socketLog.Errorf("Failed to remove control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+			if err := os.Remove(controlSocketRunSymlink); err != nil {
+				socketLog.Errorf("Failed to remove control socket symlink %s: %s", controlSocketRunSymlink, err)
 			}
 		}()
 	}
@@ -374,7 +404,7 @@ LOOP:
 	if isRex {
 		rex.ShutdownComplete()
 	}
-	return err
+	return logReturn(l, err)
 }
 
 func loadConfig(ctx context.Context, override cfgOverrider, runAsOtel bool) (*configuration.Configuration, error) {
@@ -485,7 +515,7 @@ func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) stri
 		return configuredLevel
 	}
 
-	return defaultLogLevel
+	return ""
 }
 
 func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider) (*configuration.Configuration, error) {
@@ -518,18 +548,37 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	// see https://github.com/elastic/elastic-agent/issues/4043
 	// SkipDaemonRestart to true avoids running that code.
 	options.SkipDaemonRestart = true
+	pathConfigFile := paths.ConfigFile()
+	encStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create encrypted disk store: %w", err)
+	}
+	store := storage.NewReplaceOnSuccessStore(
+		pathConfigFile,
+		application.DefaultAgentFleetConfig,
+		encStore,
+	)
 	c, err := newEnrollCmd(
-		ctx,
 		logger,
 		&options,
 		paths.ConfigFile(),
+		store,
 	)
 	if err != nil {
 		return nil, err
 	}
-	err = c.Execute(ctx, cli.NewIOStreams())
-	if err != nil {
-		return nil, err
+	// perform the enrollment in a loop, it should keep trying to enroll no matter what
+	// the enrollCmd has built in backoff so no need to wrap this in its own backoff as well
+	for {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		err = c.Execute(ctx, cli.NewIOStreams())
+		if err == nil {
+			// enrollment was successful
+			break
+		}
+		logger.Error(fmt.Errorf("failed to perform delayed enrollment (will try again): %w", err))
 	}
 	err = os.Remove(enrollPath)
 	if err != nil {
@@ -621,16 +670,12 @@ func setupMetrics(
 		Host:    monitoring.AgentMonitoringEndpoint(operatingSystem, cfg),
 	}
 
-	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg), operatingSystem, cfg)
+	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, operatingSystem, cfg)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}
 
 	return s, nil
-}
-
-func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
-	return cfg != nil && cfg.HTTP.Enabled
 }
 
 // handleUpgrade checks if agent is being run as part of an

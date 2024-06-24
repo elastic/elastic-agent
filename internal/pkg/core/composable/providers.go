@@ -4,7 +4,9 @@
 
 package composable
 
-import "context"
+import (
+	"context"
+)
 
 // FetchContextProvider is the interface that a context provider uses allow variable values to be determined when the
 // configuration is rendered versus it being known in advanced.

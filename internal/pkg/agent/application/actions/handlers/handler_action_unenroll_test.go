@@ -6,9 +6,8 @@ package handlers
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
-
-	"github.com/elastic/elastic-agent-libs/atomic"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -43,7 +42,7 @@ func makeComponentState(name string, proxiedActions []string) runtime.ComponentC
 
 type MockActionCoordinator struct {
 	st               coordinator.State
-	performedActions atomic.Int
+	performedActions atomic.Int64
 }
 
 func (c *MockActionCoordinator) State() coordinator.State {
@@ -51,7 +50,7 @@ func (c *MockActionCoordinator) State() coordinator.State {
 }
 
 func (c *MockActionCoordinator) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
-	c.performedActions.Inc()
+	c.performedActions.Add(1)
 	return nil, nil
 }
 
@@ -118,7 +117,7 @@ func TestActionUnenrollHandler(t *testing.T) {
 		name                 string
 		st                   coordinator.State
 		wantErr              error // Handler error
-		wantPerformedActions int
+		wantPerformedActions int64
 		tamperProtectionFn   func() bool
 	}{
 		{
