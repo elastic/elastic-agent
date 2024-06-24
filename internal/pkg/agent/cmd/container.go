@@ -179,7 +179,7 @@ func logContainerCmd(streams *cli.IOStreams) error {
 
 func containerCmd(streams *cli.IOStreams) error {
 	// set paths early so all action below use the defined paths
-	if err := setPaths("", "", "", "", true); err != nil {
+	if err := setPaths("", "", "", "", true, streams); err != nil {
 		return err
 	}
 
@@ -771,7 +771,7 @@ func logToStderr(cfg *configuration.Configuration) {
 	}
 }
 
-func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
+func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool, streams *cli.IOStreams) error {
 	statePath = envWithDefault(statePath, "STATE_PATH")
 	if statePath == "" {
 		statePath = defaultStateDirectory
@@ -830,8 +830,8 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 
 	// persist the paths so other commands in the container will use the correct paths
 	if writePaths {
-		if err := writeContainerPaths(originalTop, statePath, configPath, logsPath, socketPath); err != nil {
-			return err
+		if err := writeContainerPaths(originalTop, statePath, configPath, logsPath, socketPath); err != nil && streams != nil {
+			_, _ = streams.Out.Write([]byte(fmt.Sprintf("[warning] unable to write container paths: %s", err)))
 		}
 	}
 	return nil
@@ -882,7 +882,7 @@ func tryContainerLoadPaths() error {
 	if err != nil {
 		return fmt.Errorf("failed to unpack %s: %w", pathFile, err)
 	}
-	return setPaths(paths.StatePath, paths.ConfigPath, paths.LogsPath, paths.SocketPath, false)
+	return setPaths(paths.StatePath, paths.ConfigPath, paths.LogsPath, paths.SocketPath, false, nil)
 }
 
 func copyFile(destPath string, srcPath string, mode os.FileMode) error {
