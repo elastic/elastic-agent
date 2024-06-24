@@ -14,7 +14,7 @@ require (
 	github.com/elastic/e2e-testing v1.2.1
 	github.com/elastic/elastic-agent-autodiscover v0.7.0
 	github.com/elastic/elastic-agent-client/v7 v7.11.0
-	github.com/elastic/elastic-agent-libs v0.9.12
+	github.com/elastic/elastic-agent-libs v0.9.13
 	github.com/elastic/elastic-agent-system-metrics v0.10.3
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
@@ -58,8 +58,8 @@ require (
 	github.com/tsg/go-daemon v0.0.0-20200207173439-e704b93fd89b
 	github.com/winlabs/gowin32 v0.0.0-20221003142512-0d265587d3c9
 	go.elastic.co/apm/module/apmgorilla v1.15.0
-	go.elastic.co/ecszap v1.0.1
-	go.elastic.co/go-licence-detector v0.5.0
+	go.elastic.co/ecszap v1.0.2
+	go.elastic.co/go-licence-detector v0.6.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.24.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
