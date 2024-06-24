@@ -1,41 +1,40 @@
 package manifest
 
 import (
+	_ "embed"
 	"encoding/json"
 	"log"
-	"os"
-	"path"
-	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/stretchr/testify/assert"
 )
 
-// Helper to get the absolute path of the parent directory name of the current file
-func ParentDir() string {
-	_, filename, _, _ := runtime.Caller(1)
-	return path.Dir(filename)
-}
+var (
+	//go:embed test_payload/manifest-8.14.2.json
+	manifest8_14_2 string
 
-func getManifestJsonData(t *testing.T, filePath string) tools.Build {
+	//go:embed test_payload/manifest-8.14.2-SNAPSHOT.json
+	manifest8_14_2_SNAPSHOT string
+
+	//go:embed test_payload/manifest-8.14.0+build202406201002.json
+	manifest8_14_0_build202406201002 string
+)
+
+func getManifestJsonData(t *testing.T, contents string) tools.Build {
 	var response tools.Build
 
-	contents, err := os.Open(filePath)
-	assert.NoError(t, err)
-
-	err = json.NewDecoder(contents).Decode(&response)
+	err := json.NewDecoder(strings.NewReader(contents)).Decode(&response)
 	assert.NoError(t, err)
 
 	return response
 }
 
 func TestBlah(t *testing.T) {
-	parentDir := ParentDir()
-
 	tcs := []struct {
 		name            string
-		filePath        string
+		file            string
 		componentName   string
 		packageName     string
 		requiredPackage string
@@ -43,7 +42,7 @@ func TestBlah(t *testing.T) {
 	}{
 		{
 			name:            "Unified Release Staging 8.14 apm-server",
-			filePath:        path.Join(parentDir, "test_payload", "manifest-8.14.2.json"),
+			file:            manifest8_14_2,
 			componentName:   "apm-server",
 			packageName:     "apm-server",
 			requiredPackage: "linux-x86_64.tar.gz",
@@ -55,7 +54,7 @@ func TestBlah(t *testing.T) {
 		},
 		{
 			name:            "Unified Release Snapshot 8.14 apm-server",
-			filePath:        path.Join(parentDir, "test_payload", "manifest-8.14.2-SNAPSHOT.json"),
+			file:            manifest8_14_2_SNAPSHOT,
 			componentName:   "apm-server",
 			packageName:     "apm-server",
 			requiredPackage: "linux-x86_64.tar.gz",
@@ -67,7 +66,7 @@ func TestBlah(t *testing.T) {
 		},
 		{
 			name:            "Independent Agent Staging 8.14 apm-server",
-			filePath:        path.Join(parentDir, "test_payload", "manifest-8.14.0+build202406201002.json"),
+			file:            manifest8_14_0_build202406201002,
 			componentName:   "apm-server",
 			packageName:     "apm-server",
 			requiredPackage: "linux-x86_64.tar.gz",
@@ -79,7 +78,7 @@ func TestBlah(t *testing.T) {
 		},
 		{
 			name:            "Unified Release Staging 8.14 endpoint-dev",
-			filePath:        path.Join(parentDir, "test_payload", "manifest-8.14.2.json"),
+			file:            manifest8_14_2,
 			componentName:   "endpoint-dev",
 			packageName:     "endpoint-security",
 			requiredPackage: "linux-x86_64.tar.gz",
@@ -91,7 +90,7 @@ func TestBlah(t *testing.T) {
 		},
 		{
 			name:            "Unified Release Snapshot 8.14 endpoint-dev",
-			filePath:        path.Join(parentDir, "test_payload", "manifest-8.14.2-SNAPSHOT.json"),
+			file:            manifest8_14_2_SNAPSHOT,
 			componentName:   "endpoint-dev",
 			packageName:     "endpoint-security",
 			requiredPackage: "linux-x86_64.tar.gz",
@@ -103,7 +102,7 @@ func TestBlah(t *testing.T) {
 		},
 		{
 			name:            "Independent Agent Staging 8.14 endpoint-dev",
-			filePath:        path.Join(parentDir, "test_payload", "manifest-8.14.0+build202406201002.json"),
+			file:            manifest8_14_0_build202406201002,
 			componentName:   "endpoint-dev",
 			packageName:     "endpoint-security",
 			requiredPackage: "linux-x86_64.tar.gz",
@@ -118,7 +117,7 @@ func TestBlah(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			manifestJson := getManifestJsonData(t, tc.filePath)
+			manifestJson := getManifestJsonData(t, tc.file)
 			log.Printf("Manifest Version: [%s]", manifestJson.Version)
 
 			projects := manifestJson.Projects
