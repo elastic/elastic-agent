@@ -71,6 +71,7 @@ shared:
         config_mode: 0644
         skip_on_missing: true
 
+<<<<<<< HEAD
   # MacOS pkg spec for community beats.
   - &macos_agent_pkg_spec
     <<: *common
@@ -121,6 +122,15 @@ shared:
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
+=======
+  - &linux_otel_files
+    'otelcol':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
+      mode: 0755
+    'data/{{.BeatName}}-{{ commit_short }}/otelcol':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
+      mode: 0755
+>>>>>>> 609b1c52ad (Remove unused section (#4182))
 
   - &agent_binary_common_files
     LICENSE.txt:
