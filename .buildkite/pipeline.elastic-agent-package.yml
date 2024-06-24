@@ -10,10 +10,10 @@ env:
 
 steps:
   - input: "Build parameters"
-    if: build.env("ManifestURL") == null
+    if: build.env("MANIFEST_URL") == null
     fields:
-      - text: "ManifestURL"
-        key: "ManifestURL"
+      - text: "MANIFEST_URL"
+        key: "MANIFEST_URL"
         default: ""
         required: true
         hint: "Link to the build manifest URL."
@@ -51,7 +51,7 @@ steps:
         hint: "If the DRA release manager script would actually publish anything or just print"
 
   - wait: ~
-    if: build.env("ManifestURL") == null
+    if: build.env("MANIFEST_URL") == null
 
   - group: ":Packaging Artefacts"
     key: "package"
@@ -63,10 +63,10 @@ steps:
           machineType: "c2-standard-16"
           diskSizeGb: 400
         command: |
-          if [[ -z "${ManifestURL}" ]]; then
-            export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
-            if [[ -z "${ManifestURL}" ]]; then
-              echo ":broken_heart: Missing ManifestURL variable or empty string provided"
+          if [[ -z "${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+            if [[ -z "${MANIFEST_URL}" ]]; then
+              echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
               exit 1
             fi
           fi
@@ -86,10 +86,10 @@ steps:
           PLATFORMS: "linux/arm64"
           PACKAGES: "docker"
         command: |
-          if [[ -z "${ManifestURL}" ]]; then
-            export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
-            if [[ -z "${ManifestURL}" ]]; then
-              echo ":broken_heart: Missing ManifestURL variable or empty string provided"
+          if [[ -z "${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+            if [[ -z "${MANIFEST_URL}" ]]; then
+              echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
               exit 1
             fi
           fi
@@ -101,6 +101,7 @@ steps:
           - "build/distributions/**/*"
 
   - label: ":elastic-stack: Publishing to DRA"
+    if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
     key: dra-publish
     depends_on: package
     agents:
@@ -126,3 +127,49 @@ steps:
         export DRA_VERSION
       fi
       .buildkite/scripts/steps/dra-publish.sh
+
+  - label: "Publishing via BK API for Independent Agent Release"
+    if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "independent-agent-release-staging"
+    key: bk-api-publish-independent-agent
+    depends_on: package
+    agents:
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      diskSizeGb: 250
+    env:
+      DRA_PROJECT_ID: "elastic-agent-package"
+      DRA_PROJECT_ARTIFACT_ID: "agent-package"
+    artifact_paths:
+      - "build/distributions/**/*"
+    command: |
+      echo "+++ Restoring Artifacts"
+      buildkite-agent artifact download "build/**/*" .
+      echo "+++ Changing permissions for the BK API commands"
+      sudo chown -R :1000 build/distributions/
+      echo "--- File listing"
+      ls -alR build
+      echo "--- Copy workaround for ironbank container filename"
+      .buildkite/scripts/steps/ironbank-cp-workaround.sh
+      echo "--- File listing after workaround"
+      ls -alR build
+      echo "+++ Checking artifact validity with release-manager collect dry run"
+      DRA_DRY_RUN="--dry-run"
+      export DRA_DRY_RUN
+      .buildkite/scripts/steps/dra-publish.sh
+      # Artifacts will be uploaded via the artifact_paths entry above
+      echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
+      if [[ -z "${TRIGGER_JOB_ID}" ]]; then
+        echo "TRIGGER_JOB_ID is not set, so not setting metadata"
+      else
+        # If a pipeline that triggered this build passes in a "TRIGGER_JOB_ID" env var, that
+        # is an indicator that it will want us to set some metadata in that calling build
+        # so that it can reference this specific build ID in order to easily download
+        # artifacts saved off in this build.
+        #
+        # This is a much easier way to pull back artifacts from a triggered build than using
+        # a Buildkite token that we then have to manage via vault, etc.
+        # See: https://forum.buildkite.community/t/how-to-download-artifacts-back-from-triggered-pipeline/3480/2
+        echo "Setting metadata for job that trigger this one"
+        buildkite-agent meta-data set "triggered_build_id" "$BUILDKITE_BUILD_ID" --job $TRIGGER_JOB_ID
+        buildkite-agent meta-data set "triggered_commit_hash" "$BUILDKITE_COMMIT" --job $TRIGGER_JOB_ID
+      fi

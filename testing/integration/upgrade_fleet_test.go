@@ -35,23 +35,41 @@ import (
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
-// TestFleetManagedUpgrade tests that the build under test can retrieve an action from
-// Fleet and perform the upgrade. It does not need to test all the combinations of
-// versions as the standalone tests already perform those tests and would be redundant.
-func TestFleetManagedUpgrade(t *testing.T) {
+// TestFleetManagedUpgradeUnprivileged tests that the build under test can retrieve an action from
+// Fleet and perform the upgrade as an unprivileged Elastic Agent. It does not need to test
+// all the combinations of versions as the standalone tests already perform those tests and
+// would be redundant.
+func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Fleet,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+	testFleetManagedUpgrade(t, info, true)
+}
 
+// TestFleetManagedUpgradePrivileged tests that the build under test can retrieve an action from
+// Fleet and perform the upgrade as a privileged Elastic Agent. It does not need to test all
+// the combinations of  versions as the standalone tests already perform those tests and
+// would be redundant.
+func TestFleetManagedUpgradePrivileged(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: FleetPrivileged,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+	testFleetManagedUpgrade(t, info, false)
+}
+
+func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
+	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	err = startFixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -61,13 +79,9 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	// Upgrade to a different build but of the same version (always a snapshot).
 	// In the case there is not a different build then the test is skipped.
 	// Fleet doesn't allow a downgrade to occur, so we cannot go to a lower version.
-	sameVersion := define.Version()
-	if !strings.HasSuffix(sameVersion, "-SNAPSHOT") {
-		sameVersion += "-SNAPSHOT"
-	}
 	endFixture, err := atesting.NewFixture(
 		t,
-		sameVersion,
+		upgradetest.EnsureSnapshot(define.Version()),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
@@ -86,10 +100,10 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), endVersionInfo.Binary.String())
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy())
+	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged)
 }
 
-func TestFleetAirGappedUpgrade(t *testing.T) {
+func TestFleetAirGappedUpgradeUnprivileged(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
 		Group: FleetAirgapped,
 		Stack: &define.Stack{},
@@ -98,7 +112,22 @@ func TestFleetAirGappedUpgrade(t *testing.T) {
 		Local: false, // Needed as the test requires Agent installation
 		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
 	})
+	testFleetAirGappedUpgrade(t, stack, true)
+}
 
+func TestFleetAirGappedUpgradePrivileged(t *testing.T) {
+	stack := define.Require(t, define.Requirements{
+		Group: FleetAirgappedPrivileged,
+		Stack: &define.Stack{},
+		// The test uses iptables to simulate the air-gaped environment.
+		OS:    []define.OS{{Type: define.Linux}},
+		Local: false, // Needed as the test requires Agent installation
+		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
+	})
+	testFleetAirGappedUpgrade(t, stack, false)
+}
+
+func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bool) {
 	ctx, _ := testcontext.WithDeadline(
 		t, context.Background(), time.Now().Add(10*time.Minute))
 
@@ -117,7 +146,7 @@ func TestFleetAirGappedUpgrade(t *testing.T) {
 	err = upgradeTo.Prepare(ctx)
 	require.NoError(t, err)
 
-	s := newArtifactsServer(ctx, t, latest)
+	s := newArtifactsServer(ctx, t, latest, upgradeTo.PackageFormat())
 	host := "artifacts.elastic.co"
 	simulateAirGapedEnvironment(t, host)
 
@@ -142,7 +171,7 @@ func TestFleetAirGappedUpgrade(t *testing.T) {
 			"It should not affect the connection to the stack. Host: %s, response body: %s",
 		stack.KibanaClient.URL, host, body)
 
-	fixture, err := define.NewFixture(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -163,7 +192,7 @@ func TestFleetAirGappedUpgrade(t *testing.T) {
 	policy := defaultPolicy()
 	policy.DownloadSourceID = src.Item.ID
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy)
+	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy, unprivileged)
 }
 
 func testUpgradeFleetManagedElasticAgent(
@@ -172,7 +201,8 @@ func testUpgradeFleetManagedElasticAgent(
 	info *define.Info,
 	startFixture *atesting.Fixture,
 	endFixture *atesting.Fixture,
-	policy kibana.AgentPolicy) {
+	policy kibana.AgentPolicy,
+	unprivileged bool) {
 	kibClient := info.KibanaClient
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
@@ -181,6 +211,19 @@ func testUpgradeFleetManagedElasticAgent(
 	require.NoError(t, err)
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err)
+	endParsedVersion, err := version.ParseVersion(endVersionInfo.Binary.String())
+	require.NoError(t, err)
+
+	if unprivileged {
+		if !upgradetest.SupportsUnprivileged(startParsedVersion, endParsedVersion) {
+			t.Skipf("Either starting version %s or ending version %s doesn't support --unprivileged", startParsedVersion.String(), endParsedVersion.String())
+		}
+	}
+
+	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("target version has the same commit hash %q", endVersionInfo.Binary.Commit)
+		return
+	}
 
 	t.Log("Creating Agent policy...")
 	policyResp, err := kibClient.CreatePolicy(ctx, policy)
@@ -198,7 +241,7 @@ func testUpgradeFleetManagedElasticAgent(
 	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
 
-	t.Log("Installing Elastic Agent...")
+	t.Logf("Installing Elastic Agent (unprivileged: %t)...", unprivileged)
 	var nonInteractiveFlag bool
 	if upgradetest.Version_8_2_0.Less(*startParsedVersion) {
 		nonInteractiveFlag = true
@@ -210,6 +253,7 @@ func testUpgradeFleetManagedElasticAgent(
 			URL:             fleetServerURL,
 			EnrollmentToken: enrollmentToken.APIKey,
 		},
+		Privileged: !unprivileged,
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
@@ -342,14 +386,14 @@ func simulateAirGapedEnvironment(t *testing.T, host string) {
 	})
 }
 
-func newArtifactsServer(ctx context.Context, t *testing.T, version string) *httptest.Server {
+func newArtifactsServer(ctx context.Context, t *testing.T, version string, packageFormat string) *httptest.Server {
 	fileServerDir := t.TempDir()
 	downloadAt := filepath.Join(fileServerDir, "downloads", "beats", "elastic-agent", "beats", "elastic-agent")
 	err := os.MkdirAll(downloadAt, 0700)
 	require.NoError(t, err, "could not create directory structure for file server")
 
 	fetcher := atesting.ArtifactFetcher()
-	fr, err := fetcher.Fetch(ctx, runtime.GOOS, runtime.GOARCH, version)
+	fr, err := fetcher.Fetch(ctx, runtime.GOOS, runtime.GOARCH, version, packageFormat)
 	require.NoErrorf(t, err, "could not prepare fetcher to download agent %s",
 		version)
 	err = fr.Fetch(ctx, t, downloadAt)

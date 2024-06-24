@@ -6,15 +6,51 @@ package info
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
+
+type Agent interface {
+	// AgentID returns an agent identifier.
+	AgentID() string
+
+	// Headers returns custom headers used to communicate with elasticsearch.
+	Headers() map[string]string
+
+	// LogLevel retrieves a log level, returning a default if none is set
+	LogLevel() string
+
+	// RawLogLevel returns the set log level, no defaults
+	RawLogLevel() string
+
+	// ReloadID reloads agent info ID from configuration file.
+	ReloadID(ctx context.Context) error
+
+	// SetLogLevel updates log level of agent.
+	SetLogLevel(ctx context.Context, level string) error
+
+	// Snapshot returns if this version is a snapshot.
+	Snapshot() bool
+
+	// Version returns the version for this Agent.
+	Version() string
+
+	// Unprivileged returns true when this Agent is running unprivileged.
+	Unprivileged() bool
+
+	// IsStandalone returns true is the agent is running in standalone mode, i.e, without fleet
+	IsStandalone() bool
+}
 
 // AgentInfo is a collection of information about agent.
 type AgentInfo struct {
-	agentID  string
-	logLevel string
+	agentID      string
+	logLevel     string
+	unprivileged bool
+	isStandalone bool
 
 	// esHeaders will be injected into the headers field of any elasticsearch
 	// output created by this agent (see component.toIntermediate).
@@ -28,15 +64,21 @@ type AgentInfo struct {
 // If agent config file does not exist it gets created.
 // Initiates log level to predefined value.
 func NewAgentInfoWithLog(ctx context.Context, level string, createAgentID bool) (*AgentInfo, error) {
-	agentInfo, err := loadAgentInfoWithBackoff(ctx, false, level, createAgentID)
+	agentInfo, isStandalone, err := loadAgentInfoWithBackoff(ctx, false, level, createAgentID)
 	if err != nil {
 		return nil, err
 	}
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine root/Administrator: %w", err)
+	}
 
 	return &AgentInfo{
-		agentID:   agentInfo.ID,
-		logLevel:  agentInfo.LogLevel,
-		esHeaders: agentInfo.Headers,
+		agentID:      agentInfo.ID,
+		logLevel:     agentInfo.LogLevel,
+		unprivileged: !isRoot,
+		esHeaders:    agentInfo.Headers,
+		isStandalone: isStandalone,
 	}, nil
 }
 
@@ -51,9 +93,15 @@ func NewAgentInfo(ctx context.Context, createAgentID bool) (*AgentInfo, error) {
 
 // LogLevel retrieves a log level.
 func (i *AgentInfo) LogLevel() string {
-	if i.logLevel == "" {
+	rawLogLevel := i.RawLogLevel()
+	if rawLogLevel == "" {
 		return logger.DefaultLogLevel.String()
 	}
+	return rawLogLevel
+}
+
+// RawLogLevel retrieves a log level.
+func (i *AgentInfo) RawLogLevel() string {
 	return i.logLevel
 }
 
@@ -95,4 +143,13 @@ func (*AgentInfo) Snapshot() bool {
 // Headers returns custom headers used to communicate with elasticsearch.
 func (i *AgentInfo) Headers() map[string]string {
 	return i.esHeaders
+}
+
+// Unprivileged returns true when this Agent is running unprivileged.
+func (i *AgentInfo) Unprivileged() bool {
+	return i.unprivileged
+}
+
+func (i *AgentInfo) IsStandalone() bool {
+	return i.isStandalone
 }

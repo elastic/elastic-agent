@@ -44,12 +44,13 @@ type ActionDispatcher struct {
 	queue    priorityQueue
 	rt       *retryConfig
 	errCh    chan error
+	topPath  string
 
 	lastUpgradeDetails *details.Details
 }
 
 // New creates a new action dispatcher.
-func New(log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionDispatcher, error) {
+func New(log *logger.Logger, topPath string, def actions.Handler, queue priorityQueue) (*ActionDispatcher, error) {
 	var err error
 	if log == nil {
 		log, err = logger.New("action_dispatcher", false)
@@ -69,6 +70,7 @@ func New(log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionD
 		queue:    queue,
 		rt:       defaultRetryConfig(),
 		errCh:    make(chan error),
+		topPath:  topPath,
 	}, nil
 }
 
@@ -156,7 +158,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 				ad.scheduleRetry(ctx, rAction, acker)
 				continue
 			}
-			ad.log.Debugf("Failed to dispatch action '%+v', error: %+v", action, err)
+			ad.log.Errorf("Failed to dispatch action id %q of type %q, error: %+v", action.ID(), action.Type(), err)
 			reportedErr = err
 			continue
 		}

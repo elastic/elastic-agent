@@ -39,22 +39,23 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	// Start at old version, we want this test to upgrade to our
-	// build to ensure that the uninstall will kill the watcher.
-	startVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
-	require.NoError(t, err)
-	startFixture, err := atesting.NewFixture(
-		t,
-		startVersion,
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
-	)
-	require.NoError(t, err)
-
 	// Upgrades to build under test.
-	endFixture, err := define.NewFixture(t, define.Version())
+	endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get end agent build version info")
+
+	// Start on a snapshot build, we want this test to upgrade to our
+	// build to ensure that the uninstall will kill the watcher.
+	// We need a version with a non-matching commit hash to perform the upgrade
+	startVersion, err := upgradetest.PreviousMinor()
+	require.NoError(t, err)
+	startFixture, err := atesting.NewFixture(
+		t,
+		startVersion.String(),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
+	require.NoError(t, err)
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
@@ -64,8 +65,7 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	}
 
 	err = upgradetest.PerformUpgrade(
-		ctx, startFixture, endFixture, t,
-		upgradetest.WithPostUpgradeHook(postUpgradeHook))
+		ctx, startFixture, endFixture, t, upgradetest.WithPostUpgradeHook(postUpgradeHook))
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}
@@ -82,6 +82,14 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 		}
 	}
 	require.NoError(t, err)
+
+	// watcher needs to start before uninstall, otherwise you can
+	// get a race condition where watcher hasn't started before
+	// uninstall does it's PID check to find the watcher.
+	watcherErr := upgradetest.WaitForWatcher(ctx, 1*time.Minute, time.Second)
+	if watcherErr != nil {
+		t.Logf("watcher failed to start: %s", watcherErr)
+	}
 
 	// call uninstall now, do not wait for the watcher to finish running
 	// 8.11+ should always kill the running watcher (if it doesn't uninstall will fail)

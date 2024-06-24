@@ -41,12 +41,12 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
     docker_login
   fi
 
-  if [[ "$BUILDKITE_STEP_KEY" == "dra-publish" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "dra-publish" || "$BUILDKITE_STEP_KEY" == "bk-api-publish-independent-agent" ]]; then
     release_manager_login
   fi
 fi
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-extended-testing" && "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   # Set GCP credentials
   export GOOGLE_APPLICATION_GCP_SECRET=$(retry 5 vault kv get -format=json -field=data ${CI_GCP_OBS_PATH})
   echo "${GOOGLE_APPLICATION_GCP_SECRET}" > ./gcp.json

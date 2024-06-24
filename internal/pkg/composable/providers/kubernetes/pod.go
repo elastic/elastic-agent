@@ -9,10 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-autodiscover/utils"
-
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
+	"github.com/elastic/elastic-agent-autodiscover/utils"
 	c "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -74,7 +73,7 @@ func NewPodEventer(
 		return nil, errors.New(err, "couldn't create kubernetes watcher")
 	}
 
-	var replicaSetWatcher, jobWatcher kubernetes.Watcher
+	var replicaSetWatcher, jobWatcher, namespaceWatcher, nodeWatcher kubernetes.Watcher
 
 	options := kubernetes.WatchOptions{
 		SyncTimeout: cfg.SyncPeriod,
@@ -82,15 +81,20 @@ func NewPodEventer(
 	}
 	metaConf := cfg.AddResourceMetadata
 
-	nodeWatcher, err := kubernetes.NewNamedWatcher("agent-node", client, &kubernetes.Node{}, options, nil)
-	if err != nil {
-		logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Node{}, err)
+	if metaConf.Node.Enabled() || cfg.Hints.Enabled {
+		nodeWatcher, err = kubernetes.NewNamedWatcher("agent-node", client, &kubernetes.Node{}, options, nil)
+		if err != nil {
+			logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Node{}, err)
+		}
 	}
-	namespaceWatcher, err := kubernetes.NewNamedWatcher("agent-namespace", client, &kubernetes.Namespace{}, kubernetes.WatchOptions{
-		SyncTimeout: cfg.SyncPeriod,
-	}, nil)
-	if err != nil {
-		logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
+
+	if metaConf.Namespace.Enabled() || cfg.Hints.Enabled {
+		namespaceWatcher, err = kubernetes.NewNamedWatcher("agent-namespace", client, &kubernetes.Namespace{}, kubernetes.WatchOptions{
+			SyncTimeout: cfg.SyncPeriod,
+		}, nil)
+		if err != nil {
+			logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
+		}
 	}
 
 	// Resource is Pod so we need to create watchers for Replicasets and Jobs that it might belong to
@@ -138,12 +142,12 @@ func NewPodEventer(
 	watcher.AddEventHandler(p)
 
 	if nodeWatcher != nil && metaConf.Node.Enabled() {
-		updater := kubernetes.NewNodePodUpdater(p.unlockedUpdate, watcher.Store(), &p.crossUpdate)
+		updater := kubernetes.NewNodePodUpdater(p.unlockedUpdate, watcher.Store(), p.nodeWatcher, &p.crossUpdate)
 		nodeWatcher.AddEventHandler(updater)
 	}
 
 	if namespaceWatcher != nil && metaConf.Namespace.Enabled() {
-		updater := kubernetes.NewNamespacePodUpdater(p.unlockedUpdate, watcher.Store(), &p.crossUpdate)
+		updater := kubernetes.NewNamespacePodUpdater(p.unlockedUpdate, watcher.Store(), p.namespaceWatcher, &p.crossUpdate)
 		namespaceWatcher.AddEventHandler(updater)
 	}
 
@@ -212,7 +216,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 		if !p.managed {
 			if ann, ok := data.mapping["annotations"]; ok {
 				annotations, _ := ann.(mapstr.M)
-				hints := utils.GenerateHints(annotations, "", p.config.Prefix)
+				hints, _ := hintsCheck(annotations, "", p.config.Prefix, true, allSupportedHints, p.logger, pod)
 				if len(hints) > 0 {
 					p.logger.Debugf("Extracted hints are :%v", hints)
 					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")
@@ -519,4 +523,13 @@ func updateProcessors(newprocessors []mapstr.M, processors []map[string]interfac
 	}
 
 	return processors
+}
+
+// HintsCheck geenrates hints from provided annotations of the pod and logs any possible incorrect annotations that have been provided in the pod
+func hintsCheck(annotations mapstr.M, container string, prefix string, validate bool, allSupportedHints []string, logger *logp.Logger, pod *kubernetes.Pod) (mapstr.M, []string) {
+	hints, incorrecthints := utils.GenerateHints(annotations, container, prefix, validate, allSupportedHints)
+	for _, value := range incorrecthints { //We check whether the provided annotation follows the supported format and vocabulary. The check happens for annotations that have prefix co.elastic
+		logger.Warnf("provided hint: %s/%s is not recognised as supported annotation for pod %s in namespace %s", prefix, value, pod.Name, pod.ObjectMeta.Namespace)
+	}
+	return hints, incorrecthints
 }

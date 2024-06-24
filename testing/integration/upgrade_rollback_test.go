@@ -51,11 +51,11 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 
 	// Upgrade from an old build because the new watcher from the new build will
 	// be ran. Otherwise the test will run the old watcher from the old build.
-	upgradeFromVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,
-		upgradeFromVersion,
+		upgradeFromVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
@@ -63,7 +63,7 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 	require.NoError(t, err, "failed to get start agent build version info")
 
 	// Upgrade to the build under test.
-	endFixture, err := define.NewFixture(t, define.Version())
+	endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, define.Version())
@@ -166,11 +166,11 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 
 	// Upgrade from an old build because the new watcher from the new build will
 	// be ran. Otherwise the test will run the old watcher from the old build.
-	upgradeFromVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,
-		upgradeFromVersion,
+		upgradeFromVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
@@ -178,7 +178,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	require.NoError(t, err, "failed to get start agent build version info")
 
 	// Upgrade to the build under test.
-	endFixture, err := define.NewFixture(t, define.Version())
+	endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, define.Version())
@@ -205,7 +205,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		topPath := paths.Top()
 
 		t.Logf("Stopping agent via service to simulate crashing")
-		err = install.StopService(topPath)
+		err = install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
 		if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
 			// Due to the quick restarts every 10 seconds its possible that this is faster than Windows
 			// can handle. Decrementing restartIdx means that the loop will occur again.

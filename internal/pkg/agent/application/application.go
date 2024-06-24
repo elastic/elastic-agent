@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -40,17 +41,19 @@ func New(
 	log *logger.Logger,
 	baseLogger *logger.Logger,
 	logLevel logp.Level,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
+	runAsOtel bool,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
-	err := version.InitVersionInformation()
-	if err != nil {
+	err := version.InitVersionError()
+	if err != nil && !runAsOtel {
+		// ignore this error when running in otel mode
 		// non-fatal error, log a warning and move on
 		log.With("error.message", err).Warnf("Error initializing version information: falling back to %s", release.Version())
 	}
@@ -89,7 +92,13 @@ func New(
 		log.Infof("Loading baseline config from %v", pathConfigFile)
 		rawConfig, err = config.LoadFile(pathConfigFile)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+			if !runAsOtel {
+				return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+			}
+
+			// initialize with empty config, configuration file is not necessary in otel mode,
+			// best effort is fine
+			rawConfig = config.New()
 		}
 	}
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
@@ -111,7 +120,6 @@ func New(
 	runtime, err := runtime.NewManager(
 		log,
 		baseLogger,
-		cfg.Settings.GRPC.String(),
 		agentInfo,
 		tracer,
 		monitor,
@@ -132,6 +140,9 @@ func New(
 
 		// testing mode uses a config manager that takes configuration from over the control protocol
 		configMgr = newTestingModeConfigManager(log)
+	} else if runAsOtel {
+		// ignoring configuration in elastic-agent.yml
+		configMgr = otel.NewOtelModeConfigManager()
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
 
@@ -165,7 +176,8 @@ func New(
 				EndpointSignedComponentModifier(),
 			)
 
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, upgrader)
+			// TODO: stop using global state
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -173,12 +185,16 @@ func New(
 		}
 	}
 
-	composable, err := composable.New(log, rawConfig, composableManaged)
-	if err != nil {
-		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
+	var varsManager composable.Controller
+	if !runAsOtel {
+		// no need for vars in otel mode
+		varsManager, err = composable.New(log, rawConfig, composableManaged)
+		if err != nil {
+			return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
+		}
 	}
 
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, isManaged, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
@@ -200,12 +216,15 @@ func New(
 		return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 	}
 
-	return coord, configMgr, composable, nil
+	return coord, configMgr, varsManager, nil
 }
 
 func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(ctx, path)
+	store, err := storage.NewEncryptedDiskStore(ctx, path)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
 
 	reader, err := store.Load()
 	if err != nil {

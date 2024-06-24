@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -33,6 +34,7 @@ func (md *mockDownloader) Download(ctx context.Context, a artifact.Artifact, ver
 }
 
 func TestFallbackIsAppended(t *testing.T) {
+	testAgentVersion123 := agtversion.NewParsedSemVer(1, 2, 3, "", "")
 	testCases := []struct {
 		name                 string
 		passedBytes          []string
@@ -40,14 +42,13 @@ func TestFallbackIsAppended(t *testing.T) {
 		expectedDefaultIdx   int
 		expectedSecondaryIdx int
 		fleetServerURI       string
-		targetVersion        string
+		targetVersion        *agtversion.ParsedSemVer
 	}{
-		{"nil input", nil, 1, 0, -1, "", ""},
-		{"empty input", []string{}, 1, 0, -1, "", ""},
-		{"valid input with pgp", []string{"pgp-bytes"}, 2, 1, -1, "", ""},
-		{"valid input with pgp and version, no fleet uri", []string{"pgp-bytes"}, 2, 1, -1, "", "1.2.3"},
-		{"valid input with pgp and version and fleet uri", []string{"pgp-bytes"}, 3, 1, 2, "some-uri", "1.2.3"},
-		{"valid input with pgp and fleet uri no version", []string{"pgp-bytes"}, 2, 1, -1, "some-uri", ""},
+		{"nil input", nil, 1, 0, -1, "", testAgentVersion123},
+		{"empty input", []string{}, 1, 0, -1, "", testAgentVersion123},
+		{"valid input with pgp", []string{"pgp-bytes"}, 2, 1, -1, "", nil},
+		{"valid input with pgp and version, no fleet uri", []string{"pgp-bytes"}, 2, 1, -1, "", testAgentVersion123},
+		{"valid input with pgp and version and fleet uri", []string{"pgp-bytes"}, 3, 1, 2, "some-uri", testAgentVersion123},
 	}
 
 	for _, tc := range testCases {
@@ -65,7 +66,7 @@ func TestFallbackIsAppended(t *testing.T) {
 
 			if tc.expectedSecondaryIdx >= 0 {
 				// last element is fleet uri
-				expectedPgpURI := download.PgpSourceURIPrefix + tc.fleetServerURI + strings.Replace(fleetUpgradeFallbackPGPFormat, "%d.%d.%d", tc.targetVersion, 1)
+				expectedPgpURI := download.PgpSourceURIPrefix + tc.fleetServerURI + strings.Replace(fleetUpgradeFallbackPGPFormat, "%d.%d.%d", tc.targetVersion.CoreVersion(), 1)
 				require.Equal(t, expectedPgpURI, res[len(res)-1])
 			}
 		})
@@ -230,8 +231,10 @@ func TestDownloadWithRetries(t *testing.T) {
 	// Download timeout expired (before all retries are exhausted)
 	t.Run("download_timeout_expired", func(t *testing.T) {
 		testCaseSettings := settings
-		testCaseSettings.Timeout = 200 * time.Millisecond
-		testCaseSettings.RetrySleepInitDuration = 100 * time.Millisecond
+		testCaseSettings.Timeout = 500 * time.Millisecond
+		testCaseSettings.RetrySleepInitDuration = 10 * time.Millisecond
+		// exponential backoff with 10ms init and 500ms timeout should fit at least 3 attempts.
+		minNmExpectedAttempts := 3
 
 		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
@@ -250,9 +253,10 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.Equal(t, "context deadline exceeded", err.Error())
 		require.Equal(t, "", path)
 
-		minNmExpectedAttempts := int(testCaseSettings.Timeout / testCaseSettings.RetrySleepInitDuration)
 		logs := obs.TakeAll()
-		require.GreaterOrEqual(t, len(logs), minNmExpectedAttempts*2)
+		logsJSON, err := json.MarshalIndent(logs, "", " ")
+		require.NoError(t, err)
+		require.GreaterOrEqualf(t, len(logs), minNmExpectedAttempts*2, "logs output: %s", logsJSON)
 		for i := 0; i < minNmExpectedAttempts; i++ {
 			require.Equal(t, fmt.Sprintf("download attempt %d", i+1), logs[(2*i)].Message)
 			require.Contains(t, logs[(2*i+1)].Message, "unable to download package: download failed; retrying")

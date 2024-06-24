@@ -41,7 +41,7 @@ const dispatchFlushInterval = time.Minute * 5
 
 type managedConfigManager struct {
 	log                  *logger.Logger
-	agentInfo            *info.AgentInfo
+	agentInfo            info.Agent
 	cfg                  *configuration.Configuration
 	client               *remote.Client
 	store                storage.Store
@@ -60,11 +60,12 @@ type managedConfigManager struct {
 func newManagedConfigManager(
 	ctx context.Context,
 	log *logger.Logger,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	cfg *configuration.Configuration,
 	storeSaver storage.Store,
 	runtime *runtime.Manager,
 	fleetInitTimeout time.Duration,
+	topPath string,
 	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
@@ -86,7 +87,7 @@ func newManagedConfigManager(
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
 
-	actionDispatcher, err := dispatcher.New(log, handlers.NewDefault(log), actionQueue)
+	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
 	}
@@ -334,12 +335,19 @@ func fleetServerRunning(state runtime.ComponentState) bool {
 }
 
 func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *handlers.PolicyChangeHandler {
+	settingsHandler := handlers.NewSettings(
+		m.log,
+		m.agentInfo,
+		m.coord,
+	)
+
 	policyChanger := handlers.NewPolicyChangeHandler(
 		m.log,
 		m.agentInfo,
 		m.cfg,
 		m.store,
 		m.ch,
+		settingsHandler,
 	)
 
 	m.dispatcher.MustRegister(
@@ -370,11 +378,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionSettings{},
-		handlers.NewSettings(
-			m.log,
-			m.agentInfo,
-			m.coord,
-		),
+		settingsHandler,
 	)
 
 	m.dispatcher.MustRegister(
@@ -389,6 +393,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		&fleetapi.ActionDiagnostics{},
 		handlers.NewDiagnostics(
 			m.log,
+			paths.Top(), // TODO: stop using global state
 			m.coord,
 			m.cfg.Settings.MonitoringConfig.Diagnostics.Limit,
 			uploader.New(m.agentInfo.AgentID(), m.client, m.cfg.Settings.MonitoringConfig.Diagnostics.Uploader),

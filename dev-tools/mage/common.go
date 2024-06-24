@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -118,7 +117,7 @@ func joinMaps(args ...map[string]interface{}) map[string]interface{} {
 }
 
 func expandFile(src, dst string, args ...map[string]interface{}) error {
-	tmplData, err := ioutil.ReadFile(src)
+	tmplData, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("failed reading from template %v, %w", src, err)
 	}
@@ -133,7 +132,7 @@ func expandFile(src, dst string, args ...map[string]interface{}) error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(createDir(dst), []byte(output), 0644); err != nil {
+	if err = os.WriteFile(createDir(dst), []byte(output), 0644); err != nil {
 		return fmt.Errorf("failed to write rendered template: %w", err)
 	}
 
@@ -236,13 +235,13 @@ func FindReplace(file string, re *regexp.Regexp, repl string) error {
 		return err
 	}
 
-	contents, err := ioutil.ReadFile(file)
+	contents, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
 
 	out := re.ReplaceAllString(string(contents), repl)
-	return ioutil.WriteFile(file, []byte(out), info.Mode().Perm())
+	return os.WriteFile(file, []byte(out), info.Mode().Perm())
 }
 
 // MustFindReplace invokes FindReplace and panics if an error occurs.
@@ -481,6 +480,14 @@ func untar(sourceFile, destinationDir string) error {
 			if err = writer.Close(); err != nil {
 				return err
 			}
+		case tar.TypeSymlink:
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				return err
+			}
+			if err := os.Symlink(header.Linkname, path); err != nil {
+				return fmt.Errorf("error creating symlink %s pointing to %s: %w", path, header.Linkname, err)
+			}
+
 		default:
 			return fmt.Errorf("unable to untar type=%c in file=%s", header.Typeflag, path)
 		}
@@ -862,21 +869,21 @@ var parseVersionRegex = regexp.MustCompile(`(?m)^[^\d]*(?P<major>\d+)\.(?P<minor
 
 // ParseVersion extracts the major, minor, and optional patch number from a
 // version string.
-func ParseVersion(version string) (major, minor, patch int, err error) {
+func ParseVersion(version string) (int, int, int, error) {
 	names := parseVersionRegex.SubexpNames()
 	matches := parseVersionRegex.FindStringSubmatch(version)
 	if len(matches) == 0 {
-		err = fmt.Errorf("failed to parse version '%v'", version)
-		return
+		err := fmt.Errorf("failed to parse version '%v'", version)
+		return 0, 0, 0, err
 	}
 
 	data := map[string]string{}
 	for i, match := range matches {
 		data[names[i]] = match
 	}
-	major, _ = strconv.Atoi(data["major"])
-	minor, _ = strconv.Atoi(data["minor"])
-	patch, _ = strconv.Atoi(data["patch"])
+	major, _ := strconv.Atoi(data["major"])
+	minor, _ := strconv.Atoi(data["minor"])
+	patch, _ := strconv.Atoi(data["patch"])
 	return major, minor, patch, nil
 }
 

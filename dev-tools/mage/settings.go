@@ -8,9 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"go/build"
-	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -20,11 +20,13 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"gopkg.in/yaml.v3"
 
 	"github.com/magefile/mage/sh"
-	"golang.org/x/tools/go/vcs"
+	"golang.org/x/tools/go/vcs" //nolint:staticcheck // this deprecation will be handled in https://github.com/elastic/elastic-agent/issues/4138
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
 
 const (
@@ -39,12 +41,20 @@ const (
 
 	elasticAgentModulePath = "github.com/elastic/elastic-agent"
 
+	defaultName = "elastic-agent"
+
 	// Env vars
 	// agent package version
 	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
+	//ManifestUrlEnvVar is the name fo the environment variable containing the Manifest URL to be used for packaging agent
+	ManifestUrlEnvVar = "MANIFEST_URL"
+	// AgentCommitHashEnvVar allows to override agent commit hash string during packaging
+	AgentCommitHashEnvVar
 
 	// Mapped functions
-	agentPackageVersionMappedFunc = "agent_package_version"
+	agentPackageVersionMappedFunc    = "agent_package_version"
+	agentManifestGeneratorMappedFunc = "manifest"
+	snapshotSuffix                   = "snapshot_suffix"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -65,7 +75,7 @@ var (
 	// the crossbuild images at /go/pkg/mod, read-only,  when set to true.
 	CrossBuildMountModcache = true
 
-	BeatName        = EnvOr("BEAT_NAME", filepath.Base(CWD()))
+	BeatName        = EnvOr("BEAT_NAME", defaultName)
 	BeatServiceName = EnvOr("BEAT_SERVICE_NAME", BeatName)
 	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
 	BeatDescription = EnvOr("BEAT_DESCRIPTION", "")
@@ -92,18 +102,20 @@ var (
 	ManifestURL string
 
 	FuncMap = map[string]interface{}{
-		"beat_doc_branch":             BeatDocBranch,
-		"beat_version":                BeatQualifiedVersion,
-		"commit":                      CommitHash,
-		"commit_short":                CommitHashShort,
-		"date":                        BuildDate,
-		"elastic_beats_dir":           ElasticBeatsDir,
-		"go_version":                  GoVersion,
-		"repo":                        GetProjectRepoInfo,
-		"title":                       func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
-		"tolower":                     strings.ToLower,
-		"contains":                    strings.Contains,
-		agentPackageVersionMappedFunc: AgentPackageVersion,
+		"beat_doc_branch":                BeatDocBranch,
+		"beat_version":                   BeatQualifiedVersion,
+		"commit":                         CommitHash,
+		"commit_short":                   CommitHashShort,
+		"date":                           BuildDate,
+		"elastic_beats_dir":              ElasticBeatsDir,
+		"go_version":                     GoVersion,
+		"repo":                           GetProjectRepoInfo,
+		"title":                          func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
+		"tolower":                        strings.ToLower,
+		"contains":                       strings.Contains,
+		agentPackageVersionMappedFunc:    AgentPackageVersion,
+		agentManifestGeneratorMappedFunc: PackageManifest,
+		snapshotSuffix:                   SnapshotSuffix,
 	}
 )
 
@@ -146,7 +158,7 @@ func initGlobals() {
 
 	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
 
-	ManifestURL = EnvOr("ManifestURL", "")
+	ManifestURL = EnvOr(ManifestUrlEnvVar, "")
 	PackagingFromManifest = ManifestURL != ""
 }
 
@@ -249,6 +261,7 @@ repo.RootDir                 = {{ repo.RootDir }}
 repo.ImportPath              = {{ repo.ImportPath }}
 repo.SubDir                  = {{ repo.SubDir }}
 agent_package_version        = {{ agent_package_version}}
+snapshot_suffix              = {{ snapshot_suffix }}
 `
 
 	return Expand(dumpTemplate)
@@ -274,7 +287,12 @@ var (
 func CommitHash() (string, error) {
 	var err error
 	commitHashOnce.Do(func() {
-		commitHash, err = sh.Output("git", "rev-parse", "HEAD")
+		// Check commit hash override first
+		commitHash = EnvOr(AgentCommitHashEnvVar, "")
+		if commitHash == "" {
+			// no override found, get the hash from HEAD
+			commitHash, err = sh.Output("git", "rev-parse", "HEAD")
+		}
 	})
 	return commitHash, err
 }
@@ -295,6 +313,57 @@ func AgentPackageVersion() (string, error) {
 	}
 
 	return BeatQualifiedVersion()
+}
+
+func PackageManifest() (string, error) {
+
+	packageVersion, err := AgentPackageVersion()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent package version: %w", err)
+	}
+
+	hash, err := CommitHash()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
+	}
+
+	commitHashShort, err := CommitHashShort()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
+	}
+
+	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort)
+}
+
+func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string) (string, error) {
+	m := v1.NewManifest()
+	m.Package.Version = packageVersion
+	m.Package.Snapshot = snapshot
+	m.Package.Hash = fullHash
+
+	versionedHomePath := path.Join("data", fmt.Sprintf("%s-%s", beatName, shortHash))
+	m.Package.VersionedHome = versionedHomePath
+	m.Package.PathMappings = []map[string]string{{}}
+	m.Package.PathMappings[0][versionedHomePath] = fmt.Sprintf("data/%s-%s%s-%s", beatName, m.Package.Version, GenerateSnapshotSuffix(snapshot), shortHash)
+	m.Package.PathMappings[0][v1.ManifestFileName] = fmt.Sprintf("data/%s-%s%s-%s/%s", beatName, m.Package.Version, GenerateSnapshotSuffix(snapshot), shortHash, v1.ManifestFileName)
+	yamlBytes, err := yaml.Marshal(m)
+	if err != nil {
+		return "", fmt.Errorf("marshaling manifest: %w", err)
+
+	}
+	return string(yamlBytes), nil
+}
+
+func SnapshotSuffix() string {
+	return GenerateSnapshotSuffix(Snapshot)
+}
+
+func GenerateSnapshotSuffix(snapshot bool) string {
+	if !snapshot {
+		return ""
+	}
+
+	return "-SNAPSHOT"
 }
 
 var (
@@ -516,7 +585,7 @@ func (s *BuildVariableSources) GetBeatVersion() (string, error) {
 		return "", err
 	}
 
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return "", fmt.Errorf("failed to read beat version file=%v: %w", file, err)
 	}
@@ -534,7 +603,7 @@ func (s *BuildVariableSources) GetGoVersion() (string, error) {
 		return "", err
 	}
 
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return "", fmt.Errorf("failed to read go version file=%v: %w", file, err)
 	}
@@ -552,7 +621,7 @@ func (s *BuildVariableSources) GetDocBranch() (string, error) {
 		return "", err
 	}
 
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return "", fmt.Errorf("failed to read doc branch file=%v: %w", file, err)
 	}

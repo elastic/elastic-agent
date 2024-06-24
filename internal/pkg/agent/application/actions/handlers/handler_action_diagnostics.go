@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -30,6 +31,11 @@ import (
 // or if the agent goes offline and retrieves multiple diagnostics actions.
 // In either case the 1st action will succeed and the others will ack with an the error.
 var ErrRateLimit = fmt.Errorf("rate limit exceeded")
+
+// getCPUDiag is a wrapper around diagnostics.CreateCPUProfile so it can be replaced in unit-tests.
+var getCPUDiag = func(ctx context.Context, d time.Duration) ([]byte, error) {
+	return diagnostics.CreateCPUProfile(ctx, d)
+}
 
 // Uploader is the interface used to upload a diagnostics bundle to fleet-server.
 type Uploader interface {
@@ -62,15 +68,20 @@ type Diagnostics struct {
 	diagProvider diagnosticsProvider
 	limiter      *rate.Limiter
 	uploader     Uploader
+	topPath      string
 }
 
 // NewDiagnostics returns a new Diagnostics handler.
-func NewDiagnostics(log abstractLogger, coord diagnosticsProvider, cfg config.Limit, uploader Uploader) *Diagnostics {
+func NewDiagnostics(log abstractLogger, topPath string, coord diagnosticsProvider, cfg config.Limit, uploader Uploader) *Diagnostics {
+	if topPath == "" {
+		topPath = paths.Top()
+	}
 	return &Diagnostics{
 		log:          log,
 		diagProvider: coord,
 		limiter:      rate.NewLimiter(rate.Every(cfg.Interval), cfg.Burst),
 		uploader:     uploader,
+		topPath:      topPath,
 	}
 }
 
@@ -122,7 +133,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	}
 
 	h.log.Debug("Gathering agent diagnostics.")
-	aDiag, err := h.runHooks(ctx)
+	aDiag, err := h.runHooks(ctx, action)
 	if err != nil {
 		action.Err = err
 		h.log.Errorw("diagnostics action handler failed to run diagnostics hooks",
@@ -134,13 +145,13 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	uDiag := h.diagUnits(ctx)
 
 	h.log.Debug("Gathering component diagnostics.")
-	cDiag := h.diagComponents(ctx)
+	cDiag := h.diagComponents(ctx, action)
 
 	var r io.Reader
 	// attempt to create the a temporary diagnostics file on disk in order to avoid loading a
 	// potentially large file in memory.
 	// if on-disk creation fails an in-memory buffer is used.
-	f, s, err := h.diagFile(aDiag, uDiag, cDiag)
+	f, s, err := h.diagFile(aDiag, uDiag, cDiag, action.ExcludeEventsLog)
 	if err != nil {
 		var b bytes.Buffer
 		h.log.Warnw("Diagnostics action unable to use temporary file, using buffer instead.", "error.message", err)
@@ -150,7 +161,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 				h.log.Warn(str)
 			}
 		}()
-		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag, cDiag)
+		err := diagnostics.ZipArchive(&wBuf, &b, h.topPath, aDiag, uDiag, cDiag, action.ExcludeEventsLog)
 		if err != nil {
 			h.log.Errorw(
 				"diagnostics action handler failed generate zip archive",
@@ -185,9 +196,26 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 }
 
 // runHooks runs the agent diagnostics hooks.
-func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResult, error) {
+func (h *Diagnostics) runHooks(ctx context.Context, action *fleetapi.ActionDiagnostics) ([]client.DiagnosticFileResult, error) {
 	hooks := append(h.diagProvider.DiagnosticHooks(), diagnostics.GlobalHooks()...)
-	diags := make([]client.DiagnosticFileResult, 0, len(hooks))
+
+	// Currently CPU is the only additional metric we can collect.
+	// If this changes we would need to change how we scan AdditionalMetrics.
+	collectCPU := false
+	for _, metric := range action.AdditionalMetrics {
+		if metric == "CPU" {
+			h.log.Debug("Diagnostics will collect CPU profile.")
+			collectCPU = true
+			break
+		}
+	}
+
+	resultLen := len(hooks)
+	if collectCPU {
+		resultLen++
+	}
+	diags := make([]client.DiagnosticFileResult, 0, resultLen)
+
 	for _, hook := range hooks {
 		if ctx.Err() != nil {
 			return diags, ctx.Err()
@@ -204,6 +232,20 @@ func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResu
 		})
 		elapsed := time.Since(startTime)
 		h.log.Debugw(fmt.Sprintf("Hook %s execution complete, took %s", hook.Name, elapsed.String()), "hook", hook.Name, "filename", hook.Filename, "elapsed", elapsed.String())
+	}
+	if collectCPU {
+		p, err := getCPUDiag(ctx, diagnostics.DiagCPUDuration)
+		if err != nil {
+			return diags, fmt.Errorf("unable to gather CPU profile: %w", err)
+		}
+		diags = append(diags, client.DiagnosticFileResult{
+			Name:        diagnostics.DiagCPUName,
+			Filename:    diagnostics.DiagCPUFilename,
+			Description: diagnostics.DiagCPUDescription,
+			ContentType: diagnostics.DiagCPUContentType,
+			Content:     p,
+			Generated:   time.Now().UTC(),
+		})
 	}
 	return diags, nil
 }
@@ -246,14 +288,20 @@ func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResu
 }
 
 // diagUnits gathers diagnostics from components.
-func (h *Diagnostics) diagComponents(ctx context.Context) []client.DiagnosticComponentResult {
+func (h *Diagnostics) diagComponents(ctx context.Context, action *fleetapi.ActionDiagnostics) []client.DiagnosticComponentResult {
 	cDiag := make([]client.DiagnosticComponentResult, 0)
 	h.log.Debug("Performing component diagnostics")
 	startTime := time.Now()
 	defer func() {
 		h.log.Debugf("Component diagnostics complete. Took: %s", time.Since(startTime))
 	}()
-	rr, err := h.diagProvider.PerformComponentDiagnostics(ctx, []cproto.AdditionalDiagnosticRequest{})
+	additionalMetrics := []cproto.AdditionalDiagnosticRequest{}
+	for _, metric := range action.AdditionalMetrics {
+		if metric == "CPU" {
+			additionalMetrics = append(additionalMetrics, cproto.AdditionalDiagnosticRequest_CPU)
+		}
+	}
+	rr, err := h.diagProvider.PerformComponentDiagnostics(ctx, additionalMetrics)
 	if err != nil {
 		h.log.Errorf("Error fetching component-level diagnostics: %w", err)
 	}
@@ -284,7 +332,12 @@ func (h *Diagnostics) diagComponents(ctx context.Context) []client.DiagnosticCom
 }
 
 // diagFile will write the diagnostics to a temporary file and return the file ready to be read
-func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []client.DiagnosticUnitResult, cDiag []client.DiagnosticComponentResult) (*os.File, int64, error) {
+func (h *Diagnostics) diagFile(
+	aDiag []client.DiagnosticFileResult,
+	uDiag []client.DiagnosticUnitResult,
+	cDiag []client.DiagnosticComponentResult,
+	excludeEvents bool) (*os.File, int64, error) {
+
 	f, err := os.CreateTemp("", "elastic-agent-diagnostics")
 	if err != nil {
 		return nil, 0, err
@@ -297,7 +350,7 @@ func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []clie
 			h.log.Warn(str)
 		}
 	}()
-	if err := diagnostics.ZipArchive(&wBuf, f, aDiag, uDiag, cDiag); err != nil {
+	if err := diagnostics.ZipArchive(&wBuf, f, h.topPath, aDiag, uDiag, cDiag, excludeEvents); err != nil {
 		os.Remove(name)
 		return nil, 0, err
 	}

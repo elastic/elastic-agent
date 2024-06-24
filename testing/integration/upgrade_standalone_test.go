@@ -18,6 +18,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -28,27 +29,50 @@ func TestStandaloneUpgrade(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
-	defer cancel()
-
-	// test 2 current 8.x version and 1 previous 7.x version
-	versionList, err := upgradetest.GetUpgradableVersions(ctx, define.Version(), 2, 1)
+	versionList, err := upgradetest.GetUpgradableVersions()
+	require.NoError(t, err)
+	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
 	for _, startVersion := range versionList {
-		t.Run(fmt.Sprintf("Upgrade %s to %s", startVersion, define.Version()), func(t *testing.T) {
-			startFixture, err := atesting.NewFixture(
-				t,
-				startVersion.String(),
-				atesting.WithFetcher(atesting.ArtifactFetcher()),
-			)
-			require.NoError(t, err, "error creating previous agent fixture")
-
-			endFixture, err := define.NewFixture(t, define.Version())
-			require.NoError(t, err)
-
-			err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t)
-			assert.NoError(t, err)
+		unprivilegedAvailable := false
+		if upgradetest.SupportsUnprivileged(startVersion, endVersion) {
+			unprivilegedAvailable = true
+		}
+		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
+			testStandaloneUpgrade(t, startVersion, define.Version(), false)
 		})
+		if unprivilegedAvailable {
+			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
+				testStandaloneUpgrade(t, startVersion, define.Version(), true)
+			})
+		}
 	}
+}
+
+func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, unprivileged bool) {
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	startFixture, err := atesting.NewFixture(
+		t,
+		startVersion.String(),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
+	require.NoError(t, err, "error creating previous agent fixture")
+
+	endFixture, err := define.NewFixtureFromLocalBuild(t, endVersion)
+	require.NoError(t, err)
+
+	startVersionInfo, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("both start and end versions have the same hash %q, skipping...", startVersionInfo.Binary.Commit)
+		return
+	}
+
+	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithUnprivileged(unprivileged))
+	assert.NoError(t, err)
 }

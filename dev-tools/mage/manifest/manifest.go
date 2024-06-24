@@ -19,6 +19,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 // A backoff schedule for when and how often to retry failed HTTP
@@ -61,7 +62,7 @@ func DownloadManifest(manifest string) (tools.Build, error) {
 	}
 	if mg.Verbose() {
 		log.Printf(">>>> Downloaded manifest %s", manifest)
-		log.Printf(">>>> Packaing version: %s, build_id: %s, manifest_version:%s", manifestResponse.Version, manifestResponse.BuildID, manifestResponse.ManifestVersion)
+		log.Printf(">>>> Packaging version: %s, build_id: %s, manifest_version:%s", manifestResponse.Version, manifestResponse.BuildID, manifestResponse.ManifestVersion)
 	}
 	return manifestResponse, nil
 }
@@ -84,7 +85,7 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 func DownloadComponentsFromManifest(manifest string, platforms []string, platformPackages map[string]string, dropPath string) error {
 	componentSpec := map[string][]string{
 		"apm-server":            {"apm-server"},
-		"beats":                 {"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat"},
+		"beats":                 {"agentbeat"},
 		"cloud-defend":          {"cloud-defend"},
 		"cloudbeat":             {"cloudbeat"},
 		"elastic-agent-shipper": {"elastic-agent-shipper"},
@@ -99,6 +100,16 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	}
 	projects := manifestResponse.Projects
 
+	parsedManifestVersion, err := version.ParseVersion(manifestResponse.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse manifest version: [%s]", manifestResponse.Version)
+	}
+
+	// For resolving manifest package name and version, just use the Major.Minor.Patch part of the version
+	// for Staging builds, and Major.Minor.Patch-SNAPSHOT for snapshots.
+	// This eliminates the "+buildYYYYMMDDHHMM" suffix on Independent Agent Release builds
+	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
+
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
 	for component, pkgs := range componentSpec {
 		for _, platform := range platforms {
@@ -111,7 +122,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 
 			for _, pkg := range pkgs {
 				reqPackage := platformPackages[platform]
-				pkgURL := resolveManifestPackage(projects[component], pkg, reqPackage, manifestResponse.Version)
+				pkgURL := resolveManifestPackage(projects[component], pkg, reqPackage, majorMinorPatchVersion)
 				if pkgURL != nil {
 					for _, p := range pkgURL {
 						log.Printf(">>>>>>>>> Downloading [%s] [%s] ", pkg, p)
@@ -119,7 +130,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 						downloadTarget := filepath.Join(targetPath, pkgFilename)
 						if _, err := os.Stat(downloadTarget); err != nil {
 							errGrp.Go(func(ctx context.Context, url, target string) func() error {
-								return func() error { return downloadPackage(ctx, url, target) }
+								return func() error { return DownloadPackage(ctx, url, target) }
 							}(downloadsCtx, p, downloadTarget))
 						}
 					}
@@ -139,7 +150,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	return nil
 }
 
-func downloadPackage(ctx context.Context, downloadUrl string, target string) error {
+func DownloadPackage(ctx context.Context, downloadUrl string, target string) error {
 	parsedURL, errorUrl := url.Parse(downloadUrl)
 	if errorUrl != nil {
 		return errorInvalidManifestURL

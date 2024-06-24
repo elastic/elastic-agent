@@ -8,7 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -81,7 +83,12 @@ type MonitorManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// MonitoringConfig injects monitoring configuration into resolved ast tree.
-	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string) (map[string]interface{}, error)
+	// args:
+	// - the existing config policy
+	// - a list of the expected running components
+	// - a map of component IDs to binary names
+	// - a map of component IDs to the PIDs of the running components.
+	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string, map[string]uint64) (map[string]interface{}, error)
 }
 
 // Runner provides interface to run a manager and receive running errors.
@@ -172,7 +179,7 @@ type configReloader interface {
 // All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
 type Coordinator struct {
 	logger    *logger.Logger
-	agentInfo *info.AgentInfo
+	agentInfo info.Agent
 	isManaged bool
 
 	cfg   *configuration.Configuration
@@ -278,6 +285,19 @@ type Coordinator struct {
 
 	// mx         sync.RWMutex
 	// protection protection.Config
+
+	// a sync channel that can be called by other components to check if the main coordinator
+	// loop in runLoopIteration() is active and listening.
+	// Should only be interacted with via CoordinatorActive() or runLoopIteration()
+	heartbeatChan chan struct{}
+
+	// if a component (mostly endpoint) has a new PID, we need to update
+	// the monitoring components so they have a PID to monitor
+	// however, if endpoint is in some kind of restart loop,
+	// we could DOS the config system. Instead,
+	// run a ticker that checks to see if we have a new PID.
+	componentPIDTicker         *time.Ticker
+	componentPidRequiresUpdate *atomic.Bool
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -298,8 +318,30 @@ type managerChans struct {
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 }
 
+// diffCheck is a container used by checkAndLogUpdate()
+type diffCheck struct {
+	inNew   bool
+	inLast  bool
+	updated bool
+}
+
+// UpdateStats reports the diff of a component update.
+// This is primarily used as a log message, and exported in case it's needed elsewhere.
+type UpdateStats struct {
+	Components UpdateComponentChange `json:"components"`
+	Outputs    UpdateComponentChange `json:"outputs"`
+}
+
+// UpdateComponentChange reports stats for changes to a particular part of a config.
+type UpdateComponentChange struct {
+	Added   []string `json:"added,omitempty"`
+	Removed []string `json:"removed,omitempty"`
+	Updated []string `json:"updated,omitempty"`
+	Count   int      `json:"count,omitempty"`
+}
+
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -346,9 +388,12 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		// synchronization in the subscriber API, just set the input buffer to 0.
 		stateBroadcaster: broadcaster.New(state, 64, 32),
 
-		logLevelCh:         make(chan logp.Level),
-		overrideStateChan:  make(chan *coordinatorOverrideState),
-		upgradeDetailsChan: make(chan *details.Details),
+		logLevelCh:                 make(chan logp.Level),
+		overrideStateChan:          make(chan *coordinatorOverrideState),
+		upgradeDetailsChan:         make(chan *details.Details),
+		heartbeatChan:              make(chan struct{}),
+		componentPIDTicker:         time.NewTicker(time.Second * 30),
+		componentPidRequiresUpdate: &atomic.Bool{},
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -387,6 +432,22 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 // Called by external goroutines.
 func (c *Coordinator) State() State {
 	return c.stateBroadcaster.Get()
+}
+
+// IsActive is a blocking method that waits for a channel response
+// from the coordinator loop. This can be used to as a basic health check,
+// as we'll timeout and return false if the coordinator run loop doesn't
+// respond to our channel.
+func (c *Coordinator) IsActive(timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	select {
+	case <-c.heartbeatChan:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 func (c *Coordinator) RegisterMonitoringServer(s configReloader) {
@@ -525,13 +586,16 @@ func (c *Coordinator) PerformComponentDiagnostics(ctx context.Context, additiona
 
 // SetLogLevel changes the entire log level for the running Elastic Agent.
 // Called from external goroutines.
-func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
+func (c *Coordinator) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
+	if lvl == nil {
+		return fmt.Errorf("logp.Level passed to Coordinator.SetLogLevel() must be not nil")
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case c.logLevelCh <- lvl:
+	case c.logLevelCh <- *lvl:
 		// set global once the level change has been taken by the channel
-		logger.SetLevel(lvl)
+		logger.SetLevel(*lvl)
 		return nil
 	}
 }
@@ -635,10 +699,16 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	// shutdown state.
 	defer close(c.stateBroadcaster.InputChan)
 
+	if c.varsMgr != nil {
+		c.setCoordinatorState(agentclient.Starting, "Waiting for initial configuration and composable variables")
+	} else {
+		// vars not initialized, go directly to running
+		c.setCoordinatorState(agentclient.Healthy, "Running")
+	}
+
 	// The usual state refresh happens in the main run loop in Coordinator.runner,
 	// so before/after the runner call we need to trigger state change broadcasts
 	// manually with refreshState.
-	c.setCoordinatorState(agentclient.Starting, "Waiting for initial configuration and composable variables")
 	c.refreshState()
 
 	err := c.runner(ctx)
@@ -669,6 +739,34 @@ func (c *Coordinator) Run(ctx context.Context) error {
 // Called by external goroutines.
 func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 	return diagnostics.Hooks{
+		{
+			Name:        "agent-info",
+			Filename:    "agent-info.yaml",
+			Description: "current state of the agent information of the running Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				output := struct {
+					AgentID      string            `yaml:"agent_id"`
+					Headers      map[string]string `yaml:"headers"`
+					LogLevel     string            `yaml:"log_level"`
+					Snapshot     bool              `yaml:"snapshot"`
+					Version      string            `yaml:"version"`
+					Unprivileged bool              `yaml:"unprivileged"`
+				}{
+					AgentID:      c.agentInfo.AgentID(),
+					Headers:      c.agentInfo.Headers(),
+					LogLevel:     c.agentInfo.LogLevel(),
+					Snapshot:     c.agentInfo.Snapshot(),
+					Version:      c.agentInfo.Version(),
+					Unprivileged: c.agentInfo.Unprivileged(),
+				}
+				o, err := yaml.Marshal(output)
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
 		{
 			Name:        "local-config",
 			Filename:    "local-config.yaml",
@@ -844,6 +942,8 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	defer c.componentPIDTicker.Stop()
+
 	// We run nil checks before starting the various managers so that unit tests
 	// only have to initialize / mock the specific components they're testing.
 	// If a manager is nil, we prebuffer its return channel with nil also so
@@ -953,6 +1053,20 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case upgradeDetails := <-c.upgradeDetailsChan:
 		c.setUpgradeDetails(upgradeDetails)
+
+	case c.heartbeatChan <- struct{}{}:
+
+	case <-c.componentPIDTicker.C:
+		// if we hit the ticker and we've got a new PID,
+		// reload the component model
+		if c.componentPidRequiresUpdate.Swap(false) {
+			err := c.refreshComponentModel(ctx)
+			if err != nil {
+				err = fmt.Errorf("error refreshing component model for PID update: %w", err)
+				c.setConfigManagerError(err)
+				c.logger.Errorf("%s", err)
+			}
+		}
 
 	case componentState := <-c.managerChans.runtimeManagerUpdate:
 		// New component change reported by the runtime manager via
@@ -1193,11 +1307,17 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
+	var existingCompState = make(map[string]uint64, len(c.state.Components))
+	for _, comp := range c.state.Components {
+		existingCompState[comp.Component.ID] = comp.State.Pid
+	}
+
 	comps, err := c.specs.ToComponents(
 		cfg,
 		configInjector,
 		c.state.LogLevel,
 		c.agentInfo,
+		existingCompState,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
@@ -1216,8 +1336,147 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	// If we made it this far, update our internal derived values and
 	// return with no error
 	c.derivedConfig = cfg
+
+	lastComponentModel := c.componentModel
 	c.componentModel = comps
+
+	c.checkAndLogUpdate(lastComponentModel)
+
 	return nil
+}
+
+// compares the last component model with an updated model,
+// logging any differences.
+func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component) {
+	if lastComponentModel == nil {
+		c.logger.Debugf("Received initial component update; total of %d components", len(c.componentModel))
+		return
+	}
+
+	type compCheck struct {
+		inCurrent bool
+		inLast    bool
+
+		diffUnits map[string]diffCheck
+	}
+
+	lastCompMap := convertComponentListToMap(lastComponentModel)
+	currentCompMap := convertComponentListToMap(c.componentModel)
+
+	compDiffMap := map[string]compCheck{}
+	outDiffMap := map[string]diffCheck{}
+	// kinda-callbacks for dealing with output logic
+	foundInLast := func(outName string) {
+		if outDiff, ok := outDiffMap[outName]; ok {
+			outDiff.inLast = true
+			outDiffMap[outName] = outDiff
+		} else {
+			outDiffMap[outName] = diffCheck{inLast: true}
+		}
+	}
+
+	foundInUpdated := func(outName string) {
+		if outDiff, ok := outDiffMap[outName]; ok {
+			outDiff.inNew = true
+			outDiffMap[outName] = outDiff
+		} else {
+			outDiffMap[outName] = diffCheck{inNew: true}
+		}
+	}
+
+	// diff the maps
+
+	// find added & updated components
+	for id, comp := range currentCompMap {
+		// check output
+		foundInUpdated(comp.OutputType)
+		// compare with last state
+		diff := compCheck{inCurrent: true}
+		if lastComp, ok := lastCompMap[id]; ok {
+			diff.inLast = true
+			// if the unit is in both the past and previous, check for updated units
+			diff.diffUnits = diffUnitList(lastComp.Units, comp.Units)
+			foundInLast(lastComp.OutputType)
+			// a bit of optimization: after we're done, we'll need to iterate over lastCompMap to fetch removed units,
+			// so delete items we don't need to iterate over
+			delete(lastCompMap, id)
+		}
+		compDiffMap[id] = diff
+	}
+
+	// find removed components
+	// if something is still in this map, that means it's only in this map
+	for id, comp := range lastCompMap {
+		compDiffMap[id] = compCheck{inLast: true}
+		foundInLast(comp.OutputType)
+	}
+
+	addedList := []string{}
+	removedList := []string{}
+
+	formattedUpdated := []string{}
+
+	// reduced to list of added/removed outputs
+	addedOutputs := []string{}
+	removedOutputs := []string{}
+
+	// take our diff map and format everything for output
+	for id, diff := range compDiffMap {
+		if diff.inLast && !diff.inCurrent {
+			removedList = append(removedList, id)
+		}
+		if !diff.inLast && diff.inCurrent {
+			addedList = append(addedList, id)
+		}
+		// format a user-readable list of diffs
+		if diff.inLast && diff.inCurrent {
+			units := []string{}
+			for unitId, state := range diff.diffUnits {
+				action := ""
+				if state.inLast && !state.inNew {
+					action = "removed"
+				}
+				if state.inNew && !state.inLast {
+					action = "added"
+				}
+				if state.updated {
+					action = "updated"
+				}
+				if action != "" {
+					units = append(units, fmt.Sprintf("(%s: %s)", unitId, action))
+				}
+			}
+			if len(units) > 0 {
+				formatted := fmt.Sprintf("%s: %v", id, units)
+				formattedUpdated = append(formattedUpdated, formatted)
+			}
+		}
+	}
+
+	// format outputs
+	for output, comp := range outDiffMap {
+		if comp.inLast && !comp.inNew {
+			removedOutputs = append(removedOutputs, output)
+		}
+		if !comp.inLast && comp.inNew {
+			addedOutputs = append(addedOutputs, output)
+		}
+	}
+
+	logStruct := UpdateStats{
+		Components: UpdateComponentChange{
+			Added:   addedList,
+			Removed: removedList,
+			Count:   len(c.componentModel),
+			Updated: formattedUpdated,
+		},
+		Outputs: UpdateComponentChange{
+			Added:   addedOutputs,
+			Removed: removedOutputs,
+		},
+	}
+
+	c.logger.Infow("component model updated", "changes", logStruct)
 }
 
 // Filter any inputs and outputs in the generated component model
@@ -1241,6 +1500,48 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 		result = append(result, component)
 	}
 	return result
+}
+
+// helpers for checkAndLogUpdate
+
+func convertUnitListToMap(unitList []component.Unit) map[string]component.Unit {
+	unitMap := map[string]component.Unit{}
+	for _, c := range unitList {
+		unitMap[c.ID] = c
+	}
+	return unitMap
+}
+
+func convertComponentListToMap(compList []component.Component) map[string]component.Component {
+	compMap := map[string]component.Component{}
+	for _, c := range compList {
+		compMap[c.ID] = c
+	}
+	return compMap
+}
+
+func diffUnitList(old, new []component.Unit) map[string]diffCheck {
+	oldMap := convertUnitListToMap(old)
+	newMap := convertUnitListToMap(new)
+
+	diffMap := map[string]diffCheck{}
+	// find new and updated units
+	for id, newUnits := range newMap {
+		diff := diffCheck{inNew: true}
+		if oldUnit, ok := oldMap[id]; ok {
+			diff.inLast = true
+			if newUnits.Config != nil && oldUnit.Config != nil && newUnits.Config.GetSource() != nil && oldUnit.Config.GetSource() != nil {
+				diff.updated = !reflect.DeepEqual(newUnits.Config.GetSource().AsMap(), oldUnit.Config.GetSource().AsMap())
+			}
+			delete(oldMap, id)
+		}
+		diffMap[id] = diff
+	}
+	// find removed units
+	for id := range oldMap {
+		diffMap[id] = diffCheck{inLast: true}
+	}
+	return diffMap
 }
 
 // collectManagerErrors listens on the shutdown channels for the

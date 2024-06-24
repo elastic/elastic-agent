@@ -13,19 +13,30 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"hash"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/blakesmith/ar"
 	"github.com/cavaliercoder/go-rpm"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
+	"github.com/elastic/elastic-agent/dev-tools/mage"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
 
 const (
@@ -93,6 +104,7 @@ func TestZip(t *testing.T) {
 func TestDocker(t *testing.T) {
 	dockers := getFiles(t, regexp.MustCompile(`\.docker\.tar\.gz$`))
 	for _, docker := range dockers {
+		t.Log(docker)
 		checkDocker(t, docker)
 	}
 }
@@ -157,6 +169,16 @@ func checkTar(t *testing.T, file string) {
 	checkModulesPermissions(t, p)
 	checkModulesOwner(t, p, true)
 	checkLicensesPresent(t, "", p)
+
+	t.Run(p.Name+"_check_manifest_file", func(t *testing.T) {
+		tempExtractionPath := t.TempDir()
+		err = mage.Extract(file, tempExtractionPath)
+		require.NoError(t, err, "error extracting tar archive")
+		containingDir := strings.TrimSuffix(path.Base(file), ".tar.gz")
+		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
+	})
+
+	checkSha512PackageHash(t, file)
 }
 
 func checkZip(t *testing.T, file string) {
@@ -172,6 +194,53 @@ func checkZip(t *testing.T, file string) {
 	checkModulesDPresent(t, "", p)
 	checkModulesPermissions(t, p)
 	checkLicensesPresent(t, "", p)
+
+	t.Run(p.Name+"_check_manifest_file", func(t *testing.T) {
+		tempExtractionPath := t.TempDir()
+		err = mage.Extract(file, tempExtractionPath)
+		require.NoError(t, err, "error extracting zip archive")
+		containingDir := strings.TrimSuffix(path.Base(file), ".zip")
+		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
+	})
+
+	checkSha512PackageHash(t, file)
+}
+
+func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
+	t.Log("Checking file manifest.yaml")
+	manifestReadCloser, err := os.Open(filepath.Join(extractedPackageDir, v1.ManifestFileName))
+	if err != nil {
+		t.Errorf("opening manifest %s : %v", v1.ManifestFileName, err)
+	}
+	defer func(closer io.ReadCloser) {
+		err := closer.Close()
+		assert.NoError(t, err, "error closing manifest file")
+	}(manifestReadCloser)
+
+	var m v1.PackageManifest
+	err = yaml.NewDecoder(manifestReadCloser).Decode(&m)
+	if err != nil {
+		t.Errorf("unmarshaling package manifest: %v", err)
+	}
+
+	assert.Equal(t, v1.ManifestKind, m.Kind, "manifest specifies wrong kind")
+	assert.Equal(t, v1.VERSION, m.Version, "manifest specifies wrong api version")
+
+	assert.NotEmpty(t, m.Package.Version, "manifest version must not be empty")
+	assert.NotEmpty(t, m.Package.Hash, "manifest hash must not be empty")
+
+	if assert.NotEmpty(t, m.Package.PathMappings, "path mappings in manifest are empty") {
+		versionedHome := m.Package.VersionedHome
+		assert.DirExistsf(t, filepath.Join(extractedPackageDir, versionedHome), "versionedHome directory %q not found in %q", versionedHome, extractedPackageDir)
+		if assert.Contains(t, m.Package.PathMappings[0], versionedHome, "path mappings in manifest do not contain the extraction path for versionedHome") {
+			// the first map should have the mapping for the data/elastic-agent-****** path)
+			mappedPath := m.Package.PathMappings[0][versionedHome]
+			assert.Contains(t, mappedPath, m.Package.Version, "mapped path for versionedHome does not contain the package version")
+			if m.Package.Snapshot {
+				assert.Contains(t, mappedPath, "SNAPSHOT", "mapped path for versionedHome does not contain the snapshot qualifier")
+			}
+		}
+	}
 }
 
 const (
@@ -665,9 +734,9 @@ func readTarContents(tarName string, data io.Reader) (*packageFile, error) {
 type inspector func(pkg, file string, contents io.Reader) error
 
 func readZip(t *testing.T, zipFile string, inspectors ...inspector) (*packageFile, error) {
-	r, err := zip.OpenReader(zipFile)
+	r, err := openZip(zipFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening zip: %w", err)
 	}
 	defer r.Close()
 
@@ -697,14 +766,28 @@ func readZip(t *testing.T, zipFile string, inspectors ...inspector) (*packageFil
 	return p, nil
 }
 
+func openZip(zipFile string) (*zip.ReadCloser, error) {
+	r, err := zip.OpenReader(zipFile)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
 func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
+	// Read the manifest file first so that the config file and layer
+	// names are known in advance.
+	manifest, err := getDockerManifest(dockerFile)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	file, err := os.Open(dockerFile)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer file.Close()
 
-	var manifest *dockerManifest
 	var info *dockerInfo
 	layers := make(map[string]*packageFile)
 
@@ -715,7 +798,6 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 	defer gzipReader.Close()
 
 	tarReader := tar.NewReader(gzipReader)
-	manifestFileName := "manifest.json"
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
@@ -726,22 +808,17 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 		}
 
 		switch {
-		case header.Name == manifestFileName:
-			manifest, err = readDockerManifest(tarReader)
-			if err != nil {
-				return nil, nil, err
-			}
-		case strings.HasSuffix(header.Name, ".json") && header.Name != manifestFileName:
+		case header.Name == manifest.Config:
 			info, err = readDockerInfo(tarReader)
 			if err != nil {
 				return nil, nil, err
 			}
-		case strings.HasSuffix(header.Name, "/layer.tar"):
+		case slices.Contains(manifest.Layers, header.Name):
 			layer, err := readTarContents(header.Name, tarReader)
 			if err != nil {
 				return nil, nil, err
 			}
-			layers[filepath.Dir(header.Name)] = layer
+			layers[header.Name] = layer
 		}
 	}
 
@@ -755,10 +832,9 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 	// Read layers in order and for each file keep only the entry seen in the later layer
 	p := &packageFile{Name: filepath.Base(dockerFile), Contents: map[string]packageEntry{}}
 	for _, layer := range manifest.Layers {
-		layerID := filepath.Dir(layer)
-		layerFile, found := layers[layerID]
+		layerFile, found := layers[layer]
 		if !found {
-			return nil, nil, fmt.Errorf("layer not found: %s", layerID)
+			return nil, nil, fmt.Errorf("layer not found: %s", layer)
 		}
 		for name, entry := range layerFile.Contents {
 			if excludedPathsPattern.MatchString(name) {
@@ -790,25 +866,6 @@ type dockerManifest struct {
 	Layers   []string
 }
 
-func readDockerManifest(r io.Reader) (*dockerManifest, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	var manifests []*dockerManifest
-	err = json.Unmarshal(data, &manifests)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(manifests) != 1 {
-		return nil, fmt.Errorf("one and only one manifest expected, %d found", len(manifests))
-	}
-
-	return manifests[0], nil
-}
-
 type dockerInfo struct {
 	Config struct {
 		Entrypoint []string
@@ -831,4 +888,126 @@ func readDockerInfo(r io.Reader) (*dockerInfo, error) {
 	}
 
 	return &info, nil
+}
+
+// getDockerManifest opens a gzipped tar file to read the Docker manifest.json
+// that it is expected to contain.
+func getDockerManifest(file string) (*dockerManifest, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	gzipReader, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, err
+	}
+	defer gzipReader.Close()
+
+	var manifest *dockerManifest
+	tarReader := tar.NewReader(gzipReader)
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
+
+		if header.Name == "manifest.json" {
+			manifest, err = readDockerManifest(tarReader)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+
+	return manifest, nil
+}
+
+func readDockerManifest(r io.Reader) (*dockerManifest, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var manifests []*dockerManifest
+	err = json.Unmarshal(data, &manifests)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(manifests) != 1 {
+		return nil, fmt.Errorf("one and only one manifest expected, %d found", len(manifests))
+	}
+
+	return manifests[0], nil
+}
+
+func checkSha512PackageHash(t *testing.T, packageFile string) {
+	t.Run("check hash file", func(t *testing.T) {
+		expectedHashFile := packageFile + ".sha512"
+		require.FileExists(t, expectedHashFile, "hash file for package %q should exist with name %q", packageFile, expectedHashFile)
+
+		// calculate SHA512 hash for the file
+		hashFile, err := os.Open(expectedHashFile)
+		require.NoError(t, err, "hash file should be readable")
+
+		checksumsMap := readHashFile(t, hashFile)
+
+		packageBaseName := filepath.Base(packageFile)
+		require.Containsf(t, checksumsMap, packageBaseName, "checksum file should contain an entry for %q", packageBaseName)
+
+		// compare checksum entry with actual package hash
+		checksum := calculateChecksum(t, packageFile, sha512.New())
+
+		assert.Equalf(t, checksum, checksumsMap[packageBaseName], "checksum for file %q does not match", packageFile)
+	})
+}
+
+func calculateChecksum(t *testing.T, file string, hasher hash.Hash) string {
+
+	input, err := os.Open(file)
+	require.NoErrorf(t, err, "error opening input file %q", file)
+
+	defer func(input *os.File) {
+		errClose := input.Close()
+		assert.NoErrorf(t, errClose, "error closing input file %q", file)
+	}(input)
+
+	_, err = io.Copy(hasher, input)
+	require.NoError(t, err, "error reading file to calculate hash")
+
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+// readHashFile return a map of {filename, hash} reading a .sha512 file.
+// If any line has not exactly 2 tokens separated by white spaces, it will fail the test.
+// When it's done reading it will close the reader
+func readHashFile(t *testing.T, reader io.ReadCloser) map[string]string {
+
+	defer func(reader io.ReadCloser) {
+		err := reader.Close()
+		assert.NoError(t, err, "error closing hash file reader")
+	}(reader)
+
+	checksums := map[string]string{}
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Fields(line)
+		if len(parts) != 2 {
+			// Fail test because it's malformed.
+			assert.Failf(t, "malformed line %q in hash file", line)
+			continue
+		}
+		filename := strings.TrimLeft(parts[1], "*")
+		checksum := parts[0]
+		checksums[filename] = checksum
+	}
+
+	return checksums
 }

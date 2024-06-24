@@ -7,10 +7,11 @@ package component
 import (
 	"fmt"
 	goruntime "runtime"
-	"strconv"
 	"strings"
 
 	"github.com/elastic/go-sysinfo"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -99,13 +100,21 @@ func (p Platforms) Exists(platform string) bool {
 	return false
 }
 
+// UserDetail provides user specific information on the running platform.
+type UserDetail struct {
+	Root bool
+}
+
 // PlatformDetail is platform that has more detail information about the running platform.
 type PlatformDetail struct {
 	Platform
 
-	Family string
-	Major  string
-	Minor  string
+	NativeArch string
+	Family     string
+	Major      int
+	Minor      int
+
+	User UserDetail
 }
 
 // PlatformModifier can modify the platform details before the runtime specifications are loaded.
@@ -113,20 +122,39 @@ type PlatformModifier func(detail PlatformDetail) PlatformDetail
 
 // LoadPlatformDetail loads the platform details for the current system.
 func LoadPlatformDetail(modifiers ...PlatformModifier) (PlatformDetail, error) {
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return PlatformDetail{}, err
+	}
 	info, err := sysinfo.Host()
 	if err != nil {
 		return PlatformDetail{}, err
 	}
 	os := info.Info().OS
+	nativeArch := info.Info().NativeArchitecture
+	if nativeArch == "x86_64" {
+		// go-sysinfo Architecture and NativeArchitecture prefer x64_64
+		// but GOARCH prefers amd64
+		nativeArch = "amd64"
+	}
+	if nativeArch == "aarch64" {
+		// go-sysinfo Architecture and NativeArchitecture prefer aarch64
+		// but GOARCH prefers arm64
+		nativeArch = "arm64"
+	}
 	detail := PlatformDetail{
 		Platform: Platform{
 			OS:   goruntime.GOOS,
 			Arch: goruntime.GOARCH,
 			GOOS: goruntime.GOOS,
 		},
-		Family: os.Family,
-		Major:  strconv.Itoa(os.Major),
-		Minor:  strconv.Itoa(os.Minor),
+		NativeArch: nativeArch,
+		Family:     os.Family,
+		Major:      os.Major,
+		Minor:      os.Minor,
+		User: UserDetail{
+			Root: hasRoot,
+		},
 	}
 	for _, modifier := range modifiers {
 		detail = modifier(detail)

@@ -9,8 +9,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent/testing/installtest"
+
+	"github.com/hectane/go-acl"
+	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
@@ -29,6 +37,7 @@ type CustomPGP struct {
 type upgradeOpts struct {
 	sourceURI *string
 
+	unprivileged     *bool
 	skipVerify       bool
 	skipDefaultPgp   bool
 	customPgp        *CustomPGP
@@ -38,75 +47,85 @@ type upgradeOpts struct {
 	// See also WithDisableUpgradeWatcherUpgradeDetailsCheck.
 	disableUpgradeWatcherUpgradeDetailsCheck bool
 
+	// Disable check that enforces different hashed between the to and from version of upgrade
+	disableHashCheck bool
+
 	preInstallHook  func() error
 	postInstallHook func() error
 	preUpgradeHook  func() error
 	postUpgradeHook func() error
 }
 
-type upgradeOpt func(opts *upgradeOpts)
+type UpgradeOpt func(opts *upgradeOpts)
 
 // WithSourceURI sets a specific --source-uri for the upgrade
 // command. This doesn't change the verification of the upgrade
 // the resulting upgrade must still be the same agent provided
 // in the endFixture variable.
-func WithSourceURI(sourceURI string) upgradeOpt {
+func WithSourceURI(sourceURI string) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.sourceURI = &sourceURI
 	}
 }
 
+// WithUnprivileged sets the install to be explicitly unprivileged.
+func WithUnprivileged(unprivileged bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.unprivileged = &unprivileged
+	}
+}
+
 // WithSkipVerify sets the skip verify option for upgrade.
-func WithSkipVerify(skipVerify bool) upgradeOpt {
+func WithSkipVerify(skipVerify bool) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.skipVerify = skipVerify
 	}
 }
 
 // WithSkipDefaultPgp sets the skip default pgp option for upgrade.
-func WithSkipDefaultPgp(skipDefaultPgp bool) upgradeOpt {
+func WithSkipDefaultPgp(skipDefaultPgp bool) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.skipDefaultPgp = skipDefaultPgp
 	}
 }
 
 // WithCustomPGP sets a custom pgp configuration for upgrade.
-func WithCustomPGP(customPgp CustomPGP) upgradeOpt {
+func WithCustomPGP(customPgp CustomPGP) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.customPgp = &customPgp
 	}
 }
 
 // WithPreInstallHook sets a hook to be called before install.
-func WithPreInstallHook(hook func() error) upgradeOpt {
+func WithPreInstallHook(hook func() error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.preInstallHook = hook
 	}
 }
 
 // WithPostInstallHook sets a hook to be called before install.
-func WithPostInstallHook(hook func() error) upgradeOpt {
+func WithPostInstallHook(hook func() error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.postInstallHook = hook
 	}
 }
 
 // WithPreUpgradeHook sets a hook to be called before install.
-func WithPreUpgradeHook(hook func() error) upgradeOpt {
+func WithPreUpgradeHook(hook func() error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.preUpgradeHook = hook
 	}
 }
 
 // WithPostUpgradeHook sets a hook to be called before install.
-func WithPostUpgradeHook(hook func() error) upgradeOpt {
+func WithPostUpgradeHook(hook func() error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.postUpgradeHook = hook
 	}
 }
 
 // WithCustomWatcherConfig sets a custom watcher configuration to use.
-func WithCustomWatcherConfig(cfg string) upgradeOpt {
+func WithCustomWatcherConfig(cfg string) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.customWatcherCfg = cfg
 	}
@@ -116,9 +135,16 @@ func WithCustomWatcherConfig(cfg string) upgradeOpt {
 // upgrade details that are being set by the Upgrade Watcher. This option is
 // useful in upgrade tests where the end Agent version does not contain changes
 // in the Upgrade Watcher whose effects are being asserted upon in PerformUpgrade.
-func WithDisableUpgradeWatcherUpgradeDetailsCheck() upgradeOpt {
+func WithDisableUpgradeWatcherUpgradeDetailsCheck() UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.disableUpgradeWatcherUpgradeDetailsCheck = true
+	}
+}
+
+// WithDisableHashCheck disables hash check between start and end versions of upgrade
+func WithDisableHashCheck(disable bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.disableHashCheck = disable
 	}
 }
 
@@ -128,7 +154,7 @@ func PerformUpgrade(
 	startFixture *atesting.Fixture,
 	endFixture *atesting.Fixture,
 	logger Logger,
-	opts ...upgradeOpt,
+	opts ...UpgradeOpt,
 ) error {
 	// use the passed in options to perform the upgrade
 	// `skipVerify` is by default enabled, because default is to perform a local
@@ -169,9 +195,39 @@ func PerformUpgrade(
 	if err != nil {
 		return fmt.Errorf("failed to get parsed start agent build version (%s): %w", startVersionInfo.Binary.String(), err)
 	}
+	startVersion, err := version.ParseVersion(startVersionInfo.Binary.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse version of starting Agent binary: %w", err)
+	}
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get end agent build version info: %w", err)
+	}
+	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
+	}
+
+	// in the unprivileged is unset we adjust it to use unprivileged when the version allows it
+	// in the case that its explicitly set then we ensure the version supports it
+	if upgradeOpts.unprivileged == nil {
+		if SupportsUnprivileged(startVersion, endVersion) {
+			unprivileged := true
+			upgradeOpts.unprivileged = &unprivileged
+			logger.Logf("installation of Elastic Agent will use --unprivileged as both start and end version support --unprivileged mode")
+		} else {
+			// must be privileged
+			unprivileged := false
+			upgradeOpts.unprivileged = &unprivileged
+		}
+	} else if *upgradeOpts.unprivileged {
+		if !SupportsUnprivileged(startVersion, endVersion) {
+			return fmt.Errorf("cannot install with forced --unprivileged because either start version %s or end version %s doesn't support --unprivileged mode", startVersion.String(), endVersion.String())
+		}
+	}
+
+	if !upgradeOpts.disableHashCheck && startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		return fmt.Errorf("target version has the same commit hash %q", endVersionInfo.Binary.Commit)
 	}
 
 	// For asserting on the effects of any Upgrade Watcher changes made in 8.12.0, we need
@@ -183,11 +239,6 @@ func PerformUpgrade(
 	// process from the starting version of the agent and not the ending version of the agent. So
 	// even though an 8.12.0 watcher knows to write the upgrade details, prior to 8.10.0 the 8.12.0
 	// watcher version never executes and the upgrade details are never populated.
-	endVersion, err := version.ParseVersion(endVersionInfo.Binary.Version)
-	if err != nil {
-		return fmt.Errorf("failed to parse version of upgraded Agent binary: %w", err)
-	}
-
 	upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck = upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck ||
 		endVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) ||
 		startParsedVersion.Less(*version.NewParsedSemVer(8, 10, 0, "", ""))
@@ -208,6 +259,7 @@ func PerformUpgrade(
 	installOpts := atesting.InstallOpts{
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
+		Privileged:     !(*upgradeOpts.unprivileged),
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	if err != nil {
@@ -227,22 +279,29 @@ func PerformUpgrade(
 		return err
 	}
 
+	// validate installation is correct
+	if InstallChecksAllowed(!installOpts.Privileged, startVersion) {
+		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+		if err != nil {
+			return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
+		}
+	}
+
 	if upgradeOpts.preUpgradeHook != nil {
 		if err := upgradeOpts.preUpgradeHook(); err != nil {
 			return fmt.Errorf("pre upgrade hook failed: %w", err)
 		}
 	}
 
-	logger.Logf("Upgrading from version %q to version %q", startParsedVersion, endVersionInfo.Binary.String())
+	logger.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"", startParsedVersion, startVersionInfo.Binary.Commit, endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
 
 	upgradeCmdArgs := []string{"upgrade", endVersionInfo.Binary.String()}
 	if upgradeOpts.sourceURI == nil {
 		// no --source-uri set so it comes from the endFixture
-		srcPkg, err := endFixture.SrcPackage(ctx)
+		sourceURI, err := getSourceURI(ctx, endFixture, *upgradeOpts.unprivileged)
 		if err != nil {
 			return fmt.Errorf("failed to get end agent source package path: %w", err)
 		}
-		sourceURI := "file://" + filepath.Dir(srcPkg)
 		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI)
 	} else if *upgradeOpts.sourceURI != "" {
 		// specific --source-uri
@@ -273,12 +332,20 @@ func PerformUpgrade(
 
 	upgradeOutput, err := startFixture.Exec(ctx, upgradeCmdArgs)
 	if err != nil {
-		return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
+		// Sometimes the gRPC server shuts down before replying to the command which is expected
+		// we can determine this state by the EOF error coming from the server.
+		// If the server is just unavailable/not running, we should not succeed.
+		// Starting with version 8.13.2, this is handled by the upgrade command itself.
+		outputString := string(upgradeOutput)
+		isConnectionInterrupted := strings.Contains(outputString, "Unavailable") && strings.Contains(outputString, "EOF")
+		if !isConnectionInterrupted {
+			return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
+		}
 	}
 
 	// wait for the watcher to show up
 	logger.Logf("waiting for upgrade watcher to start")
-	err = WaitForWatcher(ctx, 2*time.Minute, 10*time.Second)
+	err = WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to find watcher: %w", err)
 	}
@@ -341,6 +408,14 @@ func PerformUpgrade(
 	if err != nil {
 		// error context added by CheckHealthyAndVersion
 		return err
+	}
+
+	// validate again that the installation is correct, upgrade should not have changed installation validation
+	if InstallChecksAllowed(!installOpts.Privileged, startVersion, endVersion) {
+		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+		if err != nil {
+			return fmt.Errorf("post-upgrade installation checks failed: %w", err)
+		}
 	}
 
 	return nil
@@ -504,4 +579,65 @@ func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedS
 			continue
 		}
 	}
+}
+
+func getSourceURI(ctx context.Context, f *atesting.Fixture, unprivileged bool) (string, error) {
+	srcPkg, err := f.SrcPackage(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get source package: %w", err)
+	}
+	if unprivileged {
+		// move the file to temp directory
+		baseTmp := ""
+		if runtime.GOOS == "windows" {
+			// `elastic-agent-user` needs to have access to the file, default
+			// will place this in C:\Users\windows\AppData\Local\Temp\ which
+			// `elastic-agent-user` doesn't have access.
+
+			// create C:\Temp with world read/write to use for temp directory
+			baseTmp, err = windowsBaseTemp()
+			if err != nil {
+				return "", fmt.Errorf("failed to create windows base temp path: %w", err)
+			}
+		}
+		dir, err := os.MkdirTemp(baseTmp, "agent-upgrade-*")
+		if err != nil {
+			return "", fmt.Errorf("failed to create temp directory: %w", err)
+		}
+		err = os.Chmod(dir, 0777)
+		if err != nil {
+			return "", fmt.Errorf("failed to chmod temp directory: %w", err)
+		}
+		for _, suffix := range []string{"", ".sha512"} {
+			source := fmt.Sprintf("%s%s", srcPkg, suffix)
+			dest := fmt.Sprintf("%s%s", filepath.Join(dir, filepath.Base(srcPkg)), suffix)
+			err = copy.Copy(source, dest, copy.Options{
+				PermissionControl: copy.AddPermission(0777),
+			})
+			if err != nil {
+				return "", fmt.Errorf("failed to copy %s -> %s: %w", source, dest, err)
+			}
+		}
+		srcPkg = filepath.Join(dir, filepath.Base(srcPkg))
+	}
+	return "file://" + filepath.Dir(srcPkg), nil
+}
+
+func windowsBaseTemp() (string, error) {
+	baseTmp := "C:\\Temp"
+	_, err := os.Stat(baseTmp)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("failed to stat %s: %w", baseTmp, err)
+		}
+		err = os.Mkdir(baseTmp, 0777)
+		if err != nil {
+			return "", fmt.Errorf("failed to mkdir %s: %w", baseTmp, err)
+		}
+	}
+	err = acl.Chmod(baseTmp, 0777)
+	if err != nil {
+		return "", fmt.Errorf("failed to chmod %s: %w", baseTmp, err)
+	}
+	return baseTmp, nil
 }

@@ -1,0 +1,407 @@
+# This script is used to measure the disk size of elastic-agent logs and metrics.
+# We need to run a baseline and an updated version of the agent for comparison.
+# After ingesting the logs and metrics from both runs we reindex the documents based on
+# agent ids and timestamp range and store them in dedicated indices so we can measure
+# disk size (the new indices are creates with the same mappings as the elastic-agent
+# logs and metrics datastreams)
+
+# In order to simplify running the script, a few variables have been defined.
+# Note: The *_start_ts variables seem to not always render correctly, we may
+# just replace the values as a workaround
+
+# Variables (with some sample values)
+#
+# Variable name		Sample value
+#
+# baseline_agent_id	acaf7ee8-defa-476a-bd57-2ef565809470
+# updated_agent_id	e9a7c222-172e-4d39-9dbb-311be5e24a75
+# baseline_start_ts	2024-04-29T06:40:39
+# updated_start_ts	2024-04-29T08:53:23
+# time_interval		+1h
+
+
+
+# Cleanup
+
+# Test log indices and templates
+DELETE /_data_stream/logs-elastic_agent-disksize.baseline
+DELETE /_data_stream/logs-elastic_agent-disksize.updated
+DELETE /_data_stream/logs-elastic_agent.filebeat-disksize.baseline
+DELETE /_data_stream/logs-elastic_agent.filebeat-disksize.updated
+DELETE /_data_stream/logs-elastic_agent.metricbeat-disksize.baseline
+DELETE /_data_stream/logs-elastic_agent.metricbeat-disksize.updated
+
+# Test metrics indices and templates
+DELETE /metrics-elastic_agent.elastic_agent-disksize.baseline
+DELETE /metrics-elastic_agent.elastic_agent-disksize.updated
+DELETE /_index_template/metrics-elastic_agent.elastic_agent-disksize
+
+DELETE /metrics-elastic_agent.filebeat-disksize.baseline
+DELETE /metrics-elastic_agent.filebeat-disksize.updated
+DELETE /_index_template/metrics-elastic_agent.filebeat-disksize
+
+DELETE /metrics-elastic_agent.metricbeat-disksize.baseline
+DELETE /metrics-elastic_agent.metricbeat-disksize.updated
+DELETE /_index_template/metrics-elastic_agent.metricbeat-disksize
+
+
+# Recreate index templates
+
+# Mappings we want to use in our test index templates
+# GET /_index_template/logs-elastic_agent
+# GET /_index_template/metrics-elastic_agent.elastic_agent
+# GET /_index_template/metrics-elastic_agent.filebeat
+# GET /_index_template/metrics-elastic_agent.metricbeat
+
+
+PUT /_index_template/metrics-elastic_agent.elastic_agent-disksize
+{
+  "index_patterns": [
+    "metrics-elastic_agent.elastic_agent-disksize*"
+  ],
+  "template": {
+    "settings": {
+      "index": {
+        "mode": "time_series",
+        "routing_path": [
+          "component.id",
+          "agent.id",
+          "metricset.name"
+        ]
+      }
+    },
+    "mappings": {
+    }
+  },
+  "composed_of": [
+    "metrics@tsdb-settings",
+    "metrics-elastic_agent.elastic_agent@package",
+    "metrics-elastic_agent.elastic_agent@custom",
+    "ecs@mappings",
+    ".fleet_globals-1",
+    ".fleet_agent_id_verification-1"
+  ],
+  "priority": 201,
+  "ignore_missing_component_templates": [
+    "metrics-elastic_agent.elastic_agent@custom"
+  ]
+}
+
+PUT /_index_template/metrics-elastic_agent.filebeat-disksize
+{
+  "index_patterns": [
+    "metrics-elastic_agent.filebeat-disksize*"
+  ],
+  "template": {
+    "settings": {
+      "index": {
+        "mode": "time_series",
+        "routing_path": [
+          "component.id",
+          "agent.id",
+          "metricset.name"
+        ]
+      }
+    },
+    "mappings": {
+    }
+  },
+  "composed_of": [
+    "metrics@tsdb-settings",
+    "metrics-elastic_agent.filebeat@package",
+    "metrics-elastic_agent.filebeat@custom",
+    "ecs@mappings",
+    ".fleet_globals-1",
+    ".fleet_agent_id_verification-1"
+  ],
+  "priority": 201,
+  "ignore_missing_component_templates": [
+    "metrics-elastic_agent.filebeat@custom"
+  ]
+}
+
+PUT /_index_template/metrics-elastic_agent.metricbeat-disksize
+{
+  "index_patterns": [
+    "metrics-elastic_agent.metricbeat-disksize*"
+  ],
+  "template": {
+    "settings": {
+      "index": {
+        "mode": "time_series",
+        "routing_path": [
+          "component.id",
+          "agent.id",
+          "metricset.name"
+        ]
+      }
+    },
+    "mappings": {
+    }
+  },
+  "composed_of": [
+    "metrics@tsdb-settings",
+    "metrics-elastic_agent.metricbeat@package",
+    "metrics-elastic_agent.metricbeat@custom",
+    "ecs@mappings",
+    ".fleet_globals-1",
+    ".fleet_agent_id_verification-1"
+  ],
+  "priority": 201,
+  "ignore_missing_component_templates": [
+    "metrics-elastic_agent.metricbeat@custom"
+  ]
+}
+
+# Reindex a subset of the elastic-agent logs in the new indices
+POST _reindex
+{
+  "source": {
+    "index": "logs-elastic_agent-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${baseline_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${baseline_start_ts}", "lte": "${baseline_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "logs-elastic_agent-disksize.baseline",
+    "op_type": "create"
+  }
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "logs-elastic_agent-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${updated_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${updated_start_ts}", "lte": "${updated_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "logs-elastic_agent-disksize.updated",
+    "op_type": "create"
+  }
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "logs-elastic_agent.filebeat-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${baseline_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${baseline_start_ts}", "lte": "${baseline_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "logs-elastic_agent.filebeat-disksize.baseline",
+    "op_type": "create"
+  }
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "logs-elastic_agent.filebeat-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${updated_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${updated_start_ts}", "lte": "${updated_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "logs-elastic_agent.filebeat-disksize.updated",
+    "op_type": "create"
+  }
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "logs-elastic_agent.metricbeat-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${baseline_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${baseline_start_ts}", "lte": "${baseline_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "logs-elastic_agent.metricbeat-disksize.baseline",
+    "op_type": "create"
+  }
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "logs-elastic_agent.metricbeat-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${updated_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${updated_start_ts}", "lte": "${updated_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "logs-elastic_agent.metricbeat-disksize.updated",
+    "op_type": "create"
+  }
+}
+
+# Reindex a subset of the elastic-agent metrics in the new indices
+POST _reindex
+{
+  "source": {
+    "index": "metrics-elastic_agent.elastic_agent-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${baseline_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${baseline_start_ts}", "lte": "${baseline_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "metrics-elastic_agent.elastic_agent-disksize.baseline",
+    "op_type": "create"
+  }
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "metrics-elastic_agent.elastic_agent-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${updated_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${updated_start_ts}", "lte": "${updated_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "metrics-elastic_agent.elastic_agent-disksize.updated",
+    "op_type": "create"
+  }
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "metrics-elastic_agent.filebeat-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${baseline_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${baseline_start_ts}", "lte": "${baseline_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "metrics-elastic_agent.filebeat-disksize.baseline",
+    "op_type": "create"
+  }
+}
+
+
+POST _reindex
+{
+  "source": {
+    "index": "metrics-elastic_agent.filebeat-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${updated_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${updated_start_ts}", "lte": "${updated_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "metrics-elastic_agent.filebeat-disksize.updated",
+    "op_type": "create"
+  }
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "metrics-elastic_agent.metricbeat-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${baseline_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${baseline_start_ts}", "lte": "${baseline_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "metrics-elastic_agent.metricbeat-disksize.baseline",
+    "op_type": "create"
+  }
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "metrics-elastic_agent.metricbeat-default",
+    "query": {
+      "bool": {
+        "filter": [
+          {"term": {"agent.id":"${updated_agent_id}"}},
+          {"range": {"@timestamp": {"gte": "${updated_start_ts}", "lte": "${updated_start_ts}||${time_interval}"}}}
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "metrics-elastic_agent.metricbeat-disksize.updated",
+    "op_type": "create"
+  }
+}
+
+# Check indices disk usage
+
+## Logs
+POST /logs-elastic_agent-disksize.baseline/_disk_usage?run_expensive_tasks=true
+POST /logs-elastic_agent-disksize.updated/_disk_usage?run_expensive_tasks=true
+
+POST /logs-elastic_agent.filebeat-disksize.baseline/_disk_usage?run_expensive_tasks=true
+POST /logs-elastic_agent.filebeat-disksize.updated/_disk_usage?run_expensive_tasks=true
+
+POST /logs-elastic_agent.metricbeat-disksize.baseline/_disk_usage?run_expensive_tasks=true
+POST /logs-elastic_agent.metricbeat-disksize.updated/_disk_usage?run_expensive_tasks=true
+
+## Metrics
+POST /metrics-elastic_agent.elastic_agent-disksize.baseline/_disk_usage?run_expensive_tasks=true
+POST /metrics-elastic_agent.elastic_agent-disksize.updated/_disk_usage?run_expensive_tasks=true
+
+POST /metrics-elastic_agent.filebeat-disksize.baseline/_disk_usage?run_expensive_tasks=true
+POST /metrics-elastic_agent.filebeat-disksize.updated/_disk_usage?run_expensive_tasks=true
+
+POST /metrics-elastic_agent.metricbeat-disksize.baseline/_disk_usage?run_expensive_tasks=true
+POST /metrics-elastic_agent.metricbeat-disksize.updated/_disk_usage?run_expensive_tasks=true

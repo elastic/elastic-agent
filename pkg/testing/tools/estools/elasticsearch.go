@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -201,6 +203,35 @@ func CreateAPIKey(ctx context.Context, client elastictransport.Interface, req AP
 	return parsed, nil
 }
 
+func CreateServiceToken(ctx context.Context, client elastictransport.Interface, service string) (string, error) {
+	req := esapi.SecurityCreateServiceTokenRequest{
+		Namespace: "elastic",
+		Service:   service,
+		Name:      uuid.New().String(), // FIXME(michel-laterman): We need to specify a random name until an upstream issue is fixed: https://github.com/elastic/go-elasticsearch/issues/861
+	}
+	resp, err := req.Do(ctx, client)
+	if err != nil {
+		return "", fmt.Errorf("error creating service token: %w", err)
+	}
+	defer resp.Body.Close()
+	resultBuf, err := handleResponseRaw(resp)
+	if err != nil {
+		return "", fmt.Errorf("error handling HTTP response: %w", err)
+	}
+
+	var parsed struct {
+		Token struct {
+			Value string `json:"value"`
+		} `json:"token"`
+	}
+	err = json.Unmarshal(resultBuf, &parsed)
+	if err != nil {
+		return "", fmt.Errorf("error unmarshaling json response: %w", err)
+	}
+	return parsed.Token.Value, nil
+
+}
+
 // FindMatchingLogLines returns any logs with message fields that match the given line
 func FindMatchingLogLines(ctx context.Context, client elastictransport.Interface, namespace, line string) (Documents, error) {
 	return FindMatchingLogLinesWithContext(ctx, client, namespace, line)
@@ -222,7 +253,7 @@ func GetLatestDocumentMatchingQuery(ctx context.Context, client elastictransport
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	return performQueryForRawQuery(ctx, queryRaw, indexPattern, client)
+	return PerformQueryForRawQuery(ctx, queryRaw, indexPattern, client)
 }
 
 // GetIndexTemplatesForPattern lists all index templates on the system
@@ -362,7 +393,7 @@ func FindMatchingLogLinesWithContext(ctx context.Context, client elastictranspor
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
+	return PerformQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
 
 }
 
@@ -375,21 +406,17 @@ func CheckForErrorsInLogs(ctx context.Context, client elastictransport.Interface
 // CheckForErrorsInLogsWithContext checks to see if any error-level lines exist
 // excludeStrings can be used to remove any particular error strings from logs
 func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictransport.Interface, namespace string, excludeStrings []string) (Documents, error) {
-	queryRaw := map[string]interface{}{
-		"query": map[string]interface{}{
-			"bool": map[string]interface{}{
-				"must": []map[string]interface{}{
-					{
-						"match": map[string]interface{}{
-							"log.level": "error",
-						},
-					},
-					{
-						"term": map[string]interface{}{
-							"data_stream.namespace": map[string]interface{}{
-								"value": namespace,
-							},
-						},
+	filters := map[string]interface{}{
+		"must": []map[string]interface{}{
+			{
+				"match": map[string]interface{}{
+					"log.level": "error",
+				},
+			},
+			{
+				"term": map[string]interface{}{
+					"data_stream.namespace": map[string]interface{}{
+						"value": namespace,
 					},
 				},
 			},
@@ -405,27 +432,14 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 				},
 			})
 		}
-		queryRaw = map[string]interface{}{
-			"query": map[string]interface{}{
-				"bool": map[string]interface{}{
-					"must": []map[string]interface{}{
-						{
-							"match": map[string]interface{}{
-								"log.level": "error",
-							},
-						},
-						{
-							"term": map[string]interface{}{
-								"data_stream.namespace": map[string]interface{}{
-									"value": namespace,
-								},
-							},
-						},
-					},
-					"must_not": excludeStatements,
-				},
-			},
-		}
+
+		filters["must_not"] = excludeStatements
+	}
+
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": filters,
+		},
 	}
 
 	var buf bytes.Buffer
@@ -434,7 +448,7 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
 	}
 
-	return performQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
+	return PerformQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
 }
 
 // GetLogsForDataset returns any logs associated with the datastream
@@ -477,6 +491,44 @@ func GetLogsForAgentID(ctx context.Context, client elastictransport.Interface, i
 	return handleDocsResponse(res)
 }
 
+// GetResultsForAgentAndDatastream returns any documents match both the given agent ID and data stream
+func GetResultsForAgentAndDatastream(ctx context.Context, client elastictransport.Interface, dataset string, agentID string) (Documents, error) {
+	indexQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match": map[string]interface{}{"data_stream.dataset": dataset},
+					},
+					{
+						"match": map[string]interface{}{"agent.id": agentID},
+					},
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(indexQuery)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	es := esapi.New(client)
+	res, err := es.Search(
+		es.Search.WithExpandWildcards("all"),
+		es.Search.WithBody(&buf),
+		es.Search.WithTrackTotalHits(true),
+		es.Search.WithContext(ctx),
+		es.Search.WithSize(300),
+	)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
+	}
+
+	return handleDocsResponse(res)
+}
+
 // GetLogsForDatasetWithContext returns any logs associated with the datastream
 func GetLogsForDatasetWithContext(ctx context.Context, client elastictransport.Interface, index string) (Documents, error) {
 	indexQuery := map[string]interface{}{
@@ -487,7 +539,7 @@ func GetLogsForDatasetWithContext(ctx context.Context, client elastictransport.I
 		},
 	}
 
-	return performQueryForRawQuery(ctx, indexQuery, "logs-elastic_agent*", client)
+	return PerformQueryForRawQuery(ctx, indexQuery, "logs-elastic_agent*", client)
 }
 
 // GetLogsForIndexWithContext returns any logs that match the given condition
@@ -498,7 +550,7 @@ func GetLogsForIndexWithContext(ctx context.Context, client elastictransport.Int
 		},
 	}
 
-	return performQueryForRawQuery(ctx, indexQuery, index, client)
+	return PerformQueryForRawQuery(ctx, indexQuery, index, client)
 }
 
 // GetPing performs a basic ping and returns ES config info
@@ -523,7 +575,8 @@ func GetPing(ctx context.Context, client elastictransport.Interface) (Ping, erro
 
 }
 
-func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{}, index string, client elastictransport.Interface) (Documents, error) {
+// PerformQueryForRawQuery executes the ES query specified by queryRaw
+func PerformQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{}, index string, client elastictransport.Interface) (Documents, error) {
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(queryRaw)
 	if err != nil {
@@ -538,12 +591,45 @@ func performQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{
 		es.Search.WithTrackTotalHits(true),
 		es.Search.WithPretty(),
 		es.Search.WithContext(ctx),
+		es.Search.WithSize(300),
 	)
 	if err != nil {
 		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
 	}
 
 	return handleDocsResponse(res)
+}
+
+// FindMatchingLogLinesForAgentWithContext returns the matching `message` line field for an agent with the matching ID
+func FindMatchingLogLinesForAgentWithContext(ctx context.Context, client elastictransport.Interface, agentID, line string) (Documents, error) {
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match_phrase": map[string]interface{}{
+							"message": line,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"agent.id": map[string]interface{}{
+								"value": agentID,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(queryRaw)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	return PerformQueryForRawQuery(ctx, queryRaw, "logs-elastic_agent*", client)
 }
 
 // GetLogsForDatastream returns any logs associated with the datastream

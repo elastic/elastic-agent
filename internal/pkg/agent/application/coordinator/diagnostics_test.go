@@ -33,6 +33,7 @@ import (
 func TestCoordinatorExpectedDiagnosticHooks(t *testing.T) {
 
 	expected := []string{
+		"agent-info",
 		"local-config",
 		"pre-config",
 		"variables",
@@ -96,6 +97,7 @@ agent:
     http: null
     logs: false
     metrics: false
+    metrics_period: ""
     namespace: ""
     pprof: null
     traces: true
@@ -126,6 +128,39 @@ fleet:
 
 	result := hook.Hook(context.Background())
 	assert.YAMLEq(t, expectedCfg, string(result), "local-config diagnostic returned unexpected value")
+}
+
+func TestDiagnosticAgentInfo(t *testing.T) {
+	// Create a coordinator with an info.Agent and ensure its included in diagnostics.
+
+	coord := &Coordinator{agentInfo: fakeAgentInfo{
+		agentID: "agent-id",
+		headers: map[string]string{
+			"header1": "value1",
+			"header2": "value2",
+		},
+		logLevel:     "trace",
+		snapshot:     true,
+		version:      "8.14.0",
+		unprivileged: true,
+	}}
+
+	expected := `
+agent_id: agent-id
+headers:
+  header1: value1
+  header2: value2
+log_level: trace
+snapshot: true
+version: 8.14.0
+unprivileged: true
+`
+
+	hook, ok := diagnosticHooksMap(coord)["agent-info"]
+	require.True(t, ok, "diagnostic hooks should have an entry for agent-info")
+
+	result := hook.Hook(context.Background())
+	assert.YAMLEq(t, expected, string(result), "agent-info diagnostic returned unexpected value")
 }
 
 func TestDiagnosticPreConfig(t *testing.T) {
@@ -409,10 +444,9 @@ components:
 	assert.YAMLEq(t, expected, string(result), "components-actual diagnostic returned unexpected value")
 }
 
+// TestDiagnosticState creates a coordinator with a test state and verify that
+// the state diagnostic reports it.
 func TestDiagnosticState(t *testing.T) {
-	// Create a coordinator with a test state and verify that the state
-	// diagnostic reports it
-
 	now := time.Now().UTC()
 	state := State{
 		State:        agentclient.Starting,
@@ -427,8 +461,8 @@ func TestDiagnosticState(t *testing.T) {
 					State:   client.UnitStateDegraded,
 					Message: "degraded message",
 					VersionInfo: runtime.ComponentVersionInfo{
-						Name:    "version name",
-						Version: "version value",
+						Name:      "version name",
+						BuildHash: "a-build-hash",
 					},
 				},
 			},
@@ -455,6 +489,7 @@ log_level: "warning"
 components:
   - id: "comp-1"
     state:
+      pid: 0
       state: 3
       message: "degraded message"
       features_idx: 0
@@ -462,7 +497,7 @@ components:
       units: {}
       version_info:
         name: "version name"
-        version: "version value"
+        build_hash: "a-build-hash"
 upgrade_details:
   target_version: 8.12.0
   state: UPG_DOWNLOADING
@@ -505,8 +540,8 @@ func TestDiagnosticStateForAPM(t *testing.T) {
 					State:   client.UnitStateDegraded,
 					Message: "degraded message",
 					VersionInfo: runtime.ComponentVersionInfo{
-						Name:    "version name",
-						Version: "version value",
+						Name:      "version name",
+						BuildHash: "a-build-hash",
 					},
 					Component: &proto.Component{
 						ApmConfig: &proto.APMConfig{
@@ -537,13 +572,14 @@ log_level: "warning"
 components:
   - id: "comp-1"
     state:
+      pid: 0
       state: 3
       message: "degraded message"
       features_idx: 0
       units: {}
       version_info:
         name: "version name"
-        version: "version value"
+        build_hash: "a-build-hash"
       component:
         apmconfig:
           elastic:
@@ -590,3 +626,48 @@ func mapFromRawYAML(t *testing.T, str string) map[string]interface{} {
 	require.NoError(t, err, "Parsing of YAML test string must succeed")
 	return result
 }
+
+type fakeAgentInfo struct {
+	agentID      string
+	headers      map[string]string
+	logLevel     string
+	snapshot     bool
+	version      string
+	unprivileged bool
+	isStandalone bool
+}
+
+func (a fakeAgentInfo) AgentID() string {
+	return a.agentID
+}
+
+func (a fakeAgentInfo) Headers() map[string]string {
+	return a.headers
+}
+
+func (a fakeAgentInfo) LogLevel() string {
+	return a.logLevel
+}
+
+func (a fakeAgentInfo) RawLogLevel() string {
+	return a.logLevel
+}
+
+func (a fakeAgentInfo) Snapshot() bool {
+	return a.snapshot
+}
+
+func (a fakeAgentInfo) Version() string {
+	return a.version
+}
+
+func (a fakeAgentInfo) Unprivileged() bool {
+	return a.unprivileged
+}
+
+func (a fakeAgentInfo) IsStandalone() bool {
+	return a.isStandalone
+}
+
+func (a fakeAgentInfo) ReloadID(ctx context.Context) error                  { panic("implement me") }
+func (a fakeAgentInfo) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/url"
 	"os"
 	"os/exec"
@@ -34,6 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -72,6 +74,8 @@ The following actions are possible and grouped based on the actions.
   FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLED and FLEET_ENROLL is set. Then the token is fetched from Kibana.
   FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
+  ELASTIC_AGENT_CERT - path to certificate to use for connecting to fleet-server.
+  ELASTIC_AGENT_CERT_KEY - path to private key use for connecting to fleet-server.
 
 
   The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
@@ -100,6 +104,9 @@ The following actions are possible and grouped based on the actions.
   FLEET_SERVER_CERT - path to certificate to use for HTTPS endpoint
   FLEET_SERVER_CERT_KEY - path to private key for certificate to use for HTTPS endpoint
   FLEET_SERVER_CERT_KEY_PASSPHRASE - path to private key passphrase file for certificate to use for HTTPS endpoint
+  FLEET_SERVER_ES_CERT - path to certificate to use for connecting to Elasticsearch
+  FLEET_SERVER_ES_CERT_KEY - path to private key for certificate to use for connecting to Elasticsearch
+  FLEET_SERVER_CLIENT_AUTH - fleet-server mTLS client authentication for connecting elastic-agents. Must be one of [none, optional, required]. A default of none is used.
   FLEET_SERVER_INSECURE_HTTP - expose Fleet Server over HTTP (not recommended; insecure)
   FLEET_SERVER_INIT_TIMEOUT - Sets the initial timeout when starting up the fleet server under agent. Default: 30s.
 
@@ -432,6 +439,12 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		if cfg.FleetServer.Elasticsearch.CATrustedFingerprint != "" {
 			args = append(args, "--fleet-server-es-ca-trusted-fingerprint", cfg.FleetServer.Elasticsearch.CATrustedFingerprint)
 		}
+		if cfg.FleetServer.Elasticsearch.Cert != "" {
+			args = append(args, "--fleet-server-es-cert", cfg.FleetServer.Elasticsearch.Cert)
+		}
+		if cfg.FleetServer.Elasticsearch.CertKey != "" {
+			args = append(args, "--fleet-server-es-cert-key", cfg.FleetServer.Elasticsearch.CertKey)
+		}
 		if cfg.FleetServer.Host != "" {
 			args = append(args, "--fleet-server-host", cfg.FleetServer.Host)
 		}
@@ -446,6 +459,9 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		}
 		if cfg.FleetServer.PassphrasePath != "" {
 			args = append(args, "--fleet-server-cert-key-passphrase", cfg.FleetServer.PassphrasePath)
+		}
+		if cfg.FleetServer.ClientAuth != "" {
+			args = append(args, "--fleet-server-client-auth", cfg.FleetServer.ClientAuth)
 		}
 
 		for k, v := range cfg.FleetServer.Headers {
@@ -486,6 +502,12 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 	if cfg.Fleet.DaemonTimeout != 0 {
 		args = append(args, "--daemon-timeout")
 		args = append(args, cfg.Fleet.DaemonTimeout.String())
+	}
+	if cfg.Fleet.Cert != "" {
+		args = append(args, "--elastic-agent-cert", cfg.Fleet.Cert)
+	}
+	if cfg.Fleet.CertKey != "" {
+		args = append(args, "--elastic-agent-cert-key", cfg.Fleet.CertKey)
 	}
 	return args, nil
 }
@@ -754,13 +776,20 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	if statePath == "" {
 		statePath = defaultStateDirectory
 	}
+
 	topPath := filepath.Join(statePath, "data")
 	configPath = envWithDefault(configPath, "CONFIG_PATH")
 	if configPath == "" {
 		configPath = statePath
 	}
+	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
+		if err := os.MkdirAll(configPath, 0755); err != nil {
+			return fmt.Errorf("cannot create folders for config path '%s': %w", configPath, err)
+		}
+	}
+
 	if socketPath == "" {
-		socketPath = fmt.Sprintf("unix://%s", filepath.Join(topPath, paths.ControlSocketName))
+		socketPath = utils.SocketURLWithFallback(statePath, topPath)
 	}
 	// ensure that the directory and sub-directory data exists
 	if err := os.MkdirAll(topPath, 0755); err != nil {

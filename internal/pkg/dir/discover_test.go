@@ -5,7 +5,6 @@
 package dir
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,7 +58,7 @@ func TestDiscover(t *testing.T) {
 
 func withFiles(files []string, fn func(dst string, t *testing.T)) func(t *testing.T) {
 	return func(t *testing.T) {
-		tmp, _ := ioutil.TempDir("", "watch")
+		tmp, _ := os.MkdirTemp("", "watch")
 		defer os.RemoveAll(tmp)
 
 		for _, file := range files {

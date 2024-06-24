@@ -6,18 +6,35 @@
 
 package paths
 
-import "path/filepath"
-
 const (
-	// ControlSocketRunSymlink is the path to the symlink that should be
-	// created to the control socket when Elastic Agent is running with root.
-	ControlSocketRunSymlink = "/run/elastic-agent.sock"
+	// BinaryName is the name of the installed binary.
+	BinaryName = "elastic-agent"
 
-	// defaultAgentVaultPath is the directory for linux where the vault store is located or the
-	defaultAgentVaultPath = "vault"
+	// DefaultBasePath is the base path used by the install command
+	// for installing Elastic Agent's files.
+	DefaultBasePath = "/opt"
+
+	// serviceName is the service name when installed.
+	serviceName             = "elastic-agent"
+	serviceNameNamespaceFmt = "elastic-agent-%s"
+
+	// shellWrapperPath is the path to the installed shell wrapper.
+	shellWrapperPath             = "/usr/bin/elastic-agent"
+	shellWrapperPathNamespaceFmt = "/usr/bin/elastic-%s-agent"
+
+	// ShellWrapper is the wrapper that is installed.  The %s must
+	// be substituted with the appropriate top path.
+	ShellWrapperFmt = `#!/bin/sh
+exec %s/elastic-agent $@
+`
+
+	// controlSocketRunSymlink is the path to the symlink that should be
+	// created to the control socket when Elastic Agent is running with root.
+	controlSocketRunSymlink             = "/run/elastic-agent.sock"
+	controlSocketRunSymlinkNamespaceFmt = "/run/elastic-agent-%s.sock"
 )
 
-// AgentVaultPath is the directory that contains all the files for the value
-func AgentVaultPath() string {
-	return filepath.Join(Config(), defaultAgentVaultPath)
+// ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
+func ArePathsEqual(expected, actual string) bool {
+	return expected == actual
 }

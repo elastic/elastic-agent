@@ -10,15 +10,17 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 )
 
 const (
@@ -33,7 +35,8 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	defer cn()
 
 	fp := filepath.Join(dir, testConfigFile)
-	s := NewEncryptedDiskStore(ctx, fp, WithVaultPath(dir))
+	s, err := NewEncryptedDiskStore(ctx, fp, WithVaultPath(dir))
+	require.NoError(t, err)
 
 	// Test that the file loads and doesn't create vault
 	r, err := s.Load()
@@ -42,7 +45,7 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	}
 	defer r.Close()
 
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +74,7 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	}
 
 	// Create agent secret
-	err = secret.CreateAgentSecret(ctx, secret.WithVaultPath(dir))
+	err = secret.CreateAgentSecret(ctx, vault.WithVaultPath(dir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +102,7 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 	}
 	defer nr.Close()
 
-	b, err = ioutil.ReadAll(nr)
+	b, err = io.ReadAll(nr)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,7 +6,7 @@ package download
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,7 +31,7 @@ func TestAddingHeaders(t *testing.T) {
 	c.Transport = rtt
 	resp, err := c.Get(server.URL)
 	require.NoError(t, err)
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	require.NoError(t, err)
 	assert.Equal(t, b, msg)

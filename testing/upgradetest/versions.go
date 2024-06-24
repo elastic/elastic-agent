@@ -6,11 +6,16 @@ package upgradetest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"sort"
+	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -29,109 +34,262 @@ var (
 	Version_8_10_0_SNAPSHOT = version.NewParsedSemVer(8, 10, 0, "SNAPSHOT", "")
 	// Version_8_11_0_SNAPSHOT is the minimum version for uninstall command to kill the watcher upon uninstall
 	Version_8_11_0_SNAPSHOT = version.NewParsedSemVer(8, 11, 0, "SNAPSHOT", "")
+	// Version_8_13_0_SNAPSHOT is the minimum version for testing upgrading agent with the same hash
+	Version_8_13_0_SNAPSHOT = version.NewParsedSemVer(8, 13, 0, "SNAPSHOT", "")
+	// Version_8_14_0_SNAPSHOT is the minimum version for proper unprivileged execution on all platforms
+	Version_8_14_0_SNAPSHOT = version.NewParsedSemVer(8, 14, 0, "SNAPSHOT", "")
+
+	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
+	ErrNoSnapshot = errors.New("failed to find a snapshot on the version list")
+	// ErrNoPreviousMinor is returned when a requested previous minor is not on the version list.
+	ErrNoPreviousMinor = errors.New("failed to find a previous minor on the version list")
 )
 
-// GetUpgradableVersions returns the version that the upgradeToVersion can upgrade from.
-func GetUpgradableVersions(ctx context.Context, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int) ([]*version.ParsedSemVer, error) {
-	aac := tools.NewArtifactAPIClient()
-	vList, err := aac.GetVersions(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving versions from Artifact API: %w", err)
-	}
-	if len(vList.Versions) == 0 {
-		return nil, errors.New("retrieved versions list from Artifact API is empty")
-	}
-
-	return getUpgradableVersions(ctx, vList, upgradeToVersion, currentMajorVersions, previousMajorVersions)
+type VersionsFetcher interface {
+	FetchAgentVersions(ctx context.Context) (version.SortableParsedVersions, error)
 }
 
-// Internal version of GetUpgradableVersions() with the artifacts API dependency removed for testing.
-func getUpgradableVersions(ctx context.Context, vList *tools.VersionList, upgradeToVersion string, currentMajorVersions int, previousMajorVersions int) ([]*version.ParsedSemVer, error) {
-	parsedUpgradeToVersion, err := version.ParseVersion(upgradeToVersion)
+type SnapshotFetcher interface {
+	FindLatestSnapshots(ctx context.Context, branches []string) (version.SortableParsedVersions, error)
+}
+
+// VersionRequirements is to set requirements for upgradable versions while fetching them.
+//
+// Keep in mind that requirements can overlap. For example 2 previous minors might already
+// cover 2 current majors, so the results would be combined.
+//
+// `SnapshotBranches` is a list of active release branches used for finding latest snapshots on them.
+// A branch might have no snapshot, in this case it's getting silently skipped.
+type VersionRequirements struct {
+	UpgradeToVersion string
+	CurrentMajors    int
+	PreviousMajors   int
+	PreviousMinors   int
+	SnapshotBranches []string
+}
+
+const AgentVersionsFilename = ".agent-versions.json"
+
+type AgentVersions struct {
+	// TestVersions contains semver-compliant versions of the agent to run integration tests against.
+	TestVersions []string `json:"testVersions"`
+}
+
+var (
+	agentVersions *AgentVersions
+)
+
+func init() {
+	v, err := getAgentVersions()
 	if err != nil {
-		return nil, fmt.Errorf("upgradeToVersion %q is not a valid version string: %w", upgradeToVersion, err)
+		panic(err)
 	}
+	agentVersions = v
+}
 
-	currentMajor := parsedUpgradeToVersion.Major()
-	var currentMajorSelected, previousMajorSelected int
-
-	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
-	for _, v := range vList.Versions {
-		pv, err := version.ParseVersion(v)
-		if err != nil {
-			return nil, fmt.Errorf("invalid version %q retrieved from artifact API: %w", v, err)
-		}
-		sortedParsedVersions = append(sortedParsedVersions, pv)
+func getAgentVersions() (*AgentVersions, error) {
+	var (
+		filePath string
+		dir      string
+	)
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the current directory: %w", err)
 	}
-
-	if len(sortedParsedVersions) == 0 {
-		return nil, errors.New("parsed versions list is empty")
-	}
-
-	// normally the output of the versions returned by artifact API is already sorted in ascending order,
-	// we want to sort in descending orders, so we sort them
-	sort.Sort(sort.Reverse(sortedParsedVersions))
-
-	// If the only available build of the most recent version is a snapshot it is unreleased.
-	// This is always true on main and true until the first release of each minor version branch.
-	mostRecentVersion := sortedParsedVersions[0]
-	mostRecentIsUnreleased := mostRecentVersion.IsSnapshot()
-
-	var upgradableVersions []*version.ParsedSemVer
-	for _, parsedVersion := range sortedParsedVersions {
-		if currentMajorSelected == currentMajorVersions && previousMajorSelected == previousMajorVersions {
-			// we got all the versions we need, break the loop
+	dir = wd
+	for {
+		pathToCheck := filepath.Join(dir, AgentVersionsFilename)
+		fi, err := os.Stat(pathToCheck)
+		if (err == nil || os.IsExist(err)) && !fi.IsDir() {
+			filePath = pathToCheck
 			break
 		}
-
-		if !parsedVersion.Less(*parsedUpgradeToVersion) {
-			// skip as testing version is less than version to upgrade from
-			continue
+		if strings.HasSuffix(dir, string(filepath.Separator)) {
+			return nil, fmt.Errorf("failed to find %s using working directory %s", AgentVersionsFilename, wd)
 		}
-
-		isPrevMinor := (parsedUpgradeToVersion.Major() == parsedVersion.Major()) &&
-			(parsedUpgradeToVersion.Minor()-parsedVersion.Minor()) == 1
-
-		if parsedVersion.IsSnapshot() {
-			// Allow returning the snapshot build of the previous minor if the current version is unreleased.
-			// In this situation the previous minor branch may also be unreleased immediately after feature freeze.
-			if !mostRecentIsUnreleased || !isPrevMinor {
-				continue
-			}
-		} else {
-			// Skip the non-snapshot build of the previous minor since it might only be available at
-			// staging.elastic.co which is not a default binary download location.
-			if mostRecentIsUnreleased && isPrevMinor {
-				continue
-			}
-		}
-
-		if parsedVersion.Major() == currentMajor && currentMajorSelected < currentMajorVersions {
-			upgradableVersions = append(upgradableVersions, parsedVersion)
-			currentMajorSelected++
-			continue
-		}
-
-		if parsedVersion.Major() < currentMajor && previousMajorSelected < previousMajorVersions {
-			upgradableVersions = append(upgradableVersions, parsedVersion)
-			previousMajorSelected++
-			continue
-		}
-
+		dir = filepath.Dir(dir)
 	}
+
+	f, err := os.OpenFile(filePath, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open %s: %w", filePath, err)
+	}
+	defer f.Close()
+
+	d := json.NewDecoder(f)
+	var versionFile AgentVersions
+	err = d.Decode(&versionFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode JSON in %s: %w", filePath, err)
+	}
+
+	return &versionFile, nil
+}
+
+// FetchUpgradableVersions returns the versions list from the agent version file.
+func GetUpgradableVersions() ([]*version.ParsedSemVer, error) {
+	parsedVersions := make([]*version.ParsedSemVer, 0, len(agentVersions.TestVersions))
+	for _, v := range agentVersions.TestVersions {
+		parsed, err := version.ParseVersion(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse version %q from %s: %w", v, AgentVersionsFilename, err)
+		}
+		parsedVersions = append(parsedVersions, parsed)
+	}
+
+	return parsedVersions, nil
+}
+
+// FetchUpgradableVersions returns a list of versions that meet the specified requirements.
+//
+// Every version on the resulting list will meet the given requirements (by OR condition).
+// However, it's not guaranteed that the list contains the amount of versions per requirement.
+// For example, if only 2 previous minor versions exist but 5 requested, the list will have only 2.
+func FetchUpgradableVersions(ctx context.Context, vf VersionsFetcher, sf SnapshotFetcher, reqs VersionRequirements) ([]string, error) {
+	releaseVersions, err := vf.FetchAgentVersions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving release versions: %w", err)
+	}
+	if len(releaseVersions) == 0 {
+		return nil, errors.New("retrieved release versions list is empty")
+	}
+
+	snapshotVersions, err := sf.FindLatestSnapshots(ctx, reqs.SnapshotBranches)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving snapshot versions: %w", err)
+	}
+	if len(snapshotVersions) == 0 {
+		return nil, errors.New("retrieved snapshot versions list is empty")
+	}
+
+	allVersions := append(releaseVersions, snapshotVersions...)
+
+	// now sort the complete list
+	sort.Sort(sort.Reverse(allVersions))
+
+	return findRequiredVersions(allVersions, reqs)
+}
+
+// findRequiredVersions filters the version list according to the set requirements.
+func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs VersionRequirements) ([]string, error) {
+	parsedUpgradeToVersion, err := version.ParseVersion(reqs.UpgradeToVersion)
+	if err != nil {
+		return nil, fmt.Errorf("upgradeToVersion %q is not a valid version string: %w", reqs.UpgradeToVersion, err)
+	}
+	upgradableVersions := make([]string, 0, reqs.CurrentMajors+reqs.PreviousMajors+reqs.PreviousMinors+len(reqs.SnapshotBranches))
+
+	currentMajor := parsedUpgradeToVersion.Major()
+	currentMinor := parsedUpgradeToVersion.Minor()
+
+	currentMajorsToFind := reqs.CurrentMajors
+	previousMajorsToFind := reqs.PreviousMajors
+	previousMinorsToFind := reqs.PreviousMinors
+	recentSnapshotsToFind := len(reqs.SnapshotBranches)
+
+	for _, version := range sortedParsedVersions {
+		switch {
+		// we skip version above the target
+		case !version.Less(*parsedUpgradeToVersion):
+			continue
+
+		case recentSnapshotsToFind > 0 && version.IsSnapshot():
+			upgradableVersions = append(upgradableVersions, version.String())
+			recentSnapshotsToFind--
+
+		// for the rest of the checks we capture only released versions
+		case version.Prerelease() != "" || version.BuildMetadata() != "":
+			continue
+
+		// previous minors
+		case previousMinorsToFind > 0 && version.Major() == currentMajor && version.Minor() < currentMinor:
+			upgradableVersions = append(upgradableVersions, version.String())
+			currentMinor = version.Minor() // so, we pick a lower minor next time
+			previousMinorsToFind--
+			currentMajorsToFind-- // counts as the current major as well
+
+		// current majors
+		case currentMajorsToFind > 0 && version.Major() == currentMajor:
+			upgradableVersions = append(upgradableVersions, version.String())
+			currentMajorsToFind--
+
+		// previous majors
+		case previousMajorsToFind > 0 && version.Major() < currentMajor:
+			upgradableVersions = append(upgradableVersions, version.String())
+			currentMajor = version.Major()
+			previousMajorsToFind--
+
+		// since the list is sorted we can stop here
+		default:
+			break
+		}
+	}
+
 	return upgradableVersions, nil
 }
 
-// PreviousMinor gets the previous minor version of the provided version.
-//
-// This checks with the artifact API to ensure to only return version that have actual builds.
-func PreviousMinor(ctx context.Context, version string) (string, error) {
-	versions, err := GetUpgradableVersions(ctx, version, 1, 0)
+// PreviousMinor returns the previous minor version available for upgrade.
+func PreviousMinor() (*version.ParsedSemVer, error) {
+	versions, err := GetUpgradableVersions()
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to get upgradable versions: %w", err)
 	}
-	if len(version) == 0 {
-		return "", fmt.Errorf("no previous minor")
+	current, err := version.ParseVersion(define.Version())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse the current version %s: %w", define.Version(), err)
 	}
-	return versions[0].String(), nil
+	for _, v := range versions {
+		if v.Prerelease() != "" || v.BuildMetadata() != "" {
+			continue
+		}
+		if v.Major() == current.Major() && v.Minor() < current.Minor() {
+			return v, nil
+		}
+	}
+	return nil, ErrNoPreviousMinor
+}
+
+// EnsureSnapshot ensures that the version string is a snapshot version.
+func EnsureSnapshot(version string) string {
+	if !strings.HasSuffix(version, "-SNAPSHOT") {
+		version += "-SNAPSHOT"
+	}
+	return version
+}
+
+// SupportsUnprivileged returns true when the version supports unprivileged mode.
+func SupportsUnprivileged(versions ...*version.ParsedSemVer) bool {
+	for _, ver := range versions {
+		if ver.Less(*Version_8_13_0_SNAPSHOT) {
+			return false
+		}
+		if runtime.GOOS != define.Linux && ver.Less(*Version_8_14_0_SNAPSHOT) {
+			return false
+		}
+	}
+	return true
+}
+
+// InstallChecksAllowed returns true when the upgrade test should verify installation.
+//
+// Unprivileged mode both versions must be 8.14+. This is because the older versions do not
+// create the same user that is created in 8.14+. pre-8.14 was experimental.
+//
+// Privileged mode requires 8.13+ because pre-8.13 didn't set the `.installed` file to not have world access.
+func InstallChecksAllowed(unprivileged bool, versions ...*version.ParsedSemVer) bool {
+	if unprivileged {
+		for _, ver := range versions {
+			if ver.Less(*Version_8_14_0_SNAPSHOT) {
+				// all versions must be 8.14+
+				return false
+			}
+		}
+		return true
+	}
+	for _, ver := range versions {
+		if ver.Less(*Version_8_13_0_SNAPSHOT) {
+			// all versions must be 8.13+
+			return false
+		}
+	}
+	return true
 }

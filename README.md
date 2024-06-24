@@ -1,22 +1,65 @@
 # Elastic Agent
 
+[![Build status](https://badge.buildkite.com/1d35bb40427cc6833979645b61ea214fc4b686a2ffe3a68bdf.svg)](https://buildkite.com/elastic/elastic-agent)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=elastic_elastic-agent&metric=coverage)](https://sonarcloud.io/summary/new_code?id=elastic_elastic-agent)
 
-## Architecture / internal docs
+## Architecture and Internals
 
 - [Agent architecture](docs/architecture.md)
 - [Component spec files](docs/component-specs.md)
 - [Policy configuration](docs/agent-policy.md)
 
+## Official Documentation
+
+See https://www.elastic.co/guide/en/fleet/current/index.html.
+
+The source files for the offical Elastic Agent documentation are currently stored
+in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/main/docs/en/ingest-management) repository.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Developer docs
+## Developing
 
-The source files for the general Elastic Agent documentation are currently stored
-in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/main/docs/en/ingest-management) repository.
-The following docs are only focused on getting developers started building code for Elastic Agent.
+The following are exclusively focused on getting developers started building code for Elastic Agent.
+
+### Development Installations
+
+> :warning: Development installations are not officially supported and are intended for Elastic Agent developers.
+
+If you are an Elastic employee, you already have an Information Security managed Elastic Agent installed on your machine for endpoint protection.
+This prevents you from installing the Elastic Agent a second time for development without using a VM or Docker container. To eliminate this point
+of friction, Elastic Agent has a development mode that permits installing the Elastic Agent on your machine a second time:
+
+```sh
+# All other arguments to the install command are still supported when --develop is specified.
+sudo ./elastic-agent install --develop
+# The run command also supports the --develop option to allow running without installing when there is another agent on the machine.
+./elastic-agent run -e --develop
+```
+
+Using the `--develop` option will install the agent in an isolated `Agent-Development` agent directory in the chosen base path.
+Development agents enrolled in Fleet will have the `Development` tag added automatically. Using the default base path on MacOS you will see:
+
+```sh
+sudo ls /Library/Elastic/
+Agent
+Agent-Development
+```
+
+The `elastic-agent` command in the shell is replaced with `elastic-development-agent` to interact with the development agent:
+
+```sh
+# For a privileged agent
+sudo elastic-development-agent status
+# For an unprivileged agent
+sudo -u elastic-agent-user elastic-development-agent status
+```
+
+The primary restriction of `--develop` installations is that you cannot run Elastic Defend a second time on the same machine. Attempting to
+install Defend twice will fail with resource conflicts. All other integrations should be usable provided conflicting configurations are
+changed ahead of time. For example two agents cannot bind to the same `agent.monitoring.http.port` to expose their monitoring servers.
 
 ### Test Framework
 
@@ -46,7 +89,7 @@ pr: https://github.com/elastic/elastic-agent/pull/823
 Prerequisites:
 - installed [mage](https://github.com/magefile/mage)
 - [Docker](https://docs.docker.com/get-docker/)
-- [X-pack](https://github.com/elastic/beats/tree/main/x-pack) to pre-exist in the parent folder of the local Git repository checkout
+- [beats](https://github.com/elastic/beats) to pre-exist in the parent folder of the local Git repository checkout if, and only if, packaging with `EXTERNAL=false` to package the beats as well
 - [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool) to add changelog fragments for changelog generation
 
 To build a local version of the agent for development, run the command below. The following platforms are supported:
@@ -76,6 +119,22 @@ sudo elastic-agent install
 ```
 
 For basic use the agent binary can be run directly, with the `sudo elastic-agent run` command.
+
+#### Packaging for other architectures
+When packaging for an architecture different than the host machine,
+you might face the following error:
+```
+exec /crossbuild: exec format error
+```
+
+If that happens, enable
+[`multiarch/qemu-user-static`](https://github.com/multiarch/qemu-user-static)
+is to enable an execution of different multi-architecture containers
+by QEMU and binfmt_misc:
+
+```
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+```
 
 ### Docker
 

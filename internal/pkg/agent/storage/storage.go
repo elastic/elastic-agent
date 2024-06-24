@@ -8,9 +8,11 @@ import (
 	"context"
 	"io"
 	"os"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-const perms os.FileMode = 0600
+const permMask os.FileMode = 0600
 
 // Store saves the io.Reader.
 type Store interface {
@@ -31,14 +33,17 @@ type Storage interface {
 
 // DiskStore takes a persistedConfig and save it to a temporary files and replace the target file.
 type DiskStore struct {
-	target string
+	target    string
+	ownership *utils.FileOwner
 }
 
 // EncryptedDiskStore encrypts config when saving to disk.
 // When saving it will save to a temporary file then replace the target file.
 type EncryptedDiskStore struct {
-	ctx       context.Context
-	target    string
-	vaultPath string
-	key       []byte
+	ctx          context.Context
+	target       string
+	vaultPath    string
+	key          []byte
+	unprivileged bool
+	ownership    *utils.FileOwner
 }

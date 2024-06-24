@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	Rhel = "rhel"
 	// Ubuntu is a Linux distro.
 	Ubuntu = "ubuntu"
 )
@@ -30,6 +31,16 @@ type SupportedOS struct {
 }
 
 var (
+	// UbuntuAMD64_2404 - Ubuntu (amd64) 24.04
+	UbuntuAMD64_2404 = SupportedOS{
+		OS: define.OS{
+			Type:    define.Linux,
+			Arch:    define.AMD64,
+			Distro:  Ubuntu,
+			Version: "24.04",
+		},
+		Runner: DebianRunner{},
+	}
 	// UbuntuAMD64_2204 - Ubuntu (amd64) 22.04
 	UbuntuAMD64_2204 = SupportedOS{
 		OS: define.OS{
@@ -47,6 +58,16 @@ var (
 			Arch:    define.AMD64,
 			Distro:  Ubuntu,
 			Version: "20.04",
+		},
+		Runner: DebianRunner{},
+	}
+	// UbuntuARM64_2404 - Ubuntu (arm64) 24.04
+	UbuntuARM64_2404 = SupportedOS{
+		OS: define.OS{
+			Type:    define.Linux,
+			Arch:    define.ARM64,
+			Distro:  Ubuntu,
+			Version: "24.04",
 		},
 		Runner: DebianRunner{},
 	}
@@ -69,6 +90,16 @@ var (
 			Version: "20.04",
 		},
 		Runner: DebianRunner{},
+	}
+	// RhelAMD64_8 - RedHat Enterprise Linux (amd64) 8
+	RhelAMD64_8 = SupportedOS{
+		OS: define.OS{
+			Type:    define.Linux,
+			Arch:    define.AMD64,
+			Distro:  Rhel,
+			Version: "8",
+		},
+		Runner: RhelRunner{},
 	}
 	// WindowsAMD64_2022 - Windows (amd64) Server 2022
 	WindowsAMD64_2022 = SupportedOS{
@@ -135,10 +166,13 @@ var (
 // one in this list will be picked. So it's best to place the one that we want the
 // most testing at the top.
 var supported = []SupportedOS{
+	UbuntuAMD64_2404,
 	UbuntuAMD64_2204,
 	UbuntuAMD64_2004,
+	UbuntuARM64_2404,
 	UbuntuARM64_2204,
 	UbuntuARM64_2004,
+	RhelAMD64_8,
 	WindowsAMD64_2022,
 	WindowsAMD64_2022_Core,
 	WindowsAMD64_2019,

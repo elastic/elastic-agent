@@ -61,11 +61,17 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 		}
 	}
 
+	//  Unless explicitly configured otherwise, All registered providers are enabled by default
+	providersInitialDefault := true
+	if providersCfg.ProvidersInitialDefault != nil {
+		providersInitialDefault = *providersCfg.ProvidersInitialDefault
+	}
+
 	// build all the context providers
 	contextProviders := map[string]*contextProviderState{}
 	for name, builder := range Providers.contextProviders {
 		pCfg, ok := providersCfg.Providers[name]
-		if ok && !pCfg.Enabled() {
+		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
 			// explicitly disabled; skipping
 			continue
 		}
@@ -84,7 +90,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	dynamicProviders := map[string]*dynamicProviderState{}
 	for name, builder := range Providers.dynamicProviders {
 		pCfg, ok := providersCfg.Providers[name]
-		if ok && !pCfg.Enabled() {
+		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
 			// explicitly disabled; skipping
 			continue
 		}
@@ -294,6 +300,21 @@ type contextProviderState struct {
 	signal   chan bool
 }
 
+// Signal signals that something has changed in the provider.
+//
+// Note: This should only be used by fetch context providers, standard context
+// providers should use Set to update the overall state.
+func (c *contextProviderState) Signal() {
+	// Notify the controller Run loop that a state has changed. The notification
+	// channel has buffer size 1 so this ensures that an update will always
+	// happen after this change, while coalescing multiple simultaneous changes
+	// into a single controller update.
+	select {
+	case c.signal <- true:
+	default:
+	}
+}
+
 // Set sets the current mapping.
 func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 	var err error
@@ -315,15 +336,7 @@ func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 		return nil
 	}
 	c.mapping = mapping
-
-	// Notify the controller Run loop that a state has changed. The notification
-	// channel has buffer size 1 so this ensures that an update will always
-	// happen after this change, while coalescing multiple simultaneous changes
-	// into a single controller update.
-	select {
-	case c.signal <- true:
-	default:
-	}
+	c.Signal()
 	return nil
 }
 

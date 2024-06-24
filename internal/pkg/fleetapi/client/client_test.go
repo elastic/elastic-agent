@@ -7,7 +7,7 @@ package client
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -47,7 +47,7 @@ func TestHTTPClient(t *testing.T) {
 			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, `{ message: "hello" }`, string(body))
@@ -104,7 +104,7 @@ func TestHTTPClient(t *testing.T) {
 			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, `{ message: "hello" }`, string(body))
@@ -181,6 +181,37 @@ func TestElasticApiVersion(t *testing.T) {
 		if assert.NoError(t, err) {
 			defer resp.Body.Close()
 		}
+	})
+
+	t.Run("verify that we don't log a generic 400 status as a downgrade request", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/genericbadrequest", func(writer http.ResponseWriter, request *http.Request) {
+			assert.Equal(t, request.Header.Get(elasticApiVersionHeaderKey), defaultFleetApiVersion)
+			// request return a 400 with the defaultFleetApiVersion (just testing that we don't log that as a downgrade request)
+			writer.Header().Add(elasticApiVersionHeaderKey, defaultFleetApiVersion)
+			writer.WriteHeader(http.StatusBadRequest)
+		})
+
+		ts := httptest.NewServer(mux)
+		defer ts.Close()
+
+		testLogger, obsLogs := logger.NewTesting("testElasticApiVersion")
+
+		clt, err := NewWithConfig(testLogger, remote.Config{
+			Hosts: []string{ts.URL},
+		})
+		require.NoError(t, err)
+
+		resp, err := clt.Send(ctx, http.MethodGet, "/genericbadrequest", nil, nil, nil)
+		if assert.NoError(t, err) {
+			defer resp.Body.Close()
+		}
+		logs := obsLogs.FilterMessageSnippet("fleet requested a different api version").All()
+		t.Logf("retrieved logs: %v", logs)
+		assert.Empty(t, logs, "downgrade response should not be logged when the fleet api version is the same as the request")
 	})
 
 	t.Run("verify that we log a downgrade request", func(t *testing.T) {

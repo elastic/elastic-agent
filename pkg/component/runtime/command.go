@@ -420,7 +420,7 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 
 func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	go func() {
-		err := comm.WriteConnInfo(info.Stdin)
+		err := comm.WriteStartUpInfo(info.Stdin)
 		if err != nil {
 			_, _ = c.logErr.Write([]byte(fmt.Sprintf("Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err)))
 			// kill instantly
@@ -497,13 +497,7 @@ func (c *commandRuntime) getSpecType() string {
 }
 
 func (c *commandRuntime) getSpecBinaryName() string {
-	if c.current.InputSpec != nil {
-		return c.current.InputSpec.BinaryName
-	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.BinaryName
-	}
-	return ""
+	return c.current.BinaryName()
 }
 
 func (c *commandRuntime) getSpecBinaryPath() string {

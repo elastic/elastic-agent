@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,7 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/otiai10/copy"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -40,6 +41,7 @@ type Fixture struct {
 	fetcher         Fetcher
 	operatingSystem string
 	architecture    string
+	packageFormat   string
 	logOutput       bool
 	allowErrs       bool
 	connectTimout   time.Duration
@@ -79,6 +81,14 @@ func WithOSArchitecture(operatingSystem string, architecture string) FixtureOpt 
 	return func(f *Fixture) {
 		f.operatingSystem = operatingSystem
 		f.architecture = architecture
+	}
+}
+
+// WithPackageFormat changes the package format to use for the fixture.
+// By default, targz is picked except for windows which uses zip
+func WithPackageFormat(packageFormat string) FixtureOpt {
+	return func(f *Fixture) {
+		f.packageFormat = packageFormat
 	}
 }
 
@@ -138,6 +148,10 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 	if !ok {
 		return nil, errors.New("unable to determine callers file path")
 	}
+	pkgFormat := "targz"
+	if runtime.GOOS == "windows" {
+		pkgFormat = "zip"
+	}
 	f := &Fixture{
 		t:               t,
 		version:         version,
@@ -145,7 +159,8 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 		fetcher:         ArtifactFetcher(),
 		operatingSystem: runtime.GOOS,
 		architecture:    runtime.GOARCH,
-		connectTimout:   5 * time.Second,
+		packageFormat:   pkgFormat,
+		connectTimout:   15 * time.Second,
 		// default to elastic-agent, can be changed by a set FixtureOpt below
 		binaryName: "elastic-agent",
 	}
@@ -252,6 +267,11 @@ func (f *Fixture) SrcPackage(ctx context.Context) (string, error) {
 	return f.srcPackage, nil
 }
 
+// PackageFormat returns the package format for the  fixture
+func (f *Fixture) PackageFormat() string {
+	return f.packageFormat
+}
+
 func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	filename := filepath.Base(artifactFile)
 	_, ext, err := splitFileType(filename)
@@ -269,6 +289,11 @@ func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 		err := unzip(artifactFile, outputDir)
 		if err != nil {
 			return fmt.Errorf("failed to unzip %s: %w", artifactFile, err)
+		}
+	case ".deb", "rpm":
+		err := copy.Copy(artifactFile, filepath.Join(outputDir, filepath.Base(artifactFile)))
+		if err != nil {
+			return fmt.Errorf("failed to copy %s to %s: %w", artifactFile, outputDir, err)
 		}
 	}
 	l.Logf("Completed extraction of artifact %s to %s", filename, outputDir)
@@ -312,9 +337,10 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
 
+	procWaitCh := proc.Wait()
 	killProc := func() {
 		_ = proc.Kill()
-		<-proc.Wait()
+		<-procWaitCh
 	}
 
 	var doneChan <-chan time.Time
@@ -328,7 +354,7 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		case <-ctx.Done():
 			killProc()
 			return ctx.Err()
-		case ps := <-proc.Wait():
+		case ps := <-procWaitCh:
 			if stopping {
 				return nil
 			}
@@ -384,9 +410,10 @@ func RunProcess(t *testing.T,
 		return fmt.Errorf("failed to spawn %q: %w", processPath, err)
 	}
 
+	procWaitCh := proc.Wait()
 	killProc := func() {
 		_ = proc.Kill()
-		<-proc.Wait()
+		<-procWaitCh
 	}
 
 	var doneChan <-chan time.Time
@@ -400,7 +427,7 @@ func RunProcess(t *testing.T,
 		case <-ctx.Done():
 			killProc()
 			return ctx.Err()
-		case ps := <-proc.Wait():
+		case ps := <-procWaitCh:
 			if stopping {
 				return nil
 			}
@@ -427,7 +454,7 @@ func RunProcess(t *testing.T,
 	}
 }
 
-// RunWithClient runs the provided binary.
+// RunOtelWithClient runs the provided binary in otel mode.
 //
 // If `states` are provided, agent runs until each state has been reached. Once reached the
 // Elastic Agent is stopped. If at any time the Elastic Agent logs an error log and the Fixture is not started
@@ -443,7 +470,11 @@ func RunProcess(t *testing.T,
 // when `Run` is called.
 //
 // if shouldWatchState is set to false, communicating state does not happen.
-func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, states ...State) error {
+func (f *Fixture) RunOtelWithClient(ctx context.Context, shouldWatchState bool, enableTestingMode bool, states ...State) error {
+	return f.executeWithClient(ctx, "otel", false, shouldWatchState, enableTestingMode, states...)
+}
+
+func (f *Fixture) executeWithClient(ctx context.Context, command string, disableEncryptedStore bool, shouldWatchState bool, enableTestingMode bool, states ...State) error {
 	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
 		f.t.Fatal("Context passed to Fixture.Run() has no deadline set.")
 	}
@@ -482,13 +513,6 @@ func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, stat
 		return fmt.Errorf("failed to get control protcol address: %w", err)
 	}
 
-	if shouldWatchState {
-		agentClient = client.New(client.WithAddress(cAddr))
-		f.setClient(agentClient)
-		defer f.setClient(nil)
-		stateCh, stateErrCh = watchState(ctx, agentClient, f.connectTimout)
-	}
-
 	var logProxy Logger
 	if f.logOutput {
 		logProxy = f.t
@@ -496,7 +520,13 @@ func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, stat
 	stdOut := newLogWatcher(logProxy)
 	stdErr := newLogWatcher(logProxy)
 
-	args := []string{"run", "-e", "--disable-encrypted-store", "--testing-mode"}
+	args := []string{command, "-e"}
+	if disableEncryptedStore {
+		args = append(args, "--disable-encrypted-store")
+	}
+	if enableTestingMode {
+		args = append(args, "--testing-mode")
+	}
 
 	args = append(args, f.additionalArgs...)
 
@@ -510,14 +540,22 @@ func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, stat
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
 
-	killProc := func() {
-		_ = proc.Kill()
-		<-proc.Wait()
+	if shouldWatchState {
+		agentClient = client.New(client.WithAddress(cAddr))
+		f.setClient(agentClient)
+		defer f.setClient(nil)
+		stateCh, stateErrCh = watchState(ctx, f.t, agentClient, f.connectTimout)
 	}
 
 	var doneChan <-chan time.Time
 	if f.runLength != 0 {
 		doneChan = time.After(f.runLength)
+	}
+
+	procWaitCh := proc.Wait()
+	killProc := func() {
+		_ = proc.Kill()
+		<-procWaitCh
 	}
 
 	stopping := false
@@ -526,7 +564,7 @@ func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, stat
 		case <-ctx.Done():
 			killProc()
 			return ctx.Err()
-		case ps := <-proc.Wait():
+		case ps := <-procWaitCh:
 			if stopping {
 				return nil
 			}
@@ -545,6 +583,9 @@ func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, stat
 			}
 		case err := <-stateErrCh:
 			if !stopping {
+				// Give the log watchers a second to write out the agent logs.
+				// Client connnection failures can happen quickly enough to prevent logging.
+				time.Sleep(time.Second)
 				// connection to elastic-agent failed
 				killProc()
 				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
@@ -595,7 +636,7 @@ func (f *Fixture) RunWithClient(ctx context.Context, shouldWatchState bool, stat
 // The `elastic-agent.yml` generated by `Fixture.Configure` is ignored
 // when `Run` is called.
 func (f *Fixture) Run(ctx context.Context, states ...State) error {
-	return f.RunWithClient(ctx, true, states...)
+	return f.executeWithClient(ctx, "run", true, true, true, states...)
 }
 
 // Exec provides a way of performing subcommand on the prepared Elastic Agent binary.
@@ -684,7 +725,10 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (Ag
 				}, uerr))
 	}
 
-	return status, err
+	if err != nil {
+		return status, fmt.Errorf("error running command (output: %s): %w", string(out), err)
+	}
+	return status, nil
 }
 
 // ExecInspect executes to inspect subcommand on the prepared Elastic Agent binary.
@@ -724,6 +768,34 @@ func (f *Fixture) ExecVersion(ctx context.Context, opts ...process.CmdOption) (A
 	return version, err
 }
 
+// ExecDiagnostics executes the agent diagnostic and returns the path to the
+// zip file. If no cmd is provided, `diagnostics` will be used as the default.
+// The working directory of the command will be set to a temporary directory.
+// Use extractZipArchive to extract the diagnostics archive.
+func (f *Fixture) ExecDiagnostics(ctx context.Context, cmd ...string) (string, error) {
+	t := f.t
+	t.Helper()
+
+	if len(cmd) == 0 {
+		cmd = []string{"diagnostics"}
+	}
+
+	wd := t.TempDir()
+	diagnosticCmdOutput, err := f.Exec(ctx, cmd, process.WithWorkDir(wd))
+
+	t.Logf("diagnostic command completed with output \n%q\n", diagnosticCmdOutput)
+	require.NoErrorf(t, err, "error running diagnostic command: %v", err)
+
+	t.Logf("checking directory %q for the generated diagnostics archive", wd)
+	files, err := filepath.Glob(filepath.Join(wd, "elastic-agent-diagnostics-*.zip"))
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	t.Logf("Found %q diagnostic archive.", files[0])
+
+	return files[0], err
+}
+
 // IsHealthy checks whether the prepared Elastic Agent reports itself as healthy.
 // It returns an error if either the reported state isn't healthy or if it fails
 // to fetch the current state. If the status is successfully fetched, but it
@@ -732,7 +804,7 @@ func (f *Fixture) ExecVersion(ctx context.Context, opts ...process.CmdOption) (A
 func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) error {
 	status, err := f.ExecStatus(ctx, opts...)
 	if err != nil {
-		return fmt.Errorf("agent status returned and error: %w", err)
+		return fmt.Errorf("agent status returned an error: %w", err)
 	}
 
 	if status.State != int(cproto.State_HEALTHY) {
@@ -741,6 +813,11 @@ func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) erro
 	}
 
 	return nil
+}
+
+// IsInstalled returns true if this fixture has been installed
+func (f *Fixture) IsInstalled() bool {
+	return f.installed
 }
 
 // EnsurePrepared ensures that the fixture has been prepared.
@@ -754,11 +831,19 @@ func (f *Fixture) EnsurePrepared(ctx context.Context) error {
 func (f *Fixture) binaryPath() string {
 	workDir := f.workDir
 	if f.installed {
-		if f.installOpts != nil && f.installOpts.BasePath != "" {
-			workDir = filepath.Join(f.installOpts.BasePath, "Elastic", "Agent")
-		} else {
-			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
+		installDir := "Agent"
+		if f.installOpts != nil && f.installOpts.Namespace != "" {
+			installDir = paths.InstallDirNameForNamespace(f.installOpts.Namespace)
 		}
+
+		if f.installOpts != nil && f.installOpts.BasePath != "" {
+			workDir = filepath.Join(f.installOpts.BasePath, "Elastic", installDir)
+		} else {
+			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", installDir)
+		}
+	}
+	if f.packageFormat == "deb" || f.packageFormat == "rpm" {
+		workDir = "/usr/bin"
 	}
 	defaultBin := "elastic-agent"
 	if f.binaryName != "" {
@@ -787,7 +872,7 @@ func (f *Fixture) fetch(ctx context.Context) (string, error) {
 		cache.dir = dir
 	}
 
-	res, err := f.fetcher.Fetch(ctx, f.operatingSystem, f.architecture, f.version)
+	res, err := f.fetcher.Fetch(ctx, f.operatingSystem, f.architecture, f.version, f.packageFormat)
 	if err != nil {
 		return "", err
 	}
@@ -835,7 +920,7 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 	if err != nil {
 		return err
 	}
-	contents, err := ioutil.ReadDir(componentsDir)
+	contents, err := os.ReadDir(componentsDir)
 	if err != nil {
 		return fmt.Errorf("failed to read contents of components directory %s: %w", componentsDir, err)
 	}
@@ -975,7 +1060,7 @@ func getCacheDir(caller string, name string) (string, error) {
 // FindComponentsDir identifies the directory that holds the components.
 func FindComponentsDir(dir string) (string, error) {
 	dataDir := filepath.Join(dir, "data")
-	agentVersions, err := ioutil.ReadDir(dataDir)
+	agentVersions, err := os.ReadDir(dataDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to read contents of the data directory %s: %w", dataDir, err)
 	}
@@ -1021,16 +1106,14 @@ func attachOutErr(stdOut *logWatcher, stdErr *logWatcher) process.CmdOption {
 	}
 }
 
-func watchState(ctx context.Context, c client.Client, timeout time.Duration) (chan *client.AgentState, chan error) {
+func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time.Duration) (chan *client.AgentState, chan error) {
 	stateCh := make(chan *client.AgentState)
 	errCh := make(chan error)
-	go func() {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
 
+	go func() {
 		err := c.Connect(ctx)
 		if err != nil {
-			errCh <- err
+			errCh <- fmt.Errorf("Connect() failed: %w", err)
 			return
 		}
 		defer c.Disconnect()
@@ -1038,27 +1121,32 @@ func watchState(ctx context.Context, c client.Client, timeout time.Duration) (ch
 		// StateWatch will return an error if the client is not fully connected
 		// we retry this in a loop based on the timeout to ensure that we can
 		// get a valid StateWatch connection
-		started := time.Now()
 		var sub client.ClientStateWatch
-		for {
-			sub, err = c.StateWatch(ctx)
-			if err != nil {
-				if time.Since(started) > timeout {
-					// failed to connected in timeout range
-					errCh <- err
-					return
-				}
-				<-time.After(100 * time.Millisecond)
-			} else {
-				// connected successfully
-				break
-			}
+		expBackoff := backoff.NewExponentialBackOff()
+		expBackoff.InitialInterval = 100 * time.Millisecond
+		expBackoff.MaxElapsedTime = timeout
+		expBackoff.MaxInterval = 2 * time.Second
+		err = backoff.RetryNotify(
+			func() error {
+				var err error
+				sub, err = c.StateWatch(ctx)
+				return err
+			},
+			backoff.WithContext(expBackoff, ctx),
+			func(err error, retryAfter time.Duration) {
+				t.Logf("%s: StateWatch failed: %s retrying: %s", time.Now().UTC().Format(time.RFC3339Nano), err.Error(), retryAfter)
+			},
+		)
+		if err != nil {
+			errCh <- fmt.Errorf("StateWatch() failed: %w", err)
+			return
 		}
 
+		t.Logf("%s: StateWatch started", time.Now().UTC().Format(time.RFC3339Nano))
 		for {
 			recv, err := sub.Recv()
 			if err != nil {
-				errCh <- err
+				errCh <- fmt.Errorf("Recv() failed: %w", err)
 				return
 			}
 			stateCh <- recv
@@ -1079,11 +1167,13 @@ func performConfigure(ctx context.Context, c client.Client, cfg string, timeout 
 
 type AgentStatusOutput struct {
 	Info struct {
-		ID        string `json:"id"`
-		Version   string `json:"version"`
-		Commit    string `json:"commit"`
-		BuildTime string `json:"build_time"`
-		Snapshot  bool   `json:"snapshot"`
+		ID           string `json:"id"`
+		Version      string `json:"version"`
+		Commit       string `json:"commit"`
+		BuildTime    string `json:"build_time"`
+		Snapshot     bool   `json:"snapshot"`
+		PID          int32  `json:"pid"`
+		Unprivileged bool   `json:"unprivileged"`
 	} `json:"info"`
 	State      int    `json:"state"`
 	Message    string `json:"message"`

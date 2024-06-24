@@ -42,9 +42,11 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	}
 
 	// Init version information contained in package version file
-	err := version.InitVersionInformation()
-	if err != nil {
-		cmd.PrintErrf("Error initializing version information: %v\n", err)
+	if isOtel := len(args) > 1 && args[1] == "otel"; !isOtel {
+		err := version.InitVersionError()
+		if err != nil {
+			cmd.PrintErrf("Error initializing version information: %v\n", err)
+		}
 	}
 
 	// path flags
@@ -70,17 +72,21 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	run := newRunCommandWithArgs(args, streams)
 	cmd.AddCommand(basecmd.NewDefaultCommandsWithArgs(args, streams)...)
 	cmd.AddCommand(run)
-	cmd.AddCommand(newInstallCommandWithArgs(args, streams))
-	cmd.AddCommand(newUninstallCommandWithArgs(args, streams))
-	cmd.AddCommand(newUpgradeCommandWithArgs(args, streams))
-	cmd.AddCommand(newEnrollCommandWithArgs(args, streams))
-	cmd.AddCommand(newInspectCommandWithArgs(args, streams))
-	cmd.AddCommand(newWatchCommandWithArgs(args, streams))
-	cmd.AddCommand(newContainerCommand(args, streams))
-	cmd.AddCommand(newStatusCommand(args, streams))
-	cmd.AddCommand(newDiagnosticsCommand(args, streams))
-	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
-	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
+
+	addCommandIfNotNil(cmd, newInstallCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newUninstallCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newUpgradeCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newEnrollCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newInspectCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newPrivilegedCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newUnprivilegedCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newWatchCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newContainerCommand(args, streams))
+	addCommandIfNotNil(cmd, newStatusCommand(args, streams))
+	addCommandIfNotNil(cmd, newDiagnosticsCommand(args, streams))
+	addCommandIfNotNil(cmd, newComponentCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newLogsCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newOtelCommandWithArgs(args, streams))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
@@ -91,4 +97,12 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.RunE = run.RunE
 
 	return cmd
+}
+
+func addCommandIfNotNil(parent, cmd *cobra.Command) {
+	if cmd == nil || parent == nil {
+		return
+	}
+
+	parent.AddCommand(cmd)
 }

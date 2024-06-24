@@ -6,16 +6,15 @@ package storage
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,12 +44,12 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 		err = s.Save(in)
 		require.NoError(t, err)
 
-		writtenContent, err := ioutil.ReadFile(target)
+		writtenContent, err := os.ReadFile(target)
 		require.NoError(t, err)
 
 		require.True(t, bytes.Equal(writtenContent, replaceWith))
 		requireFilesCount(t, dir, 2)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 
 	t.Run("when save is not successful", func(t *testing.T) {
@@ -70,7 +69,7 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 		err = s.Save(in)
 		require.Error(t, err)
 
-		writtenContent, err := ioutil.ReadFile(target)
+		writtenContent, err := os.ReadFile(target)
 		require.NoError(t, err)
 
 		require.True(t, bytes.Equal(writtenContent, oldContent))
@@ -94,12 +93,39 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 		err = s.Save(in)
 		require.Error(t, err)
 
-		writtenContent, err := ioutil.ReadFile(target)
+		writtenContent, err := os.ReadFile(target)
 		require.NoError(t, err)
 
 		require.True(t, bytes.Equal(writtenContent, replaceWith))
 		requireFilesCount(t, dir, 1)
 
+	})
+
+	t.Run("when replace is skipped due to target already containing source content", func(t *testing.T) {
+		yamlTarget := []byte("fleet:\n  enabled: true\nother: value\n")
+		yamlReplaceWith := []byte("#This comment is left out\nfleet:\n  enabled: true\n")
+		target, err := genFile(yamlTarget)
+
+		require.NoError(t, err)
+		dir := filepath.Dir(target)
+		defer os.RemoveAll(dir)
+
+		requireFilesCount(t, dir, 1)
+
+		s := NewReplaceOnSuccessStore(
+			target,
+			yamlReplaceWith,
+			failure,
+		)
+
+		err = s.Save(in)
+		require.Error(t, err)
+
+		writtenContent, err := os.ReadFile(target)
+		require.NoError(t, err)
+
+		require.True(t, bytes.Equal(writtenContent, yamlTarget))
+		requireFilesCount(t, dir, 1)
 	})
 
 	t.Run("when target file do not exist", func(t *testing.T) {
@@ -118,36 +144,38 @@ func TestDiskStore(t *testing.T) {
 		target, err := genFile([]byte("hello world"))
 		require.NoError(t, err)
 		defer os.Remove(target)
-		d := NewDiskStore(target)
+		d, err := NewDiskStore(target)
+		require.NoError(t, err)
 
 		msg := []byte("bonjour la famille")
 		err = d.Save(bytes.NewReader(msg))
 		require.NoError(t, err)
 
-		content, err := ioutil.ReadFile(target)
+		content, err := os.ReadFile(target)
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 
 	t.Run("when the target do no exist", func(t *testing.T) {
-		dir, err := ioutil.TempDir("", "configs")
+		dir, err := os.MkdirTemp("", "configs")
 		require.NoError(t, err)
 		defer os.Remove(dir)
 
 		target := filepath.Join(dir, "hello.txt")
-		d := NewDiskStore(target)
+		d, err := NewDiskStore(target)
+		require.NoError(t, err)
 
 		msg := []byte("bonjour la famille")
 		err = d.Save(bytes.NewReader(msg))
 		require.NoError(t, err)
 
-		content, err := ioutil.ReadFile(target)
+		content, err := os.ReadFile(target)
 		require.NoError(t, err)
 
 		require.Equal(t, msg, content)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 
 	t.Run("return an io.ReadCloser to the target file", func(t *testing.T) {
@@ -155,29 +183,34 @@ func TestDiskStore(t *testing.T) {
 		target, err := genFile(msg)
 		require.NoError(t, err)
 
-		d := NewDiskStore(target)
+		d, err := NewDiskStore(target)
+		require.NoError(t, err)
+
 		r, err := d.Load()
 		require.NoError(t, err)
 		defer r.Close()
 
-		content, err := ioutil.ReadAll(r)
+		content, err := io.ReadAll(r)
 		require.NoError(t, err)
 		require.Equal(t, msg, content)
-		checkPerms(t, target, perms)
+		checkPerms(t, target, permMask)
 	})
 }
 
 func genFile(b []byte) (string, error) {
-	dir, err := ioutil.TempDir("", "configs")
+	dir, err := os.MkdirTemp("", "configs")
 	if err != nil {
 		return "", err
 	}
 
-	f, err := ioutil.TempFile(dir, "config-")
+	f, err := os.CreateTemp(dir, "config-")
 	if err != nil {
 		return "", err
 	}
-	f.Write(b)
+	_, err = f.Write(b)
+	if err != nil {
+		return "", err
+	}
 	name := f.Name()
 	if err := f.Close(); err != nil {
 		return "", err
@@ -187,7 +220,7 @@ func genFile(b []byte) (string, error) {
 }
 
 func requireFilesCount(t *testing.T, dir string, l int) {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	require.NoError(t, err)
 	require.Equal(t, l, len(files))
 }

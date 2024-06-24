@@ -74,8 +74,6 @@ type Version struct {
 type ComponentVersionInfo struct {
 	// Name of the component.
 	Name string `json:"name" yaml:"name"`
-	// Version of the component.
-	Version string `json:"version" yaml:"version"`
 	// Extra meta information about the version.
 	Meta map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
@@ -101,12 +99,13 @@ type ComponentState struct {
 
 // AgentStateInfo is the overall information about the Elastic Agent.
 type AgentStateInfo struct {
-	ID        string `json:"id" yaml:"id"`
-	Version   string `json:"version" yaml:"version"`
-	Commit    string `json:"commit" yaml:"commit"`
-	BuildTime string `json:"build_time" yaml:"build_time"`
-	Snapshot  bool   `json:"snapshot" yaml:"snapshot"`
-	PID       int32  `json:"pid" yaml:"pid"`
+	ID           string `json:"id" yaml:"id"`
+	Version      string `json:"version" yaml:"version"`
+	Commit       string `json:"commit" yaml:"commit"`
+	BuildTime    string `json:"build_time" yaml:"build_time"`
+	Snapshot     bool   `json:"snapshot" yaml:"snapshot"`
+	PID          int32  `json:"pid" yaml:"pid"`
+	Unprivileged bool   `json:"unprivileged" yaml:"unprivileged"`
 }
 
 // AgentState is the current state of the Elastic Agent.
@@ -159,8 +158,6 @@ type DiagnosticComponentResult struct {
 }
 
 // Client communicates to Elastic Agent through the control protocol.
-//
-//go:generate mockery --name Client
 type Client interface {
 	// Connect connects to the running Elastic Agent.
 	Connect(ctx context.Context, opts ...grpc.DialOption) error
@@ -469,12 +466,13 @@ func (sw *stateWatcher) Recv() (*AgentState, error) {
 func toState(res *cproto.StateResponse) (*AgentState, error) {
 	s := &AgentState{
 		Info: AgentStateInfo{
-			ID:        res.Info.Id,
-			Version:   res.Info.Version,
-			Commit:    res.Info.Commit,
-			BuildTime: res.Info.BuildTime,
-			Snapshot:  res.Info.Snapshot,
-			PID:       res.Info.Pid,
+			ID:           res.Info.Id,
+			Version:      res.Info.Version,
+			Commit:       res.Info.Commit,
+			BuildTime:    res.Info.BuildTime,
+			Snapshot:     res.Info.Snapshot,
+			PID:          res.Info.Pid,
+			Unprivileged: res.Info.Unprivileged,
 		},
 		State:          res.State,
 		Message:        res.Message,
@@ -511,9 +509,8 @@ func toState(res *cproto.StateResponse) (*AgentState, error) {
 		}
 		if comp.VersionInfo != nil {
 			cs.VersionInfo = ComponentVersionInfo{
-				Name:    comp.VersionInfo.Name,
-				Version: comp.VersionInfo.Version,
-				Meta:    comp.VersionInfo.Meta,
+				Name: comp.VersionInfo.Name,
+				Meta: comp.VersionInfo.Meta,
 			}
 		}
 		s.Components = append(s.Components, cs)

@@ -10,20 +10,23 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
 	flagInstallBasePath     = "base-path"
 	flagInstallUnprivileged = "unprivileged"
+	flagInstallDevelopment  = "develop"
+	flagInstallNamespace    = "namespace"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -46,15 +49,23 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current installation and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
-	cmd.Flags().Bool(flagInstallUnprivileged, false, "Installed Elastic Agent will create an 'elastic-agent' user and run as that user. (experimental)")
-	_ = cmd.Flags().MarkHidden(flagInstallUnprivileged) // Hidden until fully supported
+	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
+
+	cmd.Flags().String(flagInstallNamespace, "", "Install into an isolated namespace. Allows multiple Elastic Agents to be installed at once. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallNamespace) // For internal use only.
+
+	cmd.Flags().Bool(flagInstallDevelopment, false, "Install into a standardized development namespace, may enable development specific options. Allows multiple Elastic Agents to be installed at once. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
+
 	addEnrollFlags(cmd)
 
 	return cmd
 }
 
 func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
-	err := validateEnrollFlags(cmd)
+	var err error
+
+	err = validateEnrollFlags(cmd)
 	if err != nil {
 		return fmt.Errorf("could not validate flags: %w", err)
 	}
@@ -66,19 +77,29 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("unable to perform install command while checking for administrator rights, %w", err)
+		return fmt.Errorf("unable to perform install command while checking for root/Administrator rights: %w", err)
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
 
-	// only support Linux at the moment
 	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
-	if unprivileged && runtime.GOOS != "linux" {
-		return fmt.Errorf("unable to perform install command, unprivileged is currently only supported on Linux")
-	}
 	if unprivileged {
-		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this is an experimental and currently unsupported feature.")
+		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this feature is currently in beta.")
+	}
+
+	isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
+	if isDevelopmentMode {
+		fmt.Fprintln(streams.Out, "Installing into development namespace; this is an experimental and currently unsupported feature.")
+		// For now, development mode only installs agent in a well known namespace to allow two agents on the same machine.
+		paths.SetInstallNamespace(paths.DevelopmentNamespace)
+	}
+
+	namespace, _ := cmd.Flags().GetString(flagInstallNamespace)
+	if namespace != "" {
+		fmt.Fprintf(streams.Out, "Installing into namespace '%s'; this is an experimental and currently unsupported feature.\n", namespace)
+		// Overrides the development namespace if namespace was specified separately.
+		paths.SetInstallNamespace(namespace)
 	}
 
 	topPath := paths.InstallPath(basePath)
@@ -189,10 +210,19 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	progBar := install.CreateAndStartNewSpinner(streams.Out, "Installing Elastic Agent...")
 
+	log, logBuff := logger.NewInMemory("install", logp.ConsoleEncoderConfig())
+	defer func() {
+		if err == nil {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Error uninstalling. Printing logs\n")
+		fmt.Fprint(os.Stderr, logBuff.String())
+	}()
+
 	var ownership utils.FileOwner
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
-		ownership, err = install.Install(cfgFile, topPath, unprivileged, progBar, streams)
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams)
 		if err != nil {
 			return fmt.Errorf("error installing package: %w", err)
 		}
@@ -200,7 +230,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		defer func() {
 			if err != nil {
 				progBar.Describe("Uninstalling")
-				innerErr := install.Uninstall(cfgFile, topPath, "", progBar)
+				innerErr := install.Uninstall(cfgFile, topPath, "", log, progBar)
 				if innerErr != nil {
 					progBar.Describe("Failed to Uninstall")
 				} else {
@@ -214,7 +244,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			err = install.StartService(topPath)
 			if err != nil {
 				progBar.Describe("Start Service failed, exiting...")
-				fmt.Fprintf(streams.Out, "Installation failed to start Elastic Agent service.\n")
+				fmt.Fprintf(streams.Out, "Installation failed to start '%s' service.\n", paths.ServiceName())
 				return fmt.Errorf("error starting service: %w", err)
 			}
 			progBar.Describe("Service Started")
@@ -222,7 +252,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			defer func() {
 				if err != nil {
 					progBar.Describe("Stopping Service")
-					innerErr := install.StopService(topPath)
+					innerErr := install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
 					if innerErr != nil {
 						progBar.Describe("Failed to Stop Service")
 					} else {

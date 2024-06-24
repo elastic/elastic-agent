@@ -12,8 +12,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
+	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -26,14 +29,16 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/atomic"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ipc"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -97,7 +102,8 @@ type Manager struct {
 	ca         *authority.CertificateAuthority
 	listenAddr string
 	listenPort int
-	agentInfo  *info.AgentInfo
+	isLocal    bool
+	agentInfo  info.Agent
 	tracer     *apm.Tracer
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
@@ -149,8 +155,7 @@ type Manager struct {
 func NewManager(
 	logger,
 	baseLogger *logger.Logger,
-	listenAddr string,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
 	grpcConfig *configuration.GRPCConfig,
@@ -159,11 +164,25 @@ func NewManager(
 	if err != nil {
 		return nil, err
 	}
+
+	if agentInfo == nil {
+		return nil, errors.New("agentInfo cannot be nil")
+	}
+
+	controlAddress := control.Address()
+	// [gRPC:8.15] For 8.14 this always returns local TCP address, until Endpoint is modified to support domain sockets gRPC
+	listenAddr, err := deriveCommsAddress(controlAddress, grpcConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive comms GRPC: %w", err)
+	}
+	logger.With("address", listenAddr).Infof("GRPC comms socket listening at %s", listenAddr)
+
 	m := &Manager{
 		logger:         logger,
 		baseLogger:     baseLogger,
 		ca:             ca,
 		listenAddr:     listenAddr,
+		isLocal:        ipc.IsLocal(listenAddr),
 		agentInfo:      agentInfo,
 		tracer:         tracer,
 		current:        make(map[string]*componentRuntimeState),
@@ -174,7 +193,7 @@ func NewManager(
 		errCh:          make(chan error),
 		monitor:        monitor,
 		grpcConfig:     grpcConfig,
-		serverReady:    atomic.NewBool(false),
+		serverReady:    &atomic.Bool{},
 		doneChan:       make(chan struct{}),
 	}
 	return m, nil
@@ -188,11 +207,25 @@ func NewManager(
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
-	listener, err := net.Listen("tcp", m.listenAddr)
+	var (
+		listener net.Listener
+		err      error
+	)
+	if m.isLocal {
+		listener, err = ipc.CreateListener(m.logger, m.listenAddr)
+	} else {
+		listener, err = net.Listen("tcp", m.listenAddr)
+	}
+
 	if err != nil {
 		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
 	}
-	m.listenPort = listener.Addr().(*net.TCPAddr).Port
+
+	if m.isLocal {
+		defer ipc.CleanupListener(m.logger, m.listenAddr)
+	} else {
+		m.listenPort = listener.Addr().(*net.TCPAddr).Port
+	}
 
 	certPool := x509.NewCertPool()
 	if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
@@ -227,7 +260,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	wgServer.Add(1)
 	go func() {
 		defer wgServer.Done()
-		go m.serverLoop(ctx, listener, server)
+		m.serverLoop(ctx, listener, server)
 	}()
 
 	// Start the run loop, which continues on the main goroutine
@@ -658,6 +691,25 @@ func (m *Manager) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 		return status.Error(codes.PermissionDenied, "invalid token")
 	}
 
+	// enable chunking with the communicator if the initial checkin
+	// states that it supports chunking
+	runtime.comm.chunkingAllowed = false
+	for _, support := range initCheckin.Supports {
+		if support == proto.ConnectionSupports_CheckinChunking {
+			runtime.comm.chunkingAllowed = true
+			break
+		}
+	}
+	if runtime.comm.chunkingAllowed {
+		if m.grpcConfig.CheckinChunkingDisabled {
+			// chunking explicitly disabled
+			runtime.comm.chunkingAllowed = false
+			runtime.logger.Warn("control checkin v2 protocol supports chunking, but chunking was explicitly disabled")
+		} else {
+			runtime.logger.Info("control checkin v2 protocol has chunking enabled")
+		}
+	}
+
 	return runtime.comm.checkin(server, initCheckin)
 }
 
@@ -749,34 +801,38 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 		stop = append(stop, existing)
 	}
 	m.currentMx.RUnlock()
-	if len(stop) > 0 {
-		var stoppedWg sync.WaitGroup
-		stoppedWg.Add(len(stop))
-		for _, existing := range stop {
-			m.logger.Debugf("Stopping component %q", existing.id)
-			_ = existing.stop(teardown, model.Signed)
-			// stop is async, wait for operation to finish,
-			// otherwise new instance may be started and components
-			// may fight for resources (e.g ports, files, locks)
-			go func(state *componentRuntimeState) {
-				m.waitForStopped(state)
-				stoppedWg.Done()
-			}(existing)
-		}
-		stoppedWg.Wait()
-	}
 
-	// start all not started
+	var stoppedWg sync.WaitGroup
+	stoppedWg.Add(len(stop))
+	for _, existing := range stop {
+		m.logger.Debugf("Stopping component %q", existing.id)
+		_ = existing.stop(teardown, model.Signed)
+		// stop is async, wait for operation to finish,
+		// otherwise new instance may be started and components
+		// may fight for resources (e.g. ports, files, locks)
+		go func(state *componentRuntimeState) {
+			err := m.waitForStopped(state)
+			if err != nil {
+				m.logger.Errorf("updating components: failed waiting %s stop",
+					state.id)
+			}
+			stoppedWg.Done()
+		}(existing)
+	}
+	stoppedWg.Wait()
+
+	// start new components
 	for _, comp := range newComponents {
 		// new component; create its runtime
 		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-		state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
+		state, err := newComponentRuntimeState(m, logger, m.monitor, comp, m.isLocal)
 		if err != nil {
 			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 		}
 		m.currentMx.Lock()
 		m.current[comp.ID] = state
 		m.currentMx.Unlock()
+		m.logger.Debugf("Starting component %q", comp.ID)
 		if err = state.start(); err != nil {
 			return fmt.Errorf("failed to start component %s: %w", comp.ID, err)
 		}
@@ -785,10 +841,11 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 	return nil
 }
 
-func (m *Manager) waitForStopped(comp *componentRuntimeState) {
+func (m *Manager) waitForStopped(comp *componentRuntimeState) error {
 	if comp == nil {
-		return
+		return nil
 	}
+
 	currComp := comp.getCurrent()
 	compID := currComp.ID
 	timeout := defaultStopTimeout
@@ -805,20 +862,23 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 		latestState := comp.getLatest()
 		if latestState.State == client.UnitStateStopped {
 			m.logger.Debugf("component %q stopped.", compID)
-			return
+			return nil
 		}
 
+		// it might happen the component stop signal isn't received but the
+		// manager detects it stopped running. Then the manager removes it from
+		// its list of current components. Therefore, we also need to check if
+		// the component was removed, if it was, we consider it stopped.
 		m.currentMx.RLock()
 		if _, exists := m.current[compID]; !exists {
 			m.currentMx.RUnlock()
-			return
+			return nil
 		}
 		m.currentMx.RUnlock()
 
 		select {
 		case <-timeoutCh:
-			m.logger.Errorf("timeout exceeded waiting for component %q to stop", compID)
-			return
+			return fmt.Errorf("timeout exceeded after %s", timeout)
 		case <-time.After(stopCheckRetryPeriod):
 		}
 	}
@@ -937,6 +997,9 @@ func (m *Manager) getRuntimeFromComponent(comp component.Component) *componentRu
 }
 
 func (m *Manager) getListenAddr() string {
+	if m.isLocal {
+		return m.listenAddr
+	}
 	addr := strings.SplitN(m.listenAddr, ":", 2)
 	if len(addr) == 2 && addr[1] == "0" {
 		return fmt.Sprintf("%s:%d", addr[0], m.listenPort)
@@ -1022,4 +1085,33 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
 	}
 	return res.Diagnostic, nil
+}
+
+// deriveCommsAddress derives the comms socket/pipe path/name from given control address and GRPC config
+func deriveCommsAddress(controlAddress string, grpc *configuration.GRPCConfig) (string, error) {
+	if grpc.IsLocal() {
+		return deriveCommsSocketName(controlAddress)
+	}
+	return grpc.String(), nil
+}
+
+var errInvalidUri = errors.New("invalid uri")
+
+// deriveCommsSocketName derives the agent communication unix/npipe path
+// currently from the control socket path, since it's already set properly
+// matching the socket path length to meet the system limits of the platform
+func deriveCommsSocketName(uri string) (string, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return "", err
+	}
+
+	if len(u.Path) == 0 || (u.Scheme != "unix" && u.Scheme != "npipe") {
+		return "", fmt.Errorf("%w %s", errInvalidUri, uri)
+	}
+
+	// The base name without extension and use it as id argument for SocketURLWithFallback call
+	// THe idea it to use the same logic for the comms path as for the control socket/pipe path
+	base := strings.TrimSuffix(path.Base(u.Path), path.Ext(u.Path))
+	return utils.SocketURLWithFallback(base, path.Dir(u.Path)), nil
 }

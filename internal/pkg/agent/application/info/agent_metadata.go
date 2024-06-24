@@ -8,14 +8,16 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/elastic/elastic-agent/pkg/features"
+
 	"runtime"
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/features"
 
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
@@ -50,6 +52,8 @@ type AgentECSMeta struct {
 	LogLevel string `json:"log_level"`
 	// Complete is a flag specifying that the agent used is a complete image.
 	Complete bool `json:"complete"`
+	// Unprivileged is a flag specifying that the agent is running in unprivileged mode.
+	Unprivileged bool `json:"unprivileged"`
 }
 
 // SystemECSMeta is a collection of operating system metadata in ECS compliant object form.
@@ -149,15 +153,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 	}
 
 	info := sysInfo.Info()
-	hostname := info.Hostname
-	if features.FQDN() {
-		fqdn, err := sysInfo.FQDN()
-		if err != nil {
-			l.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
-		} else {
-			hostname = fqdn
-		}
-	}
+	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
 	return &ECSMeta{
 		Elastic: &ElasticECSMeta{
@@ -169,8 +165,9 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 				BuildOriginal: release.Info().String(),
 				// only upgradeable if running from Agent installer and running under the
 				// control of the system supervisor (or built specifically with upgrading enabled)
-				Upgradeable: release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
-				LogLevel:    i.LogLevel(),
+				Upgradeable:  release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
+				LogLevel:     i.LogLevel(),
+				Unprivileged: i.unprivileged,
 			},
 		},
 		Host: &HostECSMeta{
@@ -205,15 +202,7 @@ func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}
 	}
 
 	info := sysInfo.Info()
-	hostname := info.Hostname
-	if features.FQDN() {
-		fqdn, err := sysInfo.FQDN()
-		if err != nil {
-			l.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
-		} else {
-			hostname = fqdn
-		}
-	}
+	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
 	// Agent
 	meta[agentIDKey] = i.agentID

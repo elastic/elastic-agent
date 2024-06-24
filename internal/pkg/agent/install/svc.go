@@ -15,9 +15,6 @@ import (
 )
 
 const (
-	// ServiceDisplayName is the service display name for the service.
-	ServiceDisplayName = "Elastic Agent"
-
 	// ServiceDescription is the description for the service.
 	ServiceDescription = "Elastic Agent is a unified agent to observe, monitor and protect your system."
 
@@ -31,8 +28,8 @@ const (
 // ExecutablePath returns the path for the installed Agents executable.
 func ExecutablePath(topPath string) string {
 	exec := filepath.Join(topPath, paths.BinaryName)
-	if paths.ShellWrapperPath != "" {
-		exec = paths.ShellWrapperPath
+	if paths.ShellWrapperPath() != "" {
+		exec = paths.ShellWrapperPath()
 	}
 	return exec
 }
@@ -40,6 +37,7 @@ func ExecutablePath(topPath string) string {
 type serviceOpts struct {
 	Username string
 	Group    string
+	Password string
 }
 
 type serviceOpt func(opts *serviceOpts)
@@ -57,25 +55,30 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 		o(&opts)
 	}
 
+	option := map[string]interface{}{
+		// GroupName
+		"GroupName": opts.Group,
+
+		// Linux (systemd) always restart on failure
+		"Restart": "always",
+
+		// Windows setup restart on failure
+		"OnFailure":              "restart",
+		"OnFailureDelayDuration": "15s", // Matches the value used by endpoint-security.
+		"OnFailureResetPeriod":   10,
+	}
+	if opts.Password != "" {
+		option["Password"] = opts.Password
+	}
+
 	cfg := &service.Config{
-		Name:             paths.ServiceName,
-		DisplayName:      ServiceDisplayName,
+		Name:             paths.ServiceName(),
+		DisplayName:      paths.ServiceDisplayName(),
 		Description:      ServiceDescription,
 		Executable:       ExecutablePath(topPath),
 		WorkingDirectory: topPath,
 		UserName:         opts.Username,
-		Option: map[string]interface{}{
-			// GroupName
-			"GroupName": opts.Group,
-
-			// Linux (systemd) always restart on failure
-			"Restart": "always",
-
-			// Windows setup restart on failure
-			"OnFailure":              "restart",
-			"OnFailureDelayDuration": "15s", // Matches the value used by endpoint-security.
-			"OnFailureResetPeriod":   10,
-		},
+		Option:           option,
 	}
 
 	if runtime.GOOS == "linux" {
@@ -101,8 +104,8 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 
 		// Set the stdout and stderr logs to be inside the installation directory, ensures that the
 		// executing user for the service can write to the directory for the logs.
-		cfg.Option["StandardOutPath"] = filepath.Join(topPath, fmt.Sprintf("%s.out.log", paths.ServiceName))
-		cfg.Option["StandardErrorPath"] = filepath.Join(topPath, fmt.Sprintf("%s.err.log", paths.ServiceName))
+		cfg.Option["StandardOutPath"] = filepath.Join(topPath, fmt.Sprintf("%s.out.log", paths.ServiceName()))
+		cfg.Option["StandardErrorPath"] = filepath.Join(topPath, fmt.Sprintf("%s.err.log", paths.ServiceName()))
 	}
 
 	return service.New(nil, cfg)

@@ -30,6 +30,16 @@ var ErrTooManyRequests = errors.New("too many requests received (429)")
 // ErrConnRefused is returned when the connection to the server is refused.
 var ErrConnRefused = errors.New("connection refused")
 
+// ErrTemporaryServerError is returned when the request caused a temporary server error
+var ErrTemporaryServerError = errors.New("temporary server error, please retry later")
+
+// temporaryServerErrorCodes defines status codes that allow clients to retry their request.
+var temporaryServerErrorCodes = map[int]struct{}{
+	http.StatusBadGateway:         {},
+	http.StatusServiceUnavailable: {},
+	http.StatusGatewayTimeout:     {},
+}
+
 const (
 	// PermanentEnroll is default enrollment type, by default an Agent is permanently enroll to Agent.
 	PermanentEnroll = EnrollType("PERMANENT")
@@ -212,6 +222,10 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		return nil, ErrTooManyRequests
+	}
+
+	if _, temporary := temporaryServerErrorCodes[resp.StatusCode]; temporary {
+		return nil, fmt.Errorf("received code %d: %w", resp.StatusCode, ErrTemporaryServerError)
 	}
 
 	if resp.StatusCode != http.StatusOK {

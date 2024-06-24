@@ -4,7 +4,9 @@
 
 package composable
 
-import "context"
+import (
+	"context"
+)
 
 // FetchContextProvider is the interface that a context provider uses allow variable values to be determined when the
 // configuration is rendered versus it being known in advanced.
@@ -18,6 +20,12 @@ type FetchContextProvider interface {
 // ContextProviderComm is the interface that a context provider uses to communicate back to Elastic Agent.
 type ContextProviderComm interface {
 	context.Context
+
+	// Signal signals that something has changed in the provider.
+	//
+	// Note: This should only be used by fetch context providers, standard context
+	// providers should use Set to update the overall state.
+	Signal()
 
 	// Set sets the current mapping for this context.
 	Set(map[string]interface{}) error

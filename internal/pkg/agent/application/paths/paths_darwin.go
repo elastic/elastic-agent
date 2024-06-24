@@ -14,32 +14,27 @@ const (
 	// for installing Elastic Agent's files.
 	DefaultBasePath = "/Library"
 
-	// ControlSocketRunSymlink is the path to the symlink that should be
+	// controlSocketRunSymlink is the path to the symlink that should be
 	// created to the control socket when Elastic Agent is running with root.
-	ControlSocketRunSymlink = "/var/run/elastic-agent.sock"
+	controlSocketRunSymlink             = "/var/run/elastic-agent.sock"
+	controlSocketRunSymlinkNamespaceFmt = "/var/run/elastic-agent-%s.sock"
 
-	// ServiceName is the service name when installed.
-	ServiceName = "co.elastic.elastic-agent"
+	// serviceName is the service name when installed.
+	serviceName             = "co.elastic.elastic-agent"
+	serviceNameNamespaceFmt = "co.elastic.elastic-agent-%s"
 
-	// ShellWrapperPath is the path to the installed shell wrapper.
-	ShellWrapperPath = "/usr/local/bin/elastic-agent"
+	// shellWrapperPath is the path to the installed shell wrapper.
+	shellWrapperPath             = "/usr/local/bin/elastic-agent"
+	shellWrapperPathNamespaceFmt = "/usr/local/bin/elastic-%s-agent"
 
 	// ShellWrapper is the wrapper that is installed.  The %s must
 	// be substituted with the appropriate top path.
-	ShellWrapper = `#!/bin/sh
+	ShellWrapperFmt = `#!/bin/sh
 exec %s/elastic-agent $@
 `
-
-	// defaultAgentVaultName is keychain item name for mac
-	defaultAgentVaultName = "co.elastic.elastic-agent"
 )
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
 func ArePathsEqual(expected, actual string) bool {
 	return expected == actual
-}
-
-// AgentVaultPath is keychain name on Mac OS
-func AgentVaultPath() string {
-	return defaultAgentVaultName
 }

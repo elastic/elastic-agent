@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +24,8 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
@@ -58,6 +60,19 @@ var (
 				Stop:    30 * time.Second,
 			},
 		},
+	}
+	fakeIsolatedUnitsInputSpec = component.InputSpec{
+		Name:      "fake-isolated-units",
+		Platforms: []string{fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH)},
+		Shippers:  []string{"fake-shipper"},
+		Command: &component.CommandSpec{
+			Timeouts: component.CommandTimeoutSpec{
+				Checkin: 30 * time.Second,
+				Restart: 10 * time.Millisecond, // quick restart during tests
+				Stop:    30 * time.Second,
+			},
+		},
+		IsolateUnits: true,
 	}
 	fakeShipperSpec = component.ShipperSpec{
 		Name:      "fake-shipper",
@@ -95,6 +110,231 @@ func waitForState(
 			return
 		}
 	}
+}
+
+func TestComponentUpdateDiff(t *testing.T) {
+
+	err := logp.DevelopmentSetup(logp.ToObserverOutput())
+	require.NoError(t, err)
+
+	cases := []struct {
+		name    string
+		old     []component.Component
+		new     []component.Component
+		logtest func(t *testing.T, logs UpdateStats)
+	}{
+		{
+			name: "test-basic-removed",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+				{
+					ID:         "component-two",
+					OutputType: "kafka",
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+
+				require.Equal(t, []string{"component-two"}, logs.Components.Removed)
+				require.Equal(t, []string{"kafka"}, logs.Outputs.Removed)
+			},
+		},
+		{
+			name: "test-added-and-removed",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+				{
+					ID:         "component-two",
+					OutputType: "kafka",
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-three",
+					OutputType: "elasticsearch",
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Equal(t, 2, len(logs.Components.Removed))
+				require.Equal(t, []string{"component-three"}, logs.Components.Added)
+				require.Equal(t, []string{"kafka"}, logs.Outputs.Removed)
+			},
+		},
+		{
+			name: "test-updated-component",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "unit-one"},
+						{ID: "unit-two"},
+						{ID: "unit-x"},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "unit-one"},
+						{ID: "unit-two"},
+						{ID: "unit-three"},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Contains(t, logs.Components.Updated[0], "unit-three: added")
+				require.Contains(t, logs.Components.Updated[0], "unit-x: removed")
+			},
+		},
+		{
+			name: "just-change-output",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "logstash",
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Equal(t, []string{"elasticsearch"}, logs.Outputs.Removed)
+				require.Equal(t, []string{"logstash"}, logs.Outputs.Added)
+			},
+		},
+		{
+			name: "config-update",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "value"})},
+						},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "two"})},
+						},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.NotEmpty(t, logs.Components.Updated)
+			},
+		},
+		{
+			name: "config-no-changes",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "value"})},
+						},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Source: mustNewStruct(t, map[string]interface{}{"example": "value"})},
+						},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Updated, 0)
+			},
+		},
+		{
+			name: "config-source-nil",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Id: "test"},
+						},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{
+							ID:     "unit-one",
+							Config: &proto.UnitExpectedConfig{Id: "test"},
+						},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Updated, 0)
+			},
+		},
+	}
+
+	for _, testcase := range cases {
+
+		t.Run(testcase.name, func(t *testing.T) {
+			testCoord := Coordinator{
+				logger:         logp.L(),
+				componentModel: testcase.new,
+			}
+			testCoord.checkAndLogUpdate(testcase.old)
+
+			obsLogs := logp.ObserverLogs().TakeAll()
+			last := obsLogs[len(obsLogs)-1]
+
+			// extract the structured data from the log message
+			testcase.logtest(t, last.Context[0].Interface.(UpdateStats))
+		})
+
+	}
+
+}
+
+func mustNewStruct(t *testing.T, v map[string]interface{}) *structpb.Struct {
+	str, err := structpb.NewStruct(v)
+	require.NoError(t, err)
+	return str
 }
 
 func TestCoordinator_State_Starting(t *testing.T) {
@@ -320,6 +560,98 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCoordinator_StateSubscribeIsolatedUnits(t *testing.T) {
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, WithComponentInputSpec(fakeIsolatedUnitsInputSpec))
+	go func() {
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	resultChan := make(chan error)
+	go func() {
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		subChan := coord.StateSubscribe(ctx, 32)
+		for {
+			select {
+			case <-ctx.Done():
+				resultChan <- ctx.Err()
+				return
+			case state := <-subChan:
+				if len(state.Components) == 3 {
+					compState0 := getComponentState(state.Components, "fake-isolated-units-default-fake-isolated-units-0")
+					compState1 := getComponentState(state.Components, "fake-isolated-units-default-fake-isolated-units-1")
+					if compState0 != nil && compState1 != nil {
+						unit0, ok0 := compState0.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-0-unit"}]
+						unit1, ok1 := compState1.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1-unit"}]
+						if ok0 && ok1 {
+							if (unit0.State == client.UnitStateHealthy && unit0.Message == "Healthy From Fake Isolated Units 0 Config") &&
+								(unit1.State == client.UnitStateHealthy && unit1.Message == "Healthy From Fake Isolated Units 1 Config") {
+								resultChan <- nil
+								return
+							} else if unit0.State == client.UnitStateFailed && unit1.State == client.UnitStateFailed {
+								// if you get a really strange failed state, check to make sure the mock binaries in
+								// elastic-agent/pkg/component/fake/ are updated
+								t.Fail()
+								t.Logf("got units with failed state: %#v / %#v", unit1, unit0)
+							}
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	// no vars used by the config
+	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
+
+	// set the configuration to run a fake input
+	cfg, err := config.NewConfigFrom(map[string]interface{}{
+		"outputs": map[string]interface{}{
+			"default": map[string]interface{}{
+				"type": "fake-action-output",
+				"shipper": map[string]interface{}{
+					"enabled": true,
+				},
+			},
+		},
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"id":         "fake-isolated-units-0",
+				"type":       "fake-isolated-units",
+				"use_output": "default",
+				"state":      client.UnitStateHealthy,
+				"message":    "Healthy From Fake Isolated Units 0 Config",
+			},
+			map[string]interface{}{
+				"id":         "fake-isolated-units-1",
+				"type":       "fake-isolated-units",
+				"use_output": "default",
+				"state":      client.UnitStateHealthy,
+				"message":    "Healthy From Fake Isolated Units 1 Config",
+			},
+		},
+	})
+	require.NoError(t, err)
+	cfgMgr.Config(ctx, cfg)
+
+	err = <-resultChan
+	require.NoError(t, err)
+	cancel()
+
+	err = <-coordCh
+	require.NoError(t, err)
+}
+
 func TestCollectManagerErrorsTimeout(t *testing.T) {
 	handlerChan, _, _, _, _ := setupManagerShutdownChannels(time.Millisecond)
 	// Don't send anything to the shutdown channels, causing a timeout
@@ -530,6 +862,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 type createCoordinatorOpts struct {
 	managed        bool
 	upgradeManager UpgradeManager
+	compInputSpec  component.InputSpec
 }
 
 type CoordinatorOpt func(o *createCoordinatorOpts)
@@ -546,13 +879,21 @@ func WithUpgradeManager(upgradeManager UpgradeManager) CoordinatorOpt {
 	}
 }
 
+func WithComponentInputSpec(spec component.InputSpec) CoordinatorOpt {
+	return func(o *createCoordinatorOpts) {
+		o.compInputSpec = spec
+	}
+}
+
 // createCoordinator creates a coordinator that using a fake config manager and a fake vars manager.
 //
 // The runtime specifications is set up to use both the fake component and fake shipper.
 func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt) (*Coordinator, *fakeConfigManager, *fakeVarsManager) {
 	t.Helper()
 
-	o := &createCoordinatorOpts{}
+	o := &createCoordinatorOpts{
+		compInputSpec: fakeInputSpec,
+	}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -566,7 +907,7 @@ func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt
 		InputType:  "fake",
 		BinaryName: "",
 		BinaryPath: testBinary(t, "component"),
-		Spec:       fakeInputSpec,
+		Spec:       o.compInputSpec,
 	}
 	shipperSpec := component.ShipperRuntimeSpec{
 		ShipperType: "fake-shipper",
@@ -581,7 +922,7 @@ func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
-	rm, err := runtime.NewManager(l, l, "localhost:0", ai, apmtest.DiscardTracer, monitoringMgr, configuration.DefaultGRPCConfig())
+	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
@@ -614,7 +955,10 @@ func newErrorLogger(t *testing.T) *logger.Logger {
 	loggerCfg := logger.DefaultLoggingConfig()
 	loggerCfg.Level = logp.ErrorLevel
 
-	log, err := logger.NewFromConfig("", loggerCfg, false)
+	eventLoggerCfg := logger.DefaultEventLoggingConfig()
+	eventLoggerCfg.Level = loggerCfg.Level
+
+	log, err := logger.NewFromConfig("", loggerCfg, eventLoggerCfg, false)
 	require.NoError(t, err)
 	return log
 }
@@ -667,7 +1011,7 @@ func (*testMonitoringManager) Prepare(_ string) error                           
 func (*testMonitoringManager) Cleanup(string) error                                  { return nil }
 func (*testMonitoringManager) Enabled() bool                                         { return false }
 func (*testMonitoringManager) Reload(rawConfig *config.Config) error                 { return nil }
-func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string) (map[string]interface{}, error) {
+func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string, _ map[string]uint64) (map[string]interface{}, error) {
 	return nil, nil
 }
 

@@ -16,12 +16,12 @@ import (
 const (
 	// delay after agent restart is performed to allow agent to tear down all the processes
 	// important mainly for windows, as it prevents removing files which are in use
-	afterRestartDelay = 15 * time.Second
+	afterRestartDelay = 20 * time.Second
 )
 
-func invokeCmd() *exec.Cmd {
+func invokeCmd(agentExecutable string) *exec.Cmd {
 	// #nosec G204 -- user cannot inject any parameters to this command
-	cmd := exec.Command(paths.TopBinaryPath(), watcherSubcommand,
+	cmd := exec.Command(agentExecutable, watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),
 	)

@@ -11,13 +11,13 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -93,6 +93,7 @@ type PackageSpec struct {
 	Description       string                 `yaml:"description,omitempty"`
 	PreInstallScript  string                 `yaml:"pre_install_script,omitempty"`
 	PostInstallScript string                 `yaml:"post_install_script,omitempty"`
+	PostRmScript      string                 `yaml:"post_rm_script,omitempty"`
 	Files             map[string]PackageFile `yaml:"files"`
 	Qualifier         string                 `yaml:"qualifier,omitempty"`   // Optional
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
@@ -102,6 +103,7 @@ type PackageSpec struct {
 	packageDir             string
 	localPreInstallScript  string
 	localPostInstallScript string
+	localPostRmScript      string
 }
 
 // PackageFile represents a file or directory within a package.
@@ -391,6 +393,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 	s.Description = mustExpand(s.Description)
 	s.PreInstallScript = mustExpand(s.PreInstallScript)
 	s.PostInstallScript = mustExpand(s.PostInstallScript)
+	s.PostRmScript = mustExpand(s.PostRmScript)
 	s.OutputFile = mustExpand(s.OutputFile)
 
 	if s.ServiceName == "" {
@@ -434,7 +437,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 			}
 
 			f.Source = filepath.Join(s.packageDir, filepath.Base(f.Target))
-			if err = ioutil.WriteFile(CreateDir(f.Source), []byte(content), 0644); err != nil {
+			if err = os.WriteFile(CreateDir(f.Source), []byte(content), 0644); err != nil {
 				panic(fmt.Errorf("failed to write file containing content for target=%v: %w", target, err))
 			}
 		case f.Template != "":
@@ -455,6 +458,9 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		panic(err)
 	}
 	if err := copyInstallScript(s, s.PostInstallScript, &s.localPostInstallScript); err != nil {
+		panic(err)
+	}
+	if err := copyInstallScript(s, s.PostRmScript, &s.localPostRmScript); err != nil {
 		panic(err)
 	}
 
@@ -575,7 +581,7 @@ func PackageZip(spec PackageSpec) error {
 	spec.OutputFile = Zip.AddFileExtension(spec.OutputFile)
 
 	// Write the zip file.
-	if err := ioutil.WriteFile(CreateDir(spec.OutputFile), buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(CreateDir(spec.OutputFile), buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("failed to write zip file: %w", err)
 	}
 
@@ -638,7 +644,7 @@ func PackageTarGz(spec PackageSpec) error {
 			continue
 		}
 
-		tmpdir, err := ioutil.TempDir("", "TmpSymlinkDropPath")
+		tmpdir, err := os.MkdirTemp("", "TmpSymlinkDropPath")
 		if err != nil {
 			return err
 		}
@@ -777,6 +783,9 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	if spec.localPostInstallScript != "" {
 		args = append(args, "--after-install", spec.localPostInstallScript)
 	}
+	if spec.localPostRmScript != "" {
+		args = append(args, "--after-remove", spec.localPostRmScript)
+	}
 	for _, pf := range spec.Files {
 		if pf.Config {
 			args = append(args, "--config-files", pf.Target)
@@ -896,13 +905,25 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 
 // addFileToTar adds a file (or directory) to a tar archive.
 func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
+	excludedFiles := []string{
+		"cloud-defend",
+		"cloud-defend.spec.yml",
+	}
+
 	return filepath.Walk(pkgFile.Source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
 				return nil
 			}
-
 			return err
+		}
+
+		if slices.Contains(excludedFiles, info.Name()) {
+			// it's a file we have to exclude
+			if mg.Verbose() {
+				log.Printf("Skipping file %q...", path)
+			}
+			return nil
 		}
 
 		header, err := tar.FileInfoHeader(info, info.Name())

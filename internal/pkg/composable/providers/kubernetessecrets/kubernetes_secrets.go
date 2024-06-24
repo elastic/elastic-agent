@@ -45,7 +45,7 @@ type secretsData struct {
 }
 
 // ContextProviderBuilder builds the context provider.
-func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(logger *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	var cfg Config
 	if c == nil {
 		c = config.New()
@@ -86,7 +86,7 @@ func (p *contextProviderK8sSecrets) Run(ctx context.Context, comm corecomp.Conte
 	p.clientMx.Unlock()
 
 	if !p.config.DisableCache {
-		go p.updateSecrets(ctx)
+		go p.updateSecrets(ctx, comm)
 	}
 
 	<-comm.Done()
@@ -102,14 +102,18 @@ func getK8sClient(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclien
 }
 
 // Update the secrets in the cache every RefreshInterval
-func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
+func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context, comm corecomp.ContextProviderComm) {
 	timer := time.NewTimer(p.config.RefreshInterval)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			p.updateCache()
+			updatedCache := p.updateCache()
+			if updatedCache {
+				p.logger.Info("Secrets cache was updated, the agent will be notified.")
+				comm.Signal()
+			}
 			timer.Reset(p.config.RefreshInterval)
 		}
 	}
@@ -117,13 +121,20 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context) {
 
 // mergeWithCurrent merges the updated map with the cache map.
 // This function needs to be called between the mutex lock for the map.
-func (p *contextProviderK8sSecrets) mergeWithCurrent(updatedMap map[string]*secretsData) map[string]*secretsData {
+func (p *contextProviderK8sSecrets) mergeWithCurrent(updatedMap map[string]*secretsData) (map[string]*secretsData, bool) {
 	merged := make(map[string]*secretsData)
+	updatedCache := false
 
 	for name, data := range p.secretsCache {
 		diff := time.Since(data.lastAccess)
 		if diff < p.config.TTLDelete {
 			merged[name] = data
+			// Check if this key is part of the updatedMap. If it is not, we know the secrets cache was updated,
+			// and we need to signal that.
+			_, ok := updatedMap[name]
+			if !ok {
+				updatedCache = true
+			}
 		}
 	}
 
@@ -132,14 +143,20 @@ func (p *contextProviderK8sSecrets) mergeWithCurrent(updatedMap map[string]*secr
 		// it could have been updated when trying to fetch the secret at the same time we are running update cache.
 		// In that case, we only update the value.
 		if _, ok := merged[name]; ok {
-			merged[name].value = data.value
+			if merged[name].value != data.value {
+				merged[name].value = data.value
+				updatedCache = true
+			}
 		}
 	}
 
-	return merged
+	return merged, updatedCache
 }
 
-func (p *contextProviderK8sSecrets) updateCache() {
+func (p *contextProviderK8sSecrets) updateCache() bool {
+	// Keep track whether the cache had values changing, so we can notify the agent
+	updatedCache := false
+
 	// deleting entries does not free the memory, so we need to create a new map
 	// to place the secrets we want to keep
 	cacheTmp := make(map[string]*secretsData)
@@ -152,6 +169,8 @@ func (p *contextProviderK8sSecrets) updateCache() {
 	}
 	p.secretsCacheMx.RUnlock()
 
+	// The only way to update an entry in the cache is through the last access time (to delete the key)
+	// or if the value gets updated.
 	for name, data := range copyMap {
 		diff := time.Since(data.lastAccess)
 		if diff < p.config.TTLDelete {
@@ -162,17 +181,24 @@ func (p *contextProviderK8sSecrets) updateCache() {
 					lastAccess: data.lastAccess,
 				}
 				cacheTmp[name] = newData
+				if value != data.value {
+					updatedCache = true
+				}
 			}
-
+		} else {
+			updatedCache = true
 		}
 	}
 
 	// While the cache was updated, it is possible that some secret was added through another go routine.
 	// We need to merge the updated map with the current cache map to catch the new entries and avoid
 	// loss of data.
+	var updated bool
 	p.secretsCacheMx.Lock()
-	p.secretsCache = p.mergeWithCurrent(cacheTmp)
+	p.secretsCache, updated = p.mergeWithCurrent(cacheTmp)
 	p.secretsCacheMx.Unlock()
+
+	return updatedCache || updated
 }
 
 func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {

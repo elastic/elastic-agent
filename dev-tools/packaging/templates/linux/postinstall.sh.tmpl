@@ -16,8 +16,9 @@ if test -L "$symlink"; then
 fi
 
 commit_hash="{{ commit_short }}"
+version_dir="{{agent_package_version}}{{snapshot_suffix}}"
 
-new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$commit_hash"
+new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
 
 # copy the state files if there was a previous agent install
 if ! [ -z "$old_agent_dir" ] && ! [ "$old_agent_dir" -ef "$new_agent_dir" ]; then

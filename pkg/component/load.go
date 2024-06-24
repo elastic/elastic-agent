@@ -7,7 +7,6 @@ package component
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -196,7 +195,7 @@ func specFilesForDirectory(dir string) (map[string]Spec, error) {
 		return nil, err
 	}
 	for _, match := range matches {
-		data, err := ioutil.ReadFile(match)
+		data, err := os.ReadFile(match)
 		if err != nil {
 			return nil, fmt.Errorf("failed reading spec %s: %w", match, err)
 		}
@@ -290,10 +289,9 @@ func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 		return InputRuntimeSpec{}, ErrInputNotSupportedOnPlatform
 	}
 	err := validateRuntimeChecks(&runtimeSpec.Spec.Runtime, r.platform)
-	if err != nil {
-		return InputRuntimeSpec{}, err
-	}
-	return runtimeSpec, nil
+	// runtimeSpec is always returned so the caller know which runtime would have been used
+	// even if the runtime checks return an error
+	return runtimeSpec, err
 }
 
 // ShippersForOutputType returns the shippers that support the outputType.

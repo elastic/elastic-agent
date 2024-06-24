@@ -6,6 +6,8 @@
 
 package install
 
+import "os"
+
 func isBlockingOnExe(_ error) bool {
 	return false
 }
@@ -16,4 +18,11 @@ func removeBlockingExe(_ error) error {
 
 func isRetryableError(_ error) bool {
 	return false
+}
+
+// killNoneChildProcess provides a way of killing a process that is not started as a child of this process.
+//
+// On Unix systems it just calls the native golang kill.
+func killNoneChildProcess(proc *os.Process) error {
+	return proc.Kill()
 }

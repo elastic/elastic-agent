@@ -9,13 +9,13 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"runtime"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -92,7 +92,7 @@ func TestEnroll(t *testing.T) {
 
 			url := "https://" + host
 			store := &mockStore{Err: errors.New("fail to save")}
-			cmd, err := newEnrollCmdWithStore(
+			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
 					URL:                  url,
@@ -146,7 +146,7 @@ func TestEnroll(t *testing.T) {
 
 			url := "https://" + host
 			store := &mockStore{}
-			cmd, err := newEnrollCmdWithStore(
+			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
 					URL:                  url,
@@ -207,7 +207,7 @@ func TestEnroll(t *testing.T) {
 		}, func(t *testing.T, host string) {
 			url := "http://" + host + "/"
 			store := &mockStore{}
-			cmd, err := newEnrollCmdWithStore(
+			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
 					URL:                  url,
@@ -271,7 +271,7 @@ func TestEnroll(t *testing.T) {
 		}, func(t *testing.T, host string) {
 			url := "http://" + host
 			store := &mockStore{}
-			cmd, err := newEnrollCmdWithStore(
+			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
 					URL:                  url,
@@ -316,7 +316,7 @@ func TestEnroll(t *testing.T) {
 		}, func(t *testing.T, host string) {
 			url := "http://" + host
 			store := &mockStore{}
-			cmd, err := newEnrollCmdWithStore(
+			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
 					URL:                  url,
@@ -337,6 +337,81 @@ func TestEnroll(t *testing.T) {
 			require.False(t, store.Called)
 		},
 	))
+
+	counter := int32(0)
+
+	t.Run("there is a retry on a temporary server error", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
+
+				// first request fails with 503, retry is expected
+				if atomic.CompareAndSwapInt32(&counter, 0, 1) {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_, _ = w.Write([]byte(`
+{
+		"statusCode": 503,
+		"error": "Internal Server Error"
+}`))
+					return
+				}
+
+				// second attempt is successful
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`
+{
+    "action": "created",
+    "item": {
+        "id": "a9328860-ec54-11e9-93c4-d72ab8a69391",
+        "active": true,
+        "policy_id": "69f3f5a0-ec52-11e9-93c4-d72ab8a69391",
+        "type": "PERMANENT",
+        "enrolled_at": "2019-10-11T18:26:37.158Z",
+        "user_provided_metadata": {
+						"custom": "customize"
+				},
+        "local_metadata": {
+            "platform": "linux",
+            "version": "8.0.0"
+        },
+        "actions": [],
+        "access_api_key": "my-access-api-key"
+    }
+}`))
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			url := "http://" + host
+			store := &mockStore{}
+			cmd, err := newEnrollCmd(
+				log,
+				&enrollCmdOption{
+					URL:                  url,
+					CAs:                  []string{},
+					EnrollAPIKey:         "my-enrollment-api-key",
+					Insecure:             true,
+					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
+					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
+				},
+				"",
+				store,
+			)
+			require.NoError(t, err)
+
+			streams, _, _, _ := cli.NewTestingIOStreams()
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			require.NoError(t, err, "enroll command should return no error")
+
+			assert.True(t, store.Called, "the store should have been called")
+			config, err := readConfig(store.Content)
+			require.NoError(t, err)
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
+			assert.Equal(t, host, config.Client.Host)
+		},
+	))
 }
 
 func TestValidateArgs(t *testing.T) {
@@ -352,13 +427,15 @@ func TestValidateArgs(t *testing.T) {
 		require.NoError(t, err)
 		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
 		require.NotNil(t, args)
-		require.Equal(t, len(args), 9)
+		require.Equal(t, len(args), 11)
 		require.Contains(t, args, "--tag")
 		require.Contains(t, args, "windows")
 		require.Contains(t, args, "production")
 		require.Contains(t, args, "--insecure")
 		require.Contains(t, args, enrolmentToken)
 		require.Contains(t, args, url)
+		require.Contains(t, args, "--fleet-server-client-auth")
+		require.Contains(t, args, "none")
 		cleanedTags := cleanTags(args)
 		require.Contains(t, cleanedTags, "windows")
 		require.Contains(t, cleanedTags, "production")
@@ -372,12 +449,14 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, "--tag")
 		require.Contains(t, args, "windows")
 		require.Contains(t, args, " production")
+		require.Contains(t, args, "--fleet-server-client-auth")
+		require.Contains(t, args, "none")
 		cleanedTags := cleanTags(args)
 		require.Contains(t, cleanedTags, "windows")
 		require.Contains(t, cleanedTags, "production")
 		// Validate that we remove the duplicates
-		require.Equal(t, len(args), 10)
-		require.Equal(t, len(cleanedTags), 7)
+		require.Equal(t, len(args), 12)
+		require.Equal(t, len(cleanedTags), 9)
 	})
 
 	t.Run("valid tag and empty tag", func(t *testing.T) {
@@ -388,6 +467,8 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, "--tag")
 		require.Contains(t, args, "windows")
 		require.Contains(t, args, " ")
+		require.Contains(t, args, "--fleet-server-client-auth")
+		require.Contains(t, args, "none")
 		cleanedTags := cleanTags(args)
 		require.Contains(t, cleanedTags, "windows")
 		require.NotContains(t, cleanedTags, " ")
@@ -405,6 +486,32 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, "/path/to/passphrase")
 		require.Contains(t, args, "--fleet-server-service-token-path")
 		require.Contains(t, args, "/path/to/token")
+	})
+
+	t.Run("fleet-es client certificates are passed", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("fleet-server-es-cert", "/path/to/cert")
+		require.NoError(t, err)
+		err = cmd.Flags().Set("fleet-server-es-cert-key", "/path/to/key")
+		require.NoError(t, err)
+		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+		require.Contains(t, args, "--fleet-server-es-cert")
+		require.Contains(t, args, "/path/to/cert")
+		require.Contains(t, args, "--fleet-server-es-cert-key")
+		require.Contains(t, args, "/path/to/key")
+	})
+
+	t.Run("elastic-agent client certificates are passed", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("elastic-agent-cert", "/path/to/cert")
+		require.NoError(t, err)
+		err = cmd.Flags().Set("elastic-agent-cert-key", "/path/to/key")
+		require.NoError(t, err)
+		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+		require.Contains(t, args, "--elastic-agent-cert")
+		require.Contains(t, args, "/path/to/cert")
+		require.Contains(t, args, "--elastic-agent-cert-key")
+		require.Contains(t, args, "/path/to/key")
 	})
 }
 
@@ -430,6 +537,44 @@ func TestValidateEnrollFlags(t *testing.T) {
 		require.ErrorAs(t, err, &agentErr)
 		require.Equal(t, errors.TypeConfig, agentErr.Type())
 	})
+}
+
+func TestDaemonReloadWithBackoff(t *testing.T) {
+	log, _ := logger.New("tst", false)
+
+	ctx, cn := context.WithCancel(context.Background())
+	// Cancel context
+	cn()
+
+	tests := []struct {
+		name             string
+		daemonReloadFunc func(ctx context.Context) error
+		wantErr          error
+	}{
+		{
+			name:             "daemonReloadSucceeded",
+			daemonReloadFunc: func(ctx context.Context) error { return nil },
+		},
+		{
+			name: "retryWithContextCancelled",
+			daemonReloadFunc: func(ctx context.Context) error {
+				return errors.New("failed") // Return some (not context's) error so it retries
+			},
+			wantErr: context.Canceled,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := enrollCmd{
+				log:              log,
+				daemonReloadFunc: tc.daemonReloadFunc,
+			}
+
+			err := cmd.daemonReloadWithBackoff(ctx)
+			assert.ErrorIs(t, err, tc.wantErr)
+		})
+	}
 }
 
 func withServer(
@@ -478,7 +623,7 @@ func withTLSServer(
 }
 
 func bytesToTMPFile(b []byte) (string, error) {
-	f, err := ioutil.TempFile("", "prefix")
+	f, err := os.CreateTemp("", "prefix")
 	if err != nil {
 		return "", err
 	}

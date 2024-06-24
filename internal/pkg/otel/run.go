@@ -2,50 +2,33 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build !windows
+
 package otel
 
 import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/confmap/converter/expandconverter"
+	"go.opentelemetry.io/collector/confmap/provider/envprovider"
+	"go.opentelemetry.io/collector/confmap/provider/fileprovider"
+	"go.opentelemetry.io/collector/confmap/provider/httpprovider"
+	"go.opentelemetry.io/collector/confmap/provider/httpsprovider"
+	"go.opentelemetry.io/collector/confmap/provider/yamlprovider"
 	"go.opentelemetry.io/collector/otelcol"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 const buildDescription = "Elastic opentelemetry-collector distribution"
 
-// IsOtelConfig returns true if file is named:
-//   - otel.(yaml|yml)
-//   - otlp.(yaml|yml)
-//   - otelcol.(yaml|yml)
-//
-// In other cases it returns false assuming agent config for backwards compatibility
-func IsOtelConfig(ctx context.Context, pathConfigFile string) bool {
-	fileName := filepath.Base(pathConfigFile)
-	if suffix := filepath.Ext(fileName); suffix != ".yml" && suffix != ".yaml" {
-		return false
-	}
-
-	cleanFileName := strings.TrimSpace(strings.ToLower(strings.TrimSuffix(fileName, filepath.Ext(fileName))))
-	if cleanFileName == "otel" || cleanFileName == "otlp" || cleanFileName == "otelcol" {
-		return true
-	}
-
-	// default behavior is Elastic Agent
-	return false
-}
-
-func Run(ctx context.Context, cancel context.CancelFunc, stop chan bool, testingMode bool) error {
+func Run(ctx context.Context, stop chan bool, configFiles []string) error {
 	fmt.Fprintln(os.Stdout, "Starting in otel mode")
-	settings, err := newSettings(paths.ConfigFile(), release.Version())
+	settings, err := newSettings(release.Version(), configFiles)
 	if err != nil {
 		return err
 	}
@@ -66,30 +49,32 @@ func Run(ctx context.Context, cancel context.CancelFunc, stop chan bool, testing
 	return svc.Run(cancelCtx)
 }
 
-func newSettings(configPath string, version string) (*otelcol.CollectorSettings, error) {
+func newSettings(version string, configPaths []string) (*otelcol.CollectorSettings, error) {
 	buildInfo := component.BuildInfo{
 		Command:     os.Args[0],
 		Description: buildDescription,
 		Version:     version,
 	}
-
-	fmp := NewFileProviderWithDefaults()
 	configProviderSettings := otelcol.ConfigProviderSettings{
 		ResolverSettings: confmap.ResolverSettings{
-			URIs:       []string{configPath},
-			Providers:  map[string]confmap.Provider{fmp.Scheme(): fmp},
-			Converters: []confmap.Converter{expandconverter.New()},
+			URIs: configPaths,
+			ProviderFactories: []confmap.ProviderFactory{
+				fileprovider.NewFactory(),
+				envprovider.NewFactory(),
+				yamlprovider.NewFactory(),
+				httpprovider.NewFactory(),
+				httpsprovider.NewFactory(),
+			},
+			ConverterFactories: []confmap.ConverterFactory{
+				expandconverter.NewFactory(),
+			},
 		},
-	}
-	provider, err := otelcol.NewConfigProvider(configProviderSettings)
-	if err != nil {
-		return nil, err
 	}
 
 	return &otelcol.CollectorSettings{
-		Factories:      components,
-		BuildInfo:      buildInfo,
-		ConfigProvider: provider,
+		Factories:              components,
+		BuildInfo:              buildInfo,
+		ConfigProviderSettings: configProviderSettings,
 		// we're handling DisableGracefulShutdown via the cancelCtx being passed
 		// to the collector's Run method in the Run function
 		DisableGracefulShutdown: true,

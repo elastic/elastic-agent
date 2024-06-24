@@ -30,10 +30,10 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 	})
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
-	fromVersion, err := version.ParseVersion(define.Version())
+	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	if fromVersion.Less(*minVersion) {
+	if currentVersion.Less(*minVersion) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
@@ -42,20 +42,28 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
+	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err)
 
-	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
-	require.NoError(t, err)
+	// Upgrade to an old build of the same version.
 	endFixture, err := atesting.NewFixture(
 		t,
-		upgradeToVersion,
+		upgradetest.EnsureSnapshot(define.Version()),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
 	require.NoError(t, err)
 
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), upgradeToVersion)
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	if startVersionInfo.Binary.String() == endVersionInfo.Binary.String() &&
+		startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("Build under test is the same as the build from the artifacts repository (version: %s) [commit: %s]",
+			startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
+	}
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", define.Version(), endVersionInfo.Binary.String())
 
 	defaultPGP := release.PGP()
 	firstSeven := string(defaultPGP[:7])
@@ -72,6 +80,11 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
+		// passing "" as source URI is a hack to disable the --source-uri argument pointing at the endFixture srcPackage location
+		// this test needs the agent to download the real thing from artifacts.elastic.co so empty string.
+		// We need to download the same file from the same url and  use that as end fixture
+		// or we need a way to disable the commit hash check (in this case the upgrade can be verified just with the
+		// version string)
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
 		upgradetest.WithSkipVerify(false))
@@ -86,10 +99,10 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	})
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
-	fromVersion, err := version.ParseVersion(define.Version())
+	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	if fromVersion.Less(*minVersion) {
+	if currentVersion.Less(*minVersion) {
 		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
@@ -98,16 +111,30 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
-	startFixture, err := define.NewFixture(t, define.Version())
+	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor(ctx, define.Version())
+	// This is probably a way of getting a signed package
+	upgradeToVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
+	var fetcher atesting.Fetcher
+
+	// FIXME: this is a hack, PreviousMinor() uses a version.ParsedSemVer internally and that's what we should use for the snapshot check
+	// We need to distinguish between snapshots and released versions and use the appropriate fetcher
+	if upgradeToVersion.IsSnapshot() {
+		// it's a snapshot, use the artifact fetcher
+		fetcher = atesting.ArtifactFetcher()
+	} else {
+		// it's a released version, use httpFetcher
+		// this fetcher will literally pull the package from the default elastic agent download URL
+		fetcher = atesting.NewHttpFetcher()
+	}
+
 	endFixture, err := atesting.NewFixture(
 		t,
-		upgradeToVersion,
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
+		upgradeToVersion.String(),
+		atesting.WithFetcher(fetcher),
 	)
 	require.NoError(t, err)
 
@@ -129,6 +156,11 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
+		// passing "" as source URI is a hack to disable the --source-uri argument pointing at the endFixture srcPackage location
+		// this test needs the agent to download the real thing from artifacts.elastic.co so empty string.
+		// We need to download the same file from the same url and  use that as end fixture
+		// or we need a way to disable the commit hash check (in this case the upgrade can be verified just with the
+		// version string)
 		upgradetest.WithSourceURI(""),
 		upgradetest.WithCustomPGP(customPGP),
 		upgradetest.WithSkipVerify(false))

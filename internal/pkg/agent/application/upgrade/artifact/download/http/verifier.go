@@ -7,7 +7,7 @@ package http
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -171,8 +171,7 @@ func (v *Verifier) getPublicAsc(sourceURI string) ([]byte, error) {
 		return nil, errors.New(err, "failed create request for loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
-	// TODO: receive a http.Client
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := v.client.Do(req)
 	if err != nil {
 		return nil, errors.New(err, "failed loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
@@ -182,5 +181,5 @@ func (v *Verifier) getPublicAsc(sourceURI string) ([]byte, error) {
 		return nil, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }

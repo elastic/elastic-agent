@@ -66,9 +66,9 @@ func Version() string {
 	return ver
 }
 
-// NewFixture returns a new Elastic Agent testing fixture with a LocalFetcher and
+// NewFixtureFromLocalBuild returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
-func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+func NewFixtureFromLocalBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	buildsDir := os.Getenv("AGENT_BUILD_DIR")
 	if buildsDir == "" {
 		projectDir, err := findProjectRoot()
@@ -82,7 +82,7 @@ func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*ate
 
 }
 
-// NewFixture returns a new Elastic Agent testing fixture with a LocalFetcher and
+// NewFixtureWithBinary returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
 func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	ver, err := semver.ParseVersion(version)
@@ -151,7 +151,7 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 		panic("failed to get OS information")
 	}
 	if !req.runtimeAllowed(runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform) {
-		t.Skip("platform, architecture, version, and distro not supported by test")
+		t.Skipf("platform: %s, architecture: %s, version: %s, and distro: %s combination is not supported by test.  required: %v", runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, req.OS)
 		return nil
 	}
 	namespace, err := getNamespace(t, local)

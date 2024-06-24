@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
 const (
@@ -27,8 +28,18 @@ type connInfoServer struct {
 	stopTimeout time.Duration
 }
 
-func newConnInfoServer(log *logger.Logger, comm Communicator, port int) (*connInfoServer, error) {
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+func newConnInfoServer(log *logger.Logger, comm Communicator, address string) (*connInfoServer, error) {
+	var (
+		listener net.Listener
+		err      error
+	)
+
+	if ipc.IsLocal(address) {
+		listener, err = ipc.CreateListener(log, address)
+	} else {
+		listener, err = net.Listen("tcp", address)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to start connection credentials listener: %w", err)
 	}
@@ -46,7 +57,7 @@ func newConnInfoServer(log *logger.Logger, comm Communicator, port int) (*connIn
 				break
 			}
 			log.Debugf("client connected, sending connection info")
-			err = comm.WriteConnInfo(conn)
+			err = comm.WriteStartUpInfo(conn)
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
 					log.Errorf("failed write conn info: %v", err)
