@@ -1,0 +1,31 @@
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task: managed
+      # - task: standalone
+
+  build:
+    cmds:
+      # note: create overlay
+      - kustomize build overlays/elastic-agent-managed > elastic-agent-managed-kubernetes.yaml
+      - kustomize build overlays/elastic-agent-standalone > elastic-agent-standalone-kubernetes.yaml
+
+  managed:
+    cmds:
+      - kubectl apply -k overlays/elastic-agent-managed
+
+  managed-delete:
+    cmds:
+      - kubectl delete -k overlays/elastic-agent-managed
+
+  standalone:
+    cmds:
+      - kubectl apply -k overlays/elastic-agent-standalone
+
+  standalone-delete:
+    cmds:
+      - kubectl delete -k overlays/elastic-agent-standalone

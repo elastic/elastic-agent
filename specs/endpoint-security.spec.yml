@@ -5,19 +5,24 @@ inputs:
     platforms:
       - linux/amd64
       - linux/arm64
-      - container/amd64
-      - container/arm64
-    outputs:
+    outputs: &outputs
       - elasticsearch
       - logstash
+      - kafka
+    proxied_actions: &proxied_actions
+      - UNENROLL
+      - UPGRADE
     runtime:
       preventions:
-        - condition: ${runtime.user.root} == false
-          message: "Elastic Agent must be running as root"
-        - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
-          message: "No support for RHEL7 on arm64"
-    service:
+        - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == 7
+          message: "Elastic Defend doesn't support RHEL7 on arm64"
+        - condition: ${user.root} == false
+          message: "Elastic Defend requires Elastic Agent be running as root"
+        - condition: ${install.in_default} == false
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
+    service: &service
       cport: 6788
+      csocket: ".eaci.sock"
       log:
         path: "/opt/Elastic/Endpoint/state/log/endpoint-*.log"
       operations: &operations
@@ -26,7 +31,7 @@ inputs:
             - "verify"
             - "--log"
             - "stderr"
-          timeout: 30
+          timeout: 30s
         install:
           args:
             - "install"
@@ -35,23 +40,30 @@ inputs:
             - "--upgrade"
             - "--resources"
             - "endpoint-security-resources.zip"
-          timeout: 600
+          timeout: 600s
         uninstall:
           args:
             - "uninstall"
             - "--log"
             - "stderr"
-          timeout: 600
+            - "--uninstall-token"
+          timeout: 600s
   - name: endpoint
     description: "Endpoint Security"
     platforms:
       - darwin/amd64
       - darwin/arm64
-    outputs:
-      - elasticsearch
-      - logstash
+    outputs: *outputs
+    proxied_actions: *proxied_actions
+    runtime:
+      preventions:
+        - condition: ${user.root} == false
+          message: "Elastic Defend requires Elastic Agent be running as root"
+        - condition: ${install.in_default} == false
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service:
       cport: 6788
+      csocket: ".eaci.sock"
       log:
         path: "/Library/Elastic/Endpoint/state/log/endpoint-*.log"
       operations: *operations
@@ -59,15 +71,35 @@ inputs:
     description: "Endpoint Security"
     platforms:
       - windows/amd64
-    outputs:
-      - elasticsearch
-      - logstash
+    outputs: *outputs
+    proxied_actions: *proxied_actions
     runtime:
       preventions:
-        - condition: ${runtime.user.root} == false
-          message: "Elastic Agent must be running as Administrator or SYSTEM"
+        - condition: ${user.root} == false
+          message: "Elastic Defend requires Elastic Agent be running as Administrator or SYSTEM"
+        - condition: ${install.in_default} == false
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
+        - condition: ${runtime.native_arch} != '' and ${runtime.native_arch} != 'amd64'
+          message: "Elastic Defend cannot be installed on Windows running on non-AMD64 CPU"
+        - condition: ${runtime.major} <= 6
+          message: "Elastic Defend requires Windows 10 / Server 2016 or newer."
     service:
       cport: 6788
+      csocket: ".eaci.sock"
       log:
         path: "C:\\Program Files\\Elastic\\Endpoint\\state\\log\\endpoint-*.log"
       operations: *operations
+  - name: endpoint
+    description: "Endpoint Security"
+    platforms:
+      - container/amd64
+      - container/arm64
+    outputs: *outputs
+    proxied_actions: *proxied_actions
+    runtime:
+      preventions:
+        - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == 7
+          message: "No support for RHEL7 on arm64"
+        - condition: ${user.root} == false
+          message: "Elastic Agent must be running as root"
+    service: *service

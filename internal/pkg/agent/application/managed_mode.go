@@ -10,21 +10,25 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/uploader"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
@@ -32,28 +36,37 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// dispatchFlushInterval is the max time between calls to dispatcher.Dispatch
+const dispatchFlushInterval = time.Minute * 5
+
 type managedConfigManager struct {
-	log         *logger.Logger
-	agentInfo   *info.AgentInfo
-	cfg         *configuration.Configuration
-	client      *remote.Client
-	store       storage.Store
-	stateStore  *store.StateStore
-	actionQueue *queue.ActionQueue
-	dispatcher  *dispatcher.ActionDispatcher
-	runtime     *runtime.Manager
-	coord       *coordinator.Coordinator
+	log                  *logger.Logger
+	agentInfo            info.Agent
+	cfg                  *configuration.Configuration
+	client               *remote.Client
+	store                storage.Store
+	stateStore           *store.StateStore
+	actionQueue          *queue.ActionQueue
+	dispatcher           *dispatcher.ActionDispatcher
+	runtime              *runtime.Manager
+	coord                *coordinator.Coordinator
+	fleetInitTimeout     time.Duration
+	initialClientSetters []actions.ClientSetter
 
 	ch    chan coordinator.ConfigChange
 	errCh chan error
 }
 
 func newManagedConfigManager(
+	ctx context.Context,
 	log *logger.Logger,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	cfg *configuration.Configuration,
 	storeSaver storage.Store,
 	runtime *runtime.Manager,
+	fleetInitTimeout time.Duration,
+	topPath string,
+	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
@@ -64,7 +77,7 @@ func newManagedConfigManager(
 	}
 
 	// Create the state store that will persist the last good policy change on disk.
-	stateStore, err := store.NewStateStoreWithMigration(log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
+	stateStore, err := store.NewStateStoreWithMigration(ctx, log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
 	if err != nil {
 		return nil, errors.New(err, fmt.Sprintf("fail to read action store '%s'", paths.AgentActionStoreFile()))
 	}
@@ -74,23 +87,25 @@ func newManagedConfigManager(
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
 
-	actionDispatcher, err := dispatcher.New(log, handlers.NewDefault(log), actionQueue)
+	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
 	}
 
 	return &managedConfigManager{
-		log:         log,
-		agentInfo:   agentInfo,
-		cfg:         cfg,
-		client:      client,
-		store:       storeSaver,
-		stateStore:  stateStore,
-		actionQueue: actionQueue,
-		dispatcher:  actionDispatcher,
-		runtime:     runtime,
-		ch:          make(chan coordinator.ConfigChange),
-		errCh:       make(chan error),
+		log:                  log,
+		agentInfo:            agentInfo,
+		cfg:                  cfg,
+		client:               client,
+		store:                storeSaver,
+		stateStore:           stateStore,
+		actionQueue:          actionQueue,
+		dispatcher:           actionDispatcher,
+		runtime:              runtime,
+		fleetInitTimeout:     fleetInitTimeout,
+		ch:                   make(chan coordinator.ConfigChange),
+		errCh:                make(chan error),
+		initialClientSetters: clientSetters,
 	}, nil
 }
 
@@ -107,7 +122,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	}
 
 	// Reload ID because of win7 sync issue
-	if err := m.agentInfo.ReloadID(); err != nil {
+	if err := m.agentInfo.ReloadID(ctx); err != nil {
 		return err
 	}
 
@@ -150,7 +165,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
 		m.log.Info("restoring current policy from disk")
-		m.dispatcher.Dispatch(ctx, actionAcker, actions...)
+		m.dispatcher.Dispatch(ctx, m.coord.SetUpgradeDetails, actionAcker, actions...)
 		stateRestored = true
 	}
 
@@ -163,7 +178,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
 		} else {
-			err = m.initFleetServer(ctx)
+			err = m.initFleetServer(ctx, m.cfg.Fleet.Server)
 			if err != nil {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
@@ -175,7 +190,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.agentInfo,
 		m.client,
 		actionAcker,
-		m.coord,
+		m.coord.State,
 		m.stateStore,
 	)
 	if err != nil {
@@ -186,6 +201,16 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	if m.cfg.Fleet.Server == nil {
 		policyChanger.AddSetter(gateway)
 		policyChanger.AddSetter(ack)
+
+		for _, cs := range m.initialClientSetters {
+			policyChanger.AddSetter(cs)
+		}
+	} else {
+		// locally managed fleet server
+		// init with local address
+		for _, cs := range m.initialClientSetters {
+			cs.SetClient(m.client)
+		}
 	}
 
 	// Proxy errors from the gateway to our own channel.
@@ -206,20 +231,27 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		return gateway.Run(ctx)
 	})
 
-	// pass actions collected from gateway to dispatcher
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case actions := <-gateway.Actions():
-				m.dispatcher.Dispatch(ctx, actionAcker, actions...)
-			}
-		}
-	}()
+	go runDispatcher(ctx, m.dispatcher, gateway, m.coord.SetUpgradeDetails, actionAcker, dispatchFlushInterval)
 
 	<-ctx.Done()
 	return gatewayRunner.Err()
+}
+
+// runDispatcher passes actions collected from gateway to dispatcher or calls Dispatch with no actions every flushInterval.
+func runDispatcher(ctx context.Context, actionDispatcher dispatcher.Dispatcher, fleetGateway coordinator.FleetGateway, detailsSetter details.Observer, actionAcker acker.Acker, flushInterval time.Duration) {
+	t := time.NewTimer(flushInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C: // periodically call the dispatcher to handle scheduled actions.
+			actionDispatcher.Dispatch(ctx, detailsSetter, actionAcker)
+			t.Reset(flushInterval)
+		case actions := <-fleetGateway.Actions():
+			actionDispatcher.Dispatch(ctx, detailsSetter, actionAcker, actions...)
+			t.Reset(flushInterval)
+		}
+	}
 }
 
 // ActionErrors returns the error channel for actions.
@@ -246,14 +278,19 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 	return false
 }
 
-func (m *managedConfigManager) initFleetServer(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
+
+	if m.fleetInitTimeout == 0 {
+		m.fleetInitTimeout = 30 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, m.fleetInitTimeout)
 	defer cancel()
 
-	m.log.Debugf("injecting basic fleet-server for first start")
+	m.log.Debugf("injecting basic fleet-server for first start, will wait %s", m.fleetInitTimeout)
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("timeout while waiting for fleet server start: %w", ctx.Err())
 	case m.ch <- &localConfigChange{injectFleetServerInput}:
 	}
 
@@ -298,12 +335,19 @@ func fleetServerRunning(state runtime.ComponentState) bool {
 }
 
 func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *handlers.PolicyChangeHandler {
+	settingsHandler := handlers.NewSettings(
+		m.log,
+		m.agentInfo,
+		m.coord,
+	)
+
 	policyChanger := handlers.NewPolicyChangeHandler(
 		m.log,
 		m.agentInfo,
 		m.cfg,
 		m.store,
 		m.ch,
+		settingsHandler,
 	)
 
 	m.dispatcher.MustRegister(
@@ -320,6 +364,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		&fleetapi.ActionUnenroll{},
 		handlers.NewUnenroll(
 			m.log,
+			m.coord,
 			m.ch,
 			[]context.CancelFunc{canceller},
 			m.stateStore,
@@ -333,11 +378,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionSettings{},
-		handlers.NewSettings(
-			m.log,
-			m.agentInfo,
-			m.coord,
-		),
+		settingsHandler,
 	)
 
 	m.dispatcher.MustRegister(
@@ -349,8 +390,19 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	)
 
 	m.dispatcher.MustRegister(
+		&fleetapi.ActionDiagnostics{},
+		handlers.NewDiagnostics(
+			m.log,
+			paths.Top(), // TODO: stop using global state
+			m.coord,
+			m.cfg.Settings.MonitoringConfig.Diagnostics.Limit,
+			uploader.New(m.agentInfo.AgentID(), m.client, m.cfg.Settings.MonitoringConfig.Diagnostics.Uploader),
+		),
+	)
+
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionApp{},
-		handlers.NewAppAction(m.log, m.coord),
+		handlers.NewAppAction(m.log, m.coord, m.agentInfo.AgentID()),
 	)
 
 	m.dispatcher.MustRegister(

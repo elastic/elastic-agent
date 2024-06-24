@@ -6,6 +6,7 @@ package mage
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -20,15 +21,15 @@ var (
 	}
 )
 
-// BuildGoDaemon builds the go-deamon binary.
+// BuildGoDaemon builds the go-daemon binary.
 func BuildGoDaemon() error {
 	if GOOS != "linux" {
 		return errors.New("go-daemon only builds for linux")
 	}
 
 	if os.Getenv("GOLANG_CROSSBUILD") != "1" {
-		return errors.New("Use the crossBuildGoDaemon target. buildGoDaemon can " +
-			"only be executed within the golang-crossbuild docker environment.")
+		return errors.New("use the crossBuildGoDaemon target. buildGoDaemon can " +
+			"only be executed within the golang-crossbuild docker environment")
 	}
 
 	// Test if binaries are up-to-date.
@@ -69,6 +70,7 @@ func BuildGoDaemon() error {
 // CrossBuildGoDaemon cross-build the go-daemon binary using the
 // golang-crossbuild environment.
 func CrossBuildGoDaemon(options ...CrossBuildOption) error {
+	fmt.Println("--- CrossBuildGoDaemon Elastic-Agent")
 	opts := append(defaultCrossBuildGoDaemon, options...)
 	return CrossBuild(opts...)
 }

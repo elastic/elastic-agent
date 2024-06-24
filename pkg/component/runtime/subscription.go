@@ -10,16 +10,14 @@ import (
 
 // Subscription provides a channel for notifications on a component state.
 type Subscription struct {
-	ctx     context.Context
-	manager *Manager
-	ch      chan ComponentState
+	ctx context.Context
+	ch  chan ComponentState
 }
 
-func newSubscription(ctx context.Context, manager *Manager) *Subscription {
+func newSubscription(ctx context.Context) *Subscription {
 	return &Subscription{
-		ctx:     ctx,
-		manager: manager,
-		ch:      make(chan ComponentState),
+		ctx: ctx,
+		ch:  make(chan ComponentState),
 	}
 }
 
@@ -30,16 +28,23 @@ func (s *Subscription) Ch() <-chan ComponentState {
 
 // SubscriptionAll provides a channel for notifications on all component state changes.
 type SubscriptionAll struct {
-	ctx     context.Context
-	manager *Manager
-	ch      chan ComponentComponentState
+	ctx context.Context
+	ch  chan ComponentComponentState
 }
 
-func newSubscriptionAll(ctx context.Context, manager *Manager) *SubscriptionAll {
+func newSubscriptionAll(ctx context.Context) *SubscriptionAll {
 	return &SubscriptionAll{
-		ctx:     ctx,
-		manager: manager,
-		ch:      make(chan ComponentComponentState),
+		ctx: ctx,
+		ch:  make(chan ComponentComponentState),
+	}
+}
+
+// NewSubscriptionAllWithChannel creates a SubscriptionAll using an existing channel
+// For Test purposes ONLY.
+func NewSubscriptionAllWithChannel(ctx context.Context, evtChan chan ComponentComponentState) *SubscriptionAll {
+	return &SubscriptionAll{
+		ctx: ctx,
+		ch:  evtChan,
 	}
 }
 

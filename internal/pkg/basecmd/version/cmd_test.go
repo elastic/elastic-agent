@@ -5,9 +5,11 @@
 package version
 
 import (
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
+
+	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +18,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/server"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -29,7 +30,7 @@ func TestCmdBinaryOnly(t *testing.T) {
 	require.NoError(t, err)
 	err = cmd.Execute()
 	require.NoError(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 
 	require.NoError(t, err)
 	assert.True(t, strings.Contains(string(version), "Binary: "))
@@ -45,7 +46,7 @@ func TestCmdBinaryOnlyYAML(t *testing.T) {
 	require.NoError(t, err)
 	err = cmd.Execute()
 	require.NoError(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 
 	require.NoError(t, err)
 
@@ -66,7 +67,7 @@ func TestCmdDaemon(t *testing.T) {
 	cmd := NewCommandWithArgs(streams)
 	err := cmd.Execute()
 	require.NoError(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 
 	require.NoError(t, err)
 	assert.True(t, strings.Contains(string(version), "Binary: "))
@@ -84,7 +85,7 @@ func TestCmdDaemonYAML(t *testing.T) {
 	require.NoError(t, err)
 	err = cmd.Execute()
 	require.NoError(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 
 	require.NoError(t, err)
 
@@ -102,7 +103,7 @@ func TestCmdDaemonErr(t *testing.T) {
 	cmd := NewCommandWithArgs(streams)
 	err := cmd.Execute()
 	require.Error(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 	require.NoError(t, err)
 
 	assert.True(t, strings.Contains(string(version), "Binary: "))
@@ -117,7 +118,7 @@ func TestCmdDaemonErrYAML(t *testing.T) {
 	require.NoError(t, err)
 	err = cmd.Execute()
 	require.Error(t, err)
-	version, err := ioutil.ReadAll(out)
+	version, err := io.ReadAll(out)
 
 	require.NoError(t, err)
 	var output Output
@@ -134,7 +135,10 @@ func newErrorLogger(t *testing.T) *logger.Logger {
 	loggerCfg := logger.DefaultLoggingConfig()
 	loggerCfg.Level = logp.ErrorLevel
 
-	log, err := logger.NewFromConfig("", loggerCfg, false)
+	eventLoggerCfg := logger.DefaultEventLoggingConfig()
+	eventLoggerCfg.Level = loggerCfg.Level
+
+	log, err := logger.NewFromConfig("", loggerCfg, eventLoggerCfg, false)
 	require.NoError(t, err)
 	return log
 }

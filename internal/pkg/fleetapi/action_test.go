@@ -152,4 +152,84 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		assert.Equal(t, "http://example.com", action.SourceURI)
 		assert.Equal(t, 1, action.Retry)
 	})
+	t.Run("ActionDiagnostics with no additional metrics", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"REQUEST_DIAGNOSTICS","data":{}}]`)
+		a := &Actions{}
+		err := a.UnmarshalJSON(p)
+		require.Nil(t, err)
+		action, ok := (*a)[0].(*ActionDiagnostics)
+		require.True(t, ok, "unable to cast action to specific type")
+		assert.Equal(t, "testid", action.ActionID)
+		assert.Equal(t, ActionTypeDiagnostics, action.ActionType)
+		assert.Empty(t, action.AdditionalMetrics)
+	})
+	t.Run("ActionDiagnostics with additional CPU metrics", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"REQUEST_DIAGNOSTICS","data":{"additional_metrics":["CPU"]}}]`)
+		a := &Actions{}
+		err := a.UnmarshalJSON(p)
+		require.Nil(t, err)
+		action, ok := (*a)[0].(*ActionDiagnostics)
+		require.True(t, ok, "unable to cast action to specific type")
+		assert.Equal(t, "testid", action.ActionID)
+		assert.Equal(t, ActionTypeDiagnostics, action.ActionType)
+		require.Len(t, action.AdditionalMetrics, 1)
+		assert.Equal(t, "CPU", action.AdditionalMetrics[0])
+	})
+}
+
+func TestActionUnenrollMarshalMap(t *testing.T) {
+	action := ActionUnenroll{
+		ActionID:   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		ActionType: "UNENROLL",
+		Signed: &Signed{
+			Data:      "eyJAdGltZXN0YW1wIjoiMjAy",
+			Signature: "MEQCIGxsrI742xKL6OSI",
+		},
+	}
+
+	m, err := action.MarshalMap()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	diff := cmp.Diff(m, map[string]interface{}{
+		"id":   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		"type": "UNENROLL",
+		"signed": map[string]interface{}{
+			"data":      "eyJAdGltZXN0YW1wIjoiMjAy",
+			"signature": "MEQCIGxsrI742xKL6OSI",
+		},
+	})
+
+	if diff != "" {
+		t.Fatal(diff)
+	}
+}
+
+func TestActionUpgradeMarshalMap(t *testing.T) {
+	action := ActionUpgrade{
+		ActionID:   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		ActionType: "UPGRADE",
+		Signed: &Signed{
+			Data:      "eyJAdGltZXN0YW1wIjoiMjAy",
+			Signature: "MEQCIGxsrI742xKL6OSI",
+		},
+	}
+	m, err := action.MarshalMap()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	diff := cmp.Diff(m, map[string]interface{}{
+		"id":   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		"type": "UPGRADE",
+		"signed": map[string]interface{}{
+			"data":      "eyJAdGltZXN0YW1wIjoiMjAy",
+			"signature": "MEQCIGxsrI742xKL6OSI",
+		},
+	})
+
+	if diff != "" {
+		t.Fatal(diff)
+	}
 }

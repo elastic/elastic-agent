@@ -14,6 +14,7 @@ import (
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -31,7 +32,7 @@ type priorityQueue interface {
 
 // Dispatcher processes actions coming from fleet api.
 type Dispatcher interface {
-	Dispatch(context.Context, acker.Acker, ...fleetapi.Action)
+	Dispatch(context.Context, details.Observer, acker.Acker, ...fleetapi.Action)
 	Errors() <-chan error
 }
 
@@ -43,10 +44,13 @@ type ActionDispatcher struct {
 	queue    priorityQueue
 	rt       *retryConfig
 	errCh    chan error
+	topPath  string
+
+	lastUpgradeDetails *details.Details
 }
 
 // New creates a new action dispatcher.
-func New(log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionDispatcher, error) {
+func New(log *logger.Logger, topPath string, def actions.Handler, queue priorityQueue) (*ActionDispatcher, error) {
 	var err error
 	if log == nil {
 		log, err = logger.New("action_dispatcher", false)
@@ -66,6 +70,7 @@ func New(log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionD
 		queue:    queue,
 		rt:       defaultRetryConfig(),
 		errCh:    make(chan error),
+		topPath:  topPath,
 	}, nil
 }
 
@@ -101,7 +106,7 @@ func (ad *ActionDispatcher) key(a fleetapi.Action) string {
 // Dispatch will handle action queue operations, and retries.
 // Any action that implements the ScheduledAction interface may be added/removed from the queue based on StartTime.
 // Any action that implements the RetryableAction interface will be rescheduled if the handler returns an error.
-func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, actions ...fleetapi.Action) {
+func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.Observer, acker acker.Acker, actions ...fleetapi.Action) {
 	var err error
 	span, ctx := apm.StartSpan(ctx, "dispatch", "app.internal")
 	defer func() {
@@ -110,11 +115,18 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 	}()
 
 	ad.removeQueuedUpgrades(actions)
+
+	// set scheduled action as soon as it's received
+	// report it before the scheduled actions go to the queue
+	ad.reportNextScheduledUpgrade(actions, detailsSetter, ad.log)
+
 	actions = ad.queueScheduledActions(actions)
 	actions = ad.dispatchCancelActions(ctx, actions, acker)
 	queued, expired := ad.gatherQueuedActions(time.Now().UTC())
 	ad.log.Debugf("Gathered %d actions from queue, %d actions expired", len(queued), len(expired))
 	ad.log.Debugf("Expired actions: %v", expired)
+
+	ad.handleExpired(expired, detailsSetter)
 	actions = append(actions, queued...)
 
 	if err := ad.queue.Save(); err != nil {
@@ -146,7 +158,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 				ad.scheduleRetry(ctx, rAction, acker)
 				continue
 			}
-			ad.log.Debugf("Failed to dispatch action '%+v', error: %+v", action, err)
+			ad.log.Errorf("Failed to dispatch action id %q of type %q, error: %+v", action.ID(), action.Type(), err)
 			reportedErr = err
 			continue
 		}
@@ -248,7 +260,7 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	attempt := action.RetryAttempt()
 	d, err := ad.rt.GetWait(attempt)
 	if err != nil {
-		ad.log.Errorf("No more reties for action id %s: %v", action.ID(), err)
+		ad.log.Errorf("No more retries for action id %s: %v", action.ID(), err)
 		action.SetRetryAttempt(-1)
 		if err := acker.Ack(ctx, action); err != nil {
 			ad.log.Errorf("Unable to ack action failure (id %s) to fleet-server: %v", action.ID(), err)
@@ -276,4 +288,88 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	if err := acker.Commit(ctx); err != nil {
 		ad.log.Errorf("Unable to commit action retry (id %s) to fleet-server: %v", action.ID(), err)
 	}
+}
+
+func (ad *ActionDispatcher) handleExpired(
+	expired []fleetapi.Action,
+	upgradeDetailsSetter details.Observer) {
+
+	for _, e := range expired {
+		if e.Type() == fleetapi.ActionTypeUpgrade {
+			// there is a scheduled upgrade set, if it isn't the same actions as
+			// the expired, the current status take precedence
+			if ad.lastUpgradeDetails != nil &&
+				ad.lastUpgradeDetails.ActionID != e.ID() {
+				continue
+			}
+
+			version := "unknown"
+			expiration := "unknown"
+			if upgrade, ok := e.(*fleetapi.ActionUpgrade); ok {
+				version = upgrade.Version
+				expiration = upgrade.ActionExpiration
+			}
+			ad.lastUpgradeDetails = details.NewDetails(version, details.StateFailed, e.ID())
+			ad.lastUpgradeDetails.Fail(fmt.Errorf("upgrade action %q expired on %s",
+				e.ID(), expiration))
+
+			upgradeDetailsSetter(ad.lastUpgradeDetails)
+		}
+	}
+}
+
+func (ad *ActionDispatcher) reportNextScheduledUpgrade(input []fleetapi.Action, detailsSetter details.Observer, log *logger.Logger) {
+	var nextUpgrade *fleetapi.ActionUpgrade
+	for _, action := range input {
+		sAction, ok := action.(fleetapi.ScheduledAction)
+		if !ok {
+			continue
+		}
+
+		uAction, ok := sAction.(*fleetapi.ActionUpgrade)
+		if !ok {
+			continue
+		}
+
+		start, err := uAction.StartTime()
+		if err != nil {
+			log.Errorf("failed to get start time for scheduled upgrade action [id = %s]", uAction.ID())
+			continue
+		}
+
+		if !start.After(time.Now()) {
+			continue
+		}
+
+		if nextUpgrade == nil {
+			nextUpgrade = uAction
+			continue
+		}
+
+		nextUpgradeStartTime, _ := nextUpgrade.StartTime()
+		if start.Before(nextUpgradeStartTime) {
+			nextUpgrade = uAction
+		}
+	}
+
+	// If there is no scheduled upgrade, nothing to do.
+	if nextUpgrade == nil {
+		return
+	}
+
+	upgradeDetails := details.NewDetails(
+		nextUpgrade.Version,
+		details.StateScheduled,
+		nextUpgrade.ID())
+	startTime, err := nextUpgrade.StartTime()
+	if err != nil {
+		ad.log.Warnw(
+			fmt.Sprintf("could not get start time from action %s: %v",
+				nextUpgrade, err),
+			"error.message", err.Error())
+	}
+	upgradeDetails.Metadata.ScheduledAt = &startTime
+
+	detailsSetter(upgradeDetails)
+	ad.lastUpgradeDetails = upgradeDetails
 }

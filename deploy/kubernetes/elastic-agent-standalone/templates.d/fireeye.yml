@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-fireeye
+      id: filestream-fireeye-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -24,6 +25,7 @@ inputs:
             - fireeye-nx
       data_stream.namespace: default
     - name: udp-fireeye
+      id: udp-fireeye-${kubernetes.hints.container_id}
       type: udp
       use_output: default
       streams:
@@ -41,6 +43,7 @@ inputs:
           udp: null
       data_stream.namespace: default
     - name: tcp-fireeye
+      id: tcp-fireeye-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:

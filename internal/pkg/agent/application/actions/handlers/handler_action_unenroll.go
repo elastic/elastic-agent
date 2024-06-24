@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const (
@@ -32,23 +33,29 @@ type stateStore interface {
 // For it to be operational again it needs to be either enrolled or reconfigured.
 type Unenroll struct {
 	log        *logger.Logger
+	coord      actionCoordinator
 	ch         chan coordinator.ConfigChange
 	closers    []context.CancelFunc
 	stateStore stateStore
+
+	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
 }
 
 // NewUnenroll creates a new Unenroll handler.
 func NewUnenroll(
 	log *logger.Logger,
+	coord actionCoordinator,
 	ch chan coordinator.ConfigChange,
 	closers []context.CancelFunc,
 	stateStore stateStore,
 ) *Unenroll {
 	return &Unenroll{
-		log:        log,
-		ch:         ch,
-		closers:    closers,
-		stateStore: stateStore,
+		log:                log,
+		coord:              coord,
+		ch:                 ch,
+		closers:            closers,
+		stateStore:         stateStore,
+		tamperProtectionFn: features.TamperProtection,
 	}
 }
 
@@ -60,11 +67,28 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		return fmt.Errorf("invalid type, expected ActionUnenroll and received %T", a)
 	}
 
+	if h.tamperProtectionFn() {
+		// Find inputs that want to receive UNENROLL action
+		// Endpoint needs to receive a signed UNENROLL action in order to be able to uncontain itself
+		state := h.coord.State()
+		ucs := findMatchingUnitsByActionType(state, a.Type())
+		if len(ucs) > 0 {
+			err := notifyUnitsOfProxiedAction(ctx, h.log, action, ucs, h.coord.PerformAction)
+			if err != nil {
+				return err
+			}
+		} else {
+			// Log and continue
+			h.log.Debugf("No components running for %v action type", a.Type())
+		}
+	}
+
 	if action.IsDetected {
 		// not from Fleet; so we set it to nil so policyChange doesn't ack it
 		a = nil
 	}
 
+	// Generate empty policy change, this removing all the running components
 	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true)
 	h.ch <- unenrollPolicy
 

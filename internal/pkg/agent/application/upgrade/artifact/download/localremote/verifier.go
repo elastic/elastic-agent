@@ -17,18 +17,20 @@ import (
 
 // NewVerifier creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
-func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (download.Verifier, error) {
+func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (download.Verifier, error) {
 	verifiers := make([]download.Verifier, 0, 3)
 
-	fsVer, err := fs.NewVerifier(config, allowEmptyPgp, pgp)
+	fsVer, err := fs.NewVerifier(log, config, pgp)
 	if err != nil {
 		return nil, err
 	}
 	verifiers = append(verifiers, fsVer)
 
+	// if the current build is a snapshot we use this downloader to update to the latest snapshot of the same version
+	// useful for testing with a snapshot version of fleet for example
 	// try snapshot repo before official
 	if release.Snapshot() {
-		snapshotVerifier, err := snapshot.NewVerifier(config, allowEmptyPgp, pgp, "")
+		snapshotVerifier, err := snapshot.NewVerifier(log, config, pgp, nil)
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -36,11 +38,11 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 		}
 	}
 
-	remoteVer, err := http.NewVerifier(config, allowEmptyPgp, pgp)
+	remoteVer, err := http.NewVerifier(log, config, pgp)
 	if err != nil {
 		return nil, err
 	}
 	verifiers = append(verifiers, remoteVer)
 
-	return composed.NewVerifier(verifiers...), nil
+	return composed.NewVerifier(log, verifiers...), nil
 }

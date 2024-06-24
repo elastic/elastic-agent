@@ -1,0 +1,25 @@
+version: 8.10.4
+entries:
+    - kind: feature
+      summary: Secondary fallback for package signature verification
+      description: Ability to upgrade securely in air-gapped environment where fleet server is the only reachable URI.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3453
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3264
+      timestamp: 1695289867
+      file:
+        name: 1695289867-Secondary-fallback-for-package-signature-verification.yaml
+        checksum: 8f8c39d9eef2f5b6922353bcab9c4ee1b74b1378
+    - kind: breaking-change
+      summary: Elastic-agent-autodiscover to v0.6.4. Disables metadata for deployment and cronjob
+      description: Elastic-agent-autodiscover library by default comes with add_resource_metadata.deployment=false and add_resource_metadata.cronjob=false. Pods that will be created from deployments or cronjobs will not have the extra metadata field for kubernetes.deployment or kubernetes.cronjob respectively.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3591
+      issue: []
+      timestamp: 1697102363
+      file:
+        name: 1697102363-updating_agentautodiscovery_810.yaml
+        checksum: fe9015185dc4d3fe85f9c2ebf9f47e64e26fc67d

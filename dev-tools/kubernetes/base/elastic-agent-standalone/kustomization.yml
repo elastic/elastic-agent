@@ -1,0 +1,23 @@
+namespace: kube-system
+commonLabels:
+  k8s-app: elastic-agent
+namePrefix: elastic-agent-standalone-
+
+images:
+  - name: docker.elastic.co/beats/elastic-agent
+    newTag: "8.6.0"
+
+resources:
+  - ../../base/common
+  - role-kubeadm-config.yaml
+  - role-binding-kubeadm-config.yaml
+  - config-map.yaml
+  - daemonset.yaml
+
+configMapGenerator:
+  - name: configs
+    envs:
+      - .env
+
+generatorOptions:
+  disableNameSuffixHash: true

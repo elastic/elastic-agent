@@ -1,0 +1,49 @@
+version: 8.8.2
+entries:
+    - kind: security
+      summary: Increase Go version to 1.19.10.
+      description: ""
+      component: "elastic-agent"
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2846
+      issue: []
+      timestamp: 1686684090
+      file:
+        name: 1686684090-Increase-Go-version-to-1.19.10..yaml
+        checksum: 104bfc9df8da00d107f9df4373148befc9d17c1d
+    - kind: bug-fix
+      summary: Explicitly specify timeout units as seconds in Endpoint spec file.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2870
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2863
+      timestamp: 1686770028
+      file:
+        name: 1686770028-spec-timeout-units.yaml
+        checksum: 9052470a9fcf1c244ab4036424b4b358f5373abd
+    - kind: enhancement
+      summary: Log start and stop operations from service runtime at INFO level.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2879
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2864
+      timestamp: 1686833548
+      file:
+        name: 1686833548-service-runtime-info-logging.yaml
+        checksum: c2fa59f5eb73e84f6cd392eb2c096b376224cc60
+    - kind: bug-fix
+      summary: Fix logs collection in diagnostics when Elastic Agent is running on k8s.
+      description: ""
+      component: "elastic-agent"
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2905
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2899
+      timestamp: 1687251084
+      file:
+        name: 1687251084-Fixed-diagnostics-logging-collection-on-k8s.yaml
+        checksum: 72c249e04c50a336cbfedb81abc4d9685daffc75

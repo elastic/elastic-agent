@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-redis
+      id: filestream-redis-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -24,6 +25,7 @@ inputs:
             - redis-log
       data_stream.namespace: default
     - name: redis-redis
+      id: redis-redis-${kubernetes.hints.container_id}
       type: redis
       use_output: default
       streams:
@@ -36,6 +38,7 @@ inputs:
           password: ${kubernetes.hints.redis.slowlog.password|kubernetes.hints.redis.password|''}
       data_stream.namespace: default
     - name: redis/metrics-redis
+      id: redis/metrics-redis-${kubernetes.hints.container_id}
       type: redis/metrics
       use_output: default
       streams:

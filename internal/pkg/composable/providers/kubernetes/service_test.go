@@ -5,9 +5,13 @@
 package kubernetes
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
+
+	"github.com/elastic/elastic-agent-libs/config"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
@@ -16,6 +20,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestGenerateServiceData(t *testing.T) {
@@ -101,6 +107,85 @@ func TestGenerateServiceData(t *testing.T) {
 		target, _ := k["target"].(string)
 		fields := k["fields"]
 		assert.Equal(t, processors[target], fields)
+	}
+}
+
+func TestServiceEventer_NamespaceWatcher(t *testing.T) {
+	client := k8sfake.NewSimpleClientset()
+
+	log, err := logger.New("service-eventer-test", true)
+	assert.NoError(t, err)
+
+	providerDataChan := make(chan providerData, 1)
+
+	comm := MockDynamicComm{
+		context.TODO(),
+		providerDataChan,
+	}
+
+	tests := []struct {
+		namespaceEnabled bool
+		hintsEnabled     bool
+		expectedNil      bool
+		name             string
+		msg              string
+	}{
+		{
+			namespaceEnabled: false,
+			hintsEnabled:     false,
+			expectedNil:      true,
+			name:             "add_resource_metadata.namespace disabled and hints disabled.",
+			msg:              "Namespace watcher should be nil.",
+		},
+		{
+			namespaceEnabled: false,
+			hintsEnabled:     true,
+			expectedNil:      false,
+			name:             "add_resource_metadata.namespace disabled and hints enabled.",
+			msg:              "Namespace watcher should not be nil.",
+		},
+		{
+			namespaceEnabled: true,
+			hintsEnabled:     false,
+			expectedNil:      false,
+			name:             "add_resource_metadata.namespace enabled and hints disabled.",
+			msg:              "Namespace watcher should not be nil.",
+		},
+		{
+			namespaceEnabled: true,
+			hintsEnabled:     false,
+			expectedNil:      false,
+			name:             "add_resource_metadata default and hints default.",
+			msg:              "Watcher should not be nil.",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var cfg Config
+			cfg.InitDefaults()
+
+			nsCfg, err := config.NewConfigFrom(map[string]interface{}{
+				"enabled": test.namespaceEnabled,
+			})
+			assert.NoError(t, err)
+
+			cfg.AddResourceMetadata.Namespace = nsCfg
+			cfg.Hints.Enabled = test.hintsEnabled
+
+			eventer, err := NewServiceEventer(&comm, &cfg, log, client, "cluster", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			namespaceWatcher := eventer.(*service).namespaceWatcher
+
+			if test.expectedNil {
+				assert.Equalf(t, nil, namespaceWatcher, test.msg)
+			} else {
+				assert.NotEqualf(t, nil, namespaceWatcher, test.msg)
+			}
+		})
 	}
 }
 

@@ -5,7 +5,7 @@
 package component
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -46,16 +46,8 @@ func TestLoadSpec_Components(t *testing.T) {
 			Path: "apm-server.spec.yml",
 		},
 		{
-			Name: "Auditbeat",
-			Path: "auditbeat.spec.yml",
-		},
-		{
 			Name: "Cloudbeat",
 			Path: "cloudbeat.spec.yml",
-		},
-		{
-			Name: "Cloud Defend",
-			Path: "cloud-defend.spec.yml",
 		},
 		{
 			Name: "Endpoint Security",
@@ -63,33 +55,29 @@ func TestLoadSpec_Components(t *testing.T) {
 		},
 		{
 			Name: "Filebeat",
-			Path: "filebeat.spec.yml",
+			Path: "testbeat.spec.yml",
 		},
 		{
 			Name: "Fleet Server",
 			Path: "fleet-server.spec.yml",
 		},
 		{
-			Name: "Heartbeat",
-			Path: "heartbeat.spec.yml",
+			Name: "Universal Profiling Collector",
+			Path: "pf-elastic-collector.spec.yml",
 		},
 		{
-			Name: "Metricbeat",
-			Path: "metricbeat.spec.yml",
+			Name: "Universal Profiling Symbolizer",
+			Path: "pf-elastic-symbolizer.spec.yml",
 		},
 		{
-			Name: "Osquerybeat",
-			Path: "osquerybeat.spec.yml",
-		},
-		{
-			Name: "Packetbeat",
-			Path: "packetbeat.spec.yml",
+			Name: "Universal Profiling Agent",
+			Path: "pf-host-agent.spec.yml",
 		},
 	}
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
-			data, err := ioutil.ReadFile(filepath.Join("..", "..", "specs", scenario.Path))
+			data, err := os.ReadFile(filepath.Join("..", "..", "specs", scenario.Path))
 			require.NoError(t, err)
 			_, err = LoadSpec(data)
 			require.NoError(t, err)

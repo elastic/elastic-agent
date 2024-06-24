@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -14,26 +15,26 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 )
 
 // Package packages the Beat for distribution. It generates packages based on
 // the set of target platforms and registered packaging specifications.
 func Package() error {
+	fmt.Println("--- Package artifact")
 	if len(Platforms) == 0 {
 		fmt.Println(">> package: Skipping because the platform list is empty")
 		return nil
 	}
 
 	if len(Packages) == 0 {
-		return errors.New("no package specs are registered. Call " +
-			"UseCommunityBeatPackaging, UseElasticBeatPackaging or USeElasticBeatWithoutXPackPackaging first.")
+		return fmt.Errorf("no package specs are registered. Call " +
+			"UseCommunityBeatPackaging, UseElasticBeatPackaging or USeElasticBeatWithoutXPackPackaging first")
 	}
 
 	// platforms := updateWithDarwinUniversal(Platforms)
 	platforms := Platforms
 
-	var tasks []interface{}
+	tasks := make(map[string][]interface{})
 	for _, target := range platforms {
 		for _, pkg := range Packages {
 			if pkg.OS != target.GOOS() || pkg.Arch != "" && pkg.Arch != target.Arch() {
@@ -93,27 +94,16 @@ func Package() error {
 
 				spec = spec.Evaluate()
 
-				tasks = append(tasks, packageBuilder{target, spec, pkgType}.Build)
+				tasks[target.GOOS()+"-"+target.Arch()] = append(tasks[target.GOOS()+"-"+target.Arch()], packageBuilder{target, spec, pkgType}.Build)
 			}
 		}
 	}
 
-	Parallel(tasks...)
-	return nil
-}
-
-// updateWithDarwinUniversal checks if darwin/amd64 and darwin/arm64, are listed
-// if so, the universal binary was built, then we need to package it as well.
-func updateWithDarwinUniversal(platforms BuildPlatformList) BuildPlatformList {
-	if IsDarwinUniversal() {
-		platforms = append(platforms,
-			BuildPlatform{
-				Name:  "darwin/universal",
-				Flags: CGOSupported | CrossBuildSupported | Default,
-			})
+	for k, v := range tasks {
+		fmt.Printf(">> package: Building %s\n", k)
+		Parallel(v...)
 	}
-
-	return platforms
+	return nil
 }
 
 // isPackageTypeSelected returns true if SelectedPackageTypes is empty or if
@@ -140,8 +130,11 @@ type packageBuilder struct {
 func (b packageBuilder) Build() error {
 	fmt.Printf(">> package: Building %v type=%v for platform=%v\n", b.Spec.Name, b.Type, b.Platform.Name)
 	log.Printf("Package spec: %+v", b.Spec)
-	return errors.Wrapf(b.Type.Build(b.Spec), "failed building %v type=%v for platform=%v",
-		b.Spec.Name, b.Type, b.Platform.Name)
+	if err := b.Type.Build(b.Spec); err != nil {
+		return fmt.Errorf("failed building %v type=%v for platform=%v : %w",
+			b.Spec.Name, b.Type, b.Platform.Name, err)
+	}
+	return nil
 }
 
 type testPackagesParams struct {
@@ -194,6 +187,7 @@ func WithRootUserContainer() func(params *testPackagesParams) {
 // TestPackages executes the package tests on the produced binaries. These tests
 // inspect things like file ownership and mode.
 func TestPackages(options ...TestPackagesOption) error {
+	fmt.Println("--- TestPackages")
 	params := testPackagesParams{}
 	for _, opt := range options {
 		opt(&params)
@@ -236,10 +230,10 @@ func TestPackages(options ...TestPackagesOption) error {
 	args = append(args, "-files", MustExpand("{{.PWD}}/build/distributions/*"))
 
 	if out, err := goTest(args...); err != nil {
-		if !mg.Verbose() {
+		if mg.Verbose() {
 			fmt.Println(out)
 		}
-		return err
+		return fmt.Errorf("error running package_test.go: %w, stdout: %s", err, out)
 	}
 
 	return nil

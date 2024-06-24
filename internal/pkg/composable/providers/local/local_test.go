@@ -29,8 +29,11 @@ func TestContextProvider(t *testing.T) {
 	provider, err := builder(nil, cfg, true)
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	comm := ctesting.NewContextComm(context.Background())
-	err = provider.Run(comm)
+	err = provider.Run(ctx, comm)
 	require.NoError(t, err)
 
 	assert.Equal(t, mapping, comm.Current())

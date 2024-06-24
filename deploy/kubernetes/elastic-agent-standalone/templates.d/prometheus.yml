@@ -1,5 +1,6 @@
 inputs:
     - name: prometheus/metrics-prometheus
+      id: prometheus/metrics-prometheus-${kubernetes.hints.container_id}
       type: prometheus/metrics
       use_output: default
       streams:
@@ -17,6 +18,7 @@ inputs:
           password: ${kubernetes.hints.prometheus.collector.password|kubernetes.hints.prometheus.password|'secret'}
           period: ${kubernetes.hints.prometheus.collector.period|kubernetes.hints.prometheus.period|'10s'}
           rate_counters: true
+          timeout: ${kubernetes.hints.prometheus.collector.timeout|kubernetes.hints.prometheus.timeout|''}
           use_types: true
           username: ${kubernetes.hints.prometheus.collector.username|kubernetes.hints.prometheus.username|'user'}
         - condition: ${kubernetes.hints.prometheus.query.enabled} == true and ${kubernetes.hints.prometheus.enabled} == true
@@ -65,6 +67,7 @@ inputs:
           use_types: true
       data_stream.namespace: default
     - name: filestream-prometheus
+      id: filestream-prometheus-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

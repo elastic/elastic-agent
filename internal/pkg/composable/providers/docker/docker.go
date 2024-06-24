@@ -131,9 +131,11 @@ func generateData(event bus.Event) (*dockerContainerData, error) {
 		container: container,
 		mapping: map[string]interface{}{
 			"container": map[string]interface{}{
-				"id":     container.ID,
-				"name":   container.Name,
-				"image":  container.Image,
+				"id":   container.ID,
+				"name": container.Name,
+				"image": map[string]interface{}{
+					"name": container.Image,
+				},
 				"labels": labelMap,
 			},
 		},
@@ -141,10 +143,10 @@ func generateData(event bus.Event) (*dockerContainerData, error) {
 			{
 				"add_fields": map[string]interface{}{
 					"fields": map[string]interface{}{
-						"id":     container.ID,
-						"name":   container.Name,
-						"image":  container.Image,
-						"labels": processorLabelMap,
+						"id":         container.ID,
+						"name":       container.Name,
+						"image.name": container.Image,
+						"labels":     processorLabelMap,
 					},
 					"target": "container",
 				},

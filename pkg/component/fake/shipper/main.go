@@ -49,8 +49,7 @@ func main() {
 func run() error {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 	ver := client.VersionInfo{
-		Name:    fakeShipper,
-		Version: "1.0",
+		Name: fakeShipper,
 		Meta: map[string]string{
 			"shipper": fakeShipper,
 		},
@@ -107,14 +106,50 @@ type unitKey struct {
 	unitID   string
 }
 
+type CachedServer struct {
+	cfg common.FakeShipperConfig
+	srv *grpc.Server
+	wg  errgroup.Group
+	ref int
+}
+
+// inc increments the reference count of the server
+// it is used to keep the server running as long as there are units using it
+// the server is stopped when the reference count reaches 0
+// this is protected by the unitsMx mutex
+func (c *CachedServer) incRef() {
+	c.ref++
+}
+
+// dec decrements the reference count of the server and stops it if the reference count reaches 0
+// it returns true if the server was stopped and should be removed from the cache or false if the server is still in use
+// this is protected by the unitsMx mutex
+func (c *CachedServer) decRef() bool {
+	c.ref--
+	if c.ref == 0 {
+		// safeguard, should not happen
+		if c.srv != nil {
+			c.srv.Stop()
+			// left the previous implementation as is, without the error handling
+			_ = c.wg.Wait()
+		}
+		// remove the server from the cache
+		return true
+	}
+	// server is still in use
+	return false
+}
+
 type stateManager struct {
 	logger  zerolog.Logger
 	unitsMx sync.RWMutex
 	units   map[unitKey]runningUnit
+	// Protected from concurrent access by unitsMx mutex
+	serverCache map[string]*CachedServer
 }
 
 func newStateManager(logger zerolog.Logger) *stateManager {
-	return &stateManager{logger: logger, units: make(map[unitKey]runningUnit)}
+	return &stateManager{logger: logger, units: make(map[unitKey]runningUnit), serverCache: make(map[string]*CachedServer)}
 }
 
 func (s *stateManager) added(unit *client.Unit) {
@@ -238,8 +273,8 @@ func (f *fakeActionOutputRuntime) Unit() *client.Unit {
 }
 
 func (f *fakeActionOutputRuntime) Update(u *client.Unit) error {
-	expected, _, config := u.Expected()
-	if expected == client.UnitStateStopped {
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
 		// agent is requesting this to stop
 		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
@@ -251,11 +286,12 @@ func (f *fakeActionOutputRuntime) Update(u *client.Unit) error {
 		return nil
 	}
 
-	if config.Type == "" {
+	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if config.Type != fakeActionOutput {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
+	if expected.Config.Type != fakeActionOutput {
+		return fmt.Errorf("unit type changed with the same unit ID: %s",
+			expected.Config.Type)
 	}
 	// nothing to really do
 	return nil
@@ -321,45 +357,6 @@ func (f *fakeActionOutputRuntime) received(ctx context.Context, id string, event
 	return false
 }
 
-// recordEventAction is an action that returns a result only once an event comes over the fake shipper protocol
-type recordEventAction struct {
-	f *fakeActionOutputRuntime
-}
-
-func (r *recordEventAction) Name() string {
-	return "record_event"
-}
-
-func (r *recordEventAction) Execute(ctx context.Context, params map[string]interface{}) (map[string]interface{}, error) {
-	eventIDRaw, ok := params[recordActionEventID]
-	if !ok {
-		return nil, fmt.Errorf("missing required 'id' parameter")
-	}
-	eventID, ok := eventIDRaw.(string)
-	if !ok {
-		return nil, fmt.Errorf("'id' parameter not string type, got %T", eventIDRaw)
-	}
-	r.f.logger.Trace().Str(recordActionEventID, eventID).Msg("registering record event action")
-	c := r.f.subscribe(eventID)
-	defer r.f.unsubscribe(eventID)
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case e, ok := <-c:
-		r.f.logger.Trace().Fields(map[string]interface{}{
-			"timestamp": e.Generated.AsTime(),
-			"content":   e.Content.AsMap(),
-		}).Msg("record_event action got subscribed event")
-		if !ok {
-			return nil, fmt.Errorf("never recieved event")
-		}
-		return map[string]interface{}{
-			"timestamp": e.Generated.String(),
-			"event":     e.Content.AsMap(),
-		}, nil
-	}
-}
-
 type fakeShipperInput struct {
 	common.UnimplementedFakeEventProtocolServer
 
@@ -368,8 +365,7 @@ type fakeShipperInput struct {
 	unit    *client.Unit
 	cfg     *proto.UnitExpectedConfig
 
-	srv *grpc.Server
-	wg  errgroup.Group
+	srv string
 }
 
 func newFakeShipperInput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *stateManager, unit *client.Unit, cfg *proto.UnitExpectedConfig) (*fakeShipperInput, error) {
@@ -387,24 +383,36 @@ func newFakeShipperInput(logger zerolog.Logger, logLevel client.UnitLogLevel, ma
 		return nil, err
 	}
 
-	logger.Info().Str("server", srvCfg.Server).Msg("starting GRPC fake shipper server")
-	lis, err := createListener(srvCfg.Server)
-	if err != nil {
-		return nil, err
+	// This access if protected by the unitsMx
+	cachedSrv, ok := manager.serverCache[srvCfg.Server]
+	if ok {
+		// Assuming that the server is already running and units are using the same TLS configuration
+		logger.Info().Str("server", srvCfg.Server).Msg("using existing GRPC fake shipper server")
+		cachedSrv.incRef()
+		i.srv = srvCfg.Server
+	} else {
+		logger.Info().Str("server", srvCfg.Server).Msg("starting GRPC fake shipper server")
+		lis, err := createListener(srvCfg.Server)
+		if err != nil {
+			return nil, err
+		}
+		if srvCfg.TLS == nil || srvCfg.TLS.Cert == "" || srvCfg.TLS.Key == "" {
+			return nil, fmt.Errorf("ssl configuration missing")
+		}
+		cert, err := tls.X509KeyPair([]byte(srvCfg.TLS.Cert), []byte(srvCfg.TLS.Key))
+		if err != nil {
+			return nil, err
+		}
+		srv := grpc.NewServer(grpc.Creds(credentials.NewServerTLSFromCert(&cert)))
+		i.srv = srvCfg.Server
+		common.RegisterFakeEventProtocolServer(srv, i)
+		cSrv := &CachedServer{cfg: srvCfg, srv: srv, ref: 1}
+		// Launch the server in a goroutine
+		cSrv.wg.Go(func() error {
+			return srv.Serve(lis)
+		})
+		manager.serverCache[srvCfg.Server] = cSrv
 	}
-	if srvCfg.TLS == nil || srvCfg.TLS.Cert == "" || srvCfg.TLS.Key == "" {
-		return nil, fmt.Errorf("ssl configuration missing")
-	}
-	cert, err := tls.X509KeyPair([]byte(srvCfg.TLS.Cert), []byte(srvCfg.TLS.Key))
-	if err != nil {
-		return nil, err
-	}
-	srv := grpc.NewServer(grpc.Creds(credentials.NewServerTLSFromCert(&cert)))
-	i.srv = srv
-	common.RegisterFakeEventProtocolServer(srv, i)
-	i.wg.Go(func() error {
-		return srv.Serve(lis)
-	})
 
 	logger.Trace().Msg("registering kill action for unit")
 	unit.RegisterAction(&killAction{logger})
@@ -419,28 +427,39 @@ func (f *fakeShipperInput) Unit() *client.Unit {
 }
 
 func (f *fakeShipperInput) Update(u *client.Unit) error {
-	expected, _, config := u.Expected()
-	if expected == client.UnitStateStopped {
+	if u.Type() != client.UnitTypeOutput {
+		return nil // right now, it deals only with output
+	}
+
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
 		// agent is requesting this to stop
-		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
+		f.logger.Debug().
+			Str("state", client.UnitStateStopping.String()).
+			Str("message", stoppingMsg).
+			Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
+
 		go func() {
-			if f.srv != nil {
-				f.srv.Stop()
-				f.wg.Wait()
-				f.srv = nil
+			cSrv, ok := f.manager.serverCache[f.srv]
+			if ok && cSrv.decRef() {
+				delete(f.manager.serverCache, f.srv)
 			}
-			f.logger.Debug().Str("state", client.UnitStateStopped.String()).Str("message", stoppedMsg).Msg("updating unit state")
+			f.logger.Debug().
+				Str("state", client.UnitStateStopped.String()).
+				Str("message", stoppedMsg).
+				Msg("updating unit state")
 			_ = u.UpdateState(client.UnitStateStopped, stoppedMsg, nil)
 		}()
 		return nil
 	}
 
-	if config.Type == "" {
+	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if config.Type != fakeActionOutput {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
+	if expected.Config.Type != fakeActionOutput {
+		return fmt.Errorf("unit type changed with the same unit ID: %s",
+			expected.Config.Type)
 	}
 	// nothing to really do
 	return nil
@@ -452,49 +471,6 @@ func (f *fakeShipperInput) SendEvent(ctx context.Context, event *common.Event) (
 		return nil, err
 	}
 	return &common.EventResponse{}, nil
-}
-
-// killAction is an action that causes the whole component to exit (used in testing to simulate crashes)
-type killAction struct {
-	logger zerolog.Logger
-}
-
-func (s *killAction) Name() string {
-	return "kill"
-}
-
-func (s *killAction) Execute(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Trace().Msg("executing kill action")
-	os.Exit(1)
-	return nil, nil
-}
-
-func newRunningUnit(logger zerolog.Logger, manager *stateManager, unit *client.Unit) (runningUnit, error) {
-	_, logLevel, config := unit.Expected()
-	if config.Type == "" {
-		return nil, fmt.Errorf("unit config type empty")
-	}
-	if unit.Type() == client.UnitTypeOutput {
-		switch config.Type {
-		case fakeActionOutput:
-			return newFakeActionOutputRuntime(logger, logLevel, unit, config)
-		}
-		return nil, fmt.Errorf("unknown output unit config type: %s", config.Type)
-	} else if unit.Type() == client.UnitTypeInput {
-		switch config.Type {
-		case fakeShipper:
-			return newFakeShipperInput(logger, logLevel, manager, unit, config)
-		}
-		return nil, fmt.Errorf("unknown input unit config type: %s", config.Type)
-	}
-	return nil, fmt.Errorf("unknown unit type: %+v", unit.Type())
-}
-
-func newUnitKey(unit *client.Unit) unitKey {
-	return unitKey{
-		unitType: unit.Type(),
-		unitID:   unit.ID(),
-	}
 }
 
 func toZerologLevel(level client.UnitLogLevel) zerolog.Level {

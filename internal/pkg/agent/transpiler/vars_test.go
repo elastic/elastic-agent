@@ -5,6 +5,7 @@
 package transpiler
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -361,6 +362,6 @@ func (p *contextProviderMock) Fetch(key string) (string, bool) {
 	return "mockedFetchContent", true
 }
 
-func (p *contextProviderMock) Run(comm corecomp.ContextProviderComm) error {
+func (p *contextProviderMock) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
 	return nil
 }

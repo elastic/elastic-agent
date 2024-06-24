@@ -25,6 +25,136 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
+func TestFleetServerComponentModifier_NoServerConfig(t *testing.T) {
+	cfg := map[string]interface{}{}
+	modifier := FleetServerComponentModifier(nil)
+	fleetServerInputSource, err := structpb.NewStruct(map[string]interface{}{
+		"id":   "fleet-server",
+		"type": "fleet-server",
+	})
+	require.NoError(t, err)
+	fleetServerOutputSource, err := structpb.NewStruct(map[string]interface{}{
+		"type":  "elasticsearch",
+		"hosts": []interface{}{"localhost:9200"},
+	})
+	require.NoError(t, err)
+
+	fleetServerComponent := component.Component{
+		InputSpec: &component.InputRuntimeSpec{
+			InputType: "fleet-server",
+		},
+		Units: []component.Unit{
+			{
+				Type: client.UnitTypeInput,
+				Config: &proto.UnitExpectedConfig{
+					Type:   "fleet-server",
+					Source: fleetServerInputSource,
+				},
+			},
+			{
+				Type: client.UnitTypeOutput,
+				Config: &proto.UnitExpectedConfig{
+					Type:   "elasticsearch",
+					Source: fleetServerOutputSource,
+				},
+			},
+		},
+	}
+	comps := []component.Component{fleetServerComponent}
+	resComps, err := modifier(comps, cfg)
+	require.NoError(t, err)
+
+	if assert.Len(t, resComps, 1) {
+		assert.ErrorIs(t, resComps[0].Err, ErrFleetServerNotBootstrapped)
+		if assert.Len(t, resComps[0].Units, 2) {
+			assert.ErrorIs(t, resComps[0].Units[0].Err, ErrFleetServerNotBootstrapped)
+			assert.ErrorIs(t, resComps[0].Units[1].Err, ErrFleetServerNotBootstrapped)
+		}
+
+	}
+}
+
+func TestFleetServerComponentModifier(t *testing.T) {
+	tests := []struct {
+		name   string
+		source map[string]interface{}
+		expect map[string]interface{}
+	}{{
+		name:   "empty output component",
+		source: map[string]interface{}{},
+		expect: map[string]interface{}{
+			"bootstrap": map[string]interface{}{
+				"protocol":      "https",
+				"hosts":         []interface{}{"elasticsearch:9200"},
+				"service_token": "example-token",
+			},
+		},
+	}, {
+		name: "output component provided",
+		source: map[string]interface{}{
+			"protocol": "http",
+			"hosts":    []interface{}{"elasticsearch:9200", "host:9200"},
+		},
+		expect: map[string]interface{}{
+			"protocol": "http",
+			"hosts":    []interface{}{"elasticsearch:9200", "host:9200"},
+			"bootstrap": map[string]interface{}{
+				"protocol":      "https",
+				"hosts":         []interface{}{"elasticsearch:9200"},
+				"service_token": "example-token",
+			},
+		},
+	}}
+	cfg := &configuration.FleetServerConfig{
+		Output: configuration.FleetServerOutputConfig{
+			Elasticsearch: configuration.Elasticsearch{
+				Protocol:     "https",
+				Hosts:        []string{"elasticsearch:9200"},
+				ServiceToken: "example-token",
+			},
+		},
+	}
+	modifier := FleetServerComponentModifier(cfg)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src, err := structpb.NewStruct(tc.source)
+			require.NoError(t, err)
+			comps, err := modifier([]component.Component{{
+				InputSpec: &component.InputRuntimeSpec{
+					InputType: "fleet-server",
+				},
+				Units: []component.Unit{{
+					Type: client.UnitTypeOutput,
+					Config: &proto.UnitExpectedConfig{
+						Type:   "elasticsearch",
+						Source: src,
+					},
+				}},
+			}}, nil)
+			require.NoError(t, err)
+
+			require.Len(t, comps, 1)
+			require.Len(t, comps[0].Units, 1)
+			res := comps[0].Units[0].Config.Source.AsMap()
+			for k, v := range tc.expect {
+				val, ok := res[k]
+				require.Truef(t, ok, "expected %q to be in output unit config", k)
+				if mp, ok := v.(map[string]interface{}); ok {
+					rMap, ok := val.(map[string]interface{})
+					require.Truef(t, ok, "expected %q to be map[string]interface{} was %T", k, val)
+					for kk, vv := range mp {
+						assert.Contains(t, rMap, kk)
+						assert.Equal(t, rMap[kk], vv)
+					}
+				} else {
+					assert.Equal(t, v, val)
+				}
+			}
+		})
+	}
+}
+
 func TestInjectFleetConfigComponentModifier(t *testing.T) {
 	fleetConfig := &configuration.FleetAgentConfig{
 		Enabled: true,

@@ -5,9 +5,9 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -26,15 +26,15 @@ var (
 
 // LoadFullAgentConfig load agent config based on provided paths and defined capabilities.
 // In case fleet is used, config from policy action is returned.
-func LoadFullAgentConfig(logger *logger.Logger, cfgPath string, failOnFleetMissing bool) (*config.Config, error) {
-	rawConfig, err := loadConfig(cfgPath)
+func LoadFullAgentConfig(ctx context.Context, logger *logger.Logger, cfgPath string, failOnFleetMissing, unprivileged bool) (*config.Config, error) {
+	rawConfig, err := loadConfig(ctx, cfgPath, unprivileged)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error loading raw config: %w", err)
 	}
 
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating config object from raw agent config: %w", err)
 	}
 
 	if configuration.IsStandalone(cfg.Fleet) {
@@ -55,9 +55,9 @@ func LoadFullAgentConfig(logger *logger.Logger, cfgPath string, failOnFleetMissi
 		return c, nil
 	}
 
-	fleetConfig, err := loadFleetConfig()
+	fleetConfig, err := loadFleetConfig(ctx, logger, unprivileged)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error obtaining fleet config: %w", err)
 	} else if fleetConfig == nil {
 		if failOnFleetMissing {
 			return nil, ErrNoFleetConfig
@@ -67,18 +67,26 @@ func LoadFullAgentConfig(logger *logger.Logger, cfgPath string, failOnFleetMissi
 		return rawConfig, nil
 	}
 
-	return config.NewConfigFrom(fleetConfig)
+	// merge the policy on top of the configuration to provide a unified configuration
+	err = rawConfig.Merge(fleetConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge latest fleet policy with local configuration: %w", err)
+	}
+	return rawConfig, nil
 }
 
-func loadConfig(configPath string) (*config.Config, error) {
+func loadConfig(ctx context.Context, configPath string, unprivileged bool) (*config.Config, error) {
 	rawConfig, err := config.LoadFile(configPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error loading config file %s: %w", configPath, err)
 	}
 
 	path := paths.AgentConfigFile()
 
-	store := storage.NewEncryptedDiskStore(path)
+	store, err := storage.NewEncryptedDiskStore(ctx, path, storage.WithUnprivileged(unprivileged))
+	if err != nil {
+		return nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
 	reader, err := store.Load()
 	if err != nil {
 		return nil, errors.New(err, "could not initialize config store",
@@ -95,22 +103,20 @@ func loadConfig(configPath string) (*config.Config, error) {
 	}
 
 	// merge local configuration and configuration persisted from fleet.
-	_ = rawConfig.Merge(config)
+	err = rawConfig.Merge(config)
+	if err != nil {
+		return nil, fmt.Errorf("error merging local and fleet config: %w", err)
+	}
 
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error injecting agent config: %w", err)
 	}
 
 	return rawConfig, nil
 }
 
-func loadFleetConfig() (map[string]interface{}, error) {
-	log, err := newErrorLogger()
-	if err != nil {
-		return nil, err
-	}
-
-	stateStore, err := store.NewStateStoreWithMigration(log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
+func loadFleetConfig(ctx context.Context, l *logger.Logger, unprivileged bool) (map[string]interface{}, error) {
+	stateStore, err := store.NewStateStoreWithMigration(ctx, l, paths.AgentActionStoreFile(), paths.AgentStateStoreFile(), storage.WithUnprivileged(unprivileged))
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +130,4 @@ func loadFleetConfig() (map[string]interface{}, error) {
 		return cfgChange.Policy, nil
 	}
 	return nil, nil
-}
-
-func newErrorLogger() (*logger.Logger, error) {
-	return logger.NewWithLogpLevel("", logp.ErrorLevel, false)
 }

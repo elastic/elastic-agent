@@ -31,6 +31,10 @@ func TestStateStore(t *testing.T) {
 
 func runTestStateStore(t *testing.T, ackToken string) {
 	log, _ := logger.New("state_store", false)
+
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
 	withFile := func(fn func(t *testing.T, file string)) func(*testing.T) {
 		return func(t *testing.T) {
 			dir := t.TempDir()
@@ -41,7 +45,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 	t.Run("action returns empty when no action is saved on disk",
 		withFile(func(t *testing.T, file string) {
-			s := storage.NewDiskStore(file)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store, err := NewStateStore(log, s)
 			require.NoError(t, err)
 			require.Empty(t, store.Actions())
@@ -54,7 +59,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				ActionID: "abc123",
 			}
 
-			s := storage.NewDiskStore(file)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store, err := NewStateStore(log, s)
 			require.NoError(t, err)
 
@@ -78,7 +84,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				},
 			}
 
-			s := storage.NewDiskStore(file)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store, err := NewStateStore(log, s)
 			require.NoError(t, err)
 
@@ -92,7 +99,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.Empty(t, store.Queue())
 			require.Equal(t, ackToken, store.AckToken())
 
-			s = storage.NewDiskStore(file)
+			s, err = storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store1, err := NewStateStore(log, s)
 			require.NoError(t, err)
 
@@ -115,7 +123,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				SourceURI:       "https://example.com",
 			}}
 
-			s := storage.NewDiskStore(file)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store, err := NewStateStore(log, s)
 			require.NoError(t, err)
 
@@ -126,7 +135,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.Empty(t, store.Actions())
 			require.Len(t, store.Queue(), 1)
 
-			s = storage.NewDiskStore(file)
+			s, err = storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store1, err := NewStateStore(log, s)
 			require.NoError(t, err)
 			require.Empty(t, store1.Actions())
@@ -157,7 +167,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				},
 			}}
 
-			s := storage.NewDiskStore(file)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store, err := NewStateStore(log, s)
 			require.NoError(t, err)
 
@@ -168,7 +179,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.Empty(t, store.Actions())
 			require.Len(t, store.Queue(), 2)
 
-			s = storage.NewDiskStore(file)
+			s, err = storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store1, err := NewStateStore(log, s)
 			require.NoError(t, err)
 			require.Empty(t, store1.Actions())
@@ -196,7 +208,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				ActionType: "UNENROLL",
 			}
 
-			s := storage.NewDiskStore(file)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store, err := NewStateStore(log, s)
 			require.NoError(t, err)
 
@@ -210,7 +223,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.Empty(t, store.Queue())
 			require.Equal(t, ackToken, store.AckToken())
 
-			s = storage.NewDiskStore(file)
+			s, err = storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store1, err := NewStateStore(log, s)
 			require.NoError(t, err)
 
@@ -227,7 +241,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				ActionID: "abc123",
 			}
 
-			s := storage.NewDiskStore(file)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
 			store, err := NewStateStore(log, s)
 			require.NoError(t, err)
 			store.SetAckToken(ackToken)
@@ -244,9 +259,11 @@ func runTestStateStore(t *testing.T, ackToken string) {
 	t.Run("migrate actions file does not exists",
 		withFile(func(t *testing.T, actionStorePath string) {
 			withFile(func(t *testing.T, stateStorePath string) {
-				err := migrateStateStore(log, actionStorePath, stateStorePath)
+				err := migrateStateStore(ctx, log, actionStorePath, stateStorePath)
 				require.NoError(t, err)
-				stateStore, err := NewStateStore(log, storage.NewDiskStore(stateStorePath))
+				diskStore, err := storage.NewDiskStore(stateStorePath)
+				require.NoError(t, err)
+				stateStore, err := NewStateStore(log, diskStore)
 				require.NoError(t, err)
 				stateStore.SetAckToken(ackToken)
 				require.Empty(t, stateStore.Actions())
@@ -265,23 +282,27 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				},
 			}
 
-			actionStore, err := NewActionStore(log, storage.NewDiskStore(actionStorePath))
+			diskStore, err := storage.NewDiskStore(actionStorePath)
+			require.NoError(t, err)
+			actionStore, err := newActionStore(log, diskStore)
 			require.NoError(t, err)
 
-			require.Empty(t, actionStore.Actions())
-			actionStore.Add(ActionPolicyChange)
-			err = actionStore.Save()
+			require.Empty(t, actionStore.actions())
+			actionStore.add(ActionPolicyChange)
+			err = actionStore.save()
 			require.NoError(t, err)
-			require.Len(t, actionStore.Actions(), 1)
+			require.Len(t, actionStore.actions(), 1)
 
 			withFile(func(t *testing.T, stateStorePath string) {
-				err = migrateStateStore(log, actionStorePath, stateStorePath)
+				err = migrateStateStore(ctx, log, actionStorePath, stateStorePath)
 				require.NoError(t, err)
 
-				stateStore, err := NewStateStore(log, storage.NewDiskStore(stateStorePath))
+				newDiskStore, err := storage.NewDiskStore(stateStorePath)
+				require.NoError(t, err)
+				stateStore, err := NewStateStore(log, newDiskStore)
 				require.NoError(t, err)
 				stateStore.SetAckToken(ackToken)
-				diff := cmp.Diff(actionStore.Actions(), stateStore.Actions())
+				diff := cmp.Diff(actionStore.actions(), stateStore.Actions())
 				if diff != "" {
 					t.Error(diff)
 				}

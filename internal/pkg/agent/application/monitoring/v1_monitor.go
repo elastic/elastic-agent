@@ -12,9 +12,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -28,9 +30,6 @@ const (
 	logFileFormat = "%s/logs/%s"
 	// args: data path, install path, pipeline name, application name
 	logFileFormatWin = "%s\\logs\\%s"
-
-	// args: pipeline name, application name
-	mbEndpointFileFormatWin = `npipe:///%s`
 
 	// args: pipeline name, application name
 	agentMbEndpointFileFormatWin = `npipe:///elastic-agent`
@@ -48,25 +47,34 @@ const (
 	agentKey                   = "agent"
 	monitoringKey              = "monitoring"
 	useOutputKey               = "use_output"
+	monitoringMetricsPeriodKey = "metrics_period"
 	monitoringOutput           = "monitoring"
 	defaultMonitoringNamespace = "default"
 	agentName                  = "elastic-agent"
 
+	monitoringMetricsUnitID = "metrics-monitoring"
+	monitoringFilesUnitsID  = "filestream-monitoring"
+
 	windowsOS = "windows"
+
+	// metricset execution period used for the monitoring metrics inputs
+	// we set this to 60s to reduce the load/data volume on the monitoring cluster
+	defaultMetricsCollectionInterval = 60 * time.Second
 )
 
 var (
 	errNoOuputPresent          = errors.New("outputs not part of the config")
-	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "cloud-defend", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
-	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
+	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "fleet-server", "heartbeat", "osquerybeat", "packetbeat", "pf-elastic-collector", "pf-elastic-symbolizer", "shipper"}
+	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat", "pf-elastic-collector", "pf-elastic-symbolizer"}
 )
 
-// BeatsMonitor is providing V1 monitoring support for metrics and logs for endpoint-security only.
+// BeatsMonitor provides config values for monitoring of agent clients (beats, endpoint, etc)
+// by injecting the monitoring config into an existing fleet config
 type BeatsMonitor struct {
 	enabled         bool // feature flag disabling whole v1 monitoring story
 	config          *monitoringConfig
 	operatingSystem string
-	agentInfo       *info.AgentInfo
+	agentInfo       info.Agent
 }
 
 type monitoringConfig struct {
@@ -74,7 +82,7 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo *info.AgentInfo) *BeatsMonitor {
+func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
@@ -104,13 +112,29 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 }
 
 // MonitoringConfig adds monitoring inputs to a configuration based on retrieved list of components to run.
-func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, components []component.Component, componentIDToBinary map[string]string) (map[string]interface{}, error) {
+// args:
+// policy: the existing config policy
+// components: a list of the expected running components
+// componentIDToBinary: a map of component IDs to binary names
+// componentIDPidMap: a map of component IDs to the PIDs of the running components.
+func (b *BeatsMonitor) MonitoringConfig(
+	policy map[string]interface{},
+	components []component.Component,
+	componentIDToBinary map[string]string,
+	componentIDPidMap map[string]uint64,
+) (map[string]interface{}, error) {
 	if !b.Enabled() {
 		return nil, nil
 	}
 
+	cfg := make(map[string]interface{})
+
 	monitoringOutputName := defaultOutputName
+	metricsCollectionIntervalString := b.config.C.MetricsPeriod
 	if agentCfg, found := policy[agentKey]; found {
+		// The agent section is required for feature flags
+		cfg[agentKey] = agentCfg
+
 		agentCfgMap, ok := agentCfg.(map[string]interface{})
 		if ok {
 			if monitoringCfg, found := agentCfgMap[monitoringKey]; found {
@@ -121,12 +145,16 @@ func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, component
 							monitoringOutputName = useStr
 						}
 					}
+
+					if metricsPeriod, found := monitoringMap[monitoringMetricsPeriodKey]; found {
+						if metricsPeriodStr, ok := metricsPeriod.(string); ok {
+							metricsCollectionIntervalString = metricsPeriodStr
+						}
+					}
 				}
 			}
 		}
 	}
-
-	cfg := make(map[string]interface{})
 
 	if err := b.injectMonitoringOutput(policy, cfg, monitoringOutputName); err != nil && !errors.Is(err, errNoOuputPresent) {
 		return nil, errors.New(err, "failed to inject monitoring output")
@@ -145,7 +173,7 @@ func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, component
 	}
 
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, monitoringOutput); err != nil {
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, componentIDPidMap, metricsCollectionIntervalString); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -161,13 +189,13 @@ func (b *BeatsMonitor) EnrichArgs(unit, binary string, args []string) []string {
 		return args
 	}
 
-	// only beats understands these flags
-	if !isSupportedBeatsBinary(binary) {
+	// only beats & shipper understand these flags
+	if !isSupportedBeatsBinary(binary) && binary != "shipper" {
 		return args
 	}
 
 	appendix := make([]string, 0, 20)
-	endpoint := endpointPath(unit, b.operatingSystem)
+	endpoint := utils.SocketURLWithFallback(unit, paths.TempDir())
 	if endpoint != "" {
 		appendix = append(appendix,
 			"-E", "http.enabled=true",
@@ -206,7 +234,7 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 	}
 
 	if b.config.C.MonitorMetrics {
-		metricsDrop := monitoringDrop(endpointPath(unit, b.operatingSystem))
+		metricsDrop := monitoringDrop(utils.SocketURLWithFallback(unit, paths.TempDir()))
 		drops = append(drops, metricsDrop)
 	}
 
@@ -222,7 +250,7 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 			}
 
 			// create
-			if err := os.MkdirAll(drop, 0775); err != nil {
+			if err := os.MkdirAll(drop, 0o775); err != nil {
 				return errors.New(err, fmt.Sprintf("failed to create directory %q", drop))
 			}
 
@@ -242,7 +270,7 @@ func (b *BeatsMonitor) Cleanup(unit string) error {
 		return nil
 	}
 
-	endpoint := monitoringFile(unit, b.operatingSystem)
+	endpoint := monitoringFile(unit)
 	if endpoint == "" {
 		return nil
 	}
@@ -285,13 +313,14 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 	return nil
 }
 
+// injectLogsInput adds logging configs for component monitoring to the `cfg` map
 func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []component.Component, monitoringOutput string) error {
 	monitoringNamespace := b.monitoringNamespace()
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
 
 	streams := []interface{}{
 		map[string]interface{}{
-			idKey:  "filestream-monitoring-agent",
+			idKey:  fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
 			"type": "filestream",
 			"paths": []interface{}{
 				filepath.Join(logsDrop, agentName+"-*.ndjson"),
@@ -317,32 +346,31 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 					},
 				},
 			},
-			"processors": []interface{}{
+			"processors": []any{
 				// drop all events from monitoring components (do it early)
 				// without dropping these events the filestream gets stuck in an infinite loop
 				// if filestream hits an issue publishing the events it logs an error which then filestream monitor
-				// will read from the logs and try to also publish that new log message (thus the infinite loop)
+				// will read from the logs and try to also publish that new log message (thus the infinite loop).
+				// The only way to identify a monitoring component by looking
+				// at their ID. They all end in `-monitoring`, e.g:
+				// - "beat/metrics-monitoring"
+				// - "filestream-monitoring"
+				// - "http/metrics-monitoring"
 				map[string]interface{}{
 					"drop_event": map[string]interface{}{
 						"when": map[string]interface{}{
-							"or": []interface{}{
-								map[string]interface{}{
-									"equals": map[string]interface{}{
-										"component.dataset": fmt.Sprintf("elastic_agent.filestream_%s", monitoringOutput),
-									},
-								},
-								// for consistency this monitor is also not shipped (fetch-able with diagnostics)
-								map[string]interface{}{
-									"equals": map[string]interface{}{
-										"component.dataset": fmt.Sprintf("elastic_agent.beats_metrics_%s", monitoringOutput),
-									},
-								},
-								// for consistency with this monitor is also not shipped (fetch-able with diagnostics)
-								map[string]interface{}{
-									"equals": map[string]interface{}{
-										"component.dataset": fmt.Sprintf("elastic_agent.http_metrics_%s", monitoringOutput),
-									},
-								},
+							"regexp": map[string]interface{}{
+								"component.id": ".*-monitoring$",
+							},
+						},
+					},
+				},
+				// drop periodic metrics logs (those are useful mostly in diagnostic dumps where we collect log files)
+				map[string]interface{}{
+					"drop_event": map[string]interface{}{
+						"when": map[string]interface{}{
+							"regexp": map[string]interface{}{
+								"message": "^Non-zero metrics in the last",
 							},
 						},
 					},
@@ -425,7 +453,8 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 					"add_formatted_index": map[string]interface{}{
 						"index": "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}",
 					},
-				}},
+				},
+			},
 		},
 	}
 
@@ -435,11 +464,10 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 			// only monitor service inputs that define a log path
 			continue
 		}
-
-		fixedBinaryName := strings.ReplaceAll(strings.ReplaceAll(comp.InputSpec.BinaryName, "-", "_"), "/", "_") // conform with index naming policy
+		fixedBinaryName := strings.ReplaceAll(strings.ReplaceAll(comp.BinaryName(), "-", "_"), "/", "_") // conform with index naming policy
 		dataset := fmt.Sprintf("elastic_agent.%s", fixedBinaryName)
 		streams = append(streams, map[string]interface{}{
-			idKey:  fmt.Sprintf("filestream-monitoring-%s", comp.ID),
+			idKey:  fmt.Sprintf("%s-%s", monitoringFilesUnitsID, comp.ID),
 			"type": "filestream",
 			"paths": []interface{}{
 				comp.InputSpec.Spec.Service.Log.Path,
@@ -472,8 +500,17 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 						"fields": map[string]interface{}{
 							"id":      comp.ID,
 							"type":    comp.InputSpec.InputType,
-							"binary":  comp.InputSpec.BinaryName,
+							"binary":  comp.BinaryName(),
 							"dataset": dataset,
+						},
+					},
+				},
+				map[string]interface{}{
+					// injecting component log source to stay aligned with command runtime logs
+					"add_fields": map[string]interface{}{
+						"target": "log",
+						"fields": map[string]interface{}{
+							"source": comp.ID,
 						},
 					},
 				},
@@ -483,8 +520,8 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 
 	inputs := []interface{}{
 		map[string]interface{}{
-			idKey:        "filestream-monitoring-agent",
-			"name":       "filestream-monitoring-agent",
+			idKey:        fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
+			"name":       fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
 			"type":       "filestream",
 			useOutputKey: monitoringOutput,
 			"streams":    streams,
@@ -511,13 +548,24 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	}
 	return defaultMonitoringNamespace
 }
-func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string) error {
+
+// injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.
+func (b *BeatsMonitor) injectMetricsInput(
+	cfg map[string]interface{},
+	componentIDToBinary map[string]string,
+	componentList []component.Component,
+	existingStateServicePids map[string]uint64,
+	metricsCollectionIntervalString string,
+) error {
+	if metricsCollectionIntervalString == "" {
+		metricsCollectionIntervalString = defaultMetricsCollectionInterval.String()
+	}
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 	beatsStreams := make([]interface{}, 0, len(componentIDToBinary))
 	streams := []interface{}{
 		map[string]interface{}{
-			idKey: "metrics-monitoring-agent",
+			idKey: fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
 			"data_stream": map[string]interface{}{
 				"type":      "metrics",
 				"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
@@ -527,7 +575,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			"path":       "/stats",
 			"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.operatingSystem, b.config.C)},
 			"namespace":  "agent",
-			"period":     "10s",
+			"period":     metricsCollectionIntervalString,
 			"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
 			"processors": []interface{}{
 				map[string]interface{}{
@@ -582,28 +630,48 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 						"ignore_missing": true,
 					},
 				},
+				map[string]interface{}{
+					"add_fields": map[string]interface{}{
+						"target": "component",
+						"fields": map[string]interface{}{
+							"id":     "elastic-agent",
+							"binary": "elastic-agent",
+						},
+					},
+				},
 			},
 		},
 	}
-	for unit, binaryName := range componentIDToBinary {
+
+	//create a new map with the monitoring beats included
+	componentListWithMonitoring := map[string]string{
+		fmt.Sprintf("beat/%s", monitoringMetricsUnitID): "metricbeat",
+		fmt.Sprintf("http/%s", monitoringMetricsUnitID): "metricbeat",
+		monitoringFilesUnitsID:                          "filebeat",
+	}
+	for k, v := range componentIDToBinary {
+		componentListWithMonitoring[k] = v
+	}
+
+	for unit, binaryName := range componentListWithMonitoring {
 		if !isSupportedMetricsBinary(binaryName) {
 			continue
 		}
 
-		endpoints := []interface{}{prefixedEndpoint(endpointPath(unit, b.operatingSystem))}
+		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(unit, paths.TempDir()))}
 		name := strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_") // conform with index naming policy
 
 		if isSupportedBeatsBinary(binaryName) {
 			beatsStreams = append(beatsStreams, map[string]interface{}{
-				idKey: "metrics-monitoring-" + name,
+				idKey: fmt.Sprintf("%s-", monitoringMetricsUnitID) + name,
 				"data_stream": map[string]interface{}{
 					"type":      "metrics",
 					"dataset":   fmt.Sprintf("elastic_agent.%s", name),
 					"namespace": monitoringNamespace,
 				},
-				"metricsets": []interface{}{"stats", "state"},
+				"metricsets": []interface{}{"stats"},
 				"hosts":      endpoints,
-				"period":     "10s",
+				"period":     metricsCollectionIntervalString,
 				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
 				"processors": []interface{}{
 					map[string]interface{}{
@@ -643,12 +711,21 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 							},
 						},
 					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "component",
+							"fields": map[string]interface{}{
+								"id":     unit,
+								"binary": binaryName,
+							},
+						},
+					},
 				},
 			})
 		}
 
 		streams = append(streams, map[string]interface{}{
-			idKey: "metrics-monitoring-" + name + "-1",
+			idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
 			"data_stream": map[string]interface{}{
 				"type":      "metrics",
 				"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
@@ -658,7 +735,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			"hosts":      endpoints,
 			"path":       "/stats",
 			"namespace":  "agent",
-			"period":     "10s",
+			"period":     metricsCollectionIntervalString,
 			"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
 			"processors": []interface{}{
 				map[string]interface{}{
@@ -703,14 +780,139 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 						"ignore_missing": true,
 					},
 				},
+				map[string]interface{}{
+					"add_fields": map[string]interface{}{
+						"target": "component",
+						"fields": map[string]interface{}{
+							"id":     unit,
+							"binary": binaryName,
+						},
+					},
+				},
 			},
 		})
+
+		if strings.EqualFold(name, "filebeat") {
+			fbDataStreamName := "filebeat_input"
+			streams = append(streams, map[string]interface{}{
+				idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
+				"data_stream": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   fmt.Sprintf("elastic_agent.%s", fbDataStreamName),
+					"namespace": monitoringNamespace,
+				},
+				"metricsets":    []interface{}{"json"},
+				"hosts":         endpoints,
+				"path":          "/inputs/",
+				"namespace":     fbDataStreamName,
+				"json.is_array": true,
+				"period":        metricsCollectionIntervalString,
+				"index":         fmt.Sprintf("metrics-elastic_agent.%s-%s", fbDataStreamName, monitoringNamespace),
+				"processors": []interface{}{
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "event",
+							"fields": map[string]interface{}{
+								"dataset": fmt.Sprintf("elastic_agent.%s", fbDataStreamName),
+							},
+						},
+					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "elastic_agent",
+							"fields": map[string]interface{}{
+								"id":       b.agentInfo.AgentID(),
+								"version":  b.agentInfo.Version(),
+								"snapshot": b.agentInfo.Snapshot(),
+								"process":  name,
+							},
+						},
+					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "agent",
+							"fields": map[string]interface{}{
+								"id": b.agentInfo.AgentID(),
+							},
+						},
+					},
+					map[string]interface{}{
+						"copy_fields": map[string]interface{}{
+							"fields":         httpCopyRules(),
+							"ignore_missing": true,
+							"fail_on_error":  false,
+						},
+					},
+					map[string]interface{}{
+						"drop_fields": map[string]interface{}{
+							"fields": []interface{}{
+								"http",
+							},
+							"ignore_missing": true,
+						},
+					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "component",
+							"fields": map[string]interface{}{
+								"id":     unit,
+								"binary": binaryName,
+							},
+						},
+					},
+				},
+			})
+		}
+
+	}
+
+	shipperHTTPStreams := []interface{}{}
+	// the shipper is listed in componentList, but not componentIDToBinary
+	// iterate over the full component list, adding a monitoring output for every shipper binary.
+	for _, comp := range componentList {
+		if comp.ShipperSpec != nil { // a shipper unit
+			endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(comp.ID, paths.TempDir()))}
+			name := "shipper" // in other beats this is the binary name, but we can hard-code it here.
+			if comp.ShipperSpec.Spec.Name != "" {
+				name = comp.ShipperSpec.Spec.Name
+			}
+			// note: this doesn't fetch anything from the /state endpoint, as it doesn't report much beyond name/version,
+			// the equivalent of the beat /state metrics end up in /shipper
+			shipperHTTPStreams = append(shipperHTTPStreams, map[string]interface{}{
+				idKey: fmt.Sprintf("%s-shipper", monitoringMetricsUnitID),
+				"data_stream": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+					"namespace": monitoringNamespace,
+				},
+				"metricsets": []interface{}{"json"},
+				"path":       "/shipper",
+				"hosts":      endpoints,
+				"namespace":  "application",
+				"period":     metricsCollectionIntervalString,
+				"processors": createProcessorsForJSONInput(name, comp.ID, monitoringNamespace, b.agentInfo),
+			},
+				map[string]interface{}{
+					idKey: fmt.Sprintf("%s-shipper-stats", monitoringMetricsUnitID),
+					"data_stream": map[string]interface{}{
+						"type":      "metrics",
+						"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+						"namespace": monitoringNamespace,
+					},
+					"metricsets": []interface{}{"json"},
+					"path":       "/stats",
+					"hosts":      endpoints,
+					"namespace":  "agent",
+					"period":     metricsCollectionIntervalString,
+					"processors": createProcessorsForJSONInput(name, comp.ID, monitoringNamespace, b.agentInfo),
+				})
+		}
 	}
 
 	inputs := []interface{}{
 		map[string]interface{}{
-			idKey:        "metrics-monitoring-beats",
-			"name":       "metrics-monitoring-beats",
+			idKey:        fmt.Sprintf("%s-beats", monitoringMetricsUnitID),
+			"name":       fmt.Sprintf("%s-beats", monitoringMetricsUnitID),
 			"type":       "beat/metrics",
 			useOutputKey: monitoringOutput,
 			"data_stream": map[string]interface{}{
@@ -719,8 +921,8 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			"streams": beatsStreams,
 		},
 		map[string]interface{}{
-			idKey:        "metrics-monitoring-agent",
-			"name":       "metrics-monitoring-agent",
+			idKey:        fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
+			"name":       fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
 			"type":       "http/metrics",
 			useOutputKey: monitoringOutput,
 			"data_stream": map[string]interface{}{
@@ -728,6 +930,103 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			},
 			"streams": streams,
 		},
+	}
+
+	// add system/process metrics for services that can't be monitored via json/beats metrics
+	// If there's a checkin PID and the corresponding component has a service spec section, add a system/process config
+	for _, compState := range componentList {
+		if compState.InputSpec != nil && compState.InputSpec.Spec.Service != nil {
+			if comp, ok := existingStateServicePids[compState.ID]; ok && comp != 0 {
+				name := strings.ReplaceAll(strings.ReplaceAll(compState.BinaryName(), "-", "_"), "/", "_")
+				inputs = append(inputs, map[string]interface{}{
+					idKey:        fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
+					"name":       fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
+					"type":       "system/metrics",
+					useOutputKey: monitoringOutput,
+					"data_stream": map[string]interface{}{
+						"namespace": monitoringNamespace,
+					},
+					"streams": []interface{}{
+						map[string]interface{}{
+							idKey: fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
+							"data_stream": map[string]interface{}{
+								"type":      "metrics",
+								"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+								"namespace": monitoringNamespace,
+							},
+							"metricsets":              []interface{}{"process"},
+							"period":                  metricsCollectionIntervalString,
+							"index":                   fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
+							"process.pid":             comp,
+							"process.cgroups.enabled": false,
+							"processors": []interface{}{
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "data_stream",
+										"fields": map[string]interface{}{
+											"type":      "metrics",
+											"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+											"namespace": monitoringNamespace,
+										},
+									},
+								},
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "event",
+										"fields": map[string]interface{}{
+											"dataset": fmt.Sprintf("elastic_agent.%s", name),
+										},
+									},
+								},
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "elastic_agent",
+										"fields": map[string]interface{}{
+											"id":       b.agentInfo.AgentID(),
+											"version":  b.agentInfo.Version(),
+											"snapshot": b.agentInfo.Snapshot(),
+											"process":  name,
+										},
+									},
+								},
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "agent",
+										"fields": map[string]interface{}{
+											"id": b.agentInfo.AgentID(),
+										},
+									},
+								},
+								map[string]interface{}{
+									"add_fields": map[string]interface{}{
+										"target": "component",
+										"fields": map[string]interface{}{
+											"binary": name,
+											"id":     compState.ID,
+										},
+									},
+								},
+							},
+						},
+					},
+				})
+			}
+
+		}
+	}
+
+	// if we have shipper data, inject the extra inputs
+	if len(shipperHTTPStreams) > 0 {
+		inputs = append(inputs, map[string]interface{}{
+			idKey:        fmt.Sprintf("%s-shipper", monitoringMetricsUnitID),
+			"name":       fmt.Sprintf("%s-shipper", monitoringMetricsUnitID),
+			"type":       "http/metrics",
+			useOutputKey: monitoringOutput,
+			"data_stream": map[string]interface{}{
+				"namespace": monitoringNamespace,
+			},
+			"streams": shipperHTTPStreams,
+		})
 	}
 
 	inputsNode, found := cfg[inputsKey]
@@ -745,6 +1044,72 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 	return nil
 }
 
+func createProcessorsForJSONInput(name string, compID, monitoringNamespace string, agentInfo info.Agent) []interface{} {
+	return []interface{}{
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "data_stream",
+				"fields": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+					"namespace": monitoringNamespace,
+				},
+			},
+		},
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "event",
+				"fields": map[string]interface{}{
+					"dataset": fmt.Sprintf("elastic_agent.%s", name),
+				},
+			},
+		},
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "elastic_agent",
+				"fields": map[string]interface{}{
+					"id":       agentInfo.AgentID(),
+					"version":  agentInfo.Version(),
+					"snapshot": agentInfo.Snapshot(),
+					"process":  name,
+				},
+			},
+		},
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "agent",
+				"fields": map[string]interface{}{
+					"id": agentInfo.AgentID(),
+				},
+			},
+		},
+		map[string]interface{}{
+			"copy_fields": map[string]interface{}{
+				"fields":         httpCopyRules(),
+				"ignore_missing": true,
+				"fail_on_error":  false,
+			},
+		},
+		map[string]interface{}{
+			"drop_fields": map[string]interface{}{
+				"fields": []interface{}{
+					"http",
+				},
+				"ignore_missing": true,
+			},
+		},
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "component",
+				"fields": map[string]interface{}{
+					"id":     compID,
+					"binary": name,
+				},
+			},
+		},
+	}
+}
+
 func loggingPath(id, operatingSystem string) string {
 	id = strings.ReplaceAll(id, string(filepath.Separator), "-")
 	if operatingSystem == windowsOS {
@@ -752,27 +1117,6 @@ func loggingPath(id, operatingSystem string) string {
 	}
 
 	return fmt.Sprintf(logFileFormat, paths.Home(), id)
-}
-
-func endpointPath(id, operatingSystem string) (endpointPath string) {
-	return endpointPathWithDir(id, operatingSystem, paths.TempDir(), string(filepath.Separator))
-}
-
-func endpointPathWithDir(id, operatingSystem, tempDir, separator string) (endpointPath string) {
-	id = strings.ReplaceAll(id, separator, "-")
-	if operatingSystem == windowsOS {
-		// on windows named pipe `/` separates pipe name from a computer/server name
-		id = strings.ReplaceAll(id, "/", "-")
-		return fmt.Sprintf(mbEndpointFileFormatWin, id)
-	}
-	// unix socket path must be less than 104 characters
-	path := fmt.Sprintf("unix://%s.sock", filepath.Join(tempDir, id))
-	if len(path) < 104 {
-		return path
-	}
-	// place in global /tmp (or /var/tmp on Darwin) to ensure that its small enough to fit; current path is way to long
-	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
-	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
 }
 
 func prefixedEndpoint(endpoint string) string {
@@ -783,8 +1127,8 @@ func prefixedEndpoint(endpoint string) string {
 	return httpPlusPrefix + endpoint
 }
 
-func monitoringFile(id, operatingSystem string) string {
-	endpoint := endpointPath(id, operatingSystem)
+func monitoringFile(id string) string {
+	endpoint := utils.SocketURLWithFallback(id, paths.TempDir())
 	if endpoint == "" {
 		return ""
 	}
@@ -885,6 +1229,18 @@ func httpCopyRules() []interface{} {
 		map[string]interface{}{
 			"from": "http.agent.apm-server",
 			"to":   "apm-server",
+		},
+
+		// I should be able to see the filebeat input metrics
+		map[string]interface{}{
+			"from": "http.filebeat_input",
+			"to":   "filebeat_input",
+		},
+
+		// shipper specific metrics
+		map[string]interface{}{
+			"from": "http.application.shipper",
+			"to":   "shipper",
 		},
 	}
 

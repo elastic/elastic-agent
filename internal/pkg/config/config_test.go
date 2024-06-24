@@ -5,7 +5,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -43,7 +42,7 @@ func TestInputsResolveNOOP(t *testing.T) {
 		},
 	}
 
-	tmp, err := ioutil.TempDir("", "config")
+	tmp, err := os.MkdirTemp("", "config")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmp)
 
@@ -55,7 +54,13 @@ func TestInputsResolveNOOP(t *testing.T) {
 
 	cfgData, err := cfg.ToMapStr()
 	require.NoError(t, err)
+	require.Equal(t, contents, cfgData)
 
+	// run `ToMapStr` again to ensure that the result is the
+	// same, this is because the `cfg` has to be mutated for
+	// `ToMapStr` to with the `SkipVars()` option
+	cfgData, err = cfg.ToMapStr()
+	require.NoError(t, err)
 	assert.Equal(t, contents, cfgData)
 }
 
@@ -73,8 +78,24 @@ func testToMapStr(t *testing.T) {
 	assert.True(t, reflect.DeepEqual(m, nm))
 }
 
+func TestCommaParsing(t *testing.T) {
+	_ = os.Setenv("testname", "motmot")
+	// test to make sure that we don't blow up the parsers when we have a `,` in a string
+	inMap := map[string]interface{}{
+		"test": "startsWith('${testname}','motmot')",
+	}
+	outMap := map[string]interface{}{
+		"test": "startsWith('motmot','motmot')",
+	}
+	c := MustNewConfigFrom(inMap)
+	parsedMap, err := c.ToMapStr()
+	require.NoError(t, err)
+	t.Logf("got :%#v", parsedMap)
+	require.Equal(t, outMap, parsedMap)
+}
+
 func testLoadFiles(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "watch")
+	tmp, err := os.MkdirTemp("", "watch")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmp)
 
@@ -119,5 +140,6 @@ func testLoadFiles(t *testing.T) {
 func dumpToYAML(t *testing.T, out string, in interface{}) {
 	b, err := yaml.Marshal(in)
 	require.NoError(t, err)
-	ioutil.WriteFile(out, b, 0600)
+	err = os.WriteFile(out, b, 0600)
+	require.NoError(t, err)
 }

@@ -1,0 +1,24 @@
+version: 8.9.2
+entries:
+    - kind: enhancement
+      summary: Adds more logging to the rollback process
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3245
+      issue: []
+      timestamp: 1692141038
+      file:
+        name: 1692141038-upgrade-watcher-logging.yaml
+        checksum: df3b71b30a8b199dc52705069edff9c4079200b4
+    - kind: bug-fix
+      summary: Correctly identify retryable errors when attempting to uninstall on Windows
+      description: ""
+      component: Uninstaller
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3317
+      issue: []
+      timestamp: 1693319952
+      file:
+        name: 1693319952-Change-error-handling-o-Windows-when-uninstalling-the-Elastic-Agent.yaml
+        checksum: 5f52725e4e52247d7ad35d49d6402f4f4b0ce5aa

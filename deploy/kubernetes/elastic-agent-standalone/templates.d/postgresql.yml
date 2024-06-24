@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-postgresql
+      id: filestream-postgresql-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -26,6 +27,7 @@ inputs:
             - postgresql-log
       data_stream.namespace: default
     - name: postgresql/metrics-postgresql
+      id: postgresql/metrics-postgresql-${kubernetes.hints.container_id}
       type: postgresql/metrics
       use_output: default
       streams:
@@ -37,7 +39,9 @@ inputs:
             - ${kubernetes.hints.postgresql.activity.host|kubernetes.hints.postgresql.host|'postgres://localhost:5432'}
           metricsets:
             - activity
+          password: ${kubernetes.hints.postgresql.activity.password|kubernetes.hints.postgresql.password|''}
           period: ${kubernetes.hints.postgresql.activity.period|kubernetes.hints.postgresql.period|'10s'}
+          username: ${kubernetes.hints.postgresql.activity.username|kubernetes.hints.postgresql.username|''}
         - condition: ${kubernetes.hints.postgresql.bgwriter.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
           data_stream:
             dataset: postgresql.bgwriter
@@ -46,7 +50,9 @@ inputs:
             - ${kubernetes.hints.postgresql.bgwriter.host|kubernetes.hints.postgresql.host|'postgres://localhost:5432'}
           metricsets:
             - bgwriter
+          password: ${kubernetes.hints.postgresql.bgwriter.password|kubernetes.hints.postgresql.password|''}
           period: ${kubernetes.hints.postgresql.bgwriter.period|kubernetes.hints.postgresql.period|'10s'}
+          username: ${kubernetes.hints.postgresql.bgwriter.username|kubernetes.hints.postgresql.username|''}
         - condition: ${kubernetes.hints.postgresql.database.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
           data_stream:
             dataset: postgresql.database
@@ -55,7 +61,9 @@ inputs:
             - ${kubernetes.hints.postgresql.database.host|kubernetes.hints.postgresql.host|'postgres://localhost:5432'}
           metricsets:
             - database
+          password: ${kubernetes.hints.postgresql.database.password|kubernetes.hints.postgresql.password|''}
           period: ${kubernetes.hints.postgresql.database.period|kubernetes.hints.postgresql.period|'10s'}
+          username: ${kubernetes.hints.postgresql.database.username|kubernetes.hints.postgresql.username|''}
         - condition: ${kubernetes.hints.postgresql.statement.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
           data_stream:
             dataset: postgresql.statement
@@ -64,5 +72,7 @@ inputs:
             - ${kubernetes.hints.postgresql.statement.host|kubernetes.hints.postgresql.host|'postgres://localhost:5432'}
           metricsets:
             - statement
+          password: ${kubernetes.hints.postgresql.statement.password|kubernetes.hints.postgresql.password|''}
           period: ${kubernetes.hints.postgresql.statement.period|kubernetes.hints.postgresql.period|'10s'}
+          username: ${kubernetes.hints.postgresql.statement.username|kubernetes.hints.postgresql.username|''}
       data_stream.namespace: default

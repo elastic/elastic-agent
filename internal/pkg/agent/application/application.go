@@ -5,11 +5,17 @@
 package application
 
 import (
+	"context"
 	"fmt"
+	"time"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/version"
 
 	"go.elastic.co/apm"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -22,6 +28,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -29,60 +37,113 @@ import (
 
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
+	ctx context.Context,
 	log *logger.Logger,
+	baseLogger *logger.Logger,
 	logLevel logp.Level,
-	agentInfo *info.AgentInfo,
+	agentInfo info.Agent,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
+	testingMode bool,
+	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
+	runAsOtel bool,
 	modifiers ...component.PlatformModifier,
-) (*coordinator.Coordinator, error) {
+) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
+
+	err := version.InitVersionError()
+	if err != nil && !runAsOtel {
+		// ignore this error when running in otel mode
+		// non-fatal error, log a warning and move on
+		log.With("error.message", err).Warnf("Error initializing version information: falling back to %s", release.Version())
+	}
+
 	platform, err := component.LoadPlatformDetail(modifiers...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to gather system information: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to gather system information: %w", err)
 	}
 	log.Info("Gathered system information")
 
 	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
 	if err != nil {
-		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 	log.With("inputs", specs.Inputs()).Info("Detected available inputs and outputs")
 
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
 	if err != nil {
-		return nil, fmt.Errorf("failed to determine capabilities: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to determine capabilities: %w", err)
 	}
 	log.Info("Determined allowed capabilities")
 
 	pathConfigFile := paths.ConfigFile()
-	rawConfig, err := config.LoadFile(pathConfigFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+
+	var rawConfig *config.Config
+	if testingMode {
+		// testing mode doesn't read any configuration from the disk
+		rawConfig, err = config.NewConfigFrom("")
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		// monitoring is always disabled in testing mode
+		disableMonitoring = true
+	} else {
+		log.Infof("Loading baseline config from %v", pathConfigFile)
+		rawConfig, err = config.LoadFile(pathConfigFile)
+		if err != nil {
+			if !runAsOtel {
+				return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+			}
+
+			// initialize with empty config, configuration file is not necessary in otel mode,
+			// best effort is fine
+			rawConfig = config.New()
+		}
 	}
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
-	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
+	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
+	}
 	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
 
-	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), agentInfo, tracer, monitor, cfg.Settings.GRPC)
+	runtime, err := runtime.NewManager(
+		log,
+		baseLogger,
+		agentInfo,
+		tracer,
+		monitor,
+		cfg.Settings.GRPC,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
 
 	var configMgr coordinator.ConfigManager
 	var managed *managedConfigManager
-	var compModifiers []coordinator.ComponentsModifier
+	var compModifiers = []coordinator.ComponentsModifier{InjectAPMConfig}
 	var composableManaged bool
-	if configuration.IsStandalone(cfg.Fleet) {
+	var isManaged bool
+
+	if testingMode {
+		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
+
+		// testing mode uses a config manager that takes configuration from over the control protocol
+		configMgr = newTestingModeConfigManager(log)
+	} else if runAsOtel {
+		// ignoring configuration in elastic-agent.yml
+		configMgr = otel.NewOtelModeConfigManager()
+	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
 
 		loader := config.NewLoader(log, paths.ExternalInputs())
@@ -95,49 +156,75 @@ func New(
 			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
 		}
 	} else {
+		isManaged = true
 		var store storage.Store
-		store, cfg, err = mergeFleetConfig(rawConfig)
+		store, cfg, err = mergeFleetConfig(ctx, rawConfig)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
-
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
-			configMgr = newFleetServerBootstrapManager(log)
+			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, rawConfig))
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
 			composableManaged = true
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
-				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo))
+				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo),
+				EndpointSignedComponentModifier(),
+			)
 
-			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
+			// TODO: stop using global state
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), upgrader)
 			if err != nil {
-				return nil, err
+				return nil, nil, nil, err
 			}
-			configMgr = managed
+			configMgr = coordinator.NewConfigPatchManager(managed, PatchAPMConfig(log, rawConfig))
 		}
 	}
 
-	composable, err := composable.New(log, rawConfig, composableManaged)
-	if err != nil {
-		return nil, errors.New(err, "failed to initialize composable controller")
+	var varsManager composable.Controller
+	if !runAsOtel {
+		// no need for vars in otel mode
+		varsManager, err = composable.New(log, rawConfig, composableManaged)
+		if err != nil {
+			return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
+		}
 	}
 
-	coord := coordinator.New(log, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
 		managed.coord = coord
 	}
-	return coord, nil
+
+	// every time we change the limits we'll see the log message
+	limits.AddLimitsOnChangeCallback(func(new, old limits.LimitsConfig) {
+		log.Debugf("agent limits have changed: %+v -> %+v", old, new)
+	}, "application.go")
+	// applying the initial limits for the agent process
+	if err := limits.Apply(rawConfig); err != nil {
+		return nil, nil, nil, fmt.Errorf("could not parse and apply limits config: %w", err)
+	}
+
+	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
+	// any feature flag change callbacks are registered before they get called by `features.Apply`.
+	if err := features.Apply(rawConfig); err != nil {
+		return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
+	}
+
+	return coord, configMgr, varsManager, nil
 }
 
-func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
+func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(path)
+	store, err := storage.NewEncryptedDiskStore(ctx, path)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
 
 	reader, err := store.Load()
 	if err != nil {

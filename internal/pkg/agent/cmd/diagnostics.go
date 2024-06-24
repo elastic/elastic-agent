@@ -5,37 +5,27 @@
 package cmd
 
 import (
-	"archive/zip"
 	"context"
-	stderrors "errors"
 	"fmt"
-	"io"
-	"io/fs"
 	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
+	"path"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/pkg/component"
-)
-
-const (
-	REDACTED = "<REDACTED>"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 )
 
 func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diagnostics",
-		Short: "Gather diagnostics information from the elastic-agent and write it to a zip archive.",
-		Long:  "Gather diagnostics information from the elastic-agent and write it to a zip archive.",
+		Short: "Gather diagnostics information from the Elastic Agent and write it to a zip archive",
+		Long:  "This command gathers diagnostics information from the Elastic Agent and writes it to a zip archive.",
 		Run: func(c *cobra.Command, args []string) {
 			if err := diagnosticCmd(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
@@ -45,297 +35,102 @@ func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 	}
 
 	cmd.Flags().StringP("file", "f", "", "name of the output diagnostics zip archive")
+	cmd.Flags().BoolP("cpu-profile", "p", false, "wait to collect a CPU profile")
+	cmd.Flags().BoolP("skip-conn", "", false, "Skip connection request diagnostics")
+	cmd.Flags().Bool("exclude-events", false, "do not collect events log file")
 
 	return cmd
 }
 
 func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
-	fileName, _ := cmd.Flags().GetString("file")
-	if fileName == "" {
+	filepath, _ := cmd.Flags().GetString("file")
+	if filepath == "" {
 		ts := time.Now().UTC()
-		fileName = "elastic-agent-diagnostics-" + ts.Format("2006-01-02T15-04-05Z07-00") + ".zip" // RFC3339 format that replaces : with -, so it will work on Windows
+		filepath = "elastic-agent-diagnostics-" + ts.Format("2006-01-02T15-04-05Z07-00") + ".zip" // RFC3339 format that replaces : with -, so it will work on Windows
+	}
+
+	excludeEvents, err := cmd.Flags().GetBool("exclude-events")
+	if err != nil {
+		return fmt.Errorf("cannot get 'exclude-events' flag: %w", err)
 	}
 
 	ctx := handleSignal(context.Background())
 
-	daemon := client.New()
-	err := daemon.Connect(ctx)
+	// 1st create the file to store the diagnostics, if it fails, anything else
+	// is pointless.
+	f, err := createFile(filepath)
 	if err != nil {
-		return fmt.Errorf("failed to connect to daemon: %w", err)
+		return fmt.Errorf("could not create diagnostics file %q: %w", filepath, err)
 	}
-	defer daemon.Disconnect()
+	defer f.Close()
 
-	agentDiag, err := daemon.DiagnosticAgent(ctx)
+	cpuProfile, _ := cmd.Flags().GetBool("cpu-profile")
+	connSkip, _ := cmd.Flags().GetBool("skip-conn")
+	agentDiag, unitDiags, compDiags, err := collectDiagnostics(ctx, streams, cpuProfile, connSkip)
 	if err != nil {
-		return fmt.Errorf("failed to fetch agent diagnostics: %w", err)
-	}
-
-	unitDiags, err := daemon.DiagnosticUnits(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to fetch component/unit diagnostics: %w", err)
+		return fmt.Errorf("failed collecting diagnostics: %w", err)
 	}
 
-	err = createZip(streams, fileName, agentDiag, unitDiags)
-	if err != nil {
-		return fmt.Errorf("unable to create archive %q: %w", fileName, err)
+	if err := diagnostics.ZipArchive(streams.Err, f, paths.Top(), agentDiag, unitDiags, compDiags, excludeEvents); err != nil {
+		return fmt.Errorf("unable to create archive %q: %w", filepath, err)
 	}
-	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", fileName)
+	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", filepath)
 	fmt.Fprintln(streams.Out, "***** WARNING *****\nCreated archive may contain plain text credentials.\nEnsure that files in archive are redacted before sharing.\n*******************")
 	return nil
 }
 
-// createZip creates a zip archive with the passed fileName.
-//
-// The passed DiagnosticsInfo and AgentConfig data is written in the format supplied by the unit.
-// Any local log files are collected and copied into the archive.
-func createZip(streams *cli.IOStreams, fileName string, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
-	f, err := os.Create(fileName)
+func collectDiagnostics(ctx context.Context, streams *cli.IOStreams, cpuProfile, connSkip bool) ([]client.DiagnosticFileResult, []client.DiagnosticUnitResult, []client.DiagnosticComponentResult, error) {
+	daemon := client.New()
+	err := daemon.Connect(ctx)
 	if err != nil {
-		return err
+		return nil, nil, nil, fmt.Errorf("failed to connect to daemon: %w", err)
 	}
-	zw := zip.NewWriter(f)
+	defer daemon.Disconnect()
 
-	// write all Elastic Agent diagnostics at the top level
-	for _, ad := range agentDiag {
-		zf, err := zw.Create(ad.Filename)
-		if err != nil {
-			return closeHandlers(err, zw, f)
-		}
-		err = writeRedacted(streams, ad.Filename, ad, zf)
-		if err != nil {
-			return closeHandlers(err, zw, f)
-		}
+	var additionalDiags []cproto.AdditionalDiagnosticRequest
+	if !connSkip {
+		additionalDiags = append(additionalDiags, cproto.AdditionalDiagnosticRequest_CONN)
+	}
+	if cpuProfile {
+		// console will just hang while we wait for the CPU profile; print something so user doesn't get confused
+		fmt.Fprintf(streams.Out, "Creating diagnostics archive, waiting for CPU profile...\n")
+		additionalDiags = append(additionalDiags, cproto.AdditionalDiagnosticRequest_CPU)
 	}
 
-	// structure each unit into its own component directory
-	compDirs := make(map[string][]client.DiagnosticUnitResult)
-	for _, ud := range unitDiags {
-		compDir := strings.ReplaceAll(ud.ComponentID, "/", "-")
-		compDirs[compDir] = append(compDirs[compDir], ud)
-	}
-
-	// write each units diagnostics into its own directory
-	// layout becomes components/<component-id>/<unit-id>/<filename>
-	_, err = zw.Create("components/")
+	agentDiag, err := daemon.DiagnosticAgent(ctx, additionalDiags)
 	if err != nil {
-		return closeHandlers(err, zw, f)
-	}
-	for dirName, units := range compDirs {
-		_, err = zw.Create(fmt.Sprintf("components/%s/", dirName))
-		if err != nil {
-			return closeHandlers(err, zw, f)
-		}
-		for _, ud := range units {
-			unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
-			_, err = zw.Create(fmt.Sprintf("components/%s/%s/", dirName, unitDir))
-			if err != nil {
-				return closeHandlers(err, zw, f)
-			}
-			if ud.Err != nil {
-				w, err := zw.Create(fmt.Sprintf("components/%s/%s/error.txt", dirName, unitDir))
-				if err != nil {
-					return closeHandlers(err, zw, f)
-				}
-				_, err = w.Write([]byte(fmt.Sprintf("%s\n", ud.Err)))
-				if err != nil {
-					return closeHandlers(err, zw, f)
-				}
-				continue
-			}
-			for _, fr := range ud.Results {
-				fullFilePath := fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Filename)
-				zf, err := zw.Create(fullFilePath)
-				if err != nil {
-					return closeHandlers(err, zw, f)
-				}
-				err = writeRedacted(streams, fullFilePath, fr, zf)
-				if err != nil {
-					return closeHandlers(err, zw, f)
-				}
-			}
-		}
+		fmt.Fprintf(streams.Err, "[WARNING]: failed to fetch agent diagnostics: %s", err)
 	}
 
-	if err := zipLogs(zw); err != nil {
-		return closeHandlers(err, zw, f)
+	unitDiags, err := daemon.DiagnosticUnits(ctx)
+	if err != nil {
+		fmt.Fprintf(streams.Err, "[WARNING]: failed to fetch unit diagnostics: %s", err)
 	}
 
-	return closeHandlers(nil, zw, f)
+	compDiags, err := daemon.DiagnosticComponents(ctx, additionalDiags)
+	if err != nil {
+		fmt.Fprintf(streams.Err, "[WARNING]: failed to fetch component diagnostics: %s", err)
+	}
+
+	if len(compDiags) == 0 && len(unitDiags) == 0 && len(agentDiag) == 0 {
+		return nil, nil, nil, fmt.Errorf("no diags could be fetched")
+	}
+
+	return agentDiag, unitDiags, compDiags, nil
 }
 
-func writeRedacted(streams *cli.IOStreams, fullFilePath string, fr client.DiagnosticFileResult, w io.Writer) error {
-	out := &fr.Content
-
-	// Should we support json too?
-	if fr.ContentType == "application/yaml" {
-		unmarshalled := map[string]interface{}{}
-		err := yaml.Unmarshal(fr.Content, &unmarshalled)
-		if err != nil {
-			// Best effort, output a warning but still include the file
-			fmt.Fprintf(streams.Err, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
-		} else {
-			redacted, err := yaml.Marshal(redactMap(unmarshalled))
-			if err != nil {
-				// Best effort, output a warning but still include the file
-				fmt.Fprintf(streams.Err, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
-			} else {
-				out = &redacted
-			}
-		}
+func createFile(filepath string) (*os.File, error) {
+	// Ensure all the folders on filepath exist as os.Create does not do so.
+	// 0777 is the same permission, before unmask, os.Create uses.
+	dir := path.Dir(filepath)
+	if err := os.MkdirAll(dir, 0777); err != nil {
+		return nil, fmt.Errorf("could not create folders to save diagnostics on %q: %w",
+			dir, err)
 	}
 
-	_, err := w.Write(*out)
-	return err
-}
-
-func redactMap(m map[string]interface{}) map[string]interface{} {
-	for k, v := range m {
-		if v != nil && reflect.TypeOf(v).Kind() == reflect.Map {
-			v = redactMap(toMapStr(v))
-		}
-		if redactKey(k) {
-			v = REDACTED
-		}
-		m[k] = v
-	}
-	return m
-}
-
-func toMapStr(v interface{}) map[string]interface{} {
-	mm := map[string]interface{}{}
-	m, ok := v.(map[interface{}]interface{})
-	if !ok {
-		return mm
-	}
-
-	for k, v := range m {
-		mm[k.(string)] = v
-	}
-	return mm
-}
-
-func redactKey(k string) bool {
-	// "routekey" shouldn't be redacted.
-	// Add any other exceptions here.
-	if k == "routekey" {
-		return false
-	}
-
-	return strings.Contains(k, "certificate") ||
-		strings.Contains(k, "passphrase") ||
-		strings.Contains(k, "password") ||
-		strings.Contains(k, "token") ||
-		strings.Contains(k, "key")
-}
-
-// zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
-func zipLogs(zw *zip.Writer) error {
-	_, err := zw.Create("logs/")
+	f, err := os.Create(filepath)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("error creating .zip file: %w", err)
 	}
-
-	if err := collectServiceComponentsLogs(zw); err != nil {
-		return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
-	}
-
-	// using Data() + "/logs", for some reason default paths/Logs() is the home dir...
-	logPath := filepath.Join(paths.Home(), "logs") + string(filepath.Separator)
-	return filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
-		if stderrors.Is(fErr, fs.ErrNotExist) {
-			return nil
-		}
-		if fErr != nil {
-			return fmt.Errorf("unable to walk log dir: %w", fErr)
-		}
-
-		// name is the relative dir/file name replacing any filepath seperators with /
-		// this will clean log names on windows machines and will nop on *nix
-		name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
-		if name == "" {
-			return nil
-		}
-
-		if d.IsDir() {
-			_, err := zw.Create("logs/" + name + "/")
-			if err != nil {
-				return fmt.Errorf("unable to create log directory in archive: %w", err)
-			}
-			return nil
-		}
-
-		return saveLogs(name, path, zw)
-	})
-}
-
-func collectServiceComponentsLogs(zw *zip.Writer) error {
-	platform, err := component.LoadPlatformDetail()
-	if err != nil {
-		return fmt.Errorf("failed to gather system information: %w", err)
-	}
-	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
-	if err != nil {
-		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
-	}
-	for _, spec := range specs.ServiceSpecs() {
-		if spec.Spec.Service.Log == nil || spec.Spec.Service.Log.Path == "" {
-			// no log path set in specification
-			continue
-		}
-
-		logPath := filepath.Dir(spec.Spec.Service.Log.Path) + string(filepath.Separator)
-		err = filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
-			if fErr != nil {
-				if stderrors.Is(fErr, fs.ErrNotExist) {
-					return nil
-				}
-
-				return fmt.Errorf("unable to walk log directory %q for service input %s: %w", logPath, spec.InputType, fErr)
-			}
-
-			name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
-			if name == "" {
-				return nil
-			}
-
-			if d.IsDir() {
-				return nil
-			}
-
-			return saveLogs("services/"+name, path, zw)
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func saveLogs(name string, logPath string, zw *zip.Writer) error {
-	lf, err := os.Open(logPath)
-	if err != nil {
-		return fmt.Errorf("unable to open log file: %w", err)
-	}
-	zf, err := zw.Create("logs/" + name)
-	if err != nil {
-		return closeHandlers(fmt.Errorf("unable to create log file in archive: %w", err), lf)
-	}
-	_, err = io.Copy(zf, lf)
-	if err != nil {
-		return closeHandlers(fmt.Errorf("log file copy failed: %w", err), lf)
-	}
-
-	return lf.Close()
-}
-
-// closeHandlers will close all passed closers attaching any errors to the passed err and returning the result
-func closeHandlers(err error, closers ...io.Closer) error {
-	var mErr *multierror.Error
-	mErr = multierror.Append(mErr, err)
-	for _, c := range closers {
-		if inErr := c.Close(); inErr != nil {
-			mErr = multierror.Append(mErr, inErr)
-		}
-	}
-	return mErr.ErrorOrNil()
+	return f, nil
 }

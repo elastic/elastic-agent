@@ -1,0 +1,13 @@
+version: 8.10.2
+entries:
+    - kind: security
+      summary: Upgrade Go version to 1.20.8.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3393
+      issue: []
+      timestamp: 1694700200
+      file:
+        name: 1694700200-Upgrade-to-Go-1.20.8.yaml
+        checksum: f9a337cf39abbf93f66c393e52c66053ea700d09

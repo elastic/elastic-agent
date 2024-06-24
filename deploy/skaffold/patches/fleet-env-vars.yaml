@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: elastic-agent
+spec:
+  template:
+    spec:
+      containers:
+        - name: elastic-agent
+          env:
+            - name: FLEET_URL
+              value: ""
+              valueFrom:
+                configMapKeyRef:
+                  name: fleet-es-configmap
+                  key: FLEET_URL
+            # Elasticsearch API key used to enroll Elastic Agents in Fleet (https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html#fleet-enrollment-tokens)
+            # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
+            - name: FLEET_ENROLLMENT_TOKEN
+              value: ""
+              valueFrom:
+                configMapKeyRef:
+                  name: fleet-es-configmap
+                  key: FLEET_ENROLLMENT_TOKEN
+            # - name: KIBANA_HOST
+            #   value: "$(KIBANA_HOST)"
+            # # The basic authentication username used to connect to Kibana and retrieve a service_token to enable Fleet
+            # - name: KIBANA_FLEET_USERNAME
+            #   value: "$(KIBANA_FLEET_USERNAME)"
+            # # The basic authentication password used to connect to Kibana and retrieve a service_token to enable Fleet
+            # - name: KIBANA_FLEET_PASSWORD
+            #   value: "$(KIBANA_FLEET_PASSWORD)"

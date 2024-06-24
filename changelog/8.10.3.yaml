@@ -1,0 +1,26 @@
+version: 8.10.3
+entries:
+    - kind: bug-fix
+      summary: Resilient handling of air gapped PGP checks
+      description: Elastic Agent should not fail when remote PGP is specified (or official Elastic fallback PGP used) and remote is not available
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3427
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3368
+      timestamp: 1695035111
+      file:
+        name: 1695035111-Resilient-handling-of-air-gapped-PGP-checks.yaml
+        checksum: 8741bfa9475a09d5901dc3fab0fed3a06b55d5bb
+    - kind: feature
+      summary: Improve Agent uninstall on Windows by adding delay between retries when file removal is blocked by busy files
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3431
+      issue: 
+        - https://github.com/elastic/elastic-agent/issues/3221
+      timestamp: 1695050880
+      file:
+        name: 1695050880-Improve-retry-strategy-when-uninstalling-agent.yaml
+        checksum: 45eab228dfd89392a0f3685a628f73ccce05d081

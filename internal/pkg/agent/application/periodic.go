@@ -28,7 +28,7 @@ type periodic struct {
 }
 
 func (p *periodic) Run(ctx context.Context) error {
-	if err := p.work(); err != nil {
+	if err := p.work(ctx); err != nil {
 		return err
 	}
 
@@ -41,7 +41,7 @@ func (p *periodic) Run(ctx context.Context) error {
 		case <-t.C:
 		}
 
-		if err := p.work(); err != nil {
+		if err := p.work(ctx); err != nil {
 			return err
 		}
 	}
@@ -61,7 +61,7 @@ func (p *periodic) Watch() <-chan coordinator.ConfigChange {
 	return p.ch
 }
 
-func (p *periodic) work() error {
+func (p *periodic) work(ctx context.Context) error {
 	files, err := p.discover()
 	if err != nil {
 		return errors.New(err, "could not discover configuration files", errors.TypeConfig)
@@ -110,7 +110,12 @@ func (p *periodic) work() error {
 			p.watcher.Invalidate()
 			return err
 		}
-		p.ch <- &localConfigChange{cfg}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case p.ch <- &localConfigChange{cfg}:
+		}
+
 		return nil
 	}
 

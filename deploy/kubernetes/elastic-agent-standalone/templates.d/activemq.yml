@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-activemq
+      id: filestream-activemq-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -45,6 +46,7 @@ inputs:
             - activemq-log
       data_stream.namespace: default
     - name: activemq/metrics-activemq
+      id: activemq/metrics-activemq-${kubernetes.hints.container_id}
       type: activemq/metrics
       use_output: default
       streams:

@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-santa
+      id: filestream-santa-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

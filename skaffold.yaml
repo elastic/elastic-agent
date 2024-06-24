@@ -1,0 +1,57 @@
+apiVersion: skaffold/v4beta5
+kind: Config
+metadata:
+  name: elastic-agent
+build:
+  local:
+    push: false
+    useBuildkit: false
+    useDockerCLI: true
+  artifacts:
+    - image: docker.elastic.co/beats/elastic-agent
+      docker:
+        dockerfile: Dockerfile.skaffold
+        noCache: false
+        pullParent: false
+        squash: false
+profiles:
+  - name: elastic-agent-standalone
+    manifests:
+      kustomize:
+        paths: ["deploy/skaffold"]
+      hooks:
+        before:
+          - host:
+              os: ["linux", "macos"]
+              command:
+              - cp
+              - deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml
+              - deploy/skaffold/elastic-agent-kubernetes.yaml
+          - host:
+              os: ["windows"]
+              command:
+              - copy
+              - /Y
+              - deploy\kubernetes\elastic-agent-standalone-kubernetes.yaml
+              - deploy\skaffold\elastic-agent-kubernetes.yaml
+  - name: elastic-agent-managed
+    manifests:
+      kustomize:
+        paths: ["deploy/skaffold"]
+      hooks:
+        before:
+          - host:
+              os: ["linux", "macos"]
+              command:
+              - cp
+              - deploy/kubernetes/elastic-agent-managed-kubernetes.yaml
+              - deploy/skaffold/elastic-agent-kubernetes.yaml
+          - host:
+              os: ["windows"]
+              command:
+              - copy
+              - /Y
+              - deploy\kubernetes\elastic-agent-managed-kubernetes.yaml
+              - deploy\skaffold\elastic-agent-kubernetes.yaml
+deploy:
+  kubectl: {}

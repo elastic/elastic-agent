@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-traefik
+      id: filestream-traefik-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -22,6 +23,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: traefik/metrics-traefik
+      id: traefik/metrics-traefik-${kubernetes.hints.container_id}
       type: traefik/metrics
       use_output: default
       streams:

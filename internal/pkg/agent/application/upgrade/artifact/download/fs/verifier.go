@@ -6,13 +6,16 @@ package fs
 
 import (
 	"fmt"
-	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -23,22 +26,38 @@ const (
 // The signature is validated against Elastic's public GPG key that is
 // embedded into Elastic Agent.
 type Verifier struct {
-	config        *artifact.Config
-	pgpBytes      []byte
-	allowEmptyPgp bool
+	config     *artifact.Config
+	client     http.Client
+	defaultKey []byte
+	log        *logger.Logger
+}
+
+func (v *Verifier) Name() string {
+	return "fs.verifier"
 }
 
 // NewVerifier creates a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
-	if len(pgp) == 0 && !allowEmptyPgp {
-		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)
+func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Verifier, error) {
+	if len(pgp) == 0 {
+		return nil, errors.New("expecting PGP key but received none", errors.TypeSecurity)
+	}
+
+	client, err := config.HTTPTransportSettings.Client(
+		httpcommon.WithAPMHTTPInstrumentation(),
+		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+			return download.WithHeaders(rt, download.Headers)
+		}),
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	v := &Verifier{
-		config:        config,
-		allowEmptyPgp: allowEmptyPgp,
-		pgpBytes:      pgp,
+		config:     config,
+		client:     *client,
+		defaultKey: pgp,
+		log:        log,
 	}
 
 	return v, nil
@@ -46,27 +65,25 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Veri
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string) error {
+func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
-		return errors.New(err, "retrieving package name")
+		return fmt.Errorf("could not get artifact name: %w", err)
 	}
 
-	fullPath := filepath.Join(v.config.TargetDirectory, filename)
+	artifactPath := filepath.Join(v.config.TargetDirectory, filename)
 
-	if err = download.VerifySHA512Hash(fullPath); err != nil {
-		var checksumMismatchErr *download.ChecksumMismatchError
-		if errors.As(err, &checksumMismatchErr) {
-			os.Remove(fullPath)
-			os.Remove(fullPath + ".sha512")
-		}
-		return err
+	if err = download.VerifySHA512HashWithCleanup(v.log, artifactPath); err != nil {
+		return fmt.Errorf("failed to verify SHA512 hash: %w", err)
 	}
 
-	if err = v.verifyAsc(fullPath); err != nil {
+	if err = v.verifyAsc(artifactPath, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
-			os.Remove(fullPath + ".asc")
+			if err := os.Remove(artifactPath + ".asc"); err != nil {
+				v.log.Warnf("failed clean up after signature verification: failed to remove %q: %v",
+					artifactPath+".asc", err)
+			}
 		}
 		return err
 	}
@@ -74,26 +91,43 @@ func (v *Verifier) Verify(a artifact.Artifact, version string) error {
 	return nil
 }
 
-func (v *Verifier) verifyAsc(fullPath string) error {
-	if len(v.pgpBytes) == 0 {
-		// no pgp available skip verification process
-		return nil
+func (v *Verifier) Reload(c *artifact.Config) error {
+	// reload client
+	client, err := c.HTTPTransportSettings.Client(
+		httpcommon.WithAPMHTTPInstrumentation(),
+		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+			return download.WithHeaders(rt, download.Headers)
+		}),
+	)
+	if err != nil {
+		return errors.New(err, "http.verifier: failed to generate client out of config")
+	}
+
+	v.client = *client
+	v.config = c
+
+	return nil
+}
+
+func (v *Verifier) verifyAsc(fullPath string, skipDefaultKey bool, pgpSources ...string) error {
+	var pgpBytes [][]byte
+	pgpBytes, err := download.FetchPGPKeys(
+		v.log, v.client, v.defaultKey, skipDefaultKey, pgpSources)
+	if err != nil {
+		return fmt.Errorf("could not fetch pgp keys: %w", err)
 	}
 
 	ascBytes, err := v.getPublicAsc(fullPath)
-	if err != nil && v.allowEmptyPgp {
-		// asc not available but we allow empty for dev use-case
-		return nil
-	} else if err != nil {
-		return err
+	if err != nil {
+		return fmt.Errorf("could not get .asc file: %w", err)
 	}
 
-	return download.VerifyGPGSignature(fullPath, ascBytes, v.pgpBytes)
+	return download.VerifyPGPSignatureWithKeys(v.log, fullPath, ascBytes, pgpBytes)
 }
 
 func (v *Verifier) getPublicAsc(fullPath string) ([]byte, error) {
 	fullPath = fmt.Sprintf("%s%s", fullPath, ascSuffix)
-	b, err := ioutil.ReadFile(fullPath)
+	b, err := os.ReadFile(fullPath)
 	if err != nil {
 		return nil, errors.New(err, fmt.Sprintf("fetching asc file from '%s'", fullPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
 	}

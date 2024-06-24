@@ -8,11 +8,11 @@ import (
 	"context"
 	"time"
 
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -26,8 +26,11 @@ import (
 // Max number of times an invalid API Key is checked
 const maxUnauthCounter int = 6
 
-// Const for decraded state or linter complains
-const degraded = "DEGRADED"
+// Consts for states at fleet checkin
+const fleetStateDegraded = "DEGRADED"
+const fleetStateOnline = "online"
+const fleetStateError = "error"
+const fleetStateStarting = "starting"
 
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
@@ -62,7 +65,7 @@ type stateStore interface {
 	Actions() []fleetapi.Action
 }
 
-type fleetGateway struct {
+type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
 	scheduler          scheduler.Scheduler
@@ -71,7 +74,7 @@ type fleetGateway struct {
 	acker              acker.Acker
 	unauthCounter      int
 	checkinFailCounter int
-	stateFetcher       coordinator.StateFetcher
+	stateFetcher       func() coordinator.State
 	stateStore         stateStore
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
@@ -83,9 +86,9 @@ func New(
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
-	stateFetcher coordinator.StateFetcher,
+	stateFetcher func() coordinator.State,
 	stateStore stateStore,
-) (gateway.FleetGateway, error) {
+) (*FleetGateway, error) {
 
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	return newFleetGatewayWithScheduler(
@@ -107,10 +110,10 @@ func newFleetGatewayWithScheduler(
 	client client.Sender,
 	scheduler scheduler.Scheduler,
 	acker acker.Acker,
-	stateFetcher coordinator.StateFetcher,
+	stateFetcher func() coordinator.State,
 	stateStore stateStore,
-) (gateway.FleetGateway, error) {
-	return &fleetGateway{
+) (*FleetGateway, error) {
+	return &FleetGateway{
 		log:          log,
 		client:       client,
 		settings:     settings,
@@ -124,11 +127,11 @@ func newFleetGatewayWithScheduler(
 	}, nil
 }
 
-func (f *fleetGateway) Actions() <-chan []fleetapi.Action {
+func (f *FleetGateway) Actions() <-chan []fleetapi.Action {
 	return f.actionCh
 }
 
-func (f *fleetGateway) Run(ctx context.Context) error {
+func (f *FleetGateway) Run(ctx context.Context) error {
 	// Backoff implementation doesn't support the use of a context [cancellation] as the shutdown mechanism.
 	// So we keep a done channel that will be closed when the current context is shutdown.
 	done := make(chan struct{})
@@ -170,11 +173,11 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 }
 
 // Errors returns the channel to watch for reported errors.
-func (f *fleetGateway) Errors() <-chan error {
+func (f *FleetGateway) Errors() <-chan error {
 	return f.errCh
 }
 
-func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
+func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
 	bo.Reset()
 
 	// Guard if the context is stopped by a out of bound call,
@@ -214,10 +217,16 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 
 		if f.checkinFailCounter > 0 {
 			// Log at same level as error logs above so subsequent successes are visible when log level is set to 'error'.
-			f.log.Errorf("Checkin request to fleet-server succeeded after %d failures", f.checkinFailCounter)
+			f.log.Warnf("Checkin request to fleet-server succeeded after %d failures", f.checkinFailCounter)
 		}
 
 		f.checkinFailCounter = 0
+		if resp.FleetWarning != "" {
+			f.errCh <- coordinator.NewWarningError(resp.FleetWarning)
+		} else {
+			f.errCh <- nil
+		}
+
 		// Request was successful, return the collected actions.
 		return resp, nil
 	}
@@ -227,7 +236,7 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func (f *fleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState) []fleetapi.CheckinComponent {
+func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState) []fleetapi.CheckinComponent {
 	if components == nil {
 		return nil
 	}
@@ -240,7 +249,7 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 		case eaclient.UnitStateHealthy:
 			return "HEALTHY"
 		case eaclient.UnitStateDegraded:
-			return degraded
+			return fleetStateDegraded
 		case eaclient.UnitStateFailed:
 			return "FAILED"
 		case eaclient.UnitStateStopping:
@@ -268,10 +277,10 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 		state := item.State
 
 		var shipperReference *fleetapi.CheckinShipperReference
-		if component.Shipper != nil {
+		if component.ShipperRef != nil {
 			shipperReference = &fleetapi.CheckinShipperReference{
-				ComponentID: component.Shipper.ComponentID,
-				UnitID:      component.Shipper.UnitID,
+				ComponentID: component.ShipperRef.ComponentID,
+				UnitID:      component.ShipperRef.UnitID,
 			}
 		}
 		checkinComponent := fleetapi.CheckinComponent{
@@ -302,8 +311,8 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 	return checkinComponents
 }
 
-func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
-	ecsMeta, err := info.Metadata()
+func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
+	ecsMeta, err := info.Metadata(ctx, f.log)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
 	}
@@ -315,19 +324,24 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	state := f.stateFetcher.State(false)
+	state := f.stateFetcher()
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components)
 
+	f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
+	// Fix loglevel with the current log level used by coordinator
+	ecsMeta.Elastic.Agent.LogLevel = state.LogLevel.String()
+
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
-		AckToken:   ackToken,
-		Metadata:   ecsMeta,
-		Status:     agentStateToString(state.State),
-		Message:    state.Message,
-		Components: components,
+		AckToken:       ackToken,
+		Metadata:       ecsMeta,
+		Status:         agentStateToString(state.State),
+		Message:        state.Message,
+		Components:     components,
+		UpgradeDetails: state.UpgradeDetails,
 	}
 
 	resp, took, err := cmd.Execute(ctx, req)
@@ -362,7 +376,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 }
 
 // shouldUnenroll checks if the max number of trying an invalid key is reached
-func (f *fleetGateway) shouldUnenroll() bool {
+func (f *FleetGateway) shouldUnenroll() bool {
 	return f.unauthCounter > maxUnauthCounter
 }
 
@@ -370,16 +384,35 @@ func isUnauth(err error) bool {
 	return errors.Is(err, client.ErrInvalidAPIKey)
 }
 
-func (f *fleetGateway) SetClient(c client.Sender) {
+func (f *FleetGateway) SetClient(c client.Sender) {
 	f.client = c
 }
 
 func agentStateToString(state agentclient.State) string {
 	switch state {
 	case agentclient.Healthy:
-		return "online"
+		return fleetStateOnline
 	case agentclient.Failed:
-		return "error"
+		return fleetStateError
+	case agentclient.Starting:
+		return fleetStateStarting
+	case agentclient.Configuring:
+		return fleetStateOnline
+	case agentclient.Upgrading:
+		return fleetStateOnline
+	case agentclient.Rollback:
+		return fleetStateDegraded
+	case agentclient.Degraded:
+		return fleetStateDegraded
+	// Report Stopping and Stopped as online since Fleet doesn't understand these states yet.
+	// Usually Stopping and Stopped mean the agent is going to stop checking in at which point Fleet
+	// will update the state to offline. Use the online state here since there isn't anything better
+	// at the moment, and the agent will end up in the expected offline state eventually.
+	case agentclient.Stopping:
+		return fleetStateOnline
+	case agentclient.Stopped:
+		return fleetStateOnline
 	}
-	return degraded
+	// Unknown states map to degraded.
+	return fleetStateDegraded
 }

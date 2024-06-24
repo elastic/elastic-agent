@@ -4,7 +4,9 @@
 
 package composable
 
-import "context"
+import (
+	"context"
+)
 
 // FetchContextProvider is the interface that a context provider uses allow variable values to be determined when the
 // configuration is rendered versus it being known in advanced.
@@ -19,6 +21,12 @@ type FetchContextProvider interface {
 type ContextProviderComm interface {
 	context.Context
 
+	// Signal signals that something has changed in the provider.
+	//
+	// Note: This should only be used by fetch context providers, standard context
+	// providers should use Set to update the overall state.
+	Signal()
+
 	// Set sets the current mapping for this context.
 	Set(map[string]interface{}) error
 }
@@ -26,5 +34,13 @@ type ContextProviderComm interface {
 // ContextProvider is the interface that a context provider must implement.
 type ContextProvider interface {
 	// Run runs the context provider.
-	Run(ContextProviderComm) error
+	Run(context.Context, ContextProviderComm) error
+}
+
+// CloseableProvider is an interface that providers may choose to implement
+// if it makes sense for them, e.g. if they have any resources that need
+// cleaning up after the provider's (final) run.
+type CloseableProvider interface {
+	// Close is called after all runs of the provider have finished.
+	Close() error
 }

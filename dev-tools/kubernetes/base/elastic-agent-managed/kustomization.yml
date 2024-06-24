@@ -1,0 +1,20 @@
+namespace: kube-system
+commonLabels:
+  k8s-app: elastic-agent
+namePrefix: elastic-agent-managed-
+
+images:
+  - name: docker.elastic.co/beats/elastic-agent
+    newTag: "8.6.0"
+
+resources:
+  - ../../base/common
+  - daemonset.yaml
+
+configMapGenerator:
+  - name: configs
+    envs:
+      - .env
+
+generatorOptions:
+  disableNameSuffixHash: true

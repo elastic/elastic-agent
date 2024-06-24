@@ -10,6 +10,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 // Verifier is a verifier with a predefined set of verifiers.
@@ -17,46 +19,46 @@ import (
 // the next one.
 // Error is returned if all of them fail.
 type Verifier struct {
-	vv []download.Verifier
+	vv  []download.Verifier
+	log *logger.Logger
+}
+
+func (v *Verifier) Name() string {
+	return "composed.verifier"
 }
 
 // NewVerifier creates a verifier composed out of predefined set of verifiers.
 // During each verify call it tries to call the first one and on failure fallbacks to
 // the next one.
 // Error is returned if all of them fail.
-func NewVerifier(verifiers ...download.Verifier) *Verifier {
+func NewVerifier(log *logger.Logger, verifiers ...download.Verifier) *Verifier {
 	return &Verifier{
-		vv: verifiers,
+		log: log,
+		vv:  verifiers,
 	}
 }
 
 // Verify checks the package from configured source.
-func (e *Verifier) Verify(a artifact.Artifact, version string) error {
+func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	var err error
-	var checksumMismatchErr *download.ChecksumMismatchError
-	var invalidSignatureErr *download.InvalidSignatureError
 
-	for _, v := range e.vv {
-		e := v.Verify(a, version)
+	for _, verifier := range v.vv {
+		e := verifier.Verify(a, version, skipDefaultPgp, pgpBytes...)
 		if e == nil {
 			// Success
 			return nil
 		}
 
+		v.log.Debugw("Verifier failed!", "verifier", verifier.Name(), "error", e)
 		err = multierror.Append(err, e)
-
-		if errors.As(e, &checksumMismatchErr) || errors.As(err, &invalidSignatureErr) {
-			// Stop verification chain on checksum/signature errors.
-			break
-		}
 	}
 
 	return err
 }
 
-func (e *Verifier) Reload(c *artifact.Config) error {
-	for _, v := range e.vv {
-		reloadable, ok := v.(download.Reloader)
+func (v *Verifier) Reload(c *artifact.Config) error {
+	for _, verifier := range v.vv {
+		reloadable, ok := verifier.(download.Reloader)
 		if !ok {
 			continue
 		}

@@ -1,0 +1,41 @@
+version: 8.6.2
+entries:
+    - kind: unknown
+      summary: Preserve component state on upgrade
+      description: ""
+      component: ""
+      pr:
+        - "2207"
+      issue:
+        - "2136"
+      timestamp: 1675085396
+      file:
+        name: 1675085396-preserve-state-on-upgrade.yaml
+        checksum: d3519fad99bc811048307ce29e3f138e32ebe6e5
+    - kind: bug-fix
+      summary: Enable nodejs engine validation when bundling synthetics.
+      description: ""
+      component: heartbeat
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2256
+        - https://github.com/elastic/elastic-agent/pull/2254
+        - https://github.com/elastic/elastic-agent/pull/2255
+        - https://github.com/elastic/elastic-agent/pull/2225
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2249
+      timestamp: 1675379107
+      file:
+        name: 1675379107-heartbeat-engine-strict-validation.yaml
+        checksum: 0c41463b7056c1c65662733776251c7bd3a8ea12
+    - kind: bug-fix
+      summary: start-stop-components-in-a-more-syncronized-manner
+      description: ""
+      component: manager
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2226
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1532
+      timestamp: 1676487222
+      file:
+        name: 1676487222-start-stop-components-in-a-more-syncronized-manner.yaml
+        checksum: a9bc48ffeb9936b69fc51755835eafd3af73cd93

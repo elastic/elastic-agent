@@ -1,0 +1,46 @@
+# A diagram of example components managed by Agent with the shipper enabled.
+# To regenerate the image after changing this file, run:
+#   d2 components-shipper-example.d2 components-shipper-example.svg
+# To live-edit this file with immediate regeneration of the diagram, run:
+#   d2 --watch components-shipper-example.d2 components-shipper-example.svg
+ 
+filebeat1: {
+  filestream-1 -> output
+  filestream-2 -> output
+}
+
+filebeat2: {
+  udp-1 -> output
+}
+
+metricbeat: {
+  metrics-1 -> output
+  metrics-2 -> output
+}
+
+endpoint: {
+  endpoint-1 -> output
+}
+
+shipper1: {
+  filebeat1 -> output
+  metricbeat -> output
+}
+
+shipper2: {
+  filebeat2 -> output
+}
+
+shipper3: {
+  endpoint -> output
+}
+
+filebeat1.output -> shipper1.filebeat1
+metricbeat.output -> shipper1.metricbeat
+shipper1.output -> elasticsearch1
+
+filebeat2.output -> shipper2.filebeat2
+shipper2.output -> logstash
+
+endpoint.output -> shipper3.endpoint
+shipper3.output -> elasticsearch2

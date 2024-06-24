@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 )
 
 type source struct {
@@ -40,20 +38,21 @@ func sourceFromComponentID(procID string) source {
 	return s
 }
 
-func processesHandler(coord *coordinator.Coordinator) func(http.ResponseWriter, *http.Request) error {
+func processesHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 		procs := make([]process, 0)
 
-		state := coord.State(false)
+		state := coord.State()
 
-		for _, c := range state.Components {
+		for iter, c := range state.Components {
 			if c.Component.InputSpec != nil {
 				procs = append(procs, process{
-					ID:     expectedCloudProcessID(&c.Component),
+					// access the components array manually to avoid a memory aliasing error. This is fixed in go 1.22
+					ID:     expectedCloudProcessID(&state.Components[iter].Component),
 					PID:    c.LegacyPID,
-					Binary: c.Component.InputSpec.BinaryName,
+					Binary: c.Component.BinaryName(),
 					Source: sourceFromComponentID(c.Component.ID),
 				})
 			}

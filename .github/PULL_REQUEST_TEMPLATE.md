@@ -34,13 +34,15 @@ List here all the items you have verified BEFORE sending this PR. Please DO NOT 
 - [ ] I have made corresponding change to the default configuration files
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] I have added an entry in `./changelog/fragments` using the [changelog tool](https://github.com/elastic/elastic-agent#changelog)
+- [ ] I have added an integration test or an E2E test
 
-## Author's Checklist
+## Disruptive User Impact
 
-<!-- Recommended
-Add a checklist of things that are required to be reviewed in order to have the PR approved
+<!--
+Will the changes introduced by this PR cause disruption to users in any way? If so, please describe what changes users
+could make on their end to nullify or minimize this disruption. Consider impacts in related systems, not just directly
+when using Elastic Agent.
 -->
-- [ ]
 
 ## How to test this PR locally
 
@@ -58,24 +60,22 @@ Link related issues below. Insert the issue link or reference after the word "Cl
 - Requires #123
 - Superseds #123
 -->
-- 
+-
 
-## Use cases
+## Questions to ask yourself
 
-<!-- Recommended
-Explain here the different behaviors that this PR introduces or modifies in this project, user roles, environment configuration, etc.
+- How are we going to support this in production?
+- How are we going to measure its adoption?
+- How are we going to debug this?
+- What are the metrics I should take care of?
+- ...
 
-If you are familiar with Gherkin test scenarios, we recommend its usage: https://cucumber.io/docs/gherkin/reference/
--->
+<!-- CI Cheatsheet
+Trigger comments:
+/test             (Or `buildkite test this|it`) Triggers unit test pipeline
+/test extended    (Or `buildkite test extended`) Triggers integration test pipeline
 
-## Screenshots
-
-<!-- Optional
-Add here screenshots about how the project will be changed after the PR is applied. They could be related to web pages, terminal, etc, or any other image you consider important to be shared with the team.
--->
-
-## Logs
-
-<!-- Recommended
-Paste here output logs discovered while creating this PR, such as stack traces or integration logs, or any other output you consider important to be shared with the team.
+PR labels:
+skip-ci           Skips unit and integration tests
+skip-it           Skips integration tests
 -->

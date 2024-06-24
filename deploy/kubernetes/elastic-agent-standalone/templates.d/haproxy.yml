@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-haproxy
+      id: filestream-haproxy-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -24,6 +25,7 @@ inputs:
             - haproxy-log
       data_stream.namespace: default
     - name: syslog-haproxy
+      id: syslog-haproxy-${kubernetes.hints.container_id}
       type: syslog
       use_output: default
       streams:
@@ -40,6 +42,7 @@ inputs:
             - haproxy-log
       data_stream.namespace: default
     - name: haproxy/metrics-haproxy
+      id: haproxy/metrics-haproxy-${kubernetes.hints.container_id}
       type: haproxy/metrics
       use_output: default
       streams:

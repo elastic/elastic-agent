@@ -15,6 +15,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/conv"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -74,13 +75,17 @@ type stateSerializer struct {
 }
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.
-func NewStateStoreWithMigration(log *logger.Logger, actionStorePath, stateStorePath string) (*StateStore, error) {
-	err := migrateStateStore(log, actionStorePath, stateStorePath)
+func NewStateStoreWithMigration(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string, storageOpts ...storage.EncryptedOptionFunc) (*StateStore, error) {
+	err := migrateStateStore(ctx, log, actionStorePath, stateStorePath, storageOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewStateStore(log, storage.NewEncryptedDiskStore(stateStorePath))
+	encryptedDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath, storageOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
+	return NewStateStore(log, encryptedDiskStore)
 }
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
@@ -90,10 +95,11 @@ func NewStateStoreActionAcker(acker acker.Acker, store *StateStore) *StateStoreA
 
 // NewStateStore creates a new state store.
 func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
-	// If the store exists we will read it, if any errors is returned we assume we do not have anything
-	// persisted and we return an empty store.
+	// If the store exists we will read it, if an error is returned we log it
+	// and return an empty store.
 	reader, err := store.Load()
 	if err != nil {
+		log.Warnf("failed to load state store, returning empty contents: %v", err.Error())
 		return &StateStore{log: log, store: store}, nil
 	}
 	defer reader.Close()
@@ -129,7 +135,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 			state.action = &fleetapi.ActionPolicyChange{
 				ActionID:   sr.Action.ID,
 				ActionType: sr.Action.Type,
-				Policy:     sr.Action.Policy,
+				Policy:     conv.YAMLMapToJSONMap(sr.Action.Policy), // Fix Policy, in order to make it consistent with the policy received from the fleet gateway as nested map[string]interface{}
 			}
 		}
 	}
@@ -141,10 +147,17 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	}, nil
 }
 
-func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath string) (err error) {
+func migrateStateStore(ctx context.Context, log *logger.Logger, actionStorePath, stateStorePath string, storageOpts ...storage.EncryptedOptionFunc) (err error) {
 	log = log.Named("state_migration")
-	actionDiskStore := storage.NewDiskStore(actionStorePath)
-	stateDiskStore := storage.NewEncryptedDiskStore(stateStorePath)
+	actionDiskStore, err := storage.NewDiskStore(actionStorePath)
+	if err != nil {
+		return fmt.Errorf("error creating disk store: %w", err)
+	}
+
+	stateDiskStore, err := storage.NewEncryptedDiskStore(ctx, stateStorePath, storageOpts...)
+	if err != nil {
+		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
 
 	stateStoreExits, err := stateDiskStore.Exists()
 	if err != nil {
@@ -180,14 +193,14 @@ func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath strin
 		return nil
 	}
 
-	actionStore, err := NewActionStore(log, actionDiskStore)
+	actionStore, err := newActionStore(log, actionDiskStore)
 	if err != nil {
 		log.Errorf("failed to create action store %s: %v", actionStorePath, err)
 		return err
 	}
 
 	// no actions stored nothing to migrate
-	if len(actionStore.Actions()) == 0 {
+	if len(actionStore.actions()) == 0 {
 		log.Debugf("no actions stored in the action store %s, nothing to migrate", actionStorePath)
 		return nil
 	}
@@ -198,7 +211,7 @@ func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath strin
 	}
 
 	// set actions from the action store to the state store
-	stateStore.Add(actionStore.Actions()[0])
+	stateStore.Add(actionStore.actions()[0])
 
 	err = stateStore.Save()
 	if err != nil {

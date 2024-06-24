@@ -5,19 +5,23 @@
 package http
 
 import (
+	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -27,23 +31,27 @@ const (
 // Verifier verifies a downloaded package by comparing with public ASC
 // file from elastic.co website.
 type Verifier struct {
-	config        *artifact.Config
-	client        http.Client
-	pgpBytes      []byte
-	allowEmptyPgp bool
+	config     *artifact.Config
+	client     http.Client
+	defaultKey []byte
+	log        *logger.Logger
+}
+
+func (v *Verifier) Name() string {
+	return "http.verifier"
 }
 
 // NewVerifier create a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
-	if len(pgp) == 0 && !allowEmptyPgp {
-		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)
+func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Verifier, error) {
+	if len(pgp) == 0 {
+		return nil, errors.New("expecting PGP key received none", errors.TypeSecurity)
 	}
 
 	client, err := config.HTTPTransportSettings.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
-			return withHeaders(rt, headers)
+			return download.WithHeaders(rt, download.Headers)
 		}),
 	)
 	if err != nil {
@@ -51,10 +59,10 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Veri
 	}
 
 	v := &Verifier{
-		config:        config,
-		client:        *client,
-		allowEmptyPgp: allowEmptyPgp,
-		pgpBytes:      pgp,
+		config:     config,
+		client:     *client,
+		defaultKey: pgp,
+		log:        log,
 	}
 
 	return v, nil
@@ -65,7 +73,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 	client, err := c.HTTPTransportSettings.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
-			return withHeaders(rt, headers)
+			return download.WithHeaders(rt, download.Headers)
 		}),
 	)
 	if err != nil {
@@ -80,25 +88,27 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string) error {
-	fullPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
+func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+	artifactPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
 		return errors.New(err, "retrieving package path")
 	}
 
-	if err = download.VerifySHA512Hash(fullPath); err != nil {
-		var checksumMismatchErr *download.ChecksumMismatchError
-		if errors.As(err, &checksumMismatchErr) {
-			os.Remove(fullPath)
-			os.Remove(fullPath + ".sha512")
-		}
-		return err
+	if err = download.VerifySHA512HashWithCleanup(v.log, artifactPath); err != nil {
+		return fmt.Errorf("failed to verify SHA512 hash: %w", err)
 	}
 
-	if err = v.verifyAsc(a, version); err != nil {
+	if err = v.verifyAsc(a, version, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
-			os.Remove(fullPath + ".asc")
+			if err := os.Remove(artifactPath); err != nil {
+				v.log.Warnf("failed clean up after signature verification: failed to remove %q: %v",
+					artifactPath, err)
+			}
+			if err := os.Remove(artifactPath + ascSuffix); err != nil {
+				v.log.Warnf("failed clean up after sha512 check: failed to remove %q: %v",
+					artifactPath+ascSuffix, err)
+			}
 		}
 		return err
 	}
@@ -106,12 +116,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version string) error {
 	return nil
 }
 
-func (v *Verifier) verifyAsc(a artifact.Artifact, version string) error {
-	if len(v.pgpBytes) == 0 {
-		// no pgp available skip verification process
-		return nil
-	}
-
+func (v *Verifier) verifyAsc(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultKey bool, pgpSources ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return errors.New(err, "retrieving package name")
@@ -128,14 +133,17 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version string) error {
 	}
 
 	ascBytes, err := v.getPublicAsc(ascURI)
-	if err != nil && v.allowEmptyPgp {
-		// asc not available but we allow empty for dev use-case
-		return nil
-	} else if err != nil {
+	if err != nil {
 		return errors.New(err, fmt.Sprintf("fetching asc file from %s", ascURI), errors.TypeNetwork, errors.M(errors.MetaKeyURI, ascURI))
 	}
 
-	return download.VerifyGPGSignature(fullPath, ascBytes, v.pgpBytes)
+	pgpBytes, err := download.FetchPGPKeys(
+		v.log, v.client, v.defaultKey, skipDefaultKey, pgpSources)
+	if err != nil {
+		return fmt.Errorf("could not fetch pgp keys: %w", err)
+	}
+
+	return download.VerifyPGPSignatureWithKeys(v.log, fullPath, ascBytes, pgpBytes)
 }
 
 func (v *Verifier) composeURI(filename, artifactName string) (string, error) {
@@ -156,7 +164,14 @@ func (v *Verifier) composeURI(filename, artifactName string) (string, error) {
 }
 
 func (v *Verifier) getPublicAsc(sourceURI string) ([]byte, error) {
-	resp, err := v.client.Get(sourceURI) //nolint:noctx // keep previous behaviour
+	ctx, cancelFn := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelFn()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURI, nil)
+	if err != nil {
+		return nil, errors.New(err, "failed create request for loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+	}
+
+	resp, err := v.client.Do(req)
 	if err != nil {
 		return nil, errors.New(err, "failed loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
@@ -166,5 +181,5 @@ func (v *Verifier) getPublicAsc(sourceURI string) ([]byte, error) {
 		return nil, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }

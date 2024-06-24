@@ -1,0 +1,53 @@
+name: "Flaky Test"
+description: "Report a flaky test (one that doesn't pass consistently)"
+title: "[Flaky Test]: <test_case> – <short_error_message>"
+labels: ["Team:Elastic-Agent", "flaky-test"]
+projects: ["elastic/979", "elastic/1457"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a flaky test issue, please make sure that there is no existing issue for this test case and error message.
+  - type: input
+    id: test_case
+    attributes:
+      label: "Failing test case"
+      placeholder: ex. TestDiagnosticsCommand
+    validations:
+      required: true
+  - type: input
+    id: short_error_message
+    attributes:
+      label: "Error message"
+      description: "Short error description"
+      placeholder: ex. fails with busy file error due to upgrade hash collision
+    validations:
+      required: true
+  - type: input
+    id: build_url
+    attributes:
+      label: Build
+      description: "Link to a build where this test case is failing"
+      placeholder: ex. https://buildkite.com/elastic/elastic-agent/builds/6287
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      description: "On which OS the test is failing"
+      multiple: true
+      options:
+        - Linux
+        - Mac
+        - Windows
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Stacktrace and notes"
+      description: "Detailed output of the test failure and your notes about possible cause."
+      render: markdown
+    validations:
+      required: true

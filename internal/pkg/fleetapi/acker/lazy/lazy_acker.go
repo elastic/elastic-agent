@@ -87,7 +87,7 @@ func (f *Acker) Commit(ctx context.Context) (err error) {
 	// If request failed enqueue all actions with retrier if it is set
 	if err != nil {
 		if f.retrier != nil {
-			f.log.Errorf("lazy acker: failed ack batch, enqueue for retry: %s", actions)
+			f.log.Warnf("lazy acker: failed ack batch, enqueue for retry: %s", actions)
 			f.retrier.Enqueue(actions)
 			return nil
 		}

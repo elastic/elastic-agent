@@ -1,0 +1,82 @@
+// begin 8.9.0 relnotes
+
+[[release-notes-8.9.0]]
+==  8.9.0
+
+Review important information about the  8.9.0 release.
+
+
+
+[discrete]
+[[breaking-changes-8.9.0]]
+=== Breaking changes
+
+Breaking changes can prevent your application from optimal operation and
+performance. Before you upgrade, review the breaking changes, then mitigate the
+impact to your application.
+
+// TODO: add details and impact
+
+elastic-agent::
+
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/2890]]
+.Status command has been changed
+[%collapsible]
+====
+*Details* +
+The {agent} `status` command has been changed so that the default human output now uses a list format and summaries output.
+
+*Impact* +
+Full human output can be obtained with the new `full` option.
+For for information, refer to {agent-pull}2890[#2890].
+====
+
+
+
+
+
+[discrete]
+[[new-features-8.9.0]]
+=== New features
+
+The 8.9.0 release adds the following new and notable features.
+
+
+CLI::
+
+* Add the logs subcommand to the agent CLI. {CLI-pull}https://github.com/elastic/elastic-agent/pull/2745[#https://github.com/elastic/elastic-agent/pull/2745] {CLI-issue}https://github.com/elastic/elastic-agent/issues/114[#https://github.com/elastic/elastic-agent/issues/114]
+elastic-agent::
+
+* Support upgrading to specific snapshots by specifying the build ID. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2752[#https://github.com/elastic/elastic-agent/pull/2752] 
+
+
+[discrete]
+[[enhancements-8.9.0]]
+=== Enhancements
+
+
+Universal Profiling::
+
+* Add additional elements to support the Universal Profiling integration. {Universal Profiling-pull}https://github.com/elastic/elastic-agent/pull/2881[#https://github.com/elastic/elastic-agent/pull/2881] 
+elastic-agent::
+
+* Lowercase reported hostnames per Elastic Common Schema (ECS) Guidelines for the `host.name` field.
+
+
+
+
+[discrete]
+[[bug-fixes-8.9.0]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Change monitoring socket to use a hash of the ID instead of the actual ID. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3096[#https://github.com/elastic/elastic-agent/pull/3096] {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2912[#https://github.com/elastic/elastic-agent/pull/2912] 
+* Fix the drop processor for monitoring component logs to use the `component.id` instead of the dataset. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2982[#https://github.com/elastic/elastic-agent/pull/2982] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2388[#https://github.com/elastic/elastic-agent/issues/2388]
+synthetics::
+
+* Update Node version to 18.16.0. {synthetics-pull}https://github.com/elastic/elastic-agent/pull/2696[#https://github.com/elastic/elastic-agent/pull/2696] 
+
+// end 8.9.0 relnotes

@@ -17,8 +17,9 @@ import (
 
 func TestGenerateData(t *testing.T) {
 	container := &docker.Container{
-		ID:   "abc",
-		Name: "foobar",
+		ID:    "abc",
+		Name:  "foobar",
+		Image: "busybox:latest",
 		Labels: map[string]string{
 			"do.not.include":          "true",
 			"co.elastic.logs/disable": "true",
@@ -32,9 +33,11 @@ func TestGenerateData(t *testing.T) {
 	require.NoError(t, err)
 	mapping := map[string]interface{}{
 		"container": map[string]interface{}{
-			"id":    container.ID,
-			"name":  container.Name,
-			"image": container.Image,
+			"id":   container.ID,
+			"name": container.Name,
+			"image": map[string]interface{}{
+				"name": container.Image,
+			},
 			"labels": mapstr.M{
 				"do": mapstr.M{"not": mapstr.M{"include": "true"}},
 				"co": mapstr.M{"elastic": mapstr.M{"logs/disable": "true"}},
@@ -45,9 +48,9 @@ func TestGenerateData(t *testing.T) {
 		{
 			"add_fields": map[string]interface{}{
 				"fields": map[string]interface{}{
-					"id":    container.ID,
-					"name":  container.Name,
-					"image": container.Image,
+					"id":         container.ID,
+					"name":       container.Name,
+					"image.name": container.Image,
 					"labels": mapstr.M{
 						"do_not_include":          "true",
 						"co_elastic_logs/disable": "true",

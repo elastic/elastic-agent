@@ -5,7 +5,6 @@
 package store
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,7 +20,7 @@ func TestActionStore(t *testing.T) {
 	log, _ := logger.New("action_store", false)
 	withFile := func(fn func(t *testing.T, file string)) func(*testing.T) {
 		return func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "action-store")
+			dir, err := os.MkdirTemp("", "action-store")
 			require.NoError(t, err)
 			defer os.RemoveAll(dir)
 			file := filepath.Join(dir, "config.yml")
@@ -31,10 +30,11 @@ func TestActionStore(t *testing.T) {
 
 	t.Run("action returns empty when no action is saved on disk",
 		withFile(func(t *testing.T, file string) {
-			s := storage.NewDiskStore(file)
-			store, err := NewActionStore(log, s)
+			s, err := storage.NewDiskStore(file)
 			require.NoError(t, err)
-			require.Equal(t, 0, len(store.Actions()))
+			store, err := newActionStore(log, s)
+			require.NoError(t, err)
+			require.Equal(t, 0, len(store.actions()))
 		}))
 
 	t.Run("will discard silently unknown action",
@@ -43,15 +43,16 @@ func TestActionStore(t *testing.T) {
 				ActionID: "abc123",
 			}
 
-			s := storage.NewDiskStore(file)
-			store, err := NewActionStore(log, s)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
+			store, err := newActionStore(log, s)
 			require.NoError(t, err)
 
-			require.Equal(t, 0, len(store.Actions()))
-			store.Add(actionPolicyChange)
-			err = store.Save()
+			require.Equal(t, 0, len(store.actions()))
+			store.add(actionPolicyChange)
+			err = store.save()
 			require.NoError(t, err)
-			require.Equal(t, 0, len(store.Actions()))
+			require.Equal(t, 0, len(store.actions()))
 		}))
 
 	t.Run("can save to disk known action type",
@@ -64,21 +65,23 @@ func TestActionStore(t *testing.T) {
 				},
 			}
 
-			s := storage.NewDiskStore(file)
-			store, err := NewActionStore(log, s)
+			s, err := storage.NewDiskStore(file)
+			require.NoError(t, err)
+			store, err := newActionStore(log, s)
 			require.NoError(t, err)
 
-			require.Equal(t, 0, len(store.Actions()))
-			store.Add(ActionPolicyChange)
-			err = store.Save()
+			require.Equal(t, 0, len(store.actions()))
+			store.add(ActionPolicyChange)
+			err = store.save()
 			require.NoError(t, err)
-			require.Equal(t, 1, len(store.Actions()))
+			require.Equal(t, 1, len(store.actions()))
 
-			s = storage.NewDiskStore(file)
-			store1, err := NewActionStore(log, s)
+			s, err = storage.NewDiskStore(file)
+			require.NoError(t, err)
+			store1, err := newActionStore(log, s)
 			require.NoError(t, err)
 
-			actions := store1.Actions()
+			actions := store1.actions()
 			require.Equal(t, 1, len(actions))
 
 			require.Equal(t, ActionPolicyChange, actions[0])

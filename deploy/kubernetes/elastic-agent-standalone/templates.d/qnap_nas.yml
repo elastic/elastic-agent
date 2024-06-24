@@ -1,5 +1,6 @@
 inputs:
     - name: tcp-qnap_nas
+      id: tcp-qnap_nas-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:
@@ -19,6 +20,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: udp-qnap_nas
+      id: udp-qnap_nas-${kubernetes.hints.container_id}
       type: udp
       use_output: default
       streams:
@@ -38,6 +40,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: filestream-qnap_nas
+      id: filestream-qnap_nas-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

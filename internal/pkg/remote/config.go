@@ -13,7 +13,7 @@ import (
 
 // Config is the configuration for the client.
 type Config struct {
-	Protocol Protocol `config:"protocol" yaml:"protocol"`
+	Protocol Protocol `config:"protocol" yaml:"protocol,omitempty"`
 	SpaceID  string   `config:"space.id" yaml:"space.id,omitempty"`
 	Path     string   `config:"path" yaml:"path,omitempty"`
 	Host     string   `config:"host" yaml:"host,omitempty"`
@@ -34,8 +34,8 @@ const (
 
 // Unpack the protocol.
 func (p *Protocol) Unpack(from string) error {
-	if Protocol(from) != ProtocolHTTPS && Protocol(from) != ProtocolHTTP {
-		return fmt.Errorf("invalid protocol %s, accepted values are 'http' and 'https'", from)
+	if from != "" && Protocol(from) != ProtocolHTTPS && Protocol(from) != ProtocolHTTP {
+		return fmt.Errorf("invalid protocol %q, accepted values are 'http' and 'https'", from)
 	}
 
 	*p = Protocol(from)

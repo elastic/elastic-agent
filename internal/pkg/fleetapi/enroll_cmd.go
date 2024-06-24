@@ -30,6 +30,16 @@ var ErrTooManyRequests = errors.New("too many requests received (429)")
 // ErrConnRefused is returned when the connection to the server is refused.
 var ErrConnRefused = errors.New("connection refused")
 
+// ErrTemporaryServerError is returned when the request caused a temporary server error
+var ErrTemporaryServerError = errors.New("temporary server error, please retry later")
+
+// temporaryServerErrorCodes defines status codes that allow clients to retry their request.
+var temporaryServerErrorCodes = map[int]struct{}{
+	http.StatusBadGateway:         {},
+	http.StatusServiceUnavailable: {},
+	http.StatusGatewayTimeout:     {},
+}
+
 const (
 	// PermanentEnroll is default enrollment type, by default an Agent is permanently enroll to Agent.
 	PermanentEnroll = EnrollType("PERMANENT")
@@ -78,13 +88,14 @@ func (p EnrollType) MarshalJSON() ([]byte, error) {
 //
 // Example:
 // POST /api/fleet/agents/enroll
-// {
-// 	"type": "PERMANENT",
-//   "metadata": {
-// 	  "local": { "os": "macos"},
-// 	  "user_provided": { "region": "us-east"}
-//   }
-// }
+//
+//	{
+//		"type": "PERMANENT",
+//	  "metadata": {
+//		  "local": { "os": "macos"},
+//		  "user_provided": { "region": "us-east"}
+//	  }
+//	}
 type EnrollRequest struct {
 	EnrollAPIKey string     `json:"-"`
 	Type         EnrollType `json:"type"`
@@ -116,20 +127,21 @@ func (e *EnrollRequest) Validate() error {
 // EnrollResponse is the data received after enrolling an Agent into fleet.
 //
 // Example:
-// {
-//   "action": "created",
-//   "item": {
-//     "id": "a4937110-e53e-11e9-934f-47a8e38a522c",
-//     "active": true,
-//     "policy_id": "default",
-//     "type": "PERMANENT",
-//     "enrolled_at": "2019-10-02T18:01:22.337Z",
-//     "user_provided_metadata": {},
-//     "local_metadata": {},
-//     "actions": [],
-//     "access_api_key": "API_KEY"
-//   }
-// }
+//
+//	{
+//	  "action": "created",
+//	  "item": {
+//	    "id": "a4937110-e53e-11e9-934f-47a8e38a522c",
+//	    "active": true,
+//	    "policy_id": "default",
+//	    "type": "PERMANENT",
+//	    "enrolled_at": "2019-10-02T18:01:22.337Z",
+//	    "user_provided_metadata": {},
+//	    "local_metadata": {},
+//	    "actions": [],
+//	    "access_api_key": "API_KEY"
+//	  }
+//	}
 type EnrollResponse struct {
 	Action string             `json:"action"`
 	Item   EnrollItemResponse `json:"item"`
@@ -184,7 +196,7 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 	}
 
 	headers := map[string][]string{
-		key: []string{prefix + r.EnrollAPIKey},
+		key: {prefix + r.EnrollAPIKey},
 	}
 
 	b, err := json.Marshal(r)
@@ -210,6 +222,10 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		return nil, ErrTooManyRequests
+	}
+
+	if _, temporary := temporaryServerErrorCodes[resp.StatusCode]; temporary {
+		return nil, fmt.Errorf("received code %d: %w", resp.StatusCode, ErrTemporaryServerError)
 	}
 
 	if resp.StatusCode != http.StatusOK {

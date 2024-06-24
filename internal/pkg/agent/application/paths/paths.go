@@ -2,37 +2,25 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build !darwin && !windows
-// +build !darwin,!windows
-
 package paths
 
+import "path/filepath"
+
 const (
-	// BinaryName is the name of the installed binary.
-	BinaryName = "elastic-agent"
 
-	// InstallPath is the installation path using for install command.
-	InstallPath = "/opt/Elastic/Agent"
+	// defaultAgentVaultName is keychain item name for keychain based vault (available on MacOS at the moment)
+	defaultAgentVaultName = "co.elastic.elastic-agent"
 
-	// ControlSocketPath is the control socket path used when installed.
-	ControlSocketPath = "unix:///run/elastic-agent.sock"
-
-	// ShipperSocketPipePattern is the socket path used when installed for a shipper pipe.
-	ShipperSocketPipePattern = "unix:///run/elastic-agent-%s-pipe.sock"
-
-	// ServiceName is the service name when installed.
-	ServiceName = "elastic-agent"
-
-	// ShellWrapperPath is the path to the installed shell wrapper.
-	ShellWrapperPath = "/usr/bin/elastic-agent"
-
-	// ShellWrapper is the wrapper that is installed.
-	ShellWrapper = `#!/bin/sh
-exec /opt/Elastic/Agent/elastic-agent $@
-`
+	// defaultAgentVaultPath is the directory name where the file-based vault is located
+	defaultAgentVaultPath = "vault"
 )
 
-// ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
-func ArePathsEqual(expected, actual string) bool {
-	return expected == actual
+// AgentVaultPath is the default path for file-based vault
+func AgentVaultPath() string {
+	return filepath.Join(Config(), defaultAgentVaultPath)
+}
+
+// AgentKeychainName is the default name for the keychain based vault
+func AgentKeychainName() string {
+	return defaultAgentVaultName
 }

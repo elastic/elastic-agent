@@ -16,9 +16,9 @@ import (
 	"debug/elf"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -37,7 +37,6 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"github.com/magefile/mage/target"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -84,17 +83,17 @@ func expandTemplate(name, tmpl string, funcs template.FuncMap, args ...map[strin
 	t, err := t.Parse(tmpl)
 	if err != nil {
 		if name == inlineTemplate {
-			return "", errors.Wrapf(err, "failed to parse template '%v'", tmpl)
+			return "", fmt.Errorf("failed to parse template '%v' : %w", tmpl, err)
 		}
-		return "", errors.Wrap(err, "failed to parse template")
+		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	buf := new(bytes.Buffer)
 	if err := t.Execute(buf, joinMaps(args...)); err != nil {
 		if name == inlineTemplate {
-			return "", errors.Wrapf(err, "failed to expand template '%v'", tmpl)
+			return "", fmt.Errorf("failed to expand template '%v': %w", tmpl, err)
 		}
-		return "", errors.Wrap(err, "failed to expand template")
+		return "", fmt.Errorf("failed to expand template: %w", err)
 	}
 
 	return buf.String(), nil
@@ -118,9 +117,9 @@ func joinMaps(args ...map[string]interface{}) map[string]interface{} {
 }
 
 func expandFile(src, dst string, args ...map[string]interface{}) error {
-	tmplData, err := ioutil.ReadFile(src)
+	tmplData, err := os.ReadFile(src)
 	if err != nil {
-		return errors.Wrapf(err, "failed reading from template %v", src)
+		return fmt.Errorf("failed reading from template %v, %w", src, err)
 	}
 
 	output, err := expandTemplate(src, string(tmplData), FuncMap, args...)
@@ -133,9 +132,8 @@ func expandFile(src, dst string, args ...map[string]interface{}) error {
 		return err
 	}
 
-	//nolint:gosec // 0644 is required
-	if err = ioutil.WriteFile(createDir(dst), []byte(output), 0644); err != nil {
-		return errors.Wrap(err, "failed to write rendered template")
+	if err = os.WriteFile(createDir(dst), []byte(output), 0644); err != nil {
+		return fmt.Errorf("failed to write rendered template: %w", err)
 	}
 
 	return nil
@@ -145,7 +143,7 @@ func expandFile(src, dst string, args ...map[string]interface{}) error {
 func CWD(elem ...string) string {
 	wd, err := os.Getwd()
 	if err != nil {
-		panic(errors.Wrap(err, "failed to get the CWD"))
+		panic(fmt.Errorf("failed to get the CWD: %w", err))
 	}
 	return filepath.Join(append([]string{wd}, elem...)...)
 }
@@ -182,7 +180,7 @@ func (info *DockerInfo) IsBoot2Docker() bool {
 // HaveDocker returns an error if docker is unavailable.
 func HaveDocker() error {
 	if _, err := GetDockerInfo(); err != nil {
-		return errors.Wrap(err, "docker is not available")
+		return fmt.Errorf("docker is not available: %w", err)
 	}
 	return nil
 }
@@ -229,27 +227,6 @@ func HaveKubectl() error {
 	return nil
 }
 
-// IsDarwinUniversal indicates whether ot not the darwin/universal should be
-// assembled. If both platforms darwin/adm64 and darwin/arm64 are listed, then
-// IsDarwinUniversal returns true.
-// Note: Platforms might be edited at different moments, therefore it's necessary
-// to perform this check on the fly.
-func IsDarwinUniversal() bool {
-	var darwinAMD64, darwinARM64 bool
-
-	//nolint:goconst // Consistency: there are constants for platforms.
-	for _, p := range Platforms {
-		if p.Name == "darwin/arm64" {
-			darwinARM64 = true
-		}
-		if p.Name == "darwin/amd64" {
-			darwinAMD64 = true
-		}
-	}
-
-	return darwinAMD64 && darwinARM64
-}
-
 // FindReplace reads a file, performs a find/replace operation, then writes the
 // output to the same file path.
 func FindReplace(file string, re *regexp.Regexp, repl string) error {
@@ -258,19 +235,19 @@ func FindReplace(file string, re *regexp.Regexp, repl string) error {
 		return err
 	}
 
-	contents, err := ioutil.ReadFile(file)
+	contents, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
 
 	out := re.ReplaceAllString(string(contents), repl)
-	return ioutil.WriteFile(file, []byte(out), info.Mode().Perm())
+	return os.WriteFile(file, []byte(out), info.Mode().Perm())
 }
 
 // MustFindReplace invokes FindReplace and panics if an error occurs.
 func MustFindReplace(file string, re *regexp.Regexp, repl string) {
 	if err := FindReplace(file, re, repl); err != nil {
-		panic(errors.Wrap(err, "failed to find and replace"))
+		panic(fmt.Errorf("failed to find and replace: %w", err))
 	}
 }
 
@@ -282,23 +259,23 @@ func DownloadFile(url, destinationDir string) (string, error) {
 	//nolint:gosec,noctx // url is not user input
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", errors.Wrap(err, "http get failed")
+		return "", fmt.Errorf("http get failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.Errorf("download failed with http status: %v", resp.StatusCode)
+		return "", fmt.Errorf("download failed with http status: %v : %w", resp.StatusCode, err)
 	}
 
 	name := filepath.Join(destinationDir, filepath.Base(url))
 	f, err := os.Create(createDir(name))
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create output file")
+		return "", fmt.Errorf("failed to create output file: %w", err)
 	}
 	defer f.Close()
 
 	if _, err = io.Copy(f, resp.Body); err != nil {
-		return "", errors.Wrap(err, "failed to write file")
+		return "", fmt.Errorf("failed to write file: %w", err)
 	}
 
 	return name, f.Close()
@@ -313,7 +290,7 @@ func Extract(sourceFile, destinationDir string) error {
 	case ext == ".zip":
 		return unzip(sourceFile, destinationDir)
 	default:
-		return errors.Errorf("failed to extract %v, unhandled file extension", sourceFile)
+		return fmt.Errorf("failed to extract %v, unhandled file extension", sourceFile)
 	}
 }
 
@@ -338,7 +315,7 @@ func unzip(sourceFile, destinationDir string) error {
 		//nolint:gosec // G305 zip traversal, no user input
 		path := filepath.Join(destinationDir, f.Name)
 		if !strings.HasPrefix(path, destinationDir) {
-			return errors.Errorf("illegal file path in zip: %v", f.Name)
+			return fmt.Errorf("illegal file path in zip: %v", f.Name)
 		}
 
 		if f.FileInfo().IsDir() {
@@ -375,7 +352,6 @@ func unzip(sourceFile, destinationDir string) error {
 
 // Tar compress a directory using tar + gzip algorithms
 func Tar(src string, targetFile string) error {
-	//nolint:forbidigo // pattern forbidden but we want it here
 	fmt.Printf(">> creating TAR file from directory: %s, target: %s\n", src, targetFile)
 
 	f, err := os.Create(targetFile)
@@ -396,7 +372,6 @@ func Tar(src string, targetFile string) error {
 
 		// if a symlink, skip file
 		if fi.Mode().Type() == os.ModeSymlink {
-			//nolint:forbidigo // pattern forbidden but we want it here
 			fmt.Printf(">> skipping symlink: %s\n", file)
 			return nil
 		}
@@ -475,7 +450,7 @@ func untar(sourceFile, destinationDir string) error {
 		//nolint:gosec // G305: file traversal, no user input
 		path := filepath.Join(destinationDir, header.Name)
 		if !strings.HasPrefix(path, destinationDir) {
-			return errors.Errorf("illegal file path in tar: %v", header.Name)
+			return fmt.Errorf("illegal file path in tar: %v", header.Name)
 		}
 
 		switch header.Typeflag {
@@ -505,8 +480,16 @@ func untar(sourceFile, destinationDir string) error {
 			if err = writer.Close(); err != nil {
 				return err
 			}
+		case tar.TypeSymlink:
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				return err
+			}
+			if err := os.Symlink(header.Linkname, path); err != nil {
+				return fmt.Errorf("error creating symlink %s pointing to %s: %w", path, header.Linkname, err)
+			}
+
 		default:
-			return errors.Errorf("unable to untar type=%c in file=%s", header.Typeflag, path)
+			return fmt.Errorf("unable to untar type=%c in file=%s", header.Typeflag, path)
 		}
 	}
 
@@ -608,7 +591,7 @@ func ParallelCtx(ctx context.Context, fns ...interface{}) {
 
 	wg.Wait()
 	if len(errs) > 0 {
-		panic(errors.Errorf(strings.Join(errs, "\n")))
+		panic(fmt.Errorf("multiple failures: %s", strings.Join(errs, "\n")))
 	}
 }
 
@@ -647,7 +630,7 @@ func FindFiles(globs ...string) ([]string, error) {
 	for _, glob := range globs {
 		files, err := filepath.Glob(glob)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed on glob %v", glob)
+			return nil, fmt.Errorf("failed on glob %v: %w", glob, err)
 		}
 		configFiles = append(configFiles, files...)
 	}
@@ -686,7 +669,7 @@ func FindFilesRecursive(match func(path string, info os.FileInfo) bool) ([]strin
 func FileConcat(out string, perm os.FileMode, files ...string) error {
 	f, err := os.OpenFile(createDir(out), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, perm)
 	if err != nil {
-		return errors.Wrap(err, "failed to create file")
+		return fmt.Errorf("failed to create file: %w", err)
 	}
 	defer f.Close()
 
@@ -730,20 +713,20 @@ func MustFileConcat(out string, perm os.FileMode, files ...string) {
 func VerifySHA256(file string, hash string) error {
 	f, err := os.Open(file)
 	if err != nil {
-		return errors.Wrap(err, "failed to open file for sha256 verification")
+		return fmt.Errorf("failed to open file for sha256 verification: %w", err)
 	}
 	defer f.Close()
 
 	sum := sha256.New()
 	if _, err := io.Copy(sum, f); err != nil {
-		return errors.Wrap(err, "failed reading from input file")
+		return fmt.Errorf("failed reading from input file: %w", err)
 	}
 
 	computedHash := hex.EncodeToString(sum.Sum(nil))
 	expectedHash := strings.TrimSpace(hash)
 
 	if computedHash != expectedHash {
-		return errors.Errorf("SHA256 verification of %v failed. Expected=%v, "+
+		return fmt.Errorf("SHA256 verification of %v failed. Expected=%v, "+
 			"but computed=%v", f.Name(), expectedHash, computedHash)
 	}
 	log.Println("SHA256 OK:", f.Name())
@@ -760,7 +743,6 @@ func CreateSHA512File(file string) error {
 	}
 	out := fmt.Sprintf("%v  %v", computedHash, filepath.Base(file))
 
-	//nolint:gosec // permissions are correct
 	return os.WriteFile(file+".sha512", []byte(out), 0644)
 }
 
@@ -768,13 +750,13 @@ func CreateSHA512File(file string) error {
 func GetSHA512Hash(file string) (string, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to open file for sha512 summing")
+		return "", fmt.Errorf("failed to open file for sha512 summing: %w", err)
 	}
 	defer f.Close()
 
 	sum := sha512.New()
 	if _, err := io.Copy(sum, f); err != nil {
-		return "", errors.Wrap(err, "failed reading from input file")
+		return "", fmt.Errorf("failed reading from input file: %w", err)
 	}
 
 	computedHash := hex.EncodeToString(sum.Sum(nil))
@@ -796,8 +778,7 @@ func Mage(dir string, targets ...string) error {
 	return err
 }
 
-// IsUpToDate returns true iff dst exists and is older based on modtime than all
-// of the sources.
+// IsUpToDate returns true if dst exists and is older based on modtime than all the sources.
 func IsUpToDate(dst string, sources ...string) bool {
 	if len(sources) == 0 {
 		panic("No sources passed to IsUpToDate")
@@ -870,7 +851,7 @@ func CreateDir(file string) string {
 	// Create the output directory.
 	if dir := filepath.Dir(file); dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			panic(errors.Wrapf(err, "failed to create parent dir for %v", file))
+			panic(fmt.Errorf("failed to create parent dir for %v : %w", file, err))
 		}
 	}
 	return file
@@ -888,25 +869,25 @@ var parseVersionRegex = regexp.MustCompile(`(?m)^[^\d]*(?P<major>\d+)\.(?P<minor
 
 // ParseVersion extracts the major, minor, and optional patch number from a
 // version string.
-func ParseVersion(version string) (major, minor, patch int, err error) {
+func ParseVersion(version string) (int, int, int, error) {
 	names := parseVersionRegex.SubexpNames()
 	matches := parseVersionRegex.FindStringSubmatch(version)
 	if len(matches) == 0 {
-		err = errors.Errorf("failed to parse version '%v'", version)
-		return
+		err := fmt.Errorf("failed to parse version '%v'", version)
+		return 0, 0, 0, err
 	}
 
 	data := map[string]string{}
 	for i, match := range matches {
 		data[names[i]] = match
 	}
-	major, _ = strconv.Atoi(data["major"])
-	minor, _ = strconv.Atoi(data["minor"])
-	patch, _ = strconv.Atoi(data["patch"])
+	major, _ := strconv.Atoi(data["major"])
+	minor, _ := strconv.Atoi(data["minor"])
+	patch, _ := strconv.Atoi(data["patch"])
 	return major, minor, patch, nil
 }
 
-// ListMatchingEnvVars returns all of the environment variables names that begin
+// ListMatchingEnvVars returns all the environment variables names that begin
 // with prefix.
 func ListMatchingEnvVars(prefixes ...string) []string {
 	var vars []string
@@ -977,7 +958,7 @@ func ReadGLIBCRequirement(elfFile string) (*SemanticVersion, error) {
 	}
 
 	if len(versionSet) == 0 {
-		return nil, errors.New("no GLIBC symbols found in binary (is this a static binary?)")
+		return nil, fmt.Errorf("no GLIBC symbols found in binary (is this a static binary?)")
 	}
 
 	versions := make([]SemanticVersion, 0, len(versionSet))

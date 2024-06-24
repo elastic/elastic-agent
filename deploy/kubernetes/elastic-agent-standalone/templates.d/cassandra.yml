@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-cassandra
+      id: filestream-cassandra-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -27,6 +28,7 @@ inputs:
             - cassandra-systemlogs
       data_stream.namespace: default
     - name: jolokia/metrics-cassandra
+      id: jolokia/metrics-cassandra-${kubernetes.hints.container_id}
       type: jolokia/metrics
       use_output: default
       streams:

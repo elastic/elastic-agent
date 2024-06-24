@@ -1,5 +1,45 @@
 inputs:
+    - name: mysql/metrics-mysql
+      id: mysql/metrics-mysql-${kubernetes.hints.container_id}
+      type: mysql/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.mysql.galera_status.enabled} == true and ${kubernetes.hints.mysql.enabled} == true
+          data_stream:
+            dataset: mysql.galera_status
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mysql.galera_status.host|kubernetes.hints.mysql.host|'tcp(127.0.0.1:3306)/'}
+          metricsets:
+            - galera_status
+          password: ${kubernetes.hints.mysql.galera_status.password|kubernetes.hints.mysql.password|'test'}
+          period: ${kubernetes.hints.mysql.galera_status.period|kubernetes.hints.mysql.period|'10s'}
+          username: ${kubernetes.hints.mysql.galera_status.username|kubernetes.hints.mysql.username|'root'}
+        - condition: ${kubernetes.hints.mysql.performance.enabled} == true or ${kubernetes.hints.mysql.enabled} == true
+          data_stream:
+            dataset: mysql.performance
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mysql.performance.host|kubernetes.hints.mysql.host|'tcp(127.0.0.1:3306)/'}
+          metricsets:
+            - performance
+          password: ${kubernetes.hints.mysql.performance.password|kubernetes.hints.mysql.password|'test'}
+          period: ${kubernetes.hints.mysql.performance.period|kubernetes.hints.mysql.period|'10s'}
+          username: ${kubernetes.hints.mysql.performance.username|kubernetes.hints.mysql.username|'root'}
+        - condition: ${kubernetes.hints.mysql.status.enabled} == true or ${kubernetes.hints.mysql.enabled} == true
+          data_stream:
+            dataset: mysql.status
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mysql.status.host|kubernetes.hints.mysql.host|'tcp(127.0.0.1:3306)/'}
+          metricsets:
+            - status
+          password: ${kubernetes.hints.mysql.status.password|kubernetes.hints.mysql.password|'test'}
+          period: ${kubernetes.hints.mysql.status.period|kubernetes.hints.mysql.period|'10s'}
+          username: ${kubernetes.hints.mysql.status.username|kubernetes.hints.mysql.username|'root'}
+      data_stream.namespace: default
     - name: filestream-mysql
+      id: filestream-mysql-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -46,42 +86,4 @@ inputs:
           prospector:
             scanner:
                 symlinks: true
-      data_stream.namespace: default
-    - name: mysql/metrics-mysql
-      type: mysql/metrics
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.mysql.galera_status.enabled} == true and ${kubernetes.hints.mysql.enabled} == true
-          data_stream:
-            dataset: mysql.galera_status
-            type: metrics
-          hosts:
-            - ${kubernetes.hints.mysql.galera_status.host|kubernetes.hints.mysql.host|'tcp(127.0.0.1:3306)/'}
-          metricsets:
-            - galera_status
-          password: ${kubernetes.hints.mysql.galera_status.password|kubernetes.hints.mysql.password|'test'}
-          period: ${kubernetes.hints.mysql.galera_status.period|kubernetes.hints.mysql.period|'10s'}
-          username: ${kubernetes.hints.mysql.galera_status.username|kubernetes.hints.mysql.username|'root'}
-        - condition: ${kubernetes.hints.mysql.performance.enabled} == true or ${kubernetes.hints.mysql.enabled} == true
-          data_stream:
-            dataset: mysql.performance
-            type: metrics
-          hosts:
-            - ${kubernetes.hints.mysql.performance.host|kubernetes.hints.mysql.host|'tcp(127.0.0.1:3306)/'}
-          metricsets:
-            - performance
-          password: ${kubernetes.hints.mysql.performance.password|kubernetes.hints.mysql.password|'test'}
-          period: ${kubernetes.hints.mysql.performance.period|kubernetes.hints.mysql.period|'10s'}
-          username: ${kubernetes.hints.mysql.performance.username|kubernetes.hints.mysql.username|'root'}
-        - condition: ${kubernetes.hints.mysql.status.enabled} == true or ${kubernetes.hints.mysql.enabled} == true
-          data_stream:
-            dataset: mysql.status
-            type: metrics
-          hosts:
-            - ${kubernetes.hints.mysql.status.host|kubernetes.hints.mysql.host|'tcp(127.0.0.1:3306)/'}
-          metricsets:
-            - status
-          password: ${kubernetes.hints.mysql.status.password|kubernetes.hints.mysql.password|'test'}
-          period: ${kubernetes.hints.mysql.status.period|kubernetes.hints.mysql.period|'10s'}
-          username: ${kubernetes.hints.mysql.status.username|kubernetes.hints.mysql.username|'root'}
       data_stream.namespace: default

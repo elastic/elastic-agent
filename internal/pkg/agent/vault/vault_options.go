@@ -4,25 +4,90 @@
 
 package vault
 
-type Options struct {
-	readonly bool
-}
+import (
+	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
+)
 
 type OptionFunc func(o *Options)
 
+type CommonVaultOptions struct {
+	readonly     bool
+	unprivileged bool
+}
+
+type FileVaultOptions struct {
+	vaultPath      string
+	lockRetryDelay time.Duration
+	ownership      utils.FileOwner
+}
+
+type KeychainVaultOptions struct {
+	entryName string
+}
+
+type Options struct {
+	CommonVaultOptions
+	FileVaultOptions
+	KeychainVaultOptions
+}
+
+// WithReadonly opens storage for read-only access only, noop for Darwin
 func WithReadonly(readonly bool) OptionFunc {
 	return func(o *Options) {
 		o.readonly = readonly
 	}
 }
 
-//nolint:unused // not used on darwin
-func applyOptions(opts ...OptionFunc) Options {
-	var options Options
+// WithVaultPath allows to specify the vault path for the file-based vault implementation (doesn't apply for the keychain vault)
+func WithVaultPath(vaultPath string) OptionFunc {
+	return func(o *Options) {
+		o.vaultPath = vaultPath
+	}
+}
 
-	for _, opt := range opts {
-		opt(&options)
+// WithVaultOwnership allows to specify the ownership that should apply for the file-based vault implementation (doesn't apply for the keychain vault)
+func WithVaultOwnership(ownership utils.FileOwner) OptionFunc {
+	return func(o *Options) {
+		o.ownership = ownership
+	}
+}
+
+// WithVaultEntryName allows to specify the vault key entry name in the keychain (it applies only for keychain vault on darwin)
+func WithVaultEntryName(entryName string) OptionFunc {
+	return func(o *Options) {
+		o.entryName = entryName
+	}
+}
+
+// WithUnprivileged creates an unprivileged vault, has an effect only on Darwin
+func WithUnprivileged(unprivileged bool) OptionFunc {
+	return func(o *Options) {
+		o.unprivileged = unprivileged
+	}
+}
+
+// ApplyOptions applies options for Windows, Linux and Mac, not all the options may be used
+func ApplyOptions(opts ...OptionFunc) Options {
+	o := Options{
+		CommonVaultOptions: CommonVaultOptions{
+			readonly:     false,
+			unprivileged: false,
+		},
+		FileVaultOptions: FileVaultOptions{
+			vaultPath:      paths.AgentVaultPath(),
+			lockRetryDelay: defaultFlockRetryDelay,
+			ownership:      utils.CurrentFileOwner(),
+		},
+		KeychainVaultOptions: KeychainVaultOptions{
+			entryName: paths.AgentKeychainName(),
+		},
 	}
 
-	return options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
 }

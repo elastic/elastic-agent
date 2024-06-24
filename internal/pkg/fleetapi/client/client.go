@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -34,8 +33,14 @@ type Sender interface {
 	URI() string
 }
 
+// Default value for Elastic-Api-Version header when sending requests to Fleet (that's the only version we have at the time of writing)
+const defaultFleetApiVersion = "2023-06-01"
+
 var baseRoundTrippers = func(rt http.RoundTripper) (http.RoundTripper, error) {
 	rt = NewFleetUserAgentRoundTripper(rt, release.Version())
+
+	rt = NewElasticApiVersionRoundTripper(rt, defaultFleetApiVersion)
+
 	return rt, nil
 }
 
@@ -94,7 +99,7 @@ func ExtractError(resp io.Reader) error {
 		Message    string `json:"message"`
 	}{}
 
-	data, err := ioutil.ReadAll(resp)
+	data, err := io.ReadAll(resp)
 	if err != nil {
 		return errors.New(err, "fail to read original error")
 	}

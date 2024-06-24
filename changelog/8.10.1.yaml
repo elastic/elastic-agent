@@ -1,0 +1,25 @@
+version: 8.10.1
+entries:
+    - kind: bug-fix
+      summary: Rollback Elastic Agent upgrade if upgraded Agent process crashes immediately.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3166
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3124
+      timestamp: 1690917883
+      file:
+        name: 1690917883-crash-checker-pid-zero.yaml
+        checksum: 0a2ceec945ec5f1829bbf0d6d9f13f2f5b428885
+    - kind: enhancement
+      summary: Improve logging during Agent upgrades
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3382
+      issue: []
+      timestamp: 1694190260
+      file:
+        name: 1694190260-improve-upgrade-logging.yaml
+        checksum: 4d9c6f196e8fa89e834969c751237153b69b18e5

@@ -16,9 +16,10 @@ import (
 )
 
 const (
+	hints = "hints"
+
 	integration = "package"
 	datastreams = "data_streams"
-
 	host        = "host"
 	period      = "period"
 	timeout     = "timeout"
@@ -26,7 +27,10 @@ const (
 	username    = "username"
 	password    = "password"
 	stream      = "stream" // this is the container stream: stdout/stderr
+	processors  = "processors"
 )
+
+var allSupportedHints = []string{"enabled", integration, datastreams, host, period, timeout, metricspath, username, password, stream, processors}
 
 type hintsBuilder struct {
 	Key string
@@ -154,15 +158,6 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 		_, _ = integrationHints.Put("container_logs.enabled", true)
 	}
 
-	// TODO: add support for processors
-	// Processors should be data_stream specific.
-	// Add a basic processor as a base like:
-	//- add_fields:
-	//	  target: kubernetes
-	//	  fields:
-	//	    hints: true
-	// Blocked by https://github.com/elastic/elastic-agent/issues/735
-
 	integrationHost := builder.getFromMeta(builder.getHost(hints), kubeMeta)
 	if integrationHost != "" {
 		_, _ = integrationHints.Put(host, integrationHost)
@@ -257,4 +252,79 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 	_, _ = hintsMapping.Put(integration, integrationHints)
 
 	return hintsMapping
+}
+
+// GetHintsMapping Generates the hints and processor mappings from provided pod annotation map
+func GetHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) hintsData {
+	hintData := hintsData{
+		composableMapping: mapstr.M{},
+		processors:        []mapstr.M{},
+	}
+	cName := ""
+	cHost := ""
+
+	ann, ok := k8sMapping["annotations"]
+	if !ok {
+		return hintData
+	}
+	annotations, ok := ann.(mapstr.M)
+	if !ok {
+		return hintData
+	}
+
+	// Get the name of the container from the metadata. We need it to extract the hints that affect it directly.
+	// E.g. co.elastic.hints.<container-name>/host: "..."
+	if con, ok := k8sMapping["container"]; ok {
+		if containers, ok := con.(mapstr.M); ok {
+			if name, err := containers.GetValue("name"); err == nil {
+				if nameString, ok := name.(string); ok {
+					cName = nameString
+				}
+			}
+			if cPort, err := containers.GetValue("port"); err == nil {
+				// This is the default for the host value of a specific container.
+				if portString, ok := cPort.(string); ok {
+					cHost = "${kubernetes.pod.ip}:" + portString
+				}
+			}
+		}
+	}
+
+	hintsExtracted, _ := utils.GenerateHints(annotations, cName, prefix, false, allSupportedHints)
+	if len(hintsExtracted) == 0 {
+		return hintData
+	}
+
+	// Check if host exists. Otherwise, add default entry for it.
+	if cHost != "" {
+		hintsValues, ok := hintsExtracted[hints]
+		if ok {
+			if hintsHostValues, ok := hintsValues.(mapstr.M); ok {
+				if _, ok := hintsHostValues[host]; !ok {
+					hintsHostValues[host] = cHost
+				}
+			}
+		} else {
+			hintsExtracted[hints] = mapstr.M{
+				host: cHost,
+			}
+		}
+	}
+
+	logger.Debugf("Extracted hints are :%v", hintsExtracted)
+
+	hintData.composableMapping = GenerateHintsMapping(hintsExtracted, k8sMapping, logger, cID)
+	logger.Debugf("Generated hints mappings :%v", hintData.composableMapping)
+
+	hintData.processors = utils.GetConfigs(annotations, prefix, hints+"/"+processors)
+	// We need to check the processors for the specific container, if they exist.
+	if cName != "" {
+		containerProcessors := utils.GetConfigs(annotations, prefix, hints+"."+cName+"/"+processors)
+		if len(containerProcessors) > 0 {
+			hintData.processors = append(hintData.processors, containerProcessors...)
+		}
+	}
+	logger.Debugf("Generated Processors mapping :%v", hintData.processors)
+
+	return hintData
 }

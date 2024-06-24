@@ -27,6 +27,7 @@ import (
 
 const (
 	retryOnBadConnTimeout = 5 * time.Minute
+	requestIDHeaderName   = "X-Request-ID"
 )
 
 type wrapperFunc func(rt http.RoundTripper) (http.RoundTripper, error)
@@ -37,6 +38,16 @@ type requestClient struct {
 	lastUsed   time.Time
 	lastErr    error
 	lastErrOcc time.Time
+}
+
+func (r *requestClient) SetLastError(err error) {
+	r.lastUsed = time.Now().UTC()
+	r.lastErr = err
+	if err != nil {
+		r.lastErrOcc = r.lastUsed
+	} else {
+		r.lastErrOcc = time.Time{}
+	}
 }
 
 // Client wraps a http.Client and takes care of making the raw calls, the client should
@@ -160,14 +171,13 @@ func (c *Client) Send(
 	}
 
 	c.log.Debugf("Request method: %s, path: %s, reqID: %s", method, path, reqID)
-	c.clientLock.Lock()
-	defer c.clientLock.Unlock()
 
 	var resp *http.Response
 	var multiErr error
 
-	c.sortClients()
-	for i, requester := range c.clients {
+	clients := c.sortClients()
+
+	for i, requester := range clients {
 		req, err := requester.newRequest(method, path, params, body)
 		if err != nil {
 			return nil, fmt.Errorf(
@@ -185,7 +195,7 @@ func (c *Client) Send(
 
 		// If available, add the request id as an HTTP header
 		if reqID != "" {
-			req.Header.Add("X-Request-ID", reqID)
+			req.Header.Add(requestIDHeaderName, reqID)
 		}
 
 		// copy headers.
@@ -195,33 +205,56 @@ func (c *Client) Send(
 			}
 		}
 
-		requester.lastUsed = time.Now().UTC()
-
 		resp, err = requester.client.Do(req.WithContext(ctx))
-		if err != nil {
-			requester.lastErr = err
-			requester.lastErrOcc = time.Now().UTC()
 
+		// Using the same lock that was used for sorting above
+		c.clientLock.Lock()
+		requester.SetLastError(err)
+		c.clientLock.Unlock()
+
+		if err != nil {
 			msg := fmt.Sprintf("requester %d/%d to host %s errored",
-				i, len(c.clients), requester.host)
+				i, len(clients), requester.host)
 			multiErr = multierror.Append(multiErr, fmt.Errorf("%s: %w", msg, err))
 
 			// Using debug level as the error is only relevant if all clients fail.
 			c.log.With("error", err).Debugf(msg)
 			continue
 		}
+		c.checkApiVersionHeaders(req, resp)
 
-		requester.lastErr = nil
-		requester.lastErrOcc = time.Time{}
 		return resp, nil
 	}
 
 	return nil, fmt.Errorf("all hosts failed: %w", multiErr)
 }
 
+func (c *Client) checkApiVersionHeaders(req *http.Request, resp *http.Response) {
+	const elasticApiVersionHeaderKey = "Elastic-Api-Version"
+	const warningHeaderKey = "Warning"
+
+	warning := resp.Header.Get(warningHeaderKey)
+	requestID := req.Header.Get(requestIDHeaderName)
+	if warning != "" {
+		c.log.With("http.request.id", requestID).Warnf("warning in fleet response: %q", warning)
+	}
+
+	requestAPIVersion := req.Header.Get(elasticApiVersionHeaderKey)
+	downgradeVersion := resp.Header.Get(elasticApiVersionHeaderKey)
+	if resp.StatusCode == http.StatusBadRequest && downgradeVersion != "" && downgradeVersion != requestAPIVersion {
+		// fleet server requested a downgrade to a different api version, we should bubble up an error until some kind
+		// of fallback mechanism can instantiate the requested version. This is not yet implemented so we log an error
+		c.log.With("http.request.id", requestID).Errorf("fleet requested a different api version %q but this is currently not implemented", downgradeVersion)
+	}
+}
+
 // URI returns the remote URI.
 func (c *Client) URI() string {
 	host := c.config.GetHosts()[0]
+	if strings.HasPrefix(host, string(ProtocolHTTPS)+"://") ||
+		strings.HasPrefix(host, string(ProtocolHTTP)+"://") {
+		return host + "/" + c.config.Path
+	}
 	return string(c.config.Protocol) + "://" + host + "/" + c.config.Path
 }
 
@@ -245,11 +278,15 @@ func newClient(
 }
 
 // sortClients sort the clients according to the following priority:
-//  - never used
-//  - without errors, last used first when more than one does not have errors
-//  - last errored.
+//   - never used
+//   - without errors, last used first when more than one does not have errors
+//   - last errored.
+//
 // It also removes the last error after retryOnBadConnTimeout has elapsed.
-func (c *Client) sortClients() {
+func (c *Client) sortClients() []*requestClient {
+	c.clientLock.Lock()
+	defer c.clientLock.Unlock()
+
 	now := time.Now().UTC()
 
 	sort.Slice(c.clients, func(i, j int) bool {
@@ -292,11 +329,16 @@ func (c *Client) sortClients() {
 		// Lastly, the one that errored last
 		return c.clients[i].lastUsed.Before(c.clients[j].lastUsed)
 	})
+
+	// return a copy of the slice so we can iterate over it without the lock
+	res := make([]*requestClient, len(c.clients))
+	copy(res, c.clients)
+	return res
 }
 
 func (r requestClient) newRequest(method string, path string, params url.Values, body io.Reader) (*http.Request, error) {
 	path = strings.TrimPrefix(path, "/")
 	newPath := strings.Join([]string{r.host, path, "?", params.Encode()}, "")
 
-	return http.NewRequest(method, newPath, body)
+	return http.NewRequestWithContext(context.TODO(), method, newPath, body)
 }

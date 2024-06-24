@@ -1,0 +1,250 @@
+version: 8.8.0
+entries:
+    - kind: enhancement
+      summary: Make download of Elastic Agent upgrade artifacts asynchronous during Fleet-managed upgrade and increase the download timeout to 2 hours
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2205
+      issue: []
+      timestamp: 1674840786
+      file:
+        name: 1674840786-async-download-upgrade-artifacts.yaml
+        checksum: 0aa7b1bb3810df922c917dc5015b16a5a4a6d965
+    - kind: bug-fix
+      summary: Fix system config in example standalone config file
+      description: ""
+      component: config
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2338
+      issue: []
+      timestamp: 1677711770
+      file:
+        name: 1677711770-fix-standalone-system-config.yaml
+        checksum: ab73fc45885268717bc74899eca5d14c150a614a
+    - kind: bug-fix
+      summary: Fix parsing of paths from container-paths.yml file
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2340
+      issue: []
+      timestamp: 1677780422
+      file:
+        name: 1677780422-fix-container-paths-config-parsing.yaml
+        checksum: 99d209f37ce7d6c57d4d1d3f67016f22696faf28
+    - kind: feature
+      summary: Add Universal Profiling Symbolizer
+      description: ""
+      component: spec
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2401
+      issue: []
+      timestamp: 1679899362
+      file:
+        name: 1679899362-pf-elastic-symbolizer.yaml
+        checksum: c73d31af40108ff1b5a0fab01168a004bb19f56f
+    - kind: feature
+      summary: Add Universal Profiling Collector
+      description: ""
+      component: spec
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2407
+      issue: []
+      timestamp: 1679986811
+      file:
+        name: 1679986811-pf-elastic-collector.yaml
+        checksum: c487db9995e37a1c485d0d922e4e71d62491ca00
+    - kind: bug-fix
+      summary: Fix action acknowledgements taking up to 5 minutes. Fixed OSQuery live query results taking up to five minutes to show up in Kibana
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2406
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2410
+      timestamp: 1680101776
+      file:
+        name: 1680101776-Fix-actions-acks-delay.yaml
+        checksum: 1ec1403420a07e550002cc162fdd1d92fae28dfa
+    - kind: feature
+      summary: Add support for fleet-server secret files
+      description: ""
+      component: Add support for providing the ssl key passphrase, or fleet-server service_token through a secret file.
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2424
+      issue: []
+      timestamp: 1680203080
+      file:
+        name: 1680203080-Add-support-for-fleet-server-secret-files.yaml
+        checksum: 0beff457a00af62876793a98b564e366ae567ed4
+    - kind: bug-fix
+      summary: Fixes a bug that logging.level settings were not being respected, coming either from Fleet UI or a config file
+      description: ""
+      component: elastic-agent
+      pr:
+        - "2456"
+      issue:
+        - "2450"
+      timestamp: 1680764383
+      file:
+        name: 1680764383-Respecting-logging.level-settings.yaml
+        checksum: b4c689aa41884020f23848adab7b586d886c3659
+    - kind: bug-fix
+      summary: Fixes a bug that caused an empty proxy from a Fleet managed agent policy to override the proxy set by --proxy-url
+      description: ""
+      component: action handlers
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2468
+      issue: []
+      timestamp: 1681211832
+      file:
+        name: 1681211832-empty-proxy-from-the-policy-don't-overrides-the-proxy-set-by---proxy-url.yaml
+        checksum: b5edcf2189cdf6d4a3666f179333fc6398fedfcb
+    - kind: bug-fix
+      summary: Ensure local bin directory exists on Mac OS during installation.
+      description: |
+        During installation of the Elatic Agent on Mac OS ensure that the /usr/local/bin path exists before
+        creating the /usr/local/bin/elastic-agent symlink.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/2490
+      issue: []
+      timestamp: 1681311024
+      file:
+        name: 1681311024-Ensure-local-bin-directory-exists-on-Mac-OS-during-installation..yaml
+        checksum: 648894f466ad911ee06be9c3b4b2477fad3488bc
+    - kind: enhancement
+      summary: Make the language used in CLI commands more consistent.
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2496
+      issue: []
+      timestamp: 1681340196
+      file:
+        name: 1681340196-More-consistent-language-in-CLI-commands.yaml
+        checksum: e91dd7f091ca01562479ca131ddfa5d9503e76c9
+    - kind: bug-fix
+      summary: Report not bootstrapped with fleet-server as an error.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2505
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2170
+      timestamp: 1681742558
+      file:
+        name: 1681742558-Report-not-bootstrapped-with-fleet-server-as-an-error.yaml
+        checksum: 2c601eb490be451cc5e9e022b8d82d6bc225016e
+    - kind: bug-fix
+      summary: Re-add lumberjack input to the Filebeat spec.
+      description: ""
+      component: spec
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2511
+      issue: []
+      timestamp: 1681842199
+      file:
+        name: 1681842199-re-add-lumberjack-input-spec.yaml
+        checksum: a0bb03fb0a7739946d631eece1dc0c5a807038e6
+    - kind: bug-fix
+      summary: Fix diagnostic zip file handling of sub-directories in logs/.
+      description: ""
+      component: diagnostics
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2523
+      issue: []
+      timestamp: 1681942680
+      file:
+        name: 1681942680-fix-diag-zip-file.yaml
+        checksum: ff3bd63aa3dfa8d9c7d8f708cf7d3febde4e5bae
+    - kind: bug-fix
+      summary: Fixed an issue where inspect and diagnostics didn't include the local Elastic Agent configuration
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2529
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2390
+      timestamp: 1682005908
+      file:
+        name: 1682005908-Add-local-config.yaml-to-diagnostics-and-merge-together-in-inspect..yaml
+        checksum: 62a404c9dc8b45aa3d17042fa482545709ce1ac2
+    - kind: enhancement
+      summary: Increase timeout, add config for timeout in fleet setup
+      description: ""
+      component: config-manager
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2541
+      issue: []
+      timestamp: 1682117462
+      file:
+        name: 1682117462-fleet-connection-changes.yaml
+        checksum: e4acb525c2183d0e69eabcb6af48ebb14ce0e9e3
+    - kind: bug-fix
+      summary: fix pprof diagnostics
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2617
+        - https://github.com/elastic/elastic-agent/pull/2549
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2530
+      timestamp: 1682442537
+      file:
+        name: 1682442537-fix-pprof-diagnostics.yaml
+        checksum: 403815e914a64e726360f3a2219547faf9b8ec80
+    - kind: feature
+      summary: Adding Cloud Defend application to Elastic Agent
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2617
+        - https://github.com/elastic/elastic-agent/pull/2551
+      issue: []
+      timestamp: 1682455535
+      file:
+        name: 1682455535-Adding-Cloud-Defend-application-to-Elastic-Agent.yaml
+        checksum: e2c53fe2bb4dec679c2b8be1e858f02843e69538
+    - kind: bug-fix
+      summary: Fix container service token path issue
+      description: |
+        Fix issue that occurs when specifing a FLEET_SERVER_SERVICE_TOKEN_PATH with
+        the agent running in a Docker container where both the token value and path
+        are passed in the enroll section of the agent setup.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2576
+      issue: []
+      timestamp: 1682953274
+      file:
+        name: 1682953274-Fix-container-service-token-path-issue.yaml
+        checksum: 2434964330fe5268c12b60c13db26064f4678bf3
+    - kind: enhancement
+      summary: add hostPath to Kubernetes manifest to store the Elastic Agent state
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2550
+      issue: []
+      timestamp: 1684747663
+      file:
+        name: 1684747663-add-hostPath-to-Kubernetes-mainfest-to-store-the-Elastic-Agent-state.yaml
+        checksum: fdace615a0393bc65ea3dbc805ccec2c5d38c0a6
+    - kind: enhancement
+      summary: change default logs folder and upgrade watcher logs are collected by diagnostics command
+      description: ""
+      component: |
+        Now the Elastic Agent logs to `logs/elastic-agent-{hash}` by default.
+        The upgrade watcher also logs to this folder with the `elastic-agent-watcher-[DATE]` suffix.
+        When collecting the logs, the diagnostics command also collects the watcher logs and the logs of
+        a possible new version if the agent which failed during upgrade and then it was rolled back to the
+        previous version.
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2518
+      issue: []
+      timestamp: 1684749098
+      file:
+        name: 1684749098-change-default-logs-folder-and-upgrade-watcher-logs-are-collected-by-diagnostics-command.yaml
+        checksum: e5186a6b12eda62ef6547ce245da2f3d19c8c293

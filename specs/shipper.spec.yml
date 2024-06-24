@@ -1,3 +1,6 @@
+# this is used only in UT. does not make it into production
+# actual shipper spec file lives in shipper repo and is named 
+# properly 'elastic-agent-shipper.spec.yml'
 version: 2
 shippers:
   - name: shipper

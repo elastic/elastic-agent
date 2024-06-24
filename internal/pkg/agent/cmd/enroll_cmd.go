@@ -20,16 +20,14 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
@@ -39,8 +37,11 @@ import (
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -51,6 +52,8 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
+	enrollBackoffInit              = time.Second
+	enrollBackoffMax               = 10 * time.Second
 )
 
 var (
@@ -71,6 +74,9 @@ type enrollCmd struct {
 	remoteConfig remote.Config
 	agentProc    *process.Info
 	configPath   string
+
+	// For testability
+	daemonReloadFunc func(context.Context) error
 }
 
 // enrollCmdFleetServerOption define all the supported enrollment options for bootstrapping with Fleet Server.
@@ -79,13 +85,18 @@ type enrollCmdFleetServerOption struct {
 	ElasticsearchCA       string
 	ElasticsearchCASHA256 string
 	ElasticsearchInsecure bool
+	ElasticsearchCert     string
+	ElasticsearchCertKey  string
 	ServiceToken          string
+	ServiceTokenPath      string
 	PolicyID              string
 	Host                  string
 	Port                  uint16
 	InternalPort          uint16
 	Cert                  string
 	CertKey               string
+	CertKeyPassphrasePath string
+	ClientAuth            string
 	Insecure              bool
 	SpawnAgent            bool
 	Headers               map[string]string
@@ -98,6 +109,8 @@ type enrollCmdOption struct {
 	InternalURL          string                     `yaml:"-"`
 	CAs                  []string                   `yaml:"ca,omitempty"`
 	CASha256             []string                   `yaml:"ca_sha256,omitempty"`
+	Certificate          string                     `yaml:"certificate,omitempty"`
+	Key                  string                     `yaml:"key,omitempty"`
 	Insecure             bool                       `yaml:"insecure,omitempty"`
 	EnrollAPIKey         string                     `yaml:"enrollment_key,omitempty"`
 	Staging              string                     `yaml:"staging,omitempty"`
@@ -106,10 +119,11 @@ type enrollCmdOption struct {
 	ProxyHeaders         map[string]string          `yaml:"proxy_headers,omitempty"`
 	DaemonTimeout        time.Duration              `yaml:"daemon_timeout,omitempty"`
 	UserProvidedMetadata map[string]interface{}     `yaml:"-"`
-	FixPermissions       bool                       `yaml:"-"`
+	FixPermissions       *utils.FileOwner           `yaml:"-"`
 	DelayEnroll          bool                       `yaml:"-"`
 	FleetServer          enrollCmdFleetServerOption `yaml:"-"`
 	SkipCreateSecret     bool                       `yaml:"-"`
+	SkipDaemonRestart    bool                       `yaml:"-"`
 	Tags                 []string                   `yaml:"omitempty"`
 }
 
@@ -133,6 +147,12 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	if e.Insecure {
 		tlsCfg.VerificationMode = tlscommon.VerifyNone
 	}
+	if e.Certificate != "" || e.Key != "" {
+		tlsCfg.Certificate = tlscommon.CertificateConfig{
+			Certificate: e.Certificate,
+			Key:         e.Key,
+		}
+	}
 
 	cfg.Transport.TLS = &tlsCfg
 
@@ -146,56 +166,45 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	return cfg, nil
 }
 
-// newEnrollCmd creates a new enroll command that will registers the current beats to the remote
-// system.
+// newEnrollCmd creates a new enrollment with the given store.
 func newEnrollCmd(
-	log *logger.Logger,
-	options *enrollCmdOption,
-	configPath string,
-) (*enrollCmd, error) {
-
-	store := storage.NewReplaceOnSuccessStore(
-		configPath,
-		application.DefaultAgentFleetConfig,
-		storage.NewEncryptedDiskStore(paths.AgentConfigFile()),
-	)
-
-	return newEnrollCmdWithStore(
-		log,
-		options,
-		configPath,
-		store,
-	)
-}
-
-// newEnrollCmdWithStore creates an new enrollment and accept a custom store.
-func newEnrollCmdWithStore(
 	log *logger.Logger,
 	options *enrollCmdOption,
 	configPath string,
 	store saver,
 ) (*enrollCmd, error) {
 	return &enrollCmd{
-		log:         log,
-		options:     options,
-		configStore: store,
-		configPath:  configPath,
+		log:              log,
+		options:          options,
+		configStore:      store,
+		configPath:       configPath,
+		daemonReloadFunc: daemonReload,
 	}, nil
 }
 
-// Execute tries to enroll the agent into Fleet.
+// Execute enrolls the agent into Fleet.
 func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	var err error
 	defer c.stopAgent() // ensure its stopped no matter what
+
 	span, ctx := apm.StartSpan(ctx, "enroll", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
 
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
+	}
+
 	// Create encryption key from the agent before touching configuration
 	if !c.options.SkipCreateSecret {
-		err = secret.CreateAgentSecret()
+		opts := []vault.OptionFunc{vault.WithUnprivileged(!hasRoot)}
+		if c.options.FixPermissions != nil {
+			opts = append(opts, vault.WithVaultOwnership(*c.options.FixPermissions))
+		}
+		err = secret.CreateAgentSecret(ctx, opts...)
 		if err != nil {
 			return err
 		}
@@ -231,7 +240,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		// Ensure that the agent does not use a proxy configuration
 		// when connecting to the local fleet server.
 		// Note that when running fleet-server the enroll request will be sent to :8220,
-		// however when the agent is running afterwards requests will be sent to :8221
+		// however when the agent is running afterward requests will be sent to :8221
 		c.remoteConfig.Transport.Proxy.Disable = true
 	}
 
@@ -247,33 +256,50 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		if c.options.FleetServer.Host != "" {
 			return errors.New("--delay-enroll cannot be used with --fleet-server-es", errors.TypeConfig)
 		}
-		return c.writeDelayEnroll(streams)
+		err = c.writeDelayEnroll(streams)
+		if err != nil {
+			// context for error already provided in writeDelayEnroll
+			return err
+		}
+		if c.options.FixPermissions != nil {
+			err = perms.FixPermissions(paths.Top(), perms.WithOwnership(*c.options.FixPermissions))
+			if err != nil {
+				return errors.New(err, "failed to fix permissions")
+			}
+		}
+		return nil
 	}
 
 	err = c.enrollWithBackoff(ctx, persistentConfig)
 	if err != nil {
-		return errors.New(err, "fail to enroll")
+		return fmt.Errorf("fail to enroll: %w", err)
 	}
 
-	if c.options.FixPermissions {
-		err = install.FixPermissions()
+	if c.options.FixPermissions != nil {
+		err = perms.FixPermissions(paths.Top(), perms.WithOwnership(*c.options.FixPermissions))
 		if err != nil {
 			return errors.New(err, "failed to fix permissions")
 		}
 	}
 
 	defer func() {
-		fmt.Fprintln(streams.Out, "Successfully enrolled the Elastic Agent.")
+		if err != nil {
+			fmt.Fprintf(streams.Err, "Something went wrong while enrolling the Elastic Agent: %v\n", err)
+		} else {
+			fmt.Fprintln(streams.Out, "Successfully enrolled the Elastic Agent.")
+		}
 	}()
 
-	if c.agentProc == nil {
-		if c.daemonReload(ctx) != nil {
-			c.log.Info("Elastic Agent might not be running; unable to trigger restart")
-		} else {
-			c.log.Info("Successfully triggered restart on running Elastic Agent.")
+	if c.agentProc == nil && !c.options.SkipDaemonRestart {
+		if err = c.daemonReloadWithBackoff(ctx); err != nil {
+			c.log.Errorf("Elastic Agent might not be running; unable to trigger restart: %v", err)
+			return fmt.Errorf("could not reload agent daemon, unable to trigger restart: %w", err)
 		}
+
+		c.log.Info("Successfully triggered restart on running Elastic Agent.")
 		return nil
 	}
+
 	c.log.Info("Elastic Agent has been enrolled; start Elastic Agent")
 	return nil
 }
@@ -310,7 +336,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 	if err != nil {
 		if !c.options.FleetServer.SpawnAgent {
 			// wait longer to try and communicate with the Elastic Agent
-			err = waitForAgent(ctx, c.options.DaemonTimeout)
+			err = wait.ForAgent(ctx, c.options.DaemonTimeout)
 			if err != nil {
 				return "", errors.New("failed to communicate with elastic-agent daemon; is elastic-agent running?")
 			}
@@ -328,10 +354,12 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 
 	//nolint:dupl // duplicate because same params are passed
 	fleetConfig, err := createFleetServerBootstrapConfig(
-		c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken,
+		c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenPath,
 		c.options.FleetServer.PolicyID,
 		c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
-		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+		c.options.CAs, c.options.FleetServer.ClientAuth,
+		c.options.FleetServer.ElasticsearchCert, c.options.FleetServer.ElasticsearchCertKey,
 		c.options.FleetServer.Headers,
 		c.options.ProxyURL,
 		c.options.ProxyDisabled,
@@ -437,29 +465,44 @@ func (c *enrollCmd) prepareFleetTLS() error {
 	return nil
 }
 
+const (
+	daemonReloadInitBackoff = time.Second
+	daemonReloadMaxBackoff  = time.Minute
+	daemonReloadRetries     = 5
+)
+
 func (c *enrollCmd) daemonReloadWithBackoff(ctx context.Context) error {
-	err := c.daemonReload(ctx)
-	if err == nil {
-		return nil
-	}
+	backExp := backoff.NewExpBackoff(ctx.Done(), daemonReloadInitBackoff, daemonReloadMaxBackoff)
 
-	signal := make(chan struct{})
-	backExp := backoff.NewExpBackoff(signal, 10*time.Second, 1*time.Minute)
+	var lastErr error
+	for i := 0; i < daemonReloadRetries; i++ {
+		attempt := i
 
-	for i := 5; i >= 0; i-- {
-		backExp.Wait()
-		c.log.Info("Retrying to restart...")
-		err = c.daemonReload(ctx)
+		c.log.Infof("Restarting agent daemon, attempt %d", attempt)
+		err := c.daemonReloadFunc(ctx)
 		if err == nil {
-			break
+			return nil
+		}
+
+		// If the context was cancelled, return early
+		if errors.Is(err, context.DeadlineExceeded) ||
+			errors.Is(err, context.Canceled) {
+			return fmt.Errorf("could not reload daemon after %d retries: %w",
+				attempt, err)
+		}
+		lastErr = err
+
+		c.log.Errorf("Restart attempt %d failed: '%s'. Waiting for %s", attempt, err, backExp.NextWait().String())
+		// backoff Wait returns false if context.Done()
+		if !backExp.Wait() {
+			return ctx.Err()
 		}
 	}
 
-	close(signal)
-	return err
+	return fmt.Errorf("could not reload agent's daemon, all retries failed. Last error: %w", lastErr)
 }
 
-func (c *enrollCmd) daemonReload(ctx context.Context) error {
+func daemonReload(ctx context.Context) error {
 	daemon := client.New()
 	err := daemon.Connect(ctx)
 	if err != nil {
@@ -474,8 +517,14 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 
 	c.log.Infof("Starting enrollment to URL: %s", c.client.URI())
 	err := c.enroll(ctx, persistentConfig)
+	if err == nil {
+		return nil
+	}
+
+	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", c.client.URI(), enrollBackoffInit, enrollBackoffMax)
 	signal := make(chan struct{})
-	backExp := backoff.NewExpBackoff(signal, 60*time.Second, 10*time.Minute)
+	defer close(signal)
+	backExp := backoff.NewExpBackoff(signal, enrollBackoffInit, enrollBackoffMax)
 
 	for {
 		retry := false
@@ -484,6 +533,9 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 			retry = true
 		} else if errors.Is(err, fleetapi.ErrConnRefused) {
 			c.log.Warn("Remote server is not ready to accept connections, will retry in a moment.")
+			retry = true
+		} else if errors.Is(err, fleetapi.ErrTemporaryServerError) {
+			c.log.Warn("Remote server failed to handle the request, will retry in a moment.")
 			retry = true
 		}
 		if !retry {
@@ -494,16 +546,21 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 		err = c.enroll(ctx, persistentConfig)
 	}
 
-	close(signal)
 	return err
 }
 
 func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]interface{}) error {
 	cmd := fleetapi.NewEnrollCmd(c.client)
 
-	metadata, err := info.Metadata()
+	metadata, err := info.Metadata(ctx, c.log)
 	if err != nil {
 		return errors.New(err, "acquiring metadata failed")
+	}
+
+	// Automatically add the namespace as a tag when installed into a namepsace.
+	// Ensures the development agent is differentiated from others when on the same host.
+	if namespace := paths.InstallNamespace(); namespace != "" {
+		c.options.Tags = append(c.options.Tags, namespace)
 	}
 
 	r := &fleetapi.EnrollRequest{
@@ -534,17 +591,21 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 	if localFleetServer {
 		//nolint:dupl // not duplicates, just similar params are passed
 		serverConfig, err := createFleetServerBootstrapConfig(
-			c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken,
+			c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenPath,
 			c.options.FleetServer.PolicyID,
 			c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
-			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+			c.options.CAs, c.options.FleetServer.ClientAuth,
+			c.options.FleetServer.ElasticsearchCert, c.options.FleetServer.ElasticsearchCertKey,
 			c.options.FleetServer.Headers,
 			c.options.ProxyURL, c.options.ProxyDisabled, c.options.ProxyHeaders,
 			c.options.FleetServer.ElasticsearchInsecure,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf(
+				"failed creating fleet-server bootstrap config: %w", err)
 		}
+
 		// no longer need bootstrap at this point
 		serverConfig.Server.Bootstrap = false
 		fleetConfig.Server = serverConfig.Server
@@ -564,11 +625,11 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 
 	reader, err := yamlToReader(configToStore)
 	if err != nil {
-		return err
+		return fmt.Errorf("yamlToReader failed: %w", err)
 	}
 
 	if err := safelyStoreAgentInfo(c.configStore, reader); err != nil {
-		return err
+		return fmt.Errorf("failed to store agent config: %w", err)
 	}
 
 	// clear action store
@@ -595,7 +656,7 @@ func (c *enrollCmd) startAgent(ctx context.Context) (<-chan *os.ProcessState, er
 	args := []string{
 		"run", "-e", "-c", paths.ConfigFile(),
 		"--path.home", paths.Top(), "--path.config", paths.Config(),
-		"--path.logs", paths.Logs(),
+		"--path.logs", paths.Logs(), "--path.socket", paths.ControlSocket(),
 	}
 	if paths.Downloads() != "" {
 		args = append(args, "--path.downloads", paths.Downloads())
@@ -666,54 +727,6 @@ func getDaemonState(ctx context.Context) (*client.AgentState, error) {
 type waitResult struct {
 	enrollmentToken string
 	err             error
-}
-
-func waitForAgent(ctx context.Context, timeout time.Duration) error {
-	if timeout == 0 {
-		timeout = 1 * time.Minute
-	}
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	maxBackoff := timeout
-	if maxBackoff <= 0 {
-		// indefinite timeout
-		maxBackoff = 10 * time.Minute
-	}
-
-	resChan := make(chan waitResult)
-	innerCtx, innerCancel := context.WithCancel(context.Background())
-	defer innerCancel()
-	go func() {
-		backOff := expBackoffWithContext(innerCtx, 1*time.Second, maxBackoff)
-		for {
-			backOff.Wait()
-			_, err := getDaemonState(innerCtx)
-			if errors.Is(err, context.Canceled) {
-				resChan <- waitResult{err: err}
-				return
-			}
-			if err == nil {
-				resChan <- waitResult{}
-				break
-			}
-		}
-	}()
-
-	var res waitResult
-	select {
-	case <-ctx.Done():
-		innerCancel()
-		res = <-resChan
-	case res = <-resChan:
-	}
-
-	if res.err != nil {
-		return res.err
-	}
-	return nil
 }
 
 func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessState, log *logger.Logger, timeout time.Duration) (string, error) {
@@ -884,9 +897,11 @@ func storeAgentInfo(s saver, reader io.Reader) error {
 }
 
 func createFleetServerBootstrapConfig(
-	connStr, serviceToken, policyID, host string,
+	connStr, serviceToken, serviceTokenPath, policyID, host string,
 	port uint16, internalPort uint16,
-	cert, key, esCA, esCASHA256 string,
+	cert, key, passphrasePath, esCA, esCASHA256 string,
+	cas []string, clientAuth string,
+	esClientCert, esClientCertKey string,
 	headers map[string]string,
 	proxyURL string,
 	proxyDisabled bool,
@@ -895,7 +910,7 @@ func createFleetServerBootstrapConfig(
 ) (*configuration.FleetAgentConfig, error) {
 	localFleetServer := connStr != ""
 
-	es, err := configuration.ElasticsearchFromConnStr(connStr, serviceToken, insecure)
+	es, err := configuration.ElasticsearchFromConnStr(connStr, serviceToken, serviceTokenPath, insecure)
 	if err != nil {
 		return nil, err
 	}
@@ -915,6 +930,16 @@ func createFleetServerBootstrapConfig(
 			}
 		} else {
 			es.TLS.CATrustedFingerprint = esCASHA256
+		}
+	}
+	if esClientCert != "" || esClientCertKey != "" {
+		if es.TLS == nil {
+			es.TLS = &tlscommon.Config{}
+		}
+
+		es.TLS.Certificate = tlscommon.CertificateConfig{
+			Certificate: esClientCert,
+			Key:         esClientCertKey,
 		}
 	}
 	if host == "" {
@@ -954,14 +979,23 @@ func createFleetServerBootstrapConfig(
 		cfg.Server.Policy = &configuration.FleetServerPolicyConfig{ID: policyID}
 	}
 	if cert != "" || key != "" {
-		cfg.Server.TLS = &tlscommon.Config{
+		cfg.Server.TLS = &tlscommon.ServerConfig{
 			Certificate: tlscommon.CertificateConfig{
-				Certificate: cert,
-				Key:         key,
+				Certificate:    cert,
+				Key:            key,
+				PassphrasePath: passphrasePath,
 			},
 		}
 		if insecure {
 			cfg.Server.TLS.VerificationMode = tlscommon.VerifyNone
+		}
+
+		cfg.Server.TLS.CAs = cas
+
+		var cAuth tlscommon.TLSClientAuth
+		cfg.Server.TLS.ClientAuth = &cAuth
+		if err := cfg.Server.TLS.ClientAuth.Unpack(clientAuth); err != nil {
+			return nil, errors.New(err, "failed to unpack --fleet-server-client-auth", errors.TypeConfig)
 		}
 	}
 
@@ -1025,6 +1059,7 @@ func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) 
 	}
 
 	pc := &struct {
+		Headers        map[string]string                      `json:"agent.headers,omitempty" yaml:"agent.headers,omitempty" config:"agent.headers,omitempty"`
 		LogLevel       string                                 `json:"agent.logging.level,omitempty" yaml:"agent.logging.level,omitempty" config:"agent.logging.level,omitempty"`
 		MonitoringHTTP *monitoringConfig.MonitoringHTTPConfig `json:"agent.monitoring.http,omitempty" yaml:"agent.monitoring.http,omitempty" config:"agent.monitoring.http,omitempty"`
 	}{
@@ -1058,10 +1093,15 @@ func expBackoffWithContext(ctx context.Context, init, max time.Duration) backoff
 
 func cleanTags(tags []string) []string {
 	var r []string
+	// Create a map to store unique elements
+	seen := make(map[string]bool)
 	for _, str := range tags {
 		tag := strings.TrimSpace(str)
 		if tag != "" {
-			r = append(r, tag)
+			if _, ok := seen[tag]; !ok {
+				seen[tag] = true
+				r = append(r, tag)
+			}
 		}
 	}
 	return r

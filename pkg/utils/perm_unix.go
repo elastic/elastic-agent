@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !windows
-// +build !windows
 
 package utils
 
@@ -11,6 +10,20 @@ import (
 	"errors"
 	"os"
 )
+
+// FileOwner is the ownership a file should have.
+type FileOwner struct {
+	UID int
+	GID int
+}
+
+// CurrentFileOwner returns the executing UID and GID of the current process.
+func CurrentFileOwner() FileOwner {
+	return FileOwner{
+		UID: os.Getuid(),
+		GID: os.Getgid(),
+	}
+}
 
 // HasStrictExecPerms ensures that the path is executable by the owner, cannot be written by anyone other than the
 // owner of the file and that the owner of the file is the same as the UID or root.

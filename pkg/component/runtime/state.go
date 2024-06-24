@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 
 	gproto "google.golang.org/protobuf/proto"
@@ -42,14 +43,19 @@ type ComponentUnitKey struct {
 	UnitID   string
 }
 
+// MarshalYAML implements the Marshaller interface for the componentUnitKey
+func (key ComponentUnitKey) MarshalYAML() (interface{}, error) {
+	return fmt.Sprintf("%s-%s", key.UnitType.String(), key.UnitID), nil
+}
+
 // ComponentVersionInfo provides version information reported by the component.
 type ComponentVersionInfo struct {
 	// Name of the binary.
 	Name string `yaml:"name"`
-	// Version of the binary.
-	Version string `yaml:"version"`
 	// Additional metadata about the binary.
 	Meta map[string]string `yaml:"meta,omitempty"`
+	// BuildHash is the VCS commit hash the program was built from.
+	BuildHash string `yaml:"build_hash"`
 }
 
 // ComponentState is the overall state of the component.
@@ -59,10 +65,29 @@ type ComponentState struct {
 
 	Units map[ComponentUnitKey]ComponentUnitState `yaml:"units"`
 
+	// We don't serialize the Features field as YAML so it doesn't show up
+	// in the diagnostics-generated state.yaml file, keeping it concise.
+	Features    *proto.Features `yaml:"-"`
+	FeaturesIdx uint64          `yaml:"features_idx"`
+
+	Component    *proto.Component `yaml:"component,omitempty"`
+	ComponentIdx uint64           `yaml:"component_idx"`
+
 	VersionInfo ComponentVersionInfo `yaml:"version_info"`
+
+	// The PID of the process, as obtained from the *from the Protobuf API*
+	// As of now, this is only used by Endpoint, as agent doesn't know the PID
+	// of the endpoint service. If you need the PID for beats, use the coordinator/communicator
+	Pid uint64
 
 	// internal
 	expectedUnits map[ComponentUnitKey]expectedUnitState
+
+	expectedFeatures    *proto.Features
+	expectedFeaturesIdx uint64
+
+	expectedComponent    *proto.Component
+	expectedComponentIdx uint64
 }
 
 // expectedUnitState is the expected state of a unit.
@@ -79,7 +104,13 @@ func newComponentState(comp *component.Component) (s ComponentState) {
 	s.Message = startingMsg
 	s.Units = make(map[ComponentUnitKey]ComponentUnitState)
 	s.expectedUnits = make(map[ComponentUnitKey]expectedUnitState)
-	s.syncComponent(comp)
+	s.expectedFeaturesIdx = 1
+	s.expectedComponentIdx = 1
+
+	// Merge initial component state.
+	s.syncExpected(comp)
+	s.syncUnits(comp)
+
 	return s
 }
 
@@ -94,21 +125,24 @@ func (s *ComponentState) Copy() (c ComponentState) {
 	for k, v := range s.expectedUnits {
 		c.expectedUnits[k] = v
 	}
-	return c
-}
 
-func (s *ComponentState) syncComponent(comp *component.Component) bool {
-	changed := s.syncExpected(comp)
-	s.syncUnits(comp)
-	if changed {
-		return true
-	}
-	return s.unsettled()
+	c.Features = s.Features
+	c.FeaturesIdx = s.FeaturesIdx
+	c.expectedFeatures = s.expectedFeatures
+	c.expectedFeaturesIdx = s.expectedFeaturesIdx
+
+	c.Component = s.Component
+	c.ComponentIdx = s.ComponentIdx
+	c.expectedComponent = s.expectedComponent
+	c.expectedComponentIdx = s.expectedComponentIdx
+
+	return c
 }
 
 func (s *ComponentState) syncExpected(comp *component.Component) bool {
 	changed := false
 	touched := make(map[ComponentUnitKey]bool)
+
 	for _, unit := range comp.Units {
 		key := ComponentUnitKey{
 			UnitType: unit.Type,
@@ -116,33 +150,36 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 		}
 
 		touched[key] = true
-		existing, ok := s.expectedUnits[key]
+		expected, ok := s.expectedUnits[key]
 		if ok {
-			if existing.logLevel != unit.LogLevel {
-				existing.logLevel = unit.LogLevel
+			if expected.logLevel != unit.LogLevel {
+				expected.logLevel = unit.LogLevel
 				changed = true
 			}
-			if !gproto.Equal(existing.config, unit.Config) {
-				existing.config = unit.Config
-				existing.configStateIdx++
+			if !gproto.Equal(expected.config, unit.Config) {
+				expected.config = unit.Config
+				expected.configStateIdx++
 				changed = true
 			}
 		} else {
-			existing.state = client.UnitStateHealthy
-			existing.logLevel = unit.LogLevel
-			existing.config = unit.Config
-			existing.configStateIdx = 1
+			expected.state = client.UnitStateHealthy
+			expected.logLevel = unit.LogLevel
+			expected.config = unit.Config
+			expected.configStateIdx = 1
 			changed = true
 		}
-		if !errors.Is(existing.err, unit.Err) {
-			existing.err = unit.Err
-			if existing.err != nil {
-				existing.state = client.UnitStateFailed
+
+		if !errors.Is(expected.err, unit.Err) {
+			expected.err = unit.Err
+			if expected.err != nil {
+				expected.state = client.UnitStateFailed
 			}
 			changed = true
 		}
-		s.expectedUnits[key] = existing
+
+		s.expectedUnits[key] = expected
 	}
+
 	for key, unit := range s.expectedUnits {
 		_, ok := touched[key]
 		if !ok {
@@ -155,6 +192,19 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 			}
 		}
 	}
+
+	if !gproto.Equal(s.expectedFeatures, comp.Features) {
+		changed = true
+		s.expectedFeaturesIdx++
+		s.expectedFeatures = comp.Features
+	}
+
+	if !gproto.Equal(s.expectedComponent, comp.Component) {
+		changed = true
+		s.expectedComponentIdx++
+		s.expectedComponent = comp.Component
+	}
+
 	return changed
 }
 
@@ -208,11 +258,28 @@ func (s *ComponentState) syncUnits(comp *component.Component) bool {
 			}
 		}
 	}
+
+	if !gproto.Equal(s.Features, comp.Features) {
+		s.Features = comp.Features
+		changed = true
+	}
+
+	if !gproto.Equal(s.Component, comp.Component) {
+		s.Component = comp.Component
+		changed = true
+	}
+
 	return changed
 }
 
 func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 	changed := false
+
+	if s.Pid != checkin.Pid {
+		changed = true
+		s.Pid = checkin.Pid
+	}
+
 	touched := make(map[ComponentUnitKey]bool)
 	for _, unit := range checkin.Units {
 		key := ComponentUnitKey{
@@ -256,39 +323,43 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		}
 		s.Units[key] = existing
 	}
+
 	for key, unit := range s.Units {
-		_, ok := touched[key]
-		if !ok {
-			unit.unitState = client.UnitStateStarting
-			unit.unitMessage = ""
-			unit.unitPayload = nil
-			unit.configStateIdx = 0
-			if unit.err != nil {
-				errMsg := unit.err.Error()
-				if unit.State != client.UnitStateFailed || unit.Message != errMsg || diffPayload(unit.Payload, nil) {
-					changed = true
-					unit.State = client.UnitStateFailed
-					unit.Message = errMsg
-					unit.Payload = nil
-				}
-			} else if unit.State != client.UnitStateStarting && unit.State != client.UnitStateStopped {
-				if unit.State != client.UnitStateFailed || unit.Message != missingMsg || diffPayload(unit.Payload, nil) {
-					changed = true
-					unit.State = client.UnitStateFailed
-					unit.Message = missingMsg
-					unit.Payload = nil
-				}
+		// Look for units that weren't in the checkin.
+		if _, ok := touched[key]; ok {
+			continue
+		}
+		unit.unitState = client.UnitStateStarting
+		unit.unitMessage = ""
+		unit.unitPayload = nil
+		unit.configStateIdx = 0
+		if unit.err != nil {
+			errMsg := unit.err.Error()
+			if unit.State != client.UnitStateFailed || unit.Message != errMsg || diffPayload(unit.Payload, nil) {
+				changed = true
+				unit.State = client.UnitStateFailed
+				unit.Message = errMsg
+				unit.Payload = nil
+			}
+		} else if unit.State != client.UnitStateStarting && unit.State != client.UnitStateStopped {
+			if unit.State != client.UnitStateFailed || unit.Message != missingMsg || diffPayload(unit.Payload, nil) {
+				changed = true
+				unit.State = client.UnitStateFailed
+				unit.Message = missingMsg
+				unit.Payload = nil
 			}
 		}
+
 		s.Units[key] = unit
 	}
+
 	if checkin.VersionInfo != nil {
 		if checkin.VersionInfo.Name != "" && s.VersionInfo.Name != checkin.VersionInfo.Name {
 			s.VersionInfo.Name = checkin.VersionInfo.Name
 			changed = true
 		}
-		if checkin.VersionInfo.Version != "" && s.VersionInfo.Version != checkin.VersionInfo.Version {
-			s.VersionInfo.Version = checkin.VersionInfo.Version
+		if checkin.VersionInfo.BuildHash != "" && s.VersionInfo.BuildHash != checkin.VersionInfo.BuildHash {
+			s.VersionInfo.BuildHash = checkin.VersionInfo.BuildHash
 			changed = true
 		}
 		if checkin.VersionInfo.Meta != nil && diffMeta(s.VersionInfo.Meta, checkin.VersionInfo.Meta) {
@@ -296,6 +367,17 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 			changed = true
 		}
 	}
+
+	if s.FeaturesIdx != checkin.FeaturesIdx {
+		s.FeaturesIdx = checkin.FeaturesIdx
+		changed = true
+	}
+
+	if s.ComponentIdx != checkin.ComponentIdx {
+		s.ComponentIdx = checkin.ComponentIdx
+		changed = true
+	}
+
 	return changed
 }
 
@@ -304,22 +386,26 @@ func (s *ComponentState) unsettled() bool {
 		// mismatch on unit count
 		return true
 	}
+
 	for ek, e := range s.expectedUnits {
 		o, ok := s.Units[ek]
 		if !ok {
 			// unit missing
 			return true
 		}
-		if o.configStateIdx != e.configStateIdx || e.state != o.State {
+		if o.configStateIdx != e.configStateIdx ||
+			e.state != o.State {
 			// config or state mismatch
 			return true
 		}
 	}
-	return false
+
+	return s.FeaturesIdx != s.expectedFeaturesIdx || s.ComponentIdx != s.expectedComponentIdx
 }
 
 func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
 	units := make([]*proto.UnitExpected, 0, len(s.expectedUnits))
+
 	for k, u := range s.expectedUnits {
 		e := &proto.UnitExpected{
 			Id:             k.UnitID,
@@ -345,7 +431,14 @@ func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
 		}
 		units = append(units, e)
 	}
-	return &proto.CheckinExpected{Units: units}
+
+	return &proto.CheckinExpected{
+		Units:        units,
+		Features:     s.expectedFeatures,
+		FeaturesIdx:  s.expectedFeaturesIdx,
+		Component:    s.expectedComponent,
+		ComponentIdx: s.expectedComponentIdx,
+	}
 }
 
 func (s *ComponentState) cleanupStopped() bool {
@@ -373,7 +466,9 @@ func (s *ComponentState) cleanupStopped() bool {
 	return cleaned
 }
 
-// forceState force updates the state for the entire component, forcing that state on all units.
+// forceState force updates the state for the entire component, forcing that
+// state on all units. It returns true if either the component state or any of
+// the units state changed, false otherwise.
 func (s *ComponentState) forceState(state client.UnitState, msg string) bool {
 	changed := false
 	if s.State != state || s.Message != msg {

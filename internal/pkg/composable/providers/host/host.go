@@ -5,23 +5,28 @@
 package host
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"runtime"
 	"time"
-
-	"github.com/elastic/go-sysinfo"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/go-sysinfo"
 )
 
-// DefaultCheckInterval is the default timeout used to check if any host information has changed.
-const DefaultCheckInterval = 5 * time.Minute
+const (
+	// DefaultCheckInterval is the default timeout used to check if any host information has changed.
+	DefaultCheckInterval = 5 * time.Minute
+
+	fqdnFeatureFlagCallbackID = "host_provider"
+)
 
 func init() {
 	composable.Providers.MustAddContextProvider("host", ContextProviderBuilder)
@@ -34,12 +39,16 @@ type contextProvider struct {
 
 	CheckInterval time.Duration `config:"check_interval"`
 
+	// fqdnFFChangeCh is used to signal when the FQDN
+	// feature flag has changed
+	fqdnFFChangeCh chan struct{}
+
 	// used by testing
 	fetcher infoFetcher
 }
 
 // Run runs the environment context provider.
-func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
+func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
 	current, err := c.fetcher()
 	if err != nil {
 		return err
@@ -56,6 +65,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		case <-comm.Done():
 			t.Stop()
 			return comm.Err()
+		case <-c.fqdnFFChangeCh:
 		case <-t.C:
 		}
 
@@ -76,11 +86,26 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 	}
 }
 
+func (c *contextProvider) onFQDNFeatureFlagChange(new, old bool) {
+	// FQDN feature flag was toggled, so notify on channel
+	select {
+	case c.fqdnFFChangeCh <- struct{}{}:
+	default:
+	}
+}
+
+func (c *contextProvider) Close() error {
+	features.RemoveFQDNOnChangeCallback(fqdnFeatureFlagCallbackID)
+	close(c.fqdnFFChangeCh)
+
+	return nil
+}
+
 // ContextProviderBuilder builds the context provider.
 func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{
 		logger:  log,
-		fetcher: getHostInfo,
+		fetcher: getHostInfo(log),
 	}
 	if c != nil {
 		err := c.Unpack(p)
@@ -91,25 +116,36 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 	if p.CheckInterval <= 0 {
 		p.CheckInterval = DefaultCheckInterval
 	}
+
+	p.fqdnFFChangeCh = make(chan struct{}, 1)
+	err := features.AddFQDNOnChangeCallback(
+		p.onFQDNFeatureFlagChange,
+		fqdnFeatureFlagCallbackID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to add FQDN onChange callback in host provider: %w", err)
+	}
+
 	return p, nil
 }
 
-func getHostInfo() (map[string]interface{}, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
+func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
+	return func() (map[string]interface{}, error) {
+		sysInfo, err := sysinfo.Host()
+		if err != nil {
+			return nil, err
+		}
+
+		info := sysInfo.Info()
+		name := util.GetHostName(features.FQDN(), info, sysInfo, log)
+
+		return map[string]interface{}{
+			"id":           info.UniqueID,
+			"name":         name,
+			"platform":     runtime.GOOS,
+			"architecture": info.Architecture,
+			"ip":           info.IPs,
+			"mac":          info.MACs,
+		}, nil
 	}
-	sysInfo, err := sysinfo.Host()
-	if err != nil {
-		return nil, err
-	}
-	info := sysInfo.Info()
-	return map[string]interface{}{
-		"id":           info.UniqueID,
-		"name":         hostname,
-		"platform":     runtime.GOOS,
-		"architecture": info.Architecture,
-		"ip":           info.IPs,
-		"mac":          info.MACs,
-	}, nil
 }

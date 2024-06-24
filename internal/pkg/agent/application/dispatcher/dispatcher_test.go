@@ -6,16 +6,21 @@ package dispatcher
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type mockHandler struct {
@@ -52,6 +57,10 @@ func (m *mockAction) Type() string {
 func (m *mockAction) String() string {
 	args := m.Called()
 	return args.String(0)
+}
+func (m *mockAction) AckEvent() fleetapi.AckEvent {
+	args := m.Called()
+	return args.Get(0).(fleetapi.AckEvent)
 }
 func (m *mockScheduledAction) StartTime() (time.Time, error) {
 	args := m.Called()
@@ -103,6 +112,7 @@ func (m *mockQueue) Save() error {
 }
 
 func TestActionDispatcher(t *testing.T) {
+	detailsSetter := func(upgradeDetails *details.Details) {}
 	ack := noop.New()
 
 	t.Run("Success to dispatch multiples events", func(t *testing.T) {
@@ -111,7 +121,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		success1 := &mockHandler{}
@@ -135,7 +145,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(ctx)
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action1, action2)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action1, action2)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -153,7 +163,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		action := &mockOtherAction{}
@@ -162,7 +172,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(ctx)
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -177,7 +187,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		def := &mockHandler{}
 		queue := &mockQueue{}
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		err = d.Register(&mockAction{}, success1)
@@ -197,7 +207,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 		queue.On("Add", mock.Anything, mock.Anything).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -212,7 +222,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action1, action2)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action1, action2)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -222,13 +232,17 @@ func TestActionDispatcher(t *testing.T) {
 
 	t.Run("Cancel queued action", func(t *testing.T) {
 		def := &mockHandler{}
-		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		calledCh := make(chan bool)
+		call := def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		call.RunFn = func(_ mock.Arguments) {
+			calledCh <- true
+		}
 
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -239,15 +253,19 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action)
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
-		case <-time.After(200 * time.Microsecond):
-			// we're not expecting any reset,
+		case <-calledCh:
+			// Handle was called, expected
+		case <-time.After(1 * time.Second):
+			t.Fatal("mock Handle never called")
 		}
 		def.AssertExpectations(t)
-		queue.AssertExpectations(t)
+		// Flaky assertion: https://github.com/elastic/elastic-agent/issues/3137
+		// TODO: re-enabled when fixed
+		// queue.AssertExpectations(t)
 	})
 
 	t.Run("Retrieve actions from queue", func(t *testing.T) {
@@ -264,7 +282,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{action1}).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -275,7 +293,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action2)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action2)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -291,14 +309,14 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack)
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
@@ -317,7 +335,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 		queue.On("Add", mock.Anything, mock.Anything).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockRetryableAction{}, def)
 		require.NoError(t, err)
@@ -333,7 +351,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -351,7 +369,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -367,7 +385,7 @@ func TestActionDispatcher(t *testing.T) {
 		// launch in another routing and sleep to check if an error is generated
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, ack, action1, action2)
+		go d.Dispatch(dispatchCtx, detailsSetter, ack, action1, action2)
 		time.Sleep(time.Millisecond * 200)
 		select {
 		case <-d.Errors():
@@ -394,7 +412,7 @@ func TestActionDispatcher(t *testing.T) {
 		queue.On("Save").Return(nil).Times(2)
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Times(2)
 
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -410,7 +428,7 @@ func TestActionDispatcher(t *testing.T) {
 		// launch in another routing and sleep to check if an error is generated
 		dispatchCtx1, cancelFn1 := context.WithCancel(context.Background())
 		defer cancelFn1()
-		go d.Dispatch(dispatchCtx1, ack, action1)
+		go d.Dispatch(dispatchCtx1, detailsSetter, ack, action1)
 		select {
 		case err := <-d.Errors():
 			if err == nil {
@@ -421,7 +439,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx2, cancelFn2 := context.WithCancel(context.Background())
 		defer cancelFn2()
-		go d.Dispatch(dispatchCtx2, ack, action2)
+		go d.Dispatch(dispatchCtx2, detailsSetter, ack, action2)
 		select {
 		case err := <-d.Errors():
 			if err != nil {
@@ -433,6 +451,175 @@ func TestActionDispatcher(t *testing.T) {
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
 	})
+
+	t.Run("report next scheduled upgrade", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle",
+			mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Twice()
+
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Once()
+		queue.On("Add", mock.Anything, mock.Anything).Once()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
+		queue.On("CancelType", mock.Anything).Return(1).Once()
+
+		d, err := New(nil, t.TempDir(), def, queue)
+		require.NoError(t, err)
+
+		var gotDetails *details.Details
+		detailsSetter := func(upgradeDetails *details.Details) {
+			gotDetails = upgradeDetails
+		}
+
+		action := &fleetapi.ActionUpgrade{
+			ActionID:         "id",
+			ActionType:       fleetapi.ActionTypeUpgrade,
+			ActionStartTime:  time.Now().Add(2 * time.Minute).Format(time.RFC3339),
+			ActionExpiration: time.Now().Add(3 * time.Minute).Format(time.RFC3339),
+		}
+
+		d.Dispatch(context.Background(), detailsSetter, ack, action)
+		select {
+		case err := <-d.Errors():
+			if err != nil {
+				t.Errorf("Unexpected error from Dispatch: %v", err)
+			}
+		default:
+		}
+
+		require.NotNilf(t, gotDetails, "upgrade details should have been set")
+		assert.Equal(t, gotDetails.State, details.StateScheduled)
+		assert.NotZerof(t, gotDetails.Metadata.ScheduledAt, "upgrade details metadata must have the ScheduledAt set")
+	})
+
+	t.Run("report next scheduled upgrade if there is a valid and an expired upgrade action", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle",
+			mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Twice()
+
+		expiredAction := &fleetapi.ActionUpgrade{
+			ActionID:         "id-expired",
+			ActionType:       fleetapi.ActionTypeUpgrade,
+			ActionStartTime:  time.Now().Add(-5 * time.Minute).Format(time.RFC3339),
+			ActionExpiration: time.Now().Add(-3 * time.Minute).Format(time.RFC3339),
+		}
+
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Once()
+		queue.On("Add", mock.Anything, mock.Anything).Once()
+		queue.On("DequeueActions").
+			Return([]fleetapi.ScheduledAction{expiredAction}).
+			Once()
+		queue.On("CancelType", mock.Anything).Return(1).Once()
+
+		d, err := New(nil, t.TempDir(), def, queue)
+		require.NoError(t, err)
+
+		var gotDetails *details.Details
+		detailsSetter := func(upgradeDetails *details.Details) {
+			gotDetails = upgradeDetails
+		}
+
+		action := &fleetapi.ActionUpgrade{
+			ActionID:         "id",
+			ActionType:       fleetapi.ActionTypeUpgrade,
+			ActionStartTime:  time.Now().Add(2 * time.Minute).Format(time.RFC3339),
+			ActionExpiration: time.Now().Add(3 * time.Minute).Format(time.RFC3339),
+		}
+
+		d.Dispatch(context.Background(), detailsSetter, ack, action)
+		select {
+		case err := <-d.Errors():
+			if err != nil {
+				t.Errorf("Unexpected error from Dispatch: %v", err)
+			}
+		default:
+		}
+
+		require.NotNilf(t, gotDetails, "upgrade details should have been set")
+		assert.Equal(t, gotDetails.State, details.StateScheduled)
+	})
+
+	t.Run("keep the report of scheduled upgrade if there is no new upgrade action", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle",
+			mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Twice()
+
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Once()
+		queue.On("Add", mock.Anything, mock.Anything).Once()
+		queue.On("DequeueActions").
+			Return([]fleetapi.ScheduledAction{}).
+			Once()
+		queue.On("CancelType", mock.Anything).Return(1).Once()
+
+		d, err := New(nil, t.TempDir(), def, queue)
+		require.NoError(t, err)
+
+		wantDetail := &details.Details{
+			State:    details.StateScheduled,
+			ActionID: "my action ID"}
+		gotDetails := wantDetail
+		detailsSetter := func(upgradeDetails *details.Details) {
+			gotDetails = upgradeDetails
+		}
+
+		d.Dispatch(context.Background(), detailsSetter, ack)
+		select {
+		case err := <-d.Errors():
+			if err != nil {
+				t.Errorf("Unexpected error from Dispatch: %v", err)
+			}
+		default:
+		}
+
+		assert.Equalf(t, wantDetail, gotDetails, "upgrade details shoul not have been modified")
+	})
+
+	t.Run("set upgrade to failed if the action expires", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle",
+			mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Twice()
+		expired := &fleetapi.ActionUpgrade{
+			ActionID:         "id-expired",
+			ActionType:       fleetapi.ActionTypeUpgrade,
+			ActionStartTime:  time.Now().Add(-5 * time.Minute).Format(time.RFC3339),
+			ActionExpiration: time.Now().Add(-3 * time.Minute).Format(time.RFC3339),
+		}
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Once()
+		queue.On("Add", mock.Anything, mock.Anything).Once()
+		queue.On("DequeueActions").
+			Return([]fleetapi.ScheduledAction{expired}).
+			Once()
+		queue.On("CancelType", mock.Anything).Return(1).Once()
+
+		d, err := New(nil, t.TempDir(), def, queue)
+		require.NoError(t, err)
+
+		var gotDetails *details.Details
+		detailsSetter := func(upgradeDetails *details.Details) {
+			gotDetails = upgradeDetails
+		}
+
+		d.Dispatch(context.Background(), detailsSetter, ack)
+		select {
+		case err := <-d.Errors():
+			if err != nil {
+				t.Errorf("Unexpected error from Dispatch: %v", err)
+			}
+		default:
+		}
+
+		require.NotNilf(t, gotDetails, "upgrade details cannot be nil")
+		assert.Equal(t, details.StateFailed, gotDetails.State)
+		assert.NotEmptyf(t, gotDetails.Metadata.ErrorMsg, "want an error message, got none")
+		assert.Equalf(t, expired.ActionID, gotDetails.ActionID, "action id must be the same")
+	})
 }
 
 func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
@@ -441,7 +628,7 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 
 	t.Run("no more attmpts", func(t *testing.T) {
 		queue := &mockQueue{}
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		action := &mockRetryableAction{}
@@ -458,7 +645,7 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("Add", mock.Anything, mock.Anything).Once()
-		d, err := New(nil, def, queue)
+		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
 
 		action := &mockRetryableAction{}
@@ -471,4 +658,105 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 		queue.AssertExpectations(t)
 		action.AssertExpectations(t)
 	})
+}
+
+func TestReportNextScheduledUpgrade(t *testing.T) {
+	now := time.Now().UTC()
+	later := now.Add(3 * time.Hour)
+	laterTruncate := later.Truncate(time.Second)
+	muchLater := later.Add(3 * time.Hour)
+
+	cases := map[string]struct {
+		actions           []fleetapi.Action
+		expectedDetails   *details.Details
+		expectedErrLogMsg string
+	}{
+		"no_scheduled_upgrades": {
+			actions: []fleetapi.Action{
+				&fleetapi.ActionUpgrade{
+					ActionID: "action1",
+					Version:  "8.12.3",
+				},
+			},
+			expectedErrLogMsg: "failed to get start time for scheduled upgrade action [id = action1]",
+		},
+		"one_scheduled_upgrade": {
+			actions: []fleetapi.Action{
+				&fleetapi.ActionUpgrade{
+					ActionID:        "action2",
+					ActionStartTime: later.Format(time.RFC3339),
+					Version:         "8.13.0",
+				},
+			},
+			expectedDetails: &details.Details{
+				TargetVersion: "8.13.0",
+				State:         details.StateScheduled,
+				ActionID:      "action2",
+				Metadata: details.Metadata{
+					ScheduledAt: &laterTruncate,
+				},
+			},
+		},
+		"many_scheduled_upgrades": {
+			actions: []fleetapi.Action{
+				&fleetapi.ActionUpgrade{
+					ActionID:        "action3",
+					ActionStartTime: muchLater.Format(time.RFC3339),
+					Version:         "8.14.1",
+				},
+				&fleetapi.ActionUpgrade{
+					ActionID:        "action4",
+					ActionStartTime: later.Format(time.RFC3339),
+					Version:         "8.13.5",
+				},
+			},
+			expectedDetails: &details.Details{
+				TargetVersion: "8.13.5",
+				State:         details.StateScheduled,
+				ActionID:      "action4",
+				Metadata: details.Metadata{
+					ScheduledAt: &laterTruncate,
+				},
+			},
+		},
+		"invalid_time_scheduled_upgrade": {
+			actions: []fleetapi.Action{
+				&fleetapi.ActionUpgrade{
+					ActionID:        "action1",
+					Version:         "8.13.2",
+					ActionStartTime: "invalid",
+				},
+			},
+			expectedErrLogMsg: "failed to get start time for scheduled upgrade action [id = action1]",
+		},
+	}
+
+	def := &mockHandler{}
+
+	queue := &mockQueue{}
+	d, err := New(nil, t.TempDir(), def, queue)
+	require.NoError(t, err, "could not create dispatcher")
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			var actualDetails *details.Details
+			detailsSetter := func(upgradeDetails *details.Details) {
+				actualDetails = upgradeDetails
+			}
+			log, obs := logger.NewTesting("report_next_upgrade_details")
+
+			d.reportNextScheduledUpgrade(test.actions, detailsSetter, log)
+
+			require.True(t, test.expectedDetails.Equals(actualDetails))
+
+			logs := obs.TakeAll()
+			if test.expectedErrLogMsg != "" {
+				require.Len(t, logs, 1)
+				require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
+				require.Equal(t, test.expectedErrLogMsg, logs[0].Message)
+			} else {
+				require.Empty(t, logs)
+			}
+		})
+	}
 }

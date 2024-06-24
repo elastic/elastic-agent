@@ -5,10 +5,10 @@
 package fs
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha512"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,31 +18,41 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/pgptest"
 )
 
-const (
-	version = "7.5.1"
-)
+var testVersion = agtversion.NewParsedSemVer(7, 5, 1, "", "")
 
 var (
-	beatSpec = artifact.Artifact{Name: "Filebeat", Cmd: "filebeat", Artifact: "beat/filebeat"}
+	agentSpec = artifact.Artifact{
+		Name:     "Elastic Agent",
+		Cmd:      "elastic-agent",
+		Artifact: "beat/elastic-agent"}
 )
 
 func TestFetchVerify(t *testing.T) {
+	// See docs/pgp-sign-verify-artifact.md for how to generate a key, export
+	// the public key, sign a file and verify it.
+
+	log, _ := logger.New("", false)
 	timeout := 15 * time.Second
 	dropPath := filepath.Join("testdata", "drop")
 	installPath := filepath.Join("testdata", "install")
 	targetPath := filepath.Join("testdata", "download")
 	ctx := context.Background()
-	s := artifact.Artifact{Name: "Beat", Cmd: "beat", Artifact: "beats/filebeat"}
-	version := "8.0.0"
+	a := artifact.Artifact{
+		Name: "elastic-agent", Cmd: "elastic-agent", Artifact: "beats/elastic-agent"}
+	version := agtversion.NewParsedSemVer(8, 0, 0, "", "")
 
-	targetFilePath := filepath.Join(targetPath, "beat-8.0.0-darwin-x86_64.tar.gz")
-	hashTargetFilePath := filepath.Join(targetPath, "beat-8.0.0-darwin-x86_64.tar.gz.sha512")
+	filename := "elastic-agent-8.0.0-darwin-x86_64.tar.gz"
+	targetFilePath := filepath.Join(targetPath, filename)
+	hashTargetFilePath := filepath.Join(targetPath, filename+".sha512")
+	ascTargetFilePath := filepath.Join(targetPath, filename+".asc")
 
 	// cleanup
 	defer os.RemoveAll(targetPath)
@@ -58,48 +68,52 @@ func TestFetchVerify(t *testing.T) {
 		},
 	}
 
-	err := prepareFetchVerifyTests(dropPath, targetPath, targetFilePath, hashTargetFilePath)
-	assert.NoError(t, err)
+	err := prepareFetchVerifyTests(dropPath, targetPath, filename, targetFilePath, hashTargetFilePath)
+	require.NoError(t, err)
 
-	downloader := NewDownloader(config)
-	verifier, err := NewVerifier(config, true, nil)
-	assert.NoError(t, err)
+	pgp, err := os.ReadFile(filepath.Join(dropPath, "public-key.pgp"))
+	require.NoError(t, err, "could not read public PGP key")
+	verifier, err := NewVerifier(log, config, pgp)
+	require.NoError(t, err, "could not create the verifier")
 
 	// first download verify should fail:
 	// download skipped, as invalid package is prepared upfront
 	// verify fails and cleans download
-	err = verifier.Verify(s, version)
+	err = verifier.Verify(a, *version, false)
 	var checksumErr *download.ChecksumMismatchError
-	assert.ErrorAs(t, err, &checksumErr)
+	require.ErrorAs(t, err, &checksumErr)
 
 	_, err = os.Stat(targetFilePath)
-	assert.True(t, os.IsNotExist(err))
+	require.True(t, os.IsNotExist(err))
 
 	_, err = os.Stat(hashTargetFilePath)
-	assert.True(t, os.IsNotExist(err))
+	require.True(t, os.IsNotExist(err))
 
 	// second one should pass
 	// download not skipped: package missing
 	// verify passes because hash is not correct
-	_, err = downloader.Download(ctx, s, version)
-	assert.NoError(t, err)
+	_, err = NewDownloader(config).Download(ctx, a, version)
+	require.NoError(t, err)
+	asc, err := os.ReadFile(filepath.Join(dropPath, filename+".asc"))
+	require.NoErrorf(t, err, "could not open .asc for copy")
+	err = os.WriteFile(ascTargetFilePath, asc, 0o600)
+	require.NoErrorf(t, err, "could not save .asc (%q) to target path (%q)",
+		filepath.Join(dropPath, filename+".asc"), ascTargetFilePath)
 
 	// file downloaded ok
 	_, err = os.Stat(targetFilePath)
-	assert.NoError(t, err)
-
+	require.NoError(t, err)
 	_, err = os.Stat(hashTargetFilePath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	_, err = os.Stat(ascTargetFilePath)
+	require.NoError(t, err)
 
-	err = verifier.Verify(s, version)
-	assert.NoError(t, err)
-
-	// Enable GPG signature validation.
-	verifier.allowEmptyPgp = false
+	err = verifier.Verify(a, *version, false)
+	require.NoError(t, err)
 
 	// Bad GPG public key.
 	{
-		verifier.pgpBytes = []byte("garbage")
+		verifier.defaultKey = []byte("garbage")
 
 		// Don't delete anything.
 		assertFileExists(t, targetFilePath)
@@ -107,11 +121,11 @@ func TestFetchVerify(t *testing.T) {
 	}
 
 	// Setup proper GPG public key.
-	_, verifier.pgpBytes = release.PGP()
+	verifier.defaultKey = release.PGP()
 
 	// Missing .asc file.
 	{
-		err = verifier.Verify(s, version)
+		err = verifier.Verify(a, *version, false)
 		require.Error(t, err)
 
 		// Don't delete these files when GPG validation failure.
@@ -121,10 +135,10 @@ func TestFetchVerify(t *testing.T) {
 
 	// Invalid signature.
 	{
-		err = ioutil.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
+		err = os.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
 		require.NoError(t, err)
 
-		err = verifier.Verify(s, version)
+		err = verifier.Verify(a, *version, false)
 		var invalidSigErr *download.InvalidSignatureError
 		assert.ErrorAs(t, err, &invalidSigErr)
 
@@ -137,9 +151,14 @@ func TestFetchVerify(t *testing.T) {
 	}
 }
 
-func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFilePath string) error {
-	sourceFilePath := filepath.Join(dropPath, "beat-8.0.0-darwin-x86_64.tar.gz")
-	hashSourceFilePath := filepath.Join(dropPath, "beat-8.0.0-darwin-x86_64.tar.gz.sha512")
+func prepareFetchVerifyTests(
+	dropPath,
+	targetDir,
+	filename,
+	targetFilePath,
+	hashTargetFilePath string) error {
+	sourceFilePath := filepath.Join(dropPath, filename)
+	hashSourceFilePath := filepath.Join(dropPath, filename+".sha512")
 
 	// clean targets
 	os.Remove(targetFilePath)
@@ -161,80 +180,96 @@ func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFile
 	}
 	defer targretFile.Close()
 
-	hashContent, err := ioutil.ReadFile(hashSourceFilePath)
+	hashContent, err := os.ReadFile(hashSourceFilePath)
 	if err != nil {
 		return err
 	}
 
 	corruptedHash := append([]byte{1, 2, 3, 4, 5, 6}, hashContent[6:]...)
-	return ioutil.WriteFile(hashTargetFilePath, corruptedHash, 0666) //nolint:gosec // no sweat, it's a test
+	return os.WriteFile(hashTargetFilePath, corruptedHash, 0666)
 }
 
 func TestVerify(t *testing.T) {
-	targetDir, err := ioutil.TempDir(os.TempDir(), "")
-	if err != nil {
-		t.Fatal(err)
+	tt := []struct {
+		Name             string
+		RemotePGPUris    []string
+		UnreachableCount int
+	}{
+		{"default", nil, 0},
+		{"unreachable local path", []string{download.PgpSourceURIPrefix + "https://127.0.0.1:2874/path/does/not/exist"}, 1},
 	}
 
-	timeout := 30 * time.Second
+	for _, tc := range tt {
+		t.Run(tc.Name, func(t *testing.T) {
+			log, obs := logger.NewTesting("TestVerify")
+			targetDir := t.TempDir()
 
-	config := &artifact.Config{
-		TargetDirectory: targetDir,
-		DropPath:        filepath.Join(targetDir, "drop"),
-		OperatingSystem: "linux",
-		Architecture:    "32",
-		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
-			Timeout: timeout,
-		},
+			timeout := 30 * time.Second
+
+			config := &artifact.Config{
+				TargetDirectory: targetDir,
+				DropPath:        filepath.Join(targetDir, "drop"),
+				OperatingSystem: "linux",
+				Architecture:    "32",
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: timeout,
+				},
+			}
+
+			pgpKey := prepareTestCase(t, agentSpec, testVersion, config)
+
+			testClient := NewDownloader(config)
+			artifactPath, err := testClient.Download(context.Background(), agentSpec, testVersion)
+			require.NoError(t, err, "fs.Downloader could not download artifacts")
+			_, err = testClient.DownloadAsc(context.Background(), agentSpec, *testVersion)
+			require.NoError(t, err, "fs.Downloader could not download artifacts .asc file")
+
+			_, err = os.Stat(artifactPath)
+			require.NoError(t, err)
+
+			testVerifier, err := NewVerifier(log, config, pgpKey)
+			require.NoError(t, err)
+
+			err = testVerifier.Verify(agentSpec, *testVersion, false, tc.RemotePGPUris...)
+			require.NoError(t, err)
+
+			// log message informing remote PGP was skipped
+			logs := obs.FilterMessageSnippet("Skipped remote PGP located at")
+			require.Equal(t, tc.UnreachableCount, logs.Len())
+		})
 	}
-
-	if err := prepareTestCase(beatSpec, version, config); err != nil {
-		t.Fatal(err)
-	}
-
-	testClient := NewDownloader(config)
-	artifact, err := testClient.Download(context.Background(), beatSpec, version)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = os.Stat(artifact)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testVerifier, err := NewVerifier(config, true, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = testVerifier.Verify(beatSpec, version)
-	require.NoError(t, err)
-
-	os.Remove(artifact)
-	os.Remove(artifact + ".sha512")
-	os.RemoveAll(config.DropPath)
 }
 
-func prepareTestCase(a artifact.Artifact, version string, cfg *artifact.Config) error {
-	filename, err := artifact.GetArtifactName(a, version, cfg.OperatingSystem, cfg.Architecture)
-	if err != nil {
-		return err
-	}
+// prepareTestCase creates an artifact file, defined by 'a' and 'version',
+// its corresponding checksum (.sha512) and signature (.asc) files.
+// It creates the necessary key to sing the artifact and returns the public key
+// to verify the signature.
+func prepareTestCase(t *testing.T, a artifact.Artifact, version *agtversion.ParsedSemVer, cfg *artifact.Config) []byte {
 
-	if err := os.MkdirAll(cfg.DropPath, 0777); err != nil {
-		return err
-	}
+	filename, err := artifact.GetArtifactName(a, *version, cfg.OperatingSystem, cfg.Architecture)
+	require.NoErrorf(t, err, "could not get artifact name")
+
+	err = os.MkdirAll(cfg.DropPath, 0777)
+	require.NoErrorf(t, err, "failed creating directory %q", cfg.DropPath)
+
+	filePath := filepath.Join(cfg.DropPath, filename)
+	filePathSHA := filePath + ".sha512"
+	filePathASC := filePath + ".asc"
 
 	content := []byte("sample content")
+	err = os.WriteFile(filePath, content, 0644)
+	require.NoErrorf(t, err, "could not write %q file", filePath)
+
 	hash := sha512.Sum512(content)
 	hashContent := fmt.Sprintf("%x %s", hash, filename)
+	err = os.WriteFile(filePathSHA, []byte(hashContent), 0644)
+	require.NoErrorf(t, err, "could not write %q file", filePathSHA)
 
-	if err := ioutil.WriteFile(filepath.Join(cfg.DropPath, filename), content, 0644); err != nil { //nolint:gosec // no sweat, it's a test
-		return err
-	}
+	pub, sig := pgptest.Sing(t, bytes.NewReader(content))
+	err = os.WriteFile(filePathASC, sig, 0644)
+	require.NoErrorf(t, err, "could not write %q file", filePathASC)
 
-	return ioutil.WriteFile(filepath.Join(cfg.DropPath, filename+".sha512"), []byte(hashContent), 0644) //nolint:gosec // no sweat, it's a test
+	return pub
 }
 
 func assertFileExists(t testing.TB, path string) {

@@ -5,16 +5,22 @@
 package info
 
 import (
+	"context"
 	"fmt"
-	"os"
+
+	"github.com/elastic/elastic-agent/pkg/features"
+
 	"runtime"
 	"strings"
 
-	"github.com/elastic/go-sysinfo"
-	"github.com/elastic/go-sysinfo/types"
-
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+
+	"github.com/elastic/go-sysinfo"
+	"github.com/elastic/go-sysinfo/types"
 )
 
 // ECSMeta is a collection of agent related metadata in ECS compliant object form.
@@ -44,6 +50,10 @@ type AgentECSMeta struct {
 	// LogLevel describes currently set log level.
 	// Possible values: "debug"|"info"|"warning"|"error"
 	LogLevel string `json:"log_level"`
+	// Complete is a flag specifying that the agent used is a complete image.
+	Complete bool `json:"complete"`
+	// Unprivileged is a flag specifying that the agent is running in unprivileged mode.
+	Unprivileged bool `json:"unprivileged"`
 }
 
 // SystemECSMeta is a collection of operating system metadata in ECS compliant object form.
@@ -121,13 +131,13 @@ const (
 )
 
 // Metadata loads metadata from disk.
-func Metadata() (*ECSMeta, error) {
-	agentInfo, err := NewAgentInfo(false)
+func Metadata(ctx context.Context, l *logger.Logger) (*ECSMeta, error) {
+	agentInfo, err := NewAgentInfo(ctx, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new agent info: %w", err)
 	}
 
-	meta, err := agentInfo.ECSMetadata()
+	meta, err := agentInfo.ECSMetadata(l)
 	if err != nil {
 		return nil, errors.New(err, "failed to gather host metadata")
 	}
@@ -136,18 +146,14 @@ func Metadata() (*ECSMeta, error) {
 }
 
 // ECSMetadata returns an agent ECS compliant metadata.
-func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-
+func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 	sysInfo, err := sysinfo.Host()
 	if err != nil {
 		return nil, err
 	}
 
 	info := sysInfo.Info()
+	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
 	return &ECSMeta{
 		Elastic: &ElasticECSMeta{
@@ -155,11 +161,13 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 				ID:            i.agentID,
 				Version:       release.Version(),
 				Snapshot:      release.Snapshot(),
+				Complete:      release.Complete(),
 				BuildOriginal: release.Info().String(),
 				// only upgradeable if running from Agent installer and running under the
 				// control of the system supervisor (or built specifically with upgrading enabled)
-				Upgradeable: release.Upgradeable() || (RunningInstalled() && RunningUnderSupervisor()),
-				LogLevel:    i.LogLevel(),
+				Upgradeable:  release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
+				LogLevel:     i.LogLevel(),
+				Unprivileged: i.unprivileged,
 			},
 		},
 		Host: &HostECSMeta{
@@ -184,12 +192,7 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 }
 
 // ECSMetadataFlatMap returns an agent ECS compliant metadata in a form of flattened map.
-func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-
+func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}, error) {
 	// TODO: remove these values when kibana migrates to ECS
 	meta := make(map[string]interface{})
 
@@ -199,6 +202,7 @@ func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
 	}
 
 	info := sysInfo.Info()
+	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
 	// Agent
 	meta[agentIDKey] = i.agentID

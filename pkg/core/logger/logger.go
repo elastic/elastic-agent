@@ -5,12 +5,14 @@
 package logger
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
 	"go.elastic.co/ecszap"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v2"
 
@@ -20,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const agentName = "elastic-agent"
@@ -41,10 +44,13 @@ type Logger = logp.Logger
 // Config is a logging config.
 type Config = logp.Config
 
+var internalLevelEnabler *zap.AtomicLevel
+
 // New returns a configured ECS Logger
 func New(name string, logInternal bool) (*Logger, error) {
 	defaultCfg := DefaultLoggingConfig()
-	return new(name, defaultCfg, logInternal)
+	defaultEventLogCfg := DefaultEventLoggingConfig()
+	return new(name, defaultCfg, defaultEventLogCfg, logInternal)
 }
 
 // NewWithLogpLevel returns a configured logp Logger with specified level.
@@ -52,13 +58,16 @@ func NewWithLogpLevel(name string, level logp.Level, logInternal bool) (*Logger,
 	defaultCfg := DefaultLoggingConfig()
 	defaultCfg.Level = level
 
-	return new(name, defaultCfg, logInternal)
+	defaultEventLogCfg := DefaultEventLoggingConfig()
+	defaultEventLogCfg.Level = level
+
+	return new(name, defaultCfg, defaultEventLogCfg, logInternal)
 }
 
 // NewFromConfig takes the user configuration and generate the right logger.
 // We should finish implementation, need support on the library that we use.
-func NewFromConfig(name string, cfg *Config, logInternal bool) (*Logger, error) {
-	return new(name, cfg, logInternal)
+func NewFromConfig(name string, cfg, eventLogCfg *Config, logInternal bool) (*Logger, error) {
+	return new(name, cfg, eventLogCfg, logInternal)
 }
 
 // NewWithoutConfig returns a new logger without having a configuration.
@@ -68,15 +77,47 @@ func NewWithoutConfig(name string) *Logger {
 	return logp.NewLogger(name)
 }
 
-func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
-	commonCfg, err := toCommonConfig(cfg)
+// NewInMemory returns a new in-memory logger along with the buffer to which i
+// logs.
+// encCfg configures the log format, use logp.ConsoleEncoderConfig for console
+// format, logp.JSONEncoderConfig for JSON or any other valid zapcore.EncoderConfig.
+func NewInMemory(selector string, encCfg zapcore.EncoderConfig) (*Logger, *bytes.Buffer) {
+	buff := bytes.Buffer{}
+
+	encoderConfig := ecszap.ECSCompatibleEncoderConfig(encCfg)
+	encoderConfig.EncodeTime = UtcTimestampEncode
+	encoder := zapcore.NewConsoleEncoder(encoderConfig)
+
+	core := zapcore.NewCore(
+		encoder,
+		zapcore.AddSync(&buff),
+		zap.NewAtomicLevelAt(zap.DebugLevel))
+	ecszap.ECSCompatibleEncoderConfig(logp.ConsoleEncoderConfig())
+
+	logger := logp.NewLogger(
+		selector,
+		zap.WrapCore(func(in zapcore.Core) zapcore.Core {
+			return core
+		}))
+	return logger, &buff
+}
+
+// AddCallerSkip returns new logger with incremented stack frames to skip.
+// This is needed in order to correctly report the log file lines when the logging statement
+// is wrapped in some convenience wrapping function for example.
+func AddCallerSkip(l *Logger, skip int) *Logger {
+	return l.WithOptions(zap.AddCallerSkip(skip))
+}
+
+func new(name string, cfg, eventLoggerCfg *Config, logInternal bool) (*Logger, error) {
+	commonCfg, err := ToCommonConfig(cfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not convert log config: %w", err)
 	}
 
 	var outputs []zapcore.Core
 	if logInternal {
-		internal, err := makeInternalFileOutput(cfg)
+		internal, err := MakeInternalFileOutput(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -84,13 +125,19 @@ func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
 		outputs = append(outputs, internal)
 	}
 
-	if err := configure.LoggingWithOutputs("", commonCfg, outputs...); err != nil {
+	eventLoggercommonCfg, err := ToCommonConfig(eventLoggerCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert event log config: %w", err)
+	}
+
+	if err := configure.LoggingWithTypedOutputs("", commonCfg, eventLoggercommonCfg, "log.type", "event", outputs...); err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
+
 	return logp.NewLogger(name), nil
 }
 
-func toCommonConfig(cfg *Config) (*config.C, error) {
+func ToCommonConfig(cfg *Config) (*config.C, error) {
 	// work around custom types and common config
 	// when custom type is transformed to common.Config
 	// value is determined based on reflect value which is incorrect
@@ -110,7 +157,11 @@ func toCommonConfig(cfg *Config) (*config.C, error) {
 
 // SetLevel changes the overall log level of the global logger.
 func SetLevel(lvl logp.Level) {
-	logp.SetLevel(lvl.ZapLevel())
+	zapLevel := lvl.ZapLevel()
+	logp.SetLevel(zapLevel)
+	if internalLevelEnabler != nil {
+		internalLevelEnabler.SetLevel(zapLevel)
+	}
 }
 
 // DefaultLoggingConfig returns default configuration for agent logging.
@@ -122,23 +173,53 @@ func DefaultLoggingConfig() *Config {
 	cfg.Files.Path = paths.Logs()
 	cfg.Files.Name = agentName
 	cfg.Files.MaxSize = 20 * 1024 * 1024
+	cfg.Files.Permissions = 0600 // default user only
+	root, _ := utils.HasRoot()   // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		cfg.Files.Permissions = 0660
+	}
 
 	return &cfg
 }
 
-// makeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
+// DefaultLoggingConfig returns default configuration for agent logging.
+func DefaultEventLoggingConfig() *Config {
+	cfg := logp.DefaultEventConfig(logp.DefaultEnvironment)
+
+	// That's the same path useb by MakeInternalFileOutput
+	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory, "events")
+	cfg.Files.Name = agentName + "-event-log"
+
+	root, _ := utils.HasRoot() // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		cfg.Files.Permissions = 0660
+	}
+
+	return &cfg
+}
+
+// MakeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
 //
 // This is the logger that the spawned filebeat expects to read the log file from and ship to ES.
-func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
+func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
 	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
-
+	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
+	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
+	permissions := 0600        // default user only
+	root, _ := utils.HasRoot() // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		permissions = 0660
+	}
 	rotator, err := file.NewFileRotator(filename,
 		file.MaxSizeBytes(defaultCfg.Files.MaxSize),
 		file.MaxBackups(defaultCfg.Files.MaxBackups),
-		file.Permissions(os.FileMode(defaultCfg.Files.Permissions)),
+		file.Permissions(os.FileMode(permissions)),
 		file.Interval(defaultCfg.Files.Interval),
 		file.RotateOnStartup(defaultCfg.Files.RotateOnStartup),
 		file.RedirectStderr(defaultCfg.Files.RedirectStderr),
@@ -148,13 +229,13 @@ func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	}
 
 	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())
-	encoderConfig.EncodeTime = utcTimestampEncode
+	encoderConfig.EncodeTime = UtcTimestampEncode
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
-	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, cfg.Level.ZapLevel())), nil
+	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, internalLevelEnabler)), nil
 }
 
-// utcTimestampEncode is a zapcore.TimeEncoder that formats time.Time in ISO-8601 in UTC.
-func utcTimestampEncode(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+// UtcTimestampEncode is a zapcore.TimeEncoder that formats time.Time in ISO-8601 in UTC.
+func UtcTimestampEncode(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	type appendTimeEncoder interface {
 		AppendTimeLayout(time.Time, string)
 	}

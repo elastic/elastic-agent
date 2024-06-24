@@ -9,11 +9,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 )
@@ -47,11 +48,12 @@ type CheckinComponent struct {
 
 // CheckinRequest consists of multiple events reported to fleet ui.
 type CheckinRequest struct {
-	Status     string             `json:"status"`
-	AckToken   string             `json:"ack_token,omitempty"`
-	Metadata   *info.ECSMeta      `json:"local_metadata,omitempty"`
-	Message    string             `json:"message"`    // V2 Agent message
-	Components []CheckinComponent `json:"components"` // V2 Agent components
+	Status         string             `json:"status"`
+	AckToken       string             `json:"ack_token,omitempty"`
+	Metadata       *info.ECSMeta      `json:"local_metadata,omitempty"`
+	Message        string             `json:"message"`    // V2 Agent message
+	Components     []CheckinComponent `json:"components"` // V2 Agent components
+	UpgradeDetails *details.Details   `json:"upgrade_details,omitempty"`
 }
 
 // SerializableEvent is a representation of the event to be send to the Fleet Server API via the checkin
@@ -77,8 +79,9 @@ func (e *CheckinRequest) Validate() error {
 // CheckinResponse is the response send back from the server which contains all the action that
 // need to be executed or proxy to running processes.
 type CheckinResponse struct {
-	AckToken string  `json:"ack_token"`
-	Actions  Actions `json:"actions"`
+	AckToken     string  `json:"ack_token"`
+	Actions      Actions `json:"actions"`
+	FleetWarning string  `json:"-"`
 }
 
 // Validate validates the response send from the server.
@@ -121,7 +124,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 	cp := fmt.Sprintf(checkingPath, e.info.AgentID())
 	sendStart := time.Now()
 	resp, err := e.client.Send(ctx, "POST", cp, nil, nil, bytes.NewBuffer(b))
-	sendDuration := time.Now().Sub(sendStart)
+	sendDuration := time.Since(sendStart)
 	if err != nil {
 		return nil, sendDuration, errors.New(err,
 			"fail to checkin to fleet-server",
@@ -134,12 +137,13 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 		return nil, sendDuration, client.ExtractError(resp.Body)
 	}
 
-	rs, err := ioutil.ReadAll(resp.Body)
+	rs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, sendDuration, errors.New(err, "failed to read checkin response")
 	}
 
 	checkinResponse := &CheckinResponse{}
+	checkinResponse.FleetWarning = resp.Header.Get("Warning")
 	decoder := json.NewDecoder(bytes.NewReader(rs))
 	if err := decoder.Decode(checkinResponse); err != nil {
 		return nil, sendDuration, errors.New(err,

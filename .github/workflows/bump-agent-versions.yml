@@ -1,0 +1,87 @@
+---
+name: update-agent-versions
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  update_versions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # no depth limit
+          # so, we can generate snapshot versions based on release branches
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.21
+
+      - name: Set git config
+        run: |
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Install mage
+        uses: magefile/mage-action@v3
+        with:
+          version: v1.13.0
+          install-only: true
+
+      - name: Update versions
+        id: update
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./.github/workflows/bump-agent-versions.sh
+
+      - if: ${{ failure()  }}
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          channel-id: '#ingest-notifications'
+          payload: |
+            {
+              "text": "${{ env.SLACK_MESSAGE }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ env.SLACK_MESSAGE }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_MESSAGE: ":traffic_cone: Elastic Agent version update failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+        # if a PR was created as a result of this job, we notify on the Slack channel
+      - if: ${{ startsWith(steps.update.outputs.pr, 'https') }}
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          channel-id: '#ingest-notifications'
+          payload: |
+            {
+              "text": "${{ env.SLACK_MESSAGE }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ env.SLACK_MESSAGE }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_MESSAGE: "Update for Elastic Agent versions has been created: ${{ steps.update.outputs.pr }}"

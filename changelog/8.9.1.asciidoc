@@ -1,0 +1,43 @@
+// begin 8.9.1 relnotes
+
+[[release-notes-8.9.1]]
+==  8.9.1
+
+Review important information about the  8.9.1 release.
+
+[discrete]
+[[security-updates-8.9.1]]
+=== Security updates
+
+
+elastic-agent::
+
+* Upgrade To Go 1.19.12. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3186[#https://github.com/elastic/elastic-agent/pull/3186] 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.9.1]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Fix Error Messages From Upgrade Watcher. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3093[#https://github.com/elastic/elastic-agent/pull/3093] 
+* Stop Translating The Upgrading Agent State To Degraded. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3227[#https://github.com/elastic/elastic-agent/pull/3227] 
+synthetics::
+
+* Add Default Utc Timezone To Synthetics Agent Docker Images To Prevent Navigation Errors. {synthetics-pull}https://github.com/elastic/elastic-agent/pull/3160[#https://github.com/elastic/elastic-agent/pull/3160] {synthetics-issue}https://github.com/elastic/beats/issues/36117[#https://github.com/elastic/beats/issues/36117]
+
+// end 8.9.1 relnotes

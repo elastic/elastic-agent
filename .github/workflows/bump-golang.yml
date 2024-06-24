@@ -1,0 +1,53 @@
+---
+name: bump-golang
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 20 * * 1-6"
+
+permissions:
+  contents: read
+
+env:
+  JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+jobs:
+  bump:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Updatecli in the runner
+        uses: updatecli/updatecli-action@eb158f6fd9e425b940a6750d6318f98e050ac390 # v0.76.1
+
+      - name: Run Updatecli in Apply mode
+        run: updatecli apply --config .github/updatecli-bump-golang.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_USER: "github-actions[bot]"
+          GIT_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - if: ${{ failure()  }}
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          channel-id: '#ingest-notifications'
+          payload: |
+            {
+              "text": "${{ env.SLACK_MESSAGE }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ env.SLACK_MESSAGE }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_MESSAGE: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"

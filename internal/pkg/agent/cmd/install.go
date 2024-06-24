@@ -9,21 +9,31 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
+)
+
+const (
+	flagInstallBasePath     = "base-path"
+	flagInstallUnprivileged = "unprivileged"
+	flagInstallDevelopment  = "develop"
+	flagInstallNamespace    = "namespace"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install Elastic Agent permanently on this system",
-		Long: `This will install Elastic Agent permanently on this system and will become managed by the systems service manager.
+		Long: `This command installs Elastic Agent permanently on this system. The system's service manager then manages the installed Elastic agent.
 
 Unless all the require command-line parameters are provided or -f is used this command will ask questions on how you
 would like the Agent to operate.
@@ -36,35 +46,73 @@ would like the Agent to operate.
 		},
 	}
 
-	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
+	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current installation and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
+	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
+	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
+
+	cmd.Flags().String(flagInstallNamespace, "", "Install into an isolated namespace. Allows multiple Elastic Agents to be installed at once. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallNamespace) // For internal use only.
+
+	cmd.Flags().Bool(flagInstallDevelopment, false, "Install into a standardized development namespace, may enable development specific options. Allows multiple Elastic Agents to be installed at once. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
+
 	addEnrollFlags(cmd)
 
 	return cmd
 }
 
 func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
-	err := validateEnrollFlags(cmd)
+	var err error
+
+	err = validateEnrollFlags(cmd)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not validate flags: %w", err)
+	}
+
+	basePath, _ := cmd.Flags().GetString(flagInstallBasePath)
+	if !filepath.IsAbs(basePath) {
+		return fmt.Errorf("base path [%s] is not absolute", basePath)
 	}
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
-		return fmt.Errorf("unable to perform install command while checking for administrator rights, %w", err)
+		return fmt.Errorf("unable to perform install command while checking for root/Administrator rights: %w", err)
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
-	status, reason := install.Status()
+
+	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
+	if unprivileged {
+		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this feature is currently in beta.")
+	}
+
+	isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
+	if isDevelopmentMode {
+		fmt.Fprintln(streams.Out, "Installing into development namespace; this is an experimental and currently unsupported feature.")
+		// For now, development mode only installs agent in a well known namespace to allow two agents on the same machine.
+		paths.SetInstallNamespace(paths.DevelopmentNamespace)
+	}
+
+	namespace, _ := cmd.Flags().GetString(flagInstallNamespace)
+	if namespace != "" {
+		fmt.Fprintf(streams.Out, "Installing into namespace '%s'; this is an experimental and currently unsupported feature.\n", namespace)
+		// Overrides the development namespace if namespace was specified separately.
+		paths.SetInstallNamespace(namespace)
+	}
+
+	topPath := paths.InstallPath(basePath)
+
+	status, reason := install.Status(topPath)
 	force, _ := cmd.Flags().GetBool("force")
 	if status == install.Installed && !force {
-		return fmt.Errorf("already installed at: %s", paths.InstallPath)
+		return fmt.Errorf("already installed at: %s", topPath)
 	}
 
 	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 	if nonInteractive {
-		fmt.Fprintf(streams.Out, "Installing in non-interactive mode.")
+		fmt.Fprintln(streams.Out, "Installing in non-interactive mode.")
 	}
 
 	if status == install.PackageInstall {
@@ -77,14 +125,14 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
 			return fmt.Errorf("cannot perform installation as Elastic Agent is already running from this directory")
 		}
-		return err
+		return fmt.Errorf("error obtaining lock: %w", err)
 	}
 	_ = locker.Unlock()
 
 	if status == install.Broken {
 		if !force && !nonInteractive {
 			fmt.Fprintf(streams.Out, "Elastic Agent is installed but currently broken: %s\n", reason)
-			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will re-install Elastic Agent over the current installation at %s. Do you want to continue?", paths.InstallPath), true)
+			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will re-install Elastic Agent over the current installation at %s. Do you want to continue?", topPath), true)
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
 			}
@@ -94,7 +142,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	} else if status != install.PackageInstall {
 		if !force && !nonInteractive {
-			confirm, err := cli.Confirm(fmt.Sprintf("Elastic Agent will be installed at %s and will run as a service. Do you want to continue?", paths.InstallPath), true)
+			confirm, err := cli.Confirm(fmt.Sprintf("Elastic Agent will be installed at %s and will run as a service. Do you want to continue?", topPath), true)
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
 			}
@@ -141,7 +189,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 				return fmt.Errorf("problem reading prompt response")
 			}
 			if url == "" {
-				fmt.Fprintf(streams.Out, "Enrollment cancelled because no URL was provided.\n")
+				fmt.Fprintln(streams.Out, "Enrollment cancelled because no URL was provided.")
 				return nil
 			}
 		}
@@ -160,58 +208,95 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
+	progBar := install.CreateAndStartNewSpinner(streams.Out, "Installing Elastic Agent...")
+
+	log, logBuff := logger.NewInMemory("install", logp.ConsoleEncoderConfig())
+	defer func() {
+		if err == nil {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Error uninstalling. Printing logs\n")
+		fmt.Fprint(os.Stderr, logBuff.String())
+	}()
+
+	var ownership utils.FileOwner
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
-		err = install.Install(cfgFile)
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams)
 		if err != nil {
-			return err
+			return fmt.Errorf("error installing package: %w", err)
 		}
 
 		defer func() {
 			if err != nil {
-				_ = install.Uninstall(cfgFile)
+				progBar.Describe("Uninstalling")
+				innerErr := install.Uninstall(cfgFile, topPath, "", log, progBar)
+				if innerErr != nil {
+					progBar.Describe("Failed to Uninstall")
+				} else {
+					progBar.Describe("Uninstalled")
+				}
 			}
 		}()
 
 		if !delayEnroll {
-			err = install.StartService()
+			progBar.Describe("Starting Service")
+			err = install.StartService(topPath)
 			if err != nil {
-				fmt.Fprintf(streams.Out, "Installation failed to start Elastic Agent service.\n")
-				return err
+				progBar.Describe("Start Service failed, exiting...")
+				fmt.Fprintf(streams.Out, "Installation failed to start '%s' service.\n", paths.ServiceName())
+				return fmt.Errorf("error starting service: %w", err)
 			}
+			progBar.Describe("Service Started")
 
 			defer func() {
 				if err != nil {
-					_ = install.StopService()
+					progBar.Describe("Stopping Service")
+					innerErr := install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
+					if innerErr != nil {
+						progBar.Describe("Failed to Stop Service")
+					} else {
+						progBar.Describe("Successfully Stopped Service")
+					}
 				}
 			}()
 		}
+
+		fmt.Fprintln(streams.Out, "Elastic Agent successfully installed, starting enrollment.")
 	}
 
 	if enroll {
 		enrollArgs := []string{"enroll", "--from-install"}
 		enrollArgs = append(enrollArgs, buildEnrollmentFlags(cmd, url, token)...)
-		enrollCmd := exec.Command(install.ExecutablePath(), enrollArgs...) //nolint:gosec // it's not tainted
+		enrollCmd := exec.Command(install.ExecutablePath(topPath), enrollArgs...) //nolint:gosec // it's not tainted
 		enrollCmd.Stdin = os.Stdin
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
+		err = enrollCmdExtras(enrollCmd, ownership)
+		if err != nil {
+			return err
+		}
+
+		progBar.Describe("Enrolling Elastic Agent with Fleet")
 		err = enrollCmd.Start()
 		if err != nil {
+			progBar.Describe("Failed to Enroll")
 			return fmt.Errorf("failed to execute enroll command: %w", err)
 		}
+		progBar.Describe("Waiting For Enroll...")
 		err = enrollCmd.Wait()
 		if err != nil {
-			if status != install.PackageInstall {
-				var exitErr *exec.ExitError
-				_ = install.Uninstall(cfgFile)
-				if err != nil && errors.As(err, &exitErr) {
-					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
-				}
-			}
+			progBar.Describe("Failed to Enroll")
+			// uninstall doesn't need to be performed here the defer above will
+			// catch the error and perform the uninstall
 			return fmt.Errorf("enroll command failed for unknown reason: %w", err)
 		}
+		progBar.Describe("Enroll Completed")
 	}
 
-	fmt.Fprint(streams.Out, "Elastic Agent has been successfully installed.\n")
+	progBar.Describe("Done")
+	_ = progBar.Finish()
+	_ = progBar.Exit()
+	fmt.Fprint(streams.Out, "\nElastic Agent has been successfully installed.\n")
 	return nil
 }

@@ -23,8 +23,11 @@ func TestContextProvider(t *testing.T) {
 	provider, err := builder(nil, nil, true)
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	comm := ctesting.NewContextComm(context.Background())
-	err = provider.Run(comm)
+	err = provider.Run(ctx, comm)
 	require.NoError(t, err)
 
 	current := comm.Current()
@@ -32,4 +35,6 @@ func TestContextProvider(t *testing.T) {
 	assert.True(t, hasID, "missing id")
 	_, hasVersion := current["version"]
 	assert.True(t, hasVersion, "missing version")
+	_, hasUnprivileged := current["unprivileged"]
+	assert.True(t, hasUnprivileged, "missing unprivileged")
 }

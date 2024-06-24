@@ -1,0 +1,62 @@
+version: 8.6.1
+entries:
+    - kind: bug-fix
+      summary: Fix issue where Beats started by agent may fail with an 'output unit has no config' error.
+      description: ""
+      component: "elastic-agent"
+      pr:
+        - "https://github.com/elastic/elastic-agent/pull/2138"
+      issue:
+        - "https://github.com/elastic/elastic-agent/issues/2086"
+      timestamp: 1674071325
+      file:
+        name: 1674071325-Fix-issue-where-its-possible-for-a-component-to-receive-a-unit-without-a-config.yaml
+        checksum: d59417809560d08f577ee533bf8c0cb542918634
+    - kind: bug-fix
+      summary: Fix broken deployment using traffic filter by injecting custom headers.
+      description: ""
+      component: "elastic-agent"
+      pr:
+        - "https://github.com/elastic/elastic-agent/pull/2158"
+      issue:
+        - "https://github.com/elastic/beats/issues/32993"
+      timestamp: 1674071326
+      file:
+        name: 1674071326-Fix-deployment-traffic-filter.yaml
+        checksum: d59417809560d08f577ee533bf8c0cb542918634
+    - kind: bug-fix
+      summary: Allow easily filtering only the agent logs from the combined agent log gile.
+      description: ""
+      component: "elastic-agent"
+      pr:
+        - "https://github.com/elastic/elastic-agent/pull/2044"
+      issue:
+        - "https://github.com/elastic/elastic-agent/issues/1810"
+      timestamp: 1674071327
+      file:
+        name: 1674071327-log-filtering.yaml
+        checksum: d59417809560d08f577ee533bf8c0cb542918634
+    - kind: known-issue
+      summary: |
+        OSQuery live query results can take up to 5 mins to show up in Kibana
+      description: ""
+      component: osquery
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2076
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2066
+      timestamp: 1672912002
+      file:
+        name: 1672912002-osquery-known-issue.yaml
+        checksum: e0f4d4d25322bd42298f080c62f9a86c361e7af1
+    - kind: known-issue
+      summary: |
+        Adding a Fleet Server integration to an agent that was not bootstrapped with a Fleet Server panics
+      description: ""
+      component: "Fleet-Server"
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2170
+      timestamp: 1674071328
+      file:
+        name: 1674071328-fleet-server-known-issue.yaml
+        checksum: e0f4d4d25322bd42298f080c62f9a86c361e7af1

@@ -6,118 +6,221 @@ package install
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/kardianos/service"
+	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	aerrors "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/pkg/component"
 	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile string) error {
-	// uninstall the current service
-	svc, err := newService()
+func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
+	cwd, err := os.Getwd()
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to get current working directory")
 	}
-	status, _ := svc.Status()
-	if status == service.StatusRunning {
-		err := svc.Stop()
-		if err != nil {
-			return errors.New(
-				err,
-				fmt.Sprintf("failed to stop service (%s)", paths.ServiceName),
-				errors.M("service", paths.ServiceName))
-		}
-	}
-	_ = svc.Uninstall()
 
-	if err := uninstallComponents(context.Background(), cfgFile); err != nil {
+	if runtime.GOOS == "windows" && paths.HasPrefix(cwd, topPath) {
+		return fmt.Errorf("uninstall must be run from outside the installed path '%s'", topPath)
+	}
+
+	// ensure service is stopped
+	status, err := EnsureStoppedService(topPath, pt)
+	if err != nil {
+		// context for the error already provided in the EnsureStoppedService function
 		return err
+	}
+
+	// kill any running watcher
+	if err := killWatcher(pt); err != nil {
+		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
+	}
+
+	ctx := context.Background()
+
+	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
+	unprivileged, err := checkForUnprivilegedVault(ctx)
+	if err != nil {
+		return fmt.Errorf("error checking for unprivileged vault: %w", err)
+	}
+
+	// Uninstall components first
+	if err := uninstallComponents(ctx, cfgFile, uninstallToken, log, pt, unprivileged); err != nil {
+		// If service status was running it was stopped to uninstall the components.
+		// If the components uninstall failed start the service again
+		if status == service.StatusRunning {
+			if startErr := StartService(topPath); startErr != nil {
+				// context for the error already provided in the StartService function
+				return err
+			}
+		}
+		return fmt.Errorf("error uninstalling components: %w", err)
+	}
+
+	// Uninstall service only after components were uninstalled successfully
+	pt.Describe("Removing service")
+	err = UninstallService(topPath)
+	// Is there a reason why we don't want to hard-fail on this?
+	if err != nil {
+		pt.Describe(fmt.Sprintf("Failed to Uninstall existing service: %s", err))
+	} else {
+		pt.Describe("Successfully uninstalled service")
 	}
 
 	// remove, if present on platform
-	if paths.ShellWrapperPath != "" {
-		err = os.Remove(paths.ShellWrapperPath)
+	if paths.ShellWrapperPath() != "" {
+		err = os.Remove(paths.ShellWrapperPath())
 		if !os.IsNotExist(err) && err != nil {
-			return errors.New(
+			return aerrors.New(
 				err,
-				fmt.Sprintf("failed to remove shell wrapper (%s)", paths.ShellWrapperPath),
-				errors.M("destination", paths.ShellWrapperPath))
+				fmt.Sprintf("failed to remove shell wrapper (%s)", paths.ShellWrapperPath()),
+				aerrors.M("destination", paths.ShellWrapperPath()))
 		}
 	}
 
 	// remove existing directory
-	err = os.RemoveAll(paths.InstallPath)
+	pt.Describe("Removing install directory")
+	err = RemovePath(topPath)
 	if err != nil {
-		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
-			// possible to fail on Windows, because elastic-agent.exe is running from
-			// this directory.
-			return nil
-		}
-		return errors.New(
+		pt.Describe("Failed to remove install directory")
+		return aerrors.New(
 			err,
-			fmt.Sprintf("failed to remove installation directory (%s)", paths.InstallPath),
-			errors.M("directory", paths.InstallPath))
+			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
+			aerrors.M("directory", paths.Top()))
 	}
+	pt.Describe("Removed install directory")
 
 	return nil
 }
 
+// EnsureStoppedService ensures that the installed service is stopped.
+func EnsureStoppedService(topPath string, pt *progressbar.ProgressBar) (service.Status, error) {
+	status, _ := StatusService(topPath)
+	if status == service.StatusRunning {
+		pt.Describe("Stopping service")
+		err := StopService(topPath, 30*time.Second, 250*time.Millisecond)
+		if err != nil {
+			pt.Describe("Failed to issue stop service")
+			// context for the error already provided in the StopService function
+			return status, err
+		}
+		pt.Describe("Successfully stopped service")
+	} else {
+		pt.Describe("Service already stopped")
+	}
+	return status, nil
+}
+
+func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (bool, error) {
+	// check if we have a file vault to detect if we have to use it for reading config
+	opts = append(opts, vault.WithReadonly(true))
+	vaultOpts := vault.ApplyOptions(opts...)
+	fileVault, fileVaultErr := vault.NewFileVault(ctx, vaultOpts)
+	if fileVaultErr == nil {
+		ok, keyErr := fileVault.Exists(ctx, secret.AgentSecretKey)
+		if keyErr == nil && ok {
+			// we have a valid file vault and it contains the key, set unprivileged
+			return true, nil
+		}
+	} else if !errors.Is(fileVaultErr, fs.ErrNotExist) {
+		// we had a different error than NotExist
+		return false, fmt.Errorf("error checking for file vault existence: %w", fileVaultErr)
+	}
+	return false, nil
+}
+
 // RemovePath helps with removal path where there is a probability
-// of running into self which might prevent removal.
-// Removal will be initiated 2 seconds after a call.
+// of running into an executable running that might prevent removal
+// on Windows.
+//
+// On Windows it is possible that a removal can spuriously error due
+// to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
+// seconds if it keeps getting that error.
 func RemovePath(path string) error {
-	cleanupErr := os.RemoveAll(path)
-	if cleanupErr != nil && isBlockingOnSelf(cleanupErr) {
-		delayedRemoval(path)
+	const arbitraryTimeout = 60 * time.Second
+	start := time.Now()
+	var lastErr error
+	for time.Since(start) <= arbitraryTimeout {
+		lastErr = os.RemoveAll(path)
+
+		if lastErr == nil || !isRetryableError(lastErr) {
+			return lastErr
+		}
+
+		if isBlockingOnExe(lastErr) {
+			// try to remove the blocking exe and try again to clean up the path
+			_ = removeBlockingExe(lastErr)
+		}
+
+		time.Sleep(500 * time.Millisecond)
 	}
 
-	return cleanupErr
+	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)
 }
 
-func isBlockingOnSelf(err error) bool {
-	// cannot remove self, this is expected on windows
-	// fails with  remove {path}}\elastic-agent.exe: Access is denied
-	return runtime.GOOS == "windows" &&
-		err != nil &&
-		strings.Contains(err.Error(), "elastic-agent.exe") &&
-		strings.Contains(err.Error(), "Access is denied")
-}
+func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
+	if len(exceptions) == 0 {
+		return RemovePath(path)
+	}
 
-func delayedRemoval(path string) {
-	// The installation path will still exists because we are executing from that
-	// directory. So cmd.exe is spawned that sleeps for 2 seconds (using ping, recommend way from
-	// from Windows) then rmdir is performed.
-	//nolint:gosec // it's not tainted
-	rmdir := exec.Command(
-		filepath.Join(os.Getenv("windir"), "system32", "cmd.exe"),
-		"/C", "ping", "-n", "2", "127.0.0.1", "&&", "rmdir", "/s", "/q", path)
-	_ = rmdir.Start()
-
-}
-
-func uninstallComponents(ctx context.Context, cfgFile string) error {
-	log, err := logger.NewWithLogpLevel("", logp.ErrorLevel, false)
+	files, err := os.ReadDir(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("error reading directory %s: %w", path, err)
 	}
 
+	for _, f := range files {
+		if containsString(f.Name(), exceptions, runtime.GOOS != component.Windows) {
+			continue
+		}
+
+		err = RemovePath(filepath.Join(path, f.Name()))
+		if !bestEffort && err != nil {
+			return fmt.Errorf("error removing path %s: %w", f.Name(), err)
+		}
+	}
+
+	return err
+}
+
+func containsString(str string, a []string, caseSensitive bool) bool {
+	if !caseSensitive {
+		str = strings.ToLower(str)
+	}
+	for _, v := range a {
+		if !caseSensitive {
+			v = strings.ToLower(v)
+		}
+		if str == v {
+			return true
+		}
+	}
+
+	return false
+}
+
+func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, unprivileged bool) error {
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
 		return fmt.Errorf("failed to gather system information: %w", err)
@@ -128,19 +231,19 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 
-	cfg, err := operations.LoadFullAgentConfig(log, cfgFile, false)
+	cfg, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
 	if err != nil {
-		return err
+		return fmt.Errorf("error loading agent config: %w", err)
 	}
 
 	cfg, err = applyDynamics(ctx, log, cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("error applying dynamic inputs: %w", err)
 	}
 
 	comps, err := serviceComponentsFromConfig(specs, cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating service components: %w", err)
 	}
 
 	// nothing to remove
@@ -148,26 +251,56 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 		return nil
 	}
 
+	// Need to read the features from config on uninstall, in order to set the tamper protection feature flag correctly
+	if err = features.Apply(cfg); err != nil {
+		return fmt.Errorf("could not parse and apply feature flags config: %w", err)
+	}
+
+	// check caps so we don't try uninstalling things that were already
+	// prevented from installing
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
+	if err != nil {
+		return fmt.Errorf("error checking capabilities: %w", err)
+	}
+
 	// remove each service component
 	for _, comp := range comps {
-		if err := uninstallComponent(ctx, log, comp); err != nil {
+		if !caps.AllowInput(comp.InputType) || !caps.AllowOutput(comp.OutputType) {
+			// This component is not active
+			continue
+		}
+		if err = uninstallServiceComponent(ctx, log, comp, uninstallToken, pt); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
+			// The decision was made to change the behaviour and leave the Agent installed if Endpoint uninstall fails
+			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
+			// Thus returning error here.
+			return fmt.Errorf("error uninstalling component: %w", err)
 		}
 	}
 
 	return nil
 }
 
-func uninstallComponent(ctx context.Context, log *logp.Logger, comp component.Component) error {
-	return comprt.UninstallService(ctx, log, comp)
+func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string, pt *progressbar.ProgressBar) error {
+	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
+	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
+	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
+	pt.Describe(fmt.Sprintf("Uninstalling service component %s", comp.InputType))
+	err := comprt.UninstallService(ctx, log, comp, uninstallToken)
+	if err != nil {
+		pt.Describe("Failed to uninstall service")
+		return fmt.Errorf("error uninstalling service: %w", err)
+	}
+	pt.Describe("Uninstalled service")
+	return nil
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
 	mm, err := cfg.ToMapStr()
 	if err != nil {
-		return nil, errors.New("failed to create a map from config", err)
+		return nil, aerrors.New("failed to create a map from config", err)
 	}
-	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel)
+	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
@@ -206,24 +339,8 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 		}
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
-			return nil, errors.New("inserting rendered inputs failed", err)
+			return nil, aerrors.New("inserting rendered inputs failed", err)
 		}
-	}
-
-	// apply caps
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
-	if err != nil {
-		return nil, err
-	}
-
-	astIface, err := caps.Apply(ast)
-	if err != nil {
-		return nil, err
-	}
-
-	newAst, ok := astIface.(*transpiler.AST)
-	if ok {
-		ast = newAst
 	}
 
 	finalConfig, err := ast.Map()
@@ -232,4 +349,49 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	}
 
 	return config.NewConfigFrom(finalConfig)
+}
+
+// killWatcher finds and kills any running Elastic Agent watcher.
+func killWatcher(pt *progressbar.ProgressBar) error {
+	for {
+		// finding and killing watchers is performed in a loop until no
+		// more watchers are existing, this ensures that during uninstall
+		// that no matter what the watchers are dead before going any further
+		pids, err := utils.GetWatcherPIDs()
+		if err != nil {
+			pt.Describe("Failed to get watcher PID")
+			return fmt.Errorf("error fetching watcher PIDs: %w", err)
+		}
+		if len(pids) == 0 {
+			// step was never started so no watcher was found on first loop
+			pt.Describe("Stopping upgrade watcher; none found")
+			return nil
+		}
+
+		var pidsStr []string
+		for _, pid := range pids {
+			pidsStr = append(pidsStr, fmt.Sprintf("%d", pid))
+		}
+		pt.Describe(fmt.Sprintf("Stopping upgrade watcher (%s)", strings.Join(pidsStr, ", ")))
+
+		var errs error
+		for _, pid := range pids {
+			proc, err := os.FindProcess(pid)
+			if err != nil {
+				errs = errors.Join(errs, fmt.Errorf("failed to load watcher process with pid %d: %w", pid, err))
+				continue
+			}
+			err = killNoneChildProcess(proc)
+			if err != nil && !errors.Is(err, os.ErrProcessDone) {
+				errs = errors.Join(errs, fmt.Errorf("failed to kill watcher process with pid %d: %w", pid, err))
+				continue
+			}
+		}
+		if errs != nil {
+			pt.Describe("Failed to find and stop watcher processes")
+			return errs
+		}
+		// wait 1 second before performing the loop again
+		<-time.After(1 * time.Second)
+	}
 }

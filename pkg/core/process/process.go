@@ -91,6 +91,14 @@ func WithCmdOptions(cmdOpts ...CmdOption) StartOption {
 	}
 }
 
+// WithWorkDir sets the cmd working directory
+func WithWorkDir(wd string) CmdOption {
+	return func(c *exec.Cmd) error {
+		c.Dir = wd
+		return nil
+	}
+}
+
 // Kill kills the process.
 func (i *Info) Kill() error {
 	return killCmd(i.Process)
@@ -111,7 +119,9 @@ func (i *Info) StopWait() error {
 	return err
 }
 
-// Wait returns a channel that will send process state once it exits.
+// Wait returns a channel that will send process state once it exits. Each
+// call to Wait() creates a goroutine. Failure to read from the returned
+// channel will leak this goroutine.
 func (i *Info) Wait() <-chan *os.ProcessState {
 	ch := make(chan *os.ProcessState)
 

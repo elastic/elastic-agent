@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -38,7 +39,7 @@ func NewDownloader(config *artifact.Config) *Downloader {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version string) (_ string, err error) {
+func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
 	downloadedFiles := make([]string, 0, 2)
@@ -52,32 +53,34 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	}()
 
 	// download from source to dest
-	path, err := e.download(e.config.OS(), a, version)
+	path, err := e.download(e.config.OS(), a, *version, "")
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
-	hashPath, err := e.downloadHash(e.config.OS(), a, version)
+	hashPath, err := e.download(e.config.OS(), a, *version, ".sha512")
 	downloadedFiles = append(downloadedFiles, hashPath)
 	return path, err
 }
 
-func (e *Downloader) download(operatingSystem string, a artifact.Artifact, version string) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
+// DownloadAsc downloads the package .asc file from configured source.
+// It returns absolute path to the downloaded file and a no-nil error if any occurs.
+func (e *Downloader) DownloadAsc(_ context.Context, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
+	path, err := e.download(e.config.OS(), a, version, ".asc")
 	if err != nil {
-		return "", errors.New(err, "generating package name failed")
+		os.Remove(path)
+		return "", err
 	}
 
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
-
-	return e.downloadFile(filename, fullPath)
+	return path, nil
 }
 
-func (e *Downloader) downloadHash(operatingSystem string, a artifact.Artifact, version string) (string, error) {
+func (e *Downloader) download(
+	operatingSystem string,
+	a artifact.Artifact,
+	version agtversion.ParsedSemVer,
+	extension string) (string, error) {
 	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
 	if err != nil {
 		return "", errors.New(err, "generating package name failed")
@@ -88,8 +91,10 @@ func (e *Downloader) downloadHash(operatingSystem string, a artifact.Artifact, v
 		return "", errors.New(err, "generating package path failed")
 	}
 
-	filename = filename + ".sha512"
-	fullPath = fullPath + ".sha512"
+	if extension != "" {
+		filename += extension
+		fullPath += extension
+	}
 
 	return e.downloadFile(filename, fullPath)
 }

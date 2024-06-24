@@ -3,62 +3,36 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !windows
-// +build !windows
 
 package install
 
 import (
-	"os/exec"
-	"runtime"
-	"strings"
+	"fmt"
+	"os"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // postInstall performs post installation for unix-based systems.
-func postInstall() error {
+func postInstall(topPath string) error {
 	// do nothing
 	return nil
 }
 
-func checkPackageInstall() bool {
-	if runtime.GOOS != "linux" {
-		return false
+func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwner) error {
+	err := os.Chown(markerFilePath, ownership.UID, ownership.GID)
+	if err != nil {
+		return fmt.Errorf("failed to chown %d:%d %s: %w", ownership.UID, ownership.GID, markerFilePath, err)
 	}
+	return nil
+}
 
-	// NOTE searching for english words might not be a great idea as far as portability goes.
-	// list all installed packages then search for paths.BinaryName?
-	// dpkg is strange as the remove and purge processes leads to the package bing isted after a remove, but not after a purge
+// withServiceOptions just sets the user/group for the service.
+func withServiceOptions(username string, groupName string) ([]serviceOpt, error) {
+	return []serviceOpt{withUserGroup(username, groupName)}, nil
+}
 
-	// check debian based systems (or systems that use dpkg)
-	// If the package has been installed, the status starts with "install"
-	// If the package has been removed (but not pruged) status starts with "deinstall"
-	// If purged or never installed, rc is 1
-	if _, err := exec.Command("which", "dpkg-query").Output(); err == nil {
-		out, err := exec.Command("dpkg-query", "-W", "-f", "${Status}", paths.BinaryName).Output()
-		if err != nil {
-			return false
-		}
-		if strings.HasPrefix(string(out), "deinstall") {
-			return false
-		}
-		return true
-	}
-
-	// check rhel and sles based systems (or systems that use rpm)
-	// if package has been installed the query will returns the list of associated files.
-	// otherwise if uninstalled, or has never been installled status ends with "not installed"
-	if _, err := exec.Command("which", "rpm").Output(); err == nil {
-		out, err := exec.Command("rpm", "-q", paths.BinaryName, "--state").Output()
-		if err != nil {
-			return false
-		}
-		if strings.HasSuffix(string(out), "not installed") {
-			return false
-		}
-		return true
-
-	}
-
-	return false
+func serviceConfigure(ownership utils.FileOwner) error {
+	// do nothing on unix
+	return nil
 }

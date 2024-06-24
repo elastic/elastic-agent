@@ -8,19 +8,22 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -31,44 +34,64 @@ const (
 )
 
 // Rollback rollbacks to previous version which was functioning before upgrade.
-func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentHash string) error {
+func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
+	symlinkPath := filepath.Join(topDirPath, agentName)
+
+	var symlinkTarget string
+	if prevVersionedHome != "" {
+		symlinkTarget = paths.BinaryPath(filepath.Join(topDirPath, prevVersionedHome), agentName)
+	} else {
+		// fallback for upgrades that didn't use the manifest and path remapping
+		hashedDir := fmt.Sprintf("%s-%s", agentName, prevHash)
+		// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
+		symlinkTarget = paths.BinaryPath(filepath.Join(paths.DataFrom(topDirPath), hashedDir), agentName)
+	}
 	// change symlink
-	if err := ChangeSymlink(ctx, log, prevHash); err != nil {
+	if err := changeSymlink(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
 		return err
 	}
 
 	// revert active commit
-	if err := UpdateActiveCommit(log, prevHash); err != nil {
+	if err := UpdateActiveCommit(log, topDirPath, prevHash); err != nil {
 		return err
 	}
 
 	// Restart
 	log.Info("Restarting the agent after rollback")
-	if err := restartAgent(ctx); err != nil {
+	if err := restartAgent(ctx, log, c); err != nil {
 		return err
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, prevHash, true)
+	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, true, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
-func Cleanup(log *logger.Logger, currentHash string, removeMarker bool) error {
-	log.Debugw("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
+func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
+	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
 	<-time.After(afterRestartDelay)
+
+	// data directory path
+	dataDirPath := paths.DataFrom(topDirPath)
 
 	// remove upgrade marker
 	if removeMarker {
-		if err := CleanMarker(log); err != nil {
+		if err := CleanMarker(log, dataDirPath); err != nil {
 			return err
 		}
 	}
 
 	// remove data/elastic-agent-{hash}
-	dataDir, err := os.Open(paths.Data())
+	dataDir, err := os.Open(dataDirPath)
 	if err != nil {
 		return err
 	}
+	defer func(dataDir *os.File) {
+		err := dataDir.Close()
+		if err != nil {
+			log.Errorw("Error closing data directory", "file.directory", dataDirPath)
+		}
+	}(dataDir)
 
 	subdirs, err := dataDir.Readdirnames(0)
 	if err != nil {
@@ -76,12 +99,21 @@ func Cleanup(log *logger.Logger, currentHash string, removeMarker bool) error {
 	}
 
 	// remove symlink to avoid upgrade failures, ignore error
-	prevSymlink := prevSymlinkPath()
-	log.Debugw("Removing previous symlink path", "file.path", prevSymlinkPath())
+	prevSymlink := prevSymlinkPath(topDirPath)
+	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(topDirPath))
 	_ = os.Remove(prevSymlink)
 
 	dirPrefix := fmt.Sprintf("%s-", agentName)
-	currentDir := fmt.Sprintf("%s-%s", agentName, currentHash)
+	var currentDir string
+	if currentVersionedHome != "" {
+		currentDir, err = filepath.Rel("data", currentVersionedHome)
+		if err != nil {
+			return fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", currentVersionedHome, err)
+		}
+	} else {
+		currentDir = fmt.Sprintf("%s-%s", agentName, currentHash)
+	}
+
 	for _, dir := range subdirs {
 		if dir == currentDir {
 			continue
@@ -91,9 +123,13 @@ func Cleanup(log *logger.Logger, currentHash string, removeMarker bool) error {
 			continue
 		}
 
-		hashedDir := filepath.Join(paths.Data(), dir)
-		log.Debugw("Removing hashed data directory", "file.path", hashedDir)
-		if cleanupErr := install.RemovePath(hashedDir); cleanupErr != nil {
+		hashedDir := filepath.Join(dataDirPath, dir)
+		log.Infow("Removing hashed data directory", "file.path", hashedDir)
+		var ignoredDirs []string
+		if keepLogs {
+			ignoredDirs = append(ignoredDirs, "logs")
+		}
+		if cleanupErr := install.RemoveBut(hashedDir, true, ignoredDirs...); cleanupErr != nil {
 			err = multierror.Append(err, cleanupErr)
 		}
 	}
@@ -103,29 +139,38 @@ func Cleanup(log *logger.Logger, currentHash string, removeMarker bool) error {
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
 // agent during upgrade period.
-func InvokeWatcher(log *logger.Logger) error {
+func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error) {
 	if !IsUpgradeable() {
-		log.Debug("agent is not upgradable, not starting watcher")
-		return nil
+		log.Info("agent is not upgradable, not starting watcher")
+		return nil, nil
 	}
 
-	versionedHome := paths.VersionedHome(paths.Top())
-	cmd := invokeCmd(versionedHome)
-	defer func() {
-		if cmd.Process != nil {
-			log.Debugf("releasing watcher %v", cmd.Process.Pid)
-			_ = cmd.Process.Release()
+	cmd := invokeCmd(agentExecutable)
+	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start Upgrade Watcher: %w", err)
+	}
+
+	upgradeWatcherPID := cmd.Process.Pid
+	agentPID := os.Getpid()
+
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			log.Infow("Upgrade Watcher exited with error", "agent.upgrade.watcher.process.pid", "agent.process.pid", agentPID, upgradeWatcherPID, "error.message", err)
 		}
 	}()
 
-	log.Debugw("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
-	return cmd.Start()
+	log.Infow("Upgrade Watcher invoked", "agent.upgrade.watcher.process.pid", upgradeWatcherPID, "agent.process.pid", agentPID)
+
+	return cmd, nil
+
 }
 
-func restartAgent(ctx context.Context) error {
-	restartFn := func(ctx context.Context) error {
-		c := client.New()
-		err := c.Connect(ctx)
+func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) error {
+	restartViaDaemonFn := func(ctx context.Context) error {
+		connectCtx, connectCancel := context.WithTimeout(ctx, 3*time.Second)
+		defer connectCancel()
+		err := c.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry())
 		if err != nil {
 			return errors.New(err, "failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 		}
@@ -139,19 +184,46 @@ func restartAgent(ctx context.Context) error {
 		return nil
 	}
 
+	restartViaServiceFn := func(ctx context.Context) error {
+		topPath := paths.Top()
+		err := install.RestartService(topPath)
+		if err != nil {
+			return fmt.Errorf("failed to restart agent via service: %w", err)
+		}
+
+		return nil
+	}
+
 	signal := make(chan struct{})
 	backExp := backoff.NewExpBackoff(signal, restartBackoffInit, restartBackoffMax)
+	root, _ := utils.HasRoot() // error ignored
 
-	for i := maxRestartCount; i >= 1; i-- {
+	for restartAttempt := 1; restartAttempt <= maxRestartCount; restartAttempt++ {
 		backExp.Wait()
-		err := restartFn(ctx)
+		log.Infof("Restarting Agent via control protocol; attempt %d of %d", restartAttempt, maxRestartCount)
+		// First, try to restart Agent by sending a restart command
+		// to its daemon (via GRPC).
+		err := restartViaDaemonFn(ctx)
 		if err == nil {
 			break
 		}
+		log.Warnf("Failed to restart agent via control protocol: %s", err.Error())
 
-		if i == 1 {
+		// Next, try to restart Agent via the service. (only if root)
+		if root {
+			log.Infof("Restarting Agent via service; attempt %d of %d", restartAttempt, maxRestartCount)
+			err = restartViaServiceFn(ctx)
+			if err == nil {
+				break
+			}
+			log.Warnf("Failed to restart agent via service: %s", err.Error())
+		}
+
+		if restartAttempt == maxRestartCount {
+			log.Error("Failed to restart agent after final attempt")
 			return err
 		}
+		log.Warnf("Failed to restart agent; will try again in %v", backExp.NextWait())
 	}
 
 	close(signal)

@@ -6,17 +6,17 @@
 package secret
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"runtime"
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
-const agentSecretKey = "secret"
+const AgentSecretKey = "secret"
 
 // mutex for secret create calls
 var mxCreate sync.Mutex
@@ -27,32 +27,14 @@ type Secret struct {
 	CreatedOn time.Time `json:"t"` // date/time the secret was created on
 }
 
-type options struct {
-	vaultPath string
-}
-
-// OptionFunc is the functional configuration type.
-type OptionFunc func(o *options)
-
-// WithVaultPath allows to specify the vault path, doesn't apply for darwin
-func WithVaultPath(vaultPath string) OptionFunc {
-	return func(o *options) {
-		if runtime.GOOS == "darwin" {
-			return
-		}
-		o.vaultPath = vaultPath
-	}
-}
-
 // CreateAgentSecret creates agent secret key if it doesn't exist
-func CreateAgentSecret(opts ...OptionFunc) error {
-	return Create(agentSecretKey, opts...)
+func CreateAgentSecret(ctx context.Context, opts ...vault.OptionFunc) error {
+	return Create(ctx, AgentSecretKey, opts...)
 }
 
 // Create creates secret and stores it in the vault under given key
-func Create(key string, opts ...OptionFunc) error {
-	options := applyOptions(opts...)
-	v, err := vault.New(options.vaultPath)
+func Create(ctx context.Context, key string, opts ...vault.OptionFunc) error {
+	v, err := vault.New(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("could not create new vault: %w", err)
 	}
@@ -63,7 +45,7 @@ func Create(key string, opts ...OptionFunc) error {
 	defer mxCreate.Unlock()
 
 	// Check if the key exists
-	exists, err := v.Exists(key)
+	exists, err := v.Exists(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -72,7 +54,7 @@ func Create(key string, opts ...OptionFunc) error {
 	}
 
 	// Create new AES256 key
-	k, err := vault.NewKey(vault.AES256)
+	k, err := aesgcm.NewKey(aesgcm.AES256)
 	if err != nil {
 		return err
 	}
@@ -82,31 +64,31 @@ func Create(key string, opts ...OptionFunc) error {
 		CreatedOn: time.Now().UTC(),
 	}
 
-	return set(v, key, secret)
+	return set(ctx, v, key, secret)
 }
 
 // GetAgentSecret read the agent secret from the vault
-func GetAgentSecret(opts ...OptionFunc) (secret Secret, err error) {
-	return Get(agentSecretKey, opts...)
+func GetAgentSecret(ctx context.Context, opts ...vault.OptionFunc) (secret Secret, err error) {
+	return Get(ctx, AgentSecretKey, opts...)
 }
 
 // SetAgentSecret saves the agent secret from the vault
 // This is needed for migration from 8.3.0-8.3.2 to higher versions
-func SetAgentSecret(secret Secret, opts ...OptionFunc) error {
-	return Set(agentSecretKey, secret, opts...)
+func SetAgentSecret(ctx context.Context, secret Secret, opts ...vault.OptionFunc) error {
+	return Set(ctx, AgentSecretKey, secret, opts...)
 }
 
 // Get reads the secret key from the vault
-func Get(key string, opts ...OptionFunc) (secret Secret, err error) {
-	options := applyOptions(opts...)
+func Get(ctx context.Context, key string, opts ...vault.OptionFunc) (secret Secret, err error) {
 	// open vault readonly, will not create the vault directory or the seed it was not created before
-	v, err := vault.New(options.vaultPath, vault.WithReadonly(true))
+	opts = append(opts, vault.WithReadonly(true))
+	v, err := vault.New(ctx, opts...)
 	if err != nil {
 		return secret, err
 	}
 	defer v.Close()
 
-	b, err := v.Get(key)
+	b, err := v.Get(ctx, key)
 	if err != nil {
 		return secret, err
 	}
@@ -116,44 +98,31 @@ func Get(key string, opts ...OptionFunc) (secret Secret, err error) {
 }
 
 // Set saves the secret key to the vault
-func Set(key string, secret Secret, opts ...OptionFunc) error {
-	options := applyOptions(opts...)
-	v, err := vault.New(options.vaultPath)
+func Set(ctx context.Context, key string, secret Secret, opts ...vault.OptionFunc) error {
+	v, err := vault.New(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("could not create new vault: %w", err)
 	}
 	defer v.Close()
-	return set(v, key, secret)
+	return set(ctx, v, key, secret)
 }
 
-func set(v *vault.Vault, key string, secret Secret) error {
+func set(ctx context.Context, v vault.Vault, key string, secret Secret) error {
 	b, err := json.Marshal(secret)
 	if err != nil {
 		return fmt.Errorf("could not marshal secret: %w", err)
 	}
 
-	return v.Set(key, b)
+	return v.Set(ctx, key, b)
 }
 
 // Remove removes the secret key from the vault
-func Remove(key string, opts ...OptionFunc) error {
-	options := applyOptions(opts...)
-	v, err := vault.New(options.vaultPath)
+func Remove(ctx context.Context, key string, opts ...vault.OptionFunc) error {
+	v, err := vault.New(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("could not create new vault: %w", err)
 	}
 	defer v.Close()
 
-	return v.Remove(key)
-}
-
-func applyOptions(opts ...OptionFunc) options {
-	o := options{
-		vaultPath: paths.AgentVaultPath(),
-	}
-
-	for _, opt := range opts {
-		opt(&o)
-	}
-	return o
+	return v.Remove(ctx, key)
 }

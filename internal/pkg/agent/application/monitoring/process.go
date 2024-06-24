@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"syscall"
@@ -16,18 +16,19 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
-	componentIDKey    = "componentID"
-	metricsPathKey    = "metricsPath"
-	timeout           = 10 * time.Second
-	apmPrefix         = "apm-server"
-	apmTypePrefix     = "apm"
-	fleetServerPrefix = "fleet-server"
+	componentIDKey         = "componentID"
+	metricsPathKey         = "metricsPath"
+	timeout                = 10 * time.Second
+	apmPrefix              = "apm-server"
+	apmTypePrefix          = "apm"
+	fleetServerPrefix      = "fleet-server"
+	profilingServicePrefix = "pf-elastic-"
 )
 
 var redirectPathAllowlist = map[string]struct{}{
@@ -39,9 +40,10 @@ var redirectPathAllowlist = map[string]struct{}{
 var redirectableProcesses = []string{
 	apmTypePrefix,
 	fleetServerPrefix,
+	profilingServicePrefix,
 }
 
-func processHandler(coord *coordinator.Coordinator, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
+func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
@@ -77,10 +79,11 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 			return redirectToPath(w, r, componentID, metricsPath, operatingSystem)
 		}
 
-		state := coord.State(false)
+		state := coord.State()
 
-		for _, c := range state.Components {
-			if matchesCloudProcessID(&c.Component, componentID) {
+		for iter, c := range state.Components {
+			// access the components array manually to avoid a memory aliasing error. This is fixed in go 1.22
+			if matchesCloudProcessID(&state.Components[iter].Component, componentID) {
 				data := struct {
 					State   string `json:"state"`
 					Message string `json:"message"`
@@ -117,7 +120,7 @@ func isProcessRedirectable(componentID string) bool {
 }
 
 func redirectToPath(w http.ResponseWriter, r *http.Request, id, path, operatingSystem string) error {
-	endpoint := prefixedEndpoint(endpointPath(id, operatingSystem))
+	endpoint := prefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
 	metricsBytes, statusCode, metricsErr := processMetrics(r.Context(), endpoint, path)
 	if metricsErr != nil {
 		return metricsErr
@@ -171,7 +174,7 @@ func processMetrics(ctx context.Context, endpoint, path string) ([]byte, int, er
 	}
 	defer resp.Body.Close()
 
-	rb, err := ioutil.ReadAll(resp.Body)
+	rb, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, 0, errorWithStatus(http.StatusInternalServerError, err)
 	}

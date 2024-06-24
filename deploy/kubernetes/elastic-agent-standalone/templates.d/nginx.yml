@@ -1,5 +1,104 @@
 inputs:
+    - name: httpjson-nginx
+      id: httpjson-nginx-${kubernetes.hints.container_id}
+      type: httpjson
+      use_output: default
+      streams:
+        - auth.basic.password: ${kubernetes.hints.nginx.access.password|kubernetes.hints.nginx.password|''}
+          auth.basic.user: ${kubernetes.hints.nginx.access.username|kubernetes.hints.nginx.username|''}
+          condition: ${kubernetes.hints.nginx.access.enabled} == true and ${kubernetes.hints.nginx.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: nginx.access
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype=nginx:plus:access | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - nginx-access
+        - auth.basic.password: ${kubernetes.hints.nginx.error.password|kubernetes.hints.nginx.password|''}
+          auth.basic.user: ${kubernetes.hints.nginx.error.username|kubernetes.hints.nginx.username|''}
+          condition: ${kubernetes.hints.nginx.error.enabled} == true and ${kubernetes.hints.nginx.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: nginx.error
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype=nginx:plus:error | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - nginx-error
+      data_stream.namespace: default
+    - name: nginx/metrics-nginx
+      id: nginx/metrics-nginx-${kubernetes.hints.container_id}
+      type: nginx/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.nginx.stubstatus.enabled} == true or ${kubernetes.hints.nginx.enabled} == true
+          data_stream:
+            dataset: nginx.stubstatus
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.nginx.stubstatus.host|kubernetes.hints.nginx.host|'http://127.0.0.1:80'}
+          metricsets:
+            - stubstatus
+          period: ${kubernetes.hints.nginx.stubstatus.period|kubernetes.hints.nginx.period|'10s'}
+          server_status_path: /nginx_status
+      data_stream.namespace: default
     - name: filestream-nginx
+      id: filestream-nginx-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -47,96 +146,4 @@ inputs:
                 symlinks: true
           tags:
             - nginx-error
-      data_stream.namespace: default
-    - name: httpjson-nginx
-      type: httpjson
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.nginx.access.enabled} == true and ${kubernetes.hints.nginx.enabled} == true
-          config_version: 2
-          cursor:
-            index_earliest:
-                value: '[[.last_event.result.max_indextime]]'
-          data_stream:
-            dataset: nginx.access
-            type: logs
-          interval: 10s
-          request.method: POST
-          request.transforms:
-            - set:
-                target: url.params.search
-                value: search sourcetype=nginx:plus:access | streamstats max(_indextime) AS max_indextime
-            - set:
-                target: url.params.output_mode
-                value: json
-            - set:
-                default: '[[(now (parseDuration "-10s")).Unix]]'
-                target: url.params.index_earliest
-                value: '[[ .cursor.index_earliest ]]'
-            - set:
-                target: url.params.index_latest
-                value: '[[(now).Unix]]'
-            - set:
-                target: header.Content-Type
-                value: application/x-www-form-urlencoded
-          request.url: https://server.example.com:8089/services/search/jobs/export
-          response.decode_as: application/x-ndjson
-          response.split:
-            delimiter: |4+
-            target: body.result._raw
-            type: string
-          tags:
-            - forwarded
-            - nginx-access
-        - condition: ${kubernetes.hints.nginx.error.enabled} == true and ${kubernetes.hints.nginx.enabled} == true
-          config_version: 2
-          cursor:
-            index_earliest:
-                value: '[[.last_event.result.max_indextime]]'
-          data_stream:
-            dataset: nginx.error
-            type: logs
-          interval: 10s
-          request.method: POST
-          request.transforms:
-            - set:
-                target: url.params.search
-                value: search sourcetype=nginx:plus:error | streamstats max(_indextime) AS max_indextime
-            - set:
-                target: url.params.output_mode
-                value: json
-            - set:
-                default: '[[(now (parseDuration "-10s")).Unix]]'
-                target: url.params.index_earliest
-                value: '[[ .cursor.index_earliest ]]'
-            - set:
-                target: url.params.index_latest
-                value: '[[(now).Unix]]'
-            - set:
-                target: header.Content-Type
-                value: application/x-www-form-urlencoded
-          request.url: https://server.example.com:8089/services/search/jobs/export
-          response.decode_as: application/x-ndjson
-          response.split:
-            delimiter: |4+
-            target: body.result._raw
-            type: string
-          tags:
-            - forwarded
-            - nginx-error
-      data_stream.namespace: default
-    - name: nginx/metrics-nginx
-      type: nginx/metrics
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.nginx.stubstatus.enabled} == true or ${kubernetes.hints.nginx.enabled} == true
-          data_stream:
-            dataset: nginx.stubstatus
-            type: metrics
-          hosts:
-            - ${kubernetes.hints.nginx.stubstatus.host|kubernetes.hints.nginx.host|'http://127.0.0.1:80'}
-          metricsets:
-            - stubstatus
-          period: ${kubernetes.hints.nginx.stubstatus.period|kubernetes.hints.nginx.period|'10s'}
-          server_status_path: /nginx_status
       data_stream.namespace: default

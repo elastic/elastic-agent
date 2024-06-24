@@ -1,0 +1,164 @@
+version: 8.7.0
+entries:
+    - kind: feature
+      summary: Add Entity Analytics input mapping to the Filebeat spec.
+      description: ""
+      component: spec
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2196
+      issue: []
+      timestamp: 1674757194
+      file:
+        name: 1674757194-entity-analytics-input.yaml
+        checksum: a4f19569e40a0c985eeddea10f3d6841be2f9b17
+    - kind: feature
+      summary: Add diagnostics action handler.
+      description: |
+        Add support for the REQUEST_DIAGNOSTICS action.
+        When this action is recieved the agent will collect a diagnostics bundle and
+        upload it to fleet-server using the file upload APIs.
+        The handler has a configurable rate limit in order to prevent DoS attacks.
+        The uploader may retry failures with a configurable exponential backoff.
+      component: diagnostics
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1703
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1883
+      timestamp: 1674785407
+      file:
+        name: 1674785407-add-diagnostics-action-handler.yaml
+        checksum: 73538c1e4e9a60b6a99c84eeaa496ed19f46c957
+    - kind: enhancement
+      summary: Enhance agent monitoring config to support filebeat /inputs endpoint
+      description: ""
+      component: monitoring
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2171
+      issue:
+        - https://github.com/elastic/beats/issues/33953
+      timestamp: 1674822835
+      file:
+        name: 1674822835-Enhance-agent-monitoring-config-to-support-filebeat-inputs-endpoint.yaml
+        checksum: 62181801e66756a8bff898e8ccf7725acf46cef9
+    - kind: bug-fix
+      summary: Correctly migrate unencrypted Fleet configuration when upgrading from versions prior to 8.3.
+      description: This is a regression in 8.6 releases only. This works as expected in prior releases.
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2256
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2249
+      timestamp: 1676358802
+      file:
+        name: 1676358802-migrate-unencrypted-config.yaml
+        checksum: a8b5ae705574e19ba2b011b2705e77345622d43e
+    - kind: bug-fix
+      summary: Restore support for memcached/metrics inputs.
+      description: ""
+      component: Elastic agent.
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2298
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2293
+      timestamp: 1677000534
+      file:
+        name: 1677000534-Restore-support-for-memcached-metrics-inputs.yaml
+        checksum: a7f53423f9d41a6258437dc969f39a69ace6bf6a
+    - kind: unknown
+      summary: Render agent config when running leastic-agent inspect --variables-wait
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2297
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2206
+      timestamp: 1677048898
+      file:
+        name: 1677048898-render-config-for-inspect-with-variable-wait.yaml
+        checksum: e097943a4e3a1f6b546d942f842d8e7985b633b0
+    - kind: bug-fix
+      summary: Fixes the log message being emitted by the Upgrade Watcher when it detects a crash.
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2320
+      issue: []
+      timestamp: 1677255543
+      file:
+        name: 1677255543-upgrade-watcher-fix-log.yaml
+        checksum: 92674250f10b32d7912621e2483ae5a385016d13
+    - kind: bug-fix
+      summary: Fix the first checkin incorrectly reporting the agent as unhealthy.
+      description: The agent would sometimes report its intial state as "starting" which was incorrectly translated to "degraded".
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2325
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2272
+      timestamp: 1677572502
+      file:
+        name: 1677572502-add-fleet-checkin-starting-state.yaml
+        checksum: a8fe1b316d5bafaf3deb5788d6f20a2522c2cc67
+    - kind: bug-fix
+      summary: Fixes the permissions of the `state/data/tmp` and `state/data/logs` folders when they're setup as part of running `elastic-agent container`.
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2330
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2315
+      timestamp: 1677599609
+      file:
+        name: 1677599609-fix-container-state-dirs-perms.yaml
+        checksum: ecd339cf2ab8cb4b98a0cf5670fb9349d0309b45
+    - kind: bug-fix
+      summary: Periodically check for scheduled actions.
+      description: Add a timer that will periodically run the action handling mechanism that managed agents use to force it to run scheduled actions. This will allow the agent to handle previously scheduled actions if theres is no communication with fleet, or a checkin does not return any actions.
+      component: managed-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2344
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2343
+      timestamp: 1677797191
+      file:
+        name: 1677797191-dispatch-periodic-flush.yaml
+        checksum: 57d2b0f7fac494064d11ea6fbfec1a5e612ceb5b
+    - kind: bug-fix
+      summary: Fixes for agent not starting to monitor new Kubernetes pods until it is restarted.
+      description: |
+        Modifies synchronization and debounce mechanism in controller. Notification is not
+        blocking anymore so lock holded while notification is being performed can be released and
+        other event processed faster.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2349
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2269
+      timestamp: 1678178226
+      file:
+        name: 1678178226-Reduced-deadlocks-in-controller.yaml
+        checksum: 36c54bf2bad642fea7c64704cc29c77b51116d90
+    - kind: bug-fix
+      summary: Fix several possible deadlocks on shutdown.
+      description: Fix a deadlock when the agent tries to bind to a port that is already in use. Do not wait for providers to shutdown before exiting.
+      component: coordinator
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2352
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2310
+      timestamp: 1678471725
+      file:
+        name: 1678471725-coordinator_deadlock_fix.yaml
+        checksum: 8a6f5498679d1e0f92571e10598130fb63012da8
+    - kind: bug-fix
+      summary: Fix permission issue on MacOS Ventura and above when enrolling as part of the installation.
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2314
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2103
+      timestamp: 1678553750
+      file:
+        name: 1678553750-ventura-permission-issue.yaml
+        checksum: f5444bb9940277aea7038f0749b72a32152f6a22
