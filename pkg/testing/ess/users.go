@@ -10,25 +10,23 @@ import (
 	"fmt"
 )
 
-type GetUserRequest struct {
+type GetAccountRequest struct {
 	// For future use
 }
 
-type GetUserResponse struct {
-	User struct {
-		UserID int `json:"user_id"`
-	} `json:"user"`
+type GetAccountResponse struct {
+	ID string `json:"id"`
 }
 
-// GetUser returns information about the authenticated user
-func (c *Client) GetUser(ctx context.Context, req GetUserRequest) (*GetUserResponse, error) {
-	resp, err := c.doGet(ctx, "users")
+// GetAccount returns information about the authenticated user
+func (c *Client) GetAccount(ctx context.Context, req GetAccountRequest) (*GetAccountResponse, error) {
+	resp, err := c.doGet(ctx, "account")
 	if err != nil {
 		return nil, fmt.Errorf("error calling get user API: %w", err)
 	}
 	defer resp.Body.Close()
 
-	var respBody GetUserResponse
+	var respBody GetAccountResponse
 	if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
 		return nil, fmt.Errorf("error parsing get user response: %w", err)
 	}
