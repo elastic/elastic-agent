@@ -20,17 +20,13 @@ receivers:
       grpc:
       http:
 
+processors:
+  elasticinframetrics:
+
 exporters:
 
-  # Exporter to print the first 5 logs/metrics and then every 1000th
-  debug:
-    verbosity: detailed
-    sampling_initial: 5
-    sampling_thereafter: 200
-
-
   otlp/apm:
-    endpoint: "http://localhost:8200"
+    endpoint: <<APM_ENDPOINT>>
     headers:
     # Elastic APM Server secret token or API key
       Authorization: "Bearer <<APM_SECRET_KEY>>"
@@ -46,24 +42,24 @@ service:
     traces/fromsdk:
       receivers: [otlp/fromsdk]
       processors: []
-      exporters: [debug, otlp/apm]
+      exporters: [otlp/apm]
 
     metrics/fromsdk:
       receivers: [otlp/fromsdk]
       processors: []
-      exporters: [debug, otlp/apm]
+      exporters: [otlp/apm]
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: []
-      exporters: [debug, elasticsearch/bulk]
+      processors: [elasticinframetrics]
+      exporters: [elasticsearch/bulk]
 
     logs/fromsdk:
       receivers: [otlp/fromsdk]
       processors: []
-      exporters: [debug, otlp/apm]
+      exporters: [otlp/apm]
 
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: []
-      exporters: [debug, elasticsearch/bulk]
+      exporters: [elasticsearch/bulk]

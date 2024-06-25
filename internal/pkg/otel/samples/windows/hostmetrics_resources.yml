@@ -23,10 +23,8 @@ exporters:
 
   # Exporter to send logs and metrics to Elasticsearch
   elasticsearch/bulk:
-    endpoints: [http://localhost:9200]
-    user: otel
-    password: password
-    # api_key: <<YOUR_API_KEY>> # Elasticsearch API Key in "encoded" format.
+    endpoints: [<<ES_ENDPOINT>>]
+    api_key: <<ES_API_KEY>>
 
 service:
   pipelines:

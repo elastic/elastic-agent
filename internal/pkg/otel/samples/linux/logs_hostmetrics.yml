@@ -23,12 +23,10 @@ exporters:
     sampling_thereafter: 1000
 
   elasticsearch/bulk:
-    endpoints: [http://localhost:9200]
-    user: otel
-    password: password
+    endpoints: [<<ES_ENDPOINT>>]
+    api_key: <<ES_API_KEY>>
     logs_index: logs-generic-default
     metrics_index: metrics-generic-default
-    # api_key: <<YOUR_API_KEY>> # Elasticsearch API Key in "encoded" format.
 
 service:
   pipelines:
