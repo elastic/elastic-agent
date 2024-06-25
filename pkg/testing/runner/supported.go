@@ -137,24 +137,26 @@ var (
 		},
 		Runner: WindowsRunner{},
 	}
-	// WindowsAMD64_2016 - Windows (amd64) Server 2016
-	WindowsAMD64_2016 = SupportedOS{
-		OS: define.OS{
-			Type:    define.Windows,
-			Arch:    define.AMD64,
-			Version: "2016",
-		},
-		Runner: WindowsRunner{},
-	}
-	// WindowsAMD64_2016_Core - Windows (amd64) Server 2016 Core
-	WindowsAMD64_2016_Core = SupportedOS{
-		OS: define.OS{
-			Type:    define.Windows,
-			Arch:    define.AMD64,
-			Version: "2016-core",
-		},
-		Runner: WindowsRunner{},
-	}
+
+	// https://github.com/elastic/ingest-dev/issues/3484
+	// // WindowsAMD64_2016 - Windows (amd64) Server 2016
+	// WindowsAMD64_2016 = SupportedOS{
+	// 	OS: define.OS{
+	// 		Type:    define.Windows,
+	// 		Arch:    define.AMD64,
+	// 		Version: "2016",
+	// 	},
+	// 	Runner: WindowsRunner{},
+	// }
+	// // WindowsAMD64_2016_Core - Windows (amd64) Server 2016 Core
+	// WindowsAMD64_2016_Core = SupportedOS{
+	// 	OS: define.OS{
+	// 		Type:    define.Windows,
+	// 		Arch:    define.AMD64,
+	// 		Version: "2016-core",
+	// 	},
+	// 	Runner: WindowsRunner{},
+	// }
 )
 
 // supported defines the set of supported OS's.
