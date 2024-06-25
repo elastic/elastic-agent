@@ -137,6 +137,7 @@ var (
 		},
 		Runner: WindowsRunner{},
 	}
+
 	// WindowsAMD64_2016 - Windows (amd64) Server 2016
 	WindowsAMD64_2016 = SupportedOS{
 		OS: define.OS{
@@ -177,8 +178,9 @@ var supported = []SupportedOS{
 	WindowsAMD64_2022_Core,
 	WindowsAMD64_2019,
 	WindowsAMD64_2019_Core,
-	WindowsAMD64_2016,
-	WindowsAMD64_2016_Core,
+	// https://github.com/elastic/ingest-dev/issues/3484
+	// WindowsAMD64_2016,
+	// WindowsAMD64_2016_Core,
 }
 
 // osMatch returns true when the specific OS is a match for a non-specific OS.
