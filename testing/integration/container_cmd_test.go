@@ -327,10 +327,6 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	}
 
 	cmd := prepareContainerCMD(t, ctx, agentFixture, info, env)
-	t.Cleanup(func() {
-		os.RemoveAll("/usr/share/elastic-agent")
-	})
-
 	addLogIntegration(t, info, policyID, "/tmp/flog.log")
 	generateLogFile(t, "/tmp/flog.log", time.Second/2, 100)
 
@@ -348,8 +344,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err = agentFixture.IsHealthy(ctx)
-		fmt.Println("Is healthy?", err == nil)
+		err := agentFixture.IsHealthy(ctx)
 		return err == nil
 	},
 		2*time.Minute, time.Second,
