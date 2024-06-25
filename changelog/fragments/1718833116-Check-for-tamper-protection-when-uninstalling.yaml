@@ -11,14 +11,15 @@
 kind: bug
 
 # Change summary; a 80ish characters long description of the change.
-summary: Check for tamper protection when uninstalling
+summary: Check for tamper protection when install --force is used
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
-  The uninstall function will now explictily check if tamper protection is enabled
-  and if a token has been passed before proceeding.
+  When using "elastic-agent install -f", the agent will exec "elastic-agent uninstall -f"
+  so that all path references are correctly loaded and tamper protection errors will cause
+  the install attempt to fail.
 
 # Affected component; a word indicating the component this changeset affects.
 component:

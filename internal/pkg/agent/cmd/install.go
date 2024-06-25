@@ -221,6 +221,24 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	var ownership utils.FileOwner
 	cfgFile := paths.ConfigFile()
+	if status == install.Installed {
+		// Uninstall the agent
+		progBar.Describe("Uninstalling current Elastic Agent")
+		args := []string{
+			"uninstall",
+			"--force",
+		}
+		uninstall := exec.Command("elastic-agent", args...) // TODO find elastic-agent binary in $PATH
+		uninstall.Stdout = streams.Out
+		uninstall.Stderr = streams.Err
+		if err := uninstall.Start(); err != nil {
+			return fmt.Errorf("unable to start elastic-agent uninstall: %w", err)
+		}
+		if err := uninstall.Wait(); err != nil {
+			return fmt.Errorf("failed to uninstall elastic-agent: %w", err)
+		}
+		progBar.Describe("Successfully uninstalled Elastic Agent")
+	}
 	if status != install.PackageInstall {
 		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams)
 		if err != nil {

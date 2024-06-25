@@ -49,10 +49,6 @@ type cfg struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"tamper_protection,omitempty" yaml:"tamper_protection,omitempty" config:"tamper_protection,omitempty"`
 		} `json:"features" yaml:"features" config:"features"`
-		// Agent config has protection as a top level field.
-		Protection *struct {
-			Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
-		} `json:"protection,omitempty" yaml:"protection,omitempty" config:"protection,omitempty"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
 
@@ -183,13 +179,9 @@ func Parse(policy any) (*Flags, error) {
 	flags := new(Flags)
 	flags.setFQDN(parsedFlags.Agent.Features.FQDN.Enabled)
 
-	// Optional value defined by agent.features.tamper_protection.enabled is preffered.
-	// If missing, optional  value provided by agent.protection.enabled is used
-	// Otherwise fallback on default value
+	// Tamper protection flag is optional, fallback on default value if missing
 	if parsedFlags.Agent.Features.TamperProtection != nil {
 		flags.setTamperProtection(parsedFlags.Agent.Features.TamperProtection.Enabled)
-	} else if parsedFlags.Agent.Protection != nil {
-		flags.setTamperProtection(parsedFlags.Agent.Protection.Enabled)
 	} else {
 		flags.setTamperProtection(defaultTamperProtection)
 	}
