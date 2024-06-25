@@ -39,6 +39,7 @@ exporters:
     endpoints: [http://localhost:9200]
     user: otel
     password: password
+    # api_key: <<YOUR_API_KEY>> # Elasticsearch API Key in "encoded" format.
     logs_index: logs-generic-default
     metrics_index: metrics-generic-default
 

@@ -19,6 +19,7 @@ exporters:
   elasticsearch/bulk:
     endpoints: [http://localhost:9200]
     user: otel
+    # api_key: <<YOUR_API_KEY>> # Elasticsearch API Key in "encoded" format.
     password: password
 
 service:

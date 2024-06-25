@@ -28,6 +28,7 @@ exporters:
     password: password
     logs_index: logs-generic-default
     metrics_index: metrics-generic-default
+    # api_key: <<YOUR_API_KEY>> # Elasticsearch API Key in "encoded" format.
 
 service:
   pipelines:

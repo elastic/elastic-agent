@@ -25,6 +25,7 @@ exporters:
     endpoints: [http://localhost:9200]
     user: otel
     password: password
+    # api_key: <<YOUR_API_KEY>> # Elasticsearch API Key in "encoded" format.
 
 service:
   pipelines:
