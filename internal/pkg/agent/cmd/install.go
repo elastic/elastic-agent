@@ -228,7 +228,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			"uninstall",
 			"--force",
 		}
-		uninstall := exec.Command("elastic-agent", args...) // TODO find elastic-agent binary in $PATH
+		execPath, err := exec.LookPath(paths.BinaryName)
+		if err != nil {
+			return fmt.Errorf("unable to find %s on path: %w", paths.BinaryName, err)
+		}
+		uninstall := exec.Command(execPath, args...)
 		uninstall.Stdout = streams.Out
 		uninstall.Stderr = streams.Err
 		if err := uninstall.Start(); err != nil {
