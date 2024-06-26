@@ -25,8 +25,6 @@ exporters:
   elasticsearch/bulk:
     endpoints: [<<ES_ENDPOINT>>]
     api_key: <<ES_API_KEY>>
-    logs_index: logs-generic-default
-    metrics_index: metrics-generic-default
 
 service:
   pipelines:
