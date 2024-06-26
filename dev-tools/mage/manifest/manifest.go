@@ -19,7 +19,6 @@ import (
 	"github.com/magefile/mage/mg"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
@@ -39,6 +38,14 @@ var errorInvalidManifestURL = errors.New("invalid ManifestURL provided")
 var errorNotAllowedManifestURL = errors.New("the provided ManifestURL is not allowed URL")
 
 var AllowedManifestHosts = []string{"snapshots.elastic.co", "staging.elastic.co"}
+
+var PlatformPackages = map[string]string{
+	"darwin/amd64":  "darwin-x86_64.tar.gz",
+	"darwin/arm64":  "darwin-aarch64.tar.gz",
+	"linux/amd64":   "linux-x86_64.tar.gz",
+	"linux/arm64":   "linux-arm64.tar.gz",
+	"windows/amd64": "windows-x86_64.zip",
+}
 
 // Map of binaries to download to their project in the unified-release manager.
 // The project names are those used in the "projects" list in the unified release manifest.
@@ -116,9 +123,9 @@ func DownloadManifest(ctx context.Context, manifest string) (tools.Build, error)
 	return manifestResponse, nil
 }
 
-// DownloadComponentsFromManifest is going to download a set of components from the given manifest into the destination
+// DownloadComponents is going to download a set of components from the given manifest into the destination
 // dropPath folder in order to later use that folder for packaging
-func DownloadComponentsFromManifest(ctx context.Context, manifest string, platforms []string, dropPath string) error {
+func DownloadComponents(ctx context.Context, manifest string, platforms []string, dropPath string) error {
 	manifestResponse, err := DownloadManifest(ctx, manifest)
 	if err != nil {
 		return fmt.Errorf("failed to download remote manifest file %w", err)
@@ -151,7 +158,7 @@ func DownloadComponentsFromManifest(ctx context.Context, manifest string, platfo
 				continue
 			}
 
-			pkgURL, err := resolveManifestPackage(projects[project.Name], binary, common.PlatformPackages[platform], majorMinorPatchVersion)
+			pkgURL, err := resolveManifestPackage(projects[project.Name], binary, PlatformPackages[platform], majorMinorPatchVersion)
 			if err != nil {
 				return err
 			}

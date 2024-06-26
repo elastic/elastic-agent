@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -141,7 +140,7 @@ func TestBlah(t *testing.T) {
 				return
 			}
 
-			urlList, err := resolveManifestPackage(projects[tc.projectName], tc.binary, common.PlatformPackages[tc.platform], manifestJson.Version)
+			urlList, err := resolveManifestPackage(projects[tc.projectName], tc.binary, PlatformPackages[tc.platform], manifestJson.Version)
 			require.NoError(t, err)
 
 			assert.Len(t, urlList, 3)
