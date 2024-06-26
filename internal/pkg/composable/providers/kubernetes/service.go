@@ -49,6 +49,7 @@ func NewServiceEventer(
 	watcher, err := kubernetes.NewNamedWatcher("agent-service", client, &kubernetes.Service{}, kubernetes.WatchOptions{
 		SyncTimeout:  cfg.SyncPeriod,
 		Node:         cfg.Node,
+		Namespace:    cfg.Namespace,
 		HonorReSyncs: true,
 	}, nil)
 	if err != nil {
@@ -62,8 +63,9 @@ func NewServiceEventer(
 
 	if metaConf.Namespace.Enabled() || cfg.Hints.Enabled {
 		namespaceWatcher, err = kubernetes.NewNamedWatcher("agent-namespace", client, &kubernetes.Namespace{}, kubernetes.WatchOptions{
-			SyncTimeout: cfg.SyncPeriod,
-			Namespace:   cfg.Namespace,
+			SyncTimeout:  cfg.SyncPeriod,
+			Namespace:    cfg.Namespace,
+			HonorReSyncs: true,
 		}, nil)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create watcher for %T due to error %w", &kubernetes.Namespace{}, err)

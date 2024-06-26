@@ -1,0 +1,27 @@
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value: 
+    name: API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: elastic-agent-creds
+        key: api_key
+
+
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value: 
+    name: ES_HOST
+    valueFrom:
+      configMapKeyRef:
+        name: elastic-agent-configs
+        key: host
+
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value: 
+    name: CA_TRUSTED
+    valueFrom:
+      configMapKeyRef:
+        name: elastic-agent-configs
+        key: ca_trusted
