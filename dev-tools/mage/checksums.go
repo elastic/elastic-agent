@@ -11,10 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/magefile/mage/mg"
 	"github.com/otiai10/copy"
+
+	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
 const ComponentSpecFileSuffix = ".spec.yml"
