@@ -72,7 +72,7 @@ func expectedProjectPkgs() map[string][]string {
 }
 
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
-func DownloadManifest(manifest string) (tools.Build, error) {
+func DownloadManifest(ctx context.Context, manifest string) (tools.Build, error) {
 	manifestUrl, urlError := url.Parse(manifest)
 	if urlError != nil {
 		return tools.Build{}, errorInvalidManifestURL
@@ -88,7 +88,7 @@ func DownloadManifest(manifest string) (tools.Build, error) {
 		return tools.Build{}, errorNotAllowedManifestURL
 	}
 	sanitizedUrl := fmt.Sprintf("https://%s%s", manifestUrl.Host, manifestUrl.Path)
-	f := func() (tools.Build, error) { return downloadManifestData(sanitizedUrl) }
+	f := func() (tools.Build, error) { return downloadManifestData(ctx, sanitizedUrl) }
 	manifestResponse, err := doWithRetries(f)
 	if err != nil {
 		return tools.Build{}, fmt.Errorf("downloading manifest: %w", err)
@@ -100,7 +100,7 @@ func DownloadManifest(manifest string) (tools.Build, error) {
 	return manifestResponse, nil
 }
 
-func resolveManifestPackage(project tools.Project, pkg string, reqPackage string, version string) []string {
+func resolveManifestPackage(project tools.Project, pkg string, reqPackage string, version string) ([]string, error) {
 	var val tools.Package
 	var ok bool
 
@@ -161,7 +161,7 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 		}
 
 		if !foundIt {
-			return nil
+			return nil, fmt.Errorf("package [%s] not found in project manifest at %s", packageName, project.ExternalArtifactsManifestURL)
 		}
 	}
 
@@ -169,13 +169,13 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 		log.Printf(">>>>>>>>>>> Project branch/commit [%s, %s]", project.Branch, project.CommitHash)
 	}
 
-	return []string{val.URL, val.ShaURL, val.AscURL}
+	return []string{val.URL, val.ShaURL, val.AscURL}, nil
 }
 
 // DownloadComponentsFromManifest is going to download a set of components from the given manifest into the destination
 // dropPath folder in order to later use that folder for packaging
-func DownloadComponentsFromManifest(manifest string, platforms []string, platformPackages map[string]string, dropPath string) error {
-	manifestResponse, err := DownloadManifest(manifest)
+func DownloadComponentsFromManifest(ctx context.Context, manifest string, platforms []string, platformPackages map[string]string, dropPath string) error {
+	manifestResponse, err := DownloadManifest(ctx, manifest)
 	if err != nil {
 		return fmt.Errorf("failed to download remote manifest file %w", err)
 	}
@@ -191,7 +191,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	// This eliminates the "+buildYYYYMMDDHHMM" suffix on Independent Agent Release builds
 	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
 
-	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
+	errGrp, downloadsCtx := errgroup.WithContext(ctx)
 	for project, pkgs := range expectedProjectPkgs() {
 		for _, platform := range platforms {
 			targetPath := filepath.Join(dropPath)
@@ -203,20 +203,20 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 
 			for _, pkg := range pkgs {
 				reqPackage := platformPackages[platform]
-				pkgURL := resolveManifestPackage(projects[project], pkg, reqPackage, majorMinorPatchVersion)
-				if pkgURL != nil {
-					for _, p := range pkgURL {
-						log.Printf(">>>>>>>>> Downloading [%s] [%s] ", pkg, p)
-						pkgFilename := path.Base(p)
-						downloadTarget := filepath.Join(targetPath, pkgFilename)
-						if _, err := os.Stat(downloadTarget); err != nil {
-							errGrp.Go(func(ctx context.Context, url, target string) func() error {
-								return func() error { return DownloadPackage(ctx, url, target) }
-							}(downloadsCtx, p, downloadTarget))
-						}
+				pkgURL, err := resolveManifestPackage(projects[project], pkg, reqPackage, majorMinorPatchVersion)
+				if err != nil {
+					return err
+				}
+
+				for _, p := range pkgURL {
+					log.Printf(">>>>>>>>> Downloading [%s] [%s] ", pkg, p)
+					pkgFilename := path.Base(p)
+					downloadTarget := filepath.Join(targetPath, pkgFilename)
+					if _, err := os.Stat(downloadTarget); err != nil {
+						errGrp.Go(func(ctx context.Context, url, target string) func() error {
+							return func() error { return DownloadPackage(ctx, url, target) }
+						}(downloadsCtx, p, downloadTarget))
 					}
-				} else if mg.Verbose() {
-					log.Printf(">>>>>>>>> Project [%s] does not have [%s] ", pkg, platform)
 				}
 			}
 		}

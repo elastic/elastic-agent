@@ -75,9 +75,14 @@ func downloadFile(ctx context.Context, url string, filepath string) (string, err
 	return outFile.Name(), nil
 }
 
-func downloadManifestData(url string) (tools.Build, error) {
+func downloadManifestData(ctx context.Context, url string) (tools.Build, error) {
 	var response tools.Build
-	resp, err := http.Get(url) //nolint // we should have already verified that this is a proper valid url
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return response, fmt.Errorf("failed to create manifest request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return response, fmt.Errorf("failed to download manifest [%s]\n %w", url, err)
 	}

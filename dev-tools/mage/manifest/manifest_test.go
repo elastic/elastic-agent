@@ -9,6 +9,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -127,7 +128,8 @@ func TestBlah(t *testing.T) {
 			_, ok := projectPkgs[tc.projectName]
 			assert.True(t, ok)
 
-			urlList := resolveManifestPackage(projects[tc.projectName], tc.packageName, tc.requiredPackage, manifestJson.Version)
+			urlList, err := resolveManifestPackage(projects[tc.projectName], tc.packageName, tc.requiredPackage, manifestJson.Version)
+			require.NoError(t, err)
 
 			assert.Len(t, urlList, 3)
 			for _, url := range urlList {

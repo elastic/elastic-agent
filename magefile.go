@@ -189,7 +189,7 @@ func (Dev) Build() {
 }
 
 // Package bundles the agent binary with DEV flag set.
-func (Dev) Package() {
+func (Dev) Package(ctx context.Context) {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
 
@@ -200,7 +200,7 @@ func (Dev) Package() {
 	}
 
 	devtools.DevBuild = true
-	Package()
+	Package(ctx)
 }
 
 func mocksPath() (string, error) {
@@ -474,7 +474,7 @@ func AssembleDarwinUniversal() error {
 // Use SNAPSHOT=true to build snapshots.
 // Use PLATFORMS to control the target platforms.
 // Use VERSION_QUALIFIER to control the version qualifier.
-func Package() {
+func Package(ctx context.Context) {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
@@ -490,11 +490,11 @@ func Package() {
 		dependenciesVersion = beatVersion
 	}
 
-	packageAgent(platforms, dependenciesVersion, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
+	packageAgent(ctx, platforms, dependenciesVersion, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder
-func DownloadManifest() error {
+func DownloadManifest(ctx context.Context) error {
 	fmt.Println("--- Downloading manifest")
 	start := time.Now()
 	defer func() { fmt.Println("Downloading manifest took", time.Since(start)) }()
@@ -519,7 +519,7 @@ func DownloadManifest() error {
 		requiredPackages = append(requiredPackages, common.PlatformPackages[p])
 	}
 
-	if e := manifest.DownloadComponentsFromManifest(devtools.ManifestURL, platforms, common.PlatformPackages, dropPath); e != nil {
+	if e := manifest.DownloadComponentsFromManifest(ctx, devtools.ManifestURL, platforms, common.PlatformPackages, dropPath); e != nil {
 		return fmt.Errorf("failed to download the manifest file, %w", e)
 	}
 	log.Printf(">> Completed downloading packages from manifest into drop-in %s", dropPath)
@@ -758,23 +758,23 @@ func BuildFleetCfg() error {
 }
 
 // Enroll runs agent which enrolls before running.
-func (Demo) Enroll() error {
+func (Demo) Enroll(ctx context.Context) error {
 	env := map[string]string{
 		"FLEET_ENROLL": "1",
 	}
-	return runAgent(env)
+	return runAgent(ctx, env)
 }
 
 // NoEnroll runs agent which does not enroll before running.
-func (Demo) NoEnroll() error {
+func (Demo) NoEnroll(ctx context.Context) error {
 	env := map[string]string{
 		"FLEET_ENROLL": "0",
 	}
-	return runAgent(env)
+	return runAgent(ctx, env)
 }
 
 // Image builds a cloud image
-func (Cloud) Image() {
+func (Cloud) Image(ctx context.Context) {
 	platforms := os.Getenv(platformsEnv)
 	defer os.Setenv(platformsEnv, platforms)
 
@@ -808,7 +808,7 @@ func (Cloud) Image() {
 		devtools.ExternalBuild = true
 	}
 
-	Package()
+	Package(ctx)
 }
 
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
@@ -878,7 +878,7 @@ func getVersion() string {
 	return version
 }
 
-func runAgent(env map[string]string) error {
+func runAgent(ctx context.Context, env map[string]string) error {
 	prevPlatforms := os.Getenv("PLATFORMS")
 	defer os.Setenv("PLATFORMS", prevPlatforms)
 
@@ -904,7 +904,7 @@ func runAgent(env map[string]string) error {
 		}
 
 		// produce docker package
-		packageAgent([]string{
+		packageAgent(ctx, []string{
 			"linux/amd64",
 		}, dependenciesVersion, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
 
@@ -953,7 +953,7 @@ func runAgent(env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(platforms []string, dependenciesVersion string, agentPackaging, agentBinaryTarget mg.Fn) {
+func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, agentPackaging, agentBinaryTarget mg.Fn) {
 	fmt.Println("--- Package Elastic-Agent")
 	var manifestResponse tools.Build
 	var err error
@@ -969,7 +969,7 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 	if devtools.PackagingFromManifest {
 		// If we're using a manifest, download it here, and pass in the manifestResponse
 		// to other functions that need to operate on the manifest
-		if manifestResponse, err = manifest.DownloadManifest(devtools.ManifestURL); err != nil {
+		if manifestResponse, err = manifest.DownloadManifest(ctx, devtools.ManifestURL); err != nil {
 			log.Panicf("failed to download remote manifest file %s", err)
 		}
 
@@ -1057,7 +1057,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
-			for binary, project := range externalBinaries {
+			for binary, project := range manifest.ExternalBinaries {
 				for _, platform := range platforms {
 					reqPackage := common.PlatformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
@@ -1496,7 +1496,7 @@ func PackageUsingDRA(ctx context.Context) error {
 
 	manifestUrl := devtools.ManifestURL
 
-	build, err := manifest.DownloadManifest(manifestUrl)
+	build, err := manifest.DownloadManifest(ctx, manifestUrl)
 	if err != nil {
 		return fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)
 	}
@@ -1516,7 +1516,7 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("setting agent commit hash %q: %w", agentCoreProject.CommitHash, err)
 	}
 
-	packageAgent(platforms, parsedVersion.VersionWithPrerelease(), mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, manifestUrl))
+	packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, manifestUrl))
 	return nil
 }
 
@@ -1609,7 +1609,7 @@ func filterPackagesByPlatform(pkgs map[string]tools.Package) map[string]tools.Pa
 
 func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir string, projects ...string) (map[string]tools.Package, error) {
 
-	build, err := manifest.DownloadManifest(manifestUrl)
+	build, err := manifest.DownloadManifest(ctx, manifestUrl)
 	if err != nil {
 		return nil, fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)
 	}
