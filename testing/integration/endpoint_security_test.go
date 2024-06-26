@@ -899,6 +899,6 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 		"--enrollment-token",
 		token.APIKey,
 	}
-	out, err = fixture2.Exec(ctx, args)
+	out, err := fixture2.Exec(ctx, args)
 	require.Errorf(t, err, "No error detected, command output: %s", out)
 }
