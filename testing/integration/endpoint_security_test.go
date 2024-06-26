@@ -894,10 +894,8 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	args := []string{
 		"install",
 		"--force",
-		"--url",
-		url,
-		"--enrollment-token",
-		token.APIKey,
+		"--url=" + url,
+		"--enrollment-token=" + token.APIKey,
 	}
 	out, err := fixture2.Exec(ctx, args)
 	require.Errorf(t, err, "No error detected, command output: %s", out)
