@@ -50,7 +50,7 @@ var AllowedManifestHosts = []string{"snapshots.elastic.co", "staging.elastic.co"
 // https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
 // https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
 // https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
-var ReleasePackages = map[string]Project{
+var ExpectedPackages = map[string]Project{
 	"agentbeat":             Project{Name: "beats", Platforms: AllPlatforms},
 	"apm-server":            Project{Name: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
 	"cloudbeat":             Project{Name: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
@@ -85,6 +85,9 @@ type Platform struct {
 func (p Platform) Platform() string {
 	if p.Arch == "x86_64" {
 		p.Arch = "amd64"
+	}
+	if p.Arch == "aarch64" {
+		p.Arch = "arm64"
 	}
 	return p.OS + "/" + p.Arch
 }
@@ -141,7 +144,7 @@ func DownloadComponentsFromManifest(ctx context.Context, manifest string, platfo
 
 	errGrp, downloadsCtx := errgroup.WithContext(ctx)
 	// for project, pkgs := range expectedProjectPkgs() {
-	for pkg, project := range ReleasePackages {
+	for pkg, project := range ExpectedPackages {
 		for _, platform := range platforms {
 			targetPath := filepath.Join(dropPath)
 			err := os.MkdirAll(targetPath, 0755)

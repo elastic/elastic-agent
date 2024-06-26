@@ -133,7 +133,7 @@ func TestBlah(t *testing.T) {
 			projects := manifestJson.Projects
 
 			// Verify the component name is in the list of expected packages.
-			project, ok := ReleasePackages[tc.packageName]
+			project, ok := ExpectedPackages[tc.packageName]
 			assert.True(t, ok)
 
 			if !project.SupportsPlatform(tc.platform) {

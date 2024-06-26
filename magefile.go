@@ -1057,8 +1057,12 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
-			for binary, project := range manifest.ReleasePackages {
+			for binary, project := range manifest.ExpectedPackages {
 				for _, platform := range platforms {
+					if !project.SupportsPlatform(platform) {
+						fmt.Printf("--- Binary %s does not support %s, download skipped\n", binary, platform)
+						continue
+					}
 					reqPackage := common.PlatformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
@@ -1204,7 +1208,7 @@ func getComponentVersion(componentName string, requiredPackage string, component
 	// Iterate over all the packages in the component project
 	for pkgName, _ := range componentProject.Packages {
 		// Only care about the external binaries that we want to package
-		for binaryPrefix, project := range manifest.ReleasePackages {
+		for binaryPrefix, project := range manifest.ExpectedPackages {
 			// If the given component name doesn't match the external binary component, skip
 			if componentName != project.Name {
 				continue
@@ -1282,7 +1286,7 @@ func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, ve
 			// Only care about packages that match the required package constraint (os/arch)
 			if strings.Contains(pkgName, requiredPackage) {
 				// Iterate over the external binaries that we care about for packaging agent
-				for filePrefix, _ := range manifest.ReleasePackages {
+				for filePrefix, _ := range manifest.ExpectedPackages {
 					// If the individual package doesn't match the expected prefix, then continue
 					if !strings.HasPrefix(pkgName, filePrefix) {
 						continue
@@ -1751,15 +1755,10 @@ func downloadBinary(ctx context.Context, project string, packageName string, bin
 	return func() error {
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
-			if strings.Contains(err.Error(), "not found") {
-				fmt.Printf("Could not download %s: %s\n", binary, err)
-			} else {
-				return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
-			}
-		} else {
-			compl.Add(1)
+			return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
 		}
 
+		compl.Add(1)
 		fmt.Printf("Done downloading %s\n", packageName)
 		return nil
 	}
