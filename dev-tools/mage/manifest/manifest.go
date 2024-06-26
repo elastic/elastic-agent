@@ -47,7 +47,7 @@ var PlatformPackages = map[string]string{
 	"windows/amd64": "windows-x86_64.zip",
 }
 
-// Map of binaries to download to their project in the unified-release manager.
+// ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
 // The project names are those used in the "projects" list in the unified release manifest.
 // See the sample manifests in the testdata directory.
 var ExpectedBinaries = map[string]Project{

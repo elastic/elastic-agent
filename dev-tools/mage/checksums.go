@@ -100,13 +100,13 @@ func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, ver
 	projects := manifestResponse.Projects
 
 	// Iterate over the component projects in the manifest
-	for componentName, _ := range projects {
+	for componentName := range projects {
 		// Iterate over the individual package files within each component project
-		for pkgName, _ := range projects[componentName].Packages {
+		for pkgName := range projects[componentName].Packages {
 			// Only care about packages that match the required package constraint (os/arch)
 			if strings.Contains(pkgName, requiredPackage) {
 				// Iterate over the external binaries that we care about for packaging agent
-				for binary, _ := range manifest.ExpectedBinaries {
+				for binary := range manifest.ExpectedBinaries {
 					// If the individual package doesn't match the expected prefix, then continue
 					if !strings.HasPrefix(pkgName, binary) {
 						continue
@@ -211,7 +211,7 @@ func getComponentVersion(componentName string, requiredPackage string, component
 	var componentVersion string
 	var foundIt bool
 	// Iterate over all the packages in the component project
-	for pkgName, _ := range componentProject.Packages {
+	for pkgName := range componentProject.Packages {
 		// Only care about the external binaries that we want to package
 		for binary, project := range manifest.ExpectedBinaries {
 			// If the given component name doesn't match the external binary component, skip
