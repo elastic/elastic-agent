@@ -123,7 +123,8 @@ func TestBlah(t *testing.T) {
 			projects := manifestJson.Projects
 
 			// Verify the component name is in the ComponentSpec
-			_, ok := ComponentSpec[tc.componentName]
+			pkgs := componentPkgs()
+			_, ok := pkgs[tc.componentName]
 			assert.True(t, ok)
 
 			urlList := resolveManifestPackage(projects[tc.componentName], tc.packageName, tc.requiredPackage, manifestJson.Version)

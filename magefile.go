@@ -102,28 +102,6 @@ var (
 	goIntegTestTimeout = 2 * time.Hour
 	// goProvisionAndTestTimeout is the timeout used for both provisioning and running tests.
 	goProvisionAndTestTimeout = goIntegTestTimeout + 30*time.Minute
-
-	// Map of binaries to download to their project name in the unified-release manager.
-	// The project names are used to generate the URLs when downloading binaries. For example:
-	//
-	// https://artifacts-snapshot.elastic.co/beats/latest/8.11.0-SNAPSHOT.json
-	// https://artifacts-snapshot.elastic.co/cloudbeat/latest/8.11.0-SNAPSHOT.json
-	// https://artifacts-snapshot.elastic.co/cloud-defend/latest/8.11.0-SNAPSHOT.json
-	// https://artifacts-snapshot.elastic.co/apm-server/latest/8.11.0-SNAPSHOT.json
-	// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
-	// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
-	// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
-	externalBinaries = map[string]string{
-		"agentbeat":             "beats",
-		"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
-		"cloud-defend":          "cloud-defend",
-		"apm-server":            "apm-server", // not supported on darwin/aarch64
-		"endpoint-security":     "endpoint-dev",
-		"fleet-server":          "fleet-server",
-		"pf-elastic-collector":  "prodfiler",
-		"pf-elastic-symbolizer": "prodfiler",
-		"pf-host-agent":         "prodfiler",
-	}
 )
 
 func init() {
@@ -1226,7 +1204,7 @@ func getComponentVersion(componentName string, requiredPackage string, component
 	// Iterate over all the packages in the component project
 	for pkgName, _ := range componentProject.Packages {
 		// Only care about the external binaries that we want to package
-		for binaryPrefix, binaryComponent := range externalBinaries {
+		for binaryPrefix, binaryComponent := range manifest.ExternalBinaries {
 			// If the given component name doesn't match the external binary component, skip
 			if componentName != binaryComponent {
 				continue
@@ -1304,7 +1282,7 @@ func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, ve
 			// Only care about packages that match the required package constraint (os/arch)
 			if strings.Contains(pkgName, requiredPackage) {
 				// Iterate over the external binaries that we care about for packaging agent
-				for filePrefix, _ := range externalBinaries {
+				for filePrefix, _ := range manifest.ExternalBinaries {
 					// If the individual package doesn't match the expected prefix, then continue
 					if !strings.HasPrefix(pkgName, filePrefix) {
 						continue

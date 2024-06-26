@@ -39,15 +39,36 @@ var errorNotAllowedManifestURL = errors.New("the provided ManifestURL is not all
 
 var AllowedManifestHosts = []string{"snapshots.elastic.co", "staging.elastic.co"}
 
-var ComponentSpec = map[string][]string{
-	"apm-server":            {"apm-server"},
-	"beats":                 {"agentbeat"},
-	"cloud-defend":          {"cloud-defend"},
-	"cloudbeat":             {"cloudbeat"},
-	"elastic-agent-shipper": {"elastic-agent-shipper"},
-	"endpoint-dev":          {"endpoint-security"},
-	"fleet-server":          {"fleet-server"},
-	"prodfiler":             {"pf-elastic-collector", "pf-elastic-symbolizer", "pf-host-agent"},
+// Map of binaries to download to their project name in the unified-release manager.
+// The project names are used to generate the URLs when downloading binaries. For example:
+//
+// https://artifacts-snapshot.elastic.co/beats/latest/8.11.0-SNAPSHOT.json
+// https://artifacts-snapshot.elastic.co/cloudbeat/latest/8.11.0-SNAPSHOT.json
+// https://artifacts-snapshot.elastic.co/cloud-defend/latest/8.11.0-SNAPSHOT.json
+// https://artifacts-snapshot.elastic.co/apm-server/latest/8.11.0-SNAPSHOT.json
+// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
+// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
+// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
+var ExternalBinaries = map[string]string{
+	"agentbeat":             "beats",
+	"apm-server":            "apm-server", // not supported on darwin/aarch64
+	"cloudbeat":             "cloudbeat",  // only supporting linux/amd64 or linux/arm64
+	"cloud-defend":          "cloud-defend",
+	"endpoint-security":     "endpoint-dev",
+	"fleet-server":          "fleet-server",
+	"pf-elastic-collector":  "prodfiler",
+	"pf-elastic-symbolizer": "prodfiler",
+	"pf-host-agent":         "prodfiler",
+}
+
+// Converts ExternalBinaries into a map of packages and the binaries they contain. For example:
+// "prodfiler": {"pf-elastic-collector", "pf-elastic-symbolizer", "pf-host-agent"}
+func componentPkgs() map[string][]string {
+	componentPkgs := make(map[string][]string)
+	for component, pkg := range ExternalBinaries {
+		componentPkgs[pkg] = append(componentPkgs[pkg], component)
+	}
+	return componentPkgs
 }
 
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
@@ -171,7 +192,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
 
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
-	for component, pkgs := range ComponentSpec {
+	for component, pkgs := range componentPkgs() {
 		for _, platform := range platforms {
 			targetPath := filepath.Join(dropPath)
 			err := os.MkdirAll(targetPath, 0755)
