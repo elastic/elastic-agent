@@ -330,6 +330,8 @@ replace (
 	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
 	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
+	// this is temporary until the elastic-agent-client changes are merged and released
+	github.com/elastic/elastic-agent-client/v7 => github.com/pchila/elastic-agent-client/v7 v7.0.0-20240625114047-d79ccd49b854
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
 
