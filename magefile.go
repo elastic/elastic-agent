@@ -1057,7 +1057,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
-			for binary, project := range manifest.ExpectedPackages {
+			for binary, project := range manifest.ExpectedBinaries {
 				for _, platform := range platforms {
 					if !project.SupportsPlatform(platform) {
 						fmt.Printf("--- Binary %s does not support %s, download skipped\n", binary, platform)
@@ -1208,14 +1208,14 @@ func getComponentVersion(componentName string, requiredPackage string, component
 	// Iterate over all the packages in the component project
 	for pkgName, _ := range componentProject.Packages {
 		// Only care about the external binaries that we want to package
-		for binaryPrefix, project := range manifest.ExpectedPackages {
+		for binary, project := range manifest.ExpectedBinaries {
 			// If the given component name doesn't match the external binary component, skip
 			if componentName != project.Name {
 				continue
 			}
 
 			// Split the package name on the binary name prefix plus a dash
-			firstSplit := strings.Split(pkgName, binaryPrefix+"-")
+			firstSplit := strings.Split(pkgName, binary+"-")
 			if len(firstSplit) < 2 {
 				continue
 			}
@@ -1286,9 +1286,9 @@ func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, ve
 			// Only care about packages that match the required package constraint (os/arch)
 			if strings.Contains(pkgName, requiredPackage) {
 				// Iterate over the external binaries that we care about for packaging agent
-				for filePrefix, _ := range manifest.ExpectedPackages {
+				for binary, _ := range manifest.ExpectedBinaries {
 					// If the individual package doesn't match the expected prefix, then continue
-					if !strings.HasPrefix(pkgName, filePrefix) {
+					if !strings.HasPrefix(pkgName, binary) {
 						continue
 					}
 

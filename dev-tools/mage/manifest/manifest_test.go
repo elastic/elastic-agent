@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	//go:embed test_payload/manifest-8.14.2.json
+	//go:embed testdata/manifest-8.14.2.json
 	manifest8_14_2 string
 
-	//go:embed test_payload/manifest-8.14.2-SNAPSHOT.json
+	//go:embed testdata/manifest-8.14.2-SNAPSHOT.json
 	manifest8_14_2_SNAPSHOT string
 
-	//go:embed test_payload/manifest-8.14.0+build202406201002.json
+	//go:embed testdata/manifest-8.14.0+build202406201002.json
 	manifest8_14_0_build202406201002 string
 )
 
@@ -38,7 +38,7 @@ func TestBlah(t *testing.T) {
 		name            string
 		file            string
 		projectName     string
-		packageName     string
+		binary          string
 		platform        string
 		expectedUrlList []string
 	}{
@@ -46,7 +46,7 @@ func TestBlah(t *testing.T) {
 			name:        "Unified Release Staging 8.14 apm-server",
 			file:        manifest8_14_2,
 			projectName: "apm-server",
-			packageName: "apm-server",
+			binary:      "apm-server",
 			platform:    "linux/amd64",
 			expectedUrlList: []string{
 				"https://staging.elastic.co/8.14.2-cfd42f49/downloads/apm-server/apm-server-8.14.2-linux-x86_64.tar.gz",
@@ -58,7 +58,7 @@ func TestBlah(t *testing.T) {
 			name:            "Unified Release Staging 8.14 apm-server unsupported architecture",
 			file:            manifest8_14_2,
 			projectName:     "apm-server",
-			packageName:     "apm-server",
+			binary:          "apm-server",
 			platform:        "darwin/aarch64",
 			expectedUrlList: []string{},
 		},
@@ -66,7 +66,7 @@ func TestBlah(t *testing.T) {
 			name:        "Unified Release Snapshot 8.14 apm-server",
 			file:        manifest8_14_2_SNAPSHOT,
 			projectName: "apm-server",
-			packageName: "apm-server",
+			binary:      "apm-server",
 			platform:    "linux/amd64",
 			expectedUrlList: []string{
 				"https://snapshots.elastic.co/8.14.2-1ceac187/downloads/apm-server/apm-server-8.14.2-SNAPSHOT-linux-x86_64.tar.gz",
@@ -78,7 +78,7 @@ func TestBlah(t *testing.T) {
 			name:        "Independent Agent Staging 8.14 apm-server",
 			file:        manifest8_14_0_build202406201002,
 			projectName: "apm-server",
-			packageName: "apm-server",
+			binary:      "apm-server",
 			platform:    "linux/amd64",
 			expectedUrlList: []string{
 				"https://staging.elastic.co/8.14.0-fe696c51/downloads/apm-server/apm-server-8.14.0-linux-x86_64.tar.gz",
@@ -90,7 +90,7 @@ func TestBlah(t *testing.T) {
 			name:        "Unified Release Staging 8.14 endpoint-dev",
 			file:        manifest8_14_2,
 			projectName: "endpoint-dev",
-			packageName: "endpoint-security",
+			binary:      "endpoint-security",
 			platform:    "linux/amd64",
 			expectedUrlList: []string{
 				"https://staging.elastic.co/8.14.2-cfd42f49/downloads/endpoint-dev/endpoint-security-8.14.2-linux-x86_64.tar.gz",
@@ -102,7 +102,7 @@ func TestBlah(t *testing.T) {
 			name:        "Unified Release Snapshot 8.14 endpoint-dev",
 			file:        manifest8_14_2_SNAPSHOT,
 			projectName: "endpoint-dev",
-			packageName: "endpoint-security",
+			binary:      "endpoint-security",
 			platform:    "linux/amd64",
 			expectedUrlList: []string{
 				"https://snapshots.elastic.co/8.14.2-1ceac187/downloads/endpoint-dev/endpoint-security-8.14.2-SNAPSHOT-linux-x86_64.tar.gz",
@@ -114,7 +114,7 @@ func TestBlah(t *testing.T) {
 			name:        "Independent Agent Staging 8.14 endpoint-dev",
 			file:        manifest8_14_0_build202406201002,
 			projectName: "endpoint-dev",
-			packageName: "endpoint-security",
+			binary:      "endpoint-security",
 			platform:    "linux/amd64",
 			// Note how the version is one patch release higher than the manifest - this is expected
 			expectedUrlList: []string{
@@ -133,7 +133,7 @@ func TestBlah(t *testing.T) {
 			projects := manifestJson.Projects
 
 			// Verify the component name is in the list of expected packages.
-			project, ok := ExpectedPackages[tc.packageName]
+			project, ok := ExpectedBinaries[tc.binary]
 			assert.True(t, ok)
 
 			if !project.SupportsPlatform(tc.platform) {
@@ -141,7 +141,7 @@ func TestBlah(t *testing.T) {
 				return
 			}
 
-			urlList, err := resolveManifestPackage(projects[tc.projectName], tc.packageName, common.PlatformPackages[tc.platform], manifestJson.Version)
+			urlList, err := resolveManifestPackage(projects[tc.projectName], tc.binary, common.PlatformPackages[tc.platform], manifestJson.Version)
 			require.NoError(t, err)
 
 			assert.Len(t, urlList, 3)

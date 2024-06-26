@@ -40,17 +40,10 @@ var errorNotAllowedManifestURL = errors.New("the provided ManifestURL is not all
 
 var AllowedManifestHosts = []string{"snapshots.elastic.co", "staging.elastic.co"}
 
-// Map of binaries to download to their project name in the unified-release manager.
-// The project names are used to generate the URLs when downloading binaries. For example:
-//
-// https://artifacts-snapshot.elastic.co/beats/latest/8.11.0-SNAPSHOT.json
-// https://artifacts-snapshot.elastic.co/cloudbeat/latest/8.11.0-SNAPSHOT.json
-// https://artifacts-snapshot.elastic.co/cloud-defend/latest/8.11.0-SNAPSHOT.json
-// https://artifacts-snapshot.elastic.co/apm-server/latest/8.11.0-SNAPSHOT.json
-// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
-// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
-// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
-var ExpectedPackages = map[string]Project{
+// Map of binaries to download to their project in the unified-release manager.
+// The project names are those used in the "projects" list in the unified release manifest.
+// See the sample manifests in the testdata directory.
+var ExpectedBinaries = map[string]Project{
 	"agentbeat":             Project{Name: "beats", Platforms: AllPlatforms},
 	"apm-server":            Project{Name: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
 	"cloudbeat":             Project{Name: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
@@ -144,7 +137,7 @@ func DownloadComponentsFromManifest(ctx context.Context, manifest string, platfo
 
 	errGrp, downloadsCtx := errgroup.WithContext(ctx)
 	// for project, pkgs := range expectedProjectPkgs() {
-	for pkg, project := range ExpectedPackages {
+	for binary, project := range ExpectedBinaries {
 		for _, platform := range platforms {
 			targetPath := filepath.Join(dropPath)
 			err := os.MkdirAll(targetPath, 0755)
@@ -154,17 +147,17 @@ func DownloadComponentsFromManifest(ctx context.Context, manifest string, platfo
 			log.Printf("+++ Prepare to download project [%s] for [%s]", project.Name, platform)
 
 			if !project.SupportsPlatform(platform) {
-				log.Printf(">>>>>>>>> Project [%s] does not support platform [%s] ", pkg, platform)
+				log.Printf(">>>>>>>>> Project [%s] does not support platform [%s] ", binary, platform)
 				continue
 			}
 
-			pkgURL, err := resolveManifestPackage(projects[project.Name], pkg, common.PlatformPackages[platform], majorMinorPatchVersion)
+			pkgURL, err := resolveManifestPackage(projects[project.Name], binary, common.PlatformPackages[platform], majorMinorPatchVersion)
 			if err != nil {
 				return err
 			}
 
 			for _, p := range pkgURL {
-				log.Printf(">>>>>>>>> Downloading [%s] [%s] ", pkg, p)
+				log.Printf(">>>>>>>>> Downloading [%s] [%s] ", binary, p)
 				pkgFilename := path.Base(p)
 				downloadTarget := filepath.Join(targetPath, pkgFilename)
 				if _, err := os.Stat(downloadTarget); err != nil {
@@ -185,25 +178,25 @@ func DownloadComponentsFromManifest(ctx context.Context, manifest string, platfo
 	return nil
 }
 
-func resolveManifestPackage(project tools.Project, pkg string, platformPkg string, version string) ([]string, error) {
+func resolveManifestPackage(project tools.Project, binary string, platformPkg string, version string) ([]string, error) {
 	var val tools.Package
 	var ok bool
 
 	// Try the normal/easy case first
-	packageName := fmt.Sprintf("%s-%s-%s", pkg, version, platformPkg)
+	packageName := fmt.Sprintf("%s-%s-%s", binary, version, platformPkg)
 	val, ok = project.Packages[packageName]
 	if !ok {
 		// If we didn't find it, it may be an Independent Agent Release, where
 		// the opted-in projects will have a patch version one higher than
 		// the rest of the projects, so we need to seek that out
 		if mg.Verbose() {
-			log.Printf(">>>>>>>>>>> Looking for package [%s] of type [%s]", pkg, platformPkg)
+			log.Printf(">>>>>>>>>>> Looking for package [%s] of type [%s]", binary, platformPkg)
 		}
 
 		var foundIt bool
 		for pkgName := range project.Packages {
-			if strings.HasPrefix(pkgName, pkg) {
-				firstSplit := strings.Split(pkgName, pkg+"-")
+			if strings.HasPrefix(pkgName, binary) {
+				firstSplit := strings.Split(pkgName, binary+"-")
 				if len(firstSplit) < 2 {
 					continue
 				}
@@ -225,7 +218,7 @@ func resolveManifestPackage(project tools.Project, pkg string, platformPkg strin
 					}
 
 					// Create a project/package key with the package, derived version, and required package
-					foundPkgKey := fmt.Sprintf("%s-%s-%s", pkg, pkgVersion, platformPkg)
+					foundPkgKey := fmt.Sprintf("%s-%s-%s", binary, pkgVersion, platformPkg)
 					if mg.Verbose() {
 						log.Printf(">>>>>>>>>>> Looking for project package key: [%s]", foundPkgKey)
 					}
