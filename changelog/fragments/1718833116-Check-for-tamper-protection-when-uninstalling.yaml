@@ -18,8 +18,10 @@ summary: Check for tamper protection when install --force is used
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
   When using "elastic-agent install -f", the agent will exec "elastic-agent uninstall -f"
-  so that all path references are correctly loaded and tamper protection errors will cause
-  the install attempt to fail.
+  using the agent found in the system's path. This ensures all path references are correctly
+  loaded and tamper protection errors will cause the install attempt to fail. Add the
+  --run-uninstall-from-binary flag that preserves old behaviour and uses the same binary
+  that is running install to uninstall the existing agent.
 
 # Affected component; a word indicating the component this changeset affects.
 component:
