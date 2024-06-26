@@ -115,17 +115,6 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 			expectedInterval: 10 * time.Second,
 		},
 	}
-<<<<<<< HEAD
-	b := &BeatsMonitor{
-		enabled:         true,
-		config:          mCfg,
-		operatingSystem: runtime.GOOS,
-		agentInfo:       agentInfo,
-	}
-	got, err := b.MonitoringConfig(policy, nil, map[string]string{"foobeat": "filebeat"}) // put a componentID/binary mapping to have something in the beats monitoring input
-	assert.NoError(t, err)
-=======
->>>>>>> 6a452564dd (Introduce agent.monitoring.metrics_period (#4961))
 
 	for _, tc := range tcs {
 
@@ -136,7 +125,7 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
 			}
-			got, err := b.MonitoringConfig(tc.policy, nil, map[string]string{"foobeat": "filebeat"}, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
+			got, err := b.MonitoringConfig(tc.policy, nil, map[string]string{"foobeat": "filebeat"}) // put a componentID/binary mapping to have something in the beats monitoring input
 			assert.NoError(t, err)
 
 			rawInputs, ok := got["inputs"]

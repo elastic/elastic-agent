@@ -166,11 +166,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	}
 
 	if b.config.C.MonitorMetrics {
-<<<<<<< HEAD
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, monitoringOutput, components); err != nil {
-=======
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, componentIDPidMap, metricsCollectionIntervalString); err != nil {
->>>>>>> 6a452564dd (Introduce agent.monitoring.metrics_period (#4961))
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, metricsCollectionIntervalString); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -546,22 +542,12 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
-<<<<<<< HEAD
-func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component) error {
-	metricsCollectionIntervalString := metricsCollectionInterval.String()
-=======
 // injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.
-func (b *BeatsMonitor) injectMetricsInput(
-	cfg map[string]interface{},
-	componentIDToBinary map[string]string,
-	componentList []component.Component,
-	existingStateServicePids map[string]uint64,
-	metricsCollectionIntervalString string,
-) error {
+func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, componentList []component.Component, metricsCollectionIntervalString string) error {
 	if metricsCollectionIntervalString == "" {
 		metricsCollectionIntervalString = defaultMetricsCollectionInterval.String()
 	}
->>>>>>> 6a452564dd (Introduce agent.monitoring.metrics_period (#4961))
+
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 	beatsStreams := make([]interface{}, 0, len(componentIDToBinary))
