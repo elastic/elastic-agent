@@ -154,7 +154,7 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 			log.Printf("+++ Prepare to download project [%s] for [%s]", project.Name, platform)
 
 			if !project.SupportsPlatform(platform) {
-				log.Printf(">>>>>>>>> Project [%s] does not support platform [%s] ", binary, platform)
+				log.Printf(">>>>>>>>> Binary [%s] does not support platform [%s] ", binary, platform)
 				continue
 			}
 
