@@ -19,6 +19,7 @@ import (
 	"github.com/magefile/mage/mg"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
@@ -49,27 +50,46 @@ var AllowedManifestHosts = []string{"snapshots.elastic.co", "staging.elastic.co"
 // https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
 // https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
 // https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
-var ExternalBinaries = map[string]string{
-	"agentbeat":             "beats",
-	"apm-server":            "apm-server", // not supported on darwin/aarch64
-	"cloudbeat":             "cloudbeat",  // only supporting linux/amd64 or linux/arm64
-	"cloud-defend":          "cloud-defend",
-	"endpoint-security":     "endpoint-dev",
-	"fleet-server":          "fleet-server",
-	"pf-elastic-collector":  "prodfiler",
-	"pf-elastic-symbolizer": "prodfiler",
-	"pf-host-agent":         "prodfiler",
+var ReleasePackages = map[string]Project{
+	"agentbeat":             Project{Name: "beats", Platforms: AllPlatforms},
+	"apm-server":            Project{Name: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
+	"cloudbeat":             Project{Name: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	"cloud-defend":          Project{Name: "cloud-defend", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	"endpoint-security":     Project{Name: "endpoint-dev", Platforms: AllPlatforms},
+	"fleet-server":          Project{Name: "fleet-server", Platforms: AllPlatforms},
+	"pf-elastic-collector":  Project{Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	"pf-elastic-symbolizer": Project{Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	"pf-host-agent":         Project{Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
 }
 
-// Converts ExternalBinaries into a map of projects and the packages they contain. For example:
-// "prodfiler": {"pf-elastic-collector", "pf-elastic-symbolizer", "pf-host-agent"}
-func expectedProjectPkgs() map[string][]string {
-	expectedProjectPkgs := make(map[string][]string)
-	for component, pkg := range ExternalBinaries {
-		expectedProjectPkgs[pkg] = append(expectedProjectPkgs[pkg], component)
-	}
-	return expectedProjectPkgs
+type Project struct {
+	Name      string
+	Platforms []Platform
 }
+
+func (proj Project) SupportsPlatform(platform string) bool {
+	for _, p := range proj.Platforms {
+		if p.Platform() == platform {
+			return true
+		}
+	}
+	return false
+}
+
+type Platform struct {
+	OS   string
+	Arch string
+}
+
+// Converts to the format expected on the mage command line "linux", "x86_64" = "linux/amd64"
+func (p Platform) Platform() string {
+	if p.Arch == "x86_64" {
+		p.Arch = "amd64"
+	}
+	return p.OS + "/" + p.Arch
+}
+
+var AllPlatforms = []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}, {"darwin", "aarch64"}}
 
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
 func DownloadManifest(ctx context.Context, manifest string) (tools.Build, error) {
@@ -100,19 +120,81 @@ func DownloadManifest(ctx context.Context, manifest string) (tools.Build, error)
 	return manifestResponse, nil
 }
 
-func resolveManifestPackage(project tools.Project, pkg string, reqPackage string, version string) ([]string, error) {
+// DownloadComponentsFromManifest is going to download a set of components from the given manifest into the destination
+// dropPath folder in order to later use that folder for packaging
+func DownloadComponentsFromManifest(ctx context.Context, manifest string, platforms []string, dropPath string) error {
+	manifestResponse, err := DownloadManifest(ctx, manifest)
+	if err != nil {
+		return fmt.Errorf("failed to download remote manifest file %w", err)
+	}
+	projects := manifestResponse.Projects
+
+	parsedManifestVersion, err := version.ParseVersion(manifestResponse.Version)
+	if err != nil {
+		return fmt.Errorf("failed to parse manifest version: [%s]", manifestResponse.Version)
+	}
+
+	// For resolving manifest package name and version, just use the Major.Minor.Patch part of the version
+	// for Staging builds, and Major.Minor.Patch-SNAPSHOT for snapshots.
+	// This eliminates the "+buildYYYYMMDDHHMM" suffix on Independent Agent Release builds
+	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
+
+	errGrp, downloadsCtx := errgroup.WithContext(ctx)
+	// for project, pkgs := range expectedProjectPkgs() {
+	for pkg, project := range ReleasePackages {
+		for _, platform := range platforms {
+			targetPath := filepath.Join(dropPath)
+			err := os.MkdirAll(targetPath, 0755)
+			if err != nil {
+				return fmt.Errorf("failed to create directory %s", targetPath)
+			}
+			log.Printf("+++ Prepare to download project [%s] for [%s]", project.Name, platform)
+
+			if !project.SupportsPlatform(platform) {
+				log.Printf(">>>>>>>>> Project [%s] does not support platform [%s] ", pkg, platform)
+				continue
+			}
+
+			pkgURL, err := resolveManifestPackage(projects[project.Name], pkg, common.PlatformPackages[platform], majorMinorPatchVersion)
+			if err != nil {
+				return err
+			}
+
+			for _, p := range pkgURL {
+				log.Printf(">>>>>>>>> Downloading [%s] [%s] ", pkg, p)
+				pkgFilename := path.Base(p)
+				downloadTarget := filepath.Join(targetPath, pkgFilename)
+				if _, err := os.Stat(downloadTarget); err != nil {
+					errGrp.Go(func(ctx context.Context, url, target string) func() error {
+						return func() error { return DownloadPackage(ctx, url, target) }
+					}(downloadsCtx, p, downloadTarget))
+				}
+			}
+		}
+	}
+
+	err = errGrp.Wait()
+	if err != nil {
+		return fmt.Errorf("error downloading files: %w", err)
+	}
+
+	log.Printf("Downloads for manifest %q complete.", manifest)
+	return nil
+}
+
+func resolveManifestPackage(project tools.Project, pkg string, platformPkg string, version string) ([]string, error) {
 	var val tools.Package
 	var ok bool
 
 	// Try the normal/easy case first
-	packageName := fmt.Sprintf("%s-%s-%s", pkg, version, reqPackage)
+	packageName := fmt.Sprintf("%s-%s-%s", pkg, version, platformPkg)
 	val, ok = project.Packages[packageName]
 	if !ok {
 		// If we didn't find it, it may be an Independent Agent Release, where
 		// the opted-in projects will have a patch version one higher than
 		// the rest of the projects, so we need to seek that out
 		if mg.Verbose() {
-			log.Printf(">>>>>>>>>>> Looking for package [%s] of type [%s]", pkg, reqPackage)
+			log.Printf(">>>>>>>>>>> Looking for package [%s] of type [%s]", pkg, platformPkg)
 		}
 
 		var foundIt bool
@@ -125,10 +207,10 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 
 				secondHalf := firstSplit[1]
 				// Make sure we're finding one w/ the same required package type
-				if strings.Contains(secondHalf, reqPackage) {
+				if strings.Contains(secondHalf, platformPkg) {
 
 					// Split again after the version with the required package string
-					secondSplit := strings.Split(secondHalf, "-"+reqPackage)
+					secondSplit := strings.Split(secondHalf, "-"+platformPkg)
 					if len(secondSplit) < 2 {
 						continue
 					}
@@ -140,7 +222,7 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 					}
 
 					// Create a project/package key with the package, derived version, and required package
-					foundPkgKey := fmt.Sprintf("%s-%s-%s", pkg, pkgVersion, reqPackage)
+					foundPkgKey := fmt.Sprintf("%s-%s-%s", pkg, pkgVersion, platformPkg)
 					if mg.Verbose() {
 						log.Printf(">>>>>>>>>>> Looking for project package key: [%s]", foundPkgKey)
 					}
@@ -170,65 +252,6 @@ func resolveManifestPackage(project tools.Project, pkg string, reqPackage string
 	}
 
 	return []string{val.URL, val.ShaURL, val.AscURL}, nil
-}
-
-// DownloadComponentsFromManifest is going to download a set of components from the given manifest into the destination
-// dropPath folder in order to later use that folder for packaging
-func DownloadComponentsFromManifest(ctx context.Context, manifest string, platforms []string, platformPackages map[string]string, dropPath string) error {
-	manifestResponse, err := DownloadManifest(ctx, manifest)
-	if err != nil {
-		return fmt.Errorf("failed to download remote manifest file %w", err)
-	}
-	projects := manifestResponse.Projects
-
-	parsedManifestVersion, err := version.ParseVersion(manifestResponse.Version)
-	if err != nil {
-		return fmt.Errorf("failed to parse manifest version: [%s]", manifestResponse.Version)
-	}
-
-	// For resolving manifest package name and version, just use the Major.Minor.Patch part of the version
-	// for Staging builds, and Major.Minor.Patch-SNAPSHOT for snapshots.
-	// This eliminates the "+buildYYYYMMDDHHMM" suffix on Independent Agent Release builds
-	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
-
-	errGrp, downloadsCtx := errgroup.WithContext(ctx)
-	for project, pkgs := range expectedProjectPkgs() {
-		for _, platform := range platforms {
-			targetPath := filepath.Join(dropPath)
-			err := os.MkdirAll(targetPath, 0755)
-			if err != nil {
-				return fmt.Errorf("failed to create directory %s", targetPath)
-			}
-			log.Printf("+++ Prepare to download project [%s] for [%s]", project, platform)
-
-			for _, pkg := range pkgs {
-				reqPackage := platformPackages[platform]
-				pkgURL, err := resolveManifestPackage(projects[project], pkg, reqPackage, majorMinorPatchVersion)
-				if err != nil {
-					return err
-				}
-
-				for _, p := range pkgURL {
-					log.Printf(">>>>>>>>> Downloading [%s] [%s] ", pkg, p)
-					pkgFilename := path.Base(p)
-					downloadTarget := filepath.Join(targetPath, pkgFilename)
-					if _, err := os.Stat(downloadTarget); err != nil {
-						errGrp.Go(func(ctx context.Context, url, target string) func() error {
-							return func() error { return DownloadPackage(ctx, url, target) }
-						}(downloadsCtx, p, downloadTarget))
-					}
-				}
-			}
-		}
-	}
-
-	err = errGrp.Wait()
-	if err != nil {
-		return fmt.Errorf("error downloading files: %w", err)
-	}
-
-	log.Printf("Downloads for manifest %q complete.", manifest)
-	return nil
 }
 
 func DownloadPackage(ctx context.Context, downloadUrl string, target string) error {

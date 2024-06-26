@@ -519,7 +519,7 @@ func DownloadManifest(ctx context.Context) error {
 		requiredPackages = append(requiredPackages, common.PlatformPackages[p])
 	}
 
-	if e := manifest.DownloadComponentsFromManifest(ctx, devtools.ManifestURL, platforms, common.PlatformPackages, dropPath); e != nil {
+	if e := manifest.DownloadComponentsFromManifest(ctx, devtools.ManifestURL, platforms, dropPath); e != nil {
 		return fmt.Errorf("failed to download the manifest file, %w", e)
 	}
 	log.Printf(">> Completed downloading packages from manifest into drop-in %s", dropPath)
@@ -1057,13 +1057,13 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
-			for binary, project := range manifest.ExternalBinaries {
+			for binary, project := range manifest.ReleasePackages {
 				for _, platform := range platforms {
 					reqPackage := common.PlatformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
-					errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath, completedDownloads))
+					errGroup.Go(downloadBinary(ctx, project.Name, packageName, binary, platform, newVersion, targetPath, completedDownloads))
 				}
 			}
 
@@ -1204,9 +1204,9 @@ func getComponentVersion(componentName string, requiredPackage string, component
 	// Iterate over all the packages in the component project
 	for pkgName, _ := range componentProject.Packages {
 		// Only care about the external binaries that we want to package
-		for binaryPrefix, binaryComponent := range manifest.ExternalBinaries {
+		for binaryPrefix, project := range manifest.ReleasePackages {
 			// If the given component name doesn't match the external binary component, skip
-			if componentName != binaryComponent {
+			if componentName != project.Name {
 				continue
 			}
 
@@ -1282,7 +1282,7 @@ func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, ve
 			// Only care about packages that match the required package constraint (os/arch)
 			if strings.Contains(pkgName, requiredPackage) {
 				// Iterate over the external binaries that we care about for packaging agent
-				for filePrefix, _ := range manifest.ExternalBinaries {
+				for filePrefix, _ := range manifest.ReleasePackages {
 					// If the individual package doesn't match the expected prefix, then continue
 					if !strings.HasPrefix(pkgName, filePrefix) {
 						continue

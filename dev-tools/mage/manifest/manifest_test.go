@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,15 +39,15 @@ func TestBlah(t *testing.T) {
 		file            string
 		projectName     string
 		packageName     string
-		requiredPackage string
+		platform        string
 		expectedUrlList []string
 	}{
 		{
-			name:            "Unified Release Staging 8.14 apm-server",
-			file:            manifest8_14_2,
-			projectName:     "apm-server",
-			packageName:     "apm-server",
-			requiredPackage: "linux-x86_64.tar.gz",
+			name:        "Unified Release Staging 8.14 apm-server",
+			file:        manifest8_14_2,
+			projectName: "apm-server",
+			packageName: "apm-server",
+			platform:    "linux/amd64",
 			expectedUrlList: []string{
 				"https://staging.elastic.co/8.14.2-cfd42f49/downloads/apm-server/apm-server-8.14.2-linux-x86_64.tar.gz",
 				"https://staging.elastic.co/8.14.2-cfd42f49/downloads/apm-server/apm-server-8.14.2-linux-x86_64.tar.gz.sha512",
@@ -54,11 +55,19 @@ func TestBlah(t *testing.T) {
 			},
 		},
 		{
-			name:            "Unified Release Snapshot 8.14 apm-server",
-			file:            manifest8_14_2_SNAPSHOT,
+			name:            "Unified Release Staging 8.14 apm-server unsupported architecture",
+			file:            manifest8_14_2,
 			projectName:     "apm-server",
 			packageName:     "apm-server",
-			requiredPackage: "linux-x86_64.tar.gz",
+			platform:        "darwin/aarch64",
+			expectedUrlList: []string{},
+		},
+		{
+			name:        "Unified Release Snapshot 8.14 apm-server",
+			file:        manifest8_14_2_SNAPSHOT,
+			projectName: "apm-server",
+			packageName: "apm-server",
+			platform:    "linux/amd64",
 			expectedUrlList: []string{
 				"https://snapshots.elastic.co/8.14.2-1ceac187/downloads/apm-server/apm-server-8.14.2-SNAPSHOT-linux-x86_64.tar.gz",
 				"https://snapshots.elastic.co/8.14.2-1ceac187/downloads/apm-server/apm-server-8.14.2-SNAPSHOT-linux-x86_64.tar.gz.sha512",
@@ -66,11 +75,11 @@ func TestBlah(t *testing.T) {
 			},
 		},
 		{
-			name:            "Independent Agent Staging 8.14 apm-server",
-			file:            manifest8_14_0_build202406201002,
-			projectName:     "apm-server",
-			packageName:     "apm-server",
-			requiredPackage: "linux-x86_64.tar.gz",
+			name:        "Independent Agent Staging 8.14 apm-server",
+			file:        manifest8_14_0_build202406201002,
+			projectName: "apm-server",
+			packageName: "apm-server",
+			platform:    "linux/amd64",
 			expectedUrlList: []string{
 				"https://staging.elastic.co/8.14.0-fe696c51/downloads/apm-server/apm-server-8.14.0-linux-x86_64.tar.gz",
 				"https://staging.elastic.co/8.14.0-fe696c51/downloads/apm-server/apm-server-8.14.0-linux-x86_64.tar.gz.sha512",
@@ -78,11 +87,11 @@ func TestBlah(t *testing.T) {
 			},
 		},
 		{
-			name:            "Unified Release Staging 8.14 endpoint-dev",
-			file:            manifest8_14_2,
-			projectName:     "endpoint-dev",
-			packageName:     "endpoint-security",
-			requiredPackage: "linux-x86_64.tar.gz",
+			name:        "Unified Release Staging 8.14 endpoint-dev",
+			file:        manifest8_14_2,
+			projectName: "endpoint-dev",
+			packageName: "endpoint-security",
+			platform:    "linux/amd64",
 			expectedUrlList: []string{
 				"https://staging.elastic.co/8.14.2-cfd42f49/downloads/endpoint-dev/endpoint-security-8.14.2-linux-x86_64.tar.gz",
 				"https://staging.elastic.co/8.14.2-cfd42f49/downloads/endpoint-dev/endpoint-security-8.14.2-linux-x86_64.tar.gz.sha512",
@@ -90,11 +99,11 @@ func TestBlah(t *testing.T) {
 			},
 		},
 		{
-			name:            "Unified Release Snapshot 8.14 endpoint-dev",
-			file:            manifest8_14_2_SNAPSHOT,
-			projectName:     "endpoint-dev",
-			packageName:     "endpoint-security",
-			requiredPackage: "linux-x86_64.tar.gz",
+			name:        "Unified Release Snapshot 8.14 endpoint-dev",
+			file:        manifest8_14_2_SNAPSHOT,
+			projectName: "endpoint-dev",
+			packageName: "endpoint-security",
+			platform:    "linux/amd64",
 			expectedUrlList: []string{
 				"https://snapshots.elastic.co/8.14.2-1ceac187/downloads/endpoint-dev/endpoint-security-8.14.2-SNAPSHOT-linux-x86_64.tar.gz",
 				"https://snapshots.elastic.co/8.14.2-1ceac187/downloads/endpoint-dev/endpoint-security-8.14.2-SNAPSHOT-linux-x86_64.tar.gz.sha512",
@@ -102,11 +111,11 @@ func TestBlah(t *testing.T) {
 			},
 		},
 		{
-			name:            "Independent Agent Staging 8.14 endpoint-dev",
-			file:            manifest8_14_0_build202406201002,
-			projectName:     "endpoint-dev",
-			packageName:     "endpoint-security",
-			requiredPackage: "linux-x86_64.tar.gz",
+			name:        "Independent Agent Staging 8.14 endpoint-dev",
+			file:        manifest8_14_0_build202406201002,
+			projectName: "endpoint-dev",
+			packageName: "endpoint-security",
+			platform:    "linux/amd64",
 			// Note how the version is one patch release higher than the manifest - this is expected
 			expectedUrlList: []string{
 				"https://staging.elastic.co/independent-agent/8.14.1+build202406201002/downloads/endpoint-dev/endpoint-security-8.14.1-linux-x86_64.tar.gz",
@@ -123,12 +132,16 @@ func TestBlah(t *testing.T) {
 
 			projects := manifestJson.Projects
 
-			// Verify the component name is in the ComponentSpec
-			projectPkgs := expectedProjectPkgs()
-			_, ok := projectPkgs[tc.projectName]
+			// Verify the component name is in the list of expected packages.
+			project, ok := ReleasePackages[tc.packageName]
 			assert.True(t, ok)
 
-			urlList, err := resolveManifestPackage(projects[tc.projectName], tc.packageName, tc.requiredPackage, manifestJson.Version)
+			if !project.SupportsPlatform(tc.platform) {
+				t.Logf("Project %s does not support platform %s", project.Name, tc.platform)
+				return
+			}
+
+			urlList, err := resolveManifestPackage(projects[tc.projectName], tc.packageName, common.PlatformPackages[tc.platform], manifestJson.Version)
 			require.NoError(t, err)
 
 			assert.Len(t, urlList, 3)
