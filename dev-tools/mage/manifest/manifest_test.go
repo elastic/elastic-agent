@@ -35,7 +35,7 @@ func TestBlah(t *testing.T) {
 	tcs := []struct {
 		name            string
 		file            string
-		componentName   string
+		projectName     string
 		packageName     string
 		requiredPackage string
 		expectedUrlList []string
@@ -43,7 +43,7 @@ func TestBlah(t *testing.T) {
 		{
 			name:            "Unified Release Staging 8.14 apm-server",
 			file:            manifest8_14_2,
-			componentName:   "apm-server",
+			projectName:     "apm-server",
 			packageName:     "apm-server",
 			requiredPackage: "linux-x86_64.tar.gz",
 			expectedUrlList: []string{
@@ -55,7 +55,7 @@ func TestBlah(t *testing.T) {
 		{
 			name:            "Unified Release Snapshot 8.14 apm-server",
 			file:            manifest8_14_2_SNAPSHOT,
-			componentName:   "apm-server",
+			projectName:     "apm-server",
 			packageName:     "apm-server",
 			requiredPackage: "linux-x86_64.tar.gz",
 			expectedUrlList: []string{
@@ -67,7 +67,7 @@ func TestBlah(t *testing.T) {
 		{
 			name:            "Independent Agent Staging 8.14 apm-server",
 			file:            manifest8_14_0_build202406201002,
-			componentName:   "apm-server",
+			projectName:     "apm-server",
 			packageName:     "apm-server",
 			requiredPackage: "linux-x86_64.tar.gz",
 			expectedUrlList: []string{
@@ -79,7 +79,7 @@ func TestBlah(t *testing.T) {
 		{
 			name:            "Unified Release Staging 8.14 endpoint-dev",
 			file:            manifest8_14_2,
-			componentName:   "endpoint-dev",
+			projectName:     "endpoint-dev",
 			packageName:     "endpoint-security",
 			requiredPackage: "linux-x86_64.tar.gz",
 			expectedUrlList: []string{
@@ -91,7 +91,7 @@ func TestBlah(t *testing.T) {
 		{
 			name:            "Unified Release Snapshot 8.14 endpoint-dev",
 			file:            manifest8_14_2_SNAPSHOT,
-			componentName:   "endpoint-dev",
+			projectName:     "endpoint-dev",
 			packageName:     "endpoint-security",
 			requiredPackage: "linux-x86_64.tar.gz",
 			expectedUrlList: []string{
@@ -103,7 +103,7 @@ func TestBlah(t *testing.T) {
 		{
 			name:            "Independent Agent Staging 8.14 endpoint-dev",
 			file:            manifest8_14_0_build202406201002,
-			componentName:   "endpoint-dev",
+			projectName:     "endpoint-dev",
 			packageName:     "endpoint-security",
 			requiredPackage: "linux-x86_64.tar.gz",
 			// Note how the version is one patch release higher than the manifest - this is expected
@@ -123,11 +123,11 @@ func TestBlah(t *testing.T) {
 			projects := manifestJson.Projects
 
 			// Verify the component name is in the ComponentSpec
-			pkgs := componentPkgs()
-			_, ok := pkgs[tc.componentName]
+			projectPkgs := expectedProjectPkgs()
+			_, ok := projectPkgs[tc.projectName]
 			assert.True(t, ok)
 
-			urlList := resolveManifestPackage(projects[tc.componentName], tc.packageName, tc.requiredPackage, manifestJson.Version)
+			urlList := resolveManifestPackage(projects[tc.projectName], tc.packageName, tc.requiredPackage, manifestJson.Version)
 
 			assert.Len(t, urlList, 3)
 			for _, url := range urlList {

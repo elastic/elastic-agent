@@ -61,14 +61,14 @@ var ExternalBinaries = map[string]string{
 	"pf-host-agent":         "prodfiler",
 }
 
-// Converts ExternalBinaries into a map of packages and the binaries they contain. For example:
+// Converts ExternalBinaries into a map of projects and the packages they contain. For example:
 // "prodfiler": {"pf-elastic-collector", "pf-elastic-symbolizer", "pf-host-agent"}
-func componentPkgs() map[string][]string {
-	componentPkgs := make(map[string][]string)
+func expectedProjectPkgs() map[string][]string {
+	expectedProjectPkgs := make(map[string][]string)
 	for component, pkg := range ExternalBinaries {
-		componentPkgs[pkg] = append(componentPkgs[pkg], component)
+		expectedProjectPkgs[pkg] = append(expectedProjectPkgs[pkg], component)
 	}
-	return componentPkgs
+	return expectedProjectPkgs
 }
 
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
@@ -192,18 +192,18 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 	majorMinorPatchVersion := parsedManifestVersion.VersionWithPrerelease()
 
 	errGrp, downloadsCtx := errgroup.WithContext(context.Background())
-	for component, pkgs := range componentPkgs() {
+	for project, pkgs := range expectedProjectPkgs() {
 		for _, platform := range platforms {
 			targetPath := filepath.Join(dropPath)
 			err := os.MkdirAll(targetPath, 0755)
 			if err != nil {
 				return fmt.Errorf("failed to create directory %s", targetPath)
 			}
-			log.Printf("+++ Prepare to download project [%s] for [%s]", component, platform)
+			log.Printf("+++ Prepare to download project [%s] for [%s]", project, platform)
 
 			for _, pkg := range pkgs {
 				reqPackage := platformPackages[platform]
-				pkgURL := resolveManifestPackage(projects[component], pkg, reqPackage, majorMinorPatchVersion)
+				pkgURL := resolveManifestPackage(projects[project], pkg, reqPackage, majorMinorPatchVersion)
 				if pkgURL != nil {
 					for _, p := range pkgURL {
 						log.Printf(">>>>>>>>> Downloading [%s] [%s] ", pkg, p)
