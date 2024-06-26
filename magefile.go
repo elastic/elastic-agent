@@ -1146,7 +1146,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 }
 
 // This is a helper function for flattenDependencies that's used when not packaging from a manifest
-func fileHelperNoManifest(versionedFlatPath string, versionedDropPath string, packageVersion string) map[string]string {
+func checksumsWithoutManifest(versionedFlatPath string, versionedDropPath string, packageVersion string) map[string]string {
 	globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
 	if mg.Verbose() {
 		log.Printf("Finding files to copy with %s", globExpr)
@@ -1273,7 +1273,7 @@ func fixCloudDefendDirPath(dirPath string, componentVersion string, expectedArch
 }
 
 // This is a helper function for flattenDependencies that's used when building from a manifest
-func fileHelperWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse tools.Build) map[string]string {
+func checksumsWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse tools.Build) map[string]string {
 
 	checksums := make(map[string]string)
 
@@ -1434,9 +1434,9 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 		checksums := make(map[string]string)
 		// Operate on the files depending on if we're packaging from a manifest or not
 		if devtools.PackagingFromManifest {
-			checksums = fileHelperWithManifest(rp, versionedFlatPath, versionedDropPath, manifestResponse)
+			checksums = checksumsWithManifest(rp, versionedFlatPath, versionedDropPath, manifestResponse)
 		} else {
-			checksums = fileHelperNoManifest(versionedFlatPath, versionedDropPath, packageVersion)
+			checksums = checksumsWithoutManifest(versionedFlatPath, versionedDropPath, packageVersion)
 		}
 
 		if err := appendComponentChecksums(versionedDropPath, checksums); err != nil {
