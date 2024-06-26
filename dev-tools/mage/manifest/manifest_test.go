@@ -37,7 +37,7 @@ func getManifestJsonData(t *testing.T, contents string) tools.Build {
 	return response
 }
 
-func TestBlah(t *testing.T) {
+func TestResolveManifestPackage(t *testing.T) {
 	tcs := []struct {
 		name            string
 		file            string
