@@ -389,7 +389,7 @@ func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 	mockUploader.EXPECT().UploadDiagnostics(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("upload-id", nil)
 
 	diagAction := &fleetapi.ActionDiagnostics{
-		AdditionalMetrics: []string{"CPU"},
+		Data: fleetapi.ActionDiagnosticsData{AdditionalMetrics: []string{"CPU"}},
 	}
 	handler.collectDiag(context.Background(), diagAction, mockAcker)
 
