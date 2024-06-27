@@ -880,9 +880,6 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	t.Log("Verified endpoint component and units are healthy")
 
 	t.Log("Run elastic-agent install -f...")
-	fixture2, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err, "could not create agent fixture")
-
 	// We use the same policy with tamper protection enabled for this test and expect it to fail.
 	token, err := info.KibanaClient.CreateEnrollmentAPIKey(ctx, kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policy.ID,
@@ -894,9 +891,11 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	args := []string{
 		"install",
 		"--force",
-		"--url=" + url,
-		"--enrollment-token=" + token.APIKey,
+		"--url",
+		url,
+		"--enrollment-token",
+		token.APIKey,
 	}
-	out, err := fixture2.Exec(ctx, args)
+	out, err := fixture.Exec(ctx, args)
 	require.Errorf(t, err, "No error detected, command output: %s", out)
 }
