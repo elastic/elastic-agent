@@ -81,6 +81,7 @@ require (
 	k8s.io/apimachinery v0.29.5
 	k8s.io/client-go v0.29.5
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
+	sigs.k8s.io/e2e-framework v0.3.0
 )
 
 require (
@@ -152,6 +153,7 @@ require (
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
+	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/expr-lang/expr v1.16.9 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -172,6 +174,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/licenseclassifier v0.0.0-20221004142553-c1ed8fcf4bab // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
 	github.com/hashicorp/consul/api v1.29.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -309,6 +312,7 @@ require (
 	howett.net/plist v1.0.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
 	k8s.io/kubelet v0.29.3 // indirect
+	sigs.k8s.io/controller-runtime v0.15.1 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
