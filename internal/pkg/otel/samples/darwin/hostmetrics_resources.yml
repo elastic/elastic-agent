@@ -23,8 +23,8 @@ exporters:
 
   # Exporter to send logs and metrics to Elasticsearch
   elasticsearch/bulk:
-    endpoints: [<<ES_ENDPOINT>>]
-    api_key: <<ES_API_KEY>>
+    endpoints: [${env:ELASTIC_ENDPOINT}]
+    api_key: ${env:ELASTIC_API_KEY}
 
 service:
   pipelines:
