@@ -188,7 +188,7 @@ func (w *Writer) writeBlock(b []byte) error {
 		return w.err
 	}
 
-	// nolint:errcheck // Ignore the error at this point.
+	// nolint: errcheck // Ignore the error at this point.
 	w.writer.Write(iv)
 
 	encodedBytes := w.gcm.Seal(nil, iv, b, nil)
