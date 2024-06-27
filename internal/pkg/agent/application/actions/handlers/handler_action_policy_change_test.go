@@ -395,6 +395,65 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			})
 	})
 
+	t.Run("Bad http status from new fleet host does not change remote config", func(t *testing.T) {
+		badStatusCodes := []int{http.StatusInternalServerError, http.StatusNotFound}
+		for _, httpStatusCode := range badStatusCodes {
+			t.Run(fmt.Sprintf("HTTP %d", httpStatusCode), func(t *testing.T) {
+				alwaysErroringServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(httpStatusCode)
+					_, err := w.Write(nil)
+					require.NoError(t, err)
+				}))
+				defer alwaysErroringServer.Close()
+
+				log, _ := logger.NewTesting("TestPolicyChangeHandler")
+				var setterCalledCount int
+				setter := testSetter{SetClientFn: func(c client.Sender) {
+					setterCalledCount++
+				}}
+
+				originalCfg := &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Server: &configuration.FleetServerConfig{
+							Host: fleetServerHost,
+							Port: uint16(fleetServerPort),
+						},
+						AccessAPIKey: "ignore",
+						Client: remote.Config{
+							Transport: httpcommon.HTTPTransportSettings{
+								Proxy: httpcommon.HTTPClientProxySettings{
+									URL: nil,
+								}}},
+					},
+					Settings: configuration.DefaultSettingsConfig()}
+
+				h := PolicyChangeHandler{
+					agentInfo:            &info.AgentInfo{},
+					config:               originalCfg,
+					store:                &storage.NullStore{},
+					setters:              []actions.ClientSetter{&setter},
+					log:                  log,
+					policyLogLevelSetter: mockhandlers.NewLogLevelSetter(t),
+				}
+
+				cfg := config.MustNewConfigFrom(
+					map[string]interface{}{
+						"fleet.proxy_url": "",
+						"fleet.hosts":     []string{alwaysErroringServer.URL},
+					})
+
+				err = h.handlePolicyChange(context.Background(), cfg)
+				if assert.Error(t, err, "action policy change handler should return an error if new fleet server sends back a bad status code") {
+					// check that we have the correct error contents
+					assert.ErrorContains(t, err, fmt.Sprintf("fleet server ping returned a bad status code: %d", httpStatusCode))
+				}
+
+				assert.Equal(t, 0, setterCalledCount, "client setter should nopt have been called as the new policy was invalid")
+				assert.Equal(t, fleetServerHost, h.config.Fleet.Server.Host, "fleet server host should be unchanged since new policy has been rejected")
+			})
+		}
+	})
+
 	t.Run("policy with SSL config", func(t *testing.T) {
 		agentChildEncPassphrase := `reallySecurePassword`
 		passphrasePath := filepath.Join(t.TempDir(), "passphrase")
