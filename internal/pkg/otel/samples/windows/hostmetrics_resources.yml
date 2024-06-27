@@ -22,13 +22,13 @@ exporters:
     sampling_thereafter: 1000
 
   # Exporter to send logs and metrics to Elasticsearch
-  elasticsearch/bulk:
-    endpoints: [<<ES_ENDPOINT>>]
-    api_key: <<ES_API_KEY>>
+  elasticsearch:
+    endpoints: [${env:ELASTIC_ENDPOINT}]
+    api_key: ${env:ELASTIC_API_KEY}
 
 service:
   pipelines:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
       processors: [resourcedetection/system]
-      exporters: [debug, elasticsearch/bulk]
+      exporters: [debug, elasticsearch]

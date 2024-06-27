@@ -31,9 +31,9 @@ exporters:
     # Elastic APM Server secret token or API key
       Authorization: "Bearer <<APM_SECRET_KEY>>"
 
-  elasticsearch/bulk:
-    endpoints: [<<ES_ENDPOINT>>]
-    api_key: <<ES_API_KEY>>
+  elasticsearch:
+    endpoints: [${env:ELASTIC_ENDPOINT}]
+    api_key: ${env:ELASTIC_API_KEY}
 
 service:
   pipelines:
@@ -50,7 +50,7 @@ service:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
       processors: [elasticinframetrics]
-      exporters: [elasticsearch/bulk]
+      exporters: [elasticsearch]
 
     logs/fromsdk:
       receivers: [otlp/fromsdk]
@@ -60,4 +60,4 @@ service:
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: []
-      exporters: [elasticsearch/bulk]
+      exporters: [elasticsearch]
