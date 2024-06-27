@@ -14,22 +14,10 @@ receivers:
       cpu:
       memory:
 
-  # Receiver for logs, traces, and metrics from SDKs
-  otlp/fromsdk:
-    protocols:
-      grpc:
-      http:
-
 processors:
   elasticinframetrics:
 
 exporters:
-
-  otlp/apm:
-    endpoint: <<APM_ENDPOINT>>
-    headers:
-    # Elastic APM Server secret token or API key
-      Authorization: "Bearer <<APM_SECRET_KEY>>"
 
   elasticsearch/bulk:
     endpoints: [<<ES_ENDPOINT>>]
@@ -37,25 +25,10 @@ exporters:
 
 service:
   pipelines:
-    traces/fromsdk:
-      receivers: [otlp/fromsdk]
-      processors: []
-      exporters: [otlp/apm]
-
-    metrics/fromsdk:
-      receivers: [otlp/fromsdk]
-      processors: []
-      exporters: [otlp/apm]
-
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
       processors: [elasticinframetrics]
       exporters: [elasticsearch/bulk]
-
-    logs/fromsdk:
-      receivers: [otlp/fromsdk]
-      processors: []
-      exporters: [otlp/apm]
 
     logs/platformlogs:
       receivers: [filelog/platformlogs]

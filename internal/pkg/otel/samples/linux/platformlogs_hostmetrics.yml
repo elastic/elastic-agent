@@ -1,9 +1,8 @@
 receivers:
-
   # Receiver for platform specific log files
   filelog/platformlogs:
     include: [ /var/log/*.log ]
-#    start_at: beginning
+#   start_at: beginning
 
   # Receiver for CPU, Disk, Memory, and Filesystem metrics
   hostmetrics/system:
@@ -14,11 +13,14 @@ receivers:
       cpu:
       memory:
 
-processors:
-  elasticinframetrics:
-
 exporters:
+  # Exporter to print the first 5 logs/metrics and then every 1000th
+  debug:
+    verbosity: detailed
+    sampling_initial: 5
+    sampling_thereafter: 1000
 
+  # Exporter to send logs and metrics to Elasticsearch
   elasticsearch/bulk:
     endpoints: [<<ES_ENDPOINT>>]
     api_key: <<ES_API_KEY>>
@@ -27,10 +29,9 @@ service:
   pipelines:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [elasticinframetrics]
-      exporters: [elasticsearch/bulk]
-
+      processors: []
+      exporters: [debug, elasticsearch/bulk]
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: []
-      exporters: [elasticsearch/bulk]
+      exporters: [debug, elasticsearch/bulk]
