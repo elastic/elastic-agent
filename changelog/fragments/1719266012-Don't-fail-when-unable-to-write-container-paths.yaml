@@ -11,7 +11,7 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Don't fail when unable to write container-paths.yml
+summary: Allow Elastic Agent container to work with a read-only filesystem
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
