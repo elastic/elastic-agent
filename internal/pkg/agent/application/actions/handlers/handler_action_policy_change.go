@@ -179,6 +179,12 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return errors.New(
+			err, fmt.Sprintf("fleet server ping returned a bad status code: %d", resp.StatusCode),
+			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
+	}
+
 	// discard body for proper cancellation and connection reuse
 	_, _ = io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
