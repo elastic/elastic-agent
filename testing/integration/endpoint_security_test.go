@@ -234,34 +234,6 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 }
 
 func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info, protected bool) {
-<<<<<<< HEAD
-	// Get path to agent executable.
-	fixture, err := define.NewFixture(t, define.Version())
-	require.NoError(t, err)
-
-	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
-	createPolicyReq := buildPolicyWithTamperProtection(
-		kibana.AgentPolicy{
-			Name:        "test-policy-" + policyUUID,
-			Namespace:   "default",
-			Description: "Test policy " + policyUUID,
-			MonitoringEnabled: []kibana.MonitoringEnabledOption{
-				kibana.MonitoringEnabledLogs,
-				kibana.MonitoringEnabledMetrics,
-			},
-		},
-		protected,
-	)
-
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-		Privileged:     true,
-	}
-
-=======
->>>>>>> 1d7b8654ee ("install -f" uses exec to uninstall an existing agent (#4965))
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
@@ -349,34 +321,6 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 }
 
 func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, info *define.Info, protected bool) {
-<<<<<<< HEAD
-	// Get path to agent executable.
-	fixture, err := define.NewFixture(t, define.Version())
-	require.NoError(t, err)
-
-	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
-	createPolicyReq := buildPolicyWithTamperProtection(
-		kibana.AgentPolicy{
-			Name:        "test-policy-" + policyUUID,
-			Namespace:   "default",
-			Description: "Test policy " + policyUUID,
-			MonitoringEnabled: []kibana.MonitoringEnabledOption{
-				kibana.MonitoringEnabledLogs,
-				kibana.MonitoringEnabledMetrics,
-			},
-		},
-		protected,
-	)
-
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-		Privileged:     true,
-	}
-
-=======
->>>>>>> 1d7b8654ee ("install -f" uses exec to uninstall an existing agent (#4965))
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 

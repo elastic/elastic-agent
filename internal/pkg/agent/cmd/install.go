@@ -23,16 +23,9 @@ import (
 )
 
 const (
-<<<<<<< HEAD
-	flagInstallBasePath     = "base-path"
-	flagInstallUnprivileged = "unprivileged"
-=======
 	flagInstallBasePath               = "base-path"
 	flagInstallUnprivileged           = "unprivileged"
-	flagInstallDevelopment            = "develop"
-	flagInstallNamespace              = "namespace"
 	flagInstallRunUninstallFromBinary = "run-uninstall-from-binary"
->>>>>>> 1d7b8654ee ("install -f" uses exec to uninstall an existing agent (#4965))
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -55,22 +48,11 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current installation and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
-<<<<<<< HEAD
 	cmd.Flags().Bool(flagInstallUnprivileged, false, "Installed Elastic Agent will create an 'elastic-agent' user and run as that user. (experimental)")
 	_ = cmd.Flags().MarkHidden(flagInstallUnprivileged) // Hidden until fully supported
-=======
-	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
 
 	cmd.Flags().Bool(flagInstallRunUninstallFromBinary, false, "Run the uninstall command from this binary instead of using the binary found in the system's path.")
-	_ = cmd.Flags().MarkHidden(flagInstallRunUninstallFromBinary) // Advanced option to force a new agent to override an existing installation, it may orphan installed components.
-
-	cmd.Flags().String(flagInstallNamespace, "", "Install into an isolated namespace. Allows multiple Elastic Agents to be installed at once. (experimental)")
-	_ = cmd.Flags().MarkHidden(flagInstallNamespace) // For internal use only.
-
-	cmd.Flags().Bool(flagInstallDevelopment, false, "Install into a standardized development namespace, may enable development specific options. Allows multiple Elastic Agents to be installed at once. (experimental)")
-	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
-
->>>>>>> 1d7b8654ee ("install -f" uses exec to uninstall an existing agent (#4965))
+	_ = cmd.Flags().MarkHidden(flagInstallRunUninstallFromBinary) // For internal use only.
 	addEnrollFlags(cmd)
 
 	return cmd
