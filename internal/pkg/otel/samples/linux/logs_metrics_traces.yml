@@ -22,17 +22,21 @@ receivers:
 
 processors:
   elasticinframetrics:
+  resourcedetection:
+    detectors: ["system"]
+    system:
+      hostname_sources: ["os"]
 
 exporters:
 
   otlp/apm:
-    endpoint: <<APM_ENDPOINT>>
+    endpoint: "${env:APM_ENDPOINT}"
     headers:
     # Elastic APM Server secret token or API key
-      Authorization: "Bearer <<APM_SECRET_KEY>>"
+      Authorization: "Bearer ${env:APM_SECRET_KEY}"
 
   elasticsearch:
-    endpoints: [${env:ELASTIC_ENDPOINT}]
+    endpoints: ["${env:ELASTIC_ENDPOINT}"]
     api_key: ${env:ELASTIC_API_KEY}
 
 service:
@@ -49,7 +53,7 @@ service:
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [elasticinframetrics]
+      processors: [elasticinframetrics, resourcedetection]
       exporters: [elasticsearch]
 
     logs/fromsdk:
@@ -59,5 +63,5 @@ service:
 
     logs/platformlogs:
       receivers: [filelog/platformlogs]
-      processors: []
+      processors: [resourcedetection]
       exporters: [elasticsearch]

@@ -9,7 +9,7 @@ receivers:
       memory:
 
 processors:
-  resourcedetection/system:
+  resourcedetection:
     detectors: ["system"]
     system:
       hostname_sources: ["os"]
@@ -23,12 +23,12 @@ exporters:
 
   # Exporter to send logs and metrics to Elasticsearch
   elasticsearch:
-    endpoints: [${env:ELASTIC_ENDPOINT}]
+    endpoints: ["${env:ELASTIC_ENDPOINT}"]
     api_key: ${env:ELASTIC_API_KEY}
 
 service:
   pipelines:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [resourcedetection/system]
+      processors: [resourcedetection]
       exporters: [debug, elasticsearch]

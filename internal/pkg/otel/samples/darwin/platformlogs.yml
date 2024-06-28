@@ -4,8 +4,14 @@ receivers:
     include: [ /var/log/*.log ]
 #   start_at: beginning
 
-exporters:
 
+processors:
+  resourcedetection:
+    detectors: ["system"]
+    system:
+      hostname_sources: ["os"]
+
+exporters:
   # Exporter to print the first 5 logs/metrics and then every 1000th
   debug:
     verbosity: detailed
@@ -14,12 +20,12 @@ exporters:
 
   # Exporter to send logs and metrics to Elasticsearch
   elasticsearch:
-    endpoints: [${env:ELASTIC_ENDPOINT}]
+    endpoints: ["${env:ELASTIC_ENDPOINT}"]
     api_key: ${env:ELASTIC_API_KEY}
 
 service:
   pipelines:
     logs/platformlogs:
       receivers: [filelog/platformlogs]
-      processors: []
+      processors: [resourcedetection]
       exporters: [debug, elasticsearch]

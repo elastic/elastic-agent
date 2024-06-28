@@ -1,5 +1,4 @@
 receivers:
-
   # Receiver for platform specific log files
   filelog/platformlogs:
     include: [ /var/log/*.log ]
@@ -16,21 +15,24 @@ receivers:
 
 processors:
   elasticinframetrics:
+  resourcedetection:
+    detectors: ["system"]
+    system:
+      hostname_sources: ["os"]
 
 exporters:
-
   elasticsearch:
-    endpoints: [${env:ELASTIC_ENDPOINT}]
+    endpoints: ["${env:ELASTIC_ENDPOINT}"]
     api_key: ${env:ELASTIC_API_KEY}
 
 service:
   pipelines:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [elasticinframetrics]
+      processors: [elasticinframetrics, resourcedetection]
       exporters: [elasticsearch]
 
     logs/platformlogs:
       receivers: [filelog/platformlogs]
-      processors: []
+      processors: [resourcedetection]
       exporters: [elasticsearch]
