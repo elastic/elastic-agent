@@ -473,13 +473,22 @@ func AssembleDarwinUniversal() error {
 // Use SNAPSHOT=true to build snapshots.
 // Use PLATFORMS to control the target platforms.
 // Use VERSION_QUALIFIER to control the version qualifier.
-func Package(ctx context.Context) {
+func Package(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
 	platforms := devtools.Platforms.Names()
 	if len(platforms) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
+	}
+
+	var err error
+	var manifestResponse *tools.Build
+	if devtools.PackagingFromManifest {
+		manifestResponse, _, err = downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
+		if err != nil {
+			return fmt.Errorf("failed downloading manifest: %w", err)
+		}
 	}
 
 	var dependenciesVersion string
@@ -489,10 +498,11 @@ func Package(ctx context.Context) {
 		dependenciesVersion = beatVersion
 	}
 
-	packageAgent(ctx, platforms, dependenciesVersion, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
+	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
+	return nil
 }
 
-// DownloadManifest downloads the provided manifest file into the predefined folder
+// DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
 func DownloadManifest(ctx context.Context) error {
 	fmt.Println("--- Downloading manifest")
 	start := time.Now()
@@ -905,7 +915,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		// produce docker package
 		packageAgent(ctx, []string{
 			"linux/amd64",
-		}, dependenciesVersion, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
+		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -952,10 +962,8 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, agentPackaging, agentBinaryTarget mg.Fn) {
+func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *tools.Build, agentPackaging, agentBinaryTarget mg.Fn) error {
 	fmt.Println("--- Package Elastic-Agent")
-	var manifestResponse tools.Build
-	var err error
 
 	requiredPackages := []string{}
 	for _, p := range platforms {
@@ -965,28 +973,8 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, requiredPackages)
 	}
 
-	if devtools.PackagingFromManifest {
-		// If we're using a manifest, download it here, and pass in the manifestResponse
-		// to other functions that need to operate on the manifest
-		if manifestResponse, err = manifest.DownloadManifest(ctx, devtools.ManifestURL); err != nil {
-			log.Panicf("failed to download remote manifest file %s", err)
-		}
-
-		if parsedVersion, err := version.ParseVersion(manifestResponse.Version); err != nil {
-			log.Panicf("the manifest version from manifest is not semver, got %s", manifestResponse.Version)
-		} else {
-			// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
-			// something that we use as an implicit parameter to various functions
-			if parsedVersion.IsSnapshot() {
-				os.Setenv(snapshotEnv, "true")
-				mage.Snapshot = true
-			}
-			os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
-		}
-	}
-
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, requiredPackages, manifestResponse)
+	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, requiredPackages)
 
 	// cleanup after build
 	defer os.RemoveAll(archivePath)
@@ -1012,6 +1000,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	mg.Deps(Update)
 	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
 	mg.SerialDeps(devtools.Package, TestPackages)
+	return nil
 }
 
 // collectPackageDependencies performs the download (if it's an external dep), unpacking and move all the elastic-agent
@@ -1019,7 +1008,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 // NOTE: after the build is done the caller must:
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
-func collectPackageDependencies(platforms []string, packageVersion string, requiredPackages []string, manifestResponse tools.Build) (archivePath string, dropPath string) {
+func collectPackageDependencies(platforms []string, packageVersion string, requiredPackages []string) (archivePath string, dropPath string) {
 
 	dropPath, found := os.LookupEnv(agentDropPath)
 
@@ -1146,7 +1135,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
-func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse tools.Build) {
+func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse *tools.Build) {
 
 	for _, rp := range requiredPackages {
 		targetPath := filepath.Join(archivePath, rp)
@@ -1194,7 +1183,7 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 
 		checksums := make(map[string]string)
 		// Operate on the files depending on if we're packaging from a manifest or not
-		if devtools.PackagingFromManifest {
+		if manifestResponse != nil {
 			checksums = devtools.ChecksumsWithManifest(rp, versionedFlatPath, versionedDropPath, manifestResponse)
 		} else {
 			checksums = devtools.ChecksumsWithoutManifest(versionedFlatPath, versionedDropPath, packageVersion)
@@ -1259,30 +1248,44 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("elastic-agent PackageUsingDRA is expected to build from a manifest. Check that %s is set to a manifest URL", devtools.ManifestUrlEnvVar)
 	}
 
-	manifestUrl := devtools.ManifestURL
-
-	build, err := manifest.DownloadManifest(ctx, manifestUrl)
+	manifestResponse, parsedVersion, err := downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
 	if err != nil {
-		return fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)
-	}
-
-	parsedVersion, err := version.ParseVersion(build.Version)
-	if err != nil {
-		return fmt.Errorf("parsing version string %q: %w", build.Version, err)
+		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 
 	// fix the commit hash independently of the current commit hash on the branch
-	agentCoreProject, ok := build.Projects[agentCoreProjectName]
+	agentCoreProject, ok := manifestResponse.Projects[agentCoreProjectName]
 	if !ok {
-		return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, manifestUrl)
+		return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, devtools.ManifestURL)
 	}
 	err = os.Setenv(mage.AgentCommitHashEnvVar, agentCoreProject.CommitHash)
 	if err != nil {
 		return fmt.Errorf("setting agent commit hash %q: %w", agentCoreProject.CommitHash, err)
 	}
 
-	packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, manifestUrl))
-	return nil
+	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL))
+}
+
+func downloadManifestAndSetVersion(ctx context.Context, url string) (*tools.Build, *version.ParsedSemVer, error) {
+	resp, err := manifest.DownloadManifest(ctx, url)
+	if err != nil {
+		return nil, nil, fmt.Errorf("downloading manifest: %w", err)
+	}
+
+	parsedVersion, err := version.ParseVersion(resp.Version)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing manifest version %s: %w", resp.Version, err)
+	}
+
+	// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
+	// something that we use as an implicit parameter to various functions
+	if parsedVersion.IsSnapshot() {
+		os.Setenv(snapshotEnv, "true")
+		mage.Snapshot = true
+	}
+	os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
+
+	return &resp, parsedVersion, nil
 }
 
 func findRepositoryRoot() (string, error) {
@@ -1373,7 +1376,6 @@ func filterPackagesByPlatform(pkgs map[string]tools.Package) map[string]tools.Pa
 }
 
 func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir string, projects ...string) (map[string]tools.Package, error) {
-
 	build, err := manifest.DownloadManifest(ctx, manifestUrl)
 	if err != nil {
 		return nil, fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)

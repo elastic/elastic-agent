@@ -95,11 +95,14 @@ func ChecksumsWithoutManifest(versionedFlatPath string, versionedDropPath string
 }
 
 // This is a helper function for flattenDependencies that's used when building from a manifest
-func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse tools.Build) map[string]string {
+func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse *tools.Build) map[string]string {
 	checksums := make(map[string]string)
-	projects := manifestResponse.Projects
+	if manifestResponse == nil {
+		return checksums
+	}
 
 	// Iterate over the component projects in the manifest
+	projects := manifestResponse.Projects
 	for componentName := range projects {
 		// Iterate over the individual package files within each component project
 		for pkgName := range projects[componentName].Packages {
