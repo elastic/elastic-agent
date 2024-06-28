@@ -67,6 +67,12 @@ exporters:
     api_key: ${env:ELASTIC_API_KEY}
     mapping:
       mode: ecs
+    logs_dynamic_index:
+      enabled: true
+    metrics_dynamic_index:
+      enabled: true
+    traces_dynamic_index:
+      enabled: true
 
 service:
   pipelines:
