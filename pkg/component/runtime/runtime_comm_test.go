@@ -7,12 +7,14 @@ package runtime
 import (
 	"bytes"
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 )
 
@@ -49,18 +51,51 @@ func (a agentInfoMock) RawLogLevel() string                                 { pa
 func (a agentInfoMock) ReloadID(ctx context.Context) error                  { panic("implement me") }
 func (a agentInfoMock) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
 
+func TestCheckinExpected(t *testing.T) {
+	ca, err := authority.NewCA()
+	require.NoError(t, err, "could not create CA")
+	pair, err := ca.GeneratePair()
+	require.NoError(t, err, "could not create certificate pair from CA")
+	test := runtimeComm{
+		listenAddr: "localhost",
+		ca:         ca,
+		name:       "a_name",
+		token:      "a_token",
+		cert:       pair,
+		agentInfo: agentInfoMock{
+			agentID:      "testagent",
+			snapshot:     true,
+			version:      "8.13.0+build1966-09-6",
+			unprivileged: true,
+		},
+		checkinExpected:       make(chan *proto.CheckinExpected, 1),
+		checkinObserved:       make(chan *proto.CheckinObserved),
+		initCheckinObservedMx: sync.Mutex{},
+	}
+
+	expected := &proto.CheckinExpected{}
+	observed := &proto.CheckinObserved{}
+	test.CheckinExpected(expected, observed)
+
+	got := <-test.checkinExpected
+	require.True(t, got.AgentInfo.Unprivileged)
+	t.Logf("got : %#v", got)
+
+}
+
 func TestRuntimeComm_WriteStartUpInfo_packageVersion(t *testing.T) {
 	agentInfo := agentInfoMock{
 		agentID:      "NCC-1701",
 		snapshot:     true,
 		version:      "8.13.0+build1966-09-6",
-		unprivileged: false,
+		unprivileged: true,
 	}
 
 	want := client.AgentInfo{
-		ID:       agentInfo.AgentID(),
-		Version:  agentInfo.Version(),
-		Snapshot: agentInfo.Snapshot(),
+		ID:           agentInfo.AgentID(),
+		Version:      agentInfo.Version(),
+		Snapshot:     agentInfo.Snapshot(),
+		Unprivileged: agentInfo.Unprivileged(),
 	}
 
 	ca, err := authority.NewCA()

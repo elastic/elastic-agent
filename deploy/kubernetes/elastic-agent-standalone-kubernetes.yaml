@@ -14,8 +14,11 @@ data:
         hosts:
           - >-
             ${ES_HOST}
-        username: ${ES_USERNAME}
-        password: ${ES_PASSWORD}
+        api_key: ${API_KEY}
+        ssl.ca_trusted_fingerprint: ${CA_TRUSTED}
+        # Uncomment username/password and remove api_key if you want to use alternative authentication method
+        # username: ${ES_USERNAME}
+        # password: ${ES_PASSWORD}
     agent:
       monitoring:
         enabled: true
@@ -201,6 +204,7 @@ data:
             hosts:
               - 'kube-state-metrics:8080'
             period: 10s
+            #<processors_placeholder>
             # Openshift:
             # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
             # and/or tls termination, then configuration below should be considered:
@@ -709,7 +713,10 @@ spec:
           image: docker.elastic.co/beats/elastic-agent:8.15.0
           args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
           env:
-            # The basic authentication username used to connect to Elasticsearch
+            # The API Key with access privilleges to connect to Elasticsearch. https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent
+            - name: API_KEY
+              value: ""
+            # The basic authentication username used to connect to Elasticsearch. Alternative to API_KEY access.
             # This user needs the privileges required to publish events to Elasticsearch.
             - name: ES_USERNAME
               value: "elastic"

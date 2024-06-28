@@ -3065,12 +3065,12 @@ func authESS(ctx context.Context) error {
 	// Attempt to use API key to check if it's valid
 	for authSuccess := false; !authSuccess; {
 		client := ess.NewClient(ess.Config{ApiKey: essAPIKey})
-		u, err := client.GetUser(ctx, ess.GetUserRequest{})
+		u, err := client.GetAccount(ctx, ess.GetAccountRequest{})
 		if err != nil {
 			return fmt.Errorf("unable to successfully connect to ESS API: %w", err)
 		}
 
-		if u.User.UserID != 0 {
+		if u.ID != "" {
 			// We have a user. It indicates that the API key works. All set!
 			authSuccess = true
 			continue
@@ -3079,7 +3079,7 @@ func authESS(ctx context.Context) error {
 		fmt.Fprintln(os.Stderr, "❌  ESS authentication unsuccessful. Retrying...")
 
 		prompt := fmt.Sprintf("Please provide a ESS API key for %s. To get your API key, "+
-			"visit %s/deployment-features/keys:", client.BaseURL(), strings.TrimRight(client.BaseURL(), "/api/v1"))
+			"visit %s/account/keys:", client.BaseURL(), strings.TrimRight(client.BaseURL(), "/api/v1"))
 		essAPIKey, err = stringPrompt(prompt)
 		if err != nil {
 			return fmt.Errorf("unable to read ESS API key from prompt: %w", err)

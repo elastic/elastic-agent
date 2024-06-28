@@ -13,7 +13,7 @@ require (
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/e2e-testing v1.2.1
 	github.com/elastic/elastic-agent-autodiscover v0.7.0
-	github.com/elastic/elastic-agent-client/v7 v7.11.0
+	github.com/elastic/elastic-agent-client/v7 v7.13.0
 	github.com/elastic/elastic-agent-libs v0.9.13
 	github.com/elastic/elastic-agent-system-metrics v0.10.3
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
@@ -22,7 +22,7 @@ require (
 	github.com/elastic/go-sysinfo v1.14.0
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.2.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.3.0
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gofrs/flock v0.8.1
@@ -150,7 +150,7 @@ require (
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
-	github.com/elastic/opentelemetry-lib v0.3.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.4.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect

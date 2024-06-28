@@ -133,7 +133,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 				action: &fleetapi.ActionSettings{
 					ActionID:   "someactionid",
 					ActionType: fleetapi.ActionTypeSettings,
-					LogLevel:   "debug",
+					Data:       fleetapi.ActionSettingsData{LogLevel: "debug"},
 				},
 			},
 			setupMocks: func(t *testing.T, agent *mockinfo.Agent, setter *mockhandlers.LogLevelSetter, acker *mockfleetacker.Acker) {
@@ -154,7 +154,8 @@ func TestSettings_handleLogLevel(t *testing.T) {
 				action: &fleetapi.ActionSettings{
 					ActionID:   "someactionid",
 					ActionType: fleetapi.ActionTypeSettings,
-					LogLevel:   clearLogLevelValue,
+					Data: fleetapi.ActionSettingsData{
+						LogLevel: clearLogLevelValue},
 				},
 			},
 			setupMocks: func(t *testing.T, agent *mockinfo.Agent, setter *mockhandlers.LogLevelSetter, acker *mockfleetacker.Acker) {
@@ -175,7 +176,8 @@ func TestSettings_handleLogLevel(t *testing.T) {
 				action: &fleetapi.ActionSettings{
 					ActionID:   "someactionid",
 					ActionType: fleetapi.ActionTypeSettings,
-					LogLevel:   clearLogLevelValue,
+					Data: fleetapi.ActionSettingsData{
+						LogLevel: clearLogLevelValue},
 				},
 			},
 			setupMocks: func(t *testing.T, agent *mockinfo.Agent, setter *mockhandlers.LogLevelSetter, acker *mockfleetacker.Acker) {

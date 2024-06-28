@@ -103,7 +103,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	// // Cache signature validation key for the next policy handling
 	// h.signatureValidationKey = signatureValidationKey
 
-	c, err := config.NewConfigFrom(action.Policy)
+	c, err := config.NewConfigFrom(action.Data.Policy)
 	if err != nil {
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
@@ -176,6 +176,12 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 	if err != nil {
 		return errors.New(
 			err, "fail to communicate with Fleet Server API client hosts",
+			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.New(
+			err, fmt.Sprintf("fleet server ping returned a bad status code: %d", resp.StatusCode),
 			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
 	}
 
