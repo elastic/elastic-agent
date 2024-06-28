@@ -200,7 +200,7 @@ func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath 
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 			defer cancel()
 			return downloadPackage(ctx, l, doer, downloadPath, packageFile)
-		}
+		}()
 		if err == nil {
 			return nil
 		}
