@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -105,6 +106,8 @@ type InstallOpts struct {
 	NonInteractive bool   // --non-interactive
 	ProxyURL       string // --proxy-url
 	DelayEnroll    bool   // --delay-enroll
+	Develop        bool   // --develop, not supported for DEB and RPM. Calling Install() sets Namespace to the development namespace so that checking only for a Namespace is sufficient.
+	Namespace      string // --namespace, not supported for DEB and RPM.
 
 	Privileged bool // inverse of --unprivileged (as false is the default)
 
@@ -112,7 +115,7 @@ type InstallOpts struct {
 	FleetBootstrapOpts
 }
 
-func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
+func (i *InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	var args []string
 	if i.BasePath != "" {
 		args = append(args, "--base-path", i.BasePath)
@@ -135,6 +138,16 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	if !i.Privileged {
 		args = append(args, "--unprivileged")
 	}
+	if i.Namespace != "" {
+		args = append(args, "--namespace="+i.Namespace)
+	}
+	if i.Develop {
+		args = append(args, "--develop")
+		if i.Namespace == "" {
+			// If --namespace was used it will override the development namespace.
+			i.Namespace = paths.DevelopmentNamespace
+		}
+	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
 	args = append(args, i.FleetBootstrapOpts.toCmdArgs()...)
@@ -152,8 +165,10 @@ func (i InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 
-	// check for running agents before installing, but proceed anyway
-	assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
+	// check for running agents before installing, but only if not installed into a namespace whose point is allowing two agents at once.
+	if installOpts != nil && !installOpts.Develop && installOpts.Namespace == "" {
+		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
+	}
 
 	switch f.packageFormat {
 	case "targz", "zip":
@@ -196,14 +211,21 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	f.installed = true
 	f.installOpts = installOpts
 
+	installDir := "Agent"
+	socketRunSymlink := paths.ControlSocketRunSymlink("")
+	if installOpts.Namespace != "" {
+		installDir = paths.InstallDirNameForNamespace(installOpts.Namespace)
+		socketRunSymlink = paths.ControlSocketRunSymlink(installOpts.Namespace)
+	}
+
 	if installOpts.BasePath == "" {
-		f.workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
+		f.workDir = filepath.Join(paths.DefaultBasePath, "Elastic", installDir)
 	} else {
-		f.workDir = filepath.Join(installOpts.BasePath, "Elastic", "Agent")
+		f.workDir = filepath.Join(installOpts.BasePath, "Elastic", installDir)
 	}
 
 	// we just installed agent, the control socket is at a well-known location
-	socketPath := fmt.Sprintf("unix://%s", paths.ControlSocketRunSymlink) // use symlink as that works for all versions
+	socketPath := fmt.Sprintf("unix://%s", socketRunSymlink) // use symlink as that works for all versions
 	if runtime.GOOS == "windows" {
 		// Windows uses a fixed named pipe, that is always the same.
 		// It is the same even running in unprivileged mode.
@@ -229,6 +251,12 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
 
 			filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-%s-%s-ProcessDump.json", sanitizedTestName, f.operatingSystem, f.architecture))
+			fileDir := path.Dir(filePath)
+			if err := os.MkdirAll(fileDir, 0777); err != nil {
+				f.t.Logf("failed to dump process; failed to create directory %s: %s", fileDir, err)
+				return
+			}
+
 			f.t.Logf("Dumping running processes in %s", filePath)
 			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 			if err != nil {
@@ -250,7 +278,20 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 
 	f.t.Cleanup(func() {
 		// check for running agents after uninstall had a chance to run
-		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at the end of the test")
+		processes := getElasticAgentProcesses(f.t)
+
+		// there can be a single agent left when using --develop mode
+		if f.installOpts != nil && f.installOpts.Namespace != "" {
+			assert.LessOrEqualf(f.t, len(processes), 1, "More than one agent left running at the end of the test when second agent in namespace %s was used: %v", f.installOpts.Namespace, processes)
+			// The agent left running has to be the non-development agent. The development agent should be uninstalled first as a convention.
+			if len(processes) > 0 {
+				assert.NotContainsf(f.t, processes[0].Cmdline, paths.InstallDirNameForNamespace(f.installOpts.Namespace),
+					"The agent installed into namespace %s was left running at the end of the test or was not uninstalled first: %v", f.installOpts.Namespace, processes)
+			}
+			return
+		}
+
+		assert.Empty(f.t, processes, "there should be no running agent at the end of the test")
 	})
 
 	f.t.Cleanup(func() {

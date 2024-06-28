@@ -108,7 +108,7 @@ func init() {
 	common.RegisterCheckDeps(Update, Check.All)
 	test.RegisterDeps(UnitTest)
 	devtools.BeatLicense = "Elastic License"
-	devtools.BeatDescription = "Agent manages other beats based on configuration provided."
+	devtools.BeatDescription = "Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host."
 
 	devtools.Platforms = devtools.Platforms.Filter("!linux/386")
 	devtools.Platforms = devtools.Platforms.Filter("!windows/386")
@@ -3065,12 +3065,12 @@ func authESS(ctx context.Context) error {
 	// Attempt to use API key to check if it's valid
 	for authSuccess := false; !authSuccess; {
 		client := ess.NewClient(ess.Config{ApiKey: essAPIKey})
-		u, err := client.GetUser(ctx, ess.GetUserRequest{})
+		u, err := client.GetAccount(ctx, ess.GetAccountRequest{})
 		if err != nil {
 			return fmt.Errorf("unable to successfully connect to ESS API: %w", err)
 		}
 
-		if u.User.UserID != 0 {
+		if u.ID != "" {
 			// We have a user. It indicates that the API key works. All set!
 			authSuccess = true
 			continue
@@ -3079,7 +3079,7 @@ func authESS(ctx context.Context) error {
 		fmt.Fprintln(os.Stderr, "❌  ESS authentication unsuccessful. Retrying...")
 
 		prompt := fmt.Sprintf("Please provide a ESS API key for %s. To get your API key, "+
-			"visit %s/deployment-features/keys:", client.BaseURL(), strings.TrimRight(client.BaseURL(), "/api/v1"))
+			"visit %s/account/keys:", client.BaseURL(), strings.TrimRight(client.BaseURL(), "/api/v1"))
 		essAPIKey, err = stringPrompt(prompt)
 		if err != nil {
 			return fmt.Errorf("unable to read ESS API key from prompt: %w", err)
@@ -3153,6 +3153,7 @@ type dependencies struct {
 	Exporters  []dependency
 	Processors []dependency
 	Extensions []dependency
+	Connectors []dependency
 }
 
 func (d dependency) Clean(sep string) dependency {
@@ -3209,13 +3210,14 @@ func getOtelDependencies() (*dependencies, error) {
 	scanner := bufio.NewScanner(readFile)
 
 	scanner.Split(bufio.ScanLines)
-	var receivers, extensions, exporters, processors []dependency
+	var receivers, extensions, exporters, processors, connectors []dependency
 	// process imports
 	for scanner.Scan() {
 		l := strings.TrimSpace(scanner.Text())
 		// is otel
 		if !strings.Contains(l, "go.opentelemetry.io/") &&
-			!strings.Contains(l, "github.com/open-telemetry/") {
+			!strings.Contains(l, "github.com/open-telemetry/") &&
+			!strings.Contains(l, "github.com/elastic/opentelemetry-collector-components/") {
 			continue
 		}
 
@@ -3247,6 +3249,8 @@ func getOtelDependencies() (*dependencies, error) {
 			exporters = append(exporters, d.Clean("/exporter/"))
 		} else if strings.Contains(l, "/extension/") {
 			extensions = append(extensions, d.Clean("/extension/"))
+		} else if strings.Contains(l, "/connector/") {
+			connectors = append(connectors, d.Clean("/connector/"))
 		}
 	}
 
@@ -3255,5 +3259,6 @@ func getOtelDependencies() (*dependencies, error) {
 		Exporters:  exporters,
 		Processors: processors,
 		Extensions: extensions,
+		Connectors: connectors,
 	}, nil
 }

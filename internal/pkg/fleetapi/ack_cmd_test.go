@@ -51,9 +51,11 @@ func TestAck(t *testing.T) {
 			action := &ActionPolicyChange{
 				ActionID:   "my-id",
 				ActionType: "POLICY_CHANGE",
-				Policy: map[string]interface{}{
+				Data: struct {
+					Policy map[string]interface{} `json:"policy" yaml:"policy,omitempty"`
+				}{Policy: map[string]interface{}{
 					"id": "config_id",
-				},
+				}},
 			}
 
 			cmd := NewAckCmd(&agentinfo{}, client)

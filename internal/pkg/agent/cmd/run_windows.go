@@ -16,7 +16,7 @@ import (
 // the Application EventLog.  This is a best effort logger and no
 // errors are returned.
 func logExternal(msg string) {
-	eLog, err2 := eventlog.Open(paths.ServiceName)
+	eLog, err2 := eventlog.Open(paths.ServiceName())
 	if err2 != nil {
 		return
 	}

@@ -130,10 +130,11 @@ func (c *runtimeComm) WriteStartUpInfo(w io.Writer, services ...client.Service) 
 		Supports:       []proto.ConnectionSupports{proto.ConnectionSupports_CheckinChunking},
 		MaxMessageSize: uint32(c.maxMessageSize),
 		AgentInfo: &proto.AgentInfo{
-			Id:       c.agentInfo.AgentID(),
-			Version:  c.agentInfo.Version(),
-			Snapshot: c.agentInfo.Snapshot(),
-			Mode:     protoAgentMode(c.agentInfo),
+			Id:           c.agentInfo.AgentID(),
+			Version:      c.agentInfo.Version(),
+			Snapshot:     c.agentInfo.Snapshot(),
+			Mode:         protoAgentMode(c.agentInfo),
+			Unprivileged: c.agentInfo.Unprivileged(),
 		},
 	}
 	infoBytes, err := protobuf.Marshal(startupInfo)
@@ -151,12 +152,14 @@ func (c *runtimeComm) CheckinExpected(
 	expected *proto.CheckinExpected,
 	observed *proto.CheckinObserved,
 ) {
+	c.agentInfo.Unprivileged()
 	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
 		expected.AgentInfo = &proto.AgentInfo{
-			Id:       c.agentInfo.AgentID(),
-			Version:  c.agentInfo.Version(),
-			Snapshot: c.agentInfo.Snapshot(),
-			Mode:     protoAgentMode(c.agentInfo),
+			Id:           c.agentInfo.AgentID(),
+			Version:      c.agentInfo.Version(),
+			Snapshot:     c.agentInfo.Snapshot(),
+			Mode:         protoAgentMode(c.agentInfo),
+			Unprivileged: c.agentInfo.Unprivileged(),
 		}
 	} else {
 		expected.AgentInfo = nil
@@ -295,7 +298,6 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 				close(recvDone)
 				return
 			}
-			c.logger.Infof("got checkin with pid %d", checkin.Pid)
 			c.checkinObserved <- checkin
 		}
 	}()
