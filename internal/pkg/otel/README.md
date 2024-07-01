@@ -45,7 +45,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| elasticsearchexporter | v0.103.1-0.20240701071104-081464465b3a|
+| elasticsearchexporter | v0.103.1-0.20240701121317-74244e46a6b6|
 | fileexporter | v0.103.0|
 | debugexporter | v0.103.0|
 | otlpexporter | v0.103.0|

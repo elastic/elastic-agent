@@ -87,7 +87,7 @@ require (
 	github.com/cavaliercoder/badio v0.0.0-20160213150051-ce5280129e9e // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.103.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.103.1-0.20240701071104-081464465b3a
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.103.1-0.20240701121317-74244e46a6b6
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.103.0
