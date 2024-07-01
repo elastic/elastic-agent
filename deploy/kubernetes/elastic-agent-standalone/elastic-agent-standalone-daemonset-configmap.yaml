@@ -14,8 +14,11 @@ data:
         hosts:
           - >-
             ${ES_HOST}
-        username: ${ES_USERNAME}
-        password: ${ES_PASSWORD}
+        api_key: ${API_KEY}
+        ssl.ca_trusted_fingerprint: ${CA_TRUSTED}
+        # Uncomment username/password and remove api_key if you want to use alternative authentication method
+        # username: ${ES_USERNAME}
+        # password: ${ES_PASSWORD}
     agent:
       monitoring:
         enabled: true
@@ -201,6 +204,7 @@ data:
             hosts:
               - 'kube-state-metrics:8080'
             period: 10s
+            #<processors_placeholder>
             # Openshift:
             # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
             # and/or tls termination, then configuration below should be considered:

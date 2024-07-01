@@ -121,13 +121,10 @@ func loadFleetConfig(ctx context.Context, l *logger.Logger, unprivileged bool) (
 		return nil, err
 	}
 
-	for _, c := range stateStore.Actions() {
-		cfgChange, ok := c.(*fleetapi.ActionPolicyChange)
-		if !ok {
-			continue
-		}
-
-		return cfgChange.Policy, nil
+	cfgChange, ok := stateStore.Action().(*fleetapi.ActionPolicyChange)
+	if ok {
+		return cfgChange.Data.Policy, nil
 	}
+
 	return nil, nil
 }
