@@ -77,12 +77,12 @@ func NewPolicyChangeHandler(
 }
 
 // AddSetter adds a setter into a collection of client setters.
-func (h *PolicyChangeHandler) AddSetter(cs actions.ClientSetter) {
-	if h.setters == nil {
-		h.setters = make([]actions.ClientSetter, 0)
+func (p *PolicyChangeHandler) AddSetter(cs actions.ClientSetter) {
+	if p.setters == nil {
+		p.setters = make([]actions.ClientSetter, 0)
 	}
 
-	h.setters = append(h.setters, cs)
+	p.setters = append(p.setters, cs)
 }
 
 // Handle handles policy change action.
