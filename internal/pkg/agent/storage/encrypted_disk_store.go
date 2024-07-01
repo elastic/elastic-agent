@@ -12,8 +12,10 @@ import (
 	"io/fs"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
@@ -122,6 +124,19 @@ func (d *EncryptedDiskStore) ensureKey(ctx context.Context) error {
 // Specially on windows systems, if the original files is still open because of
 // Load(), Save() would fail.
 func (d *EncryptedDiskStore) Save(in io.Reader) error {
+
+	l, logErr := logger.New("encrypted-disk-store-debug", true)
+	if logErr != nil {
+		fmt.Fprintf(os.Stderr, "error instantiating debug logger: %s", logErr)
+	}
+
+	if d.target == paths.AgentConfigFile() {
+		l.Infof("Save of %s started at %s\n", paths.AgentConfigFile(), time.Now())
+		defer func() {
+			l.Infof("Save of %s finished at %s\n", paths.AgentConfigFile(), time.Now())
+		}()
+	}
+
 	// Ensure has agent key
 	err := d.ensureKey(d.ctx)
 	if err != nil {
@@ -187,7 +202,11 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
+	DumpFilesystemInfo(d.target, l.Infof)
 	if err := file.SafeFileRotate(d.target, tmpFile); err != nil {
+
+		DumpFilesystemInfo(d.target, l.Infof)
+
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s", d.target),
 			errors.TypeFilesystem,
@@ -209,6 +228,13 @@ func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
 			fmt.Sprintf("could not open %s", d.target),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, d.target))
+	}
+
+	if d.target == paths.AgentConfigFile() {
+		fmt.Fprintf(os.Stderr, "Load of %s started at %s", paths.AgentConfigFile(), time.Now())
+		defer func() {
+			fmt.Fprintf(os.Stderr, "Load of %s finished at %s", paths.AgentConfigFile(), time.Now())
+		}()
 	}
 
 	// Close fd if there is an error upon return

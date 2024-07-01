@@ -4,8 +4,8 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 
 STACK_PROVISIONER="${1:-"stateful"}"
-MAGE_TARGET="${2:-"integration:test"}"
-MAGE_SUBTARGET="${3:-""}"
+MAGE_TARGET="${2:-"integration:single"}"
+MAGE_SUBTARGET="${3:-"TestProxyURL"}"
 
 
 # Override the agent package version using a string with format <major>.<minor>.<patch>
@@ -23,7 +23,7 @@ AGENT_PACKAGE_VERSION="${OVERRIDE_AGENT_PACKAGE_VERSION}" DEV=true EXTERNAL=true
 
 # Run integration tests
 set +e
-AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}" TEST_INTEG_CLEAN_ON_EXIT=true  STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage $MAGE_TARGET $MAGE_SUBTARGET
+TEST_PLATFORMS="windows/amd64/2022" TEST_RUN_UNTIL_FAILURE=true KEEP_AGENT_INSTALLED=true AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}" TEST_INTEG_CLEAN_ON_EXIT=false  STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage $MAGE_TARGET $MAGE_SUBTARGET
 TESTS_EXIT_STATUS=$?
 set -e
 

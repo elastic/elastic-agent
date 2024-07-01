@@ -100,7 +100,7 @@ func TestProxyURL(t *testing.T) {
 				ackToken := "ackToken-AckTokenTestNoProxyInThePolicy"
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
-					0,
+					30*time.Second,
 					action,
 				)
 
@@ -137,7 +137,7 @@ func TestProxyURL(t *testing.T) {
 				require.NoError(t, err, "could not generate action with policy")
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
-					0,
+					30*time.Second,
 					action,
 				)
 
@@ -179,7 +179,7 @@ func TestProxyURL(t *testing.T) {
 				ackToken := "AckToken-TestValidProxyInThePolicy"
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
-					0,
+					30*time.Second,
 					action,
 				)
 
@@ -227,7 +227,7 @@ func TestProxyURL(t *testing.T) {
 				ackToken := "AckToken-TestValidProxyInThePolicy"
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
-					0,
+					30*time.Second,
 					action,
 				)
 				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
@@ -276,7 +276,7 @@ func TestProxyURL(t *testing.T) {
 				ackToken := "AckToken-TestRemoveProxyFromThePolicy"
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
-					0,
+					30*time.Second,
 					action,
 				)
 
@@ -318,7 +318,7 @@ func TestProxyURL(t *testing.T) {
 				ackToken := "AckToken-TestRemovedProxyFromThePolicy"
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
-					0,
+					30*time.Second,
 					action,
 				)
 
@@ -385,7 +385,7 @@ func TestProxyURL(t *testing.T) {
 				ackToken := "AckToken-TestValidProxyInThePolicy"
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
-					0,
+					30*time.Second,
 					action,
 				)
 				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
@@ -486,7 +486,7 @@ func TestProxyURL(t *testing.T) {
 				ackToken := "AckToken-TestValidProxyInThePolicy"
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
-					0,
+					30*time.Second,
 					action,
 				)
 				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
@@ -626,7 +626,7 @@ func TestProxyURL(t *testing.T) {
 				ackToken := "AckToken-TestValidProxyInThePolicy"
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
-					0,
+					30*time.Second,
 					action,
 				)
 				return map[string]*proxytest.Proxy{"enroll": proxyEnroll, "proxyFleetPolicy": proxyFleetPolicy},
@@ -710,11 +710,11 @@ func TestProxyURL(t *testing.T) {
 			require.NoError(t, err, "SetupTest: fixture.Prepare failed")
 
 			privileged := false
-			if runtime.GOOS == "windows" {
-				// On windows installing + enrolling mode leads to access denied error when updating fleet.enc (regardless of privileged/unprivileged)
-				// See https://github.com/elastic/elastic-agent/issues/4913
-				t.Skip("Skipped on windows until https://github.com/elastic/elastic-agent/issues/4913 is resolved")
-			}
+			//if runtime.GOOS == "windows" {
+			//	// On windows installing + enrolling mode leads to access denied error when updating fleet.enc (regardless of privileged/unprivileged)
+			//	// See https://github.com/elastic/elastic-agent/issues/4913
+			//	t.Skip("Skipped on windows until https://github.com/elastic/elastic-agent/issues/4913 is resolved")
+			//}
 
 			out, err := fixture.Install(
 				ctx,
