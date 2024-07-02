@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
@@ -115,6 +116,11 @@ func TestContainerCMD(t *testing.T) {
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
+	// prepare must be called otherwise `agentFixture.WorkDir()` will be empty
+	// and it must be set so the `STATE_PATH` below gets a valid path.
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err)
+
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
 		t.Fatalf("could not get Fleet URL: %s", err)
@@ -147,7 +153,7 @@ func TestContainerCMD(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err = agentFixture.IsHealthy(ctx)
+		err = agentFixture.IsHealthy(ctx, withEnv(env))
 		return err == nil
 	},
 		5*time.Minute, time.Second,
@@ -225,7 +231,7 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 				// the agent logs will be present in the error message
 				// which should help to explain why the agent was not
 				// healthy.
-				err = agentFixture.IsHealthy(ctx)
+				err = agentFixture.IsHealthy(ctx, withEnv(env))
 				return err == nil
 			},
 				1*time.Minute, time.Second,
@@ -245,16 +251,27 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 			if _, err := os.Stat(tc.expectedSocketPath); err != nil {
 				t.Errorf("cannot stat expected socket path ('%s'): %s", tc.expectedSocketPath, err)
 			}
+			containerPaths := filepath.Join(tc.expectedStatePath, "container-paths.yml")
+			if _, err := os.Stat(tc.expectedSocketPath); err != nil {
+				t.Errorf("cannot stat expected container-paths.yml path ('%s'): %s", containerPaths, err)
+			}
 
 			if t.Failed() {
-				containerPaths, err := os.ReadFile(filepath.Join(agentFixture.WorkDir(), "container-paths.yml"))
+				containerPathsContent, err := os.ReadFile(containerPaths)
 				if err != nil {
 					t.Fatalf("could not read container-paths.yml: %s", err)
 				}
 
 				t.Log("contents of 'container-paths-yml'")
-				t.Log(string(containerPaths))
+				t.Log(string(containerPathsContent))
 			}
 		})
+	}
+}
+
+func withEnv(env []string) process.CmdOption {
+	return func(c *exec.Cmd) error {
+		c.Env = append(os.Environ(), env...)
+		return nil
 	}
 }
