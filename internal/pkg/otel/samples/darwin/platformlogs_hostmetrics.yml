@@ -8,12 +8,30 @@ receivers:
   hostmetrics/system:
     collection_interval: 30s
     scrapers:
-      disk:
       filesystem:
-      cpu:
       memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+      process:
+        mute_process_exe_error: true
+        mute_process_io_error: true
+        mute_process_user_error: true
+        metrics:
+          process.threads:
+            enabled: true
+          process.open_file_descriptors:
+            enabled: true
+          process.memory.utilization:
+            enabled: true
+          process.disk.operations:
+            enabled: true
+      network:
+      processes:
+      load:
 
 processors:
+  elasticinframetrics:
   resourcedetection:
     detectors: ["system"]
     system:
@@ -45,14 +63,13 @@ processors:
           enabled: true
         os.type:
           enabled: true
+  attributes/dataset:
+    actions:
+      - key: event.dataset
+        from_attribute: data_stream.dataset
+        action: upsert
 
 exporters:
-  # Exporter to print the first 5 logs/metrics and then every 1000th
-  debug:
-    verbosity: detailed
-    sampling_initial: 5
-    sampling_thereafter: 1000
-
   # Exporter to send logs and metrics to Elasticsearch
   elasticsearch:
     endpoints: ["${env:ELASTIC_ENDPOINT}"]
@@ -70,9 +87,9 @@ service:
   pipelines:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [resourcedetection]
-      exporters: [debug, elasticsearch]
+      processors: [elasticinframetrics, resourcedetection, attributes/dataset]
+      exporters: [elasticsearch]
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: [resourcedetection]
-      exporters: [debug, elasticsearch]
+      exporters: [elasticsearch]
