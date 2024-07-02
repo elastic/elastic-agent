@@ -4,7 +4,7 @@
 # The script takes as an argument the path of elastic-agent manifests
 # Eg. ./creator_k8s_manifest.sh deploy/kubernetes
 ####
-
+## For test, delete this line before merge
 
 STANDALONE=elastic-agent-standalone-kubernetes-without-configmap.yaml
 MANAGED=elastic-agent-managed-kubernetes-without-configmap.yaml
