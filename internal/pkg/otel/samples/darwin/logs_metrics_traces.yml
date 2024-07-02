@@ -53,6 +53,11 @@ processors:
           enabled: true
         os.type:
           enabled: true
+  attributes/dataset:
+          actions:
+            - key: event.dataset
+              from_attribute: data_stream.dataset
+              action: upsert
 
 exporters:
 
@@ -88,7 +93,7 @@ service:
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [elasticinframetrics, resourcedetection]
+      processors: [elasticinframetrics, resourcedetection, attributes/dataset]
       exporters: [elasticsearch]
 
     logs/fromsdk:
