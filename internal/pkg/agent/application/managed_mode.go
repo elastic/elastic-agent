@@ -343,6 +343,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		m.store,
 		m.ch,
 		settingsHandler,
+		m.coord,
 	)
 
 	m.dispatcher.MustRegister(
