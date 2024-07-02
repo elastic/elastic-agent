@@ -20,7 +20,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -191,6 +194,8 @@ func TestOtelFileProcessing(t *testing.T) {
 		},
 		3*time.Minute, 500*time.Millisecond,
 		fmt.Sprintf("there should be exported logs by now"))
+
+	testAgentCanRun(ctx, t, fixture)
 
 	cancel()
 	fixtureWg.Wait()
@@ -445,4 +450,31 @@ func mapAtLeastOneTrue(mm map[string]bool) bool {
 	}
 
 	return false
+}
+
+func testAgentCanRun(ctx context.Context, t *testing.T, fixture *atesting.Fixture) func(*testing.T) {
+	tCtx, cancel := testcontext.WithDeadline(t, ctx, time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	return func(t *testing.T) {
+		// Get path to Elastic Agent executable
+		devFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+		require.NoError(t, err)
+
+		// Prepare the Elastic Agent so the binary is extracted and ready to use.
+		err = devFixture.Prepare(tCtx)
+		require.NoError(t, err)
+
+		require.Eventually(
+			t,
+			func() bool {
+				return nil == devFixture.Run(tCtx, integrationtest.State{
+					Configure:  complexIsolatedUnitsConfig,
+					AgentState: integrationtest.NewClientState(client.Healthy),
+				})
+			},
+			5*time.Minute, 500*time.Millisecond,
+			"Agent should not return error",
+		)
+	}
 }
