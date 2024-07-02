@@ -116,7 +116,7 @@ RUN set -e ; \
 
 COPY docker-entrypoint /usr/local/bin/docker-entrypoint
 RUN groupadd --gid 1000 {{ .BeatName }} && \
-    useradd -M --uid 1000 --gid 1000 --groups 0 {{ .user }} && \
+    useradd -M --uid 1000 --gid 1000 {{ .user }} && \
     chmod 755 /usr/local/bin/docker-entrypoint && \
     true
 
@@ -144,6 +144,7 @@ RUN mkdir /app && \
 {{- end }}
 
 # Keep this after any chown command, chown resets any applied capabilities
+RUN setcap cap_setfcap,cap_chown,cap_setpcap=ep {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent
 RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
 {{- if .linux_capabilities }}
 # Since the beat is stored at the other end of a symlink we must follow the symlink first
@@ -195,10 +196,13 @@ RUN cd {{$beatHome}}/.node \
   && chmod ugo+rwX -R $NODE_PATH \
 # Install synthetics as a regular user, installing npm deps as root odesn't work
    # fix .node .npm and .synthetics
-   && chown -R {{ .user }}:{{ .user }} $NODE_PATH
+   && chown -R {{ .user }}:{{ .user }} $NODE_PATH \
+   && mkdir -p {{ $beatHome }}/.npm/_logs \
+   && chown -R {{ .user }}:{{ .user }} {{ $beatHome }}/.npm \
+   && chown -R {{ .user }}:{{ .user }} {{ $beatHome }}/.cache
 USER {{ .user }}
 # If this fails dump the NPM logs
-RUN (npm i -g --loglevel verbose --production --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
+RUN (npm i -g --loglevel verbose --production --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 {{ $beatHome }}/.npm/_logs/* && exit 1') && \
     chmod ugo+rwX -R $NODE_PATH
 USER root
 

@@ -45,6 +45,7 @@ const (
 	defaultRequestRetrySleep = "1s"                             // sleep 1 sec between retries for HTTP requests
 	defaultMaxRequestRetries = "30"                             // maximum number of retries for HTTP requests
 	defaultStateDirectory    = "/usr/share/elastic-agent/state" // directory that will hold the state data
+	agentBaseDirectory       = "/usr/share/elastic-agent"       // directory that holds all elastic-agent related files
 
 	logsPathPerms = 0775
 )
@@ -147,6 +148,7 @@ occurs on every start of the container set FLEET_FORCE to 1.
 			}
 		},
 	}
+
 	return &cmd
 }
 
@@ -159,6 +161,14 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 }
 
 func logContainerCmd(streams *cli.IOStreams) error {
+	shouldExit, err := initContainer(streams)
+	if err != nil {
+		return err
+	}
+	if shouldExit {
+		return nil
+	}
+
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams
