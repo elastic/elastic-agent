@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 // Code generated from Eql.g4 by ANTLR 4.13.1. DO NOT EDIT.
 
 package parser // Eql
@@ -326,8 +330,10 @@ errorExit:
 		p.SetError(nil)
 	}
 	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBooleanContext is an interface to support dynamic dispatch.
@@ -442,8 +448,10 @@ errorExit:
 		p.SetError(nil)
 	}
 	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IConstantContext is an interface to support dynamic dispatch.
@@ -633,8 +641,10 @@ errorExit:
 		p.SetError(nil)
 	}
 	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVariableContext is an interface to support dynamic dispatch.
@@ -792,8 +802,10 @@ errorExit:
 		p.SetError(nil)
 	}
 	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVariableExpContext is an interface to support dynamic dispatch.
@@ -962,8 +974,10 @@ errorExit:
 		p.SetError(nil)
 	}
 	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpContext is an interface to support dynamic dispatch.
@@ -3232,8 +3246,10 @@ errorExit:
 		p.SetError(nil)
 	}
 	p.UnrollRecursionContexts(_parentctx)
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArgumentsContext is an interface to support dynamic dispatch.
@@ -3402,8 +3418,10 @@ errorExit:
 		p.SetError(nil)
 	}
 	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArrayContext is an interface to support dynamic dispatch.
@@ -3572,8 +3590,10 @@ errorExit:
 		p.SetError(nil)
 	}
 	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IKeyContext is an interface to support dynamic dispatch.
@@ -3722,8 +3742,10 @@ errorExit:
 		p.SetError(nil)
 	}
 	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDictContext is an interface to support dynamic dispatch.
@@ -3892,8 +3914,10 @@ errorExit:
 		p.SetError(nil)
 	}
 	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 func (p *EqlParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
