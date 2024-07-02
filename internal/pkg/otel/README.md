@@ -36,7 +36,7 @@ This section provides a summary of components included in the Elastic Distributi
 | httpcheckreceiver | v0.103.0|
 | k8sclusterreceiver | v0.103.0|
 | kubeletstatsreceiver | v0.103.0|
-| otlpreceiver | v0.103.0|
+| otlpreceiver | v0.104.0|
 
 
 
@@ -47,9 +47,9 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | elasticsearchexporter | v0.103.1-0.20240701121317-74244e46a6b6|
 | fileexporter | v0.103.0|
-| debugexporter | v0.103.0|
-| otlpexporter | v0.103.0|
-| otlphttpexporter | v0.103.0|
+| debugexporter | v0.104.0|
+| otlpexporter | v0.104.0|
+| otlphttpexporter | v0.104.0|
 
 
 
@@ -65,7 +65,7 @@ This section provides a summary of components included in the Elastic Distributi
 | resourcedetectionprocessor | v0.103.0|
 | resourceprocessor | v0.103.0|
 | transformprocessor | v0.103.0|
-| batchprocessor | v0.103.0|
+| batchprocessor | v0.104.0|
 
 
 
@@ -75,7 +75,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | storage/filestorage | v0.103.0|
-| memorylimiterextension | v0.103.0|
+| memorylimiterextension | v0.104.0|
 
 
 
