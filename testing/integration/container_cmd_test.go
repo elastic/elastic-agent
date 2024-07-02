@@ -18,6 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent/pkg/core/process"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+>>>>>>> c46a379a9c (Write `container-paths.yml` into the `STATE_PATH` (#4995))
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
@@ -112,7 +117,43 @@ func TestContainerCMD(t *testing.T) {
 	agentOutput := strings.Builder{}
 	cmd.Stderr = &agentOutput
 	cmd.Stdout = &agentOutput
+<<<<<<< HEAD
 	cmd.Env = append(os.Environ(),
+=======
+	cmd.Env = append(os.Environ(), env...)
+	return cmd
+}
+
+func TestContainerCMD(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Group: "container",
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// prepare must be called otherwise `agentFixture.WorkDir()` will be empty
+	// and it must be set so the `STATE_PATH` below gets a valid path.
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	if err != nil {
+		t.Fatalf("could not get Fleet URL: %s", err)
+	}
+
+	enrollmentToken := createPolicy(t, ctx, agentFixture, info)
+	env := []string{
+>>>>>>> c46a379a9c (Write `container-paths.yml` into the `STATE_PATH` (#4995))
 		"FLEET_ENROLL=1",
 		"FLEET_URL="+fleetURL,
 		"FLEET_ENROLLMENT_TOKEN="+enrollmentToken.APIKey,
@@ -135,7 +176,7 @@ func TestContainerCMD(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err = agentFixture.IsHealthy(ctx)
+		err = agentFixture.IsHealthy(ctx, withEnv(env))
 		return err == nil
 	},
 		5*time.Minute, time.Second,
@@ -143,3 +184,120 @@ func TestContainerCMD(t *testing.T) {
 		err, &agentOutput,
 	)
 }
+<<<<<<< HEAD
+=======
+
+func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Group: "container",
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	if err != nil {
+		t.Fatalf("could not get Fleet URL: %s", err)
+	}
+
+	testCases := map[string]struct {
+		statePath          string
+		expectedStatePath  string
+		expectedSocketPath string
+		expectError        bool
+	}{
+		"small path": { // Use the set path
+			statePath:          filepath.Join(os.TempDir(), "foo", "bar"),
+			expectedStatePath:  filepath.Join(os.TempDir(), "foo", "bar"),
+			expectedSocketPath: "/tmp/foo/bar/data/smp7BzlzcwgrLK4PUxpu7G1O5UwV4adr.sock",
+		},
+		"no path set": { // Use the default path
+			statePath:          "",
+			expectedStatePath:  "/usr/share/elastic-agent/state",
+			expectedSocketPath: "/usr/share/elastic-agent/state/data/Td8I7R-Zby36_zF_IOd9QVNlFblNEro3.sock",
+		},
+		"long path": { // Path too long to create a unix socket, it will use /tmp/elastic-agent
+			statePath:          "/tmp/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			expectedStatePath:  "/tmp/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			expectedSocketPath: "/tmp/elastic-agent/Xegnlbb8QDcqNLPzyf2l8PhVHjWvlQgZ.sock",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err)
+
+			enrollmentToken := createPolicy(t, ctx, agentFixture, info)
+			env := []string{
+				"FLEET_ENROLL=1",
+				"FLEET_URL=" + fleetURL,
+				"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
+				"STATE_PATH=" + tc.statePath,
+			}
+
+			cmd := prepareContainerCMD(t, ctx, agentFixture, info, env)
+			t.Logf(">> running binary with: %v", cmd.Args)
+			if err := cmd.Start(); err != nil {
+				t.Fatalf("error running container cmd: %s", err)
+			}
+			agentOutput := cmd.Stderr.(*strings.Builder)
+
+			require.Eventuallyf(t, func() bool {
+				// This will return errors until it connects to the agent,
+				// they're mostly noise because until the agent starts running
+				// we will get connection errors. If the test fails
+				// the agent logs will be present in the error message
+				// which should help to explain why the agent was not
+				// healthy.
+				err = agentFixture.IsHealthy(ctx, withEnv(env))
+				return err == nil
+			},
+				1*time.Minute, time.Second,
+				"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
+				err, agentOutput,
+			)
+
+			t.Cleanup(func() {
+				_ = os.RemoveAll(tc.expectedStatePath)
+			})
+
+			// Now that the Elastic-Agent is healthy, check that the control socket path
+			// is the expected one
+			if _, err := os.Stat(tc.expectedStatePath); err != nil {
+				t.Errorf("cannot stat expected state path ('%s'): %s", tc.expectedStatePath, err)
+			}
+			if _, err := os.Stat(tc.expectedSocketPath); err != nil {
+				t.Errorf("cannot stat expected socket path ('%s'): %s", tc.expectedSocketPath, err)
+			}
+			containerPaths := filepath.Join(tc.expectedStatePath, "container-paths.yml")
+			if _, err := os.Stat(tc.expectedSocketPath); err != nil {
+				t.Errorf("cannot stat expected container-paths.yml path ('%s'): %s", containerPaths, err)
+			}
+
+			if t.Failed() {
+				containerPathsContent, err := os.ReadFile(containerPaths)
+				if err != nil {
+					t.Fatalf("could not read container-paths.yml: %s", err)
+				}
+
+				t.Log("contents of 'container-paths-yml'")
+				t.Log(string(containerPathsContent))
+			}
+		})
+	}
+}
+
+func withEnv(env []string) process.CmdOption {
+	return func(c *exec.Cmd) error {
+		c.Env = append(os.Environ(), env...)
+		return nil
+	}
+}
+>>>>>>> c46a379a9c (Write `container-paths.yml` into the `STATE_PATH` (#4995))
