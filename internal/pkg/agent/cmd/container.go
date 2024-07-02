@@ -866,7 +866,10 @@ func writeContainerPaths(statePath, configPath, logsPath, socketPath string) err
 }
 
 func tryContainerLoadPaths() error {
-	statePath := envWithDefault(defaultStateDirectory, "STATE_PATH")
+	statePath := envWithDefault("", "STATE_PATH")
+	if statePath == "" {
+		statePath = defaultStateDirectory
+	}
 	pathFile := filepath.Join(statePath, "container-paths.yml")
 	_, err := os.Stat(pathFile)
 	if os.IsNotExist(err) {
