@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
@@ -39,6 +41,9 @@ func TestContainerCMD(t *testing.T) {
 	ctx := context.Background()
 
 	agentFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	err = agentFixture.Prepare(ctx)
 	require.NoError(t, err)
 
 	createPolicyReq := kibana.AgentPolicy{
@@ -112,7 +117,7 @@ func TestContainerCMD(t *testing.T) {
 	agentOutput := strings.Builder{}
 	cmd.Stderr = &agentOutput
 	cmd.Stdout = &agentOutput
-	cmd.Env = append(os.Environ(),
+	env := append(os.Environ(),
 		"FLEET_ENROLL=1",
 		"FLEET_URL="+fleetURL,
 		"FLEET_ENROLLMENT_TOKEN="+enrollmentToken.APIKey,
@@ -122,6 +127,7 @@ func TestContainerCMD(t *testing.T) {
 		// container, distinct from the current execution path.
 		"STATE_PATH="+agentFixture.WorkDir(),
 	)
+	cmd.Env = env
 
 	t.Logf(">> running binary with: %v", cmd.Args)
 	if err := cmd.Start(); err != nil {
@@ -135,11 +141,18 @@ func TestContainerCMD(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err = agentFixture.IsHealthy(ctx)
+		err = agentFixture.IsHealthy(ctx, withEnv(env))
 		return err == nil
 	},
 		5*time.Minute, time.Second,
 		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
 		err, &agentOutput,
 	)
+}
+
+func withEnv(env []string) process.CmdOption {
+	return func(c *exec.Cmd) error {
+		c.Env = append(c.Env, env...)
+		return nil
+	}
 }
