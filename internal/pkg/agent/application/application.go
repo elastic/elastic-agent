@@ -174,6 +174,7 @@ func New(
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
 				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo),
 				EndpointSignedComponentModifier(),
+				InjectProxyEndpointModifier(),
 			)
 
 			// TODO: stop using global state
