@@ -312,7 +312,8 @@ func getConnInfoServerAddress(os string, isLocal bool, port int, socket string) 
 		}
 
 		u.Scheme = "unix"
-		return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), socket).String(), nil
+		// Use the path that is relative to path.top which corresponds to the agent binary directory in all installation types
+		return u.JoinPath(paths.Top(), socket).String(), nil
 	}
 
 	return fmt.Sprintf("127.0.0.1:%d", port), nil
