@@ -1,0 +1,73 @@
+receivers:
+  # Receiver for platform specific log files
+  filelog/platformlogs:
+    include: [ /var/log/*.log ]
+#    start_at: beginning
+
+  # Receiver for CPU, Disk, Memory, and Filesystem metrics
+  hostmetrics/system:
+    collection_interval: 30s
+    scrapers:
+      disk:
+      filesystem:
+      cpu:
+      memory:
+
+processors:
+  elasticinframetrics:
+  resourcedetection:
+    detectors: ["system"]
+    system:
+      hostname_sources: ["os"]
+      resource_attributes:
+        host.name:
+          enabled: true
+        host.id:
+          enabled: false
+        host.arch:
+          enabled: true
+        host.ip:
+          enabled: true
+        host.mac:
+          enabled: true
+        host.cpu.vendor.id:
+          enabled: true
+        host.cpu.family:
+          enabled: true
+        host.cpu.model.id:
+          enabled: true
+        host.cpu.model.name:
+          enabled: true
+        host.cpu.stepping:
+          enabled: true
+        host.cpu.cache.l2.size:
+          enabled: true
+        os.description:
+          enabled: true
+        os.type:
+          enabled: true
+
+exporters:
+  elasticsearch:
+    endpoints: ["${env:ELASTIC_ENDPOINT}"]
+    api_key: ${env:ELASTIC_API_KEY}
+    mapping:
+      mode: ecs
+    logs_dynamic_index:
+      enabled: true
+    metrics_dynamic_index:
+      enabled: true
+    traces_dynamic_index:
+      enabled: true
+
+service:
+  pipelines:
+    metrics/hostmetrics:
+      receivers: [hostmetrics/system]
+      processors: [elasticinframetrics, resourcedetection]
+      exporters: [elasticsearch]
+
+    logs/platformlogs:
+      receivers: [filelog/platformlogs]
+      processors: [resourcedetection]
+      exporters: [elasticsearch]
