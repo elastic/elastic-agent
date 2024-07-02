@@ -31,6 +31,7 @@ LARR: '[';
 RARR: ']';
 LDICT: '{';
 RDICT: '}';
+BEGIN_EVARIABLE: '$${';
 BEGIN_VARIABLE: '${';
 
 expList: exp EOF;
@@ -71,6 +72,7 @@ exp
 | left=exp AND right=exp # ExpLogicalAnd
 | left=exp OR right=exp # ExpLogicalOR
 | boolean # ExpBoolean
+| BEGIN_EVARIABLE variableExp RDICT # ExpEVariable
 | BEGIN_VARIABLE variableExp RDICT # ExpVariable
 | NAME LPAR arguments? RPAR # ExpFunction
 | LARR array? RARR # ExpArray
