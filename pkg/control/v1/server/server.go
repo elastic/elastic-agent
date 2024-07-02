@@ -11,7 +11,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v1/proto"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
