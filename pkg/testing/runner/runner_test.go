@@ -103,6 +103,10 @@ func (p *fakeInstanceProvisioner) Name() string {
 	return "fake"
 }
 
+func (p *fakeInstanceProvisioner) Type() ProvisionerType {
+	return ProvisionerTypeVM
+}
+
 func (p *fakeInstanceProvisioner) SetLogger(_ Logger) {
 }
 

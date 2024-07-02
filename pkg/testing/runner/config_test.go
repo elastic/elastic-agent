@@ -30,7 +30,7 @@ func TestConfig_GetPlatforms(t *testing.T) {
 		},
 		{
 			Platforms: []string{"unknown"},
-			Err:       errors.New(`failed to parse platform string "unknown": type must be either darwin, linux, or windows`),
+			Err:       errors.New(`failed to parse platform string "unknown": type must be either darwin, linux, windows, or kubernetes`),
 		},
 		{
 			Platforms: []string{"linux/blah"},

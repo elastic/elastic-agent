@@ -10,6 +10,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
+type ProvisionerType uint32
+
+const (
+	ProvisionerTypeVM ProvisionerType = iota
+	ProvisionerTypeK8SCluster
+)
+
 // Instance represents a provisioned instance.
 type Instance struct {
 	// Provider is the instance provider for the instance.
@@ -40,6 +47,9 @@ type Instance struct {
 type InstanceProvisioner interface {
 	// Name returns the name of the instance provisioner.
 	Name() string
+
+	// Type returns the type of the provisioner.
+	Type() ProvisionerType
 
 	// SetLogger sets the logger for it to use.
 	SetLogger(l Logger)

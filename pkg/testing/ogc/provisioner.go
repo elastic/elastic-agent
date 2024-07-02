@@ -50,6 +50,10 @@ func (p *provisioner) SetLogger(l runner.Logger) {
 	p.logger = l
 }
 
+func (p *provisioner) Type() runner.ProvisionerType {
+	return runner.ProvisionerTypeVM
+}
+
 // Supported returns true when we support this OS for OGC.
 func (p *provisioner) Supported(os define.OS) bool {
 	_, ok := findOSLayout(os)
