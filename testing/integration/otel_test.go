@@ -456,12 +456,27 @@ func testAgentCanRun(ctx context.Context, t *testing.T, fixture *atesting.Fixtur
 
 	return func(t *testing.T) {
 		// Get path to Elastic Agent executable
-		devFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+		devFixture, err := define.NewFixture(t, define.Version())
 		require.NoError(t, err)
 
 		// Prepare the Elastic Agent so the binary is extracted and ready to use.
 		err = devFixture.Prepare(tCtx)
 		require.NoError(t, err)
+		complexIsolatedUnitsConfig := `
+		outputs:
+		  default:
+			type: fake-action-output
+			shipper.enabled: true
+		inputs:
+		  - id: fake-isolated-units
+			type: fake-isolated-units
+			state: 2
+			message: Healthy
+		  - id: fake-isolated-units-1
+			type: fake-isolated-units
+			state: 2
+			message: Healthy
+		`
 
 		require.Eventually(
 			t,
