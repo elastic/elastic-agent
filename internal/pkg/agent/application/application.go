@@ -125,6 +125,7 @@ func New(
 		tracer,
 		monitor,
 		cfg.Settings.GRPC,
+		runAsOtel,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
