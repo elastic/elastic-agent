@@ -922,7 +922,7 @@ func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
-	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, configuration.DefaultGRPCConfig())
+	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, configuration.DefaultGRPCConfig(), false)
 	require.NoError(t, err)
 
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)

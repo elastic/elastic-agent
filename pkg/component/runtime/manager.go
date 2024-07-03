@@ -148,7 +148,8 @@ type Manager struct {
 
 	// doneChan is closed when Manager is shutting down to signal that any
 	// pending requests should be canceled.
-	doneChan chan struct{}
+	doneChan  chan struct{}
+	runAsOtel bool
 }
 
 // NewManager creates a new manager.
@@ -159,6 +160,7 @@ func NewManager(
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
 	grpcConfig *configuration.GRPCConfig,
+	runAsOtel bool,
 ) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
@@ -195,6 +197,7 @@ func NewManager(
 		grpcConfig:     grpcConfig,
 		serverReady:    &atomic.Bool{},
 		doneChan:       make(chan struct{}),
+		runAsOtel:      runAsOtel,
 	}
 	return m, nil
 }
@@ -210,58 +213,59 @@ func (m *Manager) Run(ctx context.Context) error {
 	var (
 		listener net.Listener
 		err      error
+		server   *grpc.Server
+		wgServer sync.WaitGroup
 	)
-	if m.isLocal {
-		listener, err = ipc.CreateListener(m.logger, m.listenAddr)
-	} else {
-		listener, err = net.Listen("tcp", m.listenAddr)
-	}
+	if !m.runAsOtel {
+		if m.isLocal {
+			listener, err = ipc.CreateListener(m.logger, m.listenAddr)
+		} else {
+			listener, err = net.Listen("tcp", m.listenAddr)
+		}
 
-	if err != nil {
-		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
-	}
+		if err != nil {
+			return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
+		}
 
-	if m.isLocal {
-		defer ipc.CleanupListener(m.logger, m.listenAddr)
-	} else {
-		m.listenPort = listener.Addr().(*net.TCPAddr).Port
-	}
+		if m.isLocal {
+			defer ipc.CleanupListener(m.logger, m.listenAddr)
+		} else {
+			m.listenPort = listener.Addr().(*net.TCPAddr).Port
+		}
 
-	certPool := x509.NewCertPool()
-	if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
-		return errors.New("failed to append root CA")
-	}
-	creds := credentials.NewTLS(&tls.Config{
-		ClientAuth:     tls.RequireAndVerifyClientCert,
-		ClientCAs:      certPool,
-		GetCertificate: m.getCertificate,
-		MinVersion:     tls.VersionTLS12,
-	})
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
+			return errors.New("failed to append root CA")
+		}
+		creds := credentials.NewTLS(&tls.Config{
+			ClientAuth:     tls.RequireAndVerifyClientCert,
+			ClientCAs:      certPool,
+			GetCertificate: m.getCertificate,
+			MinVersion:     tls.VersionTLS12,
+		})
+		m.logger.Infof("Starting grpc control protocol listener on port %v with max_message_size %v", m.grpcConfig.Port, m.grpcConfig.MaxMsgSize)
+		if m.tracer != nil {
+			apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(m.tracer))
+			server = grpc.NewServer(
+				grpc.UnaryInterceptor(apmInterceptor),
+				grpc.Creds(creds),
+				grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
+			)
+		} else {
+			server = grpc.NewServer(
+				grpc.Creds(creds),
+				grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
+			)
+		}
+		proto.RegisterElasticAgentServer(server, m)
 
-	var server *grpc.Server
-	m.logger.Infof("Starting grpc control protocol listener on port %v with max_message_size %v", m.grpcConfig.Port, m.grpcConfig.MaxMsgSize)
-	if m.tracer != nil {
-		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(m.tracer))
-		server = grpc.NewServer(
-			grpc.UnaryInterceptor(apmInterceptor),
-			grpc.Creds(creds),
-			grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
-		)
-	} else {
-		server = grpc.NewServer(
-			grpc.Creds(creds),
-			grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
-		)
+		// start serving GRPC connections
+		wgServer.Add(1)
+		go func() {
+			defer wgServer.Done()
+			m.serverLoop(ctx, listener, server)
+		}()
 	}
-	proto.RegisterElasticAgentServer(server, m)
-
-	// start serving GRPC connections
-	var wgServer sync.WaitGroup
-	wgServer.Add(1)
-	go func() {
-		defer wgServer.Done()
-		m.serverLoop(ctx, listener, server)
-	}()
 
 	// Start the run loop, which continues on the main goroutine
 	// until the context is canceled.
@@ -271,11 +275,13 @@ func (m *Manager) Run(ctx context.Context) error {
 	m.shutdown()
 
 	// Close the rpc listener and wait for serverLoop to return
-	listener.Close()
-	wgServer.Wait()
+	if !m.runAsOtel {
+		listener.Close()
+		wgServer.Wait()
 
-	// Cancel any remaining connections
-	server.Stop()
+		// Cancel any remaining connections
+		server.Stop()
+	}
 	return ctx.Err()
 }
 
