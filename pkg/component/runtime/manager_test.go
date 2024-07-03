@@ -36,6 +36,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
 		configuration.DefaultGRPCConfig(),
+		false,
 	)
 	require.NoError(t, err)
 

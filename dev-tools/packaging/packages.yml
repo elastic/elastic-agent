@@ -87,6 +87,9 @@ shared:
     'data/{{.BeatName}}-{{ commit_short }}/otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
       mode: 0755
+    'otel_samples':
+      source: '{{ repo.RootDir }}/internal/pkg/otel/samples/linux/'
+      mode: 0755
 
   - &agent_binary_common_files
     LICENSE.txt:
@@ -160,6 +163,9 @@ shared:
     'data/{{.BeatName}}-{{ commit_short }}/otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
       mode: 0755
+    'otel_samples':
+      source: '{{ repo.RootDir }}/internal/pkg/otel/samples/darwin/'
+      mode: 0755
     <<: *agent_darwin_app_bundle_files
     <<: *agent_binary_common_files
 
@@ -201,6 +207,10 @@ shared:
       'data/{{.BeatName}}-{{ commit_short }}/otelcol.ps1':
         source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
         mode: 0755
+      # windows not supported yet  
+      # 'otel_samples':
+      #   source: '{{ repo.RootDir }}/internal/pkg/otel/samples/windows/'
+      #   mode: 0755
 
   - &agent_docker_spec
     <<: *agent_binary_spec
