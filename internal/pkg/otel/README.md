@@ -31,21 +31,12 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-| filelogreceiver | v0.103.0|
-| hostmetricsreceiver | v0.103.0|
-| httpcheckreceiver | v0.103.0|
-| k8sclusterreceiver | v0.103.0|
-| kubeletstatsreceiver | v0.103.0|
-| otlpreceiver | v0.103.0|
-=======
 | filelogreceiver | v0.104.0|
 | hostmetricsreceiver | v0.104.0|
 | httpcheckreceiver | v0.104.0|
 | k8sclusterreceiver | v0.104.0|
 | kubeletstatsreceiver | v0.104.0|
 | otlpreceiver | v0.104.0|
->>>>>>> 11cca4b5fb (Bump the otel-dependencies group with 28 updates (#5041))
 
 
 
@@ -54,19 +45,11 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-| elasticsearchexporter | v0.103.1-0.20240701121317-74244e46a6b6|
-| fileexporter | v0.103.0|
-| debugexporter | v0.103.0|
-| otlpexporter | v0.103.0|
-| otlphttpexporter | v0.103.0|
-=======
 | elasticsearchexporter | v0.104.0|
 | fileexporter | v0.104.0|
 | debugexporter | v0.104.0|
 | otlpexporter | v0.104.0|
 | otlphttpexporter | v0.104.0|
->>>>>>> 11cca4b5fb (Bump the otel-dependencies group with 28 updates (#5041))
 
 
 
@@ -75,17 +58,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
 | elasticinframetricsprocessor | v0.2.0|
-| attributesprocessor | v0.103.0|
-| filterprocessor | v0.103.0|
-| k8sattributesprocessor | v0.103.0|
-| resourcedetectionprocessor | v0.103.0|
-| resourceprocessor | v0.103.0|
-| transformprocessor | v0.103.0|
-| batchprocessor | v0.103.0|
-=======
-| elasticinframetricsprocessor | v0.4.0|
 | attributesprocessor | v0.104.0|
 | filterprocessor | v0.104.0|
 | k8sattributesprocessor | v0.104.0|
@@ -93,7 +66,6 @@ This section provides a summary of components included in the Elastic Distributi
 | resourceprocessor | v0.104.0|
 | transformprocessor | v0.104.0|
 | batchprocessor | v0.104.0|
->>>>>>> 11cca4b5fb (Bump the otel-dependencies group with 28 updates (#5041))
 
 
 
@@ -102,13 +74,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-| storage/filestorage | v0.103.0|
-| memorylimiterextension | v0.103.0|
-=======
 | storage/filestorage | v0.104.0|
 | memorylimiterextension | v0.104.0|
->>>>>>> 11cca4b5fb (Bump the otel-dependencies group with 28 updates (#5041))
 
 
 
