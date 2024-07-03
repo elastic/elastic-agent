@@ -15,7 +15,6 @@ import (
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
 const ComponentSpecFileSuffix = ".spec.yml"
@@ -95,7 +94,7 @@ func ChecksumsWithoutManifest(versionedFlatPath string, versionedDropPath string
 }
 
 // This is a helper function for flattenDependencies that's used when building from a manifest
-func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse *tools.Build) map[string]string {
+func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse *manifest.Build) map[string]string {
 	checksums := make(map[string]string)
 	if manifestResponse == nil {
 		return checksums
@@ -210,7 +209,7 @@ func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, ver
 // for projects in an Independent Agent Release to have different versions since the opted-in
 // ones will be one patch version higher than the opted-out/previously released projects.
 // This function tries to find the versions from the package name
-func getComponentVersion(componentName string, requiredPackage string, componentProject tools.Project) string {
+func getComponentVersion(componentName string, requiredPackage string, componentProject manifest.Project) string {
 	var componentVersion string
 	var foundIt bool
 	// Iterate over all the packages in the component project
