@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/antlr4-go/antlr/v4"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql/parser"
 )
@@ -248,6 +248,13 @@ func (v *expVisitor) VisitExpNot(ctx *parser.ExpNotContext) interface{} {
 	}
 
 	return !val
+}
+
+func (v *expVisitor) VisitExpEVariable(ctx *parser.ExpEVariableContext) interface{} {
+	// escaped variables are not allowed in Eql conditions
+	// they should be wrapped in a constant to be allowed as a valid string in the expression
+	v.err = errors.New("escaped variable $${ is not allowed")
+	return nil
 }
 
 func (v *expVisitor) VisitExpVariable(ctx *parser.ExpVariableContext) interface{} {

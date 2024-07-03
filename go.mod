@@ -1,10 +1,10 @@
 module github.com/elastic/elastic-agent
 
-go 1.21.10
+go 1.22.4
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230321174746-8dcc6526cfb1
+	github.com/antlr4-go/antlr/v4 v4.13.0
 	github.com/billgraziano/dpapi v0.4.0
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
 	github.com/cavaliercoder/go-rpm v0.0.0-20190131055624-7a9c54e3d83e
@@ -22,7 +22,7 @@ require (
 	github.com/elastic/go-sysinfo v1.14.0
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.3.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.4.0
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gofrs/flock v0.8.1
@@ -148,7 +148,7 @@ require (
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
-	github.com/elastic/opentelemetry-lib v0.4.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.5.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect

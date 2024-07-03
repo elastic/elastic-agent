@@ -499,8 +499,8 @@ github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be/go.mod h1:ySMOLuW
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed/go.mod h1:F7bn7fEU90QkQ3tnmaTx3LTKLEDqnwWODIYppRQ5hnY=
 github.com/antlr/antlr4/runtime/Go/antlr v1.4.10/go.mod h1:F7bn7fEU90QkQ3tnmaTx3LTKLEDqnwWODIYppRQ5hnY=
-github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230321174746-8dcc6526cfb1 h1:X8MJ0fnN5FPdcGF5Ij2/OW+HgiJrRg3AfHAx1PJtIzM=
-github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230321174746-8dcc6526cfb1/go.mod h1:pSwJ0fSY5KhvocuWSx4fz3BA8OrA1bQn+K1Eli3BRwM=
+github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8TVTI=
+github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
@@ -851,10 +851,10 @@ github.com/elastic/gosigar v0.14.3 h1:xwkKwPia+hSfg9GqrCUKYdId102m9qTJIIr7egmK/u
 github.com/elastic/gosigar v0.14.3/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
 github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f h1:qo0Nn9G+p7HbG+CmiWwSoiKJ/cyRq59TRn9Z2PRHTi8=
 github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f/go.mod h1:mVdKBYYwt30xRFjCegbcURHh+3LWOCkQM33fgWbUiRI=
-github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.3.0 h1:iZrOpSv4X7QIOttTYmfJ73JTlqXa5XxgCXUXw9GEfwM=
-github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.3.0/go.mod h1:Z3Bgi98f9RhBNwlaT0ZLSbXQLzaNELyTJREV+v+2KgE=
-github.com/elastic/opentelemetry-lib v0.4.0 h1:e+N00oKXnv8EIXDVjHXPjkxox98JVm1b4kHVMp1NcTA=
-github.com/elastic/opentelemetry-lib v0.4.0/go.mod h1:/kKvHbJLVo/NcKMPHI8/RZKL64fushmnRUzn+arQpjg=
+github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.4.0 h1:jSq7qvh39GCpv0XF7/hys2mJmQaATKkCNVj/SY5S730=
+github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.4.0/go.mod h1:cbFtO2rPm7o2kAZKwH/SQ7QZVGYt2qdqHjWOw5TTsYg=
+github.com/elastic/opentelemetry-lib v0.5.0 h1:BT1Koon6lm0zF554NuPtachBBR+26RS9GlCaaMbGIJ8=
+github.com/elastic/opentelemetry-lib v0.5.0/go.mod h1:/kKvHbJLVo/NcKMPHI8/RZKL64fushmnRUzn+arQpjg=
 github.com/elastic/package-spec/v2 v2.6.0/go.mod h1:ks9/FaVOS+vCrGRQcDvXAd2FlmB84mrLikbRiO6ACuk=
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
 github.com/elastic/pkcs8 v1.0.0/go.mod h1:ipsZToJfq1MxclVTwpG7U/bgeDtf+0HkUiOxebk95+0=
