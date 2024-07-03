@@ -808,7 +808,11 @@ func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
+<<<<<<< HEAD
 	rm, err := runtime.NewManager(l, l, "localhost:0", ai, apmtest.DiscardTracer, monitoringMgr, configuration.DefaultGRPCConfig())
+=======
+	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, configuration.DefaultGRPCConfig(), false)
+>>>>>>> db40ac2575 (Conditional runtime server for otel mode (#5018))
 	require.NoError(t, err)
 
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
