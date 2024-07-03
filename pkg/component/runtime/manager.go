@@ -195,13 +195,6 @@ func NewManager(
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
-<<<<<<< HEAD
-	listener, err := net.Listen("tcp", m.listenAddr)
-	if err != nil {
-		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
-	}
-	m.listenPort = listener.Addr().(*net.TCPAddr).Port
-=======
 	var (
 		listener net.Listener
 		err      error
@@ -209,22 +202,11 @@ func (m *Manager) Run(ctx context.Context) error {
 		wgServer sync.WaitGroup
 	)
 	if !m.runAsOtel {
-		if m.isLocal {
-			listener, err = ipc.CreateListener(m.logger, m.listenAddr)
-		} else {
-			listener, err = net.Listen("tcp", m.listenAddr)
-		}
-
+		listener, err = net.Listen("tcp", m.listenAddr)
 		if err != nil {
 			return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
 		}
-
-		if m.isLocal {
-			defer ipc.CleanupListener(m.logger, m.listenAddr)
-		} else {
-			m.listenPort = listener.Addr().(*net.TCPAddr).Port
-		}
->>>>>>> db40ac2575 (Conditional runtime server for otel mode (#5018))
+		m.listenPort = listener.Addr().(*net.TCPAddr).Port
 
 		certPool := x509.NewCertPool()
 		if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
