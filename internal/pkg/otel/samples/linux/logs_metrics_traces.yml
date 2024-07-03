@@ -1,8 +1,11 @@
 receivers:
-
   # Receiver for platform specific log files
   filelog/platformlogs:
     include: [ /var/log/*.log ]
+    retry_on_failure:
+      enabled: true
+    start_at: end
+    storage: file_storage
 #    start_at: beginning
 
   # Receiver for CPU, Disk, Memory, and Filesystem metrics
@@ -43,6 +46,10 @@ receivers:
     protocols:
       grpc:
       http:
+
+extensions:
+  file_storage:
+    directory: ${env:STORAGE_DIR}
 
 processors:
   elasticinframetrics:
@@ -110,6 +117,7 @@ exporters:
       enabled: true
 
 service:
+  extensions: [file_storage]
   pipelines:
     traces/fromsdk:
       receivers: [otlp/fromsdk]
