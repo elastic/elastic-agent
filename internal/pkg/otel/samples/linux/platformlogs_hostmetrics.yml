@@ -75,6 +75,12 @@ processors:
       - key: event.dataset
         from_attribute: data_stream.dataset
         action: upsert
+  resource/process:
+    attributes:
+      - key: process.executable.name
+        action: delete
+      - key: process.executable.path
+        action: delete
 
 exporters:
   # Exporter to send logs and metrics to Elasticsearch
@@ -94,7 +100,7 @@ service:
   pipelines:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [elasticinframetrics, resourcedetection, attributes/dataset]
+      processors: [elasticinframetrics, resourcedetection, attributes/dataset, resource/process]
       exporters: [elasticsearch]
     logs/platformlogs:
       receivers: [filelog/platformlogs]
