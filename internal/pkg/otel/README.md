@@ -58,7 +58,11 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | elasticinframetricsprocessor | v0.2.0|
+=======
+| elasticinframetricsprocessor | v0.5.1|
+>>>>>>> 1063e802d9 (Updated es infra processor and dependabot rules to include further up… (#5061))
 | attributesprocessor | v0.104.0|
 | filterprocessor | v0.104.0|
 | k8sattributesprocessor | v0.104.0|
