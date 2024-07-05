@@ -144,7 +144,7 @@ RUN mkdir /app && \
 {{- end }}
 
 # Keep this after any chown command, chown resets any applied capabilities
-RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
+RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/agentbeat && \
 {{- if .linux_capabilities }}
 # Since the beat is stored at the other end of a symlink we must follow the symlink first
 # For security reasons setcap does not support symlinks. This is smart in the general case
@@ -240,4 +240,3 @@ RUN echo -e '#!/bin/sh\nexec /usr/local/bin/docker-entrypoint' > /app/apm.sh && 
 {{- else }}
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]
 {{- end }}
-
