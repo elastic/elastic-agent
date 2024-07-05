@@ -348,3 +348,57 @@ func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixt
 		t.Log(logEntry)
 	}
 }
+
+func collectDiagnosticsAndVeriflyLogs(
+	t *testing.T,
+	ctx context.Context,
+	agentFixture *atesting.Fixture,
+	cmd,
+	expectedFiles []string) {
+
+	diagPath, err := agentFixture.ExecDiagnostics(ctx, cmd...)
+	if err != nil {
+		t.Fatalf("could not execute diagnostics excluding events log: %s", err)
+	}
+
+	extractionDir := t.TempDir()
+	extractZipArchive(t, diagPath, extractionDir)
+	diagLogFiles, diagEventLogFiles := getLogFilenames(
+		t,
+		filepath.Join(extractionDir, "logs", "elastic-agent*"))
+	allLogs := append(diagLogFiles, diagEventLogFiles...)
+
+	require.ElementsMatch(
+		t,
+		expectedFiles,
+		allLogs,
+		"expected: 'listA', got: 'listB'")
+}
+
+func getLogFilenames(
+	t *testing.T,
+	basepath string,
+) (logFiles, eventLogFiles []string) {
+
+	logFilesGlob := filepath.Join(basepath, "*.ndjson")
+	logFilesPath, err := filepath.Glob(logFilesGlob)
+	if err != nil {
+		t.Fatalf("could not get log file names:%s", err)
+	}
+
+	for _, f := range logFilesPath {
+		logFiles = append(logFiles, filepath.Base(f))
+	}
+
+	eventLogFilesGlob := filepath.Join(basepath, "events", "*.ndjson")
+	eventLogFilesPath, err := filepath.Glob(eventLogFilesGlob)
+	if err != nil {
+		t.Fatalf("could not get log file names:%s", err)
+	}
+
+	for _, f := range eventLogFilesPath {
+		eventLogFiles = append(eventLogFiles, filepath.Base(f))
+	}
+
+	return logFiles, eventLogFiles
+}
