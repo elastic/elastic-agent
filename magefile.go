@@ -41,7 +41,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
 	pv "github.com/elastic/elastic-agent/pkg/testing/tools/product_versions"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/snapshots"
@@ -483,7 +482,7 @@ func Package(ctx context.Context) error {
 	}
 
 	var err error
-	var manifestResponse *tools.Build
+	var manifestResponse *manifest.Build
 	if devtools.PackagingFromManifest {
 		manifestResponse, _, err = downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
 		if err != nil {
@@ -962,7 +961,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *tools.Build, agentPackaging, agentBinaryTarget mg.Fn) error {
+func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	requiredPackages := []string{}
@@ -1135,7 +1134,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
-func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse *tools.Build) {
+func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build) {
 
 	for _, rp := range requiredPackages {
 		targetPath := filepath.Join(archivePath, rp)
@@ -1266,7 +1265,7 @@ func PackageUsingDRA(ctx context.Context) error {
 	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL))
 }
 
-func downloadManifestAndSetVersion(ctx context.Context, url string) (*tools.Build, *version.ParsedSemVer, error) {
+func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.Build, *version.ParsedSemVer, error) {
 	resp, err := manifest.DownloadManifest(ctx, url)
 	if err != nil {
 		return nil, nil, fmt.Errorf("downloading manifest: %w", err)
@@ -1348,12 +1347,12 @@ func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
 	return mappedPltf, found
 }
 
-func filterPackagesByPlatform(pkgs map[string]tools.Package) map[string]tools.Package {
+func filterPackagesByPlatform(pkgs map[string]manifest.Package) map[string]manifest.Package {
 	if mg.Verbose() {
 		log.Printf("unfiltered packages: %v", pkgs)
 	}
 	platforms := devtools.Platforms.Names()
-	filteredPackages := map[string]tools.Package{}
+	filteredPackages := map[string]manifest.Package{}
 	for pkgName, pkgDesc := range pkgs {
 		if mg.Verbose() {
 			log.Printf("checking if %s:%v should be included", pkgName, pkgDesc)
@@ -1375,7 +1374,7 @@ func filterPackagesByPlatform(pkgs map[string]tools.Package) map[string]tools.Pa
 	return filteredPackages
 }
 
-func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir string, projects ...string) (map[string]tools.Package, error) {
+func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir string, projects ...string) (map[string]manifest.Package, error) {
 	build, err := manifest.DownloadManifest(ctx, manifestUrl)
 	if err != nil {
 		return nil, fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)
@@ -1390,7 +1389,7 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 
 	// sync access to the downloadedArtifacts map
 	mx := new(sync.Mutex)
-	downloadedArtifacts := map[string]tools.Package{}
+	downloadedArtifacts := map[string]manifest.Package{}
 	errGrp, errCtx := errgroup.WithContext(ctx)
 
 	for _, projectName := range projects {
@@ -1408,7 +1407,7 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 			log.Printf("packages to download: %v", filteredPackages)
 		}
 		for pkgName, pkgDesc := range filteredPackages {
-			downloadFunc := func(pkgName string, pkgDesc tools.Package) func() error {
+			downloadFunc := func(pkgName string, pkgDesc manifest.Package) func() error {
 				return func() error {
 					artifactDownloadPath := filepath.Join(draDownloadDir, pkgName)
 					err := manifest.DownloadPackage(errCtx, pkgDesc.URL, artifactDownloadPath)

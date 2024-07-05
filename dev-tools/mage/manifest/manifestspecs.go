@@ -15,8 +15,6 @@ import (
 	"time"
 
 	"github.com/magefile/mage/mg"
-
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
 func doWithRetries[T any](f func() (T, error)) (T, error) {
@@ -75,8 +73,8 @@ func downloadFile(ctx context.Context, url string, filepath string) (string, err
 	return outFile.Name(), nil
 }
 
-func downloadManifestData(ctx context.Context, url string) (tools.Build, error) {
-	var response tools.Build
+func downloadManifestData(ctx context.Context, url string) (Build, error) {
+	var response Build
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return response, fmt.Errorf("failed to create manifest request: %w", err)
