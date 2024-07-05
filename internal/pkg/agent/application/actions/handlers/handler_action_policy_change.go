@@ -312,8 +312,8 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	if err != nil {
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
-	loggingHasChanged := h.eventLoggingHasChanged(cfg)
-	if loggingHasChanged {
+	hasEventLoggingOutputChanged := h.hasEventLoggingOutputChanged(cfg)
+	if hasEventLoggingOutputChanged {
 		h.config.Settings.EventLoggingConfig = cfg.Settings.EventLoggingConfig
 	}
 
@@ -329,17 +329,20 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return fmt.Errorf("applying FleetClientConfig: %w", err)
 	}
 
-	if loggingHasChanged {
-		// The only way to update the logging configuration
-		// is to re-start the Elastic-Agent
+	// If the event logging output has changed, we need to
+	// re-exec the Elastic-Agent to apply the new logging
+	// output.
+	// The new logging configuration has already been persisted
+	// to the disk, the Elastic-Agent will pick it up once it starts.
+	if hasEventLoggingOutputChanged {
 		h.coordinator.ReExec(nil)
 	}
 
 	return nil
 }
 
-// eventLoggingHasChanged returns true if the output of the event logger has changed
-func (p *PolicyChangeHandler) eventLoggingHasChanged(new *configuration.Configuration) bool {
+// hasEventLoggingOutputChanged returns true if the output of the event logger has changed
+func (p *PolicyChangeHandler) hasEventLoggingOutputChanged(new *configuration.Configuration) bool {
 	switch {
 	case p.config.Settings.EventLoggingConfig.ToFiles != new.Settings.EventLoggingConfig.ToFiles:
 		return true
