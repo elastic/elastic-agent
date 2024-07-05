@@ -2645,11 +2645,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-ucfg@v0.8.8/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor
-Version: v0.2.0
+Version: v0.5.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor@v0.2.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor@v0.5.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -20064,11 +20064,11 @@ limitations under the License.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/opentelemetry-lib
-Version: v0.3.0
+Version: v0.6.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-lib@v0.3.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-lib@v0.6.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
