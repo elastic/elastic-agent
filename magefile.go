@@ -709,6 +709,13 @@ func FakeShipperProto() error {
 		"pkg/component/fake/common/event.proto")
 }
 
+func PrintVersion() error {
+	mage.DefaultBeatBuildVariableSources.GetBeatVersion()
+	version := getVersion()
+	fmt.Println(version)
+	return nil
+}
+
 func BuildPGP() error {
 	// go run elastic-agent/dev-tools/cmd/buildpgp/build_pgp.go --in agent/spec/GPG-KEY-elasticsearch --out elastic-agent/pkg/release/pgp.go
 	goF := filepath.Join("dev-tools", "cmd", "buildpgp", "build_pgp.go")
