@@ -11,7 +11,7 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: Inject proxy_url into endpoint elasticsearch output
+summary: Inject proxy_url into endpoint elasticsearch output and fleet config
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
@@ -19,6 +19,7 @@ summary: Inject proxy_url into endpoint elasticsearch output
 description: |
   Inject a proxy_url value into endpoint's elasticsearch output if there is no existing key as part of the policy, but the agent has one set by enviroment variables.
   HTTPS_PROXY is used over HTTP_PROXY. Injection will be skipped if the policy sets proxy_disable to true.
+  A proxy_url value is also injected into endpoint and APM's fleet configuration using the fleet hosts to help determine if the HTTPS or HTTP proxy var should be used.
 
 # Affected component; a word indicating the component this changeset affects.
 component:

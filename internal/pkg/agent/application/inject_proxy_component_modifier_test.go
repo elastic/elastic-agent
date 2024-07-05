@@ -270,3 +270,66 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 		})
 	}
 }
+
+func Test_injectProxyURL(t *testing.T) {
+	t.Setenv("HTTPS_PROXY", "https://localhost:8080")
+	t.Setenv("HTTP_PROXY", "http://localhost:8081")
+
+	tests := []struct {
+		name   string
+		m      map[string]interface{}
+		hosts  []string
+		expect map[string]interface{}
+	}{{
+		name:  "nil map",
+		m:     nil,
+		hosts: nil,
+	}, {
+		name:   "proxy_url defined",
+		m:      map[string]interface{}{"key": "value", "proxy_url": "http://proxy:80"},
+		hosts:  nil,
+		expect: map[string]interface{}{"key": "value", "proxy_url": "http://proxy:80"},
+	}, {
+		name:   "proxy_disable set",
+		m:      map[string]interface{}{"key": "value", "proxy_disable": true},
+		hosts:  nil,
+		expect: map[string]interface{}{"key": "value", "proxy_disable": true},
+	}, {
+		name:   "no hosts uses HTTPS_PROXY",
+		m:      map[string]interface{}{"key": "value"},
+		hosts:  nil,
+		expect: map[string]interface{}{"key": "value", "proxy_url": "https://localhost:8080"},
+	}, {
+		name:   "https hosts uses HTTPS_PROXY",
+		m:      map[string]interface{}{"key": "value"},
+		hosts:  []string{"https://example:443"},
+		expect: map[string]interface{}{"key": "value", "proxy_url": "https://localhost:8080"},
+	}, {
+		name:   "http host uses HTTP_PROXY",
+		m:      map[string]interface{}{"key": "value"},
+		hosts:  []string{"http://example:80"},
+		expect: map[string]interface{}{"key": "value", "proxy_url": "http://localhost:8081"},
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			injectProxyURL(tc.m, tc.hosts)
+			require.Equal(t, tc.expect, tc.m)
+		})
+	}
+
+	t.Run("no hosts or HTTPS_PROXY uses HTTP_PROXY", func(t *testing.T) {
+		t.Setenv("HTTPS_PROXY", "")
+		t.Setenv("HTTP_PROXY", "http://localhost:8081")
+
+		m := map[string]interface{}{"key": "value"}
+		injectProxyURL(m, nil)
+		require.Equal(t, map[string]interface{}{"key": "value", "proxy_url": "http://localhost:8081"}, m)
+	})
+	t.Run("no env vars", func(t *testing.T) {
+		t.Setenv("HTTPS_PROXY", "")
+		t.Setenv("HTTP_PROXY", "")
+		m := map[string]interface{}{"key": "value"}
+		injectProxyURL(m, nil)
+		require.Equal(t, map[string]interface{}{"key": "value"}, m)
+	})
+}
