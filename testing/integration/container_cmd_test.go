@@ -38,10 +38,11 @@ func createPolicy(
 	ctx context.Context,
 	agentFixture *atesting.Fixture,
 	info *define.Info,
+	policyName string,
 	dataOutputID string) (string, string) {
 
 	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
+		Name:        policyName,
 		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
@@ -80,8 +81,14 @@ func createPolicy(
 	return policy.ID, enrollmentToken.APIKey
 }
 
-func prepareContainerCMD(t *testing.T, ctx context.Context, agentFixture *atesting.Fixture, info *define.Info, env []string) *exec.Cmd {
-	cmd, err := agentFixture.PrepareAgentCommand(ctx, []string{"container"})
+func prepareAgentCMD(
+	t *testing.T,
+	ctx context.Context,
+	agentFixture *atesting.Fixture,
+	args []string,
+	env []string) (*exec.Cmd, *strings.Builder) {
+
+	cmd, err := agentFixture.PrepareAgentCommand(ctx, args)
 	if err != nil {
 		t.Fatalf("could not prepare agent command: %s", err)
 	}
@@ -113,7 +120,7 @@ func prepareContainerCMD(t *testing.T, ctx context.Context, agentFixture *atesti
 	cmd.Stderr = &agentOutput
 	cmd.Stdout = &agentOutput
 	cmd.Env = append(os.Environ(), env...)
-	return cmd
+	return cmd, &agentOutput
 }
 
 func TestContainerCMD(t *testing.T) {
@@ -143,7 +150,13 @@ func TestContainerCMD(t *testing.T) {
 		t.Fatalf("could not get Fleet URL: %s", err)
 	}
 
-	_, enrollmentToken := createPolicy(t, ctx, agentFixture, info, "")
+	_, enrollmentToken := createPolicy(
+		t,
+		ctx,
+		agentFixture,
+		info,
+		fmt.Sprintf("%s-%s", t.Name(), uuid.New().String()),
+		"")
 	env := []string{
 		"FLEET_ENROLL=1",
 		"FLEET_URL=" + fleetURL,
@@ -155,13 +168,11 @@ func TestContainerCMD(t *testing.T) {
 		"STATE_PATH=" + agentFixture.WorkDir(),
 	}
 
-	cmd := prepareContainerCMD(t, ctx, agentFixture, info, env)
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
 	t.Logf(">> running binary with: %v", cmd.Args)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("error running container cmd: %s", err)
 	}
-
-	agentOutput := cmd.Stderr.(*strings.Builder)
 
 	require.Eventuallyf(t, func() bool {
 		// This will return errors until it connects to the agent,
@@ -226,7 +237,14 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 			agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 			require.NoError(t, err)
 
-			_, enrollmentToken := createPolicy(t, ctx, agentFixture, info, "")
+			_, enrollmentToken := createPolicy(
+				t,
+				ctx,
+				agentFixture,
+				info,
+				fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
+				"")
+
 			env := []string{
 				"FLEET_ENROLL=1",
 				"FLEET_URL=" + fleetURL,
@@ -234,12 +252,11 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 				"STATE_PATH=" + tc.statePath,
 			}
 
-			cmd := prepareContainerCMD(t, ctx, agentFixture, info, env)
+			cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
 			t.Logf(">> running binary with: %v", cmd.Args)
 			if err := cmd.Start(); err != nil {
 				t.Fatalf("error running container cmd: %s", err)
 			}
-			agentOutput := cmd.Stderr.(*strings.Builder)
 
 			require.Eventuallyf(t, func() bool {
 				// This will return errors until it connects to the agent,
@@ -303,6 +320,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		},
 		Group: "container",
 	})
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -310,7 +328,13 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	require.NoError(t, err)
 
 	_, outputID := createMockESOutput(t, info)
-	policyID, enrollmentAPIKey := createPolicy(t, ctx, agentFixture, info, outputID)
+	policyID, enrollmentAPIKey := createPolicy(
+		t,
+		ctx,
+		agentFixture,
+		info,
+		fmt.Sprintf("%s-%s", t.Name(), uuid.New().String()),
+		outputID)
 
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
@@ -326,7 +350,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		"EVENTS_TO_STDERR=true",
 	}
 
-	cmd := prepareContainerCMD(t, ctx, agentFixture, info, env)
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
 	addLogIntegration(t, info, policyID, "/tmp/flog.log")
 	generateLogFile(t, "/tmp/flog.log", time.Second/2, 100)
 
@@ -334,8 +358,6 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("error running container cmd: %s", err)
 	}
-
-	agentOutput := cmd.Stderr.(*strings.Builder)
 
 	assert.Eventuallyf(t, func() bool {
 		// This will return errors until it connects to the agent,
