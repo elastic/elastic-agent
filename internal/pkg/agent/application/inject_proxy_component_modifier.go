@@ -26,7 +26,22 @@ func InjectProxyEndpointModifier() coordinator.ComponentsModifier {
 				for j, unit := range comp.Units {
 					if unit.Type == client.UnitTypeOutput && unit.Config.Type == elasticsearch {
 						unitCfgMap := unit.Config.Source.AsMap()
-						injectProxyURL(unitCfgMap, nil) // TODO
+
+						// convert unitCfgMap["hosts"] to []string
+						var hosts []string
+						if hArr, ok := unitCfgMap["hosts"]; ok {
+							if arr, ok := hArr.([]interface{}); ok {
+								for _, v := range arr {
+									host, ok := v.(string)
+									if !ok {
+										continue
+									}
+									hosts = append(hosts, host)
+								}
+							}
+						}
+
+						injectProxyURL(unitCfgMap, hosts)
 						unitCfg, err := component.ExpectedConfig(unitCfgMap)
 						if err != nil {
 							return nil, err
@@ -65,15 +80,19 @@ func injectProxyURL(m map[string]interface{}, hosts []string) {
 	}
 
 	var proxyURL string
+	matched := false
 	// If hosts are specified, check the 1st to see if HTTPS or HTTP is used to determine proxy
 	if len(hosts) > 0 {
 		if strings.HasPrefix(hosts[0], "https://") {
+			matched = true
 			proxyURL = os.Getenv("HTTPS_PROXY")
-		} else {
+		} else if strings.HasPrefix(hosts[0], "http://") {
+			matched = true
 			proxyURL = os.Getenv("HTTP_PROXY")
 		}
-	} else {
-		// Otherwise prefer HTTPS_PROXY over HTTP_PROXY
+	}
+	// if no hosts are specified, or it could not match a host prefix prefer HTTPS_PROXY over HTTP_PROXY
+	if proxyURL == "" && !matched {
 		proxyURL = os.Getenv("HTTPS_PROXY")
 		if proxyURL == "" {
 			proxyURL = os.Getenv("HTTP_PROXY")

@@ -18,6 +18,7 @@ import (
 
 func TestInjectProxyEndpointModifier(t *testing.T) {
 	t.Setenv("HTTPS_PROXY", "https://localhost:8080")
+	t.Setenv("HTTP_PROXY", "http://localhost:8081")
 	compModifier := InjectProxyEndpointModifier()
 
 	tests := []struct {
@@ -244,6 +245,51 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
 									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"],"proxy_url":"https://localhost:8080"}`))
+									require.NoError(t, err)
+									return &source
+								}(),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "hosts present, inject HTTP_PROXY",
+			comps: []component.Component{
+				{
+					InputSpec: &component.InputRuntimeSpec{
+						InputType: endpoint,
+					},
+					Units: []component.Unit{
+						{
+							Type: client.UnitTypeOutput,
+							Config: &proto.UnitExpectedConfig{
+								Type: elasticsearch,
+								Source: func() *structpb.Struct {
+									var source structpb.Struct
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["http://localhost:9200"]}`))
+									require.NoError(t, err)
+									return &source
+								}(),
+							},
+						},
+					},
+				},
+			},
+			expect: []component.Component{
+				{
+					InputSpec: &component.InputRuntimeSpec{
+						InputType: endpoint,
+					},
+					Units: []component.Unit{
+						{
+							Type: client.UnitTypeOutput,
+							Config: &proto.UnitExpectedConfig{
+								Type: elasticsearch,
+								Source: func() *structpb.Struct {
+									var source structpb.Struct
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["http://localhost:9200"],"proxy_url":"http://localhost:8081"}`))
 									require.NoError(t, err)
 									return &source
 								}(),

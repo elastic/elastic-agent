@@ -17,9 +17,9 @@ summary: Inject proxy_url into endpoint elasticsearch output and fleet config
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
-  Inject a proxy_url value into endpoint's elasticsearch output if there is no existing key as part of the policy, but the agent has one set by enviroment variables.
-  HTTPS_PROXY is used over HTTP_PROXY. Injection will be skipped if the policy sets proxy_disable to true.
-  A proxy_url value is also injected into endpoint and APM's fleet configuration using the fleet hosts to help determine if the HTTPS or HTTP proxy var should be used.
+  Inject a proxy_url value into endpoint's elasticsearch output and endpoint and APM's fleet configuration if there are no existing keys as part of the policy, but the agent default proxy servers set by enviroment variables.
+  The 1st host in the output list is used to determine if the HTTPS_PROXY or HTTP_PROXY value is used, if this can't be determined this way the HTTPS_PROXY is used over HTTP_PROXY.
+  Injection will be skipped if the policy sets proxy_disable to true, the proxy_url key is set with an empty value, or the proxy from the env var is empty.
 
 # Affected component; a word indicating the component this changeset affects.
 component:
