@@ -6,6 +6,14 @@
 # the final image because of permission changes.
 FROM {{ .buildFrom }} AS home
 
+RUN for iter in {1..10}; do \
+        apt-get update -y && \
+        DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes libcap2-bin && \
+        apt-get clean all && \
+        exit_code=0 && break || exit_code=$? && echo "apt-get error: retry $iter in 10s" && sleep 10; \
+    done; \
+    (exit $exit_code)
+
 COPY beat {{ $beatHome }}
 
 RUN true && \
@@ -44,6 +52,17 @@ RUN true && \
 {{- end }}
     true
 
+# Keep this after any chown command, chown resets any applied capabilities
+RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/agentbeat && \
+{{- if .linux_capabilities }}
+# Since the beat is stored at the other end of a symlink we must follow the symlink first
+# For security reasons setcap does not support symlinks. This is smart in the general case
+# but in our specific case since we're building a trusted image from trusted binaries this is
+# fine. Thus, we use readlink to follow the link and setcap on the actual binary
+   setcap {{ .linux_capabilities }}  $(readlink -f {{ $beatBinary }}) && \
+{{- end }}
+true
+
 FROM {{ .from }}
 
 ENV BEAT_SETUID_AS={{ .user }}
@@ -54,7 +73,7 @@ RUN for iter in {1..10}; do microdnf update -y && microdnf install -y tar gzip f
 
 RUN for iter in {1..10}; do \
         apt-get update -y && \
-        DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes ca-certificates curl gawk libcap2-bin xz-utils && \
+        DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes ca-certificates curl gawk xz-utils && \
         apt-get clean all && \
         exit_code=0 && break || exit_code=$? && echo "apt-get error: retry $iter in 10s" && sleep 10; \
     done; \
@@ -143,17 +162,6 @@ RUN mkdir /app && \
     chown {{ .user }}:{{ .user }} /app
 {{- end }}
 
-# Keep this after any chown command, chown resets any applied capabilities
-RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
-{{- if .linux_capabilities }}
-# Since the beat is stored at the other end of a symlink we must follow the symlink first
-# For security reasons setcap does not support symlinks. This is smart in the general case
-# but in our specific case since we're building a trusted image from trusted binaries this is
-# fine. Thus, we use readlink to follow the link and setcap on the actual binary
-   setcap {{ .linux_capabilities }}  $(readlink -f {{ $beatBinary }}) && \
-{{- end }}
-true
-
 {{- if (and (contains .image_name "-complete") (not (contains .from "ubi-minimal")))  }}
 USER root
 ENV NODE_PATH={{ $beatHome }}/.node
@@ -240,4 +248,3 @@ RUN echo -e '#!/bin/sh\nexec /usr/local/bin/docker-entrypoint' > /app/apm.sh && 
 {{- else }}
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]
 {{- end }}
-

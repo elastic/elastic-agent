@@ -13,8 +13,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
 var (
@@ -28,8 +26,8 @@ var (
 	manifest8_14_0_build202406201002 string
 )
 
-func getManifestJsonData(t *testing.T, contents string) tools.Build {
-	var response tools.Build
+func getManifestJsonData(t *testing.T, contents string) Build {
+	var response Build
 
 	err := json.NewDecoder(strings.NewReader(contents)).Decode(&response)
 	assert.NoError(t, err)
