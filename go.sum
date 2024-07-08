@@ -823,8 +823,8 @@ github.com/elastic/elastic-integration-corpus-generator-tool v0.5.0/go.mod h1:uf
 github.com/elastic/elastic-package v0.77.0/go.mod h1:Xeqx0OOVnKBfFoSHsHmKI74RxgRGiDhU6yXEu8BkJJM=
 github.com/elastic/elastic-transport-go/v8 v8.6.0 h1:Y2S/FBjx1LlCv5m6pWAF2kDJAHoSjSRSJCApolgfthA=
 github.com/elastic/elastic-transport-go/v8 v8.6.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
-github.com/elastic/go-docappender/v2 v2.1.4 h1:R6TN4udeC5pap+uA7Lrb3pzeOm03vx6K3+yQdczviH0=
-github.com/elastic/go-docappender/v2 v2.1.4/go.mod h1:eixVwyxvjJJLMditD/9630jjPbN6nHtSkVjae8nqJsY=
+github.com/elastic/go-docappender/v2 v2.2.0 h1:Pq6w+R0ZbWlqZHoqzoujR2ElKBfaPUf3M/cJvPVSrfA=
+github.com/elastic/go-docappender/v2 v2.2.0/go.mod h1:efwvMZfrJ1dRr0SkfmZosXKmgmV/D+3E5G66rQL/B4A=
 github.com/elastic/go-elasticsearch/v7 v7.17.7/go.mod h1:OJ4wdbtDNk5g503kvlHLyErCgQwwzmDtaFC4XyOxXA4=
 github.com/elastic/go-elasticsearch/v7 v7.17.10 h1:TCQ8i4PmIJuBunvBS6bwT2ybzVFxxUhhltAs3Gyu1yo=
 github.com/elastic/go-elasticsearch/v7 v7.17.10/go.mod h1:OJ4wdbtDNk5g503kvlHLyErCgQwwzmDtaFC4XyOxXA4=
@@ -851,10 +851,10 @@ github.com/elastic/gosigar v0.14.3 h1:xwkKwPia+hSfg9GqrCUKYdId102m9qTJIIr7egmK/u
 github.com/elastic/gosigar v0.14.3/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
 github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f h1:qo0Nn9G+p7HbG+CmiWwSoiKJ/cyRq59TRn9Z2PRHTi8=
 github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f/go.mod h1:mVdKBYYwt30xRFjCegbcURHh+3LWOCkQM33fgWbUiRI=
-github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.4.0 h1:jSq7qvh39GCpv0XF7/hys2mJmQaATKkCNVj/SY5S730=
-github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.4.0/go.mod h1:cbFtO2rPm7o2kAZKwH/SQ7QZVGYt2qdqHjWOw5TTsYg=
-github.com/elastic/opentelemetry-lib v0.5.0 h1:BT1Koon6lm0zF554NuPtachBBR+26RS9GlCaaMbGIJ8=
-github.com/elastic/opentelemetry-lib v0.5.0/go.mod h1:/kKvHbJLVo/NcKMPHI8/RZKL64fushmnRUzn+arQpjg=
+github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.0 h1:YtTftK2sZnqk9KK5GW+ZMqZKsWq2ddX6qxJE4XH9Nt4=
+github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.0/go.mod h1:jl3Sn9HYehE2fmnh5/alrlsQBkkPxP/Q0SKcl9WCCyM=
+github.com/elastic/opentelemetry-lib v0.7.1 h1:eD3j/tyqSfOsPllqWRd56fgev39m2FNqvaxjqn0Uoi4=
+github.com/elastic/opentelemetry-lib v0.7.1/go.mod h1:/kKvHbJLVo/NcKMPHI8/RZKL64fushmnRUzn+arQpjg=
 github.com/elastic/package-spec/v2 v2.6.0/go.mod h1:ks9/FaVOS+vCrGRQcDvXAd2FlmB84mrLikbRiO6ACuk=
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
 github.com/elastic/pkcs8 v1.0.0/go.mod h1:ipsZToJfq1MxclVTwpG7U/bgeDtf+0HkUiOxebk95+0=

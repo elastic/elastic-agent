@@ -19,9 +19,53 @@ import (
 	"github.com/magefile/mage/mg"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
+
+type Build struct {
+	Projects             map[string]Project `json:"projects"`
+	StartTime            string             `json:"start_time"`
+	ReleaseBranch        string             `json:"release_branch"`
+	Prefix               string             `json:"prefix"`
+	EndTime              string             `json:"end_time"`
+	ManifestVersion      string             `json:"manifest_version"`
+	Version              string             `json:"version"`
+	Branch               string             `json:"branch"`
+	BuildID              string             `json:"build_id"`
+	BuildDurationSeconds int                `json:"build_duration_seconds"`
+}
+type Project struct {
+	Branch                       string             `json:"branch"`
+	CommitHash                   string             `json:"commit_hash"`
+	CommitURL                    string             `json:"commit_url"`
+	ExternalArtifactsManifestURL string             `json:"external_artifacts_manifest_url"`
+	BuildDurationSeconds         int                `json:"build_duration_seconds"`
+	Packages                     map[string]Package `json:"packages"`
+	Dependencies                 []Dependency       `json:"dependencies"`
+}
+
+type Package struct {
+	URL          string   `json:"url"`
+	ShaURL       string   `json:"sha_url"`
+	AscURL       string   `json:"asc_url"`
+	Type         string   `json:"type"`
+	Architecture string   `json:"architecture"`
+	Os           []string `json:"os"`
+	Classifier   string   `json:"classifier"`
+	Attributes   struct {
+		IncludeInRepo string `json:"include_in_repo"`
+		ArtifactNoKpi string `json:"artifactNoKpi"`
+		Internal      string `json:"internal"`
+		ArtifactID    string `json:"artifact_id"`
+		Oss           string `json:"oss"`
+		Group         string `json:"group"`
+	} `json:"attributes"`
+}
+
+type Dependency struct {
+	Prefix   string `json:"prefix"`
+	BuildUri string `json:"build_uri"`
+}
 
 // A backoff schedule for when and how often to retry failed HTTP
 // requests. The first element is the time to wait after the
@@ -50,24 +94,24 @@ var PlatformPackages = map[string]string{
 // ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
 // The project names are those used in the "projects" list in the unified release manifest.
 // See the sample manifests in the testdata directory.
-var ExpectedBinaries = map[string]Project{
-	"agentbeat":             Project{Name: "beats", Platforms: AllPlatforms},
-	"apm-server":            Project{Name: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
-	"cloudbeat":             Project{Name: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	"cloud-defend":          Project{Name: "cloud-defend", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	"endpoint-security":     Project{Name: "endpoint-dev", Platforms: AllPlatforms},
-	"fleet-server":          Project{Name: "fleet-server", Platforms: AllPlatforms},
-	"pf-elastic-collector":  Project{Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	"pf-elastic-symbolizer": Project{Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	"pf-host-agent":         Project{Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+var ExpectedBinaries = map[string]BinarySpec{
+	"agentbeat":             {Name: "beats", Platforms: AllPlatforms},
+	"apm-server":            {Name: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
+	"cloudbeat":             {Name: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	"cloud-defend":          {Name: "cloud-defend", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	"endpoint-security":     {Name: "endpoint-dev", Platforms: AllPlatforms},
+	"fleet-server":          {Name: "fleet-server", Platforms: AllPlatforms},
+	"pf-elastic-collector":  {Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	"pf-elastic-symbolizer": {Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	"pf-host-agent":         {Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
 }
 
-type Project struct {
+type BinarySpec struct {
 	Name      string
 	Platforms []Platform
 }
 
-func (proj Project) SupportsPlatform(platform string) bool {
+func (proj BinarySpec) SupportsPlatform(platform string) bool {
 	for _, p := range proj.Platforms {
 		if p.Platform() == platform {
 			return true
@@ -95,10 +139,10 @@ func (p Platform) Platform() string {
 var AllPlatforms = []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}, {"darwin", "aarch64"}}
 
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
-func DownloadManifest(ctx context.Context, manifest string) (tools.Build, error) {
+func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
 	manifestUrl, urlError := url.Parse(manifest)
 	if urlError != nil {
-		return tools.Build{}, errorInvalidManifestURL
+		return Build{}, errorInvalidManifestURL
 	}
 	var valid = false
 	for _, manifestHost := range AllowedManifestHosts {
@@ -108,13 +152,13 @@ func DownloadManifest(ctx context.Context, manifest string) (tools.Build, error)
 	}
 	if !valid {
 		log.Printf("Not allowed %s, valid ones are %+v", manifestUrl.Host, AllowedManifestHosts)
-		return tools.Build{}, errorNotAllowedManifestURL
+		return Build{}, errorNotAllowedManifestURL
 	}
 	sanitizedUrl := fmt.Sprintf("https://%s%s", manifestUrl.Host, manifestUrl.Path)
-	f := func() (tools.Build, error) { return downloadManifestData(ctx, sanitizedUrl) }
+	f := func() (Build, error) { return downloadManifestData(ctx, sanitizedUrl) }
 	manifestResponse, err := doWithRetries(f)
 	if err != nil {
-		return tools.Build{}, fmt.Errorf("downloading manifest: %w", err)
+		return Build{}, fmt.Errorf("downloading manifest: %w", err)
 	}
 	if mg.Verbose() {
 		log.Printf(">>>> Downloaded manifest %s", manifest)
@@ -185,8 +229,8 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 	return nil
 }
 
-func resolveManifestPackage(project tools.Project, binary string, platformPkg string, version string) ([]string, error) {
-	var val tools.Package
+func resolveManifestPackage(project Project, binary string, platformPkg string, version string) ([]string, error) {
+	var val Package
 	var ok bool
 
 	// Try the normal/easy case first
