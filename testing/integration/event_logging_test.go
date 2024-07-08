@@ -187,6 +187,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 
 	enrollArgs := []string{
 		"enroll",
+		"--force",
 		"--skip-daemon-reload",
 		"--url",
 		fleetURL,
