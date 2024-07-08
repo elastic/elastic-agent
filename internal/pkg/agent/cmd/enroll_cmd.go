@@ -751,8 +751,16 @@ func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessStat
 		msg := ""
 		msgCount := 0
 		backExp := expBackoffWithContext(innerCtx, 1*time.Second, maxBackoff)
+
 		for {
-			backExp.Wait()
+			// if the timeout is reached, no response was sent on `res`, therefore
+			// send an error
+			if !backExp.Wait() {
+				resChan <- waitResult{err: fmt.Errorf(
+					"timed out waiting for Fleet Server to start after %s",
+					timeout)}
+			}
+
 			state, err := getDaemonState(innerCtx)
 			if errors.Is(err, context.Canceled) {
 				resChan <- waitResult{err: err}

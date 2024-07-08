@@ -41,7 +41,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
 	pv "github.com/elastic/elastic-agent/pkg/testing/tools/product_versions"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/snapshots"
@@ -77,7 +76,6 @@ const (
 	packagesEnv       = "PACKAGES"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
-	specSuffix        = ".spec.yml"
 	checksumFilename  = "checksum.yml"
 	commitLen         = 7
 
@@ -189,7 +187,7 @@ func (Dev) Build() {
 }
 
 // Package bundles the agent binary with DEV flag set.
-func (Dev) Package() {
+func (Dev) Package(ctx context.Context) {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
 
@@ -200,7 +198,7 @@ func (Dev) Package() {
 	}
 
 	devtools.DevBuild = true
-	Package()
+	Package(ctx)
 }
 
 func mocksPath() (string, error) {
@@ -474,13 +472,22 @@ func AssembleDarwinUniversal() error {
 // Use SNAPSHOT=true to build snapshots.
 // Use PLATFORMS to control the target platforms.
 // Use VERSION_QUALIFIER to control the version qualifier.
-func Package() {
+func Package(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
 	platforms := devtools.Platforms.Names()
 	if len(platforms) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
+	}
+
+	var err error
+	var manifestResponse *manifest.Build
+	if devtools.PackagingFromManifest {
+		manifestResponse, _, err = downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
+		if err != nil {
+			return fmt.Errorf("failed downloading manifest: %w", err)
+		}
 	}
 
 	var dependenciesVersion string
@@ -490,11 +497,12 @@ func Package() {
 		dependenciesVersion = beatVersion
 	}
 
-	packageAgent(platforms, dependenciesVersion, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
+	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
+	return nil
 }
 
-// DownloadManifest downloads the provided manifest file into the predefined folder
-func DownloadManifest() error {
+// DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
+func DownloadManifest(ctx context.Context) error {
 	fmt.Println("--- Downloading manifest")
 	start := time.Now()
 	defer func() { fmt.Println("Downloading manifest took", time.Since(start)) }()
@@ -514,20 +522,12 @@ func DownloadManifest() error {
 		return errAtLeastOnePlatform
 	}
 
-	platformPackages := map[string]string{
-		"darwin/amd64":  "darwin-x86_64.tar.gz",
-		"darwin/arm64":  "darwin-aarch64.tar.gz",
-		"linux/amd64":   "linux-x86_64.tar.gz",
-		"linux/arm64":   "linux-arm64.tar.gz",
-		"windows/amd64": "windows-x86_64.zip",
-	}
-
 	var requiredPackages []string
 	for _, p := range platforms {
-		requiredPackages = append(requiredPackages, platformPackages[p])
+		requiredPackages = append(requiredPackages, manifest.PlatformPackages[p])
 	}
 
-	if e := manifest.DownloadComponentsFromManifest(devtools.ManifestURL, platforms, platformPackages, dropPath); e != nil {
+	if e := manifest.DownloadComponents(ctx, devtools.ManifestURL, platforms, dropPath); e != nil {
 		return fmt.Errorf("failed to download the manifest file, %w", e)
 	}
 	log.Printf(">> Completed downloading packages from manifest into drop-in %s", dropPath)
@@ -766,23 +766,23 @@ func BuildFleetCfg() error {
 }
 
 // Enroll runs agent which enrolls before running.
-func (Demo) Enroll() error {
+func (Demo) Enroll(ctx context.Context) error {
 	env := map[string]string{
 		"FLEET_ENROLL": "1",
 	}
-	return runAgent(env)
+	return runAgent(ctx, env)
 }
 
 // NoEnroll runs agent which does not enroll before running.
-func (Demo) NoEnroll() error {
+func (Demo) NoEnroll(ctx context.Context) error {
 	env := map[string]string{
 		"FLEET_ENROLL": "0",
 	}
-	return runAgent(env)
+	return runAgent(ctx, env)
 }
 
 // Image builds a cloud image
-func (Cloud) Image() {
+func (Cloud) Image(ctx context.Context) {
 	platforms := os.Getenv(platformsEnv)
 	defer os.Setenv(platformsEnv, platforms)
 
@@ -816,7 +816,7 @@ func (Cloud) Image() {
 		devtools.ExternalBuild = true
 	}
 
-	Package()
+	Package(ctx)
 }
 
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
@@ -886,7 +886,7 @@ func getVersion() string {
 	return version
 }
 
-func runAgent(env map[string]string) error {
+func runAgent(ctx context.Context, env map[string]string) error {
 	prevPlatforms := os.Getenv("PLATFORMS")
 	defer os.Setenv("PLATFORMS", prevPlatforms)
 
@@ -912,9 +912,9 @@ func runAgent(env map[string]string) error {
 		}
 
 		// produce docker package
-		packageAgent([]string{
+		packageAgent(ctx, []string{
 			"linux/amd64",
-		}, dependenciesVersion, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
+		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -961,20 +961,12 @@ func runAgent(env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-var platformPackages = map[string]string{
-	"darwin/amd64":  "darwin-x86_64.tar.gz",
-	"darwin/arm64":  "darwin-aarch64.tar.gz",
-	"linux/amd64":   "linux-x86_64.tar.gz",
-	"linux/arm64":   "linux-arm64.tar.gz",
-	"windows/amd64": "windows-x86_64.zip",
-}
-
-func packageAgent(platforms []string, dependenciesVersion string, agentPackaging, agentBinaryTarget mg.Fn) {
+func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	requiredPackages := []string{}
 	for _, p := range platforms {
-		requiredPackages = append(requiredPackages, platformPackages[p])
+		requiredPackages = append(requiredPackages, manifest.PlatformPackages[p])
 	}
 	if mg.Verbose() {
 		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, requiredPackages)
@@ -997,7 +989,7 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(requiredPackages, dependenciesVersion, archivePath, dropPath, flatPath)
+	flattenDependencies(requiredPackages, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse)
 
 	// package agent
 	log.Println("--- Running packaging function")
@@ -1007,6 +999,7 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 	mg.Deps(Update)
 	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
 	mg.SerialDeps(devtools.Package, TestPackages)
+	return nil
 }
 
 // collectPackageDependencies performs the download (if it's an external dep), unpacking and move all the elastic-agent
@@ -1015,24 +1008,6 @@ func packageAgent(platforms []string, dependenciesVersion string, agentPackaging
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
 func collectPackageDependencies(platforms []string, packageVersion string, requiredPackages []string) (archivePath string, dropPath string) {
-	// if we have defined a manifest URL to package Agent from, we should be using the same packageVersion of that manifest
-	if devtools.PackagingFromManifest {
-		if manifestResponse, err := manifest.DownloadManifest(devtools.ManifestURL); err != nil {
-			log.Panicf("failed to download remote manifest file %s", err)
-		} else {
-			if parsedVersion, err := version.ParseVersion(manifestResponse.Version); err != nil {
-				log.Panicf("the manifest version from manifest is not semver, got %s", manifestResponse.Version)
-			} else {
-				// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
-				// something that we use as an implicit parameter to various functions
-				if parsedVersion.IsSnapshot() {
-					os.Setenv(snapshotEnv, "true")
-					mage.Snapshot = true
-				}
-				os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
-			}
-		}
-	}
 
 	dropPath, found := os.LookupEnv(agentDropPath)
 
@@ -1056,27 +1031,6 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 		os.Setenv(agentDropPath, dropPath)
 
 		if devtools.ExternalBuild == true {
-			// Map of binaries to download to their project name in the unified-release manager.
-			// The project names are used to generate the URLs when downloading binaries. For example:
-			//
-			// https://artifacts-snapshot.elastic.co/beats/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/cloudbeat/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/cloud-defend/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/apm-server/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/endpoint-dev/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/fleet-server/latest/8.11.0-SNAPSHOT.json
-			// https://artifacts-snapshot.elastic.co/prodfiler/latest/8.11.0-SNAPSHOT.json
-			externalBinaries := map[string]string{
-				"agentbeat":             "beats",
-				"cloudbeat":             "cloudbeat", // only supporting linux/amd64 or linux/arm64
-				"cloud-defend":          "cloud-defend",
-				"apm-server":            "apm-server", // not supported on darwin/aarch64
-				"endpoint-security":     "endpoint-dev",
-				"fleet-server":          "fleet-server",
-				"pf-elastic-collector":  "prodfiler",
-				"pf-elastic-symbolizer": "prodfiler",
-				"pf-host-agent":         "prodfiler",
-			}
 
 			// Only log fatal logs for logs produced using logrus. This is the global logger
 			// used by github.com/elastic/e2e-testing/pkg/downloads which can only be configured globally like this or via
@@ -1090,13 +1044,17 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
-			for binary, project := range externalBinaries {
+			for binary, project := range manifest.ExpectedBinaries {
 				for _, platform := range platforms {
-					reqPackage := platformPackages[platform]
+					if !project.SupportsPlatform(platform) {
+						fmt.Printf("--- Binary %s does not support %s, download skipped\n", binary, platform)
+						continue
+					}
+					reqPackage := manifest.PlatformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
-					errGroup.Go(downloadBinary(ctx, project, packageName, binary, platform, newVersion, targetPath, completedDownloads))
+					errGroup.Go(downloadBinary(ctx, project.Name, packageName, binary, platform, newVersion, targetPath, completedDownloads))
 				}
 			}
 
@@ -1176,7 +1134,8 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
-func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string) {
+func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build) {
+
 	for _, rp := range requiredPackages {
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
@@ -1199,6 +1158,7 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 		if mg.Verbose() {
 			log.Printf("--- Extracting into the flat dir: %v", matches)
 		}
+
 		for _, m := range matches {
 			stat, err := os.Stat(m)
 			if os.IsNotExist(err) {
@@ -1214,52 +1174,18 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 			if mg.Verbose() {
 				log.Printf(">>> Extracting %s to %s", m, versionedFlatPath)
 			}
+
 			if err := devtools.Extract(m, versionedFlatPath); err != nil {
 				panic(err)
 			}
 		}
 
-		globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
-		if mg.Verbose() {
-			log.Printf("Finding files to copy with %s", globExpr)
-		}
-		files, err := filepath.Glob(globExpr)
-		if err != nil {
-			panic(err)
-		}
-		if mg.Verbose() {
-			log.Printf("Validating checksums for %+v", files)
-			log.Printf("--- Copying into %s: %v", versionedDropPath, files)
-		}
 		checksums := make(map[string]string)
-		for _, f := range files {
-			options := copy.Options{
-				OnSymlink: func(_ string) copy.SymlinkAction {
-					return copy.Shallow
-				},
-				Sync: true,
-			}
-			if mg.Verbose() {
-				log.Printf("> prepare to copy %s ", f)
-			}
-			err = copy.Copy(f, versionedDropPath, options)
-			if err != nil {
-				panic(err)
-			}
-
-			// copy spec file for match
-			specName := filepath.Base(f)
-			idx := strings.Index(specName, "-"+packageVersion)
-			if idx != -1 {
-				specName = specName[:idx]
-			}
-
-			checksum, err := copyComponentSpecs(specName, versionedDropPath)
-			if err != nil {
-				panic(err)
-			}
-
-			checksums[specName+specSuffix] = checksum
+		// Operate on the files depending on if we're packaging from a manifest or not
+		if manifestResponse != nil {
+			checksums = devtools.ChecksumsWithManifest(rp, versionedFlatPath, versionedDropPath, manifestResponse)
+		} else {
+			checksums = devtools.ChecksumsWithoutManifest(versionedFlatPath, versionedDropPath, packageVersion)
 		}
 
 		if err := appendComponentChecksums(versionedDropPath, checksums); err != nil {
@@ -1321,30 +1247,44 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("elastic-agent PackageUsingDRA is expected to build from a manifest. Check that %s is set to a manifest URL", devtools.ManifestUrlEnvVar)
 	}
 
-	manifestUrl := devtools.ManifestURL
-
-	build, err := manifest.DownloadManifest(manifestUrl)
+	manifestResponse, parsedVersion, err := downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
 	if err != nil {
-		return fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)
-	}
-
-	parsedVersion, err := version.ParseVersion(build.Version)
-	if err != nil {
-		return fmt.Errorf("parsing version string %q: %w", build.Version, err)
+		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 
 	// fix the commit hash independently of the current commit hash on the branch
-	agentCoreProject, ok := build.Projects[agentCoreProjectName]
+	agentCoreProject, ok := manifestResponse.Projects[agentCoreProjectName]
 	if !ok {
-		return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, manifestUrl)
+		return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, devtools.ManifestURL)
 	}
 	err = os.Setenv(mage.AgentCommitHashEnvVar, agentCoreProject.CommitHash)
 	if err != nil {
 		return fmt.Errorf("setting agent commit hash %q: %w", agentCoreProject.CommitHash, err)
 	}
 
-	packageAgent(platforms, parsedVersion.VersionWithPrerelease(), mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, manifestUrl))
-	return nil
+	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL))
+}
+
+func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.Build, *version.ParsedSemVer, error) {
+	resp, err := manifest.DownloadManifest(ctx, url)
+	if err != nil {
+		return nil, nil, fmt.Errorf("downloading manifest: %w", err)
+	}
+
+	parsedVersion, err := version.ParseVersion(resp.Version)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing manifest version %s: %w", resp.Version, err)
+	}
+
+	// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
+	// something that we use as an implicit parameter to various functions
+	if parsedVersion.IsSnapshot() {
+		os.Setenv(snapshotEnv, "true")
+		mage.Snapshot = true
+	}
+	os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
+
+	return &resp, parsedVersion, nil
 }
 
 func findRepositoryRoot() (string, error) {
@@ -1407,12 +1347,12 @@ func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
 	return mappedPltf, found
 }
 
-func filterPackagesByPlatform(pkgs map[string]tools.Package) map[string]tools.Package {
+func filterPackagesByPlatform(pkgs map[string]manifest.Package) map[string]manifest.Package {
 	if mg.Verbose() {
 		log.Printf("unfiltered packages: %v", pkgs)
 	}
 	platforms := devtools.Platforms.Names()
-	filteredPackages := map[string]tools.Package{}
+	filteredPackages := map[string]manifest.Package{}
 	for pkgName, pkgDesc := range pkgs {
 		if mg.Verbose() {
 			log.Printf("checking if %s:%v should be included", pkgName, pkgDesc)
@@ -1434,9 +1374,8 @@ func filterPackagesByPlatform(pkgs map[string]tools.Package) map[string]tools.Pa
 	return filteredPackages
 }
 
-func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir string, projects ...string) (map[string]tools.Package, error) {
-
-	build, err := manifest.DownloadManifest(manifestUrl)
+func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir string, projects ...string) (map[string]manifest.Package, error) {
+	build, err := manifest.DownloadManifest(ctx, manifestUrl)
 	if err != nil {
 		return nil, fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)
 	}
@@ -1450,7 +1389,7 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 
 	// sync access to the downloadedArtifacts map
 	mx := new(sync.Mutex)
-	downloadedArtifacts := map[string]tools.Package{}
+	downloadedArtifacts := map[string]manifest.Package{}
 	errGrp, errCtx := errgroup.WithContext(ctx)
 
 	for _, projectName := range projects {
@@ -1468,7 +1407,7 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 			log.Printf("packages to download: %v", filteredPackages)
 		}
 		for pkgName, pkgDesc := range filteredPackages {
-			downloadFunc := func(pkgName string, pkgDesc tools.Package) func() error {
+			downloadFunc := func(pkgName string, pkgDesc manifest.Package) func() error {
 				return func() error {
 					artifactDownloadPath := filepath.Join(draDownloadDir, pkgName)
 					err := manifest.DownloadPackage(errCtx, pkgDesc.URL, artifactDownloadPath)
@@ -1578,49 +1517,23 @@ func downloadBinary(ctx context.Context, project string, packageName string, bin
 	return func() error {
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
-			if strings.Contains(err.Error(), "not found") {
-				fmt.Printf("Could not download %s: %s\n", binary, err)
-			} else {
-				return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
-			}
-		} else {
-			compl.Add(1)
+			return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
 		}
 
+		compl.Add(1)
 		fmt.Printf("Done downloading %s\n", packageName)
 		return nil
 	}
 }
 
-func copyComponentSpecs(componentName, versionedDropPath string) (string, error) {
-	specFileName := componentName + specSuffix
-	targetPath := filepath.Join(versionedDropPath, specFileName)
-
-	if _, err := os.Stat(targetPath); err != nil {
-		fmt.Printf(">> File %s does not exist, reverting to local specfile\n", targetPath)
-		// spec not present copy from local
-		sourceSpecFile := filepath.Join("specs", specFileName)
-		if mg.Verbose() {
-			log.Printf("Copy spec from %s to %s", sourceSpecFile, targetPath)
-		}
-		err := devtools.Copy(sourceSpecFile, targetPath)
-		if err != nil {
-			return "", fmt.Errorf("failed copying spec file %q to %q: %w", sourceSpecFile, targetPath, err)
-		}
-	}
-
-	// compute checksum
-	return devtools.GetSHA512Hash(targetPath)
-}
-
 func appendComponentChecksums(versionedDropPath string, checksums map[string]string) error {
 	// for each spec file checksum calculate binary checksum as well
 	for file := range checksums {
-		if !strings.HasSuffix(file, specSuffix) {
+		if !strings.HasSuffix(file, devtools.ComponentSpecFileSuffix) {
 			continue
 		}
 
-		componentFile := strings.TrimSuffix(file, specSuffix)
+		componentFile := strings.TrimSuffix(file, devtools.ComponentSpecFileSuffix)
 		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
 		if errors.Is(err, os.ErrNotExist) {
 			fmt.Printf(">>> Computing hash for %q failed: file not present %w \n", componentFile, err)
