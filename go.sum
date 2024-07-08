@@ -851,10 +851,10 @@ github.com/elastic/gosigar v0.14.3 h1:xwkKwPia+hSfg9GqrCUKYdId102m9qTJIIr7egmK/u
 github.com/elastic/gosigar v0.14.3/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
 github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f h1:qo0Nn9G+p7HbG+CmiWwSoiKJ/cyRq59TRn9Z2PRHTi8=
 github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f/go.mod h1:mVdKBYYwt30xRFjCegbcURHh+3LWOCkQM33fgWbUiRI=
-github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.5.1 h1:DtRPj288iHCZPjBUfxhgHS8SWM1p2TtBadbHjZBpZck=
-github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.5.1/go.mod h1:/eTf2omfsfYQOw+nGK2NzByPMNmwq2xBFmcnREOQMBI=
-github.com/elastic/opentelemetry-lib v0.6.1 h1:Ayx82UH+oXF2222wmKTcRcq0todI6btpd8KF1tz1ZQ8=
-github.com/elastic/opentelemetry-lib v0.6.1/go.mod h1:/kKvHbJLVo/NcKMPHI8/RZKL64fushmnRUzn+arQpjg=
+github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.6.0 h1:BOQ2NGl2wLtAAjGyAz/+UJByhy0k6wHrhrtCMr2I6+0=
+github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.6.0/go.mod h1:645TtN9alBSeZniKDIvtfoKaqcBlsX+K8lAUew/2Icg=
+github.com/elastic/opentelemetry-lib v0.7.0 h1:sarbwqZJ9sx+B1zUl6qmf93/j7ggDAidc5CYKsIsQQk=
+github.com/elastic/opentelemetry-lib v0.7.0/go.mod h1:/kKvHbJLVo/NcKMPHI8/RZKL64fushmnRUzn+arQpjg=
 github.com/elastic/package-spec/v2 v2.6.0/go.mod h1:ks9/FaVOS+vCrGRQcDvXAd2FlmB84mrLikbRiO6ACuk=
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
 github.com/elastic/pkcs8 v1.0.0/go.mod h1:ipsZToJfq1MxclVTwpG7U/bgeDtf+0HkUiOxebk95+0=
