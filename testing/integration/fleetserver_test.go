@@ -51,7 +51,7 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 	defer cancel()
 
 	// Get path to Elastic Agent executable
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithAdditionalArgs([]string{"-E", "output.elasticsearch.allow_older_versions=true"}))
 	require.NoError(t, err)
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
