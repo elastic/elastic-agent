@@ -37,6 +37,7 @@ check-ci:
 	@mage -v check
 	@$(MAKE) notice
 	@GENERATEKUSTOMIZE=true $(MAKE) -C deploy/kubernetes generate-k8s
+	@$(MAKE) -C deploy/kubernetes generate-k8s
 	@$(MAKE) check-no-changes
 
 ## check: run all the checks including linting using golangci-lint.
