@@ -31,7 +31,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-{{ range .Receivers }}| {{ .Name }} | {{ .Version -}} |
+{{ range .Receivers }}| [{{ .Name }}]({{ .Link }}) | {{ .Version -}} |
 {{ end }}
 {{ end }}
 
@@ -40,7 +40,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-{{ range .Exporters }}| {{ .Name }} | {{ .Version -}} |
+{{ range .Exporters }}| [{{ .Name }}]({{ .Link }}) | {{ .Version -}} |
 {{ end }}
 {{ end }}
 
@@ -49,7 +49,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-{{ range .Processors }}| {{ .Name }} | {{ .Version -}} |
+{{ range .Processors }}| [{{ .Name }}]({{ .Link }}) | {{ .Version -}} |
 {{ end }}
 {{ end }}
 
@@ -58,7 +58,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-{{ range .Extensions }}| {{ .Name }} | {{ .Version -}} |
+{{ range .Extensions }}| [{{ .Name }}]({{ .Link }}) | {{ .Version -}} |
 {{ end }}
 {{ end }}
 
@@ -67,6 +67,6 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-{{ range .Connectors }}| {{ .Name }} | {{ .Version -}} |
+{{ range .Connectors }}| [{{ .Name }}]({{ .Link }}) | {{ .Version -}} |
 {{ end }}
 {{ end }}
