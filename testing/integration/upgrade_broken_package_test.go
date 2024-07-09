@@ -32,8 +32,6 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	t.Skip("Skipping test until 8.16.0 bump is complete and agent version pinning is removed")
-
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -41,6 +39,9 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	// logic that is in the build.
 	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithAdditionalArgs([]string{"-E", "output.elasticsearch.allow_older_versions=true"}))
 	require.NoError(t, err)
+
+	// This test won't work if the version in code and the one in package version file differ, check and skip it if we detect a version bump
+	skipTestIfVersionIsBumped(ctx, t, startFixture)
 
 	// Upgrade to an old build.
 	upgradeToVersion, err := upgradetest.PreviousMinor()
@@ -64,8 +65,50 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func skipTestIfVersionIsBumped(ctx context.Context, t *testing.T, startFixture *atesting.Fixture) {
+	err := startFixture.EnsurePrepared(ctx)
+	require.NoError(t, err, "error preparing startFixture")
+
+	workDir := startFixture.WorkDir()
+	packageVersionFiles, err := findPackageVersionFiles(workDir)
+	require.NoErrorf(t, err, "error searching for package.version files in startFixture workdir %q", workDir)
+	require.NotEmpty(t, packageVersionFiles, "there should be at least one package.version file in startFixture root dir %q", workDir)
+
+	packageVersionBytes, err := os.ReadFile(filepath.Join(workDir, packageVersionFiles[0]))
+	require.NoError(t, err, "error reading package.version file from startFixture in %q", workDir)
+	agentPackageVersion := string(packageVersionBytes)
+	if agtversion.GetDefaultVersion() != agentPackageVersion {
+		t.Skipf(
+			"Package version %q and default version %q differ: this means that we are probably running a bumped version of agent pinned as previous, skipping...",
+			agentPackageVersion,
+			agtversion.GetDefaultVersion(),
+		)
+	}
+}
+
 func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) error {
-	installFS := os.DirFS(f.WorkDir())
+	rootDir := f.WorkDir()
+	matches, err := findPackageVersionFiles(rootDir)
+	if err != nil {
+		return err
+	}
+
+	t.Logf("package version files found: %v", matches)
+
+	// the version files should have been removed from the other test, we just make sure
+	for _, m := range matches {
+		vFile := filepath.Join(rootDir, m)
+		t.Logf("removing package version file %q", vFile)
+		err = os.Remove(vFile)
+		if err != nil {
+			return fmt.Errorf("error removing package version file %q: %w", vFile, err)
+		}
+	}
+	return nil
+}
+
+func findPackageVersionFiles(rootDir string) ([]string, error) {
+	installFS := os.DirFS(rootDir)
 	matches := []string{}
 
 	err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
@@ -78,20 +121,5 @@ func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	t.Logf("package version files found: %v", matches)
-
-	// the version files should have been removed from the other test, we just make sure
-	for _, m := range matches {
-		vFile := filepath.Join(f.WorkDir(), m)
-		t.Logf("removing package version file %q", vFile)
-		err = os.Remove(vFile)
-		if err != nil {
-			return fmt.Errorf("error removing package version file %q: %w", vFile, err)
-		}
-	}
-	return nil
+	return matches, err
 }
