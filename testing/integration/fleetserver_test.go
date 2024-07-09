@@ -40,14 +40,14 @@ func fleetPolicy() kibana.AgentPolicy {
 }
 
 func TestInstallFleetServerBootstrap(t *testing.T) {
-	t.Skip("Skip until the first 8.16.0-SNAPSHOT is available")
-
 	info := define.Require(t, define.Requirements{
 		Group: FleetPrivileged,
 		Stack: &define.Stack{},
 		Sudo:  true,
 		Local: false,
 	})
+
+	t.Skip("Skip until the first 8.16.0-SNAPSHOT is available")
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
