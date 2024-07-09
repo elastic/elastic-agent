@@ -59,7 +59,12 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tsg/go-daemon v0.0.0-20200207173439-e704b93fd89b
 	github.com/winlabs/gowin32 v0.0.0-20221003142512-0d265587d3c9
+<<<<<<< HEAD
 	go.elastic.co/apm/module/apmgorilla v1.15.0
+=======
+	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
+	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0
+>>>>>>> d19603bbcc (feat: upgrade go agent to v2 (#4939))
 	go.elastic.co/apm/v2 v2.6.0
 	go.elastic.co/ecszap v1.0.2
 	go.elastic.co/go-licence-detector v0.6.1
@@ -261,7 +266,7 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.elastic.co/apm/module/apmhttp v1.15.0 // indirect
+	go.elastic.co/apm v1.15.0 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.6.0 // indirect
 	go.elastic.co/apm/module/apmzap/v2 v2.6.0 // indirect
 	go.elastic.co/fastjson v1.3.0 // indirect
@@ -313,9 +318,14 @@ require (
 	golang.org/x/net v0.27.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
 	gonum.org/v1/gonum v0.15.0 // indirect
+<<<<<<< HEAD
 	google.golang.org/genproto/googleapis/api v0.0.0-20240701130421-f6361c86f094 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
 	google.golang.org/grpc/examples v0.0.0-20240723001002-0231b0d9429d // indirect
+=======
+	google.golang.org/genproto/googleapis/api v0.0.0-20240520151616-dc85e6b867a5 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240624140628-dc46fd24d27d // indirect
+>>>>>>> d19603bbcc (feat: upgrade go agent to v2 (#4939))
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	howett.net/plist v1.0.1 // indirect
@@ -329,8 +339,6 @@ require (
 require (
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect; indirecthttps://github.com/elastic/ingest-dev/issues/3253
-	go.elastic.co/apm v1.15.0
-	go.elastic.co/apm/module/apmgrpc v1.15.0
 	k8s.io/klog/v2 v2.110.1 // indirect
 )
 
