@@ -23,8 +23,6 @@ const (
 	Linux = "linux"
 	// Windows represents running on Windows
 	Windows = "windows"
-	// Kubernetes represents running on Kubernetes
-	Kubernetes = "kubernetes"
 )
 
 const (
@@ -54,16 +52,6 @@ var GlobalPlatforms = Platforms{
 	{
 		OS:   Container,
 		Arch: ARM64,
-		GOOS: Linux,
-	},
-	{
-		OS:   Kubernetes,
-		Arch: ARM64,
-		GOOS: Linux,
-	},
-	{
-		OS:   Kubernetes,
-		Arch: AMD64,
 		GOOS: Linux,
 	},
 	{

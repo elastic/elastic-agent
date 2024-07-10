@@ -15,10 +15,6 @@ import (
 
 func TestLoadRuntimeSpecs(t *testing.T) {
 	for _, platform := range GlobalPlatforms {
-		if platform.OS == Kubernetes {
-			// kubernetes platform is only supported in integration tests
-			continue
-		}
 		t.Run(platform.String(), func(t *testing.T) {
 			detail := PlatformDetail{
 				Platform: platform,

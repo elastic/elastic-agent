@@ -24,7 +24,7 @@ const (
 	// Windows is Windows platform
 	Windows = component.Windows
 	// Kubernetes is Kubernetes platform
-	Kubernetes = component.Kubernetes
+	Kubernetes = "kubernetes"
 )
 
 const (
