@@ -15,8 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -62,10 +63,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 
 	// Run the kustomizer on the given directory
 	resMap, err := k.Run(fSys, agentK8SKustomize)
-	if err != nil {
-		fmt.Printf("Error running kustomize: %v\n", err)
-		os.Exit(1)
-	}
+	require.NoError(t, err)
 
 	// Convert the result to YAML
 	renderedManifest, err := resMap.AsYaml()
@@ -144,7 +142,6 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 
 		return true
 	}, time.Second*100, time.Second*1)
-
 	require.NoError(t, err)
 }
 
