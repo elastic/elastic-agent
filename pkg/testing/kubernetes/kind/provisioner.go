@@ -141,7 +141,8 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 			return nil, err
 		}
 
-		if err := p.LoadImage(ctx, instanceName, cfg.AgentVersion); err != nil {
+		agentImage := fmt.Sprintf("docker.elastic.co/beats/elastic-agent-complete:%s", cfg.AgentVersion)
+		if err := p.LoadImage(ctx, instanceName, agentImage); err != nil {
 			return nil, err
 		}
 
@@ -153,8 +154,9 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 			Username:    "",
 			RemotePath:  "",
 			Internal: map[string]interface{}{
-				"config":  kConfigPath,
-				"version": k8sVersion,
+				"config":      kConfigPath,
+				"version":     k8sVersion,
+				"agent_image": agentImage,
 			},
 		})
 	}
@@ -162,8 +164,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 	return instances, nil
 }
 
-func (p *provisioner) LoadImage(ctx context.Context, clusterName string, agentVersion string) error {
-	image := fmt.Sprintf("docker.elastic.co/beats/elastic-agent-complete:%s", agentVersion)
+func (p *provisioner) LoadImage(ctx context.Context, clusterName string, image string) error {
 	ret, err := p.kindCmd(nil, "load", "docker-image", "--name", clusterName, image)
 	if err != nil {
 		return fmt.Errorf("kind: load docker-image %s failed: %w: %s", image, err, ret.stderr)

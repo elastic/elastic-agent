@@ -345,6 +345,7 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 				env["GOTEST_FLAGS"] = r.cfg.TestFlags
 				env["KUBECONFIG"] = instance.Instance.Internal["config"].(string)
 				env["TEST_BINARY_NAME"] = r.cfg.BinaryName
+				env["AGENT_IMAGE"] = instance.Instance.Internal["agent_image"].(string)
 
 				prefix := fmt.Sprintf("%s-%s", instance.Instance.Internal["version"].(string), batch.ID)
 
