@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,7 +77,7 @@ func skipTestIfVersionIsBumped(ctx context.Context, t *testing.T, startFixture *
 
 	packageVersionBytes, err := os.ReadFile(filepath.Join(workDir, packageVersionFiles[0]))
 	require.NoError(t, err, "error reading package.version file from startFixture in %q", workDir)
-	agentPackageVersion := string(packageVersionBytes)
+	agentPackageVersion := strings.TrimSpace(string(packageVersionBytes))
 	if agtversion.GetDefaultVersion() != agentPackageVersion {
 		t.Skipf(
 			"Package version %q and default version %q differ: this means that we are probably running a bumped version of agent pinned as previous, skipping...",
