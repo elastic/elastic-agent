@@ -31,6 +31,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | filelogreceiver | v0.104.0|
 | hostmetricsreceiver | v0.104.0|
 | httpcheckreceiver | v0.104.0|
@@ -40,11 +41,20 @@ This section provides a summary of components included in the Elastic Distributi
 
 
 
+=======
+| [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.104.0/receiver/filelogreceiver/README.md) | v0.104.0 |
+| [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.104.0/receiver/hostmetricsreceiver/README.md) | v0.104.0 |
+| [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.104.0/receiver/httpcheckreceiver/README.md) | v0.104.0 |
+| [k8sclusterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sclusterreceiver/v0.104.0/receiver/k8sclusterreceiver/README.md) | v0.104.0 |
+| [kubeletstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kubeletstatsreceiver/v0.104.0/receiver/kubeletstatsreceiver/README.md) | v0.104.0 |
+| [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.104.0/receiver/otlpreceiver/README.md) | v0.104.0 |
+>>>>>>> 341a24e1bc ([otel] docs: Add links to components in OTel README (#5087))
 
 ### Exporters
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | elasticsearchexporter | v0.104.0|
 | fileexporter | v0.104.0|
 | debugexporter | v0.104.0|
@@ -53,11 +63,19 @@ This section provides a summary of components included in the Elastic Distributi
 
 
 
+=======
+| [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.104.0/exporter/elasticsearchexporter/README.md) | v0.104.0 |
+| [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.104.0/exporter/fileexporter/README.md) | v0.104.0 |
+| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.104.0/exporter/debugexporter/README.md) | v0.104.0 |
+| [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.104.0/exporter/otlpexporter/README.md) | v0.104.0 |
+| [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.104.0/exporter/otlphttpexporter/README.md) | v0.104.0 |
+>>>>>>> 341a24e1bc ([otel] docs: Add links to components in OTel README (#5087))
 
 ### Processors
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | elasticinframetricsprocessor | v0.7.1|
 | attributesprocessor | v0.104.0|
 | filterprocessor | v0.104.0|
@@ -69,20 +87,39 @@ This section provides a summary of components included in the Elastic Distributi
 
 
 
+=======
+| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.7.0/processor/elasticinframetricsprocessor/README.md) | v0.7.0 |
+| [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.104.0/processor/attributesprocessor/README.md) | v0.104.0 |
+| [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.104.0/processor/filterprocessor/README.md) | v0.104.0 |
+| [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.104.0/processor/k8sattributesprocessor/README.md) | v0.104.0 |
+| [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.104.0/processor/resourcedetectionprocessor/README.md) | v0.104.0 |
+| [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.104.0/processor/resourceprocessor/README.md) | v0.104.0 |
+| [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.104.0/processor/transformprocessor/README.md) | v0.104.0 |
+| [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.104.0/processor/batchprocessor/README.md) | v0.104.0 |
+>>>>>>> 341a24e1bc ([otel] docs: Add links to components in OTel README (#5087))
 
 ### Extensions
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | storage/filestorage | v0.104.0|
 | memorylimiterextension | v0.104.0|
 
 
 
+=======
+| [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.104.0/extension/storage/filestorage/README.md) | v0.104.0 |
+| [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.104.0/extension/memorylimiterextension/README.md) | v0.104.0 |
+>>>>>>> 341a24e1bc ([otel] docs: Add links to components in OTel README (#5087))
 
 ### Connectors
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | spanmetricsconnector | v0.104.0|
 
+=======
+| [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.104.0/connector/spanmetricsconnector/README.md) | v0.104.0 |
+>>>>>>> 341a24e1bc ([otel] docs: Add links to components in OTel README (#5087))
