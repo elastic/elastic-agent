@@ -3,7 +3,6 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-# 
 function ess_up() {
   echo "~~~ Staring ESS Stack"
   # Delete
@@ -48,7 +47,6 @@ function ess_up() {
   export KIBANA_USERNAME=$ELASTICSEARCH_USERNAME
   export KIBANA_PASSWORD=$ELASTICSEARCH_PASSWORD
 
-  # Delete
   sex +x
 }
 
@@ -64,10 +62,6 @@ function ess_down() {
 
   terraform destroy -auto-approve
   set +x
-}
-
-function save_state() {
-  
 }
 
 function get_git_user_email() {
