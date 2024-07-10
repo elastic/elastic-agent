@@ -7,9 +7,26 @@ export PATH=$HOME/bin:${PATH}
 source .buildkite/scripts/install-kubectl.sh
 source .buildkite/scripts/install-kind.sh
 
+# Increase max inotify instances and watches to avoid 'too many open files' errors
+# when spawning more than one k8s cluster
+sudo sysctl fs.inotify.max_user_instances=1280
+sudo sysctl fs.inotify.max_user_watches=655360
+
 # Run k8s integration tests
 set +e
-TEST_INTEG_CLEAN_ON_EXIT=true INSTANCE_PROVISIONER=kind STACK_PROVISIONER=stateful EXTERNAL=true mage integration:kubernetes
+
+arch_type="$(uname -m)"
+if [ "${arch_type}" == "x86_64" ]; then
+  export PLATFORMS="linux/amd64"
+elif [[ "${arch_type}" == "aarch64" || "${arch_type}" == "arm64" ]]; then
+  export PLATFORMS="linux/arm64"
+else
+  echo "Unsupported OS"
+  exit 10
+fi
+
+DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES=docker mage -v package
+TEST_INTEG_CLEAN_ON_EXIT=true INSTANCE_PROVISIONER=kind STACK_PROVISIONER=stateful SNAPSHOT=true mage integration:kubernetes
 TESTS_EXIT_STATUS=$?
 set -e
 

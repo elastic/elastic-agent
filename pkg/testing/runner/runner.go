@@ -256,17 +256,11 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 			return Result{}, err
 		}
 	case ProvisionerTypeK8SCluster:
-		results = make(map[string]OSRunnerResult)
-		instance := instances[0]
-		batch, ok := findBatchByID(instance.ID, r.batches)
-		if !ok {
-			return Result{}, fmt.Errorf("unable to find batch with ID: %s", instance.ID)
-		}
-		result, err := r.runK8sInstance(ctx, batch, instances[0])
+		results, err = r.runK8sInstances(ctx, instances)
 		if err != nil {
 			return Result{}, err
 		}
-		results[batch.ID] = result
+
 	default:
 		return Result{}, fmt.Errorf("invalid provisioner type %d", r.ip.Type())
 	}
@@ -311,42 +305,67 @@ func (r *Runner) Clean() error {
 	return g.Wait()
 }
 
-func (r *Runner) runK8sInstance(ctx context.Context, batch OSBatch, instance StateInstance) (OSRunnerResult, error) {
-	logger := &batchLogger{wrapped: r.logger, prefix: instance.ID}
-	// start with the ExtraEnv first preventing the other environment flags below
-	// from being overwritten
-	env := map[string]string{}
-	for k, v := range r.cfg.ExtraEnv {
-		env[k] = v
-	}
-	// ensure that we have all the requirements for the stack if required
-	if batch.Batch.Stack != nil {
-		// wait for the stack to be ready before continuing
-		logger.Logf("Waiting for stack to be ready...")
-		stack, err := r.getStackForBatchID(batch.ID)
-		if err != nil {
-			return OSRunnerResult{}, err
-		}
-		env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
-		env["ELASTICSEARCH_USERNAME"] = stack.Username
-		env["ELASTICSEARCH_PASSWORD"] = stack.Password
-		env["KIBANA_HOST"] = stack.Kibana
-		env["KIBANA_USERNAME"] = stack.Username
-		env["KIBANA_PASSWORD"] = stack.Password
-		logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
-	}
+func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance) (map[string]OSRunnerResult, error) {
+	g, ctx := errgroup.WithContext(ctx)
+	results := make(map[string]OSRunnerResult)
+	var resultsMx sync.Mutex
+	for _, instance := range instances {
+		func(instance StateInstance) {
+			g.Go(func() error {
+				batch, ok := findBatchByID(instance.ID, r.batches)
+				if !ok {
+					return fmt.Errorf("unable to find batch with ID: %s", instance.ID)
+				}
 
-	// set the go test flags
-	env["GOTEST_FLAGS"] = r.cfg.TestFlags
-	env["TEST_BINARY_NAME"] = r.cfg.BinaryName
+				logger := &batchLogger{wrapped: r.logger, prefix: instance.ID}
+				// start with the ExtraEnv first preventing the other environment flags below
+				// from being overwritten
+				env := map[string]string{}
+				for k, v := range r.cfg.ExtraEnv {
+					env[k] = v
+				}
+				// ensure that we have all the requirements for the stack if required
+				if batch.Batch.Stack != nil {
+					// wait for the stack to be ready before continuing
+					logger.Logf("Waiting for stack to be ready...")
+					stack, err := r.getStackForBatchID(batch.ID)
+					if err != nil {
+						return err
+					}
+					env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
+					env["ELASTICSEARCH_USERNAME"] = stack.Username
+					env["ELASTICSEARCH_PASSWORD"] = stack.Password
+					env["KIBANA_HOST"] = stack.Kibana
+					env["KIBANA_USERNAME"] = stack.Username
+					env["KIBANA_PASSWORD"] = stack.Password
+					logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
+				}
 
-	// run the actual tests on the host
-	result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, nil, logger, r.cfg.AgentVersion, batch.ID, batch.Batch, env)
+				// set the go test flags
+				env["GOTEST_FLAGS"] = r.cfg.TestFlags
+				env["KUBECONFIG"] = instance.Instance.Internal["config"].(string)
+				env["TEST_BINARY_NAME"] = r.cfg.BinaryName
+
+				prefix := fmt.Sprintf("%s-%s", instance.Instance.Internal["version"].(string), batch.ID)
+
+				// run the actual tests on the host
+				result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, nil, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
+				if err != nil {
+					logger.Logf("Failed to execute tests on instance: %s", err)
+					return fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
+				}
+				resultsMx.Lock()
+				results[batch.ID] = result
+				resultsMx.Unlock()
+				return nil
+			})
+		}(instance)
+	}
+	err := g.Wait()
 	if err != nil {
-		logger.Logf("Failed to execute tests on instance: %s", err)
-		return OSRunnerResult{}, fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
+		return nil, err
 	}
-	return result, nil
+	return results, nil
 }
 
 // runInstances runs the batch on each instance in parallel.

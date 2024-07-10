@@ -7,12 +7,12 @@ package kind
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -49,13 +49,13 @@ nodes:
         secure-port: "10257"
 `
 
-func NewProvisioner(version string) runner.InstanceProvisioner {
-	return &provisioner{version: version}
+func NewProvisioner(versions string) runner.InstanceProvisioner {
+	return &provisioner{versions: strings.Split(versions, ",")}
 }
 
 type provisioner struct {
-	logger  runner.Logger
-	version string
+	logger   runner.Logger
+	versions []string
 }
 
 func (p *provisioner) Name() string {
@@ -75,80 +75,88 @@ func (p *provisioner) Supported(batch define.OS) bool {
 	supported := batch.Type == define.Kubernetes && batch.Arch == runtime.GOARCH && (batch.Distro == "" || batch.Distro == "kind")
 
 	if supported && batch.Version != "" {
-		supported = batch.Version == p.version
+		supported = slices.Contains(p.versions, batch.Version)
 	}
 
 	return supported
 }
 
 func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {
-	if len(batches) == 0 {
-		return nil, errors.New("kind provisioner only supports a single batch")
-	}
 
-	if len(batches) > 1 {
-		return nil, errors.New("kind provisioner only supports a single batch")
-	}
+	versionsMap := make(map[string]string)
 
-	batch := batches[0]
-	instances := []runner.Instance{
-		{
-			ID:          batch.ID,
-			Name:        batch.ID,
-			Provisioner: Name,
-			IP:          "",
-			Username:    "",
-			RemotePath:  "",
-			Internal:    nil,
-		},
-	}
-	exists, err := p.clusterExists(batch.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	if !exists {
-		p.logger.Logf("Provisioning kind cluster %s", batch.ID)
-		nodeImage := fmt.Sprintf("kindest/node:%s", p.version)
-		clusterConfig := strings.NewReader(clusterCfg)
-
-		ret, err := p.kindCmd(clusterConfig, "create", "cluster", "--name", batch.ID, "--image", nodeImage, "--config", "-")
-		if err != nil {
-			return nil, fmt.Errorf("kind: failed to create cluster %s: %s", batch.ID, ret.stderr)
+	for _, batch := range batches {
+		k8sVersion := batch.OS.Version
+		if k8sVersion == "" {
+			for _, version := range p.versions {
+				versionsMap[version] = batch.ID
+			}
+			break
 		}
 
-		exists, err = p.clusterExists(batch.ID)
+		versionsMap[k8sVersion] = batch.ID
+	}
+
+	var instances []runner.Instance
+	for k8sVersion, instanceID := range versionsMap {
+		instanceName := fmt.Sprintf("%s-%s", k8sVersion, instanceID)
+		exists, err := p.clusterExists(instanceName)
 		if err != nil {
 			return nil, err
 		}
 
 		if !exists {
-			return nil, fmt.Errorf("kind: failed to find cluster %s after successful creation", batch.ID)
+			p.logger.Logf("Provisioning kind cluster %s", instanceName)
+			nodeImage := fmt.Sprintf("kindest/node:%s", k8sVersion)
+			clusterConfig := strings.NewReader(clusterCfg)
+
+			ret, err := p.kindCmd(clusterConfig, "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
+			if err != nil {
+				return nil, fmt.Errorf("kind: failed to create cluster %s: %s", instanceName, ret.stderr)
+			}
+
+			exists, err = p.clusterExists(instanceName)
+			if err != nil {
+				return nil, err
+			}
+
+			if !exists {
+				return nil, fmt.Errorf("kind: failed to find cluster %s after successful creation", instanceName)
+			}
+		} else {
+			p.logger.Logf("Kind cluster %s already exists", instanceName)
 		}
-	} else {
-		p.logger.Logf("Kind cluster %s already exists", batch.ID)
-	}
 
-	kConfigPath, err := p.writeKubeconfig(batch.ID)
-	if err != nil {
-		return nil, err
-	}
+		kConfigPath, err := p.writeKubeconfig(instanceName)
+		if err != nil {
+			return nil, err
+		}
 
-	if err := os.Setenv("KUBECONFIG", kConfigPath); err != nil {
-		return nil, err
-	}
+		c, err := klient.NewWithKubeConfigFile(kConfigPath)
+		if err != nil {
+			return nil, err
+		}
 
-	c, err := klient.NewWithKubeConfigFile(kConfigPath)
-	if err != nil {
-		return nil, err
-	}
+		if err := p.WaitForControlPlane(c); err != nil {
+			return nil, err
+		}
 
-	if err := p.WaitForControlPlane(c); err != nil {
-		return nil, err
-	}
+		if err := p.LoadImage(ctx, instanceName, cfg.AgentVersion); err != nil {
+			return nil, err
+		}
 
-	if err := p.LoadImage(ctx, batch.ID, cfg.AgentVersion); err != nil {
-		return nil, err
+		instances = append(instances, runner.Instance{
+			ID:          instanceID,
+			Name:        instanceName,
+			Provisioner: Name,
+			IP:          "",
+			Username:    "",
+			RemotePath:  "",
+			Internal: map[string]interface{}{
+				"config":  kConfigPath,
+				"version": k8sVersion,
+			},
+		})
 	}
 
 	return instances, nil
