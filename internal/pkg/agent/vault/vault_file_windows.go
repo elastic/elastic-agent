@@ -24,7 +24,10 @@ func (v *FileVault) encrypt(data []byte) ([]byte, error) {
 	}
 	result := make([]byte, out.Size)
 	copy(result, unsafe.Slice(out.Data, out.Size))
-	windows.LocalFree(windows.Handle(unsafe.Pointer(out.Data)))
+	_, err = windows.LocalFree(windows.Handle(unsafe.Pointer(out.Data)))
+	if err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -37,7 +40,10 @@ func (v *FileVault) decrypt(data []byte) ([]byte, error) {
 
 	result := make([]byte, out.Size)
 	copy(result, unsafe.Slice(out.Data, out.Size))
-	windows.LocalFree(windows.Handle(unsafe.Pointer(out.Data)))
+	_, err = windows.LocalFree(windows.Handle(unsafe.Pointer(out.Data)))
+	if err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
