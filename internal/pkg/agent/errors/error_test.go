@@ -12,6 +12,7 @@ import (
 	"io"
 	"testing"
 
+	//nolint:gomodguard // Postpone the change here until we refactor error handling.
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
