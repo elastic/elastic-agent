@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source .buildkite/scripts/common.sh
+
 AGENT_PACKAGE_VERSION="$(cat .package-version)"
 DEV=true 
 EXTERNAL=true 

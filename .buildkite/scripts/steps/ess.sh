@@ -66,6 +66,10 @@ function ess_down() {
   set +x
 }
 
+function save_state() {
+  
+}
+
 function get_git_user_email() {
   if ! git rev-parse --is-inside-work-tree &>/dev/null; then
     echo "unknown"  
