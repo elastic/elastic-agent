@@ -17,8 +17,8 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v2"
-	"gotest.tools/assert"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
