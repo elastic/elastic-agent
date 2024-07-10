@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestErrorsIs(t *testing.T) {

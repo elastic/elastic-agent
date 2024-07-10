@@ -7,8 +7,8 @@ package config
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
@@ -204,7 +204,7 @@ func TestAPMConfig(t *testing.T) {
 			require.NoError(t, in.Unpack(cfg))
 			require.NotNil(t, cfg)
 
-			assert.DeepEqual(t, tc.out, cfg.APM)
+			assert.Equal(t, tc.out, cfg.APM)
 		})
 	}
 }
