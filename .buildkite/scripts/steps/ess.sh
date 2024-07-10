@@ -4,6 +4,7 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 
 function ess_up() {
+  install_terraform
   echo "~~~ Staring ESS Stack"
   # Delete
   set -x
@@ -51,6 +52,7 @@ function ess_up() {
 }
 
 function ess_down() {
+  install_terraform
   echo "~~~ Tearing down the ESS Stack"
   set -x
   local WORKSPACE=$(git rev-parse --show-toplevel)
@@ -78,4 +80,19 @@ function get_git_user_email() {
   else
     echo "$email"
   fi
+}
+
+# remove when use custom images
+install_terraform() {
+  if command -v terraform &> /dev/null; then    
+    return 0
+  fi
+  TERRAFORM_VERSION="1.9.1"
+  echo "~~~ Installing Terraform version ${TERRAFORM_VERSION}"
+  DOWNLOAD_URL="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.tar.gz"
+  curl -o terraform_${TERRAFORM_VERSION}_linux_amd64.tar.gz $DOWNLOAD_URL
+  tar -xzf terraform_${TERRAFORM_VERSION}_linux_amd64.tar.gz
+  sudo mv terraform /usr/local/bin/
+  rm terraform_${TERRAFORM_VERSION}_linux_amd64.tar.gz
+  echo "Terraform version $(terraform -v) installed successfully."
 }
