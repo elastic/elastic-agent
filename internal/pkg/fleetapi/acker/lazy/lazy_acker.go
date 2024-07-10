@@ -8,7 +8,7 @@ import (
 	"context"
 	"net/http"
 
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"

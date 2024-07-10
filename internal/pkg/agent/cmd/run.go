@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"go.elastic.co/apm"
-	apmtransport "go.elastic.co/apm/transport"
+	"go.elastic.co/apm/v2"
+	apmtransport "go.elastic.co/apm/v2/transport"
 	"gopkg.in/yaml.v2"
 
 	"github.com/spf13/cobra"
@@ -227,7 +227,9 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	}
 
 	// the encrypted state does not exist but the unencrypted file does
-	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
+	err = migration.MigrateToEncryptedConfig(ctx, l,
+		paths.AgentStateStoreYmlFile(),
+		paths.AgentStateStoreFile())
 	if err != nil {
 		return logReturn(l, errors.New(err, "error migrating agent state"))
 	}
@@ -593,7 +595,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 }
 
 func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig) (*apm.Tracer, error) {
-	apm.DefaultTracer.Close()
+	apm.DefaultTracer().Close()
 
 	if !mcfg.Enabled || !mcfg.MonitorTraces {
 		return nil, nil
@@ -623,10 +625,7 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 		defer os.Unsetenv(envCACert)
 	}
 
-	ts, err := apmtransport.NewHTTPTransport()
-	if err != nil {
-		return nil, err
-	}
+	opts := apmtransport.HTTPTransportOptions{}
 
 	if len(cfg.Hosts) > 0 {
 		hosts := make([]*url.URL, 0, len(cfg.Hosts))
@@ -637,12 +636,17 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 			}
 			hosts = append(hosts, u)
 		}
-		ts.SetServerURL(hosts...)
+		opts.ServerURLs = hosts
 	}
 	if cfg.APIKey != "" {
-		ts.SetAPIKey(cfg.APIKey)
+		opts.APIKey = cfg.APIKey
 	} else {
-		ts.SetSecretToken(cfg.SecretToken)
+		opts.SecretToken = cfg.SecretToken
+	}
+
+	ts, err := apmtransport.NewHTTPTransport(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	return apm.NewTracerOptions(apm.TracerOptions{

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.elastic.co/apm/apmtest"
+	"go.elastic.co/apm/v2/apmtest"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -35,6 +35,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
 		configuration.DefaultGRPCConfig(),
+		false,
 	)
 	require.NoError(t, err)
 

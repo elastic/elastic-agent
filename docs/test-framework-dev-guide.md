@@ -47,11 +47,8 @@ The test are run with mage using the `integration` namespace:
 
 - `mage integration:local [testName|all]` to execute only those tests under the
   `testing/integration` folder that set `Local: true`. It'll run all the tests if
-`all` is passed as argument, or it'll pass `[testName]` to `go test` as
-- `--run=[testName]`.These tests are executed on your local machine.
-
-- `mage integration:local [testName]` same as `mage integration:local`, but it'll
-pass `[testName]` to `go test` as `--run=[testName]`.
+  `all` is passed as argument, or it'll pass `[testName]` to `go test` as
+  `--run=[testName]`. These tests are executed on your local machine.
 
 - `mage integration:single [testName]` to execute a single test under the `testing/integration` folder. Only the selected test will be executed on remote VMs.
 

@@ -203,6 +203,12 @@ func TestVars_Replace(t *testing.T) {
 			false,
 			true,
 		},
+		{
+			`start $${keep} ${un-der_score.key1} $${un-der_score.key1}`,
+			NewStrVal(`start ${keep} data1 ${un-der_score.key1}`),
+			false,
+			false,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.Input, func(t *testing.T) {

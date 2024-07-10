@@ -804,7 +804,6 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	}
 
 	originalInstall := paths.Install()
-	originalTop := paths.Top()
 	paths.SetTop(topPath)
 	paths.SetConfig(configPath)
 	paths.SetControlSocket(socketPath)
@@ -830,7 +829,7 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 
 	// persist the paths so other commands in the container will use the correct paths
 	if writePaths {
-		if err := writeContainerPaths(originalTop, statePath, configPath, logsPath, socketPath); err != nil {
+		if err := writeContainerPaths(statePath, configPath, logsPath, socketPath); err != nil {
 			return err
 		}
 	}
@@ -844,8 +843,8 @@ type containerPaths struct {
 	SocketPath string `config:"socket_path" yaml:"socket_path,omitempty"`
 }
 
-func writeContainerPaths(original, statePath, configPath, logsPath, socketPath string) error {
-	pathFile := filepath.Join(original, "container-paths.yml")
+func writeContainerPaths(statePath, configPath, logsPath, socketPath string) error {
+	pathFile := filepath.Join(statePath, "container-paths.yml")
 	fp, err := os.Create(pathFile)
 	if err != nil {
 		return fmt.Errorf("failed creating %s: %w", pathFile, err)
@@ -867,7 +866,11 @@ func writeContainerPaths(original, statePath, configPath, logsPath, socketPath s
 }
 
 func tryContainerLoadPaths() error {
-	pathFile := filepath.Join(paths.Top(), "container-paths.yml")
+	statePath := envWithDefault("", "STATE_PATH")
+	if statePath == "" {
+		statePath = defaultStateDirectory
+	}
+	pathFile := filepath.Join(statePath, "container-paths.yml")
 	_, err := os.Stat(pathFile)
 	if os.IsNotExist(err) {
 		// no container-paths.yml file exists, so nothing to do
