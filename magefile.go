@@ -3063,35 +3063,6 @@ func hasCleanOnExit() bool {
 	return b
 }
 
-type dependency struct {
-	Name    string
-	Version string
-}
-
-type dependencies struct {
-	Receivers  []dependency
-	Exporters  []dependency
-	Processors []dependency
-	Extensions []dependency
-	Connectors []dependency
-}
-
-func (d dependency) Clean(sep string) dependency {
-	cleanFn := func(dep, sep string) string {
-		chunks := strings.SplitN(dep, sep, 2)
-		if len(chunks) == 2 {
-			return chunks[1]
-		}
-
-		return dep
-	}
-
-	return dependency{
-		Name:    cleanFn(d.Name, sep),
-		Version: d.Version,
-	}
-}
-
 func (Otel) Readme() error {
 	fmt.Println(">> Building internal/pkg/otel/README.md")
 
@@ -3119,7 +3090,7 @@ func (Otel) Readme() error {
 	return tmpl.Execute(out, data)
 }
 
-func getOtelDependencies() (*dependencies, error) {
+func getOtelDependencies() (*otelDependencies, error) {
 	// read go.mod
 	readFile, err := os.Open("go.mod")
 	if err != nil {
@@ -3130,55 +3101,132 @@ func getOtelDependencies() (*dependencies, error) {
 	scanner := bufio.NewScanner(readFile)
 
 	scanner.Split(bufio.ScanLines)
-	var receivers, extensions, exporters, processors, connectors []dependency
+	var receivers, extensions, exporters, processors, connectors []*otelDependency
 	// process imports
 	for scanner.Scan() {
 		l := strings.TrimSpace(scanner.Text())
-		// is otel
-		if !strings.Contains(l, "go.opentelemetry.io/") &&
-			!strings.Contains(l, "github.com/open-telemetry/") &&
-			!strings.Contains(l, "github.com/elastic/opentelemetry-collector-components/") {
+		dependency := newOtelDependency(l)
+		if dependency == nil {
 			continue
 		}
 
-		if strings.Contains(l, "// indirect") {
-			continue
-		}
-
-		parseLine := func(line string) (dependency, error) {
-			chunks := strings.SplitN(line, " ", 2)
-			if len(chunks) != 2 {
-				return dependency{}, fmt.Errorf("incorrect format for line %q", line)
-			}
-			return dependency{
-				Name:    chunks[0],
-				Version: chunks[1],
-			}, nil
-		}
-
-		d, err := parseLine(l)
-		if err != nil {
-			return nil, err
-		}
-
-		if strings.Contains(l, "/receiver/") {
-			receivers = append(receivers, d.Clean("/receiver/"))
-		} else if strings.Contains(l, "/processor/") {
-			processors = append(processors, d.Clean("/processor/"))
-		} else if strings.Contains(l, "/exporter/") {
-			exporters = append(exporters, d.Clean("/exporter/"))
-		} else if strings.Contains(l, "/extension/") {
-			extensions = append(extensions, d.Clean("/extension/"))
-		} else if strings.Contains(l, "/connector/") {
-			connectors = append(connectors, d.Clean("/connector/"))
+		if dependency.ComponentType == "connector" {
+			connectors = append(connectors, dependency)
+		} else if dependency.ComponentType == "exporter" {
+			exporters = append(exporters, dependency)
+		} else if dependency.ComponentType == "extension" {
+			extensions = append(extensions, dependency)
+		} else if dependency.ComponentType == "processor" {
+			processors = append(processors, dependency)
+		} else if dependency.ComponentType == "receiver" {
+			receivers = append(receivers, dependency)
 		}
 	}
 
-	return &dependencies{
-		Receivers:  receivers,
-		Exporters:  exporters,
-		Processors: processors,
-		Extensions: extensions,
+	return &otelDependencies{
 		Connectors: connectors,
+		Exporters:  exporters,
+		Extensions: extensions,
+		Processors: processors,
+		Receivers:  receivers,
 	}, nil
+}
+
+type otelDependency struct {
+	ComponentType string
+	Name          string
+	Version       string
+	Link          string
+}
+
+func newOtelDependency(l string) *otelDependency {
+	if !strings.Contains(l, "go.opentelemetry.io/") &&
+		!strings.Contains(l, "github.com/open-telemetry/") &&
+		!strings.Contains(l, "github.com/elastic/opentelemetry-collector-components/") {
+		return nil
+	}
+
+	if strings.Contains(l, "// indirect") {
+		return nil
+	}
+
+	chunks := strings.SplitN(l, " ", 2)
+	if len(chunks) != 2 {
+		return nil
+	}
+	dependencyURI := chunks[0]
+	version := chunks[1]
+
+	componentName := getOtelComponentName(dependencyURI)
+	componentType := getOtelComponentType(dependencyURI)
+	link := getOtelDependencyLink(dependencyURI, version)
+
+	return &otelDependency{
+		ComponentType: componentType,
+		Name:          componentName,
+		Version:       version,
+		Link:          link,
+	}
+}
+
+func getOtelComponentName(dependencyName string) string {
+	parts := strings.Split(dependencyName, "/")
+	return parts[len(parts)-1]
+}
+
+func getOtelComponentType(dependencyName string) string {
+	if strings.Contains(dependencyName, "/connector/") {
+		return "connector"
+	} else if strings.Contains(dependencyName, "/exporter/") {
+		return "exporter"
+	} else if strings.Contains(dependencyName, "/extension/") {
+		return "extension"
+	} else if strings.Contains(dependencyName, "/processor/") {
+		return "processor"
+	} else if strings.Contains(dependencyName, "/receiver/") {
+		return "receiver"
+	}
+	return ""
+}
+
+func getOtelDependencyLink(dependencyURI string, version string) string {
+	dependencyRepository := getDependencyRepository(dependencyURI)
+	dependencyPath := strings.TrimPrefix(dependencyURI, dependencyRepository+"/")
+	repositoryURL := getOtelRepositoryURL(dependencyURI)
+	return fmt.Sprintf("https://%s/blob/%s/%s/%s/README.md", repositoryURL, dependencyPath, version, dependencyPath)
+}
+
+func getDependencyRepository(dependencyURI string) string {
+	dependencyURIChunks := strings.Split(dependencyURI, "/")
+	if len(dependencyURIChunks) < 2 {
+		return ""
+	}
+	var dependencyRepository string
+	if dependencyURIChunks[0] == "go.opentelemetry.io" {
+		dependencyRepository = dependencyURIChunks[0] + "/" + dependencyURIChunks[1]
+	} else {
+		dependencyRepository = dependencyURIChunks[0] + "/" + dependencyURIChunks[1] + "/" + dependencyURIChunks[2]
+	}
+	return dependencyRepository
+}
+
+func getOtelRepositoryURL(dependencyURI string) string {
+	if strings.HasPrefix(dependencyURI, "go.opentelemetry.io/") {
+		return "github.com/open-telemetry/opentelemetry-collector"
+	} else if strings.HasPrefix(dependencyURI, "github.com/") {
+		parts := strings.SplitN(dependencyURI, "/", 4)
+		hostPart := parts[0]
+		orgPart := parts[1]
+		repoPart := parts[2]
+		return fmt.Sprintf("%s/%s/%s", hostPart, orgPart, repoPart)
+	}
+	return ""
+}
+
+type otelDependencies struct {
+	Connectors []*otelDependency
+	Exporters  []*otelDependency
+	Extensions []*otelDependency
+	Processors []*otelDependency
+	Receivers  []*otelDependency
 }
