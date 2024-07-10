@@ -16,6 +16,8 @@ steps:
 
   - label: "Integration tests: stateful ESS"
     key: test-tf
+    depends_on:
+      - package-it
     command: |
       buildkite-agent artifacts download build/distributions/** . --step 'package-it'
       ls -lah build/distributions/
