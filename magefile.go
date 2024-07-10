@@ -1993,33 +1993,6 @@ func (Integration) Single(ctx context.Context, testName string) error {
 
 // Kubernetes runs kubernetes integration tests
 func (Integration) Kubernetes(ctx context.Context) error {
-
-	//build elastic-agent docker package
-	targetEnv := fmt.Sprintf("linux/%s", runtime.GOARCH)
-	if err := os.Setenv(platformsEnv, targetEnv); err != nil {
-		return err
-	}
-	if err := os.Setenv(packagesEnv, "docker"); err != nil {
-		return err
-	}
-	if err := os.Setenv(devEnv, "true"); err != nil {
-		return err
-	}
-	if err := os.Setenv(snapshotEnv, "true"); err != nil {
-		return err
-	}
-
-	devtools.DevBuild = true
-	devtools.Snapshot = true
-	devtools.Platforms = devtools.Platforms.Filter(targetEnv)
-	devtools.SelectedPackageTypes = []devtools.PackageType{devtools.Docker}
-
-	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
-		devtools.ExternalBuild = true
-	}
-
-	Package()
-
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err
