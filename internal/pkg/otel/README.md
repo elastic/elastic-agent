@@ -58,6 +58,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | elasticinframetricsprocessor | v0.7.0|
 | attributesprocessor | v0.104.0|
 | filterprocessor | v0.104.0|
@@ -69,6 +70,16 @@ This section provides a summary of components included in the Elastic Distributi
 
 
 
+=======
+| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.7.1/processor/elasticinframetricsprocessor/README.md) | v0.7.1 |
+| [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.104.0/processor/attributesprocessor/README.md) | v0.104.0 |
+| [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.104.0/processor/filterprocessor/README.md) | v0.104.0 |
+| [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.104.0/processor/k8sattributesprocessor/README.md) | v0.104.0 |
+| [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.104.0/processor/resourcedetectionprocessor/README.md) | v0.104.0 |
+| [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.104.0/processor/resourceprocessor/README.md) | v0.104.0 |
+| [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.104.0/processor/transformprocessor/README.md) | v0.104.0 |
+| [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.104.0/processor/batchprocessor/README.md) | v0.104.0 |
+>>>>>>> 3bdf507efa (Bump github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor from 0.7.0 to 0.7.1 (#5111))
 
 ### Extensions
 
