@@ -18,7 +18,7 @@ function ess_up() {
     return 1
   fi
 
-  local EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
+  export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
   
   if [[ -z "${EC_API_KEY}" ]]; then
     echo "Error: Failed to get EC API key from vault" >&2
@@ -48,7 +48,7 @@ function ess_up() {
   export KIBANA_USERNAME=$ELASTICSEARCH_USERNAME
   export KIBANA_PASSWORD=$ELASTICSEARCH_PASSWORD
 
-  sex +x
+  set +x
 }
 
 function ess_down() {
@@ -57,7 +57,7 @@ function ess_down() {
   set -x
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
-  local EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
+  export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
   
   pushd "${TF_DIR}"
   trap 'popd >/dev/null' EXIT
