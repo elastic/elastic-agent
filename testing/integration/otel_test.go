@@ -228,6 +228,148 @@ func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesti
 	require.Contains(t, string(out), `service::pipelines::logs: references processor "nonexistingprocessor" which is not configured`)
 }
 
+var logsIngestionConfigTemplate = `
+exporters:
+  debug:
+    verbosity: basic
+
+  elasticsearch:
+    api_key: {{.ESApiKey}}
+    endpoint: {{.ESEndpoint}}
+
+processors:
+  resource/add-test-id:
+    attributes:
+    - key: test.id
+      action: insert
+      value: {{.TestId}}
+
+receivers:
+  filelog:
+    include:
+      - {{.InputFilePath}}
+    start_at: beginning
+
+service:
+  pipelines:
+    logs:
+      exporters:
+        - debug
+        - elasticsearch
+      processors:
+        - resource/add-test-id
+      receivers:
+        - filelog
+`
+
+func TestOtelLogsIngestion(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+		OS: []define.OS{
+			// input path missing on windows
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	// Prepare the OTel config.
+	testId := info.Namespace
+
+	tempDir := t.TempDir()
+	inputFilePath := filepath.Join(tempDir, "input.log")
+
+	esHost, err := getESHost()
+	require.NoError(t, err, "failed to get ES host")
+	require.True(t, len(esHost) > 0)
+
+	esClient := info.ESClient
+	require.NotNil(t, esClient)
+	esApiKey, err := createESApiKey(esClient)
+	require.NoError(t, err, "failed to get api key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+
+	logsIngestionConfig := logsIngestionConfigTemplate
+	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.ESApiKey}}", esApiKey.Encoded)
+	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.ESEndpoint}}", esHost)
+	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.InputFilePath}}", inputFilePath)
+	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.TestId}}", testId)
+
+	cfgFilePath := filepath.Join(tempDir, "otel.yml")
+	require.NoError(t, os.WriteFile(cfgFilePath, []byte(logsIngestionConfig), 0600))
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
+	require.NoError(t, err)
+
+	// remove elastic-agent.yml, otel should be independent
+	require.NoError(t, os.Remove(filepath.Join(fixture.WorkDir(), "elastic-agent.yml")))
+
+	var fixtureWg sync.WaitGroup
+	fixtureWg.Add(1)
+	go func() {
+		defer fixtureWg.Done()
+		err = fixture.RunOtelWithClient(ctx, false, false)
+	}()
+
+	validateCommandIsWorking(t, ctx, fixture, tempDir)
+
+	// check `elastic-agent status` returns successfully
+	require.Eventuallyf(t, func() bool {
+		// This will return errors until it connects to the agent,
+		// they're mostly noise because until the agent starts running
+		// we will get connection errors. If the test fails
+		// the agent logs will be present in the error message
+		// which should help to explain why the agent was not
+		// healthy.
+		err = fixture.IsHealthy(ctx)
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
+		err,
+	)
+
+	// Write logs to input file.
+	logsCount := 10_000
+	inputFile, err := os.OpenFile(inputFilePath, os.O_CREATE|os.O_WRONLY, 0600)
+	require.NoError(t, err)
+	for i := 0; i < logsCount; i++ {
+		_, err = fmt.Fprintf(inputFile, "This is a test log message %d\n", i+1)
+		require.NoError(t, err)
+	}
+	inputFile.Close()
+	t.Cleanup(func() {
+		_ = os.Remove(inputFilePath)
+	})
+
+	actualHits := &struct{ Hits int }{}
+	require.Eventually(t,
+		func() bool {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, esClient, ".ds-logs-generic-default*", map[string]interface{}{
+				"Resource.test.id": testId,
+			})
+			require.NoError(t, err)
+
+			actualHits.Hits = docs.Hits.Total.Value
+			return actualHits.Hits == logsCount
+		},
+		2*time.Minute, 1*time.Second,
+		"Expected %v logs, got %v", logsCount, actualHits)
+
+	cancel()
+	fixtureWg.Wait()
+	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
+}
+
 func TestOtelAPMIngestion(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -280,13 +422,13 @@ func TestOtelAPMIngestion(t *testing.T) {
 	esClient := info.ESClient
 	esApiKey, err := createESApiKey(esClient)
 	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(esApiKey) > 1, "api key is invalid %q", esApiKey)
+	require.True(t, len(esApiKey.APIKey) > 1, "api key is invalid %q", esApiKey)
 
 	apmArgs := []string{
 		"run",
 		"-e",
 		"-E", "output.elasticsearch.hosts=['" + esHost + "']",
-		"-E", "output.elasticsearch.api_key=" + esApiKey,
+		"-E", "output.elasticsearch.api_key=" + fmt.Sprintf("%s:%s", esApiKey.Id, esApiKey.APIKey),
 		"-E", "apm-server.host=127.0.0.1:8200",
 		"-E", "apm-server.ssl.enabled=false",
 	}
@@ -415,13 +557,8 @@ func getESHost() (string, error) {
 	return fixedESHost, nil
 }
 
-func createESApiKey(esClient *elasticsearch.Client) (string, error) {
-	apiResp, err := estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s:%s", apiResp.Id, apiResp.APIKey), nil
+func createESApiKey(esClient *elasticsearch.Client) (estools.APIKeyResponse, error) {
+	return estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
 }
 
 func linesTrackMap(lines []string) map[string]bool {
