@@ -145,14 +145,32 @@ func dumpToYAML(t *testing.T, out string, in interface{}) {
 }
 
 func TestToMapStrWithDollarSigns(t *testing.T) {
-	in := map[string]interface{}{
-		"hello": map[string]interface{}{
+	tests := []struct {
+		name string
+		in   map[string]interface{}
+	}{{
+		name: "in inputs",
+		in: map[string]interface{}{
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type": "logfile",
+					"what": "$$$$",
+				},
+			},
+		},
+	}, {
+		name: "top level",
+		in: map[string]interface{}{
 			"what": "$$$$",
 		},
-	}
+	}}
 
-	c := MustNewConfigFrom(in)
-	out, err := c.ToMapStr()
-	assert.NoError(t, err)
-	assert.Equal(t, in, out)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := MustNewConfigFrom(tc.in)
+			out, err := c.ToMapStr()
+			assert.NoError(t, err)
+			assert.Equal(t, tc.in, out)
+		})
+	}
 }
