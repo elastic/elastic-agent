@@ -28,21 +28,19 @@ spec:
       # Uncomment if using hints feature
       #initContainers:
       #  - name: k8s-templates-downloader
-      #    image: docker.elastic.co/beats/elastic-agent:8.14.3
-      #    command: ['bash']
+      #    image: busybox:1.28
+      #    command: ['sh']
       #    args:
       #      - -c
       #      - >-
-      #        mkdir -p /usr/share/elastic-agent/state/inputs.d &&
-      #        curl -sL https://github.com/elastic/elastic-agent/archive/8.15.tar.gz | tar xz -C /usr/share/elastic-agent/state/inputs.d --strip=5 "elastic-agent-8.15/deploy/kubernetes/elastic-agent-standalone/templates.d"
-      #    securityContext:
-      #      runAsUser: 0
+      #        mkdir -p /etc/elastic-agent/inputs.d &&
+      #        wget -O - https://github.com/elastic/elastic-agent/archive/8.14.tar.gz | tar xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-8.14/deploy/kubernetes/elastic-agent-standalone/templates.d"
       #    volumeMounts:
-      #      - name: elastic-agent-state
-      #        mountPath: /usr/share/elastic-agent/state
+      #      - name: external-inputs
+      #        mountPath: /etc/elastic-agent/inputs.d
       containers:
         - name: elastic-agent-standalone
-          image: docker.elastic.co/beats/elastic-agent:8.14.3
+          image: docker.elastic.co/beats/elastic-agent:8.14.4
           args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
           env:
             # The API Key with access privilleges to connect to Elasticsearch. https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent
@@ -66,6 +64,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: STATE_PATH
+              value: "/etc/elastic-agent"
             # The following ELASTIC_NETINFO:false variable will disable the netinfo.enabled option of add-host-metadata processor. This will remove fields host.ip and host.mac.  
             # For more info: https://www.elastic.co/guide/en/beats/metricbeat/current/add-host-metadata.html
             - name: ELASTIC_NETINFO
@@ -99,6 +99,9 @@ spec:
               mountPath: /etc/elastic-agent/agent.yml
               readOnly: true
               subPath: agent.yml
+            # Uncomment if using hints feature
+            #- name: external-inputs
+            #  mountPath: /etc/elastic-agent/inputs.d
             - name: proc
               mountPath: /hostfs/proc
               readOnly: true
@@ -129,6 +132,9 @@ spec:
           configMap:
             defaultMode: 0640
             name: agent-node-datastreams
+        # Uncomment if using hints feature
+        #- name: external-inputs
+        #  emptyDir: {}
         - name: proc
           hostPath:
             path: /proc
