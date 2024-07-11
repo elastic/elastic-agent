@@ -32,6 +32,10 @@ type FileOwner struct {
 // user. Not being able to get the current user, is a critical problem and nothing
 // can continue so a panic is appropriate.
 func CurrentFileOwner() (FileOwner, error) {
+	// os/user.Current() is not used here, because it tries to access the users home
+	// directory. It is possible during installation that the users home directory
+	// is not created yet. See issue https://github.com/elastic/elastic-agent/issues/5019
+	// for more information.
 	t, err := syscall.OpenCurrentProcessToken()
 	if err != nil {
 		return FileOwner{}, fmt.Errorf("failed to open current process token: %w", err)
