@@ -89,10 +89,11 @@ install_terraform() {
   fi
   TERRAFORM_VERSION="1.9.1"
   echo "~~~ Installing Terraform version ${TERRAFORM_VERSION}"
-  DOWNLOAD_URL="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.tar.gz"
+  DOWNLOAD_URL="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+
   curl -o terraform_${TERRAFORM_VERSION}_linux_amd64.tar.gz $DOWNLOAD_URL
-  tar -xzf terraform_${TERRAFORM_VERSION}_linux_amd64.tar.gz
+  unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
   sudo mv terraform /usr/local/bin/
-  rm terraform_${TERRAFORM_VERSION}_linux_amd64.tar.gz
+  rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
   echo "Terraform version $(terraform -v) installed successfully."
 }
