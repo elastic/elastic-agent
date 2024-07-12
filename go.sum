@@ -155,6 +155,7 @@ github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3
 github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5 h1:BzN9o4IS1Hj+AM5qDggsfMDQGFXau5KagipEFmnyIbc=
 github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5/go.mod h1:cxc20xI7fOgsFHWgt+PenlDDnMcrvh7Ocuj5hEFIdEk=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
+<<<<<<< HEAD
 github.com/elastic/elastic-agent-autodiscover v0.8.1 h1:u6TWqh7wfevu6S4GUq4SIxYBRo4b/P5RZmx/rSvT10A=
 github.com/elastic/elastic-agent-autodiscover v0.8.1/go.mod h1:0gzGsaDCAqBfUZjuCqqWsSI60eaZ778A5tQZV72rPV0=
 github.com/elastic/elastic-agent-client/v7 v7.14.0 h1:X6S2RyjZNKsDCvA2igch2I5dgHrkfldVe0ZanH/DRCM=
@@ -163,6 +164,18 @@ github.com/elastic/elastic-agent-libs v0.9.15 h1:WCLtuErafUxczT/rXJa4Vr6mxwC8dgt
 github.com/elastic/elastic-agent-libs v0.9.15/go.mod h1:2VgYxHaeM+cCDBjiS2wbmTvzPGbnlXAtYrlcLefheS8=
 github.com/elastic/elastic-agent-system-metrics v0.10.4 h1:Tmb1rPRDyVv9M453YlPyl/gwUm9s4nSiI2xH76GGEz4=
 github.com/elastic/elastic-agent-system-metrics v0.10.4/go.mod h1:cd7YgcTEjBNeLGnH/C9cEvP/YexohwS6CpmN9Ju58Mw=
+=======
+github.com/elastic/e2e-testing v1.2.2 h1:85FFeN7lL2AzKDeI30VLDp15/QIFbtYsDuer01zf1/Q=
+github.com/elastic/e2e-testing v1.2.2/go.mod h1:pBKxi5oOM5bPVrOZ4p4cx5F1/ArGCobOG5zcOAWv6rc=
+github.com/elastic/elastic-agent-autodiscover v0.7.0 h1:FCrHXh5AZGrPlpAx8kBu/s/guw9d/EXt+GKlFCnrgsc=
+github.com/elastic/elastic-agent-autodiscover v0.7.0/go.mod h1:zLf0SDdQXisVZxzXPxKXdj3Fa+H4bsu4HHbTEQImDz8=
+github.com/elastic/elastic-agent-client/v7 v7.13.0 h1:ENCfV5XIMmjWo9/0J7t//5N7xgm43Ktg0SyIomupRcA=
+github.com/elastic/elastic-agent-client/v7 v7.13.0/go.mod h1:h2yJHN8Q5rhfi9i6FfyPufh+StFN+UD9PYGv8blXKbE=
+github.com/elastic/elastic-agent-libs v0.9.14 h1:BckPivb9dkG7u09ketu9SjB3XU+svnooAwf7PaZboMo=
+github.com/elastic/elastic-agent-libs v0.9.14/go.mod h1:NzK4AsPpsgDGZMm8NmN7ia9J3xxE4ZMcKYFKXWV5GoY=
+github.com/elastic/elastic-agent-system-metrics v0.10.3 h1:8pWdj8DeY8PBG/BA0DJalRpJWruDoP5QrIP/YKug5dE=
+github.com/elastic/elastic-agent-system-metrics v0.10.3/go.mod h1:3JwPa3zZJjmBYN87xwdLcFpHrUkWpR863jiYdg39sSc=
+>>>>>>> 433182208d (build: bump github.com/elastic/mock-es (#5128))
 github.com/elastic/elastic-transport-go/v8 v8.6.0 h1:Y2S/FBjx1LlCv5m6pWAF2kDJAHoSjSRSJCApolgfthA=
 github.com/elastic/elastic-transport-go/v8 v8.6.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
 github.com/elastic/go-docappender/v2 v2.2.0 h1:Pq6w+R0ZbWlqZHoqzoujR2ElKBfaPUf3M/cJvPVSrfA=
@@ -183,8 +196,8 @@ github.com/elastic/go-windows v1.0.1 h1:AlYZOldA+UJ0/2nBuqWdo90GFCgG9xuyw9SYzGUt
 github.com/elastic/go-windows v1.0.1/go.mod h1:FoVvqWSun28vaDQPbj2Elfc0JahhPB7WQEGa3c814Ss=
 github.com/elastic/gosigar v0.14.3 h1:xwkKwPia+hSfg9GqrCUKYdId102m9qTJIIr7egmK/uo=
 github.com/elastic/gosigar v0.14.3/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
-github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f h1:qo0Nn9G+p7HbG+CmiWwSoiKJ/cyRq59TRn9Z2PRHTi8=
-github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f/go.mod h1:mVdKBYYwt30xRFjCegbcURHh+3LWOCkQM33fgWbUiRI=
+github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015 h1:z8cC8GASpPo8yKlbnXI36HQ/BM9wYjhBPNbDjAWm0VU=
+github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015/go.mod h1:qH9DX/Dmflz6EAtaks/+2SsdQzecVAKE174Zl66hk7E=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.1 h1:CMgNOCi80GgCFrnDtSDOMmHHMCXcX4VVAp0b7KcDEHE=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.1/go.mod h1:KR1P54I10KN+f4rEHaPwQZBnRkKGgiabxBrRthTWCAs=
 github.com/elastic/opentelemetry-lib v0.7.3 h1:jBTFl+sQK2KnnMGMhc3QEeTI7w1eJxIkUUFikK2no0A=
