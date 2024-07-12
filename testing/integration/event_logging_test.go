@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -317,13 +316,13 @@ func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixt
 	var logFileName string
 	require.Eventually(t, func() bool {
 		//Debug:
-		lsCMD := exec.Command("ls", "-l", "-a", "-R", agentFixture.WorkDir())
-		lsOut, err := lsCMD.CombinedOutput()
-		if err != nil {
-			t.Log("ls failed: ", err.Error())
-		}
-		t.Log("Dir contents:")
-		t.Log(string(lsOut))
+		// lsCMD := exec.Command("ls", "-l", "-a", "-R", agentFixture.WorkDir())
+		// lsOut, err := lsCMD.CombinedOutput()
+		// if err != nil {
+		// 	t.Log("ls failed: ", err.Error())
+		// }
+		// t.Log("Dir contents:")
+		// t.Log(string(lsOut))
 
 		// We ignore this error because the folder might not be there.
 		// Once the folder and file are there, then this call should succeed
