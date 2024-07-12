@@ -31,77 +31,47 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-{{ range .Receivers }}| {{ .Name }} | {{ .Version -}} |
-{{ end }}
-{{ end }}
-=======
 {{ range .Receivers -}}
 | [{{ .Name }}]({{ .Link }}) | {{ .Version }} |
 {{ end -}}
 {{ end -}}
->>>>>>> 341a24e1bc ([otel] docs: Add links to components in OTel README (#5087))
 
 {{ if .Exporters }}
 ### Exporters
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-{{ range .Exporters }}| {{ .Name }} | {{ .Version -}} |
-{{ end }}
-{{ end }}
-=======
 {{ range .Exporters -}}
 | [{{ .Name }}]({{ .Link }}) | {{ .Version }} |
 {{ end -}}
 {{ end -}}
->>>>>>> 341a24e1bc ([otel] docs: Add links to components in OTel README (#5087))
 
 {{ if .Processors }}
 ### Processors
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-{{ range .Processors }}| {{ .Name }} | {{ .Version -}} |
-{{ end }}
-{{ end }}
-=======
 {{ range .Processors -}}
 | [{{ .Name }}]({{ .Link }}) | {{ .Version }} |
 {{ end -}}
 {{ end -}}
->>>>>>> 341a24e1bc ([otel] docs: Add links to components in OTel README (#5087))
 
 {{ if .Extensions }}
 ### Extensions
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-{{ range .Extensions }}| {{ .Name }} | {{ .Version -}} |
-{{ end }}
-{{ end }}
-=======
 {{ range .Extensions -}}
 | [{{ .Name }}]({{ .Link }}) | {{ .Version }} |
 {{ end -}}
 {{ end -}}
->>>>>>> 341a24e1bc ([otel] docs: Add links to components in OTel README (#5087))
 
 {{ if .Connectors }}
 ### Connectors
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-{{ range .Connectors }}| {{ .Name }} | {{ .Version -}} |
-{{ end }}
-{{ end }}
-=======
 {{ range .Connectors -}}
 | [{{ .Name }}]({{ .Link }}) | {{ .Version }} |
 {{ end -}}
 {{ end -}}
->>>>>>> 341a24e1bc ([otel] docs: Add links to components in OTel README (#5087))
