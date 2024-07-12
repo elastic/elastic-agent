@@ -23,6 +23,8 @@ const (
 	Linux = component.Linux
 	// Windows is Windows platform
 	Windows = component.Windows
+	// Kubernetes is Kubernetes platform
+	Kubernetes = "kubernetes"
 )
 
 const (
@@ -59,8 +61,8 @@ func (o OS) Validate() error {
 	if o.Type == "" {
 		return errors.New("type must be defined")
 	}
-	if o.Type != Darwin && o.Type != Linux && o.Type != Windows {
-		return errors.New("type must be either darwin, linux, or windows")
+	if o.Type != Darwin && o.Type != Linux && o.Type != Windows && o.Type != Kubernetes {
+		return errors.New("type must be either darwin, linux, windows, or kubernetes")
 	}
 	if o.Arch != "" {
 		if o.Arch != AMD64 && o.Arch != ARM64 {
@@ -70,8 +72,8 @@ func (o OS) Validate() error {
 			return errors.New("windows on arm64 not supported")
 		}
 	}
-	if o.Distro != "" && o.Type != Linux {
-		return errors.New("distro can only be set when type is linux")
+	if o.Distro != "" && (o.Type != Linux && o.Type != Kubernetes) {
+		return errors.New("distro can only be set when type is linux or kubernetes")
 	}
 	return nil
 }
@@ -134,7 +136,7 @@ func (r Requirements) runtimeAllowed(os string, arch string, version string, dis
 		return true
 	}
 	for _, o := range r.OS {
-		if o.Type != os {
+		if o.Type != Kubernetes && o.Type != os {
 			// not valid on this runtime
 			continue
 		}
