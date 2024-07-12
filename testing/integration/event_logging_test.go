@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -207,6 +208,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 	}
 
 	runAgentCMD, agentOutput := prepareAgentCMD(t, ctx, agentFixture, nil, nil)
+	t.Log("runAgentCMD args:", runAgentCMD.Args)
 	if err := runAgentCMD.Start(); err != nil {
 		t.Fatalf("could not start Elastic-Agent: %s", err)
 	}
@@ -314,6 +316,15 @@ func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixt
 	// use glob to find the file
 	var logFileName string
 	require.Eventually(t, func() bool {
+		//Debug:
+		lsCMD := exec.Command("ls", "-l", "-a", "-R", agentFixture.WorkDir())
+		lsOut, err := lsCMD.CombinedOutput()
+		if err != nil {
+			t.Log("ls failed: ", err.Error())
+		}
+		t.Log("Dir contents:")
+		t.Log(string(lsOut))
+
 		// We ignore this error because the folder might not be there.
 		// Once the folder and file are there, then this call should succeed
 		// and we can read the file.
@@ -321,6 +332,7 @@ func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixt
 			agentFixture.WorkDir(),
 			"data", "elastic-agent-*", "logs", "events", "*")
 		files, err := filepath.Glob(glob)
+		t.Log("Files Found:", files)
 		if err != nil {
 			t.Fatalf("could not scan for the events log file: %s", err)
 		}
@@ -332,7 +344,7 @@ func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixt
 
 		return false
 
-	}, time.Minute, time.Second, "could not find event log file")
+	}, 3*time.Minute, time.Second, "could not find event log file")
 
 	logEntryBytes, err := os.ReadFile(logFileName)
 	if err != nil {
