@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build !define && !local
+//go:build !define && !local && !kubernetes
 
 package define
 
@@ -11,5 +11,5 @@ import (
 )
 
 func defineAction(t *testing.T, req Requirements) *Info {
-	return runOrSkip(t, req, false)
+	return runOrSkip(t, req, false, false)
 }

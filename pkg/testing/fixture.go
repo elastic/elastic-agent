@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -1010,6 +1011,42 @@ func (f *Fixture) setClient(c client.Client) {
 	f.cMx.Lock()
 	defer f.cMx.Unlock()
 	f.c = c
+}
+
+func (f *Fixture) DumpProcesses(suffix string) {
+	procs := getProcesses(f.t, `.*`)
+	dir, err := findProjectRoot(f.caller)
+	if err != nil {
+		f.t.Logf("failed to dump process; failed to find project root: %s", err)
+		return
+	}
+
+	// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
+	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
+
+	filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-%s-%s-ProcessDump%s.json", sanitizedTestName, f.operatingSystem, f.architecture, suffix))
+	fileDir := path.Dir(filePath)
+	if err := os.MkdirAll(fileDir, 0777); err != nil {
+		f.t.Logf("failed to dump process; failed to create directory %s: %s", fileDir, err)
+		return
+	}
+
+	f.t.Logf("Dumping running processes in %s", filePath)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		f.t.Logf("failed to dump process; failed to create output file %s root: %s", filePath, err)
+		return
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			f.t.Logf("error closing file %s: %s", file.Name(), err)
+		}
+	}(file)
+	err = json.NewEncoder(file).Encode(procs)
+	if err != nil {
+		f.t.Logf("error serializing processes: %s", err)
+	}
 }
 
 // validateComponents ensures that the provided UsableComponent's are valid.

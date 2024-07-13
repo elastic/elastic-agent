@@ -7,14 +7,12 @@ package testing
 import (
 	"archive/zip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -205,6 +203,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	installArgs = append(installArgs, installOptsArgs...)
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
+		f.DumpProcesses("-install")
 		return out, fmt.Errorf("error running agent install command: %w", err)
 	}
 
@@ -240,39 +239,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 
 	f.t.Cleanup(func() {
 		if f.t.Failed() {
-			procs := getProcesses(f.t, `.*`)
-			dir, err := findProjectRoot(f.caller)
-			if err != nil {
-				f.t.Logf("failed to dump process; failed to find project root: %s", err)
-				return
-			}
-
-			// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
-			sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
-
-			filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-%s-%s-ProcessDump.json", sanitizedTestName, f.operatingSystem, f.architecture))
-			fileDir := path.Dir(filePath)
-			if err := os.MkdirAll(fileDir, 0777); err != nil {
-				f.t.Logf("failed to dump process; failed to create directory %s: %s", fileDir, err)
-				return
-			}
-
-			f.t.Logf("Dumping running processes in %s", filePath)
-			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-			if err != nil {
-				f.t.Logf("failed to dump process; failed to create output file %s root: %s", filePath, err)
-				return
-			}
-			defer func(file *os.File) {
-				err := file.Close()
-				if err != nil {
-					f.t.Logf("error closing file %s: %s", file.Name(), err)
-				}
-			}(file)
-			err = json.NewEncoder(file).Encode(procs)
-			if err != nil {
-				f.t.Logf("error serializing processes: %s", err)
-			}
+			f.DumpProcesses("-cleanup")
 		}
 	})
 

@@ -577,6 +577,28 @@ func TestDaemonReloadWithBackoff(t *testing.T) {
 	}
 }
 
+func TestWaitForFleetServer_timeout(t *testing.T) {
+	log, _ := logger.NewTesting("TestWaitForFleetServer_timeout")
+	timeout := 5 * time.Second
+	testTimeout := 2 * timeout
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	var got string
+	var err error
+	require.Eventuallyf(t,
+		func() bool {
+			got, err = waitForFleetServer(ctx, make(chan *os.ProcessState, 1), log, timeout)
+			return true
+		},
+		testTimeout,
+		500*time.Millisecond,
+		"waitForFleetServer never returned")
+
+	assert.Empty(t, got, "waitForFleetServer should have returned and empty enrollmentToken")
+	assert.Error(t, err, "waitForFleetServer should have returned an error")
+}
+
 func withServer(
 	m func(t *testing.T) *http.ServeMux,
 	test func(t *testing.T, host string),

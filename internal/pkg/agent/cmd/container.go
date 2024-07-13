@@ -25,6 +25,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -136,6 +137,11 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
   ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
 
+
+* Elastic-Agent event logging
+  If EVENTS_TO_STDERR is set to true log entries containing event data or whole raw events will be logged to stderr alongside
+all other log entries. If unset or set to false, the events will be logged to a separate file that is not collected alongside
+the monitoring logs, however they will be present in diagnostics.
 
 By default when this command starts it will check for an existing fleet.yml. If that file already exists then
 all the above actions will be skipped, because the Elastic Agent has already been enrolled. To ensure that enrollment
@@ -779,6 +785,16 @@ func logToStderr(cfg *configuration.Configuration) {
 		cfg.Settings.LoggingConfig.ToStderr = true
 		cfg.Settings.LoggingConfig.ToFiles = false
 	}
+
+	eventsToStderrEnv := envWithDefault("false", "EVENTS_TO_STDERR")
+	eventsToStderr, err := strconv.ParseBool(eventsToStderrEnv)
+	if err != nil {
+		logp.Warn("cannot parse EVENS_TO_STDERR='%s' as boolean, logging events to file'", eventsToStderrEnv)
+	}
+	if eventsToStderr {
+		cfg.Settings.EventLoggingConfig.ToFiles = false
+		cfg.Settings.EventLoggingConfig.ToStderr = true
+	}
 }
 
 func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
@@ -814,7 +830,6 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	}
 
 	originalInstall := paths.Install()
-	originalTop := paths.Top()
 	paths.SetTop(topPath)
 	paths.SetConfig(configPath)
 	paths.SetControlSocket(socketPath)
@@ -840,7 +855,7 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 
 	// persist the paths so other commands in the container will use the correct paths
 	if writePaths {
-		if err := writeContainerPaths(originalTop, statePath, configPath, logsPath, socketPath); err != nil {
+		if err := writeContainerPaths(statePath, configPath, logsPath, socketPath); err != nil {
 			return err
 		}
 	}
@@ -854,8 +869,8 @@ type containerPaths struct {
 	SocketPath string `config:"socket_path" yaml:"socket_path,omitempty"`
 }
 
-func writeContainerPaths(original, statePath, configPath, logsPath, socketPath string) error {
-	pathFile := filepath.Join(original, "container-paths.yml")
+func writeContainerPaths(statePath, configPath, logsPath, socketPath string) error {
+	pathFile := filepath.Join(statePath, "container-paths.yml")
 	fp, err := os.Create(pathFile)
 	if err != nil {
 		return fmt.Errorf("failed creating %s: %w", pathFile, err)
@@ -877,7 +892,11 @@ func writeContainerPaths(original, statePath, configPath, logsPath, socketPath s
 }
 
 func tryContainerLoadPaths() error {
-	pathFile := filepath.Join(paths.Top(), "container-paths.yml")
+	statePath := envWithDefault("", "STATE_PATH")
+	if statePath == "" {
+		statePath = defaultStateDirectory
+	}
+	pathFile := filepath.Join(statePath, "container-paths.yml")
 	_, err := os.Stat(pathFile)
 	if os.IsNotExist(err) {
 		// no container-paths.yml file exists, so nothing to do
