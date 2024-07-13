@@ -16,8 +16,8 @@ steps:
 
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
-    depends_on:
-      - package-it
+    # depends_on:
+    #   - package-it
     concurrency_group: elastic-agent-extended-testing/serverless-integration
     concurrency: 8
     env:
@@ -38,8 +38,8 @@ steps:
 
   - label: "Extended runtime leak tests"
     key: "extended-integration-tests"
-    depends_on:
-      - package-it
+    # depends_on:
+    #   - package-it
     concurrency_group: elastic-agent-extended-testing/leak-tests
     concurrency: 8
     env:
@@ -59,8 +59,8 @@ steps:
 
   - label: "Integration tests"
     key: "integration-tests"
-    depends_on:
-      - package-it
+    # depends_on:
+    #   - package-it
     concurrency_group: elastic-agent-extended-testing/integration
     concurrency: 8
     env:
@@ -79,8 +79,8 @@ steps:
           context: "buildkite/elastic-agent-extended-testing - Integration tests"
 
   - label: "Serverless Beats Tests"
-    depends_on:
-      - package-it
+    # depends_on:
+    #   - package-it
     key: "serverless-beats-integration-tests"
     concurrency_group: elastic-agent-extended-testing/beats-integration
     concurrency: 8
