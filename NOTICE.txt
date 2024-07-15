@@ -20279,11 +20279,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-structform@v
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/go-windows
-Version: v1.0.1
+Version: v1.0.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/go-windows@v1.0.1/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-windows@v1.0.2/LICENSE.txt:
 
 
                                  Apache License
