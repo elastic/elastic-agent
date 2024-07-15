@@ -70,7 +70,7 @@ func TestPolicyChange(t *testing.T) {
 		change := <-ch
 		require.Equal(t, config.MustNewConfigFrom(conf), change.Config())
 	})
-	t.Run("Recieved config with $$ in inputs", func(t *testing.T) {
+	t.Run("Received config with $$ in inputs", func(t *testing.T) {
 		ch := make(chan coordinator.ConfigChange, 1)
 
 		conf := map[string]interface{}{
