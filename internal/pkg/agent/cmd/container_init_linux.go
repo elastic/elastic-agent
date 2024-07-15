@@ -7,12 +7,13 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/utils"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"kernel.org/pub/linux/libs/security/libcap/cap"
 
