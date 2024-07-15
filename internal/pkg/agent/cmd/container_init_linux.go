@@ -7,103 +7,173 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 
-	"golang.org/x/sys/unix"
 	"kernel.org/pub/linux/libs/security/libcap/cap"
 
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
+
+type capProc interface {
+	GetFlag(vec cap.Flag, val cap.Value) (bool, error)
+	SetFlag(vec cap.Flag, enable bool, val ...cap.Value) error
+	SetProc() error
+}
+
+type capBound interface {
+	SetVector(vec cap.Vector, raised bool, vals ...cap.Value) error
+	SetProc() error
+}
 
 var (
 	// for unit-testing
-	capBound   = cap.GetBound
-	capGetFile = cap.GetFile
-	capProc    = cap.GetProc
+	capBoundFunc = func() capBound {
+		return cap.NewIAB()
+	}
+	// for unit-testing
+	capProcFunc = func() capProc {
+		return cap.GetProc()
+	}
 )
 
 // initContainer applies the following container initialisation steps:
-// - set any missing capabilities of Effective set based on the Bounding set at elastic-agent binary
-// - raise capabilities of the Ambient set to match the Effective set
-// - chown all agent-related paths if DAC_OVERRIDE capability is not in the Effective set
-// If new binary capabilities are set then the returned cmd will be not nil. Note that it is up to caller to invoke
-// the returned cmd and spawn an agent instance with all the capabilities.
-func initContainer(streams *cli.IOStreams) (shouldExit bool, err error) {
+//   - raises the capabilities of the Effective and Inheritable sets to match the ones in the Permitted set
+//   - raises the capabilities of the Ambient set to match the ones in Effective set
+//   - chown all agent-related paths
+//
+// Note that to avoid disrupting effects, any error is logged as a warning, but not returned.
+func initContainer(streams *cli.IOStreams) {
 	isRoot, err := utils.HasRoot()
 	if err != nil {
-		return true, err
+		logWarning(streams, err)
+		return
 	}
 	if !isRoot {
-		executable, err := os.Executable()
-		if err != nil {
-			return true, err
+		logInfo(streams, "agent container initialisation - effective capabilities")
+		if err := raiseEffectiveCapabilities(); err != nil {
+			logWarning(streams, err)
+			return
 		}
 
-		logInfo(streams, "agent container initialisation - checking file capabilities")
-		updated, err := updateFileCapsFromBoundingSet(executable)
-		if err != nil {
-			return true, err
-		}
-
-		if updated {
-			logInfo(streams, "agent container initialisation - re-exec")
-			// new capabilities were added thus we need to re-exec agent to pick them up
-			args := []string{filepath.Base(executable)}
-			if len(os.Args) > 1 {
-				args = append(args, os.Args[1:]...)
-			}
-
-			return true, unix.Exec(executable, args, os.Environ())
-		}
-
-		// if we are not root, we need to raise the ambient capabilities
 		logInfo(streams, "agent container initialisation - ambient capabilities")
 		if err := raiseAmbientCapabilities(); err != nil {
-			return true, err
+			logWarning(streams, err)
 		}
 	}
 
-	// check if we have DAC_OVERRIDE
-	// Note: that even if we running under root (uid = 0), we may not have DAC_OVERRIDE which is there by default
-	// ( e.g. with cap-drop: ALL). Thus, we won't be able to read/write any file that doesn't belong to us
-	procSet := capProc()
-	hasOverride, err := procSet.GetFlag(cap.Effective, cap.DAC_OVERRIDE)
-	if err != nil {
-		return true, err
+	// we need to chown all paths
+	logInfo(streams, "agent container initialisation - chown paths")
+	if err := chownPaths(agentBaseDirectory); err != nil {
+		logWarning(streams, err)
 	}
-	if !hasOverride {
-		// we need to chown all paths
-		logInfo(streams, "agent container initialisation - chown paths")
-
-		if err = chownPaths(); err != nil {
-			return true, err
-		}
-	}
-
-	return false, nil
 }
 
-// raiseAmbientCapabilities will attempt to raise all capabilities present in the Effective set of the running process
-// to the Ambient set. Note that for security reasons CAP_CHOWN, CAP_SETPCAP, CAP_SETFCAP are excluded.
-func raiseAmbientCapabilities() error {
-	caps, err := getAmbientCapabilitiesFromEffectiveSet()
-	if err != nil {
-		return err
+// raiseEffectiveCapabilities raises the capabilities of the Effective and Inheritable sets to match
+// the ones in the Permitted set. Note that any capabilities that are not part of the Bounding set
+// are exclude by the OS from the Permitted set.
+func raiseEffectiveCapabilities() error {
+	procCaps := capProcFunc()
+
+	setProc := false
+
+	for val := cap.Value(0); val < cap.MaxBits(); val++ {
+		permittedHasCap, err := procCaps.GetFlag(cap.Permitted, val)
+		if err != nil {
+			return fmt.Errorf("get cap from permitted failed: %w", err)
+		}
+		if !permittedHasCap {
+			continue
+		}
+
+		effectiveHasCap, err := procCaps.GetFlag(cap.Effective, val)
+		if err != nil {
+			return fmt.Errorf("get cap from effective failed: %w", err)
+		}
+		if !effectiveHasCap {
+			err = procCaps.SetFlag(cap.Effective, true, val)
+			if err != nil {
+				return fmt.Errorf("set cap to permitted failed: %w", err)
+			}
+			setProc = true
+		}
+
+		inheritableHasCap, err := procCaps.GetFlag(cap.Inheritable, val)
+		if err != nil {
+			return fmt.Errorf("get cap from effective failed: %w", err)
+		}
+		if !inheritableHasCap {
+			err = procCaps.SetFlag(cap.Inheritable, true, val)
+			if err != nil {
+				return fmt.Errorf("set cap to inheritable failed: %w", err)
+			}
+			setProc = true
+		}
 	}
 
-	iab := cap.NewIAB()
-	for _, capVal := range caps {
-		err = iab.SetVector(cap.Inh, true, capVal)
+	if !setProc {
+		return nil
+	}
+
+	if err := procCaps.SetProc(); err != nil {
+		return fmt.Errorf("set proc failed: %w", err)
+	}
+
+	return nil
+}
+
+// raiseAmbientCapabilities raises all capabilities present in the Effective set of the current process
+// to the Ambient set excluding CAP_SETPCAP, and CAP_SETFCAP.
+func raiseAmbientCapabilities() error {
+	var caps []cap.Value
+	procCaps := capProcFunc()
+
+	effectiveHasSETPCAP := false
+
+	for capVal := cap.Value(0); capVal < cap.MaxBits(); capVal++ {
+
+		exists, err := procCaps.GetFlag(cap.Effective, capVal)
 		if err != nil {
-			return fmt.Errorf("failed to set inheritable vector: %w", err)
+			return fmt.Errorf("failed to get proc effective flag: %w", err)
 		}
-		err = iab.SetVector(cap.Amb, true, capVal)
-		if err != nil {
+
+		if !exists {
+			continue
+		}
+
+		if capVal == cap.SETPCAP {
+			effectiveHasSETPCAP = true
+		}
+
+		switch capVal {
+		case cap.SETPCAP, cap.SETFCAP:
+			// don't set these as they shouldn't be required by any spawned child process
+			continue
+		default:
+		}
+
+		caps = append(caps, capVal)
+	}
+
+	if len(caps) == 0 {
+		return nil
+	}
+
+	if !effectiveHasSETPCAP {
+		return errors.New("failed to set ambient vector: missing SETPCAP capability")
+	}
+
+	iab := capBoundFunc()
+	for _, capVal := range caps {
+		if err := iab.SetVector(cap.Amb, true, capVal); err != nil {
+			return fmt.Errorf("failed to set ambient vector: %w", err)
+		}
+
+		if err := iab.SetVector(cap.Inh, true, capVal); err != nil {
 			return fmt.Errorf("failed to set ambient vector: %w", err)
 		}
 	}
@@ -111,126 +181,25 @@ func raiseAmbientCapabilities() error {
 	return iab.SetProc()
 }
 
-// getAmbientCapabilitiesFromEffectiveSet returns the capabilities that are in the Effective set of the running process
-// excluding CAP_CHOWN, CAP_SETPCAP, and CAP_SETFCAP.
-func getAmbientCapabilitiesFromEffectiveSet() ([]cap.Value, error) {
-	set := capProc()
-	var caps []cap.Value
-
-	for capVal := cap.Value(0); capVal < cap.MaxBits(); capVal++ {
-
-		switch capVal {
-		case cap.SETPCAP, cap.SETFCAP:
-			// don't set these as they shouldn't be required by any exec'ed child process
-			continue
-		default:
-		}
-
-		exists, err := set.GetFlag(cap.Effective, capVal)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get proc effective flag: %w", err)
-		}
-
-		if !exists {
-			continue
-		}
-
-		caps = append(caps, capVal)
-	}
-
-	return caps, nil
-}
-
-// updateFileCapsFromBoundingSet writes the capabilities that are missing from the given executable and are in the Bounding
-// set. updated is true if the capabilities were updated. err is non-nil if an error occurred.
-func updateFileCapsFromBoundingSet(executablePath string) (updated bool, err error) {
-	capsText, err := getMissingBoundingCapsText(executablePath)
-	if err != nil {
-		return false, err
-	}
-
-	if capsText == "" {
-		return false, nil
-	}
-
-	// always chown to reset S_ISUID and S_ISGID mode bits. Otherwise the setFile might get stuck.
-	if err := os.Chown(executablePath, os.Getuid(), os.Getgid()); err != nil {
-		return false, fmt.Errorf("failed to chown %s: %w", executablePath, err)
-	}
-
-	// create a new set based on the capabilities of Bounding set
-	fileSet, err := cap.FromText(capsText)
-	if err != nil {
-		return false, fmt.Errorf("failed to parse caps text: %w", err)
-	}
-
-	// set the capabilities of the executable
-	err = fileSet.SetFile(executablePath)
-	if err != nil {
-		return false, fmt.Errorf("failed to set file %s caps: %w", executablePath, err)
-	}
-
-	return true, nil
-}
-
-// getMissingBoundingCapsText returns in text representation the missing capabilities that are in the Bounding set
-// and not in the Effective set.
-func getMissingBoundingCapsText(executablePath string) (string, error) {
-	boundCapsText := strings.Builder{}
-	missingCapabilities := false
-
-	fileCapabilities, err := capGetFile(executablePath)
-	if err != nil {
-		if errors.Is(err, syscall.ENODATA) {
-			// no capabilities set at file level start with an empty set
-			fileCapabilities = cap.NewSet()
-		} else {
-			return "", fmt.Errorf("failed to get file %s capabilities: %w", executablePath, err)
-		}
-	}
-
-	// check all capabilities
-	for capVal := cap.Value(0); capVal < cap.MaxBits(); capVal++ {
-
-		inBound, err := capBound(capVal)
-		if err != nil {
-			return "", fmt.Errorf("failed to check bounding set capability: %w", err)
-		}
-
-		if !inBound {
-			// not in Bounding set so skip
-			continue
-		}
-
-		if boundCapsText.Len() > 0 {
-			boundCapsText.WriteString(",")
-		}
-		boundCapsText.WriteString(capVal.String())
-
-		inFile, err := fileCapabilities.GetFlag(cap.Effective, capVal)
-		if err != nil {
-			return "", fmt.Errorf("failed to check file capability: %w", err)
-		}
-
-		if !inFile {
-			missingCapabilities = true
-		}
-	}
-
-	if !missingCapabilities {
-		// all capabilities of Bounding set are already set
-		return "", nil
-	}
-
-	// eip = effective, inherited, permitted
-	boundCapsText.WriteString("=eip")
-	return boundCapsText.String(), nil
-}
-
 // chownPaths will chown all agent related paths to the current uid and gid.
-func chownPaths() error {
+func chownPaths(agentBaseDirectory string) error {
 	uid := os.Getuid()
 	gid := os.Getgid()
+
+	procCaps := capProcFunc()
+	hasChown, err := procCaps.GetFlag(cap.Effective, cap.CHOWN)
+	if err != nil {
+		return fmt.Errorf("failed to get chown flag: %w", err)
+	}
+	if !hasChown {
+		hasDacOverride, err := procCaps.GetFlag(cap.Effective, cap.DAC_OVERRIDE)
+		if err != nil {
+			return fmt.Errorf("failed to get dac_override flag: %w", err)
+		}
+		if !hasDacOverride {
+			return errors.New("cannot chown agent paths without CAP_CHOWN or CAP_DAC_OVERRIDE capabilities")
+		}
+	}
 
 	pathsToChown := distinctPaths{
 		agentBaseDirectory: {},

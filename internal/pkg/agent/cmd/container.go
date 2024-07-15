@@ -43,10 +43,10 @@ import (
 const (
 	requestRetrySleepEnv     = "KIBANA_REQUEST_RETRY_SLEEP"
 	maxRequestRetriesEnv     = "KIBANA_REQUEST_RETRY_COUNT"
-	defaultRequestRetrySleep = "1s"                             // sleep 1 sec between retries for HTTP requests
-	defaultMaxRequestRetries = "30"                             // maximum number of retries for HTTP requests
-	defaultStateDirectory    = "/usr/share/elastic-agent/state" // directory that will hold the state data
-	agentBaseDirectory       = "/usr/share/elastic-agent"       // directory that holds all elastic-agent related files
+	defaultRequestRetrySleep = "1s"                          // sleep 1 sec between retries for HTTP requests
+	defaultMaxRequestRetries = "30"                          // maximum number of retries for HTTP requests
+	agentBaseDirectory       = "/usr/share/elastic-agent"    // directory that holds all elastic-agent related files
+	defaultStateDirectory    = agentBaseDirectory + "/state" // directory that will hold the state data
 
 	logsPathPerms = 0775
 )
@@ -158,6 +158,10 @@ occurs on every start of the container set FLEET_FORCE to 1.
 	return &cmd
 }
 
+func logWarning(streams *cli.IOStreams, err error) {
+	fmt.Fprintf(streams.Err, "Warning: %v\n", err)
+}
+
 func logError(streams *cli.IOStreams, err error) {
 	fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 }
@@ -167,13 +171,7 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 }
 
 func logContainerCmd(streams *cli.IOStreams) error {
-	shouldExit, err := initContainer(streams)
-	if err != nil {
-		return err
-	}
-	if shouldExit {
-		return nil
-	}
+	initContainer(streams)
 
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {

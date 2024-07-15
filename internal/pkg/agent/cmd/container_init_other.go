@@ -10,6 +10,4 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
-func initContainer(streams *cli.IOStreams) (shouldExit bool, err error) {
-	return false, nil
-}
+func initContainer(_ *cli.IOStreams) {}
