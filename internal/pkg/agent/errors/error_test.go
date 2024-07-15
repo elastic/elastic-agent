@@ -2,9 +2,9 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 //
-// nolint:errorlint // Postpone the change here until we refactor error handling.
-//
 // Packages errors provides a small api to manager hierarchy or errors.
+//
+//nolint:errorlint // Postpone the change here until we refactor error handling.
 package errors
 
 import (
@@ -12,8 +12,9 @@ import (
 	"io"
 	"testing"
 
+	//nolint:gomodguard // Postpone the change here until we refactor error handling.
 	"github.com/pkg/errors"
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestErrorsIs(t *testing.T) {
