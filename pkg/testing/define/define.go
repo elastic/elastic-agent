@@ -26,6 +26,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 	semver "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/version"
+
+	"sigs.k8s.io/e2e-framework/klient"
 )
 
 var osInfo *types.OSInfo
@@ -55,6 +57,15 @@ type Info struct {
 	// This is unique to each test and instance combination so a test that need to
 	// read/write data to a data stream in elasticsearch do not collide.
 	Namespace string
+}
+
+func (i *Info) KubeClient() (klient.Client, error) {
+	c, err := klient.NewWithKubeConfigFile(os.Getenv("KUBECONFIG"))
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
 // Version returns the version of the Elastic Agent the tests should be using.
@@ -125,7 +136,7 @@ func findProjectRoot() (string, error) {
 	}
 }
 
-func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
+func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Info {
 	// always validate requirement is valid
 	if err := req.Validate(); err != nil {
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
@@ -133,6 +144,12 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 	if !req.Local && local {
 		t.Skip("running local only tests and this test doesn't support local")
 		return nil
+	}
+	for _, o := range req.OS {
+		if o.Type == Kubernetes && !kubernetes {
+			t.Skip("test requires kubernetes")
+			return nil
+		}
 	}
 	if req.Sudo {
 		// we can run sudo tests if we are being executed as root
