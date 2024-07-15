@@ -44,6 +44,10 @@ func (p *provisioner) SetLogger(l runner.Logger) {
 	p.logger = l
 }
 
+func (p *provisioner) Type() runner.ProvisionerType {
+	return runner.ProvisionerTypeVM
+}
+
 // Supported returns true if multipass supports this OS.
 //
 // multipass only supports Ubuntu on the same architecture as the running host.
