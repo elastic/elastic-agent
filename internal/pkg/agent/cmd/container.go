@@ -158,10 +158,6 @@ occurs on every start of the container set FLEET_FORCE to 1.
 	return &cmd
 }
 
-func logWarning(streams *cli.IOStreams, err error) {
-	fmt.Fprintf(streams.Err, "Warning: %v\n", err)
-}
-
 func logError(streams *cli.IOStreams, err error) {
 	fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 }

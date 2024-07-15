@@ -42,6 +42,10 @@ var (
 	}
 )
 
+func logWarning(streams *cli.IOStreams, err error) {
+	fmt.Fprintf(streams.Err, "Warning: %v\n", err)
+}
+
 // initContainer applies the following container initialisation steps:
 //   - raises the capabilities of the Effective and Inheritable sets to match the ones in the Permitted set
 //   - raises the capabilities of the Ambient set to match the ones in Effective set
