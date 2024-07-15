@@ -195,8 +195,8 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		enrollmentAPIKey,
 	}
 
-	addLogIntegration(t, info, policyID, "/tmp/flog.log")
 	generateLogFile(t, "/tmp/flog.log", time.Second/2, 100)
+	addLogIntegration(t, info, policyID, "/tmp/flog.log")
 
 	enrollCmd, err := agentFixture.PrepareAgentCommand(ctx, enrollArgs)
 	if err != nil {
