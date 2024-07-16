@@ -21,6 +21,9 @@ echo "--- [File Creation] Create-Needed-Manifest"
 WITHOUTCONFIG=true make generate-k8s
 ./creator_k8s_manifest.sh .
 
+echo "--- [File Update] Kustomize-Tempates"
+GENERATEKUSTOMIZE=true make ci-create-kustomize 
+
 echo "--- [Clone] Kibana-Repository"
 make ci-clone-kibana-repository
 cp Makefile ./kibana
@@ -28,5 +31,3 @@ cd kibana
 echo "--- Create Kibana PR"
 make ci-create-kubernetes-templates-pull-request
 
-echo "--- [File Update] Kustomize-Tempates"
-GENERATEKUSTOMIZE=true make ci-create-kustomize 
