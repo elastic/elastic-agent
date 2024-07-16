@@ -11,7 +11,7 @@ OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
 OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
 
 # TODO fix
-go
+go version
 mage build:testBinaries
 
 ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
