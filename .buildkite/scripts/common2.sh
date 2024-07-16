@@ -64,7 +64,7 @@ install_mage() {
 }
 
 
-install_go(){
+install_go() {
     # Search for the go in the Path
     if ! [ -x "$(type -P go | sed 's/go is //g')" ];
     then
