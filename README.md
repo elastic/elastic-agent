@@ -57,9 +57,10 @@ sudo elastic-development-agent status
 sudo -u elastic-agent-user elastic-development-agent status
 ```
 
-The primary restriction of `--develop` installations is that you cannot run Elastic Defend a second time on the same machine. Attempting to
-install Defend twice will fail with resource conflicts. All other integrations should be usable provided conflicting configurations are
-changed ahead of time. For example two agents cannot bind to the same `agent.monitoring.http.port` to expose their monitoring servers.
+The primary restriction of `--develop` installations is that they cannot run Elastic Defend. Defend requires the agent to be
+in the default path, the same restrictions applies for the `--base-path` option. All other integrations should be usable provided
+conflicting configurations are changed ahead of time. For example two agents cannot bind to the same `agent.monitoring.http.port`
+to expose their monitoring servers.
 
 ### Test Framework
 
