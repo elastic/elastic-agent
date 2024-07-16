@@ -8,11 +8,11 @@ source .buildkite/scripts/steps/ess.sh
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
 OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
 OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
-SNAPSHOT=true
+
 
 ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
 trap 'ess_down' EXIT
 
 # Run integration tests
 AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
-TEST_DEFINE_PREFIX=aaaaaa go test -tags integration github.com/elastic/elastic-agent/testing/integration
+SNAPSHOT=true TEST_DEFINE_PREFIX=aaaaaa go test -tags integration github.com/elastic/elastic-agent/testing/integration
