@@ -35,6 +35,7 @@ function ess_up() {
   terraform init
   
   terraform apply \
+    -auto-approve \
     -var="stack_version=${STACK_VERSION}" \
     -var="ess_region=${ESS_REGION}" \
     -var="creator=${BUILDKITE_BUILD_CREATOR}" \
