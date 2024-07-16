@@ -16,6 +16,6 @@ const (
 // HasRoot returns true if the user has root permissions.
 // Added extra `nil` value to return since the HasRoot for windows will return an error as well
 func HasRoot() (bool, error) {
-	runSudo = os.Getenv("RUN_SUDO")
+	runSudo := os.Getenv("RUN_SUDO")
 	return runSudo == "true" || os.Geteuid() == 0, nil
 }
