@@ -17,5 +17,5 @@ const (
 // Added extra `nil` value to return since the HasRoot for windows will return an error as well
 func HasRoot() (bool, error) {
 	runSudo := os.Getenv("RUN_SUDO")
-	return runSudo == "true" || os.Geteuid() == 0, nil
+	return runSudo == "true" || os.Getsdeuid() == 0, nil
 }
