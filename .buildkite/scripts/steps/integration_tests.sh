@@ -8,11 +8,14 @@ MAGE_TARGET="${2:-"integration:test"}"
 MAGE_SUBTARGET="${3:-""}"
 
 
-# Override the agent package version using a string with format <major>.<minor>.<patch>
-# There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
+# Override the stack version from `.package-version` contents
+# There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
-OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
-OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
+
+STACK_VERSION="$(cat .package-version)"
+if [[ -n "$STACK_VERSION" ]]; then
+    STACK_VERSION=${STACK_VERSION}"-SNAPSHOT"
+fi
 
 # Run integration tests
 set +e
