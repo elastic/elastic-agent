@@ -119,7 +119,7 @@ require (
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.104.0
 	go.opentelemetry.io/collector/extension v0.104.0
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.104.0
-	go.opentelemetry.io/collector/featuregate v1.11.0
+	go.opentelemetry.io/collector/featuregate v1.12.0
 	go.opentelemetry.io/collector/otelcol v0.104.0
 	go.opentelemetry.io/collector/processor v0.104.0
 	go.opentelemetry.io/collector/processor/batchprocessor v0.104.0
@@ -228,7 +228,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.104.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.104.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.105.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.104.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.104.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.104.0 // indirect
