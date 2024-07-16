@@ -10,11 +10,11 @@ source .buildkite/scripts/steps/ess.sh
 OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
 OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
 
+mage build:testBinaries
 
 ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
 trap 'ess_down' EXIT
 
 # Run integration tests
-AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
-mage build:testBinaries
+# AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
 AGENT_VERSION="8.16.0-SNAPSHOT" SNAPSHOT=true TEST_DEFINE_PREFIX=non_sudo_linux go test -tags integration github.com/elastic/elastic-agent/testing/integration
