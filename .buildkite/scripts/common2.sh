@@ -61,10 +61,6 @@ install_mage() {
         make mage
     fi
     pushd "$WORKSPACE"
-    command "mage" "$@"
-    ACTUAL_EXIT_CODE=$?
-    popd
-    return $ACTUAL_EXIT_CODE
 }
 
 
@@ -83,10 +79,6 @@ install_go(){
         export PATH="${PATH}:${GOPATH}/bin"
     fi
     pushd "$WORKSPACE"
-    command go "$@"
-    ACTUAL_EXIT_CODE=$?
-    popd
-    return $ACTUAL_EXIT_CODE
 }
 
 google_cloud_auth() {
