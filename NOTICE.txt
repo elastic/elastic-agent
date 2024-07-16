@@ -13079,11 +13079,11 @@ Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/exte
 
 --------------------------------------------------------------------------------
 Dependency : go.opentelemetry.io/collector/featuregate
-Version: v1.11.0
+Version: v1.12.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/featuregate@v1.11.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/featuregate@v1.12.0/LICENSE:
 
 
                                  Apache License
@@ -34480,11 +34480,11 @@ Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opentele
 
 --------------------------------------------------------------------------------
 Dependency : github.com/open-telemetry/opentelemetry-collector-contrib/internal/common
-Version: v0.104.0
+Version: v0.105.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opentelemetry-collector-contrib/internal/common@v0.104.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opentelemetry-collector-contrib/internal/common@v0.105.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
