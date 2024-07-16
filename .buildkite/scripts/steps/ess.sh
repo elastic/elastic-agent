@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common.sh
+source .buildkite/scripts/retry.sh
 
 function ess_up() {
   install_terraform
-  echo "~~~ Staring ESS Stack"
-  # Delete
-  set -x
+  echo "~~~ Staring ESS Stack"  
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   local STACK_VERSION=$1
@@ -48,14 +46,11 @@ function ess_up() {
   export KIBANA_HOST=$(terraform output -raw kibana_endpoint)
   export KIBANA_USERNAME=$ELASTICSEARCH_USERNAME
   export KIBANA_PASSWORD=$ELASTICSEARCH_PASSWORD
-
-  set +x
 }
 
 function ess_down() {
   install_terraform
-  echo "~~~ Tearing down the ESS Stack"
-  set -x
+  echo "~~~ Tearing down the ESS Stack"  
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
@@ -64,7 +59,6 @@ function ess_down() {
   trap 'popd >/dev/null' EXIT
 
   terraform destroy -auto-approve
-  set +x
 }
 
 function get_git_user_email() {

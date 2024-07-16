@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common.sh
+source .buildkite/scripts/common2.sh
+
+install_go
+install_mage
+
 source .buildkite/scripts/steps/ess.sh
 
 # Override the agent package version using a string with format <major>.<minor>.<patch>
