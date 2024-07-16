@@ -148,7 +148,7 @@ require (
 	github.com/elastic/go-docappender/v2 v2.2.0 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
-	github.com/elastic/go-windows v1.0.1 // indirect
+	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/opentelemetry-lib v0.7.3 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
@@ -171,6 +171,7 @@ require (
 	github.com/gobuffalo/here v0.6.7 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
+	github.com/gofrs/uuid/v5 v5.2.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
