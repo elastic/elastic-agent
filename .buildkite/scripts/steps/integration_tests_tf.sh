@@ -15,4 +15,4 @@ trap 'ess_down' EXIT
 
 # Run integration tests
 AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
-go test -tags integration
+TEST_DEFINE_PREFIX=aaaaaa go test -tags integration github.com/elastic/elastic-agent/testing/integration
