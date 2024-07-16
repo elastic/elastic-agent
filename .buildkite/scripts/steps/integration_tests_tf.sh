@@ -15,4 +15,5 @@ trap 'ess_down' EXIT
 
 # Run integration tests
 AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
+mage build:testBinaries
 AGENT_VERSION="8.16.0-SNAPSHOT" SNAPSHOT=true TEST_DEFINE_PREFIX=non_sudo_linux go test -tags integration github.com/elastic/elastic-agent/testing/integration
