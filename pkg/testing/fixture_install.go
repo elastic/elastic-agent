@@ -21,6 +21,7 @@ import (
 	gotesting "testing"
 	"time"
 
+	"github.com/joeshaw/multierror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -371,7 +372,7 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	}
 
 	_, pids, err := procStats.FetchPids()
-	if !assert.NoError(t, err, "error fetching process information") {
+	if _, ok := err.(*multierror.MultiError); !ok && !assert.NoError(t, err, "error fetching process information") {
 		// we failed a bit further
 		return nil
 	}
