@@ -30,7 +30,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.104.0/receiver/filelogreceiver/README.md) | v0.104.0 |
-| [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.104.0/receiver/hostmetricsreceiver/README.md) | v0.104.0 |
+| [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.105.0/receiver/hostmetricsreceiver/README.md) | v0.105.0 |
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.104.0/receiver/httpcheckreceiver/README.md) | v0.104.0 |
 | [k8sclusterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sclusterreceiver/v0.104.0/receiver/k8sclusterreceiver/README.md) | v0.104.0 |
 | [kubeletstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kubeletstatsreceiver/v0.104.0/receiver/kubeletstatsreceiver/README.md) | v0.104.0 |
