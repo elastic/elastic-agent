@@ -21,5 +21,5 @@ output "es_host" {
 }
 
 output "kibana_endpoint" {
-  value = ec_deployment.integration-testing.kibana.http_endpoint
+  value = ec_deployment.integration-testing.kibana.https_endpoint
 }

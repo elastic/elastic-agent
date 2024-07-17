@@ -24,4 +24,4 @@ trap 'ess_down' EXIT
 # Run integration tests
 echo "~~~ Running integration tests"
 # AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
-AGENT_VERSION="8.16.0-SNAPSHOT" RUN_SUDO=true SNAPSHOT=true TEST_DEFINE_PREFIX=sudo_linux sudo go test -tags integration github.com/elastic/elastic-agent/testing/integration
+AGENT_VERSION="8.16.0-SNAPSHOT" RUN_SUDO=true SNAPSHOT=true TEST_DEFINE_PREFIX=sudo_linux sudo --preserve-env go test -tags integration github.com/elastic/elastic-agent/testing/integration

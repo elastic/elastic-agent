@@ -72,6 +72,13 @@ resource "ec_deployment" "integration-testing" {
     zone_count = 1
   }
 
+  integrations_server = {
+    topology = {
+      size       = "1g"
+      zone_count = 1
+    }
+  }
+
   tags = {
     "provisioner"  = "elastic-agent-integration-tests"
     "creator"      = var.creator
