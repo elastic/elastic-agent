@@ -6,6 +6,9 @@ source .buildkite/scripts/common2.sh
 install_go
 install_mage
 
+sudo usermod -aG adm buildkite-agent
+newgrp adm
+
 # source .buildkite/scripts/steps/ess.sh
 
 # Override the agent package version using a string with format <major>.<minor>.<patch>
@@ -14,20 +17,12 @@ install_mage
 # OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
 # OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
 
-# TODO fix
-which go
-go env
-sudo --preserve-env go env 
+mage build:testBinaries
 
-echo "PATH: $PATH"
-sudo --preserve-env echo "sudo PATH: $PATH"
+ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
+trap 'ess_down' EXIT
 
-# mage build:testBinaries
-
-# ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
-# trap 'ess_down' EXIT
-
-# # Run integration tests
-# echo "~~~ Running integration tests"
-# # AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
-# AGENT_VERSION="8.16.0-SNAPSHOT" SNAPSHOT=true TEST_DEFINE_PREFIX=non_sudo_linux go test -tags integration github.com/elastic/elastic-agent/testing/integration
+# Run integration tests
+echo "~~~ Running integration tests"
+# AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
+AGENT_VERSION="8.16.0-SNAPSHOT" SNAPSHOT=true TEST_DEFINE_PREFIX=non_sudo_linux go test -tags integration github.com/elastic/elastic-agent/testing/integration
