@@ -87,7 +87,7 @@ RUN for iter in {1..10}; do \
 {{- if contains .from "wolfi" }}
 RUN for iter in {1..10}; do \
         apk update && \
-        apk add --no-cache ca-certificates curl gawk shadow && \
+        apk add --no-cache ca-certificates curl gawk shadow bash && \
         exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
