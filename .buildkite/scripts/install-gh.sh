@@ -2,7 +2,7 @@
 
 # Required environment variables:
 # - GH_VERSION - the version of gh to install
-set -exuo pipefail
+set -euo pipefail
 
 echo "--- Install gh cli"
 
