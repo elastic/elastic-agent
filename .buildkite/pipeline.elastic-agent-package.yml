@@ -51,57 +51,57 @@ steps:
   - wait: ~
     if: build.env("MANIFEST_URL") == null
 
-  - group: ":Packaging Artefacts"
-    key: "package"
-    steps:
-      - label: ":package: Cross Building and package elastic-agent"
-        key: package_elastic-agent
-        agents:
-          provider: "gcp"
-          machineType: "c2-standard-16"
-          diskSizeGb: 400
-        command: |
-          if [[ -z "$${MANIFEST_URL}" ]]; then
-            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
-            if [[ -z "$${MANIFEST_URL}" ]]; then
-              echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
-              exit 1
-            fi
-          fi
-          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
-            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
-          fi
-          .buildkite/scripts/steps/package.sh
-        artifact_paths:
-          - "build/distributions/**/*"
-      - label: ":package: Package ARM elastic-agent"
-        key: package_elastic-agent-arm
-        agents:
-          provider: "aws"
-          instanceType: "t4g.2xlarge"
-          imagePrefix: "core-ubuntu-2004-aarch64"
-        env:
-          PLATFORMS: "linux/arm64"
-          PACKAGES: "docker"
-        command: |
-          if [[ -z "$${MANIFEST_URL}" ]]; then
-            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
-            if [[ -z "$${MANIFEST_URL}" ]]; then
-              echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
-              exit 1
-            fi
-          fi
-          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
-            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
-          fi
-          .buildkite/scripts/steps/package.sh
-          ls -lahR build/
-        artifact_paths:
-          - "build/distributions/**/*"
+  # - group: ":Packaging Artefacts"
+  #   key: "package"
+  #   steps:
+  #     - label: ":package: Cross Building and package elastic-agent"
+  #       key: package_elastic-agent
+  #       agents:
+  #         provider: "gcp"
+  #         machineType: "c2-standard-16"
+  #         diskSizeGb: 400
+  #       command: |
+  #         if [[ -z "$${MANIFEST_URL}" ]]; then
+  #           export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+  #           if [[ -z "$${MANIFEST_URL}" ]]; then
+  #             echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
+  #             exit 1
+  #           fi
+  #         fi
+  #         if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+  #           export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+  #         fi
+  #         .buildkite/scripts/steps/package.sh
+  #       artifact_paths:
+  #         - "build/distributions/**/*"
+  #     - label: ":package: Package ARM elastic-agent"
+  #       key: package_elastic-agent-arm
+  #       agents:
+  #         provider: "aws"
+  #         instanceType: "t4g.2xlarge"
+  #         imagePrefix: "core-ubuntu-2004-aarch64"
+  #       env:
+  #         PLATFORMS: "linux/arm64"
+  #         PACKAGES: "docker"
+  #       command: |
+  #         if [[ -z "$${MANIFEST_URL}" ]]; then
+  #           export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+  #           if [[ -z "$${MANIFEST_URL}" ]]; then
+  #             echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
+  #             exit 1
+  #           fi
+  #         fi
+  #         if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+  #           export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+  #         fi
+  #         .buildkite/scripts/steps/package.sh
+  #         ls -lahR build/
+  #       artifact_paths:
+  #         - "build/distributions/**/*"
 
   - label: ":elastic-stack: Publishing to DRA"
     if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
-    key: dra-publish
+    # key: dra-publish
     depends_on: package
     agents:
       provider: "gcp"
@@ -110,7 +110,7 @@ steps:
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
     command: |
       echo "+++ Restoring Artifacts"
-      buildkite-agent artifact download "build/**/*" . 
+      buildkite-agent artifact download "build/**/*" . --build "0190cb30-5285-47a2-a20f-355c42497158
 
       echo "+++ Changing permissions for the release manager"      
       sudo chmod -R a+r build/distributions/ 
