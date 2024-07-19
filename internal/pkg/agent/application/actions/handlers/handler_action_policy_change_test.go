@@ -70,6 +70,34 @@ func TestPolicyChange(t *testing.T) {
 		change := <-ch
 		require.Equal(t, config.MustNewConfigFrom(conf), change.Config())
 	})
+	t.Run("Received config with $$ in inputs", func(t *testing.T) {
+		ch := make(chan coordinator.ConfigChange, 1)
+
+		conf := map[string]interface{}{
+			"inputs": []interface{}{map[string]interface{}{
+				"type": "key",
+				"key":  "$$$$",
+			}}}
+		action := &fleetapi.ActionPolicyChange{
+			ActionID:   "abc123",
+			ActionType: "POLICY_CHANGE",
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: conf,
+			},
+		}
+
+		cfg := configuration.DefaultConfiguration()
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+
+		err := handler.Handle(context.Background(), action, ack)
+		require.NoError(t, err)
+
+		change := <-ch
+		m, err := change.Config().ToMapStr()
+		require.NoError(t, err)
+
+		require.Equal(t, conf, m)
+	})
 }
 
 func TestPolicyAcked(t *testing.T) {
