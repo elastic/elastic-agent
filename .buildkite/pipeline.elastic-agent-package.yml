@@ -115,7 +115,7 @@ steps:
       buildkite-agent artifact download "build/**/*" . 
 
       echo "+++ Changing permissions for the release manager"      
-      sudo chmod -R +r build/distributions/ 
+      sudo chmod -R a+r build/distributions/ 
       sudo chown -R :1000 build/distributions/
       ls -lahR build/
 

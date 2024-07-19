@@ -69,7 +69,7 @@ mage() {
 go(){
     # Search for the go in the Path
     if ! [ -x "$(type -P go | sed 's/go is //g')" ];
-    then
+    then        
         getOSOptions
         echo "installing golang "${GO_VERSION}" for "${AGENT_OS_NAME}/${AGENT_OS_ARCH}" "
         local _bin="${WORKSPACE}/bin"
