@@ -112,12 +112,15 @@ steps:
     command: |
       echo "+++ Restoring Artifacts"
       echo "UMASK: $(umask)"
-      umask 0022
+      # umask 0022
 
       buildkite-agent artifact download "build/**/*" . --build 0190c8dd-5fa9-4894-ab74-61c817b930ab
       echo "+++ Changing permissions for the release manager"
 
-      sudo chown -R 1000:1000 build/distributions/
+      ls -lahR build/
+      sudo chmod -R g+r build/distributions/ 
+      sudo chown -R :1000 build/distributions/
+
       ls -lahR build/
       echo "+++ Running DRA publish step"
       if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
