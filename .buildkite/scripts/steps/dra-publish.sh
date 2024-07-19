@@ -10,7 +10,7 @@ PACKAGE_VERSION="${DRA_VERSION:="${BEAT_VERSION:=""}"}"
 
 # force main branch on PR's or it won't execute
 # because the PR branch does not have a project folder in release-manager
-if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" || "${BUILDKITE_BRANCH}" == "debug_dra" ]]; then
+if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
     BRANCH=main
     DRY_RUN="--dry-run"
     echo "+++ Running in PR and setting branch main and --dry-run"
