@@ -6,7 +6,6 @@ if [[ -z "${WORKSPACE-""}" ]]; then
     WORKSPACE=$(git rev-parse --show-toplevel)
     export WORKSPACE
 fi
-PIPELINE="${WORKSPACE}/.buildkite/pipeline.elastic-agent-package.yml"
 if [[ -z "${SETUP_MAGE_VERSION-""}" ]]; then
     SETUP_MAGE_VERSION="1.14.0"
 fi
