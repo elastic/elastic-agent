@@ -69,7 +69,8 @@ mage() {
 go(){
     # Search for the go in the Path
     if ! [ -x "$(type -P go | sed 's/go is //g')" ];
-    then        
+    then
+        set -x
         getOSOptions
         echo "installing golang "${GO_VERSION}" for "${AGENT_OS_NAME}/${AGENT_OS_ARCH}" "
         local _bin="${WORKSPACE}/bin"
@@ -79,6 +80,7 @@ go(){
         eval "$(command "${_bin}/gvm" "${GO_VERSION}" )"
         export GOPATH=$(command go env GOPATH)
         export PATH="${PATH}:${GOPATH}/bin"
+        set +x
     fi
     pushd "$WORKSPACE"
     command go "$@"
