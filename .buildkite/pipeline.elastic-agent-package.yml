@@ -110,7 +110,7 @@ steps:
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
     command: |
       echo "+++ Restoring Artifacts"
-      buildkite-agent artifact download "build/**/*" . --build "0190cb30-5285-47a2-a20f-355c42497158
+      buildkite-agent artifact download "build/**/*" . --build 0190cb30-5285-47a2-a20f-355c42497158
 
       echo "+++ Changing permissions for the release manager"      
       sudo chmod -R a+r build/distributions/ 
