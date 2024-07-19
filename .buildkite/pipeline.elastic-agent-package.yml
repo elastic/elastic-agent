@@ -63,14 +63,14 @@ steps:
           machineType: "c2-standard-16"
           diskSizeGb: 400
         command: |
-          if [[ -z "${MANIFEST_URL}" ]]; then
+          if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
-            if [[ -z "${MANIFEST_URL}" ]]; then
+            if [[ -z "$${MANIFEST_URL}" ]]; then
               echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
               exit 1
             fi
           fi
-          if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
             export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
           fi
           .buildkite/scripts/steps/package.sh
@@ -86,14 +86,14 @@ steps:
           PLATFORMS: "linux/arm64"
           PACKAGES: "docker"
         command: |
-          if [[ -z "${MANIFEST_URL}" ]]; then
+          if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
-            if [[ -z "${MANIFEST_URL}" ]]; then
+            if [[ -z "$${MANIFEST_URL}" ]]; then
               echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
               exit 1
             fi
           fi
-          if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
             export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
           fi
           .buildkite/scripts/steps/package.sh
@@ -120,14 +120,14 @@ steps:
       ls -lahR build/
 
       echo "+++ Running DRA publish step"
-      if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
+      if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
         export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
       fi
-      if [[ -z "${DRA_DRY_RUN}" ]]; then
+      if [[ -z "$${DRA_DRY_RUN}" ]]; then
         DRA_DRY_RUN=$(buildkite-agent meta-data get DRA_DRY_RUN --default "")
         export DRA_DRY_RUN
       fi
-      if [[ -z "${DRA_VERSION}" ]]; then
+      if [[ -z "$${DRA_VERSION}" ]]; then
         DRA_VERSION=$(buildkite-agent meta-data get DRA_VERSION --default "")
         export DRA_VERSION
       fi
@@ -163,7 +163,7 @@ steps:
       .buildkite/scripts/steps/dra-publish.sh
       # Artifacts will be uploaded via the artifact_paths entry above
       echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
-      if [[ -z "${TRIGGER_JOB_ID}" ]]; then
+      if [[ -z "$${TRIGGER_JOB_ID}" ]]; then
         echo "TRIGGER_JOB_ID is not set, so not setting metadata"
       else
         # If a pipeline that triggered this build passes in a "TRIGGER_JOB_ID" env var, that
