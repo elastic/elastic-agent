@@ -1,8 +1,6 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 env:
   DOCKER_REGISTRY: "docker.elastic.co"
-  # SETUP_GVM_VERSION: "v0.5.0" # https://github.com/andrewkroh/gvm/issues/44#issuecomment-1013231151
-  SETUP_MAGE_VERSION: "1.14.0"
   # this is required in order to allow the build process to override the default PWD of the BEAT_NAME.
   BEAT_NAME: "elastic-agent"
   # after moving elastic-agent out of beats, we should update the URL of the packaging.
