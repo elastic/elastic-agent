@@ -29,9 +29,6 @@ steps:
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
-    retry:
-      automatic:
-        - limit: 1
     agents:
       provider: "gcp"
       machineType: "n1-standard-8"
@@ -53,9 +50,6 @@ steps:
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
-    retry:
-      automatic:
-        - limit: 1
     agents:
       provider: "gcp"
       machineType: "n1-standard-8"
@@ -77,9 +71,6 @@ steps:
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
-    retry:
-      automatic:
-        - limit: 1
     agents:
       provider: "gcp"
       machineType: "n1-standard-8"
@@ -99,9 +90,6 @@ steps:
       buildkite-agent artifact download build/distributions/** . --step 'package-it'
       .buildkite/scripts/steps/beats_tests.sh
     # if: "build.env('CRON') == 'yes'"
-    retry:
-      automatic:
-        - limit: 1
     agents:
       provider: "gcp"
       machineType: "n1-standard-8"
