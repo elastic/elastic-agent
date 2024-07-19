@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent-system-metrics/metric/system/process"
-	"github.com/joeshaw/multierror"
 )
 
 // GetWatcherPIDs returns the PID's of any running `elastic-agent watch` process.
@@ -25,7 +24,7 @@ func GetWatcherPIDs() ([]int, error) {
 		return nil, fmt.Errorf("failed to initialize process.Stats: %w", err)
 	}
 	pidMap, _, err := procStats.FetchPids()
-	if _, ok := err.(*multierror.MultiError); err != nil && !ok {
+	if err != nil && !process.CanDegrade(err) {
 		return nil, fmt.Errorf("failed to fetch pids: %w", err)
 	}
 	var pids []int
