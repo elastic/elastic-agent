@@ -1337,6 +1337,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckrece
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver v0.104.0/go.mod h1:htiBg7qA+iHbvEuvLXYFzKfN7YWjzIrAl8kn7p3AGCk=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.104.0 h1:+5FViBkbBvewH5huajEx8yW5YWB+CbBzDLlRQITxxFg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.104.0/go.mod h1:dSGkzxCCrAZ4mpZ4cGt+cWOStvB894ONaHLue/SKqWg=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.104.0 h1:SuPRmVqCgeXKnlRu4VxEes2UIeWzgaRG7Y8hxEUJEVc=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.104.0/go.mod h1:Uwpe7RTa/VAU5eLoisBbhD5jSI/BHKyQIq8RQnrfG58=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.104.0 h1:54u8jFK575BEX94f9tWgdopyojOCjUps0Myms+50irA=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.104.0/go.mod h1:YJoZUI6IZ0IJnZsYifJjNkQU9DxiVkO3zU2QbWBaXBg=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
