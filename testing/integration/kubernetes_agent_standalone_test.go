@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -26,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
@@ -50,6 +53,9 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 	client, err := info.KubeClient()
 	require.NoError(t, err)
 	require.NotNil(t, client)
+
+	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
+	require.NotEmpty(t, testLogsBasePath)
 
 	ctx := context.Background()
 
@@ -79,6 +85,9 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 		},
 	}
 	t.Cleanup(func() {
+		if t.Failed() {
+			dumpLogs(t, ctx, client, namespace, testLogsBasePath)
+		}
 		_ = client.Resources().Delete(ctx, k8sNamespaceObj)
 		for _, obj := range objects {
 			_ = client.Resources(namespace).Delete(ctx, obj)
@@ -129,6 +138,12 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 		require.NoError(t, err)
 
 		for _, pod := range podList.Items {
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				if containerStatus.RestartCount > 0 {
+					return false
+				}
+			}
+
 			for _, cond := range pod.Status.Conditions {
 				if cond.Type != corev1.PodReady {
 					continue
@@ -141,8 +156,63 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 		}
 
 		return true
-	}, time.Second*100, time.Second*1)
-	require.NoError(t, err)
+	}, time.Second*100, time.Second*1, "Timed out waiting for pods to be ready")
+}
+
+func dumpLogs(t *testing.T, ctx context.Context, client klient.Client, namespace string, targetDir string) {
+
+	podList := &corev1.PodList{}
+
+	clientset, err := kubernetes.NewForConfig(client.RESTConfig())
+	if err != nil {
+		t.Logf("Error creating clientset: %v\n", err)
+		return
+	}
+
+	err = client.Resources(namespace).List(ctx, podList)
+	if err != nil {
+		t.Logf("Error listing pods: %v\n", err)
+		return
+	}
+
+	for _, pod := range podList.Items {
+
+		previous := false
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.RestartCount > 0 {
+				previous = true
+				break
+			}
+		}
+
+		for _, container := range pod.Spec.Containers {
+			logFilePath := filepath.Join(targetDir, fmt.Sprintf("%s-%s-%s.log", t.Name(), pod.Name, container.Name))
+			logFile, err := os.Create(logFilePath)
+			if err != nil {
+				t.Logf("Error creating log file: %v\n", err)
+				continue
+			}
+
+			req := clientset.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
+				Container: container.Name,
+				Previous:  previous,
+			})
+			podLogsStream, err := req.Stream(context.TODO())
+			if err != nil {
+				t.Logf("Error getting container %s of pod %s logs: %v\n", container.Name, pod.Name, err)
+				continue
+			}
+
+			_, err = io.Copy(logFile, podLogsStream)
+			if err != nil {
+				t.Logf("Error writing container %s of pod %s logs: %v\n", container.Name, pod.Name, err)
+			} else {
+				t.Logf("Wrote container %s of pod %s logs to %s\n", container.Name, pod.Name, logFilePath)
+			}
+
+			_ = podLogsStream.Close()
+		}
+	}
 }
 
 // YAMLDecoder converts YAML bytes into test.Builder instances.

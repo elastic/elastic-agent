@@ -6,12 +6,11 @@ if [[ -z "${WORKSPACE-""}" ]]; then
     WORKSPACE=$(git rev-parse --show-toplevel)
     export WORKSPACE
 fi
-PIPELINE="${WORKSPACE}/.buildkite/pipeline.elastic-agent-package.yml"
 if [[ -z "${SETUP_MAGE_VERSION-""}" ]]; then
-    SETUP_MAGE_VERSION=$(grep -oe "SETUP_MAGE_VERSION\: [\"'].*[\"']" "$PIPELINE" | awk '{print $2}' | sed "s/'//g" )
+    SETUP_MAGE_VERSION="1.14.0"
 fi
 if [[ -z "${SETUP_GVM_VERSION-""}" ]]; then
-    SETUP_GVM_VERSION=$(grep -oe "SETUP_GVM_VERSION\: [\"'].*[\"']" "$PIPELINE" | awk '{print $2}' | sed "s/'//g" )
+    SETUP_GVM_VERSION="v0.5.0" # https://github.com/andrewkroh/gvm/issues/44#issuecomment-1013231151
 fi
 BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
 export BEAT_VERSION
