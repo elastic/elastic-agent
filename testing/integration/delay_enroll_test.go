@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -44,7 +44,7 @@ func TestDelayEnroll(t *testing.T) {
 	// name. This policy does not contain any integration.
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.Must(uuid.NewV4()).String()),
 		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
@@ -104,7 +104,7 @@ func TestDelayEnrollUnprivileged(t *testing.T) {
 	// name. This policy does not contain any integration.
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.Must(uuid.NewV4()).String()),
 		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{

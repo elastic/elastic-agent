@@ -27,7 +27,7 @@ import (
 	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

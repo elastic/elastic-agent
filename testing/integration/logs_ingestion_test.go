@@ -22,7 +22,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/hectane/go-acl"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -64,7 +64,7 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	// name. This policy does not contain any integration.
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.Must(uuid.NewV4()).String()),
 		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
@@ -135,7 +135,7 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 	// name. This policy does not contain any integration.
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.Must(uuid.NewV4()).String()),
 		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
@@ -203,7 +203,7 @@ func TestRpmLogIngestFleetManaged(t *testing.T) {
 	// name. This policy does not contain any integration.
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.Must(uuid.NewV4()).String()),
 		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
@@ -247,8 +247,8 @@ func TestRpmLogIngestFleetManaged(t *testing.T) {
 
 func startMockES(t *testing.T) string {
 	registry := metrics.NewRegistry()
-	uid := uuid.New()
-	clusterUUID := uuid.New().String()
+	uid := uuid.Must(uuid.NewV4())
+	clusterUUID := uuid.Must(uuid.NewV4()).String()
 
 	mux := http.NewServeMux()
 	mux.Handle("/", mockes.NewAPIHandler(
@@ -426,7 +426,7 @@ func testFlattenedDatastreamFleetPolicy(
 	policy kibana.PolicyResponse,
 ) {
 	dsType := "logs"
-	id := uuid.New().String()
+	id := uuid.Must(uuid.NewV4()).String()
 	dsNamespace := cleanString(fmt.Sprintf("namespace-%s", id))
 	dsDataset := cleanString(fmt.Sprintf("dataset-%s", id))
 	numEvents := 60

@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 )
 
@@ -121,7 +121,7 @@ func NewRouter(handlers *Handlers) *mux.Router {
 
 					ww := &statusResponseWriter{w: w}
 
-					requestID := uuid.New().String()
+					requestID := uuid.Must(uuid.NewV4()).String()
 					handlers.logFn("[%s] STARTING - %s %s %s %s\n",
 						requestID, r.Method, r.URL, r.Proto, r.RemoteAddr)
 					route.Handler.
