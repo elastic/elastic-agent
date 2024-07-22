@@ -38,6 +38,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
@@ -65,7 +66,6 @@ import (
 )
 
 const (
-	goLintRepo        = "golang.org/x/lint/golint"
 	goLicenserRepo    = "github.com/elastic/go-licenser"
 	buildDir          = "build"
 	metaDir           = "_meta"
@@ -261,11 +261,6 @@ func (Prepare) InstallGoLicenser() error {
 	return GoInstall(goLicenserRepo)
 }
 
-// InstallGoLint for the code.
-func (Prepare) InstallGoLint() error {
-	return GoInstall(goLintRepo)
-}
-
 // All build all the things for the current projects.
 func (Build) All() {
 	mg.Deps(Build.Binary)
@@ -364,28 +359,6 @@ func (Build) TestBinaries() error {
 // All run all the code checks.
 func (Check) All() {
 	mg.SerialDeps(Check.License, Integration.Check)
-}
-
-// GoLint run the code through the linter.
-func (Check) GoLint() error {
-	mg.Deps(Prepare.InstallGoLint)
-	packagesString, err := sh.Output("go", "list", "./...")
-	if err != nil {
-		return err
-	}
-
-	packages := strings.Split(packagesString, "\n")
-	for _, pkg := range packages {
-		if strings.Contains(pkg, "/vendor/") {
-			continue
-		}
-
-		if e := sh.RunV("golint", "-set_exit_status", pkg); e != nil {
-			err = multierror.Append(err, e)
-		}
-	}
-
-	return err
 }
 
 // License makes sure that all the Golang files have the appropriate license header.
@@ -1903,6 +1876,16 @@ func (Integration) Single(ctx context.Context, testName string) error {
 	return integRunner(ctx, false, testName)
 }
 
+// Kubernetes runs kubernetes integration tests
+func (Integration) Kubernetes(ctx context.Context) error {
+	// invoke integration tests
+	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
+		return err
+	}
+
+	return integRunner(ctx, false, "")
+}
+
 // UpdateVersions runs an update on the `.agent-versions.json` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
@@ -2559,6 +2542,14 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if !ok {
 		return nil, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
 	}
+
+	// Possible to change the region for deployment, default is gcp-us-west2 which is
+	// the CFT region.
+	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
+	if essRegion == "" {
+		essRegion = "gcp-us-west2"
+	}
+
 	serviceTokenPath, ok, err := getGCEServiceTokenPath()
 	if err != nil {
 		return nil, err
@@ -2573,27 +2564,58 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		datacenter = "us-central1-a"
 	}
 
-	// Possible to change the region for deployment, default is gcp-us-west2 which is
-	// the CFT region.
-	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
-	if essRegion == "" {
-		essRegion = "gcp-us-west2"
+	ogcCfg := ogc.Config{
+		ServiceTokenPath: serviceTokenPath,
+		Datacenter:       datacenter,
 	}
 
+	var instanceProvisioner runner.InstanceProvisioner
 	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
-	if instanceProvisionerMode == "" {
-		instanceProvisionerMode = "ogc"
-	}
-	if instanceProvisionerMode != "ogc" && instanceProvisionerMode != "multipass" {
+	switch instanceProvisionerMode {
+	case "", ogc.Name:
+		instanceProvisionerMode = ogc.Name
+		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
+	case multipass.Name:
+		instanceProvisioner = multipass.NewProvisioner()
+	case kind.Name:
+		k8sVersion := os.Getenv("K8S_VERSION")
+		if k8sVersion == "" {
+			return nil, errors.New("K8S_VERSION must be set to use kind instance provisioner")
+		}
+		instanceProvisioner = kind.NewProvisioner(k8sVersion)
+	default:
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
 	}
 	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
-	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
-	if stackProvisionerMode == "" {
-		stackProvisionerMode = ess.ProvisionerStateful
+
+	email, err := ogcCfg.ClientEmail()
+	if err != nil {
+		return nil, err
 	}
-	if stackProvisionerMode != ess.ProvisionerStateful &&
-		stackProvisionerMode != ess.ProvisionerServerless {
+
+	provisionCfg := ess.ProvisionerConfig{
+		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
+		APIKey:     essToken,
+		Region:     essRegion,
+	}
+
+	var stackProvisioner runner.StackProvisioner
+	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
+	switch stackProvisionerMode {
+	case "", ess.ProvisionerStateful:
+		stackProvisionerMode = ess.ProvisionerStateful
+		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
+		if err != nil {
+			return nil, err
+		}
+	case ess.ProvisionerServerless:
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
+		if err != nil {
+			return nil, err
+		}
+	default:
 		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
 			ess.ProvisionerStateful,
 			ess.ProvisionerServerless,
@@ -2604,11 +2626,11 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	timestamp := timestampEnabled()
 
 	extraEnv := map[string]string{}
-	if os.Getenv("AGENT_COLLECT_DIAG") != "" {
-		extraEnv["AGENT_COLLECT_DIAG"] = os.Getenv("AGENT_COLLECT_DIAG")
+	if agentCollectDiag := os.Getenv("AGENT_COLLECT_DIAG"); agentCollectDiag != "" {
+		extraEnv["AGENT_COLLECT_DIAG"] = agentCollectDiag
 	}
-	if os.Getenv("AGENT_KEEP_INSTALLED") != "" {
-		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
+	if agentKeepInstalled := os.Getenv("AGENT_KEEP_INSTALLED"); agentKeepInstalled != "" {
+		extraEnv["AGENT_KEEP_INSTALLED"] = agentKeepInstalled
 	}
 
 	extraEnv["TEST_LONG_RUNNING"] = os.Getenv("TEST_LONG_RUNNING")
@@ -2647,49 +2669,6 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		TestFlags:      goTestFlags,
 		ExtraEnv:       extraEnv,
 		BinaryName:     binaryName,
-	}
-	ogcCfg := ogc.Config{
-		ServiceTokenPath: serviceTokenPath,
-		Datacenter:       datacenter,
-	}
-	email, err := ogcCfg.ClientEmail()
-	if err != nil {
-		return nil, err
-	}
-
-	var instanceProvisioner runner.InstanceProvisioner
-	if instanceProvisionerMode == multipass.Name {
-		instanceProvisioner = multipass.NewProvisioner()
-	} else if instanceProvisionerMode == ogc.Name {
-		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		return nil, fmt.Errorf("unknown instance provisioner: %s", instanceProvisionerMode)
-	}
-
-	provisionCfg := ess.ProvisionerConfig{
-		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
-		APIKey:     essToken,
-		Region:     essRegion,
-	}
-	var stackProvisioner runner.StackProvisioner
-	if stackProvisionerMode == ess.ProvisionerStateful {
-		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-
-	} else if stackProvisionerMode == ess.ProvisionerServerless {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		return nil, fmt.Errorf("unknown stack provisioner: %s", stackProvisionerMode)
 	}
 
 	r, err := runner.NewRunner(cfg, instanceProvisioner, stackProvisioner, batches...)

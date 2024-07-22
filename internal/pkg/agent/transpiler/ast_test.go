@@ -60,6 +60,20 @@ func TestAST(t *testing.T) {
 				},
 			},
 		},
+		"special characters in strings": {
+			hashmap: map[string]interface{}{
+				"key":            "$1$$2$$$3$$$$4",
+				"$1$$2$$$3$$$$4": "value",
+			},
+			ast: &AST{
+				root: &Dict{
+					value: []Node{
+						&Key{name: "key", value: &StrVal{value: "$1$$2$$$3$$$$4"}},
+						&Key{name: "$1$$2$$$3$$$$4", value: &StrVal{value: "value"}},
+					},
+				},
+			},
+		},
 		"integer as key": {
 			hashmap: map[string]interface{}{
 				"1": []string{"/var/log/log1", "/var/log/log2"},
