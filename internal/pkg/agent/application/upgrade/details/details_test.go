@@ -77,7 +77,7 @@ func TestDetailsDownloadRateJSON(t *testing.T) {
 		rate_in  float64
 		rate_out float64
 	}{
-		{"non_infinity", .8, 1794.7, 1794},
+		{"non_infinity", .8, 1794.7, 1794.7},
 		{"positive_infinity", 0.99, math.Inf(1), 0},
 		{"negative_infinity", 0.99, math.Inf(-1), 0},
 		{"not_a_number", 0.99, math.NaN(), 0},
