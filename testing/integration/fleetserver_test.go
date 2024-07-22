@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -29,7 +29,7 @@ import (
 )
 
 func fleetPolicy() kibana.AgentPolicy {
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 
 	return kibana.AgentPolicy{
 		ID:          "test-fleet-policy-" + policyUUID,
@@ -77,7 +77,7 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 	policyResp, err := info.KibanaClient.CreatePolicy(ctx, fleetPolicy())
 	require.NoError(t, err, "failed creating policy")
 	policy := policyResp.AgentPolicy
-	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "fleet-server", "1.5.0", "fleet-server.json", uuid.New().String(), policy.ID)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "fleet-server", "1.5.0", "fleet-server.json", uuid.Must(uuid.NewV4()).String(), policy.ID)
 	require.NoError(t, err, "failed creating fleet-server integration")
 
 	t.Log("Get fleet-server service token...")
