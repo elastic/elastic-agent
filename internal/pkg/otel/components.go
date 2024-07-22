@@ -19,6 +19,7 @@ import (
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
+	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
@@ -60,6 +61,7 @@ func components() (otelcol.Factories, error) {
 		k8sclusterreceiver.NewFactory(),
 		hostmetricsreceiver.NewFactory(),
 		httpcheckreceiver.NewFactory(),
+		k8sobjectsreceiver.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
