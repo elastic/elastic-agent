@@ -7,7 +7,7 @@ install_go
 install_mage
 
 sudo usermod -aG adm buildkite-agent
-newgrp adm
+sudo newgrp adm
 
 # source .buildkite/scripts/steps/ess.sh
 
