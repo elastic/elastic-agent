@@ -63,8 +63,9 @@ func AddK8STestsToImage(ctx context.Context, logger runner.Logger, baseImage str
 		Tags:       []string{"kubernetes_inner"},
 		OutputFile: testBinary,
 		Env: map[string]string{
-			"GOOS":   "linux",
-			"GOARCH": arch,
+			"GOOS":        "linux",
+			"GOARCH":      arch,
+			"CGO_ENABLED": "0",
 		},
 	}
 
