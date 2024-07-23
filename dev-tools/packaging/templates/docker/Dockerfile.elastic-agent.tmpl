@@ -220,13 +220,10 @@ RUN cd {{$beatHome}}/.node \
   && chmod ugo+rwX -R $NODE_PATH \
 # Install synthetics as a regular user, installing npm deps as root odesn't work
    # fix .node .npm and .synthetics
-   && chown -R {{ .user }}:{{ .user }} $NODE_PATH \
-   && mkdir -p {{ $beatHome }}/.npm/_logs \
-   && chown -R {{ .user }}:{{ .user }} {{ $beatHome }}/.npm \
-   && chown -R {{ .user }}:{{ .user }} {{ $beatHome }}/.cache
+   && chown -R {{ .user }}:{{ .user }} $NODE_PATH
 USER {{ .user }}
 # If this fails dump the NPM logs
-RUN (npm i -g --loglevel verbose --production --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 {{ $beatHome }}/.npm/_logs/* && exit 1') && \
+RUN (npm i -g --loglevel verbose --production --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
     chmod ugo+rwX -R $NODE_PATH
 USER root
 
