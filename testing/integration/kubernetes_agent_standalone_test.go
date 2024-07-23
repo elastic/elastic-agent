@@ -265,7 +265,6 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 	}
 }
 
-
 func dumpLogs(t *testing.T, ctx context.Context, client klient.Client, namespace string, targetDir string) {
 
 	podList := &corev1.PodList{}
