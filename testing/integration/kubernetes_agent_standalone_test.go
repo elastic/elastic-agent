@@ -284,6 +284,9 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 		err := client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone",
 			[]string{"/usr/share/elastic-agent/k8s-inner-tests", "-test.v"}, &stdout, &stderr)
 		t.Log(stdout.String())
+		if err != nil {
+			t.Log(stderr.String())
+		}
 		require.NoError(t, err, "error at k8s inner tests execution")
 	}
 }
