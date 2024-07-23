@@ -19,6 +19,7 @@ steps:
     # depends_on:
     #   - package-it
     command: |
+      #!/bin/bash
       set -euxo
       buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
       ls -lah build/distributions/      
