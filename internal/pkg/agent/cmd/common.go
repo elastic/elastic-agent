@@ -37,6 +37,10 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "elastic-agent [subcommand]",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Name() == "container" {
+				initContainer(streams)
+			}
+
 			return tryContainerLoadPaths()
 		},
 	}

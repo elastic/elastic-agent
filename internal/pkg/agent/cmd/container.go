@@ -167,8 +167,6 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 }
 
 func logContainerCmd(streams *cli.IOStreams) error {
-	initContainer(streams)
-
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams
