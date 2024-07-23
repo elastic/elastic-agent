@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -180,7 +180,7 @@ func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bo
 		define.Version(), latest)
 
 	downloadSource := kibana.DownloadSource{
-		Name:      "local-air-gaped-" + uuid.NewString(),
+		Name:      "local-air-gaped-" + uuid.Must(uuid.NewV4()).String(),
 		Host:      s.URL + "/downloads/beats/elastic-agent/",
 		IsDefault: false, // other tests reuse the stack, let's not mess things up
 	}
@@ -324,7 +324,7 @@ func testUpgradeFleetManagedElasticAgent(
 }
 
 func defaultPolicy() kibana.AgentPolicy {
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 
 	policy := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,

@@ -29,45 +29,46 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.104.0/receiver/filelogreceiver/README.md) | v0.104.0 |
-| [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.104.0/receiver/hostmetricsreceiver/README.md) | v0.104.0 |
-| [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.104.0/receiver/httpcheckreceiver/README.md) | v0.104.0 |
-| [k8sclusterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sclusterreceiver/v0.104.0/receiver/k8sclusterreceiver/README.md) | v0.104.0 |
-| [kubeletstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kubeletstatsreceiver/v0.104.0/receiver/kubeletstatsreceiver/README.md) | v0.104.0 |
-| [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.104.0/receiver/otlpreceiver/README.md) | v0.104.0 |
+| [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.105.0/receiver/filelogreceiver/README.md) | v0.105.0 |
+| [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.105.0/receiver/hostmetricsreceiver/README.md) | v0.105.0 |
+| [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.105.0/receiver/httpcheckreceiver/README.md) | v0.105.0 |
+| [k8sclusterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sclusterreceiver/v0.105.0/receiver/k8sclusterreceiver/README.md) | v0.105.0 |
+| [k8sobjectsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sobjectsreceiver/v0.105.0/receiver/k8sobjectsreceiver/README.md) | v0.105.0 |
+| [kubeletstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kubeletstatsreceiver/v0.105.0/receiver/kubeletstatsreceiver/README.md) | v0.105.0 |
+| [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.105.0/receiver/otlpreceiver/README.md) | v0.105.0 |
 
 ### Exporters
 
 | Component | Version |
 |---|---|
-| [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.104.0/exporter/elasticsearchexporter/README.md) | v0.104.0 |
-| [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.104.0/exporter/fileexporter/README.md) | v0.104.0 |
-| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.104.0/exporter/debugexporter/README.md) | v0.104.0 |
-| [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.104.0/exporter/otlpexporter/README.md) | v0.104.0 |
-| [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.104.0/exporter/otlphttpexporter/README.md) | v0.104.0 |
+| [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.105.0/exporter/elasticsearchexporter/README.md) | v0.105.0 |
+| [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.105.0/exporter/fileexporter/README.md) | v0.105.0 |
+| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.105.0/exporter/debugexporter/README.md) | v0.105.0 |
+| [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.105.0/exporter/otlpexporter/README.md) | v0.105.0 |
+| [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.105.0/exporter/otlphttpexporter/README.md) | v0.105.0 |
 
 ### Processors
 
 | Component | Version |
 |---|---|
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.7.1/processor/elasticinframetricsprocessor/README.md) | v0.7.1 |
-| [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.104.0/processor/attributesprocessor/README.md) | v0.104.0 |
-| [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.104.0/processor/filterprocessor/README.md) | v0.104.0 |
-| [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.104.0/processor/k8sattributesprocessor/README.md) | v0.104.0 |
-| [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.104.0/processor/resourcedetectionprocessor/README.md) | v0.104.0 |
-| [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.104.0/processor/resourceprocessor/README.md) | v0.104.0 |
-| [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.104.0/processor/transformprocessor/README.md) | v0.104.0 |
-| [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.104.0/processor/batchprocessor/README.md) | v0.104.0 |
+| [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.105.0/processor/attributesprocessor/README.md) | v0.105.0 |
+| [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.105.0/processor/filterprocessor/README.md) | v0.105.0 |
+| [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.105.0/processor/k8sattributesprocessor/README.md) | v0.105.0 |
+| [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.105.0/processor/resourcedetectionprocessor/README.md) | v0.105.0 |
+| [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.105.0/processor/resourceprocessor/README.md) | v0.105.0 |
+| [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.105.0/processor/transformprocessor/README.md) | v0.105.0 |
+| [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.105.0/processor/batchprocessor/README.md) | v0.105.0 |
 
 ### Extensions
 
 | Component | Version |
 |---|---|
-| [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.104.0/extension/storage/filestorage/README.md) | v0.104.0 |
-| [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.104.0/extension/memorylimiterextension/README.md) | v0.104.0 |
+| [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.105.0/extension/storage/filestorage/README.md) | v0.105.0 |
+| [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.105.0/extension/memorylimiterextension/README.md) | v0.105.0 |
 
 ### Connectors
 
 | Component | Version |
 |---|---|
-| [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.104.0/connector/spanmetricsconnector/README.md) | v0.104.0 |
+| [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.105.0/connector/spanmetricsconnector/README.md) | v0.105.0 |

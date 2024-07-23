@@ -66,7 +66,6 @@ import (
 )
 
 const (
-	goLintRepo        = "golang.org/x/lint/golint"
 	goLicenserRepo    = "github.com/elastic/go-licenser"
 	buildDir          = "build"
 	metaDir           = "_meta"
@@ -262,11 +261,6 @@ func (Prepare) InstallGoLicenser() error {
 	return GoInstall(goLicenserRepo)
 }
 
-// InstallGoLint for the code.
-func (Prepare) InstallGoLint() error {
-	return GoInstall(goLintRepo)
-}
-
 // All build all the things for the current projects.
 func (Build) All() {
 	mg.Deps(Build.Binary)
@@ -365,28 +359,6 @@ func (Build) TestBinaries() error {
 // All run all the code checks.
 func (Check) All() {
 	mg.SerialDeps(Check.License, Integration.Check)
-}
-
-// GoLint run the code through the linter.
-func (Check) GoLint() error {
-	mg.Deps(Prepare.InstallGoLint)
-	packagesString, err := sh.Output("go", "list", "./...")
-	if err != nil {
-		return err
-	}
-
-	packages := strings.Split(packagesString, "\n")
-	for _, pkg := range packages {
-		if strings.Contains(pkg, "/vendor/") {
-			continue
-		}
-
-		if e := sh.RunV("golint", "-set_exit_status", pkg); e != nil {
-			err = multierror.Append(err, e)
-		}
-	}
-
-	return err
 }
 
 // License makes sure that all the Golang files have the appropriate license header.
