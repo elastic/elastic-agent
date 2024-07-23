@@ -22,7 +22,10 @@ import (
 
 // FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
 func FixPermissions(topPath string, opts ...OptFunc) error {
-	o := newOpts(opts...)
+	o, err := newOpts(opts...)
+	if err != nil {
+		return err
+	}
 
 	// SYSTEM and Administrators always get permissions
 	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
