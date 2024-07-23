@@ -22,7 +22,7 @@ steps:
       #!/bin/bash
       set -euxo
       buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
-      ls -lah build/distributions/      
+      ls -lah build/distributions/
       .buildkite/scripts/steps/integration_tests_tf.sh
     artifact_paths:
       - test_infra/ess/terraform.tfstate
