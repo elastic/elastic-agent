@@ -746,8 +746,8 @@ github.com/elastic/elastic-agent-autodiscover v0.7.0 h1:FCrHXh5AZGrPlpAx8kBu/s/g
 github.com/elastic/elastic-agent-autodiscover v0.7.0/go.mod h1:zLf0SDdQXisVZxzXPxKXdj3Fa+H4bsu4HHbTEQImDz8=
 github.com/elastic/elastic-agent-client/v7 v7.14.0 h1:X6S2RyjZNKsDCvA2igch2I5dgHrkfldVe0ZanH/DRCM=
 github.com/elastic/elastic-agent-client/v7 v7.14.0/go.mod h1:6h+f9QdIr3GO2ODC0Y8+aEXRwzbA5W4eV4dd/67z7nI=
-github.com/elastic/elastic-agent-libs v0.9.14 h1:BckPivb9dkG7u09ketu9SjB3XU+svnooAwf7PaZboMo=
-github.com/elastic/elastic-agent-libs v0.9.14/go.mod h1:NzK4AsPpsgDGZMm8NmN7ia9J3xxE4ZMcKYFKXWV5GoY=
+github.com/elastic/elastic-agent-libs v0.9.15 h1:WCLtuErafUxczT/rXJa4Vr6mxwC8dgtqMbEq+qWGD4M=
+github.com/elastic/elastic-agent-libs v0.9.15/go.mod h1:2VgYxHaeM+cCDBjiS2wbmTvzPGbnlXAtYrlcLefheS8=
 github.com/elastic/elastic-agent-system-metrics v0.10.4 h1:Tmb1rPRDyVv9M453YlPyl/gwUm9s4nSiI2xH76GGEz4=
 github.com/elastic/elastic-agent-system-metrics v0.10.4/go.mod h1:cd7YgcTEjBNeLGnH/C9cEvP/YexohwS6CpmN9Ju58Mw=
 github.com/elastic/elastic-transport-go/v8 v8.6.0 h1:Y2S/FBjx1LlCv5m6pWAF2kDJAHoSjSRSJCApolgfthA=
@@ -886,8 +886,6 @@ github.com/goccy/go-json v0.10.3/go.mod h1:oq7eo15ShAhp70Anwd5lgX2pLfOS3QCiwU/PU
 github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
 github.com/gofrs/flock v0.8.1 h1:+gYjHKf32LDeiEEFhQaotPbLuUXjY5ZqxKgXy7n59aw=
 github.com/gofrs/flock v0.8.1/go.mod h1:F1TvTiK9OcQqauNUHlbJvyl9Qa1QvF/gOUDKA14jxHU=
-github.com/gofrs/uuid v4.4.0+incompatible h1:3qXRTX8/NbyulANqlc0lchS1gqAVxRgsuW1YrTJupqA=
-github.com/gofrs/uuid v4.4.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/gofrs/uuid/v5 v5.2.0 h1:qw1GMx6/y8vhVsx626ImfKMuS5CvJmhIKKtuyvfajMM=
 github.com/gofrs/uuid/v5 v5.2.0/go.mod h1:CDOjlDMVAtN56jqyRUZh58JT31Tiw7/oQyEXZV+9bD8=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
@@ -1337,6 +1335,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckrece
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver v0.104.0/go.mod h1:htiBg7qA+iHbvEuvLXYFzKfN7YWjzIrAl8kn7p3AGCk=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.104.0 h1:+5FViBkbBvewH5huajEx8yW5YWB+CbBzDLlRQITxxFg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.104.0/go.mod h1:dSGkzxCCrAZ4mpZ4cGt+cWOStvB894ONaHLue/SKqWg=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.104.0 h1:SuPRmVqCgeXKnlRu4VxEes2UIeWzgaRG7Y8hxEUJEVc=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.104.0/go.mod h1:Uwpe7RTa/VAU5eLoisBbhD5jSI/BHKyQIq8RQnrfG58=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.104.0 h1:54u8jFK575BEX94f9tWgdopyojOCjUps0Myms+50irA=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.104.0/go.mod h1:YJoZUI6IZ0IJnZsYifJjNkQU9DxiVkO3zU2QbWBaXBg=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
@@ -1739,7 +1739,6 @@ golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f/go.mod h1:5qLYkcX4OjUUV8bRu
 golang.org/x/lint v0.0.0-20200130185559-910be7a94367/go.mod h1:3xt1FjdF8hUf6vQPIChWIBhFzV8gjjsPE/fR3IyQdNY=
 golang.org/x/lint v0.0.0-20200302205851-738671d3881b/go.mod h1:3xt1FjdF8hUf6vQPIChWIBhFzV8gjjsPE/fR3IyQdNY=
 golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5/go.mod h1:3xt1FjdF8hUf6vQPIChWIBhFzV8gjjsPE/fR3IyQdNY=
-golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 h1:VLliZ0d+/avPrXXH+OakdXhpJuEoBZuwh1m2j7U6Iug=
 golang.org/x/lint v0.0.0-20210508222113-6edffad5e616/go.mod h1:3xt1FjdF8hUf6vQPIChWIBhFzV8gjjsPE/fR3IyQdNY=
 golang.org/x/mobile v0.0.0-20190312151609-d3739f865fa6/go.mod h1:z+o9i4GpDbdi3rU15maQ/Ox0txvL9dWGYEHz965HBQE=
 golang.org/x/mobile v0.0.0-20190719004257-d2bd2a29d028/go.mod h1:E/iHnbuqvinMTCcRqshq8CkpyQDoeVncDDYHnLhea+o=

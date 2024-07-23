@@ -15,10 +15,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -31,13 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 const agentK8SKustomize = "../../deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-standalone"
@@ -61,6 +63,9 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 	client, err := info.KubeClient()
 	require.NoError(t, err)
 	require.NotNil(t, client)
+
+	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
+	require.NotEmpty(t, testLogsBasePath)
 
 	namespace := info.Namespace
 
@@ -169,23 +174,27 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 
 			ctx := context.Background()
 
-			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests)
+			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath)
 		})
 	}
 
 }
 
-func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object, namespace string, runInnerK8STests bool) {
+func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object, namespace string,
+	runInnerK8STests bool, testLogsBasePath string) {
 	k8sNamespaceObj := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
 		},
 	}
 	t.Cleanup(func() {
+		if t.Failed() {
+			dumpLogs(t, ctx, client, namespace, testLogsBasePath)
+		}
+		_ = client.Resources().Delete(ctx, k8sNamespaceObj)
 		for _, obj := range objects {
 			_ = client.Resources(namespace).Delete(ctx, obj)
 		}
-		_ = client.Resources().Delete(ctx, k8sNamespaceObj)
 	})
 
 	err := client.Resources().Create(ctx, k8sNamespaceObj)
@@ -206,9 +215,12 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 		require.NoError(t, err)
 
 		for _, pod := range podList.Items {
-			if agentPodName == "" && strings.HasPrefix(pod.GetName(), "elastic-agent-standalone") {
-				agentPodName = pod.Name
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				if containerStatus.RestartCount > 0 {
+					return false
+				}
 			}
+
 			for _, cond := range pod.Status.Conditions {
 				if cond.Type != corev1.PodReady {
 					continue
@@ -250,6 +262,63 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 			[]string{"/usr/share/elastic-agent/k8s-inner-tests", "-test.v"}, &stdout, &stderr)
 		t.Log(stdout.String())
 		require.NoError(t, err)
+	}
+}
+
+
+func dumpLogs(t *testing.T, ctx context.Context, client klient.Client, namespace string, targetDir string) {
+
+	podList := &corev1.PodList{}
+
+	clientset, err := kubernetes.NewForConfig(client.RESTConfig())
+	if err != nil {
+		t.Logf("Error creating clientset: %v\n", err)
+		return
+	}
+
+	err = client.Resources(namespace).List(ctx, podList)
+	if err != nil {
+		t.Logf("Error listing pods: %v\n", err)
+		return
+	}
+
+	for _, pod := range podList.Items {
+
+		previous := false
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.RestartCount > 0 {
+				previous = true
+				break
+			}
+		}
+
+		for _, container := range pod.Spec.Containers {
+			logFilePath := filepath.Join(targetDir, fmt.Sprintf("%s-%s-%s.log", t.Name(), pod.Name, container.Name))
+			logFile, err := os.Create(logFilePath)
+			if err != nil {
+				t.Logf("Error creating log file: %v\n", err)
+				continue
+			}
+
+			req := clientset.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
+				Container: container.Name,
+				Previous:  previous,
+			})
+			podLogsStream, err := req.Stream(context.TODO())
+			if err != nil {
+				t.Logf("Error getting container %s of pod %s logs: %v\n", container.Name, pod.Name, err)
+				continue
+			}
+
+			_, err = io.Copy(logFile, podLogsStream)
+			if err != nil {
+				t.Logf("Error writing container %s of pod %s logs: %v\n", container.Name, pod.Name, err)
+			} else {
+				t.Logf("Wrote container %s of pod %s logs to %s\n", container.Name, pod.Name, logFilePath)
+			}
+
+			_ = podLogsStream.Close()
+		}
 	}
 }
 
