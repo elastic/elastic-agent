@@ -11,6 +11,7 @@ source .buildkite/scripts/steps/ess.sh
 OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
 OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
 
+echo "~~~ Installing Go"
 sudo su -
 
 echo "~~~ Installing Go with asdf"

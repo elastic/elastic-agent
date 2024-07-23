@@ -3,9 +3,11 @@ set -euo pipefail
 
 source .buildkite/scripts/common2.sh
 
+echo "~~~ Installing Go with asdf"
 install_go
 install_mage
 
+echo "~~~ Granting access to buildkite-agent"
 sudo usermod -aG adm buildkite-agent
 sudo newgrp adm
 
@@ -17,6 +19,7 @@ source .buildkite/scripts/steps/ess.sh
 # OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
 # OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
 
+echo "~~~ Bulding test binaries"
 mage build:testBinaries
 
 ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
