@@ -148,7 +148,7 @@ func AddK8STestsToImage(ctx context.Context, logger runner.Logger, baseImage str
 		line := scanner.Text()
 		var output DockerBuildOutput
 		if err := json.Unmarshal([]byte(line), &output); err != nil {
-			return "", fmt.Errorf("error at parsing JSON: %v\n", err)
+			return "", fmt.Errorf("error at parsing JSON: %w", err)
 		}
 
 		if output.Stream != "" {
@@ -206,7 +206,7 @@ func getDockerClient() (*client.Client, error) {
 		if os.IsNotExist(err) {
 			return envClient()
 		}
-		return nil, fmt.Errorf("unable to read Docker contexts directory: %v", err)
+		return nil, fmt.Errorf("unable to read Docker contexts directory: %w", err)
 	}
 
 	for _, f := range files {
@@ -219,10 +219,10 @@ func getDockerClient() (*client.Client, error) {
 				var dockerContext DockerContext
 				content, err := os.ReadFile(metaFile)
 				if err != nil {
-					return nil, fmt.Errorf("unable to read Docker context meta file: %v", err)
+					return nil, fmt.Errorf("unable to read Docker context meta file: %w", err)
 				}
 				if err := json.Unmarshal(content, &dockerContext); err != nil {
-					return nil, fmt.Errorf("unable to parse Docker context meta file: %v", err)
+					return nil, fmt.Errorf("unable to parse Docker context meta file: %w", err)
 				}
 				if dockerContext.Name != config.CurrentContext {
 					continue
