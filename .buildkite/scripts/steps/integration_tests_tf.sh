@@ -3,7 +3,7 @@ set -euo pipefail
 
 source .buildkite/scripts/common2.sh
 
-echo "~~~ Installing Go with asdf"
+echo "~~~ Installing Go and mage"
 install_go
 install_mage
 
