@@ -272,6 +272,12 @@ func (u distinctPaths) chown(uid int, gid int) error {
 				return fmt.Errorf("failed to chown path %s: %w", walkPath, err)
 			}
 
+			if info.Mode()&fs.ModeSymlink != 0 {
+				if err = os.Lchown(walkPath, uid, gid); err != nil {
+					return fmt.Errorf("failed to chown path %s: %w", walkPath, err)
+				}
+			}
+
 			return nil
 		})
 		if err != nil {
