@@ -348,3 +348,7 @@ replace (
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
+
+replace github.com/elastic/go-sysinfo => github.com/AndersonQ/go-sysinfo v0.0.0-20240723133639-576a5a94e18c
+
+replace github.com/elastic/elastic-agent-system-metrics => github.com/AndersonQ/elastic-agent-system-metrics v0.0.0-20240723150030-6f29b3f88b68
