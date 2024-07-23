@@ -4,6 +4,11 @@
 
 package cmd
 
+// The initialization steps in this file are specifically for the elastic-agent running inside a container.
+// They aim to adjust the ownership of agent-related paths to match the elastic-agent process's uid
+// and elevate the process capabilities to those allowed for the container when the agent runs as non-root.
+// Refer to initContainer for more details.
+
 import (
 	"errors"
 	"fmt"
@@ -59,6 +64,9 @@ func initContainer(streams *cli.IOStreams) {
 		return
 	}
 	if !isRoot {
+		// if the agent runs as a non-root user, elevate the Effective capabilities to match the Bounding set.
+		// This is necessary because transitioning from the CRI process (uid 0) to the current process (non-zero uid)
+		// in Linux results in an empty Effective capabilities set.
 		logInfo(streams, "agent container initialisation - effective capabilities")
 		if err := raiseEffectiveCapabilities(); err != nil {
 			logWarning(streams, err)
@@ -71,7 +79,8 @@ func initContainer(streams *cli.IOStreams) {
 		}
 	}
 
-	// we need to chown all paths
+	// ensure all agent-related paths match the process's uid and gid to prevent access errors and
+	// meet required ownership checks of underlying Beats.
 	logInfo(streams, "agent container initialisation - chown paths")
 	if err := chownPaths(agentBaseDirectory); err != nil {
 		logWarning(streams, err)
