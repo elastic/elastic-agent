@@ -63,7 +63,6 @@ install_mage() {
     pushd "$WORKSPACE"
 }
 
-
 install_go() {
     # Search for the go in the Path
     if ! [ -x "$(type -P go | sed 's/go is //g')" ];
@@ -88,5 +87,3 @@ google_cloud_auth() {
 
     export GOOGLE_APPLICATION_CREDENTIALS=${secretFileLocation}
 }
-
-

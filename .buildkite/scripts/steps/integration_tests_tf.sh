@@ -9,7 +9,7 @@ install_mage
 sudo usermod -aG adm buildkite-agent
 sudo newgrp adm
 
-# source .buildkite/scripts/steps/ess.sh
+source .buildkite/scripts/steps/ess.sh
 
 # Override the agent package version using a string with format <major>.<minor>.<patch>
 # There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
