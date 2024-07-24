@@ -259,24 +259,22 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 
 	require.NotEmpty(t, agentPodName, "agent pod name is empty")
 
-	var stdout, stderr bytes.Buffer
 	command := []string{"elastic-agent", "status"}
-	var agentHealthy bool
-
+	var stdout, stderr bytes.Buffer
+	var agentHealthyErr error
 	// we will wait maximum 60 seconds for the agent to report healthy
-	for range 60 {
+	for i := 0; i < 60; i++ {
 		stdout.Reset()
 		stderr.Reset()
-		err := client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone", command, &stdout, &stderr)
-		if err == nil {
-			agentHealthy = true
+		agentHealthyErr = client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone", command, &stdout, &stderr)
+		if agentHealthyErr == nil {
 			break
 		}
 		time.Sleep(time.Second * 1)
 	}
 
-	if !agentHealthy {
-		t.Log("elastic-agent never reported healthy")
+	if agentHealthyErr != nil {
+		t.Errorf("elastic-agent never reported healthy: %v", agentHealthyErr)
 		t.Logf("stdout: %s\n", stdout.String())
 		t.Logf("stderr: %s\n", stderr.String())
 		t.FailNow()
