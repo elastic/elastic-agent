@@ -126,7 +126,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			int64Ptr(500),
 			int64Ptr(500),
 			[]corev1.Capability{"ALL"},
-			[]corev1.Capability{"CHOWN", "SETPCAP"},
+			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH"},
 			true,
 		},
 	}
