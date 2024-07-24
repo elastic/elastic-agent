@@ -31,7 +31,10 @@ func getFileOwnerFromCmd(cmd *cobra.Command) (utils.FileOwner, error) {
 	if err != nil {
 		return utils.FileOwner{}, err
 	}
-	ownership := utils.CurrentFileOwner()
+	ownership, err := utils.CurrentFileOwner()
+	if err != nil {
+		return utils.FileOwner{}, err
+	}
 	if uid != -1 {
 		ownership.UID = uid
 	}

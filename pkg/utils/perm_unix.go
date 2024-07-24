@@ -18,11 +18,11 @@ type FileOwner struct {
 }
 
 // CurrentFileOwner returns the executing UID and GID of the current process.
-func CurrentFileOwner() FileOwner {
+func CurrentFileOwner() (FileOwner, error) {
 	return FileOwner{
 		UID: os.Getuid(),
 		GID: os.Getgid(),
-	}
+	}, nil
 }
 
 // HasStrictExecPerms ensures that the path is executable by the owner, cannot be written by anyone other than the
