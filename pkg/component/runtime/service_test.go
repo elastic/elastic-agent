@@ -236,7 +236,7 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 				u := url.URL{}
 				u.Path = "/"
 				u.Scheme = "unix"
-				return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), "test.sock").String()
+				return u.JoinPath(paths.Top(), "test.sock").String()
 			}(),
 		},
 	}

@@ -25,5 +25,3 @@ cd kibana
 echo "--- Create Kibana PR"
 make ci-create-kubernetes-templates-pull-request
 
-echo "--- [File Update] Kustomize-Tempates"
-GENERATEKUSTOMIZE=true make ci-create-kustomize 
