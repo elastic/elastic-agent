@@ -9,7 +9,6 @@ install_mage
 
 echo "~~~ Granting access to buildkite-agent"
 sudo usermod -aG adm buildkite-agent
-sudo newgrp adm
 
 source .buildkite/scripts/steps/ess.sh
 
@@ -27,5 +26,10 @@ trap 'ess_down' EXIT
 
 # Run integration tests
 echo "~~~ Running integration tests"
-# AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
+# # AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
+# AGENT_VERSION="8.16.0-SNAPSHOT" SNAPSHOT=true TEST_DEFINE_PREFIX=non_sudo_linux go test -tags integration github.com/elastic/elastic-agent/testing/integration
+
+sudo newgrp adm <<EOF
+echo "~~~ Running integration tests"
 AGENT_VERSION="8.16.0-SNAPSHOT" SNAPSHOT=true TEST_DEFINE_PREFIX=non_sudo_linux go test -tags integration github.com/elastic/elastic-agent/testing/integration
+EOF
