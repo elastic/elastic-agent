@@ -100,7 +100,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 		{
 			"drop ALL capabilities - rootful agent",
 			int64Ptr(0),
-			int64Ptr(0),
+			nil,
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{},
 			false,
@@ -108,15 +108,15 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootful agent",
 			int64Ptr(0),
-			int64Ptr(0),
+			nil,
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
 			true,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent",
-			int64Ptr(1000),
-			int64Ptr(1000),
+			int64Ptr(1000), // elastic-agent uid
+			nil,
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
 			true,
