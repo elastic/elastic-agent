@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -262,21 +261,28 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 
 	var stdout, stderr bytes.Buffer
 	command := []string{"elastic-agent", "status"}
-	success := assert.Eventually(t, func() bool {
-		err := client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone", command, &stdout, &stderr)
-		if err != nil {
-			stdout.Reset()
-			stderr.Reset()
-			return false
-		}
-		return true
-	}, time.Second*100, time.Second*1, "elastic-agent never reported healthy")
+	var agentHealthy bool
 
-	if !success {
-		t.Log(stdout.String())
-		t.Log(stderr.String())
+	// we will wait maximum 60 seconds for the agent to report healthy
+	for range 60 {
+		stdout.Reset()
+		stderr.Reset()
+		err := client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone", command, &stdout, &stderr)
+		if err == nil {
+			agentHealthy = true
+			break
+		}
+		time.Sleep(time.Second * 1)
+	}
+
+	if !agentHealthy {
+		t.Log("elastic-agent never reported healthy")
+		t.Logf("stdout: %s\n", stdout.String())
+		t.Logf("stderr: %s\n", stderr.String())
+		t.FailNow()
 		return
 	}
+
 	stdout.Reset()
 	stderr.Reset()
 
