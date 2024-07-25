@@ -3,6 +3,8 @@ module github.com/elastic/elastic-agent
 go 1.22.4
 
 require (
+	github.com/Flaque/filet v0.0.0-20201012163910-45f684403088
+	github.com/Jeffail/gabs/v2 v2.6.0
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/antlr4-go/antlr/v4 v4.13.0
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
@@ -10,7 +12,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/e2e-testing v1.2.2
 	github.com/elastic/elastic-agent-autodiscover v0.8.0
 	github.com/elastic/elastic-agent-client/v7 v7.15.0
 	github.com/elastic/elastic-agent-libs v0.9.15
@@ -28,6 +29,7 @@ require (
 	github.com/gofrs/uuid/v5 v5.2.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/pprof v0.0.0-20230426061923-93006964c1fc
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hectane/go-acl v0.0.0-20190604041725-da78bae5fc95
@@ -129,7 +131,6 @@ require (
 require (
 	cloud.google.com/go/compute/metadata v0.4.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.24.0 // indirect
-	github.com/Jeffail/gabs/v2 v2.6.0 // indirect
 	github.com/Showmax/go-fqdn v1.0.0 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/akavel/rsrc v0.8.0 // indirect
@@ -175,12 +176,12 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/btree v1.1.2 // indirect
 	github.com/google/gnostic v0.7.0 // indirect
 	github.com/google/gnostic-models v0.6.9-0.20230804172637-c7be7c783f49 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/licenseclassifier v0.0.0-20221004142553-c1ed8fcf4bab // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
 	github.com/hashicorp/consul/api v1.29.1 // indirect

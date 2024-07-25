@@ -14,7 +14,6 @@ import (
 
 	"github.com/Jeffail/gabs/v2"
 	"github.com/cenkalti/backoff/v4"
-	"github.com/elastic/e2e-testing/internal/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -60,7 +59,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 	artifact := r.Name
 	version := r.Version
 
-	exp := utils.GetExponentialBackOff(time.Minute)
+	exp := getExponentialBackoff(time.Minute)
 
 	retryCount := 1
 
@@ -213,7 +212,7 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 		return version, nil
 	}
 
-	exp := utils.GetExponentialBackOff(time.Minute)
+	exp := getExponentialBackoff(time.Minute)
 
 	retryCount := 1
 
@@ -347,7 +346,7 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 		return "", "", err
 	}
 
-	exp := utils.GetExponentialBackOff(time.Minute)
+	exp := getExponentialBackoff(time.Minute)
 
 	retryCount := 1
 
@@ -473,7 +472,7 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 	url := fmt.Sprintf("https://artifacts.elastic.co/downloads/%s/%s/%s", r.Project, r.Name, r.FullName)
 	shaURL := fmt.Sprintf("%s.sha512", url)
 
-	exp := utils.GetExponentialBackOff(time.Minute)
+	exp := getExponentialBackoff(time.Minute)
 	retryCount := 1
 	found := false
 

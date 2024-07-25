@@ -740,8 +740,6 @@ github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3
 github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5 h1:BzN9o4IS1Hj+AM5qDggsfMDQGFXau5KagipEFmnyIbc=
 github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5/go.mod h1:cxc20xI7fOgsFHWgt+PenlDDnMcrvh7Ocuj5hEFIdEk=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
-github.com/elastic/e2e-testing v1.2.2 h1:85FFeN7lL2AzKDeI30VLDp15/QIFbtYsDuer01zf1/Q=
-github.com/elastic/e2e-testing v1.2.2/go.mod h1:pBKxi5oOM5bPVrOZ4p4cx5F1/ArGCobOG5zcOAWv6rc=
 github.com/elastic/elastic-agent-autodiscover v0.8.0 h1:euHfPSsOE1z8GsPaFoc7lBB8pwyGGUiaE2lXHt0WwQI=
 github.com/elastic/elastic-agent-autodiscover v0.8.0/go.mod h1:lSHCpBzQj2DU0U5RX7Z1Kpt12R6WGca6598MorwlJsY=
 github.com/elastic/elastic-agent-client/v7 v7.15.0 h1:nDB7v8TBoNuD6IIzC3z7Q0y+7bMgXoT2DsHfolO2CHE=
