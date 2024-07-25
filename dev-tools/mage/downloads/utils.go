@@ -18,9 +18,6 @@ import (
 )
 
 //nolint:unused
-const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-//nolint:unused
 var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 // downloadRequest struct contains download details ad path and URL
