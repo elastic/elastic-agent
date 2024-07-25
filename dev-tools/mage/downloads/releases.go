@@ -174,13 +174,6 @@ func newArtifactsSnapshotCustom(host string) *ArtifactsSnapshotVersion {
 	}
 }
 
-// Uses artifacts-snapshot.elastic.co to retrieve the latest version of a SNAPSHOT artifact
-func NewArtifactsSnapshot() *ArtifactsSnapshotVersion {
-	return &ArtifactsSnapshotVersion{
-		Host: "https://artifacts-snapshot.elastic.co",
-	}
-}
-
 // GetSnapshotArtifactVersion returns the current version:
 // Uses artifacts-snapshot.elastic.co to retrieve the latest version of a SNAPSHOT artifact
 // 1. Elastic's artifact repository, building the JSON path query based
