@@ -68,6 +68,7 @@ func downloadFile(downloadRequest *downloadRequest) error {
 			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
 		}
+		defer resp.Body.Close()
 
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return backoff.Permanent(fmt.Errorf("%s not found", downloadRequest.URL))
