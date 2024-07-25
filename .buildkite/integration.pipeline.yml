@@ -3,6 +3,7 @@
 env:
   DOCKER_REGISTRY: "docker.elastic.co"
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+  ASDF_MAGE_VERSION: 1.14.0
 
 steps:
   # - label: "Integration tests: packaging"
@@ -27,8 +28,9 @@ steps:
       - test_infra/ess/terraform.tfstate
     agents:
       provider: "gcp"
+      imageProject: elastic-images-qa
       machineType: "n1-standard-8"
-      image: "family/core-ubuntu-2204"
+      image: "family/platform-ingest-elastic-agent-gcp-linux-x86-64-elastic-agent-ubuntu-2204"
 
   # - label: "Integration tests: stateful ESS sudo"
   #   key: test-tf-sudo
