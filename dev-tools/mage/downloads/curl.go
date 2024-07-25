@@ -51,8 +51,6 @@ func delete(r httpRequest) (string, error) {
 }
 
 // head executes a HEAD request
-//
-//nolint:unused // defined for completeness of HTTP methods
 func head(r httpRequest) (string, error) {
 	r.method = "HEAD"
 
