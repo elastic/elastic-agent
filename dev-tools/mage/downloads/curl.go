@@ -83,7 +83,7 @@ func put(r httpRequest) (string, error) {
 	return request(r)
 }
 
-// post executes a request
+// request executes a request
 func request(r httpRequest) (string, error) {
 	escapedURL := r.GetURL()
 
