@@ -43,7 +43,7 @@ func (req *httpRequest) GetURL() string {
 
 // delete executes a DELETE request
 //
-//nolint:unused defined for completeness of HTTP methods
+//nolint:unused // defined for completeness of HTTP methods
 func delete(r httpRequest) (string, error) {
 	r.method = "DELETE"
 
@@ -52,7 +52,7 @@ func delete(r httpRequest) (string, error) {
 
 // head executes a HEAD request
 //
-//nolint:unused defined for completeness of HTTP methods
+//nolint:unused // defined for completeness of HTTP methods
 func head(r httpRequest) (string, error) {
 	r.method = "HEAD"
 
@@ -68,7 +68,7 @@ func get(r httpRequest) (string, error) {
 
 // post executes a POST request
 //
-//nolint:unused defined for completeness of HTTP methods
+//nolint:unused // defined for completeness of HTTP methods
 func post(r httpRequest) (string, error) {
 	r.method = "POST"
 
@@ -77,7 +77,7 @@ func post(r httpRequest) (string, error) {
 
 // put executes a PUT request
 //
-//nolint:unused defined for completeness of HTTP methods
+//nolint:unused // defined for completeness of HTTP methods
 func put(r httpRequest) (string, error) {
 	r.method = "PUT"
 
