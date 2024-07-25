@@ -5,8 +5,9 @@
 package downloads
 
 import (
-	log "github.com/sirupsen/logrus"
 	"os"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // exists checks if a path exists in the file system
