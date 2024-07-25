@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 // downloadRequest struct contains download details ad path and URL
@@ -28,15 +28,27 @@ type downloadRequest struct {
 func downloadFile(downloadRequest *downloadRequest) error {
 	var filePath string
 	if downloadRequest.DownloadPath == "" {
-		tempParentDir := filepath.Join(os.TempDir(), uuid.NewString())
-		err := mkdirAll(tempParentDir)
+		u, err := uuid.NewV4()
+		if err != nil {
+			return fmt.Errorf("failed to create UUID: %w", err)
+		}
+		tempParentDir := filepath.Join(os.TempDir(), u.String())
+		err = mkdirAll(tempParentDir)
 		if err != nil {
 			return fmt.Errorf("creating directory: %w", err)
 		}
-		filePath = filepath.Join(tempParentDir, uuid.NewString())
+		u, err = uuid.NewV4()
+		if err != nil {
+			return fmt.Errorf("failed to create UUID: %w", err)
+		}
+		filePath = filepath.Join(tempParentDir, u.String())
 		downloadRequest.DownloadPath = filePath
 	} else {
-		filePath = filepath.Join(downloadRequest.DownloadPath, uuid.NewString())
+		u, err := uuid.NewV4()
+		if err != nil {
+			return fmt.Errorf("failed to create UUID: %w", err)
+		}
+		filePath = filepath.Join(downloadRequest.DownloadPath, u.String())
 	}
 
 	tempFile, err := os.Create(filePath)
