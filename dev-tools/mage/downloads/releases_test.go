@@ -102,8 +102,8 @@ func TestArtifactsSnapshotResolver(t *testing.T) {
 
 	t.Run("Positive: parses commit has and returns full version", func(t *testing.T) {
 
-		artifactsSnapshotMockManifest, err := os.ReadFile(filepath.Join("..", "_testresources", "dra", "snapshot_artifacts_test.json"))
-		require.NoError(t, err, "couldn't read pkg/_testresources/dra/snapshot_artifacts_test.json")
+		artifactsSnapshotMockManifest, err := os.ReadFile(filepath.Join(".", "_testresources", "dra", "snapshot_artifacts_test.json"))
+		require.NoError(t, err, "couldn't read _testresources/dra/snapshot_artifacts_test.json")
 		mockResponses := map[string]string{
 			"/beats/latest/8.9.0-SNAPSHOT.json": `{
 				"version" : "8.9.0-SNAPSHOT",

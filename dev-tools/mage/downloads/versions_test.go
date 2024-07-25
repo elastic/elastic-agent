@@ -19,7 +19,7 @@ var testVersion = "BEATS_VERSION"
 var ubi8VersionPrefix = artifact + "-ubi8-" + testVersion
 var versionPrefix = artifact + "-" + testVersion
 
-var testResourcesBasePath = path.Join("..", "_testresources")
+var testResourcesBasePath = path.Join(".", "_testresources")
 
 const bucket = "beats-ci-artifacts"
 const commits = "commits"
