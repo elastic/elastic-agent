@@ -11,7 +11,7 @@ import (
 )
 
 // timeoutFactor a multiplier for the max timeout when doing backoff retries.
-// It can be overriden by TIMEOUT_FACTOR env var
+// It can be overridden by TIMEOUT_FACTOR env var
 var timeoutFactor = 3
 
 func init() {
