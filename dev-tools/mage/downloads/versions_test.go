@@ -34,19 +34,19 @@ func init() {
 	if err != nil {
 		os.Exit(1)
 	}
-	nextTokenParamJSON, _ = gabs.ParseJSON([]byte(nextTokenParamContent))
+	nextTokenParamJSON, _ = gabs.ParseJSON(nextTokenParamContent)
 
 	commitsContent, err := os.ReadFile(path.Join(testResourcesBasePath, "gcp", "commits.json"))
 	if err != nil {
 		os.Exit(1)
 	}
-	commitsJSON, _ = gabs.ParseJSON([]byte(commitsContent))
+	commitsJSON, _ = gabs.ParseJSON(commitsContent)
 
 	snapshotsContent, err := os.ReadFile(path.Join(testResourcesBasePath, "gcp", "snapshots.json"))
 	if err != nil {
 		os.Exit(1)
 	}
-	snapshotsJSON, _ = gabs.ParseJSON([]byte(snapshotsContent))
+	snapshotsJSON, _ = gabs.ParseJSON(snapshotsContent)
 }
 
 func TestBuildArtifactName(t *testing.T) {
