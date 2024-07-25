@@ -27,7 +27,7 @@ import (
 )
 
 // BeatsLocalPath is the path to a local copy of the Beats git repository
-// It can be overriden by BEATS_LOCAL_PATH env var. Using the empty string as a default.
+// It can be overridden by BEATS_LOCAL_PATH env var. Using the empty string as a default.
 // Deprecated. This variable will be removed in following releases, so it's not used anywhere else
 var BeatsLocalPath = ""
 
