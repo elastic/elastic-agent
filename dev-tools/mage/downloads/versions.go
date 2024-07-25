@@ -186,7 +186,7 @@ func GetElasticArtifactVersion(version string) (string, error) {
 
 	apiStatus := func() error {
 		url := cacheKey
-		resp, err := http.Get(url)
+		resp, err := http.Get(url) //nolint:gosec // G305 dev tools code, not in user code path
 		if err != nil {
 			return fmt.Errorf("error getting %s: %w", url, err)
 		}
