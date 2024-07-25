@@ -79,7 +79,10 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 
 	apiStatus := func() error {
 		url := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/%s?x-elastic-no-kpi=true", tmpVersion, artifact)
-		resp, err := http.Get(url) //nolint:gosec // G305 dev tools code, not in user code path
+		req := httpRequest{
+			URL: url,
+		}
+		bodyStr, err := get(req)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"kind":           r.Kind(),
@@ -90,22 +93,14 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 				"retry":          retryCount,
 				"statusEndpoint": url,
 				"elapsedTime":    exp.GetElapsedTime(),
+				"resp":           bodyStr,
 			}).Warn("Resolver failed")
 			retryCount++
 
 			return err
 		}
 
-		defer resp.Body.Close()
-		body, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return backoff.Permanent(err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return backoff.Permanent(fmt.Errorf("unexpected status code %d from url %s", resp.StatusCode, url))
-		}
-
+		body = []byte(bodyStr)
 		return nil
 	}
 
@@ -220,7 +215,10 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 
 	apiStatus := func() error {
 		url := cacheKey
-		resp, err := http.Get(url) //nolint:gosec // G305 dev tools code, not in user code path
+		r := httpRequest{
+			URL: url,
+		}
+		bodyStr, err := get(r)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"version":        version,
@@ -228,23 +226,14 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 				"retry":          retryCount,
 				"statusEndpoint": url,
 				"elapsedTime":    exp.GetElapsedTime(),
-				"resp":           resp,
+				"resp":           bodyStr,
 			}).Warn("ArtifactsSnapshotVersion failed")
 			retryCount++
 
 			return err
 		}
 
-		defer resp.Body.Close()
-		body, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return backoff.Permanent(err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return backoff.Permanent(fmt.Errorf("unexpected status code %d from url %s", resp.StatusCode, url))
-		}
-
+		body = []byte(bodyStr)
 		return nil
 	}
 

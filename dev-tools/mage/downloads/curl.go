@@ -6,6 +6,7 @@ package downloads
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -102,7 +103,7 @@ func request(r httpRequest) (string, error) {
 
 	log.WithFields(fields).Trace("Executing request")
 
-	req, err := http.NewRequest(r.method, escapedURL, body)
+	req, err := http.NewRequestWithContext(context.TODO(), r.method, escapedURL, body)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error":      err,
