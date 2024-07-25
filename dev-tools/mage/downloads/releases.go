@@ -7,8 +7,6 @@ package downloads
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 
@@ -337,7 +335,8 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 	apiStatus := func() error {
 		// https://artifacts-snapshot.elastic.co/beats/8.9.0-d1b14479/manifest-8.9.0-SNAPSHOT.json
 		url := fmt.Sprintf("%s/%s/%s-%s/manifest-%s-SNAPSHOT.json", asur.SnapshotApiHost, asur.Project, semVer, commit, semVer)
-		resp, err := http.Get(url)
+		r := httpRequest{URL: url}
+		bodyStr, err := get(r)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"kind":           asur.Kind(),
@@ -348,23 +347,14 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 				"retry":          retryCount,
 				"statusEndpoint": url,
 				"elapsedTime":    exp.GetElapsedTime(),
-				"resp":           resp,
+				"resp":           bodyStr,
 			}).Warn("resolver failed")
 			retryCount++
 
 			return err
 		}
 
-		defer resp.Body.Close()
-		body, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return backoff.Permanent(err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return backoff.Permanent(fmt.Errorf("unexpected status code %d from url %s", resp.StatusCode, url))
-		}
-
+		body = []byte(bodyStr)
 		return nil
 	}
 
@@ -459,7 +449,8 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 	found := false
 
 	apiStatus := func() error {
-		resp, err := http.Head(url)
+		req := httpRequest{URL: url}
+		bodyStr, err := head(req)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"kind":           r.Kind(),
@@ -467,19 +458,12 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 				"retry":          retryCount,
 				"statusEndpoint": url,
 				"elapsedTime":    exp.GetElapsedTime(),
-				"resp":           resp,
+				"resp":           bodyStr,
 			}).Debug("Resolver failed")
 
 			retryCount++
 
 			return err
-		}
-
-		defer resp.Body.Close()
-		_, _ = io.Copy(io.Discard, resp.Body)
-
-		if resp.StatusCode != http.StatusOK {
-			return backoff.Permanent(fmt.Errorf("unexpected status code %d from url %s", resp.StatusCode, url))
 		}
 
 		found = true
