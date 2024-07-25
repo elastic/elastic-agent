@@ -8,8 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -186,20 +184,13 @@ func GetElasticArtifactVersion(version string) (string, error) {
 
 	apiStatus := func() error {
 		url := cacheKey
-		resp, err := http.Get(url) //nolint:gosec // G305 dev tools code, not in user code path
+		r := httpRequest{URL: url}
+		bodyStr, err := get(r)
 		if err != nil {
 			return fmt.Errorf("error getting %s: %w", url, err)
 		}
 
-		if resp.StatusCode != http.StatusOK {
-			return backoff.Permanent(fmt.Errorf("unexpected status code %d from url %s when fetching version %s", resp.StatusCode, url, version))
-		}
-
-		defer resp.Body.Close()
-		body, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return backoff.Permanent(err)
-		}
+		body = []byte(bodyStr)
 		return nil
 	}
 

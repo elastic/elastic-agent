@@ -7,9 +7,9 @@ package downloads
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/gofrs/uuid/v5"
@@ -61,21 +61,16 @@ func downloadFile(downloadRequest *downloadRequest) error {
 	exp := getExponentialBackoff(3)
 
 	retryCount := 1
-	var fileReader io.ReadCloser
+	var fileReader io.Reader
 	download := func() error {
-		resp, err := http.Get(downloadRequest.URL)
+		r := httpRequest{URL: downloadRequest.URL}
+		bodyStr, err := get(r)
 		if err != nil {
 			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
 		}
-		defer resp.Body.Close()
 
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			return backoff.Permanent(fmt.Errorf("%s not found", downloadRequest.URL))
-		}
-
-		fileReader = resp.Body
-
+		fileReader = strings.NewReader(bodyStr)
 		return nil
 	}
 
@@ -83,7 +78,6 @@ func downloadFile(downloadRequest *downloadRequest) error {
 	if err != nil {
 		return err
 	}
-	defer fileReader.Close()
 
 	_, err = io.Copy(tempFile, fileReader)
 	if err != nil {
