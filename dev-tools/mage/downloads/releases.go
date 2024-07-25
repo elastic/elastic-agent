@@ -79,7 +79,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 
 	apiStatus := func() error {
 		url := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/%s?x-elastic-no-kpi=true", tmpVersion, artifact)
-		resp, err := http.Get(url)
+		resp, err := http.Get(url) //nolint:gosec // G305 dev tools code, not in user code path
 		if err != nil {
 			log.WithFields(log.Fields{
 				"kind":           r.Kind(),
@@ -220,7 +220,7 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 
 	apiStatus := func() error {
 		url := cacheKey
-		resp, err := http.Get(url)
+		resp, err := http.Get(url) //nolint:gosec // G305 dev tools code, not in user code path
 		if err != nil {
 			log.WithFields(log.Fields{
 				"version":        version,
