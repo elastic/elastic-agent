@@ -7,18 +7,13 @@ package downloads
 import (
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 )
-
-//nolint:unused
-var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 // downloadRequest struct contains download details ad path and URL
 type downloadRequest struct {
