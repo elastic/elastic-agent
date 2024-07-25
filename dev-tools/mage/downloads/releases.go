@@ -326,8 +326,8 @@ type ArtifactsSnapshotURLResolver struct {
 	SnapshotApiHost string
 }
 
-func (r *ArtifactsSnapshotURLResolver) Kind() string {
-	return fmt.Sprintf("Project snapshot resolver: %s", r.FullName)
+func (asur *ArtifactsSnapshotURLResolver) Kind() string {
+	return fmt.Sprintf("Project snapshot resolver: %s", asur.FullName)
 }
 
 func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
