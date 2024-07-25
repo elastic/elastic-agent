@@ -41,6 +41,8 @@ func (req *httpRequest) GetURL() string {
 }
 
 // delete executes a DELETE request
+//
+//nolint:unused
 func delete(r httpRequest) (string, error) {
 	r.method = "DELETE"
 
@@ -48,6 +50,8 @@ func delete(r httpRequest) (string, error) {
 }
 
 // head executes a HEAD request
+//
+//nolint:unused
 func head(r httpRequest) (string, error) {
 	r.method = "HEAD"
 
@@ -62,6 +66,8 @@ func get(r httpRequest) (string, error) {
 }
 
 // post executes a POST request
+//
+//nolint:unused
 func post(r httpRequest) (string, error) {
 	r.method = "POST"
 
@@ -69,6 +75,8 @@ func post(r httpRequest) (string, error) {
 }
 
 // put executes a PUT request
+//
+//nolint:unused
 func put(r httpRequest) (string, error) {
 	r.method = "PUT"
 
