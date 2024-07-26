@@ -3,6 +3,8 @@ module github.com/elastic/elastic-agent
 go 1.22.4
 
 require (
+	github.com/Flaque/filet v0.0.0-20201012163910-45f684403088
+	github.com/Jeffail/gabs/v2 v2.6.0
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/antlr4-go/antlr/v4 v4.13.0
 	github.com/billgraziano/dpapi v0.4.0
@@ -11,7 +13,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/e2e-testing v1.2.2
 	github.com/elastic/elastic-agent-autodiscover v0.8.0
 	github.com/elastic/elastic-agent-client/v7 v7.14.0
 	github.com/elastic/elastic-agent-libs v0.9.15
@@ -128,7 +129,6 @@ require (
 require (
 	cloud.google.com/go/compute/metadata v0.4.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.24.0 // indirect
-	github.com/Jeffail/gabs/v2 v2.6.0 // indirect
 	github.com/Showmax/go-fqdn v1.0.0 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/akavel/rsrc v0.8.0 // indirect
@@ -173,7 +173,13 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+<<<<<<< HEAD
 	github.com/google/gnostic-models v0.6.8 // indirect
+=======
+	github.com/google/btree v1.1.2 // indirect
+	github.com/google/gnostic v0.7.0 // indirect
+	github.com/google/gnostic-models v0.6.9-0.20230804172637-c7be7c783f49 // indirect
+>>>>>>> 1623d55aa5 (Remove dependency on github.com/elastic/e2e-testing (#5197))
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/licenseclassifier v0.0.0-20221004142553-c1ed8fcf4bab // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
