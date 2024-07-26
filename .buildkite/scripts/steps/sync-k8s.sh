@@ -10,7 +10,7 @@ echo "--- [Prepare env] Create required env variables"
 GITHUB_USERNAME_SECRET="elasticmachine"
 export GITHUB_USERNAME_SECRET=$GITHUB_USERNAME_SECRET
 export GITHUB_EMAIL_SECRET="elasticmachine@elastic.co"
-export GITHUB_TOKEN=$VAULT_GITHUB_TOKEN
+export GITHUB_TOKEN_SECRET=$VAULT_GITHUB_TOKEN
 
 cd deploy/kubernetes
 
