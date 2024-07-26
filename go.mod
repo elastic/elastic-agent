@@ -14,11 +14,11 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.8.0
 	github.com/elastic/elastic-agent-client/v7 v7.15.0
 	github.com/elastic/elastic-agent-libs v0.9.15
-	github.com/elastic/elastic-agent-system-metrics v0.10.4
+	github.com/elastic/elastic-agent-system-metrics v0.10.6
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
 	github.com/elastic/go-licenser v0.4.2
-	github.com/elastic/go-sysinfo v1.14.0
+	github.com/elastic/go-sysinfo v1.14.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.1
@@ -348,7 +348,3 @@ replace (
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
-
-replace github.com/elastic/go-sysinfo => github.com/AndersonQ/go-sysinfo v0.0.0-20240723133639-576a5a94e18c
-
-replace github.com/elastic/elastic-agent-system-metrics => github.com/AndersonQ/elastic-agent-system-metrics v0.0.0-20240725134009-75d8f73370c8
