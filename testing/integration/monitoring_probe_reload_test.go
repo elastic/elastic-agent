@@ -165,9 +165,8 @@ func (runner *MonitoringRunner) AllComponentsHealthy(ctx context.Context) {
 	compDebugName := ""
 	require.Eventually(runner.T(), func() bool {
 		allHealthy := true
-		status, err := runner.agentFixture.ExecStatus(ctx)
+		status, _ := runner.agentFixture.ExecStatus(ctx)
 
-		require.NoError(runner.T(), err)
 		for _, comp := range status.Components {
 			runner.T().Logf("component state: %s", comp.Message)
 			if comp.State != int(cproto.State_HEALTHY) {

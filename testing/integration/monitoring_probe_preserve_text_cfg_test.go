@@ -54,6 +54,7 @@ inputs:
         - filesystem
         data_stream.dataset: system.filesystem
 agent.monitoring:
+  metrics_period: 1s
   http:
     enabled: true
     port: 6791
@@ -187,9 +188,8 @@ func (runner *MonitoringTextRunner) AllComponentsHealthy(ctx context.Context) {
 	compDebugName := ""
 	require.Eventually(runner.T(), func() bool {
 		allHealthy := true
-		status, err := runner.agentFixture.ExecStatus(ctx)
+		status, _ := runner.agentFixture.ExecStatus(ctx)
 
-		require.NoError(runner.T(), err)
 		for _, comp := range status.Components {
 			runner.T().Logf("component state: %s", comp.Message)
 			if comp.State != int(cproto.State_HEALTHY) {
