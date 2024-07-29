@@ -772,8 +772,8 @@ github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015 h1:z8cC8GASpPo8yKl
 github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015/go.mod h1:qH9DX/Dmflz6EAtaks/+2SsdQzecVAKE174Zl66hk7E=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.1 h1:CMgNOCi80GgCFrnDtSDOMmHHMCXcX4VVAp0b7KcDEHE=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.1/go.mod h1:KR1P54I10KN+f4rEHaPwQZBnRkKGgiabxBrRthTWCAs=
-github.com/elastic/opentelemetry-lib v0.7.4 h1:nvc8ciUBPdorg73EbDck96WMeCBTCMUcLDbXRmaC2EI=
-github.com/elastic/opentelemetry-lib v0.7.4/go.mod h1:aCZdym3mU3rW87cZmbTaKbAEe5Bb9vjtlqta3FegBAU=
+github.com/elastic/opentelemetry-lib v0.8.0 h1:D+S49dIspwjA5z051CEKUUNwFTPZZJeLJ7lGyZZTw74=
+github.com/elastic/opentelemetry-lib v0.8.0/go.mod h1:aCZdym3mU3rW87cZmbTaKbAEe5Bb9vjtlqta3FegBAU=
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
 github.com/elastic/pkcs8 v1.0.0/go.mod h1:ipsZToJfq1MxclVTwpG7U/bgeDtf+0HkUiOxebk95+0=
 github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153/go.mod h1:/Zj4wYkgs4iZTTu3o/KG3Itv/qCCa8VVMlb3i9OVuzc=
