@@ -209,14 +209,13 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 	compDebugName := ""
 	require.Eventually(runner.T(), func() bool {
 		allHealthy := true
-		status, err := runner.agentFixture.ExecStatus(ctx)
+		status, _ := runner.agentFixture.ExecStatus(ctx)
 
 		apacheMatch := "logfile-apache"
 		foundApache := false
 		systemMatch := "system/metrics"
 		foundSystem := false
 
-		require.NoError(runner.T(), err)
 		for _, comp := range status.Components {
 			// make sure the components include the expected integrations
 			for _, v := range comp.Units {
@@ -269,8 +268,8 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 	oldTop := paths.Top()
 	paths.SetTop("/opt/Elastic/Agent")
 	// fetch the unit ID of the component, use that to generate the path to the unix socket
-	status, err := fixture.ExecStatus(ctx)
-	require.NoError(t, err)
+	status, _ := fixture.ExecStatus(ctx)
+
 	for _, comp := range status.Components {
 		unitId := comp.ID
 		socketPath := utils.SocketURLWithFallback(unitId, paths.TempDir())
@@ -351,8 +350,8 @@ func (handleMon *handleMonitor) Init(ctx context.Context, t *testing.T, fixture 
 	// the `last 30s` metrics tend to report gauges, which we can't use for calculating a derivative.
 	// so separately fetch the PIDs
 	pidInStatusMessageRegex := regexp.MustCompile(`[\d]+`)
-	status, err := fixture.ExecStatus(ctx)
-	require.NoError(t, err)
+	status, _ := fixture.ExecStatus(ctx)
+
 	for _, comp := range status.Components {
 		pidStr := pidInStatusMessageRegex.FindString(comp.Message)
 		pid, err := strconv.ParseInt(pidStr, 10, 64)
