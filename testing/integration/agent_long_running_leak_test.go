@@ -209,7 +209,11 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 	compDebugName := ""
 	require.Eventually(runner.T(), func() bool {
 		allHealthy := true
-		status, _ := runner.agentFixture.ExecStatus(ctx)
+		status, err := runner.agentFixture.ExecStatus(ctx)
+		if err != nil {
+			runner.T().Logf("agent status returned an error: %v", err)
+			return false
+		}
 
 		apacheMatch := "logfile-apache"
 		foundApache := false
@@ -268,7 +272,10 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 	oldTop := paths.Top()
 	paths.SetTop("/opt/Elastic/Agent")
 	// fetch the unit ID of the component, use that to generate the path to the unix socket
-	status, _ := fixture.ExecStatus(ctx)
+	status, err := fixture.ExecStatus(ctx)
+	if err != nil {
+		t.Logf("agent status returned an error: %v", err)
+	}
 
 	for _, comp := range status.Components {
 		unitId := comp.ID
@@ -350,7 +357,10 @@ func (handleMon *handleMonitor) Init(ctx context.Context, t *testing.T, fixture 
 	// the `last 30s` metrics tend to report gauges, which we can't use for calculating a derivative.
 	// so separately fetch the PIDs
 	pidInStatusMessageRegex := regexp.MustCompile(`[\d]+`)
-	status, _ := fixture.ExecStatus(ctx)
+	status, err := fixture.ExecStatus(ctx)
+	if err != nil {
+		t.Logf("agent status returned an error: %v", err)
+	}
 
 	for _, comp := range status.Components {
 		pidStr := pidInStatusMessageRegex.FindString(comp.Message)
