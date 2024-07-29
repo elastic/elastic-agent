@@ -721,7 +721,7 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (Ag
 		return AgentStatusOutput{},
 			fmt.Errorf("could not unmarshal agent status output: %w", uerr)
 	} else if status.IsZero() {
-		return status, fmt.Errorf("agent status returned empty output")
+		return status, fmt.Errorf("agent status output is empty")
 	}
 
 	return status, nil
