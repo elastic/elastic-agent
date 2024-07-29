@@ -8,14 +8,11 @@ import (
 	"path"
 	"testing"
 
-	"github.com/Flaque/filet"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMkdirAll(t *testing.T) {
-	defer filet.CleanUp(t)
-
-	tmpDir := filet.TmpDir(t, "")
+	tmpDir := t.TempDir()
 
 	dir := path.Join(tmpDir, ".op", "compose", "services")
 
