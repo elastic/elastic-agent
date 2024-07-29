@@ -715,7 +715,6 @@ func (e *ExecErr) Unwrap() error {
 // It should work with any 8.6+ agent
 func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
 	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
-
 	status := AgentStatusOutput{}
 	if uerr := json.Unmarshal(out, &status); uerr != nil {
 		return AgentStatusOutput{},
