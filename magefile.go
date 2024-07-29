@@ -31,9 +31,9 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
-	"github.com/elastic/e2e-testing/pkg/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -1006,7 +1006,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 		if devtools.ExternalBuild == true {
 
 			// Only log fatal logs for logs produced using logrus. This is the global logger
-			// used by github.com/elastic/e2e-testing/pkg/downloads which can only be configured globally like this or via
+			// used by github.com/elastic/elastic-agent/dev-tools/mage/downloads which can only be configured globally like this or via
 			// environment variables.
 			//
 			// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
