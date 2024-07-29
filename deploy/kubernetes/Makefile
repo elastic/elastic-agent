@@ -64,6 +64,7 @@ ci-clone-kibana-repository:
 
 ## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
 $(eval HASDIFF =$(shell sh -c "git status | grep $(FILE_REPO) | wc -l"))
+HASDIFF=1 
 .PHONY: ci-create-kubernetes-templates-pull-request
 ci-create-kubernetes-templates-pull-request:
 ifeq ($(HASDIFF),1)
