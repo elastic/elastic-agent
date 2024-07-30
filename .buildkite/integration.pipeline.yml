@@ -27,6 +27,8 @@ steps:
       .buildkite/scripts/steps/integration_tests_tf.sh
     artifact_paths:
       - test_infra/ess/terraform.tfstate
+      - "build/TEST-**"
+      - "build/diagnostics/*"
     agents:
       provider: "gcp"
       imageProject: elastic-images-qa
