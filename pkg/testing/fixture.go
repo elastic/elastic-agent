@@ -1237,7 +1237,7 @@ type AgentStatusOutput struct {
 }
 
 func (aso *AgentStatusOutput) IsZero() bool {
-	return aso.Info.ID == ""
+	return aso.Info.ID == "" && aso.Message == "" && aso.Info.Version == ""
 }
 
 type AgentInspectOutput struct {
