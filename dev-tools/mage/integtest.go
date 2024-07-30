@@ -5,12 +5,12 @@
 package mage
 
 import (
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 
-	"github.com/joeshaw/multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/pkg/errors"
 )
@@ -101,7 +101,7 @@ func (steps IntegrationTestSteps) Teardown(env map[string]string) error {
 }
 
 func (steps IntegrationTestSteps) teardownFrom(start int, env map[string]string) error {
-	var errs multierror.Errors
+	var errs []error
 	for i := start; i >= 0; i-- {
 		if mg.Verbose() {
 			fmt.Printf("Teardown %s...\n", steps[i].Name())
@@ -110,7 +110,7 @@ func (steps IntegrationTestSteps) teardownFrom(start int, env map[string]string)
 			errs = append(errs, errors.Wrapf(err, "%s teardown failed", steps[i].Name()))
 		}
 	}
-	return errs.Err()
+	return goerrors.Join(errs...)
 }
 
 // IntegrationTester is interface used by the actual test runner.
@@ -311,13 +311,13 @@ func (r *IntegrationRunner) Test(mageTarget string, test func() error) (err erro
 
 // Test runs the test on each runner and collects the errors.
 func (r IntegrationRunners) Test(mageTarget string, test func() error) error {
-	var errs multierror.Errors
+	var errs []error
 	for _, runner := range r {
 		if err := runner.Test(mageTarget, test); err != nil {
 			errs = append(errs, err)
 		}
 	}
-	return errs.Err()
+	return goerrors.Join(errs...)
 }
 
 func passThroughEnvs(env map[string]string, passthrough ...string) {
