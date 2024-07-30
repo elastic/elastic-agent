@@ -23,7 +23,7 @@ require (
 	github.com/elastic/go-sysinfo v1.14.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.1
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.8.0
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gofrs/flock v0.8.1
