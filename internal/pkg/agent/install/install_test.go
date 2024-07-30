@@ -177,7 +177,9 @@ func TestCopyFiles(t *testing.T) {
 
 func TestSetupInstallPath(t *testing.T) {
 	tmpdir := t.TempDir()
-	err := setupInstallPath(tmpdir, utils.CurrentFileOwner())
+	ownership, err := utils.CurrentFileOwner()
+	require.NoError(t, err)
+	err = setupInstallPath(tmpdir, ownership)
 	require.NoError(t, err)
 	require.FileExists(t, filepath.Join(tmpdir, paths.MarkerFileName))
 }
