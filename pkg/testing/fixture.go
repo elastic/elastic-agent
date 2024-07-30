@@ -715,13 +715,17 @@ func (e *ExecErr) Unwrap() error {
 // It should work with any 8.6+ agent
 func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
 	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
+	f.t.Logf(">> Got output for status: %v :err: %v", out, err)
 	status := AgentStatusOutput{}
 	if uerr := json.Unmarshal(out, &status); uerr != nil {
+		f.t.Logf(">> Error %v", errors.Join(uerr, err))
 		return AgentStatusOutput{},
 			fmt.Errorf("could not unmarshal agent status output: %w", errors.Join(uerr, err))
 	} else if status.IsZero() {
+		f.t.Logf(">> Marshalled output: %v", status)
 		return status, fmt.Errorf("agent status output is empty: %w", err)
 	}
+	f.t.Logf(">> Marshalled output: %v", status)
 
 	return status, nil
 }
