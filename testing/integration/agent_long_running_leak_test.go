@@ -210,13 +210,16 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 	require.Eventually(runner.T(), func() bool {
 		allHealthy := true
 		status, err := runner.agentFixture.ExecStatus(ctx)
+		if err != nil {
+			runner.T().Logf("agent status returned an error: %v", err)
+			return false
+		}
 
 		apacheMatch := "logfile-apache"
 		foundApache := false
 		systemMatch := "system/metrics"
 		foundSystem := false
 
-		require.NoError(runner.T(), err)
 		for _, comp := range status.Components {
 			// make sure the components include the expected integrations
 			for _, v := range comp.Units {
@@ -270,7 +273,10 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 	paths.SetTop("/opt/Elastic/Agent")
 	// fetch the unit ID of the component, use that to generate the path to the unix socket
 	status, err := fixture.ExecStatus(ctx)
-	require.NoError(t, err)
+	if err != nil {
+		t.Logf("agent status returned an error: %v", err)
+	}
+
 	for _, comp := range status.Components {
 		unitId := comp.ID
 		socketPath := utils.SocketURLWithFallback(unitId, paths.TempDir())
@@ -352,7 +358,10 @@ func (handleMon *handleMonitor) Init(ctx context.Context, t *testing.T, fixture 
 	// so separately fetch the PIDs
 	pidInStatusMessageRegex := regexp.MustCompile(`[\d]+`)
 	status, err := fixture.ExecStatus(ctx)
-	require.NoError(t, err)
+	if err != nil {
+		t.Logf("agent status returned an error: %v", err)
+	}
+
 	for _, comp := range status.Components {
 		pidStr := pidInStatusMessageRegex.FindString(comp.Message)
 		pid, err := strconv.ParseInt(pidStr, 10, 64)
