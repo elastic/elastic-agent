@@ -709,26 +709,20 @@ func (e *ExecErr) Unwrap() error {
 // ExecStatus executes the status subcommand on the prepared Elastic Agent binary.
 // It returns the parsed output and the error from the execution. Keep in mind
 // the agent exits with status 1 if it's unhealthy, but it still outputs the
-// status successfully. Therefore, a non-empty AgentStatusOutput is valid
-// regardless of the error. An empty AgentStatusOutput and non nil error
-// means the output could not be parsed. Use AgentStatusOutput.IsZero() to
-// determine if the returned AgentStatusOutput is empty or not.
+// status successfully. An empty AgentStatusOutput and non nil error
+// means the output could not be parsed.
+// As long as we get some output, we don't return any error.
 // It should work with any 8.6+ agent
 func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
 	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
 	status := AgentStatusOutput{}
 	if uerr := json.Unmarshal(out, &status); uerr != nil {
 		return AgentStatusOutput{},
-			fmt.Errorf("could not unmarshal agent status output: %w",
-				errors.Join(&ExecErr{
-					err:    err,
-					Output: out,
-				}, uerr))
+			fmt.Errorf("could not unmarshal agent status output: %w", errors.Join(uerr, err))
+	} else if status.IsZero() {
+		return status, fmt.Errorf("agent status output is empty: %w", err)
 	}
 
-	if err != nil {
-		return status, fmt.Errorf("error running command (output: %s): %w", string(out), err)
-	}
 	return status, nil
 }
 
@@ -1243,7 +1237,7 @@ type AgentStatusOutput struct {
 }
 
 func (aso *AgentStatusOutput) IsZero() bool {
-	return aso.Info.ID == ""
+	return aso.Info.ID == "" && aso.Message == "" && aso.Info.Version == ""
 }
 
 type AgentInspectOutput struct {
