@@ -145,7 +145,7 @@ require (
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/elastic/go-docappender/v2 v2.2.0 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
-	github.com/elastic/go-structform v0.0.10 // indirect
+	github.com/elastic/go-structform v0.0.11 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/opentelemetry-lib v0.7.4 // indirect
