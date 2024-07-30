@@ -22,7 +22,7 @@ require (
 	github.com/elastic/go-sysinfo v1.14.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.1
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.8.0
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gofrs/flock v0.8.1
@@ -103,8 +103,8 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.105.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.105.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.105.0
-	go.opentelemetry.io/collector/component v0.105.0
-	go.opentelemetry.io/collector/confmap v0.105.0
+	go.opentelemetry.io/collector/component v0.106.0
+	go.opentelemetry.io/collector/confmap v0.106.0
 	go.opentelemetry.io/collector/confmap/converter/expandconverter v0.105.0
 	go.opentelemetry.io/collector/confmap/provider/envprovider v0.105.0
 	go.opentelemetry.io/collector/confmap/provider/fileprovider v0.105.0
@@ -120,7 +120,7 @@ require (
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.105.0
 	go.opentelemetry.io/collector/featuregate v1.12.0
 	go.opentelemetry.io/collector/otelcol v0.105.0
-	go.opentelemetry.io/collector/processor v0.105.0
+	go.opentelemetry.io/collector/processor v0.106.0
 	go.opentelemetry.io/collector/processor/batchprocessor v0.105.0
 	go.opentelemetry.io/collector/receiver v0.105.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.105.0
@@ -266,7 +266,8 @@ require (
 	go.elastic.co/fastjson v1.3.0 // indirect
 	go.etcd.io/bbolt v1.3.10 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/collector v0.105.0 // indirect
+	go.opentelemetry.io/collector v0.106.0 // indirect
+	go.opentelemetry.io/collector/client v0.106.1 // indirect
 	go.opentelemetry.io/collector/config/configauth v0.105.0 // indirect
 	go.opentelemetry.io/collector/config/configcompression v1.12.0 // indirect
 	go.opentelemetry.io/collector/config/configgrpc v0.105.0 // indirect
@@ -274,14 +275,17 @@ require (
 	go.opentelemetry.io/collector/config/confignet v0.105.0 // indirect
 	go.opentelemetry.io/collector/config/configopaque v1.12.0 // indirect
 	go.opentelemetry.io/collector/config/configretry v1.12.0 // indirect
-	go.opentelemetry.io/collector/config/configtelemetry v0.105.0 // indirect
+	go.opentelemetry.io/collector/config/configtelemetry v0.106.0 // indirect
 	go.opentelemetry.io/collector/config/configtls v1.12.0 // indirect
 	go.opentelemetry.io/collector/config/internal v0.105.0 // indirect
-	go.opentelemetry.io/collector/consumer v0.105.0 // indirect
+	go.opentelemetry.io/collector/consumer v0.106.1 // indirect
+	go.opentelemetry.io/collector/consumer/consumerprofiles v0.106.0 // indirect
+	go.opentelemetry.io/collector/consumer/consumertest v0.106.0 // indirect
 	go.opentelemetry.io/collector/extension/auth v0.105.0 // indirect
 	go.opentelemetry.io/collector/filter v0.105.0 // indirect
-	go.opentelemetry.io/collector/internal/globalgates v0.105.0 // indirect
+	go.opentelemetry.io/collector/internal/globalgates v0.106.0 // indirect
 	go.opentelemetry.io/collector/pdata v1.12.0 // indirect
+	go.opentelemetry.io/collector/pdata/pprofile v0.106.1 // indirect
 	go.opentelemetry.io/collector/semconv v0.105.0 // indirect
 	go.opentelemetry.io/collector/service v0.105.0 // indirect
 	go.opentelemetry.io/contrib/config v0.8.0 // indirect
