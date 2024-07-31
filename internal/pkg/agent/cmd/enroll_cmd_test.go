@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -670,4 +671,58 @@ func readConfig(raw []byte) (*configuration.FleetAgentConfig, error) {
 		return nil, err
 	}
 	return cfg.Fleet, nil
+}
+
+func TestGetPersistentAgentConfig(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect map[string]interface{}
+	}{{
+		name:   "log level",
+		input:  `agent.logging.level: debug`,
+		expect: map[string]interface{}{"logging": map[string]interface{}{"level": "debug"}},
+	}, {
+		name: "http monitoring",
+		input: `agent.monitoring.http:
+  enabled: true`,
+		expect: map[string]interface{}{"monitoring": map[string]interface{}{"http": map[string]interface{}{"enabled": true}}},
+	}, {
+		name: "headers",
+		input: `agent.headers:
+  key1: val1
+  key2: val2`,
+		expect: map[string]interface{}{"headers": map[string]interface{}{"key1": "val1", "key2": "val2"}},
+	}, {
+		name: "nested keys",
+		input: `agent:
+  monitoring:
+    http:
+      enabled: true`,
+		expect: map[string]interface{}{"monitoring": map[string]interface{}{"http": map[string]interface{}{"enabled": true}}},
+	}, {
+		name: "apm config",
+		input: `agent.monitoring:
+  traces: true
+  apm:
+    hosts:
+      - example:8200
+    secret_key: secretVal`,
+		expect: map[string]interface{}{"monitoring": map[string]interface{}{"traces": true, "apm": map[string]interface{}{"hosts": []interface{}{"example:8200"}, "secret_key": "secretVal"}}},
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "input.yml")
+			f, err := os.Create(path)
+			require.NoError(t, err)
+			_, err = f.WriteString(tc.input)
+			require.NoError(t, err)
+			err = f.Close()
+			require.NoError(t, err)
+
+			mp, err := getPersistentAgentConfig(path)
+			require.NoError(t, err)
+			require.Equal(t, tc.expect, mp)
+		})
+	}
 }

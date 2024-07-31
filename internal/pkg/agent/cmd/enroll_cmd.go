@@ -32,7 +32,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
-	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -210,7 +209,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		}
 	}
 
-	persistentConfig, err := getPersistentConfig(c.configPath)
+	persistentConfig, err := getPersistentAgentConfig(c.configPath)
 	if err != nil {
 		return err
 	}
@@ -1053,11 +1052,10 @@ func (c *enrollCmd) createAgentConfig(agentID string, pc map[string]interface{},
 	return agentConfig
 }
 
-func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) {
-	persistentMap := make(map[string]interface{})
+func getPersistentAgentConfig(pathConfigFile string) (map[string]interface{}, error) {
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if os.IsNotExist(err) {
-		return persistentMap, nil
+		return map[string]interface{}{}, nil
 	}
 	if err != nil {
 		return nil, errors.New(err,
@@ -1065,28 +1063,19 @@ func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) 
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, pathConfigFile))
 	}
-
-	pc := &struct {
-		Headers        map[string]string                      `json:"agent.headers,omitempty" yaml:"agent.headers,omitempty" config:"agent.headers,omitempty"`
-		LogLevel       string                                 `json:"agent.logging.level,omitempty" yaml:"agent.logging.level,omitempty" config:"agent.logging.level,omitempty"`
-		MonitoringHTTP *monitoringConfig.MonitoringHTTPConfig `json:"agent.monitoring.http,omitempty" yaml:"agent.monitoring.http,omitempty" config:"agent.monitoring.http,omitempty"`
-	}{
-		MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
-	}
-
-	if err := rawConfig.Unpack(&pc); err != nil {
+	mp, err := rawConfig.ToMapStr()
+	if err != nil {
 		return nil, err
 	}
-
-	if pc.LogLevel != "" {
-		persistentMap["logging.level"] = pc.LogLevel
+	v, ok := mp["agent"]
+	if !ok {
+		return map[string]interface{}{}, nil
 	}
-
-	if pc.MonitoringHTTP != nil {
-		persistentMap["monitoring.http"] = pc.MonitoringHTTP
+	agentCfg, ok := v.(map[string]interface{})
+	if !ok {
+		return map[string]interface{}{}, nil
 	}
-
-	return persistentMap, nil
+	return agentCfg, nil
 }
 
 func expBackoffWithContext(ctx context.Context, init, max time.Duration) backoff.Backoff {
