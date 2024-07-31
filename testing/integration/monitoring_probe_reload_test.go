@@ -166,8 +166,11 @@ func (runner *MonitoringRunner) AllComponentsHealthy(ctx context.Context) {
 	require.Eventually(runner.T(), func() bool {
 		allHealthy := true
 		status, err := runner.agentFixture.ExecStatus(ctx)
+		if err != nil {
+			runner.T().Logf("agent status returned an error: %v", err)
+			return false
+		}
 
-		require.NoError(runner.T(), err)
 		for _, comp := range status.Components {
 			runner.T().Logf("component state: %s", comp.Message)
 			if comp.State != int(cproto.State_HEALTHY) {
