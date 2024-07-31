@@ -2758,11 +2758,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-ucfg@v0.8.8/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/mock-es
-Version: v0.0.0-20240605193845-b5546a703d6f
+Version: v0.0.0-20240712014503-e5b47ece0015
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/mock-es@v0.0.0-20240605193845-b5546a703d6f/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/mock-es@v0.0.0-20240712014503-e5b47ece0015/LICENSE:
 
 Copyright 2024 Elasticsearch B.V.
 
@@ -20440,11 +20440,11 @@ limitations under the License.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/opentelemetry-lib
-Version: v0.7.3
+Version: v0.7.4
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-lib@v0.7.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-lib@v0.7.4/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004

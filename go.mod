@@ -22,13 +22,8 @@ require (
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.14.0
 	github.com/elastic/go-ucfg v0.8.8
-<<<<<<< HEAD
-	github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.1
-=======
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.8.0
->>>>>>> 633a161796 (Bump the otel-dependencies group across 1 directory with 61 updates (#5221))
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gofrs/flock v0.8.1
@@ -156,7 +151,7 @@ require (
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
-	github.com/elastic/opentelemetry-lib v0.7.3 // indirect
+	github.com/elastic/opentelemetry-lib v0.7.4 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
