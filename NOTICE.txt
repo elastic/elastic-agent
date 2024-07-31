@@ -39,12 +39,12 @@ THE SOFTWARE.
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/bi-zone/go-winio
-Version: v0.4.15
+Dependency : github.com/Microsoft/go-winio
+Version: v0.6.2
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/bi-zone/go-winio@v0.4.15/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!microsoft/go-winio@v0.6.2/LICENSE:
 
 The MIT License (MIT)
 
