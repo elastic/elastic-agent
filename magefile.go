@@ -24,6 +24,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -62,7 +63,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
-	"k8s.io/utils/strings/slices"
 )
 
 const (

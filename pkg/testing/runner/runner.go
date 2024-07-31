@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -22,7 +23,6 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
-	"k8s.io/utils/strings/slices"
 
 	"github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
