@@ -11,10 +11,18 @@ require (
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
 	github.com/cavaliercoder/go-rpm v0.0.0-20190131055624-7a9c54e3d83e
 	github.com/cenkalti/backoff/v4 v4.3.0
+<<<<<<< HEAD
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/elastic-agent-autodiscover v0.8.0
 	github.com/elastic/elastic-agent-client/v7 v7.14.0
+=======
+	github.com/docker/docker v26.1.5+incompatible
+	github.com/docker/go-units v0.5.0
+	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
+	github.com/elastic/elastic-agent-autodiscover v0.8.1
+	github.com/elastic/elastic-agent-client/v7 v7.15.0
+>>>>>>> 576127bc5b (Bump github.com/elastic/elastic-agent-autodiscover from 0.8.0 to 0.8.1 (#5234))
 	github.com/elastic/elastic-agent-libs v0.9.15
 	github.com/elastic/elastic-agent-system-metrics v0.10.4
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
