@@ -206,6 +206,7 @@ steps:
         command: ".buildkite/scripts/steps/k8s-extended-tests.sh"
         artifact_paths:
           - "build/k8s-logs*/*"
+          - "build/k8s-logs*/**/*"
           - "build/TEST-**"
           - "build/diagnostics/*"
         agents:

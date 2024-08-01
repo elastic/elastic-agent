@@ -1,0 +1,50 @@
+{
+  "branch": "8.9",
+  "release_branch": "8.9",
+  "version": "8.9.0-SNAPSHOT",
+  "build_id": "8.9.0-b6405422",
+  "start_time": "Tue, 11 Jul 2023 19:39:23 GMT",
+  "end_time": "Tue, 11 Jul 2023 19:45:28 GMT",
+  "build_duration_seconds": 365,
+  "manifest_version": "2.1.0",
+  "prefix": "beats",
+  "projects": {
+    "beats": {
+      "branch": "8.9",
+      "commit_hash": "ae84feba9e48c163a3cb681b777607cab02b959d",
+      "commit_url": "https://github.com/elastic/beats/commits/ae84feba9e48c163a3cb681b777607cab02b959d",
+      "build_duration_seconds": 0,
+      "packages": {
+        "auditbeat-8.9.0-SNAPSHOT-windows-x86_64.zip": {
+          "url": "https://artifacts-snapshot.elastic.co/beats/8.9.0-b6405422/downloads/beats/auditbeat/auditbeat-8.9.0-SNAPSHOT-windows-x86_64.zip",
+          "sha_url": "https://artifacts-snapshot.elastic.co/beats/8.9.0-b6405422/downloads/beats/auditbeat/auditbeat-8.9.0-SNAPSHOT-windows-x86_64.zip.sha512",
+          "type": "zip",
+          "architecture": "x86_64",
+          "os": [
+            "windows"
+          ]
+        },
+        "auditbeat-8.9.0-SNAPSHOT-amd64.deb": {
+          "url": "https://artifacts-snapshot.elastic.co/auditbeat-8.9.0-SNAPSHOT-amd64.deb",
+          "sha_url": "https://artifacts-snapshot.elastic.co/auditbeat-8.9.0-SNAPSHOT-amd64.deb.sha512",
+          "type": "deb",
+          "architecture": "amd64",
+          "attributes": {
+            "include_in_repo": "true",
+            "oss": "false"
+          }
+        },
+        "auditbeat-8.9.0-SNAPSHOT-x86_64.rpm": {
+          "url": "https://artifacts-snapshot.elastic.co/beats/8.9.0-b6405422/downloads/beats/auditbeat/auditbeat-8.9.0-SNAPSHOT-x86_64.rpm",
+          "sha_url": "https://artifacts-snapshot.elastic.co/beats/8.9.0-b6405422/downloads/beats/auditbeat/auditbeat-8.9.0-SNAPSHOT-x86_64.rpm.sha512",
+          "type": "rpm",
+          "architecture": "x86_64",
+          "attributes": {
+            "include_in_repo": "true",
+            "oss": "false"
+          }
+        }
+      }
+    }
+  }
+}
