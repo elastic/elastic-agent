@@ -29,7 +29,9 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [jaegerreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jaegerreceiver/v0.106.1/receiver/jaegerreceiver/README.md) | v0.106.1 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.106.1/receiver/prometheusreceiver/README.md) | v0.106.1 |
+| [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.106.1/receiver/zipkinreceiver/README.md) | v0.106.1 |
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.106.1/receiver/filelogreceiver/README.md) | v0.106.1 |
 | [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.106.1/receiver/hostmetricsreceiver/README.md) | v0.106.1 |
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.106.1/receiver/httpcheckreceiver/README.md) | v0.106.1 |

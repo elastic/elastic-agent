@@ -29,7 +29,7 @@ require (
 	github.com/gofrs/uuid/v5 v5.2.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/pprof v0.0.0-20240528025155-186aa0362fba
-	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hectane/go-acl v0.0.0-20190604041725-da78bae5fc95
 	github.com/jaypipes/ghw v0.12.0
@@ -41,7 +41,9 @@ require (
 	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c
 	github.com/oklog/ulid v1.3.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.106.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.106.1
 	github.com/otiai10/copy v1.14.0
 	github.com/pkg/errors v0.9.1
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
@@ -145,6 +147,7 @@ require (
 	github.com/akavel/rsrc v0.8.0 // indirect
 	github.com/alecthomas/participle/v2 v2.1.1 // indirect
 	github.com/alecthomas/units v0.0.0-20231202071711-9a357b53e9c9 // indirect
+	github.com/apache/thrift v0.20.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.53.16 // indirect
@@ -188,6 +191,7 @@ require (
 	github.com/gobuffalo/here v0.6.7 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
+	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -225,6 +229,7 @@ require (
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/ionos-cloud/sdk-go/v6 v6.1.11 // indirect
+	github.com/jaegertracing/jaeger v1.59.0 // indirect
 	github.com/jaypipes/pcidb v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
@@ -242,7 +247,7 @@ require (
 	github.com/lestrrat-go/strftime v1.0.6 // indirect
 	github.com/lightstep/go-expohisto v1.0.0 // indirect
 	github.com/linode/linodego v1.35.0 // indirect
-	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
+	github.com/lufia/plan9stats v0.0.0-20220913051719-115f729f3c8c // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/markbates/pkger v0.17.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -276,15 +281,18 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.106.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.106.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.106.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/zipkin v0.106.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/openshift/api v3.9.0+incompatible // indirect
 	github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142 // indirect
+	github.com/openzipkin/zipkin-go v0.4.3 // indirect
 	github.com/ovh/go-ovh v1.5.1 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
+	github.com/power-devops/perfstat v0.0.0-20220216144756-c35f1ee13d7c // indirect
 	github.com/prometheus-community/windows_exporter v0.25.1 // indirect
 	github.com/prometheus/client_golang v1.19.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect

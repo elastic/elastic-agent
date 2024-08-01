@@ -18,10 +18,12 @@ import (
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
+	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
+	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
 	// Processors:
@@ -66,6 +68,8 @@ func components() (otelcol.Factories, error) {
 		httpcheckreceiver.NewFactory(),
 		k8sobjectsreceiver.NewFactory(),
 		prometheusreceiver.NewFactory(),
+		jaegerreceiver.NewFactory(),
+		zipkinreceiver.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
