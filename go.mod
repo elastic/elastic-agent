@@ -22,8 +22,13 @@ require (
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.14.0
 	github.com/elastic/go-ucfg v0.8.8
+<<<<<<< HEAD
 	github.com/elastic/mock-es v0.0.0-20240605193845-b5546a703d6f
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.1
+=======
+	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.9.0
+>>>>>>> b7e95fe025 (Bump the otel-dependencies group with 40 updates (#5232))
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gofrs/flock v0.8.1
@@ -89,6 +94,7 @@ require (
 require (
 	github.com/cavaliercoder/badio v0.0.0-20160213150051-ce5280129e9e // indirect
 	github.com/distribution/reference v0.6.0 // indirect
+<<<<<<< HEAD
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.105.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.105.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.105.0
@@ -126,6 +132,45 @@ require (
 	go.opentelemetry.io/collector/processor/batchprocessor v0.105.0
 	go.opentelemetry.io/collector/receiver v0.105.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.105.0
+=======
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.106.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.106.1
+	go.opentelemetry.io/collector/component v0.106.1
+	go.opentelemetry.io/collector/confmap v0.106.1
+	go.opentelemetry.io/collector/confmap/converter/expandconverter v0.106.1
+	go.opentelemetry.io/collector/confmap/provider/envprovider v0.106.1
+	go.opentelemetry.io/collector/confmap/provider/fileprovider v0.106.1
+	go.opentelemetry.io/collector/confmap/provider/httpprovider v0.106.1
+	go.opentelemetry.io/collector/confmap/provider/httpsprovider v0.106.1
+	go.opentelemetry.io/collector/confmap/provider/yamlprovider v0.106.1
+	go.opentelemetry.io/collector/connector v0.106.1
+	go.opentelemetry.io/collector/exporter v0.106.1
+	go.opentelemetry.io/collector/exporter/debugexporter v0.106.1
+	go.opentelemetry.io/collector/exporter/otlpexporter v0.106.1
+	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.106.1
+	go.opentelemetry.io/collector/extension v0.106.1
+	go.opentelemetry.io/collector/extension/memorylimiterextension v0.106.1
+	go.opentelemetry.io/collector/featuregate v1.12.0
+	go.opentelemetry.io/collector/otelcol v0.106.1
+	go.opentelemetry.io/collector/processor v0.106.1
+	go.opentelemetry.io/collector/processor/batchprocessor v0.106.1
+	go.opentelemetry.io/collector/receiver v0.106.1
+	go.opentelemetry.io/collector/receiver/otlpreceiver v0.106.1
+>>>>>>> b7e95fe025 (Bump the otel-dependencies group with 40 updates (#5232))
 )
 
 require (
@@ -224,6 +269,7 @@ require (
 	github.com/mostynb/go-grpc-compression v1.2.3 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
+<<<<<<< HEAD
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.105.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.105.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.105.0 // indirect
@@ -237,6 +283,21 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.105.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.105.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.105.0 // indirect
+=======
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/kubelet v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/metadataproviders v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/pdatautil v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/experimentalmetricmetadata v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.106.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.106.1 // indirect
+>>>>>>> b7e95fe025 (Bump the otel-dependencies group with 40 updates (#5232))
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/openshift/api v3.9.0+incompatible // indirect
@@ -277,6 +338,7 @@ require (
 	go.opentelemetry.io/collector/config/configretry v1.12.0 // indirect
 	go.opentelemetry.io/collector/config/configtelemetry v0.105.0 // indirect
 	go.opentelemetry.io/collector/config/configtls v1.12.0 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/config/internal v0.105.0 // indirect
 	go.opentelemetry.io/collector/consumer v0.105.0 // indirect
 	go.opentelemetry.io/collector/extension/auth v0.105.0 // indirect
@@ -285,6 +347,19 @@ require (
 	go.opentelemetry.io/collector/pdata v1.12.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.105.0 // indirect
 	go.opentelemetry.io/collector/service v0.105.0 // indirect
+=======
+	go.opentelemetry.io/collector/config/internal v0.106.1 // indirect
+	go.opentelemetry.io/collector/consumer v0.106.1 // indirect
+	go.opentelemetry.io/collector/consumer/consumerprofiles v0.106.1 // indirect
+	go.opentelemetry.io/collector/consumer/consumertest v0.106.1 // indirect
+	go.opentelemetry.io/collector/extension/auth v0.106.1 // indirect
+	go.opentelemetry.io/collector/filter v0.106.1 // indirect
+	go.opentelemetry.io/collector/internal/globalgates v0.106.1 // indirect
+	go.opentelemetry.io/collector/pdata v1.12.0 // indirect
+	go.opentelemetry.io/collector/pdata/pprofile v0.106.1 // indirect
+	go.opentelemetry.io/collector/semconv v0.106.1 // indirect
+	go.opentelemetry.io/collector/service v0.106.1 // indirect
+>>>>>>> b7e95fe025 (Bump the otel-dependencies group with 40 updates (#5232))
 	go.opentelemetry.io/contrib/config v0.8.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
