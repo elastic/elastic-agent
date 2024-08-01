@@ -14,11 +14,11 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.8.0
 	github.com/elastic/elastic-agent-client/v7 v7.15.0
 	github.com/elastic/elastic-agent-libs v0.9.15
-	github.com/elastic/elastic-agent-system-metrics v0.10.6-0.20240723152150-0f81a1e67528
+	github.com/elastic/elastic-agent-system-metrics v0.10.9-0.20240801165915-632d227c0f61
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
 	github.com/elastic/go-licenser v0.4.2
-	github.com/elastic/go-sysinfo v1.14.0
+	github.com/elastic/go-sysinfo v1.14.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.7.1
@@ -143,7 +143,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
-	github.com/docker/docker v26.1.4+incompatible // indirect
+	github.com/docker/docker v26.1.5+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/elastic/go-docappender/v2 v2.2.0 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
