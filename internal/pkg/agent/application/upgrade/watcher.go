@@ -133,6 +133,7 @@ LOOP:
 			// block on connection, don't retry connection, and fail on temp dial errors
 			// always a local connection it should connect quickly so the timeout is only 1 second
 			connectCtx, connectCancel := context.WithTimeout(ctx, 1*time.Second)
+			//nolint:staticcheck // requires changing client signature
 			err := ch.agentClient.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry(), grpc.FailOnNonTempDialError(true))
 			connectCancel()
 			if err != nil {

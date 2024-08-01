@@ -171,6 +171,7 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 	restartViaDaemonFn := func(ctx context.Context) error {
 		connectCtx, connectCancel := context.WithTimeout(ctx, 3*time.Second)
 		defer connectCancel()
+		//nolint:staticcheck // requires changing client signature
 		err := c.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry())
 		if err != nil {
 			return errors.New(err, "failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
