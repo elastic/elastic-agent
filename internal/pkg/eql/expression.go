@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/antlr4-go/antlr/v4"
-	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql/parser"
 )
@@ -108,6 +107,6 @@ func (el *errorListener) SyntaxError(
 	msg string,
 	e antlr.RecognitionException,
 ) {
-	el.errors = multierror.Append(el.errors,
+	el.errors = errors.Join(el.errors,
 		fmt.Errorf("condition line %d column %d: %v", line, column, msg))
 }

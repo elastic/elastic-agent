@@ -16,8 +16,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-
-	"github.com/hashicorp/go-multierror"
 )
 
 const extAsc = ".asc"
@@ -198,7 +196,7 @@ func unzip(archivePath string, extractDir string) error {
 		}
 		defer func() {
 			if cerr := rc.Close(); cerr != nil {
-				err = multierror.Append(err, cerr)
+				err = errors.Join(err, cerr)
 			}
 		}()
 
@@ -218,7 +216,7 @@ func unzip(archivePath string, extractDir string) error {
 			}
 			defer func() {
 				if cerr := f.Close(); cerr != nil {
-					err = multierror.Append(err, cerr)
+					err = errors.Join(err, cerr)
 				}
 			}()
 

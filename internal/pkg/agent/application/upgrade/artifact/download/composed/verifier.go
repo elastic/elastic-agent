@@ -5,7 +5,7 @@
 package composed
 
 import (
-	"github.com/hashicorp/go-multierror"
+	goerrors "errors"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -40,7 +40,7 @@ func NewVerifier(log *logger.Logger, verifiers ...download.Verifier) *Verifier {
 
 // Verify checks the package from configured source.
 func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
-	var err error
+	var errs []error
 
 	for _, verifier := range v.vv {
 		e := verifier.Verify(a, version, skipDefaultPgp, pgpBytes...)
@@ -50,10 +50,10 @@ func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, 
 		}
 
 		v.log.Debugw("Verifier failed!", "verifier", verifier.Name(), "error", e)
-		err = multierror.Append(err, e)
+		errs = append(errs, e)
 	}
 
-	return err
+	return goerrors.Join(errs...)
 }
 
 func (v *Verifier) Reload(c *artifact.Config) error {
