@@ -29,6 +29,9 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [jaegerreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jaegerreceiver/v0.106.1/receiver/jaegerreceiver/README.md) | v0.106.1 |
+| [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.106.1/receiver/prometheusreceiver/README.md) | v0.106.1 |
+| [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.106.1/receiver/zipkinreceiver/README.md) | v0.106.1 |
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.106.1/receiver/filelogreceiver/README.md) | v0.106.1 |
 | [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.106.1/receiver/hostmetricsreceiver/README.md) | v0.106.1 |
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.106.1/receiver/httpcheckreceiver/README.md) | v0.106.1 |
@@ -52,6 +55,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.9.0/processor/elasticinframetricsprocessor/README.md) | v0.9.0 |
+| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.106.1/processor/memorylimiterprocessor/README.md) | v0.106.1 |
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.106.1/processor/attributesprocessor/README.md) | v0.106.1 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.106.1/processor/filterprocessor/README.md) | v0.106.1 |
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.106.1/processor/k8sattributesprocessor/README.md) | v0.106.1 |
@@ -64,6 +68,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.106.1/extension/healthcheckextension/README.md) | v0.106.1 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.106.1/extension/storage/filestorage/README.md) | v0.106.1 |
 | [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.106.1/extension/memorylimiterextension/README.md) | v0.106.1 |
 
