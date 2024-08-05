@@ -184,13 +184,6 @@ shared:
       <<: *agent_components
       <<: *linux_otel_files
 
-  - &agent_otel_binary_spec
-    <<: *common
-    files:
-      <<: *agent_binary_files
-      <<: *linux_otel_files
-
-
   - &agent_darwin_binary_spec
     <<: *common
     files:
@@ -281,9 +274,9 @@ shared:
         mode: 0644
 
   - &agent_otel_docker_spec
-    <<: *agent_otel_binary_spec
+    <<: *agent_binary_spec
     extra_vars:
-      dockerfile: 'Dockerfile.elastic-agent-otel.tmpl'
+      dockerfile: 'Dockerfile.elastic-agent.tmpl'
       docker_entrypoint: 'docker-entrypoint.elastic-agent-otel.tmpl'
       user: '{{ .BeatName }}'
       linux_capabilities: ''
@@ -291,6 +284,10 @@ shared:
       image_name: '{{.BeatName}}-otel'
       expose_ports: "4317,55680,55679"
     files:
+      'elastic-agent.yml':
+        source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
       'otel.yml':
         source: 'otel.yml'
         mode: 0600
