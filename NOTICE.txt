@@ -2758,11 +2758,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-ucfg@v0.8.8/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/mock-es
-Version: v0.0.0-20240605193845-b5546a703d6f
+Version: v0.0.0-20240712014503-e5b47ece0015
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/mock-es@v0.0.0-20240605193845-b5546a703d6f/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/mock-es@v0.0.0-20240712014503-e5b47ece0015/LICENSE:
 
 Copyright 2024 Elasticsearch B.V.
 
