@@ -130,19 +130,11 @@ func (f *FleetGateway) Actions() <-chan []fleetapi.Action {
 }
 
 func (f *FleetGateway) Run(ctx context.Context) error {
-	// Backoff implementation doesn't support the use of a context [cancellation] as the shutdown mechanism.
-	// So we keep a done channel that will be closed when the current context is shutdown.
-	done := make(chan struct{})
 	backoff := backoff.NewEqualJitterBackoff(
-		done,
+		ctx.Done(),
 		f.settings.Backoff.Init,
 		f.settings.Backoff.Max,
 	)
-	go func() {
-		<-ctx.Done()
-		close(done)
-	}()
-
 	f.log.Info("Fleet gateway started")
 	for {
 		select {
