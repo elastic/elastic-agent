@@ -255,7 +255,7 @@ func startMockES(t *testing.T) string {
 		uid,
 		clusterUUID,
 		registry,
-		time.Now().Add(time.Hour), 0, 0, 100, 0))
+		time.Now().Add(time.Hour), 0, 0, 0, 100, 0))
 
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)
