@@ -10,7 +10,7 @@ case "$1" in
     ;;
 
   # 0 is for rpm uninstall
-  remove|abort-install|disappear|0)
+  upgrade|remove|failed-upgrade|abort-install|abort-upgrade|disappear|0)
     if systemctl --quiet is-active elastic-agent; then
       echo "stopping elastic-agent"
       systemctl --quiet stop elastic-agent
@@ -19,12 +19,6 @@ case "$1" in
     if test -L "$symlink"; then
       echo "found symlink $symlink, unlink"
       unlink "$symlink"
-    fi
-    ;;
-  upgrade|failed-upgrade|abort-upgrade)
-    if systemctl --quiet is-active elastic-agent; then
-      echo "restarting elastic-agent"
-      systemctl --quiet restart elastic-agent
     fi
     ;;
   *)
