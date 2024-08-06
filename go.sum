@@ -161,8 +161,13 @@ github.com/elastic/elastic-agent-client/v7 v7.14.0 h1:X6S2RyjZNKsDCvA2igch2I5dgH
 github.com/elastic/elastic-agent-client/v7 v7.14.0/go.mod h1:6h+f9QdIr3GO2ODC0Y8+aEXRwzbA5W4eV4dd/67z7nI=
 github.com/elastic/elastic-agent-libs v0.9.15 h1:WCLtuErafUxczT/rXJa4Vr6mxwC8dgtqMbEq+qWGD4M=
 github.com/elastic/elastic-agent-libs v0.9.15/go.mod h1:2VgYxHaeM+cCDBjiS2wbmTvzPGbnlXAtYrlcLefheS8=
+<<<<<<< HEAD
 github.com/elastic/elastic-agent-system-metrics v0.10.4 h1:Tmb1rPRDyVv9M453YlPyl/gwUm9s4nSiI2xH76GGEz4=
 github.com/elastic/elastic-agent-system-metrics v0.10.4/go.mod h1:cd7YgcTEjBNeLGnH/C9cEvP/YexohwS6CpmN9Ju58Mw=
+=======
+github.com/elastic/elastic-agent-system-metrics v0.11.0 h1:/bWrgTsHZWLUhdT7WPNuQDFkrSfm+A4qf6QDQnZo9d8=
+github.com/elastic/elastic-agent-system-metrics v0.11.0/go.mod h1:3QiMu9wTKJFvpCN+5klgGqasTMNKJbgY3xcoN1KQXJk=
+>>>>>>> a1fd2c9d9a ([pkg][fix] - Filter non-fatal errors and update go.mod (#5196))
 github.com/elastic/elastic-transport-go/v8 v8.6.0 h1:Y2S/FBjx1LlCv5m6pWAF2kDJAHoSjSRSJCApolgfthA=
 github.com/elastic/elastic-transport-go/v8 v8.6.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
 github.com/elastic/go-docappender/v2 v2.2.0 h1:Pq6w+R0ZbWlqZHoqzoujR2ElKBfaPUf3M/cJvPVSrfA=
