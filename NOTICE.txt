@@ -1490,19 +1490,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-l
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-system-metrics
-<<<<<<< HEAD
-Version: v0.10.4
-Licence type (autodetected): Apache-2.0
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.10.4/LICENSE.txt:
-=======
 Version: v0.11.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.11.0/LICENSE.txt:
->>>>>>> a1fd2c9d9a ([pkg][fix] - Filter non-fatal errors and update go.mod (#5196))
 
                                  Apache License
                            Version 2.0, January 2004
