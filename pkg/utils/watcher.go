@@ -5,6 +5,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -24,7 +25,8 @@ func GetWatcherPIDs() ([]int, error) {
 		return nil, fmt.Errorf("failed to initialize process.Stats: %w", err)
 	}
 	pidMap, _, err := procStats.FetchPids()
-	if err != nil {
+	if err != nil && !errors.Is(err, process.NonFatalErr{}) {
+		// return only if the error is fatal in nature
 		return nil, fmt.Errorf("failed to fetch pids: %w", err)
 	}
 	var pids []int
