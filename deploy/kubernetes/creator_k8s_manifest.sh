@@ -5,6 +5,7 @@
 # Eg. ./creator_k8s_manifest.sh deploy/kubernetes
 ####
 
+
 STANDALONE=elastic-agent-standalone-kubernetes-without-configmap.yaml
 MANAGED=elastic-agent-managed-kubernetes-without-configmap.yaml
 OUTPUT_FILE=elastic_agent_manifest.ts
