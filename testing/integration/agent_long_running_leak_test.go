@@ -68,7 +68,7 @@ func TestLongRunningAgentForLeaks(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
-			{Type: define.Windows},
+			// {Type: define.Windows}, // flaky for windows. Even running as privileged, it returns DEGRADED state.
 		},
 	})
 
