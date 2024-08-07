@@ -118,7 +118,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			int64Ptr(1000), // elastic-agent uid
 			nil,
 			[]corev1.Capability{"ALL"},
-			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
+			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE", "SYS_ADMIN"},
 			true,
 		},
 		{
@@ -126,7 +126,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			int64Ptr(500),
 			int64Ptr(500),
 			[]corev1.Capability{"ALL"},
-			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
+			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE", "SYS_ADMIN"},
 			true,
 		},
 	}
@@ -149,7 +149,6 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 					// set ImagePullPolicy to "Never" to avoid pulling the image
 					// as the image is already loaded by the kubernetes provisioner
 					container.ImagePullPolicy = "Never"
-					allowPrivilegeEscalation := true
 
 					if tc.capabilitiesDrop != nil || tc.capabilitiesAdd != nil || tc.runUser != nil || tc.runGroup != nil {
 						// set security context
@@ -158,9 +157,8 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 								Drop: tc.capabilitiesDrop,
 								Add:  tc.capabilitiesAdd,
 							},
-							RunAsUser:                tc.runUser,
-							RunAsGroup:               tc.runGroup,
-							AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+							RunAsUser:  tc.runUser,
+							RunAsGroup: tc.runGroup,
 							AppArmorProfile: &corev1.AppArmorProfile{
 								Type: corev1.AppArmorProfileTypeUnconfined,
 							},
