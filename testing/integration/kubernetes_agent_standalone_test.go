@@ -134,7 +134,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH"},
 			// this is flaky.
 			// sometimes it returns `1000:1000` as `uid:gid` for `agentbeat` , sometimes it works.
-			// It also returns `1000:1000` as `uid:gid` for `cloudbeat` ocassionaly.
+			// It also returns `1000:1000` as `uid:gid` for `cloudbeat` occasionally.
 			// https://buildkite.com/elastic/elastic-agent/builds/10924#01912cd0-c15b-4934-b236-fca6eafe72c3
 			// https://buildkite.com/elastic/elastic-agent/builds/10924#01912ca7-2a6e-444a-8a97-424d6265eddd
 			false,
