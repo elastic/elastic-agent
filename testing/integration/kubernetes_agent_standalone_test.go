@@ -23,8 +23,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-	fixture "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/go-elasticsearch/v8"
 
@@ -90,7 +88,6 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 		capabilitiesDrop []corev1.Capability
 		capabilitiesAdd  []corev1.Capability
 		runK8SInnerTests bool
-		extectedState    cproto.State
 	}{
 		{
 			"default deployment - rootful agent",
@@ -99,7 +96,6 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			nil,
 			false,
-			cproto.State_HEALTHY,
 		},
 		{
 			"drop ALL capabilities - rootful agent",
@@ -108,7 +104,6 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{},
 			false,
-			cproto.State_HEALTHY,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootful agent",
@@ -117,7 +112,6 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
 			true,
-			cproto.State_HEALTHY,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP, SYS_PTRACE capabilities - rootless agent",
@@ -126,7 +120,6 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
 			true,
-			cproto.State_DEGRADED,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP, SYS_PTRACE capabilities - rootless agent random uid:gid",
@@ -135,7 +128,6 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
 			true,
-			cproto.State_DEGRADED,
 		},
 	}
 
@@ -157,6 +149,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 					// set ImagePullPolicy to "Never" to avoid pulling the image
 					// as the image is already loaded by the kubernetes provisioner
 					container.ImagePullPolicy = "Never"
+					allowPrivilegeEscalation := true
 
 					if tc.capabilitiesDrop != nil || tc.capabilitiesAdd != nil || tc.runUser != nil || tc.runGroup != nil {
 						// set security context
@@ -165,8 +158,15 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 								Drop: tc.capabilitiesDrop,
 								Add:  tc.capabilitiesAdd,
 							},
-							RunAsUser:  tc.runUser,
-							RunAsGroup: tc.runGroup,
+							RunAsUser:                tc.runUser,
+							RunAsGroup:               tc.runGroup,
+							AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+							AppArmorProfile: &corev1.AppArmorProfile{
+								Type: corev1.AppArmorProfileTypeUnconfined,
+							},
+							SeccompProfile: &corev1.SeccompProfile{
+								Type: corev1.SeccompProfileTypeUnconfined,
+							},
 						}
 
 					}
@@ -198,7 +198,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 
 			ctx := context.Background()
 
-			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, tc.extectedState)
+			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath)
 		})
 	}
 
@@ -207,7 +207,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 // deployK8SAgent is a helper function to deploy the elastic-agent in k8s and invoke the inner k8s tests if
 // runK8SInnerTests is true
 func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object, namespace string,
-	runInnerK8STests bool, testLogsBasePath string, expectedState cproto.State) {
+	runInnerK8STests bool, testLogsBasePath string) {
 
 	objects = append([]k8s.Object{&corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -267,26 +267,22 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 
 	require.NotEmpty(t, agentPodName, "agent pod name is empty")
 
-	command := []string{"elastic-agent", "status", "--output", "json"}
+	command := []string{"elastic-agent", "status"}
 	var stdout, stderr bytes.Buffer
-	var actualState cproto.State
+	var agentHealthyErr error
 	// we will wait maximum 60 seconds for the agent to report healthy
 	for i := 0; i < 60; i++ {
 		stdout.Reset()
 		stderr.Reset()
-		_ = client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone", command, &stdout, &stderr)
-		status := fixture.AgentStatusOutput{}
-		err := json.Unmarshal(stdout.Bytes(), &status)
-		require.NoError(t, err)
-		actualState = cproto.State(status.State)
-		if actualState == expectedState {
+		agentHealthyErr = client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone", command, &stdout, &stderr)
+		if agentHealthyErr == nil {
 			break
 		}
 		time.Sleep(time.Second * 1)
 	}
 
-	if actualState != expectedState {
-		t.Errorf("elastic-agent never returnd expected state: %v, actual state: %v", expectedState, actualState)
+	if agentHealthyErr != nil {
+		t.Errorf("elastic-agent never reported healthy: %v", agentHealthyErr)
 		t.Logf("stdout: %s\n", stdout.String())
 		t.Logf("stderr: %s\n", stderr.String())
 		t.FailNow()
