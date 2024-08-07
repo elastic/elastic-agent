@@ -115,7 +115,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
 			true,
-			false,
+			true,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent",
