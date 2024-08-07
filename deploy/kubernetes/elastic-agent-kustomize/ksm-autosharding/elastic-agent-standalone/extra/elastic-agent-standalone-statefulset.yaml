@@ -159,4 +159,3 @@ spec:
 #          hostPath:
 #            path: /var/lib/elastic-agent-standalone/kube-system/state
 #            type: DirectoryOrCreate
-        # Mount required for Universal Profiling.
