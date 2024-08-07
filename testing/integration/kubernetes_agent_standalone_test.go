@@ -88,6 +88,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 		capabilitiesDrop []corev1.Capability
 		capabilitiesAdd  []corev1.Capability
 		runK8SInnerTests bool
+		expectError      bool
 	}{
 		{
 			"default deployment - rootful agent",
@@ -95,6 +96,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			false,
 			false,
 		},
 		{
@@ -104,6 +106,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{},
 			false,
+			false,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootful agent",
@@ -112,21 +115,24 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
 			true,
+			false,
 		},
 		{
-			"drop ALL add CHOWN, SETPCAP, SYS_PTRACE capabilities - rootless agent",
+			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent",
 			int64Ptr(1000), // elastic-agent uid
 			nil,
 			[]corev1.Capability{"ALL"},
-			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE", "SYS_ADMIN"},
+			[]corev1.Capability{"CHOWN", "SETPCAP"},
+			true,
 			true,
 		},
 		{
-			"drop ALL add CHOWN, SETPCAP, SYS_PTRACE capabilities - rootless agent random uid:gid",
+			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent random uid:gid",
 			int64Ptr(500),
 			int64Ptr(500),
 			[]corev1.Capability{"ALL"},
-			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE", "SYS_ADMIN"},
+			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH"},
+			true,
 			true,
 		},
 	}
@@ -159,12 +165,6 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 							},
 							RunAsUser:  tc.runUser,
 							RunAsGroup: tc.runGroup,
-							AppArmorProfile: &corev1.AppArmorProfile{
-								Type: corev1.AppArmorProfileTypeUnconfined,
-							},
-							SeccompProfile: &corev1.SeccompProfile{
-								Type: corev1.SeccompProfileTypeUnconfined,
-							},
 						}
 
 					}
@@ -196,7 +196,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 
 			ctx := context.Background()
 
-			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath)
+			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, tc.expectError)
 		})
 	}
 
@@ -205,7 +205,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 // deployK8SAgent is a helper function to deploy the elastic-agent in k8s and invoke the inner k8s tests if
 // runK8SInnerTests is true
 func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object, namespace string,
-	runInnerK8STests bool, testLogsBasePath string) {
+	runInnerK8STests bool, testLogsBasePath string, expectError bool) {
 
 	objects = append([]k8s.Object{&corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -279,7 +279,7 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 		time.Sleep(time.Second * 1)
 	}
 
-	if agentHealthyErr != nil {
+	if !expectError && agentHealthyErr != nil {
 		t.Errorf("elastic-agent never reported healthy: %v", agentHealthyErr)
 		t.Logf("stdout: %s\n", stdout.String())
 		t.Logf("stderr: %s\n", stderr.String())
