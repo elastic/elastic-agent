@@ -7,13 +7,10 @@ source .buildkite/scripts/install-gh.sh
 source .buildkite/scripts/common.sh
 
 echo "--- [Prepare env] Create required env variables"
-GITHUB_TOKEN_VAULT_PATH="kv/ci-shared/platform-ingest/github_token"
-GITHUB_USERNAME_SECRET=$(retry 5 vault kv get -field username ${GITHUB_TOKEN_VAULT_PATH})
-export GITHUB_USERNAME_SECRET
-GITHUB_EMAIL_SECRET=$(retry 5 vault kv get -field email ${GITHUB_TOKEN_VAULT_PATH})
-export GITHUB_EMAIL_SECRET
-GITHUB_TOKEN_SECRET=$(retry 5 vault kv get -field token ${GITHUB_TOKEN_VAULT_PATH})
-export GITHUB_TOKEN_SECRET
+GITHUB_USERNAME_SECRET="elasticmachine"
+export GITHUB_USERNAME_SECRET=$GITHUB_USERNAME_SECRET
+export GITHUB_EMAIL_SECRET="elasticmachine@elastic.co"
+export GITHUB_TOKEN_SECRET=$VAULT_GITHUB_TOKEN
 
 cd deploy/kubernetes
 
