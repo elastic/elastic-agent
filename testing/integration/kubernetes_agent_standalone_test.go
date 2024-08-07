@@ -149,6 +149,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 					// set ImagePullPolicy to "Never" to avoid pulling the image
 					// as the image is already loaded by the kubernetes provisioner
 					container.ImagePullPolicy = "Never"
+					allowPrivilegeEscalation := true
 
 					if tc.capabilitiesDrop != nil || tc.capabilitiesAdd != nil || tc.runUser != nil || tc.runGroup != nil {
 						// set security context
@@ -157,8 +158,12 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 								Drop: tc.capabilitiesDrop,
 								Add:  tc.capabilitiesAdd,
 							},
-							RunAsUser:  tc.runUser,
-							RunAsGroup: tc.runGroup,
+							RunAsUser:                tc.runUser,
+							RunAsGroup:               tc.runGroup,
+							AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+							AppArmorProfile: &corev1.AppArmorProfile{
+								Type: corev1.AppArmorProfileTypeUnconfined,
+							},
 						}
 
 					}
