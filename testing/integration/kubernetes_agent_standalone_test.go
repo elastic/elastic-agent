@@ -114,7 +114,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			true,
 		},
 		{
-			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent",
+			"drop ALL add CHOWN, SETPCAP, SYS_PTRACE capabilities - rootless agent",
 			int64Ptr(1000), // elastic-agent uid
 			nil,
 			[]corev1.Capability{"ALL"},
@@ -122,7 +122,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			true,
 		},
 		{
-			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent random uid:gid",
+			"drop ALL add CHOWN, SETPCAP, SYS_PTRACE capabilities - rootless agent random uid:gid",
 			int64Ptr(500),
 			int64Ptr(500),
 			[]corev1.Capability{"ALL"},
@@ -163,6 +163,9 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 							AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 							AppArmorProfile: &corev1.AppArmorProfile{
 								Type: corev1.AppArmorProfileTypeUnconfined,
+							},
+							SeccompProfile: &corev1.SeccompProfile{
+								Type: corev1.SeccompProfileTypeUnconfined,
 							},
 						}
 
