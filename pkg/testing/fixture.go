@@ -826,19 +826,20 @@ func (f *Fixture) EnsurePrepared(ctx context.Context) error {
 func (f *Fixture) binaryPath() string {
 	workDir := f.workDir
 	if f.installed {
-		installDir := "Agent"
-		if f.installOpts != nil && f.installOpts.Namespace != "" {
-			installDir = paths.InstallDirNameForNamespace(f.installOpts.Namespace)
-		}
-
-		if f.installOpts != nil && f.installOpts.BasePath != "" {
-			workDir = filepath.Join(f.installOpts.BasePath, "Elastic", installDir)
+		if f.packageFormat == "deb" || f.packageFormat == "rpm" {
+			workDir = "/usr/bin"
 		} else {
-			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", installDir)
+			installDir := "Agent"
+			if f.installOpts != nil && f.installOpts.Namespace != "" {
+				installDir = paths.InstallDirNameForNamespace(f.installOpts.Namespace)
+			}
+
+			if f.installOpts != nil && f.installOpts.BasePath != "" {
+				workDir = filepath.Join(f.installOpts.BasePath, "Elastic", installDir)
+			} else {
+				workDir = filepath.Join(paths.DefaultBasePath, "Elastic", installDir)
+			}
 		}
-	}
-	if f.packageFormat == "deb" || f.packageFormat == "rpm" {
-		workDir = "/usr/bin"
 	}
 	defaultBin := "elastic-agent"
 	if f.binaryName != "" {
