@@ -17,7 +17,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -96,7 +96,7 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 		return r, fmt.Errorf("error creating new template: %w", err)
 	}
 
-	packagePolicyID := uuid.New().String()
+	packagePolicyID := uuid.Must(uuid.NewV4()).String()
 	var pkgPolicyBuf bytes.Buffer
 
 	// Need unique name for Endpoint integration otherwise on multiple runs on the same instance you get

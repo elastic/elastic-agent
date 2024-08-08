@@ -44,11 +44,11 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.105.0/exporter/elasticsearchexporter/README.md) | v0.105.0 |
-| [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.105.0/exporter/fileexporter/README.md) | v0.105.0 |
-| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.105.0/exporter/debugexporter/README.md) | v0.105.0 |
-| [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.105.0/exporter/otlpexporter/README.md) | v0.105.0 |
-| [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.105.0/exporter/otlphttpexporter/README.md) | v0.105.0 |
+| [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.106.1/exporter/elasticsearchexporter/README.md) | v0.106.1 |
+| [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.106.1/exporter/fileexporter/README.md) | v0.106.1 |
+| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.106.1/exporter/debugexporter/README.md) | v0.106.1 |
+| [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.106.1/exporter/otlpexporter/README.md) | v0.106.1 |
+| [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.106.1/exporter/otlphttpexporter/README.md) | v0.106.1 |
 
 ### Processors
 
@@ -76,4 +76,4 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.105.0/connector/spanmetricsconnector/README.md) | v0.105.0 |
+| [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.106.1/connector/spanmetricsconnector/README.md) | v0.106.1 |
