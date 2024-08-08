@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Assign sys_ptrace and dac_override capabilities in permitted set to agentbeat binary.
+component: elastic-agent, metricbeat
