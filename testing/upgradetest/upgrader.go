@@ -382,11 +382,11 @@ func PerformUpgrade(
 	}
 
 	// it is unstable to continue until the watcher is done
-	// the maximum wait time is 1 minutes (2 minutes for grace) some older versions
+	// the maximum wait time is 10 minutes (12 minutes for grace) some older versions
 	// do not respect the `ConfigureFastWatcher` so we have to kill the watcher after the
-	// 1 minute window (1 min 15 seconds for grace) has passed.
+	// 10 minute window (10 min 15 seconds for grace) has passed.
 	logger.Logf("waiting for upgrade watcher to finish")
-	err = WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 1*time.Minute+15*time.Second)
+	err = WaitForNoWatcher(ctx, 12*time.Minute, 10*time.Second, 10*time.Minute+15*time.Second)
 	if err != nil {
 		return fmt.Errorf("watcher never stopped running: %w", err)
 	}
