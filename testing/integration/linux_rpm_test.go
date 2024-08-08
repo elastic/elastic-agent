@@ -120,23 +120,10 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		atesting.WithPackageFormat("rpm"),
 	)
 	require.NoError(t, err)
-	err = startFixture.Prepare(ctx)
-	require.NoError(t, err)
-	startVersionInfo, err := startFixture.ExecVersion(ctx)
-	require.NoError(t, err)
 
 	// end on the current build with rpm
 	endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("rpm"))
 	require.NoError(t, err)
-	err = endFixture.Prepare(ctx)
-	require.NoError(t, err)
-	endVersionInfo, err := endFixture.ExecVersion(ctx)
-	require.NoError(t, err)
-	if startVersionInfo.Binary.String() == endVersionInfo.Binary.String() &&
-		startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
-		t.Skipf("Build under test is the same as the build from the artifacts repository (version: %s) [commit: %s]",
-			startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
-	}
 
 	// 1. Create a policy in Fleet with monitoring enabled.
 	// To ensure there are no conflicts with previous test runs against
@@ -191,6 +178,6 @@ func TestRpmFleetUpgrade(t *testing.T) {
 			t.Logf("error getting agent version: %v", err)
 			return false
 		}
-		return endVersionInfo.Binary.Version == newVersion
+		return define.Version() == newVersion
 	}, 5*time.Minute, time.Second)
 }
