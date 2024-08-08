@@ -20,6 +20,7 @@ shared:
   # Deb/RPM spec for community beats.
   - &deb_rpm_agent_spec
     <<: *common
+    pre_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/preinstall.sh.tmpl'
     post_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postinstall.sh.tmpl'
     post_rm_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postrm.sh.tmpl'
     files:
