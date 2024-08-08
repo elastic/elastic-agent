@@ -18,8 +18,8 @@ import (
 	v1server "github.com/elastic/elastic-agent/pkg/control/v1/server"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
-	"go.elastic.co/apm"
-	"go.elastic.co/apm/module/apmgrpc"
+	"go.elastic.co/apm/module/apmgrpc/v2"
+	"go.elastic.co/apm/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 

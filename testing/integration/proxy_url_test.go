@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -766,7 +766,7 @@ func createBasicFleetPolicyData(t *testing.T, fleetHost string) (fleetservertest
 	}
 
 	agentID := strings.Replace(t.Name(), "/", "-", -1) + "-agent-id"
-	policyUUID, err := uuid.NewUUID()
+	policyUUID, err := uuid.NewV4()
 	require.NoError(t, err, "error generating UUID for policy")
 
 	policyID := policyUUID.String()
