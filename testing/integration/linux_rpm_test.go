@@ -168,7 +168,7 @@ func TestRpmFleetUpgrade(t *testing.T) {
 	srcPackage, err := endFixture.SrcPackage(ctx)
 	require.NoError(t, err)
 	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-i", "-v", srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
-	require.NoError(t, err, out)
+	require.NoError(t, err, string(out))
 
 	// 4. Wait for version in Fleet to match
 	require.Eventually(t, func() bool {
@@ -178,6 +178,10 @@ func TestRpmFleetUpgrade(t *testing.T) {
 			t.Logf("error getting agent version: %v", err)
 			return false
 		}
-		return define.Version() == newVersion
+		if define.Version() == newVersion {
+			return true
+		}
+		t.Logf("Got Agent version %s != %s", newVersion, define.Version())
+		return false
 	}, 5*time.Minute, time.Second)
 }
