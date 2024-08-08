@@ -102,7 +102,7 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		OS: []define.OS{
 			{
 				Type:   define.Linux,
-				Distro: "ubuntu",
+				Distro: "rhel",
 			},
 		},
 		Local: false,
