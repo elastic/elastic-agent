@@ -57,7 +57,6 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"github.com/sirupsen/logrus"
@@ -365,9 +364,7 @@ func (Check) All() {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return combineErr(
-		sh.RunV("go-licenser", "-d", "-license", "Elastic"),
-	)
+	return sh.RunV("go-licenser", "-d", "-license", "Elastic")
 }
 
 // Changes run git status --porcelain and return an error if we have changes or uncommitted files.
@@ -411,9 +408,7 @@ func (Format) All() {
 // License applies the right license header.
 func (Format) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
-	return combineErr(
-		sh.RunV("go-licenser", "-license", "Elastic"),
-	)
+	return sh.RunV("go-licenser", "-license", "Elastic")
 }
 
 // AssembleDarwinUniversal merges the darwin/amd64 and darwin/arm64 into a single
@@ -710,17 +705,6 @@ func ConfigFileParams() devtools.ConfigFileParams {
 		},
 	}
 	return p
-}
-
-func combineErr(errors ...error) error {
-	var e error
-	for _, err := range errors {
-		if err == nil {
-			continue
-		}
-		e = multierror.Append(e, err)
-	}
-	return e
 }
 
 // UnitTest performs unit test on agent.
