@@ -531,7 +531,7 @@
             }
           },
           {
-            "enabled": true,
+            "enabled": false,
             "data_stream": {
               "type": "metrics",
               "dataset": "system.process"
@@ -596,7 +596,7 @@
             }
           },
           {
-            "enabled": true,
+            "enabled": false,
             "data_stream": {
               "type": "metrics",
               "dataset": "system.process.summary"
