@@ -16,7 +16,10 @@ import (
 
 // FixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
 func FixPermissions(topPath string, opts ...OptFunc) error {
-	o := newOpts(opts...)
+	o, err := newOpts(opts...)
+	if err != nil {
+		return err
+	}
 	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil

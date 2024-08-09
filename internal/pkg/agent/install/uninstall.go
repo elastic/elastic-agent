@@ -136,7 +136,10 @@ func EnsureStoppedService(topPath string, pt *progressbar.ProgressBar) (service.
 func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (bool, error) {
 	// check if we have a file vault to detect if we have to use it for reading config
 	opts = append(opts, vault.WithReadonly(true))
-	vaultOpts := vault.ApplyOptions(opts...)
+	vaultOpts, err := vault.ApplyOptions(opts...)
+	if err != nil {
+		return false, err
+	}
 	fileVault, fileVaultErr := vault.NewFileVault(ctx, vaultOpts)
 	if fileVaultErr == nil {
 		ok, keyErr := fileVault.Exists(ctx, secret.AgentSecretKey)

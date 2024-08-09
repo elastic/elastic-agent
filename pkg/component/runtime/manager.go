@@ -19,9 +19,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gofrs/uuid"
-	"go.elastic.co/apm"
-	"go.elastic.co/apm/module/apmgrpc"
+	"github.com/gofrs/uuid/v5"
+	"go.elastic.co/apm/module/apmgrpc/v2"
+	"go.elastic.co/apm/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"

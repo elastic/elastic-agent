@@ -15,7 +15,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -1270,7 +1270,6 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	}
 
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", model.Components).Debug("Updating running component model")
 	c.runtimeMgr.Update(model)
 	return nil
 }
