@@ -11,4 +11,9 @@ set -eo pipefail
 # `./elastic-agent container --help`
 #
 
+if [[ "$ELASTIC_AGENT_OTEL" == "true" ]]
+then
+exec {{ .BeatName }} otel "$@"
+else
 exec {{ .BeatName }} container "$@"
+fi
