@@ -1,8 +1,0 @@
-#!/bin/bash
-
-# Update umask to retain group write permissions on runtime directories: $root/tmp/default, $root/logs/default and $root/run/default
-umask 0007
-
-set -eo pipefail
-
-exec {{ .BeatName }} otel "$@"

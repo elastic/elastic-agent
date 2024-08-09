@@ -184,6 +184,7 @@ shared:
       <<: *agent_components
       <<: *linux_otel_files
 
+
   - &agent_darwin_binary_spec
     <<: *common
     files:
@@ -259,30 +260,6 @@ shared:
       user: '{{ .BeatName }}'
       linux_capabilities: ''
       beats_install_path: "install"
-    files:
-      'elastic-agent.yml':
-        source: 'elastic-agent.docker.yml'
-        mode: 0600
-        config: true
-      'otel.yml':
-        source: 'otel.yml'
-        mode: 0600
-        config: true
-      '.elastic-agent.active.commit':
-        content: >
-          {{ commit }}
-        mode: 0644
-
-  - &agent_otel_docker_spec
-    <<: *agent_binary_spec
-    extra_vars:
-      dockerfile: 'Dockerfile.elastic-agent.tmpl'
-      docker_entrypoint: 'docker-entrypoint.elastic-agent-otel.tmpl'
-      user: '{{ .BeatName }}'
-      linux_capabilities: ''
-      beats_install_path: "install"
-      image_name: '{{.BeatName}}-otel'
-      expose_ports: "4317,55680,55679"
     files:
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
@@ -1038,31 +1015,6 @@ specs:
         <<: *docker_wolfi_arm_spec
         <<: *docker_builder_arm_spec
         <<: *agent_docker_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-    # Otel image is stripped of components and start in otel mode
-    - os: linux
-      arch: amd64
-      types: [docker]
-      spec:
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
-        <<: *agent_otel_docker_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-    - os: linux
-      arch: arm64
-      types: [docker]
-      spec:
-        <<: *docker_wolfi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_otel_docker_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
         files:
