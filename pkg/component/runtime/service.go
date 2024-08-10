@@ -478,7 +478,7 @@ func (s *serviceRuntime) processCheckin(checkin *proto.CheckinObserved, comm Com
 		// first check-in
 		sendExpected = true
 	}
-	*lastCheckin = time.Now().UTC()
+	*lastCheckin = time.Now()
 	if s.state.syncCheckin(checkin) {
 		changed = true
 	}
@@ -505,7 +505,7 @@ func (s *serviceRuntime) isRunning() bool {
 // checkStatus checks check-ins state, called on timer
 func (s *serviceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *time.Time, missedCheckins *int) {
 	if s.isRunning() {
-		now := time.Now().UTC()
+		now := time.Now()
 		if lastCheckin.IsZero() {
 			// never checked-in
 			*missedCheckins++

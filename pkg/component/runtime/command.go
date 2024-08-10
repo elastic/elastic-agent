@@ -195,7 +195,7 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 				// first check-in
 				sendExpected = true
 			}
-			c.lastCheckin = time.Now().UTC()
+			c.lastCheckin = time.Now()
 			if c.state.syncCheckin(checkin) {
 				changed = true
 			}
@@ -222,7 +222,7 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 					}
 				} else {
 					// running and should be running
-					now := time.Now().UTC()
+					now := time.Now()
 					if now.Sub(c.lastCheckin) <= checkinPeriod {
 						c.missedCheckins = 0
 					} else {
