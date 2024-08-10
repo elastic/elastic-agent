@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
-	"github.com/hectane/go-acl"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -34,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/testing/chmod"
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 
@@ -301,7 +301,7 @@ func testFlattenedDatastreamFleetPolicy(
 	if err != nil {
 		t.Fatalf("failed to create temp directory: %s", err)
 	}
-	err = acl.Chmod(tempDir, 0o755) // `acl.Chmod` is used to ensure unprivileged mode on Windows works
+	err = chmod.Chmod(tempDir, 0o755) // `chmod.Chmod` is used to ensure unprivileged mode on Windows works
 	if err != nil {
 		t.Fatalf("failed to chmod temp directory %s: %s", tempDir, err)
 	}
@@ -407,7 +407,7 @@ func generateLogFile(t *testing.T, fullPath string, tick time.Duration, events i
 	if err != nil {
 		t.Fatalf("could not create file '%s': %s", fullPath, err)
 	}
-	err = acl.Chmod(fullPath, 0o644) // `acl.Chmod` is used to ensure unprivileged mode on Windows works
+	err = chmod.Chmod(fullPath, 0o644) // `chmod.Chmod` is used to ensure unprivileged mode on Windows works
 	if err != nil {
 		t.Fatalf("failed to chmod file '%s': %s", fullPath, err)
 	}

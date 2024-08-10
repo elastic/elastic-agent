@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/testing/chmod"
 	"github.com/elastic/elastic-agent/testing/installtest"
 
-	"github.com/hectane/go-acl"
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
@@ -635,7 +635,7 @@ func windowsBaseTemp() (string, error) {
 			return "", fmt.Errorf("failed to mkdir %s: %w", baseTmp, err)
 		}
 	}
-	err = acl.Chmod(baseTmp, 0777)
+	err = chmod.Chmod(baseTmp, 0777)
 	if err != nil {
 		return "", fmt.Errorf("failed to chmod %s: %w", baseTmp, err)
 	}

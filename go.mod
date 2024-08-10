@@ -31,7 +31,6 @@ require (
 	github.com/google/pprof v0.0.0-20240528025155-186aa0362fba
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hectane/go-acl v0.0.0-20190604041725-da78bae5fc95
 	github.com/jaypipes/ghw v0.12.0
 	github.com/jedib0t/go-pretty/v6 v6.4.6
 	github.com/josephspurrier/goversioninfo v0.0.0-20190209210621-63e6d1acd3dd
