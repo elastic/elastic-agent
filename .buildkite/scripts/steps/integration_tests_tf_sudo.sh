@@ -11,31 +11,12 @@ source .buildkite/scripts/steps/ess.sh
 OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
 OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
 
-# echo "~~~ Installing Go"
-# sudo su -
+echo "~~~ Building test binaries"
+mage build:testBinaries
 
-# echo "~~~ Installing Go with asdf"
-# export ASDF_GOLANG_VERSION="1.22.5"
-# source /opt/buildkite-agent/.asdf/asdf.sh
-# asdf plugin add golang
-# asdf install golang $ASDF_GOLANG_VERSION
-# asdf reshim golang
-# export GOROOT="$(asdf where golang)/go/"
-# export GOPATH=$(go env GOPATH)
-# export PATH="$GOPATH/bin:$PATH"
-
-# echo "~~~ Installing Mage"
-# install_mage
-
-# # TODO fix
-# echo "~~~ Building test binaries"
-# mage build:testBinaries
-
-# ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
-# trap 'ess_down' EXIT
+ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
+trap 'ess_down' EXIT
 
 # Run integration tests
 echo "~~~ Running integration tests"
-.buildkite/scripts/prep-root.sh go version
-# AGENT_VERSION="${OVERRIDE_TEST_AGENT_VERSION}"
-#  AGENT_VERSION="8.16.0-SNAPSHOT" RUN_SUDO=true SNAPSHOT=true TEST_DEFINE_PREFIX=sudo_linux go test -tags integration github.com/elastic/elastic-agent/testing/integration
+sudo -E .buildkite/scripts/sudo-integration-tests.sh
