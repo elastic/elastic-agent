@@ -27,11 +27,8 @@ function ess_up() {
   BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-"0"}"
   BUILDKITE_PIPELINE_SLUG="${BUILDKITE_PIPELINE_SLUG:-"elastic-agent-integration-tests"}"
   
-  pushd "${TF_DIR}"
-  trap 'popd >/dev/null' EXIT
-  
+  pushd "${TF_DIR}"    
   terraform init
-  
   terraform apply \
     -auto-approve \
     -var="stack_version=${STACK_VERSION}" \
@@ -46,6 +43,7 @@ function ess_up() {
   export KIBANA_HOST=$(terraform output -raw kibana_endpoint)
   export KIBANA_USERNAME=$ELASTICSEARCH_USERNAME
   export KIBANA_PASSWORD=$ELASTICSEARCH_PASSWORD
+  popd
 }
 
 function ess_down() {
@@ -56,9 +54,8 @@ function ess_down() {
   export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
   
   pushd "${TF_DIR}"
-  trap 'popd >/dev/null' EXIT
-
   terraform destroy -auto-approve
+  popd
 }
 
 function get_git_user_email() {
