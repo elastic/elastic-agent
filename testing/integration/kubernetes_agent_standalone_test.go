@@ -82,14 +82,12 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 	require.NoError(t, err, "failed to render kustomize")
 
 	testCases := []struct {
-		name              string
-		runUser           *int64
-		runGroup          *int64
-		capabilitiesDrop  []corev1.Capability
-		capabilitiesAdd   []corev1.Capability
-		envAdd            []corev1.EnvVar
-		runK8SInnerTests  bool
-		componentPresence map[string]bool
+		name             string
+		runUser          *int64
+		runGroup         *int64
+		capabilitiesDrop []corev1.Capability
+		capabilitiesAdd  []corev1.Capability
+		runK8SInnerTests bool
 	}{
 		{
 			"default deployment - rootful agent",
@@ -97,13 +95,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			nil,
 			false,
-			map[string]bool{
-				"beat/metrics-monitoring": true,
-				"filestream-monitoring":   true,
-				"system/metrics-default":  true,
-			},
 		},
 		{
 			"drop ALL capabilities - rootful agent",
@@ -111,9 +103,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{},
-			nil,
 			false,
-			nil,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootful agent",
@@ -121,9 +111,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
-			nil,
 			true,
-			nil,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent",
@@ -131,9 +119,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
-			nil,
 			true,
-			nil,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent random uid:gid",
@@ -141,25 +127,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			int64Ptr(500),
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH"},
-			nil,
 			true,
-			nil,
-		},
-		{
-			"run agent in otel mode",
-			nil,
-			nil,
-			nil,
-			nil,
-			[]corev1.EnvVar{
-				{Name: "ELASTIC_AGENT_OTEL", Value: "true"},
-			},
-			false,
-			map[string]bool{
-				"beat/metrics-monitoring": false,
-				"filestream-monitoring":   false,
-				"system/metrics-default":  false,
-			},
 		},
 	}
 
@@ -205,10 +173,123 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 							container.Env[idx].ValueFrom = nil
 						}
 					}
+				},
+				func(pod *corev1.PodSpec) {
+					for volumeIdx, volume := range pod.Volumes {
+						// need to update the volume path of the state directory
+						// to match the test namespace
+						if volume.Name == "elastic-agent-state" {
+							hostPathType := corev1.HostPathDirectoryOrCreate
+							pod.Volumes[volumeIdx].VolumeSource.HostPath = &corev1.HostPathVolumeSource{
+								Type: &hostPathType,
+								Path: fmt.Sprintf("/var/lib/elastic-agent-standalone/%s/state", testNamespace),
+							}
+						}
+					}
+				})
+
+			ctx := context.Background()
+
+			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, nil)
+		})
+	}
+
+}
+
+func TestKubernetesAgentOtel(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  false,
+		OS: []define.OS{
+			{Type: define.Kubernetes},
+		},
+		Group: define.Kubernetes,
+	})
+
+	agentImage := os.Getenv("AGENT_IMAGE")
+	require.NotEmpty(t, agentImage, "AGENT_IMAGE must be set")
+
+	client, err := info.KubeClient()
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
+	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
+
+	err = os.MkdirAll(filepath.Join(testLogsBasePath, t.Name()), 0755)
+	require.NoError(t, err, "failed to create test logs directory")
+
+	namespace := info.Namespace
+
+	esHost := os.Getenv("ELASTICSEARCH_HOST")
+	require.NotEmpty(t, esHost, "ELASTICSEARCH_HOST must be set")
+
+	esAPIKey, err := generateESAPIKey(info.ESClient, namespace)
+	require.NoError(t, err, "failed to generate ES API key")
+	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
+
+	renderedManifest, err := renderKustomize(agentK8SKustomize)
+	require.NoError(t, err, "failed to render kustomize")
+
+	testCases := []struct {
+		name              string
+		envAdd            []corev1.EnvVar
+		runK8SInnerTests  bool
+		componentPresence map[string]bool
+	}{
+
+		{
+			"run agent in otel mode",
+			[]corev1.EnvVar{
+				{Name: "ELASTIC_AGENT_OTEL", Value: "true"},
+			},
+			false,
+			map[string]bool{
+				"beat/metrics-monitoring": false,
+				"filestream-monitoring":   false,
+				"system/metrics-default":  false,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			hasher := sha256.New()
+			hasher.Write([]byte(tc.name))
+			testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
+			testNamespace = noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
+
+			k8sObjects, err := yamlToK8SObjects(bufio.NewReader(bytes.NewReader(renderedManifest)))
+			require.NoError(t, err, "failed to convert yaml to k8s objects")
+
+			adjustK8SAgentManifests(k8sObjects, testNamespace, "elastic-agent-standalone",
+				func(container *corev1.Container) {
+					// set agent image
+					container.Image = agentImage
+					// set ImagePullPolicy to "Never" to avoid pulling the image
+					// as the image is already loaded by the kubernetes provisioner
+					container.ImagePullPolicy = "Never"
+
+					// set Elasticsearch host and API key
+					for idx, env := range container.Env {
+						if env.Name == "ES_HOST" {
+							container.Env[idx].Value = esHost
+							container.Env[idx].ValueFrom = nil
+						}
+						if env.Name == "API_KEY" {
+							container.Env[idx].Value = esAPIKey
+							container.Env[idx].ValueFrom = nil
+						}
+					}
 
 					if len(tc.envAdd) > 0 {
 						container.Env = append(container.Env, tc.envAdd...)
 					}
+
+					// drop arguments overriding default config
+					container.Args = []string{}
 				},
 				func(pod *corev1.PodSpec) {
 					for volumeIdx, volume := range pod.Volumes {
