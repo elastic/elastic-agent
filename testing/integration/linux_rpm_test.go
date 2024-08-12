@@ -9,15 +9,17 @@ package integration
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
-	"github.com/elastic/elastic-agent/testing/upgradetest"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
+
 	"github.com/gofrs/uuid/v5"
+
+	"github.com/elastic/elastic-agent-libs/kibana"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"

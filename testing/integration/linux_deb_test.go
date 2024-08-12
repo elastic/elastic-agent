@@ -14,8 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/gofrs/uuid/v5"
+
+	"github.com/elastic/elastic-agent-libs/kibana"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
