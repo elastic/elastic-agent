@@ -195,6 +195,11 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 				// first check-in
 				sendExpected = true
 			}
+			// Warning lastCheckin must contain a
+			// monotonic clock.  Functions like Local(),
+			// UTC(), Round(), AddDate(), etc. remove the
+			// monotonic clock.  See
+			// https://pkg.go.dev/time
 			c.lastCheckin = time.Now()
 			if c.state.syncCheckin(checkin) {
 				changed = true
@@ -222,6 +227,12 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 					}
 				} else {
 					// running and should be running
+					//
+					// Warning now must contain a
+					// monotonic clock.  Functions like Local(),
+					// UTC(), Round(), AddDate(), etc. remove the
+					// monotonic clock.  See
+					// https://pkg.go.dev/time
 					now := time.Now()
 					if now.Sub(c.lastCheckin) <= checkinPeriod {
 						c.missedCheckins = 0
