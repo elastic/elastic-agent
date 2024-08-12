@@ -26,7 +26,6 @@ steps:
   #     ls -lah build/distributions/
   #     .buildkite/scripts/steps/integration_tests_tf.sh
   #   artifact_paths:
-  #     - test_infra/ess/terraform.tfstate
   #     - build/**
   #   agents:
   #     provider: "gcp"
@@ -44,7 +43,6 @@ steps:
       ls -lah build/distributions/
       .buildkite/scripts/steps/integration_tests_tf_sudo.sh
     artifact_paths:
-      - test_infra/ess/terraform.tfstate
       - build/**
     agents:
       provider: "gcp"
