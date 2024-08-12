@@ -4,7 +4,7 @@
 source /opt/buildkite-agent/hooks/pre-command 
 source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 
-echo "~~~ Running integration tests as $WHOAMI"
+echo "~~~ Running integration tests as $USER"
 mkdir /usr/share/elastic-agent
 go env
 # TODO: Pass the actual version of the agent
