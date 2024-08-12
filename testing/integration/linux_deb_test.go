@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,10 +113,12 @@ func TestDebFleetUpgrade(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	// start from snapshot of the deb
+	// start from previous minor
+	upgradeFromVersion, err := upgradetest.PreviousMinor()
+	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,
-		upgradetest.EnsureSnapshot(define.Version()),
+		upgradeFromVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 		atesting.WithPackageFormat("deb"),
 	)
@@ -167,22 +170,24 @@ func TestDebFleetUpgrade(t *testing.T) {
 	// 3. Upgrade deb to the build version
 	srcPackage, err := endFixture.SrcPackage(ctx)
 	require.NoError(t, err)
-	cmd := exec.CommandContext(ctx, "sudo", "apt", "install", "--no-install-recommends", "--yes", srcPackage)
+	cmd := exec.CommandContext(ctx, "sudo", "apt-get", "install", "-y", "-qq", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", srcPackage)
 	cmd.Env = append(cmd.Env, "DEBIAN_FRONTEND=noninteractive")
 	out, err := cmd.CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	require.NoError(t, err, string(out))
 
 	// 4. Wait for version in Fleet to match
+	// Fleet will not include the `-SNAPSHOT` in the `GetAgentVersion` result
+	noSnapshotVersion := strings.TrimSuffix(define.Version(), "-SNAPSHOT")
 	require.Eventually(t, func() bool {
 		newVersion, err := fleettools.GetAgentVersion(ctx, info.KibanaClient, policy.ID)
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
 			return false
 		}
-		if define.Version() == newVersion {
+		if noSnapshotVersion == newVersion {
 			return true
 		}
-		t.Logf("Got Agent version %s != %s", newVersion, define.Version())
+		t.Logf("Got Agent version %s != %s", newVersion, noSnapshotVersion)
 		return false
 	}, 5*time.Minute, time.Second)
 }

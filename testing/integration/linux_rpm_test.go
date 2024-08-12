@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -113,9 +114,11 @@ func TestRpmFleetUpgrade(t *testing.T) {
 	defer cancel()
 
 	// start from snapshot of the rpm
+	upgradeFromVersion, err := upgradetest.PreviousMinor()
+	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,
-		upgradetest.EnsureSnapshot(define.Version()),
+		upgradeFromVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 		atesting.WithPackageFormat("rpm"),
 	)
@@ -167,10 +170,12 @@ func TestRpmFleetUpgrade(t *testing.T) {
 	// 3. Upgrade rpm to the build version
 	srcPackage, err := endFixture.SrcPackage(ctx)
 	require.NoError(t, err)
-	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-i", "-v", srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	require.NoError(t, err, string(out))
 
 	// 4. Wait for version in Fleet to match
+	// Fleet will not include the `-SNAPSHOT` in the `GetAgentVersion` result
+	noSnapshotVersion := strings.TrimSuffix(define.Version(), "-SNAPSHOT")
 	require.Eventually(t, func() bool {
 		t.Log("Getting Agent version...")
 		newVersion, err := fleettools.GetAgentVersion(ctx, info.KibanaClient, policy.ID)
@@ -178,10 +183,10 @@ func TestRpmFleetUpgrade(t *testing.T) {
 			t.Logf("error getting agent version: %v", err)
 			return false
 		}
-		if define.Version() == newVersion {
+		if noSnapshotVersion == newVersion {
 			return true
 		}
-		t.Logf("Got Agent version %s != %s", newVersion, define.Version())
+		t.Logf("Got Agent version %s != %s", newVersion, noSnapshotVersion)
 		return false
 	}, 5*time.Minute, time.Second)
 }
