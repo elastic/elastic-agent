@@ -504,6 +504,7 @@ data:
             process.include_cpu_ticks: false
             metricsets:
               - process
+            process.include_cpu_ticks: false
           - data_stream:
               dataset: system.process_summary
               type: metrics
