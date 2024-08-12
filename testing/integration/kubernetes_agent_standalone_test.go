@@ -82,12 +82,14 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 	require.NoError(t, err, "failed to render kustomize")
 
 	testCases := []struct {
-		name             string
-		runUser          *int64
-		runGroup         *int64
-		capabilitiesDrop []corev1.Capability
-		capabilitiesAdd  []corev1.Capability
-		runK8SInnerTests bool
+		name              string
+		runUser           *int64
+		runGroup          *int64
+		capabilitiesDrop  []corev1.Capability
+		capabilitiesAdd   []corev1.Capability
+		envAdd            []corev1.EnvVar
+		runK8SInnerTests  bool
+		componentPresence map[string]bool
 	}{
 		{
 			"default deployment - rootful agent",
@@ -95,7 +97,13 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			nil,
 			false,
+			map[string]bool{
+				"beat/metrics-monitoring": true,
+				"filestream-monitoring":   true,
+				"system/metrics-default":  true,
+			},
 		},
 		{
 			"drop ALL capabilities - rootful agent",
@@ -103,7 +111,9 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{},
+			nil,
 			false,
+			nil,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootful agent",
@@ -111,7 +121,9 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
+			nil,
 			true,
+			nil,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent",
@@ -119,7 +131,9 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
+			nil,
 			true,
+			nil,
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent random uid:gid",
@@ -127,7 +141,25 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			int64Ptr(500),
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH"},
+			nil,
 			true,
+			nil,
+		},
+		{
+			"run agent in otel mode",
+			nil,
+			nil,
+			nil,
+			nil,
+			[]corev1.EnvVar{
+				{Name: "ELASTIC_AGENT_OTEL", Value: "true"},
+			},
+			false,
+			map[string]bool{
+				"beat/metrics-monitoring": false,
+				"filestream-monitoring":   false,
+				"system/metrics-default":  false,
+			},
 		},
 	}
 
@@ -173,6 +205,10 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 							container.Env[idx].ValueFrom = nil
 						}
 					}
+
+					if len(tc.envAdd) > 0 {
+						container.Env = append(container.Env, tc.envAdd...)
+					}
 				},
 				func(pod *corev1.PodSpec) {
 					for volumeIdx, volume := range pod.Volumes {
@@ -190,7 +226,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 
 			ctx := context.Background()
 
-			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath)
+			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, tc.componentPresence)
 		})
 	}
 
@@ -199,7 +235,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 // deployK8SAgent is a helper function to deploy the elastic-agent in k8s and invoke the inner k8s tests if
 // runK8SInnerTests is true
 func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object, namespace string,
-	runInnerK8STests bool, testLogsBasePath string) {
+	runInnerK8STests bool, testLogsBasePath string, componentPresence map[string]bool) {
 
 	objects = append([]k8s.Object{&corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -273,9 +309,10 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 		time.Sleep(time.Second * 1)
 	}
 
+	statusString := stdout.String()
 	if agentHealthyErr != nil {
 		t.Errorf("elastic-agent never reported healthy: %v", agentHealthyErr)
-		t.Logf("stdout: %s\n", stdout.String())
+		t.Logf("stdout: %s\n", statusString)
 		t.Logf("stderr: %s\n", stderr.String())
 		t.FailNow()
 		return
@@ -283,6 +320,11 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 
 	stdout.Reset()
 	stderr.Reset()
+
+	for component, shouldBePresent := range componentPresence {
+		isPresent := strings.Contains(statusString, component)
+		require.Equal(t, shouldBePresent, isPresent)
+	}
 
 	if runInnerK8STests {
 		err := client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone",
