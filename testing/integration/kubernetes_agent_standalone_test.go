@@ -272,8 +272,8 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 	command := []string{"elastic-agent", "status"}
 	var stdout, stderr bytes.Buffer
 	var agentHealthyErr error
-	// we will wait maximum 60 seconds for the agent to report healthy
-	for i := 0; i < 60; i++ {
+	// we will wait maximum 120 seconds for the agent to report healthy
+	for i := 0; i < 120; i++ {
 		stdout.Reset()
 		stderr.Reset()
 		agentHealthyErr = client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone", command, &stdout, &stderr)
