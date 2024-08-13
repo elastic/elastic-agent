@@ -115,7 +115,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
 			true,
-			"https://github.com/elastic/elastic-agent/issues/5275",
+			"",
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent",
@@ -124,7 +124,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
 			true,
-			"",
+			"https://github.com/elastic/elastic-agent/issues/5275",
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent random uid:gid",
