@@ -133,7 +133,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH"},
 			true,
-			"",
+			"https://github.com/elastic/elastic-agent/issues/5275",
 		},
 	}
 
