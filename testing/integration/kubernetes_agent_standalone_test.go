@@ -88,6 +88,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 		capabilitiesDrop []corev1.Capability
 		capabilitiesAdd  []corev1.Capability
 		runK8SInnerTests bool
+		skipReason       string
 	}{
 		{
 			"default deployment - rootful agent",
@@ -96,6 +97,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			nil,
 			false,
+			"",
 		},
 		{
 			"drop ALL capabilities - rootful agent",
@@ -104,6 +106,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{},
 			false,
+			"",
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootful agent",
@@ -112,6 +115,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
 			true,
+			"https://github.com/elastic/elastic-agent/issues/5275",
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent",
@@ -120,6 +124,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
 			true,
+			"",
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent random uid:gid",
@@ -128,12 +133,17 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH"},
 			true,
+			"",
 		},
 	}
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.skipReason != "" {
+				t.Skip(tc.skipReason)
+			}
+
 			hasher := sha256.New()
 			hasher.Write([]byte(tc.name))
 			testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
