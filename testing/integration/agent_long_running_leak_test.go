@@ -236,7 +236,7 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 			// https://github.com/elastic/elastic-agent/issues/5300
 			// Ideally we would require State_HEALTHY but we currently report as DEGRADED due to unexpected permissions errors
 			// accessing some process metrics. Ensure the leak tests still run as long as this is the case.
-			if comp.State == int(cproto.State_HEALTHY) || comp.State == int(cproto.State_DEGRADED) {
+			if comp.State != int(cproto.State_HEALTHY) && comp.State != int(cproto.State_DEGRADED) {
 				compDebugName = comp.Name
 				allHealthy = false
 			}
