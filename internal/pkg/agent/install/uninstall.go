@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,8 +20,10 @@ import (
 	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	aerrors "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
@@ -28,6 +31,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"
 	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -100,6 +105,27 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 		}
 	}
 
+	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
+	notifyFleet := false
+	var ai *info.AgentInfo
+	c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
+	if err != nil {
+		pt.Describe(fmt.Sprintf("unable to read agent config to deterimine if notifiying fleet-server is needed: %v", err))
+	}
+	cfg, err := configuration.NewFromConfig(c)
+	if err != nil {
+		pt.Describe(fmt.Sprintf("notify fleet-server: unable to transform *config.Config to *configuration.Configuration: %v", err))
+	}
+
+	if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
+		ai, err = info.NewAgentInfo(ctx, false)
+		if err != nil {
+			pt.Describe(fmt.Sprintf("unable to read ageint info, fleet-server will not be notified of uninstall: %v", err))
+		} else {
+			notifyFleet = true
+		}
+	}
+
 	// remove existing directory
 	pt.Describe("Removing install directory")
 	err = RemovePath(topPath)
@@ -112,7 +138,60 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	}
 	pt.Describe("Removed install directory")
 
+	if notifyFleet {
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai)
+	}
+
 	return nil
+}
+
+// notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
+//
+// There are retries for the attempt after a 10s wait, but it is a best-effort approach.
+func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) {
+	pt.Describe("notify fleet-server of uninstall")
+	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
+	if err != nil {
+		pt.Describe(fmt.Sprintf("notify fleet-server: unable to create fleetapi client: %v", err))
+		return
+	}
+	cmd := fleetapi.NewAuditUnenrollCmd(ai, client)
+	req := &fleetapi.AuditUnenrollRequest{
+		Reason:    fleetapi.ReasonUninstall,
+		Timestamp: time.Now().UTC(),
+	}
+	timer := time.NewTimer(0)
+	for i := 0; i < 10; i++ {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+		status, err := cmd.Execute(ctx, req)
+		if err != nil {
+			var reqErr *fleetapi.ReqError
+			// Do not retry if it was a context error, or an error with the request.
+			if errors.Is(err, context.Canceled) || errors.As(err, &reqErr) {
+				pt.Describe(fmt.Sprintf("notify fleet-server encountered unretryable error: %v", err))
+				return
+			}
+			pt.Describe("notify fleet-server network error, retry in 10s.")
+			timer.Reset(time.Second * 10)
+			continue
+		}
+		switch status {
+		case http.StatusOK:
+			pt.Describe("notify fleet-server success")
+			return
+		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusConflict:
+			pt.Describe(fmt.Sprintf("notify fleet-server failed with status code %d. no retries.", status))
+			return
+		default:
+			pt.Describe(fmt.Sprintf("notify fleet-server failed with status code %d. retry in 10s", status))
+			timer.Reset(time.Second * 10)
+		}
+	}
+	pt.Describe("notify fleet-server failed.")
 }
 
 // EnsureStoppedService ensures that the installed service is stopped.

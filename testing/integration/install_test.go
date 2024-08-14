@@ -8,8 +8,11 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -280,6 +283,59 @@ func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, b
 			Namespace:  installOpts.Namespace,
 		}))
 	}
+}
+
+// TestInstallUninstallAudit will test to make sure that a fleet-managed agent can use the audit/unenroll endpoint when uninstalling itself.
+func TestInstallUninstallAudit(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Stack: &define.Stack{}, // needs a fleet-server.
+		Sudo:  true,
+		Local: false,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	// Run `elastic-agent install`.  We use `--force` to prevent interactive
+	// execution.
+	opts := &atesting.InstallOpts{Force: true}
+	out, err := fixture.Install(ctx, opts)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
+
+	// Check that Agent was installed in default base path
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+
+	agentID, err := getAgentID(ctx, fixture)
+	require.NoError(t, err, "error getting the agent ID")
+
+	out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	if err != nil {
+		t.Logf("uninstall output: %s", out)
+		require.NoErrorf(t, err)
+	}
+
+	response, err := info.kibanaClient.SendWithContext(ctx, http.MethodGet, "/api/fleet/agents/"+agentID, nil, nil, nil)
+	require.NoError(t, err)
+	defer response.Body.Close()
+	p, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	var res struct {
+		Item struct {
+			AuditUnenrollReason string `json:"audit_unenroll_reason"`
+		} `json:"item"`
+	}
+	err = json.Unmarshal(p, &res)
+	require.NoError(t, err)
+	require.Equal(t, "uninstall", res.Item.AuditUnenrollReason)
 }
 
 // TestRepeatedInstallUninstall will install then uninstall the agent
