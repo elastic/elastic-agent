@@ -30,6 +30,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -122,18 +123,18 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			int64Ptr(1000), // elastic-agent uid
 			nil,
 			[]corev1.Capability{"ALL"},
-			[]corev1.Capability{"CHOWN", "SETPCAP"},
+			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
 			true,
-			"https://github.com/elastic/elastic-agent/issues/5275",
+			"",
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent random uid:gid",
 			int64Ptr(500),
 			int64Ptr(500),
 			[]corev1.Capability{"ALL"},
-			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH"},
+			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
 			true,
-			"https://github.com/elastic/elastic-agent/issues/5275",
+			"",
 		},
 	}
 
@@ -159,6 +160,10 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 					// set ImagePullPolicy to "Never" to avoid pulling the image
 					// as the image is already loaded by the kubernetes provisioner
 					container.ImagePullPolicy = "Never"
+
+					container.Resources.Limits = corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("800Mi"),
+					}
 
 					if tc.capabilitiesDrop != nil || tc.capabilitiesAdd != nil || tc.runUser != nil || tc.runGroup != nil {
 						// set security context
