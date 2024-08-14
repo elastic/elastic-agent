@@ -233,7 +233,7 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 				}
 			}
 			runner.T().Logf("component state: %s", comp.Message)
-			if comp.State != int(cproto.State_FAILED) {
+			if comp.State == int(cproto.State_FAILED) {
 				compDebugName = comp.Name
 				allHealthy = false
 			}
