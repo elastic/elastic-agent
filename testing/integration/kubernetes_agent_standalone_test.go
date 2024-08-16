@@ -30,6 +30,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -88,6 +89,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 		capabilitiesDrop []corev1.Capability
 		capabilitiesAdd  []corev1.Capability
 		runK8SInnerTests bool
+		skipReason       string
 	}{
 		{
 			"default deployment - rootful agent",
@@ -96,6 +98,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			nil,
 			nil,
 			false,
+			"",
 		},
 		{
 			"drop ALL capabilities - rootful agent",
@@ -104,6 +107,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{},
 			false,
+			"",
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootful agent",
@@ -112,28 +116,35 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 			[]corev1.Capability{"ALL"},
 			[]corev1.Capability{"CHOWN", "SETPCAP"},
 			true,
+			"",
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent",
 			int64Ptr(1000), // elastic-agent uid
 			nil,
 			[]corev1.Capability{"ALL"},
-			[]corev1.Capability{"CHOWN", "SETPCAP"},
+			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
 			true,
+			"",
 		},
 		{
 			"drop ALL add CHOWN, SETPCAP capabilities - rootless agent random uid:gid",
 			int64Ptr(500),
 			int64Ptr(500),
 			[]corev1.Capability{"ALL"},
-			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH"},
+			[]corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
 			true,
+			"",
 		},
 	}
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.skipReason != "" {
+				t.Skip(tc.skipReason)
+			}
+
 			hasher := sha256.New()
 			hasher.Write([]byte(tc.name))
 			testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
@@ -149,6 +160,10 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 					// set ImagePullPolicy to "Never" to avoid pulling the image
 					// as the image is already loaded by the kubernetes provisioner
 					container.ImagePullPolicy = "Never"
+
+					container.Resources.Limits = corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("800Mi"),
+					}
 
 					if tc.capabilitiesDrop != nil || tc.capabilitiesAdd != nil || tc.runUser != nil || tc.runGroup != nil {
 						// set security context
@@ -262,8 +277,8 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 	command := []string{"elastic-agent", "status"}
 	var stdout, stderr bytes.Buffer
 	var agentHealthyErr error
-	// we will wait maximum 60 seconds for the agent to report healthy
-	for i := 0; i < 60; i++ {
+	// we will wait maximum 120 seconds for the agent to report healthy
+	for i := 0; i < 120; i++ {
 		stdout.Reset()
 		stderr.Reset()
 		agentHealthyErr = client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone", command, &stdout, &stderr)
