@@ -85,7 +85,7 @@ func put(r httpRequest) (string, error) {
 func request(r httpRequest) (string, error) {
 	escapedURL := r.GetURL()
 
-	fields := []slog.Attr{
+	fields := []any{
 		slog.String("method", r.method),
 		slog.String("escapedURL", escapedURL),
 	}
@@ -98,7 +98,7 @@ func request(r httpRequest) (string, error) {
 		body = nil
 	}
 
-	logger.Log(context.Background(), TraceLevel, "Executing request", fields)
+	logger.Log(context.Background(), TraceLevel, "Executing request", fields...)
 
 	req, err := http.NewRequestWithContext(context.TODO(), r.method, escapedURL, body)
 	if err != nil {
