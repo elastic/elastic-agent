@@ -7,9 +7,10 @@ package comp
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/encoding/protojson"
-	"os"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 )
