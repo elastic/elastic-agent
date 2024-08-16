@@ -1,11 +1,11 @@
 # Elastic Agent V2 Architecture
 
 ## Overview
-The Elastic Agent V2 architecture was introduced in the 8.6 version of the Elastic Agent. It was a large internal change of how the Elastic Agent was designed and how it operated. The change was performed to allow better status reporting of each running input, enabled support for shippers, improved the specification definition, and allowed for better parallel change actions.
+The Elastic Agent V2 architecture was introduced in the 8.6 version of the Elastic Agent. It was a large internal change of how the Elastic Agent was designed and how it operated. The change was performed to allow better status reporting of each running input, improved the specification definition, and allowed for better parallel change actions.
 ## Component Model
 The entire logic of the Elastic Agent V2 architecture works with what is called the Component Model. The Elastic Agent uses policy to generate a Component Model and then that Component Model is used to ensure a consistency between the currently observed state and the expected state (which is the Component Model).
 ### Component
-A component to Elastic Agent is anything that the Elastic Agent must run, operate, and observe during the life of the Elastic Agent. Component is a rather generic term for a good reason. A component can be multiple different types of running code that works with the Elastic Agent. The first example of this is the elastic-agent-shipper which is not an input. A component also always has units, see units below for description of a unit.
+A component to Elastic Agent is anything that the Elastic Agent must run, operate, and observe during the life of the Elastic Agent. Component is a rather generic term for a good reason. A component can be multiple different types of running code that works with the Elastic Agent. A component also always has units, see units below for description of a unit.
 ### Unit
 A unit to Elastic Agent is a unique block of configuration that is passed to a component over the control protocol. The block of configuration only represents either one input or one output. It is possible for a component to be multiple units of inputs (aka. running multiple filestream inputs), or currently only one output, but designed to support the possibility of multiple outputs. Using multiple blocks of configuration into a set of units allows the Elastic Agent control protocol and the spawned component’s to communicate a unique set of changes as well as the status of each unit.
 

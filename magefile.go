@@ -334,7 +334,6 @@ func (Build) TestBinaries() error {
 	wd, _ := os.Getwd()
 	testBinaryPkgs := []string{
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
-		filepath.Join(wd, "pkg", "component", "fake", "shipper"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 	}
 	for _, pkg := range testBinaryPkgs {
@@ -670,15 +669,6 @@ func ControlProto() error {
 		"--go_out=pkg/control/v1/proto", "--go_opt=paths=source_relative",
 		"--go-grpc_out=pkg/control/v1/proto", "--go-grpc_opt=paths=source_relative",
 		"control_v1.proto")
-}
-
-// FakeShipperProto generates pkg/component/fake/common event protocol.
-func FakeShipperProto() error {
-	return sh.RunV(
-		"protoc",
-		"--go_out=.", "--go_opt=paths=source_relative",
-		"--go-grpc_out=.", "--go-grpc_opt=paths=source_relative",
-		"pkg/component/fake/common/event.proto")
 }
 
 func BuildPGP() error {
