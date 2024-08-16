@@ -72,7 +72,6 @@ require (
 	golang.org/x/text v0.16.0
 	golang.org/x/time v0.5.0
 	golang.org/x/tools v0.22.0
-	golang.org/x/tools/go/vcs v0.1.0-deprecated
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/ini.v1 v1.67.0
