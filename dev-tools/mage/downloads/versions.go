@@ -387,7 +387,7 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 		sanitizedFilePath := filepath.Join(path.Dir(downloadRequest.UnsanitizedFilePath), name)
 		err = os.Rename(downloadRequest.UnsanitizedFilePath, sanitizedFilePath)
 		if err != nil {
-			slog.Warn("Could not sanitize downloaded file name. Keeping old name",
+			logger.Warn("Could not sanitize downloaded file name. Keeping old name",
 				slog.String("fileName", downloadRequest.UnsanitizedFilePath),
 				slog.String("sanitizedFileName", sanitizedFilePath),
 			)
