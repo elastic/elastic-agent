@@ -9,6 +9,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -29,7 +30,9 @@ import (
 	"github.com/elastic/elastic-agent-libs/api/npipe"
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -160,7 +163,10 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 		case <-timer.C:
 			done = true
 		case <-ticker.C:
-			err := runner.agentFixture.IsHealthy(ctx)
+			// https://github.com/elastic/elastic-agent/issues/5300
+			// Ideally we would require healthy but we currently report as DEGRADED due to unexpected permissions errors
+			// accessing some process metrics. Ensure the leak tests still run as long while this is the case.
+			err := runner.IsHealthyOrDegraded(ctx)
 			require.NoError(runner.T(), err)
 			// iterate through our watchers, update them
 			for _, mon := range runner.resourceWatchers {
@@ -205,6 +211,8 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 
 // CheckHealthAtStartup ensures all the beats and agent are healthy and working before we continue
 func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
+	runner.T().Helper()
+
 	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
 	compDebugName := ""
 	require.Eventually(runner.T(), func() bool {
@@ -233,13 +241,37 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 				}
 			}
 			runner.T().Logf("component state: %s", comp.Message)
-			if comp.State != int(cproto.State_HEALTHY) {
+
+			// https://github.com/elastic/elastic-agent/issues/5300
+			// Ideally we would require healthy but we currently report as DEGRADED due to unexpected permissions errors
+			// accessing some process metrics. Ensure the leak tests still run as long while this is the case.
+			if !isHealthyOrDegraded(comp.State) {
 				compDebugName = comp.Name
 				allHealthy = false
 			}
 		}
 		return allHealthy && foundApache && foundSystem
 	}, runner.healthCheckTime, runner.healthCheckRefreshTime, "install never became healthy: components did not return a healthy state: %s", compDebugName)
+}
+
+func (runner *ExtendedRunner) IsHealthyOrDegraded(ctx context.Context, opts ...process.CmdOption) error {
+	runner.T().Helper()
+
+	status, err := runner.agentFixture.ExecStatus(ctx, opts...)
+	if err != nil {
+		return fmt.Errorf("agent status returned an error: %w", err)
+	}
+
+	if !isHealthyOrDegraded(status.State) {
+		return fmt.Errorf("agent isn't healthy or degraded, current status: %s",
+			client.State(status.State))
+	}
+
+	return nil
+}
+
+func isHealthyOrDegraded(state int) bool {
+	return state == int(cproto.State_HEALTHY) || state == int(cproto.State_DEGRADED)
 }
 
 /*

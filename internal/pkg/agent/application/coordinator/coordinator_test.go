@@ -638,7 +638,6 @@ func TestCollectManagerErrorsTimeout(t *testing.T) {
 	// in collectManagerErrors
 	waitAndTestError(t, func(err error) bool {
 		return err != nil &&
-			strings.Contains(err.Error(), "1 error occurred") &&
 			strings.Contains(err.Error(), "timeout while waiting for managers")
 	}, handlerChan)
 }
@@ -653,7 +652,6 @@ func TestCollectManagerErrorsOneResponse(t *testing.T) {
 
 	waitAndTestError(t, func(err error) bool {
 		return err != nil &&
-			strings.Contains(err.Error(), "2 errors occurred") &&
 			strings.Contains(err.Error(), cfgErrStr) &&
 			strings.Contains(err.Error(), "timeout while waiting for managers")
 	}, handlerChan)
@@ -671,7 +669,6 @@ func TestCollectManagerErrorsAllResponses(t *testing.T) {
 
 	waitAndTestError(t, func(err error) bool {
 		return err != nil &&
-			strings.Contains(err.Error(), "3 errors occurred") &&
 			strings.Contains(err.Error(), runtimeErrStr) &&
 			strings.Contains(err.Error(), varsErrStr) &&
 			strings.Contains(err.Error(), upgradeMarkerWatcherErrStr)
