@@ -9,10 +9,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // httpRequest configures an HTTP request
@@ -86,28 +85,28 @@ func put(r httpRequest) (string, error) {
 func request(r httpRequest) (string, error) {
 	escapedURL := r.GetURL()
 
-	fields := log.Fields{
-		"method":     r.method,
-		"escapedURL": escapedURL,
+	fields := []slog.Attr{
+		slog.String("method", r.method),
+		slog.String("escapedURL", escapedURL),
 	}
 
 	var body io.Reader
 	if r.Payload != "" {
 		body = bytes.NewReader([]byte(r.Payload))
-		fields["payload"] = r.Payload
+		fields = append(fields, slog.String("payload", r.Payload))
 	} else {
 		body = nil
 	}
 
-	log.WithFields(fields).Trace("Executing request")
+	logger.Log(context.Background(), TraceLevel, "Executing request", fields)
 
 	req, err := http.NewRequestWithContext(context.TODO(), r.method, escapedURL, body)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"error":      err,
-			"method":     r.method,
-			"escapedURL": escapedURL,
-		}).Warn("Error creating request")
+		logger.Warn("Error creating request",
+			slog.String("error", err.Error()),
+			slog.String("method", r.method),
+			slog.String("escapedURL", escapedURL),
+		)
 		return "", err
 	}
 
@@ -123,22 +122,22 @@ func request(r httpRequest) (string, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"error":      err,
-			"method":     r.method,
-			"escapedURL": escapedURL,
-		}).Warn("Error executing request")
+		logger.Warn("Error executing request",
+			slog.String("error", err.Error()),
+			slog.String("method", r.method),
+			slog.String("escapedURL", escapedURL),
+		)
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"error":      err,
-			"method":     r.method,
-			"escapedURL": escapedURL,
-		}).Warn("Could not read response body")
+		logger.Warn("Could not read response body",
+			slog.String("error", err.Error()),
+			slog.String("method", r.method),
+			slog.String("escapedURL", escapedURL),
+		)
 		return "", err
 	}
 	bodyString := string(bodyBytes)
