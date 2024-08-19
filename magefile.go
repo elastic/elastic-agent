@@ -59,7 +59,6 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 )
@@ -989,15 +988,14 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 		if devtools.ExternalBuild == true {
 
-			// Only log fatal logs for logs produced using logrus. This is the global logger
-			// used by github.com/elastic/elastic-agent/dev-tools/mage/downloads which can only be configured globally like this or via
-			// environment variables.
+			// Only log fatal logs for logs produced. This is the global logger
+			// used by github.com/elastic/elastic-agent/dev-tools/mage/downloads which can only be configured globally like this.
 			//
 			// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
 			// download artifacts on unsupported platforms and choose to ignore the errors.
 			//
 			// Change this to InfoLevel to see exactly what the downloader is doing.
-			logrus.SetLevel(logrus.FatalLevel)
+			downloads.LogLevel.Set(downloads.FatalLevel)
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
