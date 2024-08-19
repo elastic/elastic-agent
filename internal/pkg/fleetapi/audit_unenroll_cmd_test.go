@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+
 	"github.com/stretchr/testify/require"
 )
 
