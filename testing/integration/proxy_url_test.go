@@ -165,6 +165,7 @@ func TestProxyURL(t *testing.T) {
 					proxytest.WithVerboseLog())
 				proxyFleetPolicy.Start()
 				t.Cleanup(proxyFleetPolicy.Close)
+				t.Logf("Fleet-server port: %s", mockFleet.fleetServer.Port)
 
 				// set the proxy URL in policy to proxyFleetPolicy
 				mockFleet.policyData.FleetProxyURL = new(string)
@@ -202,6 +203,9 @@ func TestProxyURL(t *testing.T) {
 				}, 5*time.Minute, 5*time.Second,
 					"did not find requests to the proxy defined in the policy. Want [%s] on %v",
 					proxies["policy"].LocalhostURL, proxies["policy"].ProxiedRequests())
+				for proxy, p := range proxies {
+					t.Logf("Proxy %s requests: %v", proxy, p.ProxiedRequests())
+				}
 			},
 		},
 		{
