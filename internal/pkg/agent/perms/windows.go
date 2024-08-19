@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"syscall"
 
 	"github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
@@ -89,6 +90,11 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 					err = apply(name, inherit, grants...)
 					if err != nil {
+						// Check for Errno = 0 which indicates success
+						// https://pkg.go.dev/golang.org/x/sys/windows#Errno
+						if errors.Is(err, syscall.Errno(0)) {
+							return nil
+						}
 						return err
 					}
 					if userSID != nil && groupSID != nil {
