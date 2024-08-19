@@ -41,7 +41,7 @@ steps:
     command: |
       buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
       ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "default" "^(TestAPMConfig|TestDiagnosticsOptionalValues|TestIsolatedUnitsDiagnosticsOptionalValues|TestDiagnosticsCommand|TestIsolatedUnitsDiagnosticsCommand|TestEventLogFile|TestFakeComponent|TestFakeIsolatedUnitsComponent|TestOtelFileProcessing|TestOtelLogsIngestion|TestOtelAPMIngestion|TestPackageVersion)$"
+      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "default" "^(TestAPMConfig|TestDiagnosticsOptionalValues|TestIsolatedUnitsDiagnosticsOptionalValues|TestDiagnosticsCommand|TestIsolatedUnitsDiagnosticsCommand|TestEventLogFile|TestFakeComponent|TestFakeIsolatedUnitsComponent|TestOtelFileProcessing|TestOtelLogsIngestion|TestOtelAPMIngestion|TestPackageVersion)$$"
     artifact_paths:
       - build/**
     agents:
@@ -58,7 +58,7 @@ steps:
     command: |
       buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
       ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "upgrade" "^(TestUpgradeBrokenPackageVersion|TestStandaloneUpgradeWithGPGFallback|TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing|TestStandaloneUpgradeRollback|TestStandaloneUpgradeRollbackOnRestarts|TestStandaloneUpgradeFailsWhenUpgradeIsInProgress|TestStandaloneUpgradeRetryDownload|TestStandaloneUpgradeSameCommit|TestStandaloneUpgrade|TestStandaloneUpgradeUninstallKillWatcher)$"
+      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "upgrade" "^(TestUpgradeBrokenPackageVersion|TestStandaloneUpgradeWithGPGFallback|TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing|TestStandaloneUpgradeRollback|TestStandaloneUpgradeRollbackOnRestarts|TestStandaloneUpgradeFailsWhenUpgradeIsInProgress|TestStandaloneUpgradeRetryDownload|TestStandaloneUpgradeSameCommit|TestStandaloneUpgrade|TestStandaloneUpgradeUninstallKillWatcher)$$"
     artifact_paths:
       - build/**
     agents:
@@ -75,7 +75,7 @@ steps:
     command: |
       buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
       ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet" "^(TestLongRunningAgentForLeaks|TestDelayEnroll|TestDelayEnrollUnprivileged|TestInstallAndCLIUninstallWithEndpointSecurity|TestInstallAndUnenrollWithEndpointSecurity|TestInstallWithEndpointSecurityAndRemoveEndpointIntegration|TestEndpointSecurityNonDefaultBasePath|TestEndpointSecurityUnprivileged|TestEndpointSecurityCannotSwitchToUnprivileged|TestEndpointLogsAreCollectedInDiagnostics|TestForceInstallOverProtectedPolicy|TestSetLogLevelFleetManaged|TestLogIngestionFleetManaged|TestMetricsMonitoringCorrectBinaries|TestEndpointAgentServiceMonitoring|TestMonitoringPreserveTextConfig|TestMonitoringLivenessReloadable|TestComponentBuildHashInDiagnostics|TestProxyURL|TestFleetManagedUpgradeUnprivileged)$"
+      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet" "^(TestLongRunningAgentForLeaks|TestDelayEnroll|TestDelayEnrollUnprivileged|TestInstallAndCLIUninstallWithEndpointSecurity|TestInstallAndUnenrollWithEndpointSecurity|TestInstallWithEndpointSecurityAndRemoveEndpointIntegration|TestEndpointSecurityNonDefaultBasePath|TestEndpointSecurityUnprivileged|TestEndpointSecurityCannotSwitchToUnprivileged|TestEndpointLogsAreCollectedInDiagnostics|TestForceInstallOverProtectedPolicy|TestSetLogLevelFleetManaged|TestLogIngestionFleetManaged|TestMetricsMonitoringCorrectBinaries|TestEndpointAgentServiceMonitoring|TestMonitoringPreserveTextConfig|TestMonitoringLivenessReloadable|TestComponentBuildHashInDiagnostics|TestProxyURL|TestFleetManagedUpgradeUnprivileged)$$"
     artifact_paths:
       - build/**
     agents:
@@ -92,7 +92,7 @@ steps:
     command: |
       buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
       ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fqdn" "^(TestFQDN)$"
+      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fqdn" "^(TestFQDN)$$"
     artifact_paths:
       - build/**
     agents:
@@ -109,7 +109,7 @@ steps:
     command: |
       buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
       ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "deb" "^(TestDebLogIngestFleetManaged|TestDebFleetUpgrade)$"
+      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "deb" "^(TestDebLogIngestFleetManaged|TestDebFleetUpgrade)$$"
     artifact_paths:
       - build/**
     agents:
@@ -126,7 +126,7 @@ steps:
     command: |
       buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
       ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-airgapped" "^(TestFleetAirGappedUpgradeUnprivileged)$"
+      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-airgapped" "^(TestFleetAirGappedUpgradeUnprivileged)$$"
     artifact_paths:
       - build/**
     agents:
@@ -143,7 +143,7 @@ steps:
     command: |
       buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
       ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-privileged" "^(TestInstallFleetServerBootstrap|TestFleetManagedUpgradePrivileged)$"
+      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-privileged" "^(TestInstallFleetServerBootstrap|TestFleetManagedUpgradePrivileged)$$"
     artifact_paths:
       - build/**
     agents:
@@ -160,7 +160,7 @@ steps:
     command: |
       buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
       ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-airgapped-privileged" "^(TestFleetAirGappedUpgradePrivileged)$"
+      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-airgapped-privileged" "^(TestFleetAirGappedUpgradePrivileged)$$"
     artifact_paths:
       - build/**
     agents:
