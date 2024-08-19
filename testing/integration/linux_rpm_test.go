@@ -44,6 +44,8 @@ func TestRpmLogIngestFleetManaged(t *testing.T) {
 		Sudo:  true,
 	})
 
+	t.Skip("Flaky https://github.com/elastic/elastic-agent/issues/5311")
+
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 

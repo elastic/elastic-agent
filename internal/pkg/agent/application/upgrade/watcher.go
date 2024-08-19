@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -134,6 +133,7 @@ LOOP:
 			// block on connection, don't retry connection, and fail on temp dial errors
 			// always a local connection it should connect quickly so the timeout is only 1 second
 			connectCtx, connectCancel := context.WithTimeout(ctx, 1*time.Second)
+			//nolint:staticcheck // requires changing client signature
 			err := ch.agentClient.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry(), grpc.FailOnNonTempDialError(true))
 			connectCancel()
 			if err != nil {
@@ -215,14 +215,14 @@ LOOP:
 				} else {
 					// agent is healthy; but a component might not be healthy
 					// upgrade tracks unhealthy component as an issue with the upgrade
-					var compErr error
+					var errs []error
 					for _, comp := range state.Components {
 						if comp.State == client.Failed {
-							compErr = multierror.Append(compErr, fmt.Errorf("component %s[%v] failed: %s", comp.Name, comp.ID, comp.Message))
+							errs = append(errs, fmt.Errorf("component %s[%v] failed: %s", comp.Name, comp.ID, comp.Message))
 						}
 					}
-					if compErr != nil {
-						failedCh <- fmt.Errorf("%w: %w", ErrAgentComponentFailed, compErr)
+					if len(errs) != 0 {
+						failedCh <- fmt.Errorf("%w: %w", ErrAgentComponentFailed, errors.Join(errs...))
 						continue
 					}
 				}

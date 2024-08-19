@@ -478,7 +478,11 @@ func (s *serviceRuntime) processCheckin(checkin *proto.CheckinObserved, comm Com
 		// first check-in
 		sendExpected = true
 	}
-	*lastCheckin = time.Now().UTC()
+	// Warning lastCheckin must contain a monotonic clock.
+	// Functions like Local(), UTC(), Round(), AddDate(),
+	// etc. remove the monotonic clock.  See
+	// https://pkg.go.dev/time
+	*lastCheckin = time.Now()
 	if s.state.syncCheckin(checkin) {
 		changed = true
 	}
@@ -505,7 +509,11 @@ func (s *serviceRuntime) isRunning() bool {
 // checkStatus checks check-ins state, called on timer
 func (s *serviceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *time.Time, missedCheckins *int) {
 	if s.isRunning() {
-		now := time.Now().UTC()
+		// Warning now must contain a monotonic clock.
+		// Functions like Local(), UTC(), Round(), AddDate(),
+		// etc. remove the monotonic clock.  See
+		// https://pkg.go.dev/time
+		now := time.Now()
 		if lastCheckin.IsZero() {
 			// never checked-in
 			*missedCheckins++
