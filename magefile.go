@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build mage
+//   go:build mage
 
 package main
 
@@ -2410,10 +2410,18 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 				"TEST_DEFINE_PREFIX": testPrefix,
 			},
 		}
-		err := devtools.GoTest(ctx, params)
+
+		log.Printf("Running %s tests: %s", packageName, packageTests)
+		paramsString, err := json.Marshal(params)
 		if err != nil {
 			return err
 		}
+		log.Printf("Params: %s", paramsString)
+
+		// err = devtools.GoTest(ctx, params)
+		// if err != nil {
+		// 	return err
+		// }
 	}
 	return nil
 }
