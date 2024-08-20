@@ -31,7 +31,7 @@ jobs:
 
       - name: check for modified NOTICE.txt
         id: notice-check
-        run: echo "modified=$(if git diff-index --quiet HEAD -- NOTICE.txt; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+        run: echo "modified=$(if git diff -s --exit-code NOTICE.txt; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
 
       - name: commit NOTICE.txt
         if: steps.notice-check.outputs.modified == 'true'
