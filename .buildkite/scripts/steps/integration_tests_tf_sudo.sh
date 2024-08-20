@@ -30,4 +30,4 @@ trap 'ess_down' EXIT
 
 # Run integration tests
 echo "~~~ Running integration tests"
-sudo -E .buildkite/scripts/sudo-integration-tests.sh "$@"
+sudo -E .buildkite/scripts/sudo-integration-tests.sh $@
