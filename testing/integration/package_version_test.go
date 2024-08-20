@@ -192,6 +192,25 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		assert.Equalf(t, wantBuildHash, c.State.VersionInfo.Meta.Commit,
 			"component %s: VersionInfo.Meta.Commit mismatch", c.ID)
 	}
+	if t.Failed() {
+		diagPath, err := f.DiagnosticsDir()
+
+		err = os.MkdirAll(diagPath, 0755)
+		require.NoError(t, err, "could not keep the diagnostics used in the test so it'd be available after the test")
+
+		stamp := time.Now().Format(time.RFC3339)
+		if runtime.GOOS == "windows" {
+			// on Windows a filename cannot contain a ':' as this collides with disk labels (aka. C:\)
+			stamp = strings.ReplaceAll(stamp, ":", "-")
+		}
+
+		// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
+		sanitizedTestName := strings.ReplaceAll(t.Name(), "/", "-")
+		outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-intest-diagnostics-%s.zip", sanitizedTestName, stamp))
+
+		err = os.Rename(diagZip, outputPath)
+		require.NoError(t, err, "could not move the diagnostics used in the test so it'd be available after the test")
+	}
 }
 
 func testVersionWithRunningAgent(runCtx context.Context, f *atesting.Fixture) func(*testing.T) {

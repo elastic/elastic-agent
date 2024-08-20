@@ -402,7 +402,7 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 //   - an error if any.
 func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
-	//Prepare so that the f.srcPackage string is populated
+	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare: %w", err)
@@ -476,7 +476,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 //   - an error if any.
 func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installRpm function", f.t.Name())
-	//Prepare so that the f.srcPackage string is populated
+	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare: %w", err)
@@ -574,6 +574,18 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	}
 }
 
+// DiagnosticsDir returns the `build/diagnostics` directory which contents are
+// available after a test fails. Use this if you need to keep a file for
+// investigation.
+func (f *Fixture) DiagnosticsDir() (string, error) {
+	dir, err := findProjectRoot(f.caller)
+	if err != nil {
+		return "", fmt.Errorf("failed to find project root: %w", err)
+	}
+
+	return filepath.Join(dir, "build", "diagnostics"), nil
+}
+
 func (f *Fixture) uninstallDeb(ctx context.Context, uninstallOpts *UninstallOpts, opts []process.CmdOption) ([]byte, error) {
 	// stop elastic-agent, non fatal if error, might have been stopped before this.
 	out, err := exec.CommandContext(ctx, "sudo", "systemctl", "stop", "elastic-agent").CombinedOutput()
@@ -628,11 +640,11 @@ func (f *Fixture) uninstallNoPkgManager(ctx context.Context, uninstallOpts *Unin
 	}
 
 	if err != nil {
-		return out, fmt.Errorf("error stating agent path: %w", err)
-	}
+		if topPathStats != nil {
+			return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:stylecheck // Elastic Agent is a proper noun
+		}
 
-	if err != nil && topPathStats != nil {
-		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:stylecheck // Elastic Agent is a proper noun
+		return out, fmt.Errorf("error stating agent path: %w", err)
 	}
 
 	return out, nil
@@ -642,12 +654,12 @@ func (f *Fixture) collectDiagnostics() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	dir, err := findProjectRoot(f.caller)
+	diagPath, err := f.DiagnosticsDir()
 	if err != nil {
-		f.t.Logf("failed to collect diagnostics; failed to find project root: %s", err)
+		f.t.Logf("failed to collect diagnostics; failed to get diagnostics directory: %w", err)
 		return
 	}
-	diagPath := filepath.Join(dir, "build", "diagnostics")
+
 	err = os.MkdirAll(diagPath, 0755)
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics; failed to create %s: %s", diagPath, err)
