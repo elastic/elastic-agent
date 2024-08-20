@@ -205,7 +205,124 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 
 			ctx := context.Background()
 
-			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath)
+			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, nil)
+		})
+	}
+
+}
+
+func TestKubernetesAgentOtel(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  false,
+		OS: []define.OS{
+			{Type: define.Kubernetes},
+		},
+		Group: define.Kubernetes,
+	})
+
+	agentImage := os.Getenv("AGENT_IMAGE")
+	require.NotEmpty(t, agentImage, "AGENT_IMAGE must be set")
+
+	client, err := info.KubeClient()
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
+	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
+
+	err = os.MkdirAll(filepath.Join(testLogsBasePath, t.Name()), 0755)
+	require.NoError(t, err, "failed to create test logs directory")
+
+	namespace := info.Namespace
+
+	esHost := os.Getenv("ELASTICSEARCH_HOST")
+	require.NotEmpty(t, esHost, "ELASTICSEARCH_HOST must be set")
+
+	esAPIKey, err := generateESAPIKey(info.ESClient, namespace)
+	require.NoError(t, err, "failed to generate ES API key")
+	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
+
+	renderedManifest, err := renderKustomize(agentK8SKustomize)
+	require.NoError(t, err, "failed to render kustomize")
+
+	testCases := []struct {
+		name              string
+		envAdd            []corev1.EnvVar
+		runK8SInnerTests  bool
+		componentPresence map[string]bool
+	}{
+
+		{
+			"run agent in otel mode",
+			[]corev1.EnvVar{
+				{Name: "ELASTIC_AGENT_OTEL", Value: "true"},
+			},
+			false,
+			map[string]bool{
+				"beat/metrics-monitoring": false,
+				"filestream-monitoring":   false,
+				"system/metrics-default":  false,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			hasher := sha256.New()
+			hasher.Write([]byte(tc.name))
+			testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
+			testNamespace = noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
+
+			k8sObjects, err := yamlToK8SObjects(bufio.NewReader(bytes.NewReader(renderedManifest)))
+			require.NoError(t, err, "failed to convert yaml to k8s objects")
+
+			adjustK8SAgentManifests(k8sObjects, testNamespace, "elastic-agent-standalone",
+				func(container *corev1.Container) {
+					// set agent image
+					container.Image = agentImage
+					// set ImagePullPolicy to "Never" to avoid pulling the image
+					// as the image is already loaded by the kubernetes provisioner
+					container.ImagePullPolicy = "Never"
+
+					// set Elasticsearch host and API key
+					for idx, env := range container.Env {
+						if env.Name == "ES_HOST" {
+							container.Env[idx].Value = esHost
+							container.Env[idx].ValueFrom = nil
+						}
+						if env.Name == "API_KEY" {
+							container.Env[idx].Value = esAPIKey
+							container.Env[idx].ValueFrom = nil
+						}
+					}
+
+					if len(tc.envAdd) > 0 {
+						container.Env = append(container.Env, tc.envAdd...)
+					}
+
+					// drop arguments overriding default config
+					container.Args = []string{}
+				},
+				func(pod *corev1.PodSpec) {
+					for volumeIdx, volume := range pod.Volumes {
+						// need to update the volume path of the state directory
+						// to match the test namespace
+						if volume.Name == "elastic-agent-state" {
+							hostPathType := corev1.HostPathDirectoryOrCreate
+							pod.Volumes[volumeIdx].VolumeSource.HostPath = &corev1.HostPathVolumeSource{
+								Type: &hostPathType,
+								Path: fmt.Sprintf("/var/lib/elastic-agent-standalone/%s/state", testNamespace),
+							}
+						}
+					}
+				})
+
+			ctx := context.Background()
+
+			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, tc.componentPresence)
 		})
 	}
 
@@ -214,7 +331,7 @@ func TestKubernetesAgentStandalone(t *testing.T) {
 // deployK8SAgent is a helper function to deploy the elastic-agent in k8s and invoke the inner k8s tests if
 // runK8SInnerTests is true
 func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object, namespace string,
-	runInnerK8STests bool, testLogsBasePath string) {
+	runInnerK8STests bool, testLogsBasePath string, componentPresence map[string]bool) {
 
 	objects = append([]k8s.Object{&corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -288,9 +405,10 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 		time.Sleep(time.Second * 1)
 	}
 
+	statusString := stdout.String()
 	if agentHealthyErr != nil {
 		t.Errorf("elastic-agent never reported healthy: %v", agentHealthyErr)
-		t.Logf("stdout: %s\n", stdout.String())
+		t.Logf("stdout: %s\n", statusString)
 		t.Logf("stderr: %s\n", stderr.String())
 		t.FailNow()
 		return
@@ -298,6 +416,11 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 
 	stdout.Reset()
 	stderr.Reset()
+
+	for component, shouldBePresent := range componentPresence {
+		isPresent := strings.Contains(statusString, component)
+		require.Equal(t, shouldBePresent, isPresent)
+	}
 
 	if runInnerK8STests {
 		err := client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone",
