@@ -60,9 +60,6 @@ type serviceRuntime struct {
 
 // newServiceRuntime creates a new command runtime for the provided component.
 func newServiceRuntime(comp component.Component, logger *logger.Logger, isLocal bool) (*serviceRuntime, error) {
-	if comp.ShipperSpec != nil {
-		return nil, errors.New("service runtime not supported for a shipper specification")
-	}
 	if comp.InputSpec == nil {
 		return nil, errors.New("service runtime requires an input specification to be defined")
 	}
