@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -172,7 +172,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 	require.NoError(t, err)
 
 	_, outputID := createMockESOutput(t, info)
-	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.New().String())
+	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
 	policyID, enrollmentAPIKey := createPolicy(
 		t,
 		ctx,

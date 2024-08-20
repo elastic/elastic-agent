@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"go.elastic.co/apm/module/apmgrpc/v2"
 	"go.elastic.co/apm/v2"
 	"google.golang.org/grpc"

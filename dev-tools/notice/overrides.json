@@ -16,3 +16,5 @@
 {"name": "kernel.org/pub/linux/libs/security/libcap/psx", "licenceType": "BSD-3-Clause", "note": "dual licensed as GPL-v2 and BSD"}
 {"name": "github.com/awslabs/kinesis-aggregation/go", "licenceType": "Apache-2.0", "url": "https://github.com/awslabs/kinesis-aggregation/blob/master/LICENSE.txt"}
 {"name": "github.com/pascaldekloe/goe", "licenceFile": "LICENSE", "licenceType": "CC0-1.0"}
+{"name": "github.com/dnaeon/go-vcr", "licenceFile": "LICENSE", "licenceType": "BSD-2-Clause"}
+{"name": "github.com/grpc-ecosystem/go-grpc-middleware/v2", "licenceFile": "LICENSE", "licenceType": "Apache-2.0"}

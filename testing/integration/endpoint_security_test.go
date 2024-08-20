@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -143,7 +143,7 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 	require.NoError(t, err, "could not create agent fixture")
 
 	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 
 	createPolicyReq := buildPolicyWithTamperProtection(
 		kibana.AgentPolicy{
@@ -411,7 +411,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
@@ -489,7 +489,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
@@ -569,7 +569,7 @@ func TestEndpointSecurityCannotSwitchToUnprivileged(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
@@ -635,7 +635,7 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",

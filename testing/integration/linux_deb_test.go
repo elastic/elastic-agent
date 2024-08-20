@@ -9,25 +9,36 @@ package integration
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
-	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
+
+	"github.com/stretchr/testify/require"
 )
 
-func TestDelayEnroll(t *testing.T) {
+func TestDebLogIngestFleetManaged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: Deb,
 		Stack: &define.Stack{},
+		OS: []define.OS{
+			{
+				Type:   define.Linux,
+				Distro: "ubuntu",
+			},
+		},
 		Local: false,
 		Sudo:  true,
 	})
@@ -35,7 +46,7 @@ func TestDelayEnroll(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
 	require.NoError(t, err)
 
 	// 1. Create a policy in Fleet with monitoring enabled.
@@ -62,12 +73,11 @@ func TestDelayEnroll(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		DelayEnroll:    true,
-		Privileged:     false,
 	}
-	// Install the Elastic-Agent with the policy that was just
-	// created.
-	_, err = tools.InstallAgentWithPolicy(
+
+	// 2. Install the Elastic-Agent with the policy that
+	// was just created.
+	policy, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
@@ -75,19 +85,28 @@ func TestDelayEnroll(t *testing.T) {
 		info.KibanaClient,
 		createPolicyReq)
 	require.NoError(t, err)
-
-	// Start elastic-agent via service, this should do the enrollment
-	err = install.StartService("") // topPath can be blank as this is only starting the service
-	require.NoErrorf(t, err, "failed to start service")
-
-	// check to make sure enroll worked
+	t.Logf("created policy: %s", policy.ID)
 	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
+
+	t.Run("Monitoring logs are shipped", func(t *testing.T) {
+		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
+	})
+
+	t.Run("Normal logs with flattened data_stream are shipped", func(t *testing.T) {
+		testFlattenedDatastreamFleetPolicy(t, ctx, info, policy)
+	})
 }
 
-func TestDelayEnrollUnprivileged(t *testing.T) {
+func TestDebFleetUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: Deb,
 		Stack: &define.Stack{},
+		OS: []define.OS{
+			{
+				Type:   define.Linux,
+				Distro: "ubuntu",
+			},
+		},
 		Local: false,
 		Sudo:  true,
 	})
@@ -95,12 +114,24 @@ func TestDelayEnrollUnprivileged(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	// start from previous minor
+	upgradeFromVersion, err := upgradetest.PreviousMinor()
+	require.NoError(t, err)
+	startFixture, err := atesting.NewFixture(
+		t,
+		upgradeFromVersion.String(),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+		atesting.WithPackageFormat("deb"),
+	)
+	require.NoError(t, err)
+
+	// end on the current build with deb
+	endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
 	require.NoError(t, err)
 
 	// 1. Create a policy in Fleet with monitoring enabled.
 	// To ensure there are no conflicts with previous test runs against
-	// the same ESS stack, we add a UUID at the end of the policy
+	// the same ESS stack, we add the current time at the end of the policy
 	// name. This policy does not contain any integration.
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
@@ -122,24 +153,42 @@ func TestDelayEnrollUnprivileged(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		DelayEnroll:    true,
-		Privileged:     false,
 	}
-	// Install the Elastic-Agent with the policy that was just
-	// created.
-	_, err = tools.InstallAgentWithPolicy(
+
+	// 2. Install the Elastic-Agent with the policy that
+	// was just created.
+	policy, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
-		agentFixture,
+		startFixture,
 		info.KibanaClient,
 		createPolicyReq)
 	require.NoError(t, err)
+	t.Logf("created policy: %s", policy.ID)
+	check.ConnectedToFleet(ctx, t, startFixture, 5*time.Minute)
 
-	// Start elastic-agent via service, this should do the enrollment
-	err = install.StartService("") // topPath can be blank as this is only starting the service
-	require.NoErrorf(t, err, "failed to start service")
+	// 3. Upgrade deb to the build version
+	srcPackage, err := endFixture.SrcPackage(ctx)
+	require.NoError(t, err)
+	cmd := exec.CommandContext(ctx, "sudo", "apt-get", "install", "-y", "-qq", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", srcPackage)
+	cmd.Env = append(cmd.Env, "DEBIAN_FRONTEND=noninteractive")
+	out, err := cmd.CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	require.NoError(t, err, string(out))
 
-	// check to make sure enroll worked
-	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
+	// 4. Wait for version in Fleet to match
+	// Fleet will not include the `-SNAPSHOT` in the `GetAgentVersion` result
+	noSnapshotVersion := strings.TrimSuffix(define.Version(), "-SNAPSHOT")
+	require.Eventually(t, func() bool {
+		newVersion, err := fleettools.GetAgentVersion(ctx, info.KibanaClient, policy.ID)
+		if err != nil {
+			t.Logf("error getting agent version: %v", err)
+			return false
+		}
+		if noSnapshotVersion == newVersion {
+			return true
+		}
+		t.Logf("Got Agent version %s != %s", newVersion, noSnapshotVersion)
+		return false
+	}, 5*time.Minute, time.Second)
 }

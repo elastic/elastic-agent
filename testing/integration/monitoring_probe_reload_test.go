@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -60,7 +60,7 @@ func (runner *MonitoringRunner) SetupSuite() {
 	require.NoError(runner.T(), err)
 	runner.agentFixture = fixture
 
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	basePolicy := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
@@ -86,7 +86,7 @@ func (runner *MonitoringRunner) SetupSuite() {
 	runner.policyID = policyResp.ID
 	runner.policyName = basePolicy.Name
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", "1.53.1", "system_integration_setup.json", uuid.New().String(), policyResp.ID)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", "1.53.1", "system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 }
 

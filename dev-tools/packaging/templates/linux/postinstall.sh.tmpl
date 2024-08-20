@@ -2,42 +2,12 @@
 
 set -e
 
-symlink="/usr/share/elastic-agent/bin/elastic-agent"
-old_agent_dir=""
-
-# check if $symlink exists for the previous install
-# and derive the old agent directory
-if test -L "$symlink"; then
-    resolved_symlink="$(readlink -f -- "$symlink")"
-    # check if it is resolved to non empty string
-    if ! [ -z "$resolved_symlink" ]; then
-        old_agent_dir="$( dirname "$resolved_symlink" )"
-    fi
-fi
-
 commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
-
+symlink="/usr/share/elastic-agent/bin/elastic-agent"
 new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
 
-# copy the state files if there was a previous agent install
-if ! [ -z "$old_agent_dir" ] && ! [ "$old_agent_dir" -ef "$new_agent_dir" ]; then
-    yml_path="$old_agent_dir/state.yml"
-    enc_path="$old_agent_dir/state.enc"
-    echo "migrate state from $old_agent_dir to $new_agent_dir"
-
-    if test -f "$yml_path"; then
-        echo "found "$yml_path", copy to "$new_agent_dir"."
-        cp "$yml_path" "$new_agent_dir"
-    fi
-
-    if test -f "$enc_path"; then
-        echo "found "$enc_path", copy to "$new_agent_dir"."
-        cp "$enc_path" "$new_agent_dir"
-    fi
-fi
-
-# delete symlink if exists
+# delete $symlink if exists
 if test -L "$symlink"; then
     echo "found symlink $symlink, unlink"
     unlink "$symlink"
@@ -47,5 +17,9 @@ fi
 echo "create symlink "$symlink" to "$new_agent_dir/elastic-agent""
 ln -s "$new_agent_dir/elastic-agent" "$symlink"
 
+# reload systemctl and then restart service
+echo "systemd enable/restart elastic-agent"
 systemctl daemon-reload 2> /dev/null
+systemctl enable elastic-agent 2> /dev/null || true
+systemctl restart elastic-agent 2> /dev/null || true
 exit 0
