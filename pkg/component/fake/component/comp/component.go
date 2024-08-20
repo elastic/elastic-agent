@@ -6,35 +6,27 @@ package comp
 
 import (
 	"context"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/structpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
-	"github.com/elastic/elastic-agent/pkg/component/fake/common"
 )
 
 const (
 	Fake              = "fake"
 	FakeIsolatedUnits = "fake-isolated-units"
-	fakeShipper       = "fake-shipper"
+	FakeOutput        = "fake-output"
 	APM               = "fake-apm"
 
-	configuringMsg = "Configuring"
-	stoppingMsg    = "Stopping"
-	stoppedMsg     = "Stopped"
+	healthyMsg  = "Healthy"
+	stoppingMsg = "Stopping"
+	stoppedMsg  = "Stopped"
 )
 
 type StateManager struct {
@@ -125,162 +117,6 @@ type runningUnit interface {
 	Update(u *client.Unit, triggers client.Trigger) error
 }
 
-type sendEvent struct {
-	evt     *common.Event
-	timeout time.Duration
-	doneCh  chan error
-}
-
-type fakeShipperOutput struct {
-	logger zerolog.Logger
-	unit   *client.Unit
-	cfg    *proto.UnitExpectedConfig
-
-	evtCh chan sendEvent
-
-	runner    errgroup.Group
-	canceller context.CancelFunc
-}
-
-func newFakeShipperOutput(logger zerolog.Logger, logLevel client.UnitLogLevel, unit *client.Unit, cfg *proto.UnitExpectedConfig) (*fakeShipperOutput, error) {
-	logger = logger.Level(toZerologLevel(logLevel))
-
-	f := &fakeShipperOutput{
-		logger: logger,
-		unit:   unit,
-		cfg:    cfg,
-		evtCh:  make(chan sendEvent),
-	}
-
-	logger.Trace().Msg("registering kill action for unit")
-	unit.RegisterAction(&killAction{f.logger})
-
-	f.start(unit, cfg)
-
-	return f, nil
-}
-
-func (f *fakeShipperOutput) Unit() *client.Unit {
-	return f.unit
-}
-
-func (f *fakeShipperOutput) Update(u *client.Unit, triggers client.Trigger) error {
-	expected := u.Expected()
-	if expected.State == client.UnitStateStopped {
-		// agent is requesting this input to stop
-		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
-		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
-		go func() {
-			f.stop()
-			f.logger.Debug().Str("state", client.UnitStateStopped.String()).Str("message", stoppedMsg).Msg("updating unit state")
-			_ = u.UpdateState(client.UnitStateStopped, stoppedMsg, nil)
-		}()
-		return nil
-	}
-
-	if expected.Config.Type == "" {
-		return fmt.Errorf("unit missing config type")
-	}
-	if expected.Config.Type != fakeShipper {
-		return fmt.Errorf("unit type changed with the same unit ID: %s",
-			expected.Config.Type)
-	}
-
-	f.stop()
-	f.cfg = expected.Config
-	f.start(u, expected.Config)
-
-	return nil
-}
-
-func (f *fakeShipperOutput) sendEvent(event map[string]interface{}, timeout time.Duration) error {
-	content, err := structpb.NewStruct(event)
-	if err != nil {
-		return err
-	}
-	evt := &common.Event{
-		Generated: timestamppb.Now(),
-		Content:   content,
-	}
-	doneCh := make(chan error)
-	f.evtCh <- sendEvent{
-		evt:     evt,
-		timeout: timeout,
-		doneCh:  doneCh,
-	}
-	return <-doneCh
-}
-
-func (f *fakeShipperOutput) start(unit *client.Unit, cfg *proto.UnitExpectedConfig) {
-	ctx, cancel := context.WithCancel(context.Background())
-	f.canceller = cancel
-	f.runner.Go(func() error {
-		for {
-			err := f.run(ctx, unit, cfg)
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					// don't restart
-					return err
-				}
-				// restartable error
-				f.logger.Error().Err(err)
-				_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
-				// delay restart
-				<-time.After(time.Second)
-			}
-		}
-	})
-}
-
-func (f *fakeShipperOutput) stop() {
-	if f.canceller != nil {
-		f.canceller()
-		f.canceller = nil
-		_ = f.runner.Wait()
-	}
-}
-
-func (f *fakeShipperOutput) run(ctx context.Context, unit *client.Unit, cfg *proto.UnitExpectedConfig) error {
-	f.logger.Debug().Str("state", client.UnitStateConfiguring.String()).Str("message", configuringMsg).Msg("restarting shipper output")
-	_ = unit.UpdateState(client.UnitStateConfiguring, configuringMsg, nil)
-
-	shipperCfg, err := common.ParseFakeShipperConfig(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to parse fake shipper config: %w", err)
-	}
-	if shipperCfg.TLS == nil || len(shipperCfg.TLS.CAs) == 0 {
-		return fmt.Errorf("fake shipper ssl configuration missing")
-	}
-	certPool := x509.NewCertPool()
-	for _, certPEM := range shipperCfg.TLS.CAs {
-		if ok := certPool.AppendCertsFromPEM([]byte(certPEM)); !ok {
-			return errors.New("failed to append CA for shipper connection")
-		}
-	}
-	conn, err := dialContext(ctx, shipperCfg.Server, certPool, unit.ID())
-	if err != nil {
-		return fmt.Errorf("grpc client failed to connect: %w", err)
-	}
-	defer conn.Close()
-
-	connectedMsg := fmt.Sprintf("GRPC fake event pipe connected %q", shipperCfg.Server)
-	f.logger.Debug().Str("state", client.UnitStateHealthy.String()).Str("message", connectedMsg).Msg("connected to output")
-	_ = unit.UpdateState(client.UnitStateHealthy, connectedMsg, nil)
-
-	client := common.NewFakeEventProtocolClient(conn)
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case evt := <-f.evtCh:
-			evtCtx, evtCanceller := context.WithTimeout(ctx, evt.timeout)
-			_, err := client.SendEvent(evtCtx, evt.evt, grpc.WaitForReady(true))
-			evtCanceller()
-			evt.doneCh <- err
-		}
-	}
-}
-
 type fakeInput struct {
 	logger  zerolog.Logger
 	manager *StateManager
@@ -315,8 +151,6 @@ func newFakeInput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *
 
 	logger.Trace().Msg("registering set_state action for unit")
 	unit.RegisterAction(&stateSetterAction{i})
-	logger.Trace().Msg("registering send_event action for unit")
-	unit.RegisterAction(&sendEventAction{i})
 	logger.Trace().Msg("registering kill action for unit")
 	unit.RegisterAction(&killAction{i.logger})
 	logger.Trace().Msg("registering " + ActionRetrieveFeatures + " action for unit")
@@ -483,6 +317,63 @@ func (f *fakeInput) stopKiller() {
 		f.killerCanceller()
 		f.killerCanceller = nil
 	}
+}
+
+type fakeOutput struct {
+	logger  zerolog.Logger
+	manager *StateManager
+	unit    *client.Unit
+	cfg     *proto.UnitExpectedConfig
+}
+
+func newFakeOutput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *StateManager, unit *client.Unit, cfg *proto.UnitExpectedConfig) (*fakeOutput, error) {
+	logger = logger.Level(toZerologLevel(logLevel))
+
+	f := &fakeOutput{
+		logger:  logger,
+		manager: manager,
+		unit:    unit,
+		cfg:     cfg,
+	}
+
+	f.logger.Debug().
+		Str("state", client.UnitStateHealthy.String()).
+		Str("message", healthyMsg).
+		Msg("updating unit state")
+	_ = unit.UpdateState(client.UnitStateHealthy, healthyMsg, nil)
+
+	return f, nil
+}
+
+func (f *fakeOutput) Unit() *client.Unit {
+	return f.unit
+}
+
+func (f *fakeOutput) Update(u *client.Unit, _ client.Trigger) error {
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
+		// agent is requesting this input to stop
+		f.logger.Debug().
+			Str("state", client.UnitStateStopping.String()).
+			Str("message", stoppingMsg).
+			Msg("updating unit state")
+		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
+		go func() {
+			<-time.After(1 * time.Second)
+			f.logger.Debug().
+				Str("state", client.UnitStateStopped.String()).
+				Str("message", stoppedMsg).
+				Msg("updating unit state")
+			_ = u.UpdateState(client.UnitStateStopped, stoppedMsg, nil)
+		}()
+		return nil
+	}
+	f.logger.Debug().
+		Str("state", client.UnitStateHealthy.String()).
+		Str("message", healthyMsg).
+		Msg("updating unit state")
+	_ = u.UpdateState(client.UnitStateHealthy, healthyMsg, nil)
+	return nil
 }
 
 func getStateFromConfig(cfg *proto.UnitExpectedConfig) (client.UnitState, string, error) {
