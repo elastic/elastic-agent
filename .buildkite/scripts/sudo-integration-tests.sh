@@ -10,7 +10,8 @@ TESTS_TO_RUN=$2
 echo "~~~ Running integration tests as $USER"
 
 echo "~~~ Integration tests: ${GROUP_NAME}"
-# TODO: Pass the actual version of the agent
+# TODO: Pass the actual version of the agen
+gotestsum --version
 AGENT_VERSION="8.16.0-SNAPSHOT" SNAPSHOT=true TEST_DEFINE_PREFIX=sudo_linux gotestsum --no-color -f standard-quiet --junitfile "build/${GROUP_NAME}.integration.xml" --jsonfile "build/${GROUP_NAME}.integration.out.json" -- -tags integration -test.shuffle on -test.timeout 2h0m0s -test.run "${TESTS_TO_RUN}" github.com/elastic/elastic-agent/testing/integration
 
 
