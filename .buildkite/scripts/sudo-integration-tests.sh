@@ -8,7 +8,6 @@ GROUP_NAME=$1
 TESTS_TO_RUN=$2
 
 echo "~~~ Running integration tests as $USER"
-
 echo "~~~ Integration tests: ${GROUP_NAME}"
 # TODO: Pass the actual version of the agen
 gotestsum --version
