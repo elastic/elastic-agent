@@ -1,0 +1,43 @@
+{{- include "elasticagent.init" $ -}}
+{{- range $presetName, $presetVal := $.Values.agent.presets -}}
+{{- if and (eq ($presetVal).mode "statefulset") (eq $.Values.agent.engine "eck") -}}
+{{- $agentName := printf "agent-%s" (lower $presetName) -}}
+apiVersion: agent.k8s.elastic.co/v1alpha1
+kind: Agent
+metadata:
+  name: {{ $agentName }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "elasticagent.labels" $ | nindent 4 }}
+    {{- with ($presetVal).labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with ($presetVal).annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  version: {{ required "An Elastic Agent version is required" $.Values.agent.version }}
+  configRef:
+    secretName: {{ $agentName }}
+  {{- with ($presetVal).outputs }}
+  {{- $eckOuputs := list }}
+  {{- range $outputName, $outputVal := . -}}
+  {{- if eq ($outputVal).type "ESECKRef" -}}
+  {{- $eckOuputs = append $eckOuputs (include "elasticagent.output.ESECKRef.preset.config" (list $ $outputName $outputVal) | fromYaml) -}}
+  {{- end -}}
+  {{- end -}}
+  {{- if gt (len $eckOuputs) 0 }}
+  elasticsearchRefs:
+  {{- $eckOuputs | toYaml | nindent 4 -}}
+  {{- end -}}
+  {{- end }}
+  statefulSet:
+    {{- with ($presetVal).replicaCount }}
+    replicas: {{ . }}
+    {{- end }}
+    podTemplate:
+{{ include "elasticagent.engine.eck.podTemplate" (list $ $presetVal $agentName) }}
+---
+{{- end -}}
+{{- end }}
