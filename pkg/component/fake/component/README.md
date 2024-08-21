@@ -26,8 +26,6 @@ inputs:
       - container/arm64
     outputs: &outputs
       - elasticsearch
-    shippers: &shippers
-      - shipper
     command: &command
       restart_monitoring_period: 5s
       maximum_restarts_per_period: 1
@@ -38,7 +36,6 @@ inputs:
     description: "Fake component apm traces generator"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
 ```
 

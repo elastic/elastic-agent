@@ -379,7 +379,7 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	}
 
 	_, pids, err := procStats.FetchPids()
-	if !assert.NoError(t, err, "error fetching process information") {
+	if err != nil && assert.Truef(t, errors.Is(err, agentsystemprocess.NonFatalErr{}), "error fetching process information: %v", err) {
 		// we failed a bit further
 		return nil
 	}
@@ -408,8 +408,8 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 		return nil, fmt.Errorf("failed to prepare: %w", err)
 	}
 
-	// sudo apt install the deb
-	out, err := exec.CommandContext(ctx, "sudo", "apt", "install", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	// sudo apt-get install the deb
+	out, err := exec.CommandContext(ctx, "sudo", "apt-get", "install", "-y", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	if err != nil {
 		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
 	}

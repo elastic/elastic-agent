@@ -12,9 +12,8 @@ import (
 
 // Spec a components specification.
 type Spec struct {
-	Version  int           `config:"version" yaml:"version" validate:"required"`
-	Inputs   []InputSpec   `config:"inputs,omitempty" yaml:"inputs,omitempty"`
-	Shippers []ShipperSpec `config:"shippers,omitempty" yaml:"shippers,omitempty"`
+	Version int         `config:"version" yaml:"version" validate:"required"`
+	Inputs  []InputSpec `config:"inputs,omitempty" yaml:"inputs,omitempty"`
 }
 
 // Validate ensures correctness of component specification.
@@ -38,24 +37,6 @@ func (s *Spec) Validate() error {
 			}
 			a = append(a, platform)
 			inputsToPlatforms[input.Name] = a
-		}
-	}
-	shippersToPlatforms := make(map[string][]string)
-	for i, shipper := range s.Shippers {
-		a, ok := shippersToPlatforms[shipper.Name]
-		if !ok {
-			shippersToPlatforms[shipper.Name] = make([]string, len(shipper.Platforms))
-			copy(shippersToPlatforms[shipper.Name], shipper.Platforms)
-			continue
-		}
-		for _, platform := range shipper.Platforms {
-			for _, existing := range a {
-				if existing == platform {
-					return fmt.Errorf("shipper '%s' at shippers.%d defines the same platform as a previous definition", shipper.Name, i)
-				}
-			}
-			a = append(a, platform)
-			shippersToPlatforms[shipper.Name] = a
 		}
 	}
 	return nil

@@ -34,7 +34,6 @@ RUN true && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloud-defend || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/fleet-server || true) && \
-    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-agent-shipper || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-collector || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-symbolizer || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-host-agent || true) && \
@@ -56,8 +55,7 @@ RUN true && \
     true
 
 # Keep this after any chown command, chown resets any applied capabilities
-RUN setcap =p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent
-RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/agentbeat && \
+RUN setcap =p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent && \
 {{- if .linux_capabilities }}
 # Since the beat is stored at the other end of a symlink we must follow the symlink first
 # For security reasons setcap does not support symlinks. This is smart in the general case
