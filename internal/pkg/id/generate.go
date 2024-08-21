@@ -8,7 +8,7 @@ import (
 	"crypto/rand"
 	"time"
 
-	"github.com/oklog/ulid"
+	"github.com/oklog/ulid/v2"
 )
 
 // ID represents a unique ID.

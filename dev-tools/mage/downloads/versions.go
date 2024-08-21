@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -20,8 +21,6 @@ import (
 	"github.com/Jeffail/gabs/v2"
 	"github.com/cenkalti/backoff/v4"
 	"go.elastic.co/apm/v2"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // BeatsLocalPath is the path to a local copy of the Beats git repository
@@ -55,7 +54,7 @@ var versionAliasRegex *regexp.Regexp
 func init() {
 	BeatsLocalPath = getEnv("BEATS_LOCAL_PATH", BeatsLocalPath)
 	if BeatsLocalPath != "" {
-		log.Warn(`⚠️ Beats local path usage is deprecated and not used to fetch the local binaries anymore. Please use the packaging job to generate the artifacts to be consumed by these tests.`)
+		logger.Warn(`⚠️ Beats local path usage is deprecated and not used to fetch the local binaries anymore. Please use the packaging job to generate the artifacts to be consumed by these tests.`)
 	}
 
 	versionAliasRegex = regexp.MustCompile(`^([0-9]+)(\.[0-9]+)(-SNAPSHOT)?$`)
@@ -74,17 +73,15 @@ func newElasticVersion(version string) *elasticVersion {
 	if aliasMatch != nil {
 		v, err := GetElasticArtifactVersion(version)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"error":   err,
-				"version": version,
-			}).Error("Failed to get version")
+			logger.Error("Failed to get version",
+				slog.String("error", err.Error()),
+				slog.String("version", version),
+			)
 			return nil
 		}
 		version = v
 	} else {
-		log.WithFields(log.Fields{
-			"version": version,
-		}).Trace("Version is not an alias.")
+		logger.Log(context.Background(), TraceLevel, "Version is not an alias.", slog.String("version", version))
 	}
 
 	versionWithoutCommit := RemoveCommitFromSnapshot(version)
@@ -120,14 +117,14 @@ func FetchElasticArtifactForSnapshots(ctx context.Context, useCISnapshots bool, 
 	binaryName := buildArtifactName(artifact, version, os, arch, extension, isDocker)
 	binaryPath, err := FetchProjectBinaryForSnapshots(ctx, useCISnapshots, artifact, binaryName, artifact, version, timeoutFactor, xpack, "", false)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"artifact":  artifact,
-			"version":   version,
-			"os":        os,
-			"arch":      arch,
-			"extension": extension,
-			"error":     err,
-		}).Error("Could not download the binary for the Elastic artifact")
+		logger.Error("Could not download the binary for the Elastic artifact",
+			slog.String("artifact", artifact),
+			slog.String("version", version),
+			slog.String("os", os),
+			slog.String("arch", arch),
+			slog.String("extension", extension),
+			slog.String("error", err.Error()),
+		)
 		return "", "", err
 	}
 
@@ -164,10 +161,10 @@ func GetElasticArtifactVersion(version string) (string, error) {
 	val, ok := elasticVersionsCache[cacheKey]
 	elasticVersionsMutex.RUnlock()
 	if ok {
-		log.WithFields(log.Fields{
-			"URL":     cacheKey,
-			"version": val,
-		}).Debug("Retrieving version from local cache")
+		logger.Debug("Retrieving version from local cache",
+			slog.String("URL", cacheKey),
+			slog.String("version", val),
+		)
 		return val, nil
 	}
 
@@ -209,10 +206,10 @@ func GetElasticArtifactVersion(version string) (string, error) {
 	lastBuild := builds.Children()[0]
 	latestVersion := lastBuild.Path("version").Data().(string)
 
-	log.WithFields(log.Fields{
-		"alias":   version,
-		"version": latestVersion,
-	}).Debug("Latest version for current version obtained")
+	logger.Debug("Latest version for current version obtained",
+		slog.String("alias", version),
+		slog.String("version", latestVersion),
+	)
 
 	elasticVersionsMutex.Lock()
 	elasticVersionsCache[cacheKey] = latestVersion
@@ -284,11 +281,11 @@ func UseElasticAgentCISnapshots() bool {
 // useCISnapshots check if CI snapshots should be used, passing a function that evaluates the repository in which
 // the given Sha commit has context. I.e. a commit in the elastic-agent repository should pass a function that
 func useCISnapshots(repository string) bool {
-	log.WithFields(log.Fields{
-		"repository": repository,
-		"gitRepo":    GithubRepository,
-		"gitSha1":    GithubCommitSha1,
-	}).Trace("Use CI Snapshot")
+	logger.Log(context.Background(), TraceLevel, "Use CI Snapshot",
+		slog.String("repository", repository),
+		slog.String("gitRepo", GithubRepository),
+		slog.String("gitSha1", GithubCommitSha1),
+	)
 
 	if GithubCommitSha1 != "" && strings.EqualFold(GithubRepository, repository) {
 		return true
@@ -371,10 +368,10 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 		val, ok := binariesCache[URL]
 		binariesMutex.RUnlock()
 		if ok {
-			log.WithFields(log.Fields{
-				"URL":  URL,
-				"path": val,
-			}).Debug("Retrieving binary from local cache")
+			logger.Debug("Retrieving binary from local cache",
+				slog.String("URL", URL),
+				slog.String("path", val),
+			)
 			return val, nil
 		}
 
@@ -390,10 +387,10 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 		sanitizedFilePath := filepath.Join(path.Dir(downloadRequest.UnsanitizedFilePath), name)
 		err = os.Rename(downloadRequest.UnsanitizedFilePath, sanitizedFilePath)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"fileName":          downloadRequest.UnsanitizedFilePath,
-				"sanitizedFileName": sanitizedFilePath,
-			}).Warn("Could not sanitize downloaded file name. Keeping old name")
+			logger.Warn("Could not sanitize downloaded file name. Keeping old name",
+				slog.String("fileName", downloadRequest.UnsanitizedFilePath),
+				slog.String("sanitizedFileName", sanitizedFilePath),
+			)
 			sanitizedFilePath = downloadRequest.UnsanitizedFilePath
 		}
 
@@ -413,7 +410,7 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 		})
 		defer span.End()
 
-		log.Debugf("Using CI snapshots for %s", artifact)
+		logger.Debug(fmt.Sprintf("Using CI snapshots for %s", artifact))
 
 		maxTimeout := time.Duration(timeoutFactor) * time.Minute
 
@@ -503,14 +500,16 @@ func getDownloadURLFromResolvers(resolvers []DownloadURLResolver) (string, strin
 			continue
 		}
 
-		log.WithFields(log.Fields{"kind": resolver.Kind()}).Info("Trying resolver.")
+		attr := slog.String("kind", resolver.Kind())
+
+		logger.Info("Trying resolver.", attr)
 		url, shaURL, err := resolver.Resolve()
 		if err != nil {
 			if i < len(resolvers)-1 {
-				log.WithFields(log.Fields{"kind": resolver.Kind()}).Warn("Object not found.")
+				logger.Warn("Object not found.", attr)
 				continue
 			} else {
-				log.WithFields(log.Fields{"kind": resolver.Kind()}).Error("Object not found. All resolvers failed")
+				logger.Error("Object not found. All resolvers failed", attr)
 				return "", "", err
 			}
 		}
@@ -530,12 +529,10 @@ func getObjectURLFromResolvers(resolvers []BucketURLResolver, maxtimeout time.Du
 		downloadURL, err := getObjectURLFromBucket(bucket, prefix, object, maxtimeout)
 		if err != nil {
 			if i < len(resolvers)-1 {
-				log.WithFields(log.Fields{
-					"resolver": resolver,
-				}).Warn("Object not found. Trying with another artifact resolver")
+				logger.Warn("Object not found. Trying with another artifact resolver", slog.String("resolver", fmt.Sprintf("%T", resolver)))
 				continue
 			} else {
-				log.Error("Object not found. There is no other artifact resolver")
+				logger.Error("Object not found. There is no other artifact resolver")
 				return "", err
 			}
 		}
@@ -564,36 +561,36 @@ func getObjectURLFromBucket(bucket string, prefix string, object string, maxtime
 
 		response, err := get(r)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"bucket":      bucket,
-				"elapsedTime": exp.GetElapsedTime(),
-				"prefix":      prefix,
-				"error":       err,
-				"object":      object,
-				"retry":       retryCount,
-			}).Warn("Google Cloud Storage API is not available yet")
+			logger.Warn("Google Cloud Storage API is not available yet",
+				slog.String("bucket", bucket),
+				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.String("prefix", prefix),
+				slog.String("error", err.Error()),
+				slog.String("object", object),
+				slog.Int("retry", retryCount),
+			)
 
 			retryCount++
 
 			return err
 		}
 
-		log.WithFields(log.Fields{
-			"bucket":      bucket,
-			"elapsedTime": exp.GetElapsedTime(),
-			"prefix":      prefix,
-			"object":      object,
-			"retries":     retryCount,
-			"url":         r.URL,
-		}).Trace("Google Cloud Storage API is available")
+		logger.Log(context.Background(), TraceLevel, "Google Cloud Storage API is available",
+			slog.String("bucket", bucket),
+			slog.Duration("elapsedTime", exp.GetElapsedTime()),
+			slog.String("prefix", prefix),
+			slog.String("object", object),
+			slog.Int("retries", retryCount),
+			slog.String("url", r.URL),
+		)
 
 		jsonParsed, err := gabs.ParseJSON([]byte(response))
 		if err != nil {
-			log.WithFields(log.Fields{
-				"bucket": bucket,
-				"prefix": prefix,
-				"object": object,
-			}).Warn("Could not parse the response body for the object")
+			logger.Warn("Could not parse the response body for the object",
+				slog.String("bucket", bucket),
+				slog.String("prefix", prefix),
+				slog.String("object", object),
+			)
 
 			retryCount++
 
@@ -602,46 +599,46 @@ func getObjectURLFromBucket(bucket string, prefix string, object string, maxtime
 
 		mediaLink, err = processBucketSearchPage(jsonParsed, currentPage, bucket, prefix, object)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"currentPage": currentPage,
-				"bucket":      bucket,
-				"prefix":      prefix,
-				"object":      object,
-			}).Warn(err.Error())
+			logger.Warn(err.Error(),
+				slog.Int("currentPage", currentPage),
+				slog.String("bucket", bucket),
+				slog.String("prefix", prefix),
+				slog.String("object", object),
+			)
 		} else if mediaLink != "" {
-			log.WithFields(log.Fields{
-				"bucket":      bucket,
-				"elapsedTime": exp.GetElapsedTime(),
-				"prefix":      prefix,
-				"medialink":   mediaLink,
-				"object":      object,
-				"retries":     retryCount,
-			}).Debug("Media link found for the object")
+			logger.Debug("Media link found for the object",
+				slog.String("bucket", bucket),
+				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.String("prefix", prefix),
+				slog.String("medialink", mediaLink),
+				slog.String("object", object),
+				slog.Int("retries", retryCount),
+			)
 			return nil
 		}
 
 		pageTokenQueryParam = getBucketSearchNextPageParam(jsonParsed)
 		if pageTokenQueryParam == "" {
-			log.WithFields(log.Fields{
-				"currentPage": currentPage,
-				"bucket":      bucket,
-				"prefix":      prefix,
-				"object":      object,
-			}).Warn("Reached the end of the pages and the object was not found")
+			logger.Warn("Reached the end of the pages and the object was not found",
+				slog.Int("currentPage", currentPage),
+				slog.String("bucket", bucket),
+				slog.String("prefix", prefix),
+				slog.String("object", object),
+			)
 
 			return nil
 		}
 
 		currentPage++
 
-		log.WithFields(log.Fields{
-			"currentPage": currentPage,
-			"bucket":      bucket,
-			"elapsedTime": exp.GetElapsedTime(),
-			"prefix":      prefix,
-			"object":      object,
-			"retries":     retryCount,
-		}).Warn("Object not found in current page. Continuing")
+		logger.Warn("Object not found in current page. Continuing",
+			slog.Int("currentPage", currentPage),
+			slog.String("bucket", bucket),
+			slog.Duration("elapsedTime", exp.GetElapsedTime()),
+			slog.String("prefix", prefix),
+			slog.String("object", object),
+			slog.Int("retries", retryCount),
+		)
 
 		return fmt.Errorf("the %s object could not be found in the current page (%d) the %s bucket and %s prefix", object, currentPage, bucket, prefix)
 	}
@@ -660,12 +657,12 @@ func getObjectURLFromBucket(bucket string, prefix string, object string, maxtime
 func processBucketSearchPage(jsonParsed *gabs.Container, currentPage int, bucket string, prefix string, object string) (string, error) {
 	items := jsonParsed.Path("items").Children()
 
-	log.WithFields(log.Fields{
-		"bucket":  bucket,
-		"prefix":  prefix,
-		"objects": len(items),
-		"object":  object,
-	}).Debug("Objects found")
+	logger.Debug("Objects found",
+		slog.String("bucket", bucket),
+		slog.String("prefix", prefix),
+		slog.Int("objects", len(items)),
+		slog.String("object", object),
+	)
 
 	for _, item := range items {
 		itemID := item.Path("id").Data().(string)
@@ -673,7 +670,7 @@ func processBucketSearchPage(jsonParsed *gabs.Container, currentPage int, bucket
 		if strings.HasPrefix(itemID, objectPath) {
 			mediaLink := item.Path("mediaLink").Data().(string)
 
-			log.Infof("medialink: %s", mediaLink)
+			logger.Info(fmt.Sprintf("medialink: %s", mediaLink))
 			return mediaLink, nil
 		}
 	}

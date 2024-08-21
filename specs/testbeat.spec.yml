@@ -16,8 +16,6 @@ inputs:
       - kafka
       - logstash
       - redis
-    shippers: &shippers
-      - shipper
     command: &command
       restart_monitoring_period: 5s
       maximum_restarts_per_period: 1
@@ -48,43 +46,36 @@ inputs:
     description: "AWS S3"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: azure-blob-storage
     description: "Azure Blob Storage"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: azure-eventhub
     description: "Azure Eventhub"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: cel
     description: "Common Expression Language Input"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: cloudfoundry
     description: "PCF Cloudfoundry"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: cometd
     description: "CometD input"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: container
     description: "Container logs"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: docker
     aliases:
@@ -92,55 +83,46 @@ inputs:
     description: "Docker logs"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: entity-analytics
     description: "Entity Analytics"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: etw
     description: "Event Tracing for Windows"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: gcp-pubsub
     description: "GCP Pub-Sub"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: gcs
     description: "Google Cloud Storage"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: http_endpoint
     description: "HTTP Endpoint"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: httpjson
     description: "HTTP JSON Endpoint"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: journald
     description: "Journald"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: kafka
     description: "Kafka"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: log
     aliases:
@@ -149,31 +131,26 @@ inputs:
     description: "Logfile"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: lumberjack
     description: "Lumberjack"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: mqtt
     description: "MQTT"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: netflow
     description: "Netflow"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: o365audit
     description: "Office 365 Audit"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: redis
     aliases:
@@ -181,7 +158,6 @@ inputs:
     description: "Redis"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: syslog
     aliases:
@@ -189,7 +165,6 @@ inputs:
     description: "Syslog"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: tcp
     aliases:
@@ -197,7 +172,6 @@ inputs:
     description: "TCP"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: udp
     aliases:
@@ -205,29 +179,24 @@ inputs:
     description: "UDP"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: unix
     description: "Unix Socket"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: winlog
     description: "Winlog"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: filestream
     description: "Filestream"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
   - name: websocket
     description: "Websocket"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command

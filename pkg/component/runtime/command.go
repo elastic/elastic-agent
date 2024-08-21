@@ -195,7 +195,12 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 				// first check-in
 				sendExpected = true
 			}
-			c.lastCheckin = time.Now().UTC()
+			// Warning lastCheckin must contain a
+			// monotonic clock.  Functions like Local(),
+			// UTC(), Round(), AddDate(), etc. remove the
+			// monotonic clock.  See
+			// https://pkg.go.dev/time
+			c.lastCheckin = time.Now()
 			if c.state.syncCheckin(checkin) {
 				changed = true
 			}
@@ -222,7 +227,13 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 					}
 				} else {
 					// running and should be running
-					now := time.Now().UTC()
+					//
+					// Warning now must contain a
+					// monotonic clock.  Functions like Local(),
+					// UTC(), Round(), AddDate(), etc. remove the
+					// monotonic clock.  See
+					// https://pkg.go.dev/time
+					now := time.Now()
 					if now.Sub(c.lastCheckin) <= checkinPeriod {
 						c.missedCheckins = 0
 					} else {
@@ -490,9 +501,6 @@ func (c *commandRuntime) getSpecType() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.InputType
 	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.ShipperType
-	}
 	return ""
 }
 
@@ -504,18 +512,12 @@ func (c *commandRuntime) getSpecBinaryPath() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.BinaryPath
 	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.BinaryPath
-	}
 	return ""
 }
 
 func (c *commandRuntime) getCommandSpec() *component.CommandSpec {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.Spec.Command
-	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.Spec.Command
 	}
 	return nil
 }
