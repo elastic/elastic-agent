@@ -76,6 +76,8 @@ func TestEventLogFile(t *testing.T) {
 		Sudo:  false,
 	})
 
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/5337")
+
 	ctx, cancel := testcontext.WithDeadline(
 		t,
 		context.Background(),
