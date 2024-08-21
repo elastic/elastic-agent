@@ -163,7 +163,6 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		},
 		Group: "container",
 	})
-	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/5159")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -255,7 +254,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		agentOutputStr := agentOutput.String()
 		scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
 		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "Cannot index event publisher.Event") {
+			if strings.Contains(scanner.Text(), "Cannot index event") {
 				return true
 			}
 		}
