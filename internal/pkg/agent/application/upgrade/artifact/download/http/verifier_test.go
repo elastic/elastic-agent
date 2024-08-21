@@ -7,7 +7,7 @@ package http
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -111,8 +111,8 @@ func runTests(t *testing.T, testCases []testCase, config *artifact.Config, log *
 func getRandomTestCases() []testCase {
 	tt := getTestCases()
 
-	first := rand.Intn(len(tt))
-	second := rand.Intn(len(tt))
+	first := rand.IntN(len(tt))
+	second := rand.IntN(len(tt))
 
 	return []testCase{
 		tt[first],
