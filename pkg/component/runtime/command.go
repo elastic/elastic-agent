@@ -501,9 +501,6 @@ func (c *commandRuntime) getSpecType() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.InputType
 	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.ShipperType
-	}
 	return ""
 }
 
@@ -515,18 +512,12 @@ func (c *commandRuntime) getSpecBinaryPath() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.BinaryPath
 	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.BinaryPath
-	}
 	return ""
 }
 
 func (c *commandRuntime) getCommandSpec() *component.CommandSpec {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.Spec.Command
-	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.Spec.Command
 	}
 	return nil
 }

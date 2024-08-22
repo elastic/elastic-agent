@@ -72,12 +72,6 @@ func newComponentRuntime(
 		}
 		return nil, errors.New("unknown component runtime")
 	}
-	if comp.ShipperSpec != nil {
-		if comp.ShipperSpec.Spec.Command != nil {
-			return newCommandRuntime(comp, logger, monitor)
-		}
-		return nil, errors.New("components for shippers can only support command runtime")
-	}
 	return nil, errors.New("component missing specification")
 }
 

@@ -137,8 +137,6 @@ type Manager struct {
 	currentMx sync.RWMutex
 	current   map[string]*componentRuntimeState
 
-	shipperConns map[string]*shipperConn
-
 	subMx         sync.RWMutex
 	subscriptions map[string][]*Subscription
 	subAllMx      sync.RWMutex
@@ -188,7 +186,6 @@ func NewManager(
 		agentInfo:      agentInfo,
 		tracer:         tracer,
 		current:        make(map[string]*componentRuntimeState),
-		shipperConns:   make(map[string]*shipperConn),
 		subscriptions:  make(map[string][]*Subscription),
 		updateChan:     make(chan component.Model),
 		updateDoneChan: make(chan struct{}),
@@ -771,13 +768,6 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 //
 // This returns as soon as possible, work is performed in the background.
 func (m *Manager) update(model component.Model, teardown bool) error {
-	// prepare the components to add consistent shipper connection information between
-	// the connected components in the model
-	err := m.connectShippers(model.Components)
-	if err != nil {
-		return err
-	}
-
 	touched := make(map[string]bool)
 	newComponents := make([]component.Component, 0, len(model.Components))
 	for _, comp := range model.Components {

@@ -256,23 +256,6 @@ func TestDiagnosticComponentsExpected(t *testing.T) {
 				{ID: "filestream-output", Type: client.UnitTypeOutput, LogLevel: 2},
 			},
 		},
-		{
-			ID:         "shipper-component",
-			OutputType: "elasticsearch",
-			ShipperSpec: &component.ShipperRuntimeSpec{
-				ShipperType: "shipper",
-				BinaryName:  "shipper-binary",
-				BinaryPath:  "shipper-path",
-				Spec: component.ShipperSpec{
-					Name:        "shipper-spec",
-					Description: "shipper description",
-				},
-			},
-			Units: []component.Unit{
-				{ID: "shipper-input", Type: client.UnitTypeInput, LogLevel: 3},
-				{ID: "shipper-output", Type: client.UnitTypeOutput, LogLevel: 3},
-			},
-		},
 	}
 
 	expected := `
@@ -294,25 +277,6 @@ components:
         type: 0
       - id: filestream-output
         log_level: 2
-        type: 1
-  - id: shipper-component
-    input_type: ""
-    output_type: elasticsearch
-    shipper_spec:
-      binary_name: shipper-binary
-      binary_path: shipper-path
-      shipper_type: shipper
-      spec:
-        name: shipper-spec
-        description: "shipper description"
-        outputs: []
-        platforms: []
-    units:
-      - id: shipper-input
-        log_level: 3
-        type: 0
-      - id: shipper-output
-        log_level: 3
         type: 1
 `
 

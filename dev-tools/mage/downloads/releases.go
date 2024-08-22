@@ -5,14 +5,15 @@
 package downloads
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/Jeffail/gabs/v2"
 	"github.com/cenkalti/backoff/v4"
-	log "github.com/sirupsen/logrus"
 )
 
 // DownloadURLResolver interface to resolve URLs for downloadable artifacts
@@ -66,10 +67,10 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 	tmpVersion := version
 	hasCommit := SnapshotHasCommit(version)
 	if hasCommit {
-		log.WithFields(log.Fields{
-			"resolver": r.Kind(),
-			"version":  version,
-		}).Trace("Removing SNAPSHOT from version including commit")
+		logger.Log(context.Background(), TraceLevel, "Removing SNAPSHOT from version including commit",
+			slog.String("resolver", r.Kind()),
+			slog.String("version", version),
+		)
 
 		// remove the SNAPSHOT from the VERSION as the artifacts API supports commits in the version, but without the snapshot suffix
 		tmpVersion = GetCommitVersion(version)
@@ -82,17 +83,17 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 		}
 		bodyStr, err := get(req)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"kind":           r.Kind(),
-				"artifact":       artifact,
-				"artifactName":   artifactName,
-				"version":        tmpVersion,
-				"error":          err,
-				"retry":          retryCount,
-				"statusEndpoint": url,
-				"elapsedTime":    exp.GetElapsedTime(),
-				"resp":           bodyStr,
-			}).Warn("Resolver failed")
+			logger.Warn("Resolver failed",
+				slog.String("kind", r.Kind()),
+				slog.String("artifact", artifact),
+				slog.String("artifactName", artifactName),
+				slog.String("version", tmpVersion),
+				slog.String("error", err.Error()),
+				slog.Int("retry", retryCount),
+				slog.String("statusEndpoint", url),
+				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.String("resp", bodyStr),
+			)
 			retryCount++
 
 			return err
@@ -104,34 +105,34 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 
 	err = backoff.Retry(apiStatus, exp)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"resolver":     r.Kind(),
-			"artifact":     artifact,
-			"artifactName": artifactName,
-			"version":      tmpVersion,
-		}).Error("Failed to get artifact")
+		logger.Error("Failed to get artifact",
+			slog.String("resolver", r.Kind()),
+			slog.String("artifact", artifact),
+			slog.String("artifactName", artifactName),
+			slog.String("version", tmpVersion),
+		)
 		return "", "", err
 	}
 
 	jsonParsed, err := gabs.ParseJSON(body)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"resolver":     r.Kind(),
-			"artifact":     artifact,
-			"artifactName": artifactName,
-			"version":      tmpVersion,
-		}).Error("Could not parse the response body for the artifact")
+		logger.Error("Could not parse the response body for the artifact",
+			slog.String("resolver", r.Kind()),
+			slog.String("artifact", artifact),
+			slog.String("artifactName", artifactName),
+			slog.String("version", tmpVersion),
+		)
 		return "", "", err
 	}
 
-	log.WithFields(log.Fields{
-		"resolver":     r.Kind(),
-		"retries":      retryCount,
-		"artifact":     artifact,
-		"artifactName": artifactName,
-		"elapsedTime":  exp.GetElapsedTime(),
-		"version":      tmpVersion,
-	}).Trace("Resolver succeeded")
+	logger.Log(context.Background(), TraceLevel, "Resolver succeeded",
+		slog.String("resolver", r.Kind()),
+		slog.Int("retries", retryCount),
+		slog.String("artifact", artifact),
+		slog.String("artifactName", artifactName),
+		slog.Duration("elapsedTime", exp.GetElapsedTime()),
+		slog.String("version", tmpVersion),
+	)
 
 	if hasCommit {
 		// remove commit from the artifact as it comes like this: elastic-agent-8.0.0-abcdef-SNAPSHOT-darwin-x86_64.tar.gz
@@ -142,11 +143,11 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 	// we need to get keys with dots using Search instead of Path
 	downloadObject := packagesObject.Search(artifactName)
 	if downloadObject == nil {
-		log.WithFields(log.Fields{
-			"artifact": artifact,
-			"name":     artifactName,
-			"version":  version,
-		}).Error("ArtifactURLResolver object not found in Artifact API")
+		logger.Error("ArtifactURLResolver object not found in Artifact API",
+			slog.String("artifact", artifact),
+			slog.String("name", artifactName),
+			slog.String("version", version),
+		)
 		return "", "", fmt.Errorf("object not found in Artifact API")
 	}
 
@@ -184,10 +185,10 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 	val, ok := elasticVersionsCache[cacheKey]
 	elasticVersionsMutex.RUnlock()
 	if ok {
-		log.WithFields(log.Fields{
-			"URL":     cacheKey,
-			"version": val,
-		}).Debug("ArtifactsSnapshotVersion Retrieving version from local cache")
+		logger.Debug("ArtifactsSnapshotVersion Retrieving version from local cache",
+			slog.String("URL", cacheKey),
+			slog.String("version", val),
+		)
 		return val, nil
 	}
 
@@ -211,14 +212,14 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 		}
 		bodyStr, err := get(r)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"version":        version,
-				"error":          err,
-				"retry":          retryCount,
-				"statusEndpoint": url,
-				"elapsedTime":    exp.GetElapsedTime(),
-				"resp":           bodyStr,
-			}).Warn("ArtifactsSnapshotVersion failed")
+			logger.Warn("ArtifactsSnapshotVersion failed",
+				slog.String("version", version),
+				slog.String("error", err.Error()),
+				slog.Int("retry", retryCount),
+				slog.String("statusEndpoint", url),
+				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.String("resp", bodyStr),
+			)
 			retryCount++
 
 			return err
@@ -242,20 +243,18 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 	response := ArtifactsSnapshotResponse{}
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"error":   err,
-			"version": version,
-			"body":    body,
-		}).Error("ArtifactsSnapshotVersion Could not parse the response body to retrieve the version")
+		logger.Error("ArtifactsSnapshotVersion Could not parse the response body to retrieve the version",
+			slog.String("error", err.Error()),
+			slog.String("version", version),
+			slog.String("body", string(body)),
+		)
 
 		return "", fmt.Errorf("could not parse the response body to retrieve the version: %w", err)
 	}
 
 	hashParts := strings.Split(response.BuildID, "-")
 	if (len(hashParts) < 2) || (hashParts[1] == "") {
-		log.WithFields(log.Fields{
-			"buildId": response.BuildID,
-		}).Error("ArtifactsSnapshotVersion Could not parse the build_id to retrieve the version hash")
+		logger.Error("ArtifactsSnapshotVersion Could not parse the build_id to retrieve the version hash", slog.String("buildId", response.BuildID))
 		return "", fmt.Errorf("could not parse the build_id to retrieve the version hash: %s", response.BuildID)
 	}
 	hash := hashParts[1]
@@ -263,10 +262,10 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 
 	latestVersion := fmt.Sprintf("%s-%s-SNAPSHOT", parsedVersion, hash)
 
-	log.WithFields(log.Fields{
-		"alias":   version,
-		"version": latestVersion,
-	}).Debug("ArtifactsSnapshotVersion got latest version for current version")
+	logger.Debug("ArtifactsSnapshotVersion got latest version for current version",
+		slog.String("alias", version),
+		slog.String("version", latestVersion),
+	)
 
 	elasticVersionsMutex.Lock()
 	elasticVersionsCache[cacheKey] = latestVersion
@@ -317,12 +316,12 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 	commit, err := ExtractCommitHash(version)
 	semVer := GetVersion(version)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"artifact":     artifact,
-			"artifactName": artifactName,
-			"project":      asur.Project,
-			"version":      version,
-		}).Info("ArtifactsSnapshotURLResolver version does not contain a commit hash, it is not a snapshot")
+		logger.Info("ArtifactsSnapshotURLResolver version does not contain a commit hash, it is not a snapshot",
+			slog.String("artifact", artifact),
+			slog.String("artifactName", artifactName),
+			slog.String("project", asur.Project),
+			slog.String("version", version),
+		)
 		return "", "", err
 	}
 
@@ -338,17 +337,17 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 		r := httpRequest{URL: url}
 		bodyStr, err := get(r)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"kind":           asur.Kind(),
-				"artifact":       artifact,
-				"artifactName":   artifactName,
-				"version":        version,
-				"error":          err,
-				"retry":          retryCount,
-				"statusEndpoint": url,
-				"elapsedTime":    exp.GetElapsedTime(),
-				"resp":           bodyStr,
-			}).Warn("resolver failed")
+			logger.Warn("resolver failed",
+				slog.String("kind", asur.Kind()),
+				slog.String("artifact", artifact),
+				slog.String("artifactName", artifactName),
+				slog.String("version", version),
+				slog.String("error", err.Error()),
+				slog.Int("retry", retryCount),
+				slog.String("statusEndpoint", url),
+				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.String("resp", bodyStr),
+			)
 			retryCount++
 
 			return err
@@ -366,13 +365,13 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 	var jsonParsed map[string]interface{}
 	err = json.Unmarshal(body, &jsonParsed)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"kind":         asur.Kind(),
-			"artifact":     artifact,
-			"artifactName": artifactName,
-			"project":      asur.Project,
-			"version":      version,
-		}).Error("Could not parse the response body for the artifact")
+		logger.Error("Could not parse the response body for the artifact",
+			slog.String("kind", asur.Kind()),
+			slog.String("artifact", artifact),
+			slog.String("artifactName", artifactName),
+			slog.String("project", asur.Project),
+			slog.String("version", version),
+		)
 		return "", "", err
 	}
 
@@ -381,15 +380,15 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 		return "", "", err
 	}
 
-	log.WithFields(log.Fields{
-		"kind":         asur.Kind(),
-		"retries":      retryCount,
-		"artifact":     artifact,
-		"artifactName": artifactName,
-		"elapsedTime":  exp.GetElapsedTime(),
-		"project":      asur.Project,
-		"version":      version,
-	}).Trace("Resolver succeeded")
+	logger.Log(context.Background(), TraceLevel, "Resolver succeeded",
+		slog.String("kind", asur.Kind()),
+		slog.Int("retries", retryCount),
+		slog.String("artifact", artifact),
+		slog.String("artifactName", artifactName),
+		slog.Duration("elapsedTime", exp.GetElapsedTime()),
+		slog.String("project", asur.Project),
+		slog.String("version", version),
+	)
 
 	return url, shaURL, nil
 }
@@ -452,14 +451,14 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 		req := httpRequest{URL: url}
 		bodyStr, err := head(req)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"kind":           r.Kind(),
-				"error":          err,
-				"retry":          retryCount,
-				"statusEndpoint": url,
-				"elapsedTime":    exp.GetElapsedTime(),
-				"resp":           bodyStr,
-			}).Debug("Resolver failed")
+			logger.Debug("Resolver failed",
+				slog.String("kind", r.Kind()),
+				slog.String("error", err.Error()),
+				slog.Int("retry", retryCount),
+				slog.String("statusEndpoint", url),
+				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.String("resp", bodyStr),
+			)
 
 			retryCount++
 
@@ -467,12 +466,12 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 		}
 
 		found = true
-		log.WithFields(log.Fields{
-			"kind":           r.Kind(),
-			"retries":        retryCount,
-			"statusEndpoint": url,
-			"elapsedTime":    exp.GetElapsedTime(),
-		}).Info("Download was found in the Elastic downloads API")
+		logger.Info("Download was found in the Elastic downloads API",
+			slog.String("kind", r.Kind()),
+			slog.Int("retries", retryCount),
+			slog.String("statusEndpoint", url),
+			slog.Duration("elapsedTime", exp.GetElapsedTime()),
+		)
 
 		return nil
 	}

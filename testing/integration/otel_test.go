@@ -136,7 +136,7 @@ func TestOtelFileProcessing(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
+	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	// remove elastic-agent.yml, otel should be independent
@@ -304,7 +304,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
+	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	// remove elastic-agent.yml, otel should be independent
@@ -402,7 +402,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
+	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	// prepare input
