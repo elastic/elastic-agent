@@ -76,8 +76,6 @@ func TestEventLogFile(t *testing.T) {
 		Sudo:  false,
 	})
 
-	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/5337")
-
 	ctx, cancel := testcontext.WithDeadline(
 		t,
 		context.Background(),
@@ -165,7 +163,6 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		},
 		Group: "container",
 	})
-	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/5159")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -257,7 +254,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		agentOutputStr := agentOutput.String()
 		scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
 		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "Cannot index event publisher.Event") {
+			if strings.Contains(scanner.Text(), "Cannot index event") {
 				return true
 			}
 		}
@@ -343,7 +340,7 @@ func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixt
 	}
 
 	logEntry := string(logEntryBytes)
-	expectedStr := "Cannot index event publisher.Event"
+	expectedStr := "Cannot index event"
 	if !strings.Contains(logEntry, expectedStr) {
 		t.Errorf(
 			"did not find the expected log entry ('%s') in the events log file",
