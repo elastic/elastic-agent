@@ -794,8 +794,8 @@ github.com/elastic/go-elasticsearch/v8 v8.14.0 h1:1ywU8WFReLLcxE1WJqii3hTtbPUE2h
 github.com/elastic/go-elasticsearch/v8 v8.14.0/go.mod h1:WRvnlGkSuZyp83M2U8El/LGXpCjYLrvlkSgkAH4O5I4=
 github.com/elastic/go-licenser v0.4.2 h1:bPbGm8bUd8rxzSswFOqvQh1dAkKGkgAmrPxbUi+Y9+A=
 github.com/elastic/go-licenser v0.4.2/go.mod h1:W8eH6FaZDR8fQGm+7FnVa7MxI1b/6dAqxz+zPB8nm5c=
-github.com/elastic/go-structform v0.0.11 h1:3wpbA+vCZ3QtX+dyMDVYO08jmVdwJmEz6E9OHVeUYpc=
-github.com/elastic/go-structform v0.0.11/go.mod h1:CZWf9aIRYY5SuKSmOhtXScE5uQiLZNqAFnwKR4OrIM4=
+github.com/elastic/go-structform v0.0.12 h1:HXpzlAKyej8T7LobqKDThUw7BMhwV6Db24VwxNtgxCs=
+github.com/elastic/go-structform v0.0.12/go.mod h1:CZWf9aIRYY5SuKSmOhtXScE5uQiLZNqAFnwKR4OrIM4=
 github.com/elastic/go-sysinfo v1.14.1 h1:BpY/Utfz75oKSpsQnbAJmmlnT3gBV9WFsopBEYgjhZY=
 github.com/elastic/go-sysinfo v1.14.1/go.mod h1:FKUXnZWhnYI0ueO7jhsGV3uQJ5hiz8OqM5b3oGyaRr8=
 github.com/elastic/go-ucfg v0.8.8 h1:54KIF/2zFKfl0MzsSOCGOsZ3O2bnjFQJ0nDJcLhviyk=
