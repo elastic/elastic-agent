@@ -51,7 +51,9 @@ function ess_down() {
   echo "~~~ Tearing down the ESS Stack"  
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
-  export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
+  if [ -z "${EC_API_KEY}" ]; then
+    export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)    
+  fi
   
   pushd "${TF_DIR}"
   terraform destroy -auto-approve
