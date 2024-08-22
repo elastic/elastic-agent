@@ -190,9 +190,9 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 			}
 
 			if !bo.Wait() {
-				// One reason this returns false is when the context is cancelled
 				if ctx.Err() != nil {
-					return nil, ctx.Err()
+					// if the context is cancelled, break out of the loop
+					break
 				}
 
 				// This should not really happen, but just in-case this error is used to show that
