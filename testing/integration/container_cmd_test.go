@@ -120,6 +120,10 @@ func prepareAgentCMD(
 	cmd.Stderr = &agentOutput
 	cmd.Stdout = &agentOutput
 	cmd.Env = append(os.Environ(), env...)
+
+	if t.Failed() {
+		fmt.Println(">>>>>>>>>>>>>>>>>>>> elastic-agent args: ", strings.Join(cmd.Args, " "))
+	}
 	return cmd, &agentOutput
 }
 

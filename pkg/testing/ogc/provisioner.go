@@ -283,6 +283,7 @@ func (p *provisioner) ogcRun(ctx context.Context, args []string, interactive boo
 		"-v",
 	)
 	runArgs = append(runArgs, args...)
+	fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> docker ", strings.Join(runArgs, " "))
 	opts := []process.StartOption{process.WithContext(ctx), process.WithArgs(runArgs)}
 	opts = append(opts, processOpts...)
 	return process.Start("docker", opts...)

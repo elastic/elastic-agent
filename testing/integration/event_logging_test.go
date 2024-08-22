@@ -226,6 +226,11 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		err, agentOutput,
 	)
 
+	defer func() {
+		if t.Failed() {
+			fmt.Println(">>>>>>>>>>>>>>>>>>>> Fleet policy URL:", info.KibanaClient.URL+"/app/fleet/policies/"+policyID)
+		}
+	}()
 	// The default behaviour is to log events to the events log file
 	// so ensure this is happening
 	requireEventLogFileExistsWithData(t, agentFixture)
