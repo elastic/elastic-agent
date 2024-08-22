@@ -59,7 +59,6 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 )
@@ -333,7 +332,6 @@ func (Build) TestBinaries() error {
 	wd, _ := os.Getwd()
 	testBinaryPkgs := []string{
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
-		filepath.Join(wd, "pkg", "component", "fake", "shipper"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 	}
 	for _, pkg := range testBinaryPkgs {
@@ -667,22 +665,6 @@ func ControlProto() error {
 		"control_v1.proto")
 }
 
-// FakeShipperProto generates pkg/component/fake/common event protocol.
-func FakeShipperProto() error {
-	return sh.RunV(
-		"protoc",
-		"--go_out=.", "--go_opt=paths=source_relative",
-		"--go-grpc_out=.", "--go-grpc_opt=paths=source_relative",
-		"pkg/component/fake/common/event.proto")
-}
-
-func PrintVersion() error {
-	mage.DefaultBeatBuildVariableSources.GetBeatVersion()
-	version := getVersion()
-	fmt.Println(version)
-	return nil
-}
-
 func BuildPGP() error {
 	// go run elastic-agent/dev-tools/cmd/buildpgp/build_pgp.go --in agent/spec/GPG-KEY-elasticsearch --out elastic-agent/pkg/release/pgp.go
 	goF := filepath.Join("dev-tools", "cmd", "buildpgp", "build_pgp.go")
@@ -996,15 +978,14 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 		if devtools.ExternalBuild == true {
 
-			// Only log fatal logs for logs produced using logrus. This is the global logger
-			// used by github.com/elastic/elastic-agent/dev-tools/mage/downloads which can only be configured globally like this or via
-			// environment variables.
+			// Only log fatal logs for logs produced. This is the global logger
+			// used by github.com/elastic/elastic-agent/dev-tools/mage/downloads which can only be configured globally like this.
 			//
 			// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
 			// download artifacts on unsupported platforms and choose to ignore the errors.
 			//
 			// Change this to InfoLevel to see exactly what the downloader is doing.
-			logrus.SetLevel(logrus.FatalLevel)
+			downloads.LogLevel.Set(downloads.FatalLevel)
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}

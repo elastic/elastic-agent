@@ -13,22 +13,17 @@ inputs:
     ...
   - name: <input name 2>
     ...
-shippers:
-  - name: <shipper name 1>
-    ...
 ```
 
 The `version` key must be present and must equal 2 (to distinguish from the older version 1 schema that is no longer supported).
 
-`inputs` is a list of input types this component can run, and `shippers` is a list of shipper types this component can run. Each configured input and shipper also has its own list of `outputs` that it supports, but the spec file only tracks the list of supported types, and the rest comes from the [Agent policy](agent-policy.md).
+`inputs` is a list of input types this component can run. Each configured input also has its own list of `outputs` that it supports, but the spec file only tracks the list of supported types, and the rest comes from the [Agent policy](agent-policy.md).
 
-Most configuration fields are shared between inputs and shippers. The next section lists all valid fields, noting where there are differences between the two cases.
-
-## Input / Shipper configuration fields
+## Input configuration fields
 
 ### `name` (string, required)
 
-The name of this input or shipper. This name must be unique for each platform, however two inputs or shippers that support different platforms can have the same name. This allows the configuration to vary between platforms.
+The name of this input. This name must be unique for each platform, however two inputs that support different platforms can have the same name. This allows the configuration to vary between platforms.
 
 ### `aliases` (list of strings, input only)
 
@@ -36,11 +31,11 @@ Inputs may specify a list of alternate names that policies can use to refer to t
 
 ### `description` (string, required)
 
-A short description of this input or shipper.
+A short description of this input.
 
 ### `platforms` (list of strings, required)
 
-The platforms this input or shipper supports. Must contain one or more of the following:
+The platforms this input supports. Must contain one or more of the following:
 - `container/amd64`
 - `container/arm64`
 - `darwin/amd64`
@@ -51,7 +46,7 @@ The platforms this input or shipper supports. Must contain one or more of the fo
 
 ### `outputs` (list of strings)
 
-The output types this input or shipper supports. If this is an input, then inputs of this type can only target (non-shipper) output types in this list. If this is a shipper, then this shipper can only implement output types in this list.
+The output types this input supports.
 
 ### `proxied_actions` (list of strings)
 
@@ -64,13 +59,9 @@ proxied_actions:
   - UPGRADE
 ```
 
-### `shippers` (list of strings, input only)
-
-The shipper types this input supports. Inputs of this type can target any output type supported by the shippers in this list, as long as the output policy includes `shipper.enabled: true`. If an input supports more than one shipper implementing the same output type, then Agent will prefer the one that appears first in this list.
-
 ### `runtime.preventions`
 
-The `runtime.preventions` field contains a list of [EQL conditions](https://www.elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html#eql-syntax-conditions) which should prevent the use of this input or shipper if any are true. Each prevention should include a `condition` in EQL syntax and a `message` that will be displayed if the condition prevents the use of a component.
+The `runtime.preventions` field contains a list of [EQL conditions](https://www.elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html#eql-syntax-conditions) which should prevent the use of this input if any are true. Each prevention should include a `condition` in EQL syntax and a `message` that will be displayed if the condition prevents the use of a component.
 
 Here are some example preventions taken from the Endpoint spec file:
 
@@ -94,9 +85,9 @@ The variables that can be accessed by a condition are:
 - `user.root`: true if Agent is being run with root / administrator permissions.
 - `install.in_default`: true if the Agent is installed in the default location or has been installed via deb or rpm.
 
-### `command` (required for shipper)
+### `command`
 
-The `command` field determines how the component will be run. Shippers must include this field, while inputs must include either `command` or `service`. `command` consists of the following subfields:
+The `command` field determines how the component will be run. Inputs must include either `command` or `service`. `command` consists of the following subfields:
 
 #### `command.args` (list of strings)
 
@@ -150,7 +141,7 @@ Some components (particularly Beats) terminate when they receive a new configura
 
 ### `service` (input only)
 
-Inputs that are run as a system service (like Endpoint Security) can use `service` instead of `command` to indicate that Agent should only monitor them, not manage their execution. `service` consists of the following subfields: 
+Inputs that are run as a system service (like Endpoint Security) can use `service` instead of `command` to indicate that Agent should only monitor them, not manage their execution. `service` consists of the following subfields:
 
 #### `service.cport` (int, required)
 
