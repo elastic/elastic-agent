@@ -15,7 +15,7 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.8.1
 	github.com/elastic/elastic-agent-client/v7 v7.15.0
 	github.com/elastic/elastic-agent-libs v0.9.15
-	github.com/elastic/elastic-agent-system-metrics v0.11.0
+	github.com/elastic/elastic-agent-system-metrics v0.11.1
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
 	github.com/elastic/go-licenser v0.4.2
@@ -30,7 +30,6 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/pprof v0.0.0-20240528025155-186aa0362fba
 	github.com/gorilla/mux v1.8.1
-	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hectane/go-acl v0.0.0-20190604041725-da78bae5fc95
 	github.com/jaypipes/ghw v0.12.0
 	github.com/jedib0t/go-pretty/v6 v6.4.6
@@ -39,7 +38,7 @@ require (
 	github.com/magefile/mage v1.15.0
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c
-	github.com/oklog/ulid v1.3.1
+	github.com/oklog/ulid/v2 v2.1.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.106.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.106.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.106.1
@@ -51,7 +50,6 @@ require (
 	github.com/sajari/regression v1.0.1
 	github.com/schollz/progressbar/v3 v3.13.1
 	github.com/shirou/gopsutil/v3 v3.24.5
-	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
@@ -72,7 +70,6 @@ require (
 	golang.org/x/text v0.16.0
 	golang.org/x/time v0.5.0
 	golang.org/x/tools v0.22.0
-	golang.org/x/tools/go/vcs v0.1.0-deprecated
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/ini.v1 v1.67.0
@@ -162,7 +159,7 @@ require (
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/elastic/go-docappender/v2 v2.2.1 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
-	github.com/elastic/go-structform v0.0.11 // indirect
+	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/opentelemetry-lib v0.8.1 // indirect
@@ -217,6 +214,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
@@ -397,8 +395,4 @@ replace (
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
-	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
-
-// Exclude this version because the version has an invalid checksum.
-exclude github.com/docker/distribution v2.8.0+incompatible

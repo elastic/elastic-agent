@@ -295,7 +295,6 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 	if !opts.showSpec {
 		for i, comp := range comps {
 			comp.InputSpec = nil
-			comp.ShipperSpec = nil
 			comps[i] = comp
 		}
 	}

@@ -6,9 +6,8 @@ package downloads
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // BeatsCIArtifactsBase name of the bucket used to store the artifacts generated on Beats CI
@@ -65,14 +64,14 @@ func (r *BeatsLegacyURLResolver) Resolve() (string, string, string) {
 		object = artifact + "/" + fileName
 	}
 
-	log.WithFields(log.Fields{
-		"beat":     r.Beat,
-		"bucket":   r.Bucket,
-		"fileName": r.FileName,
-		"object":   object,
-		"prefix":   prefix,
-		"variant":  r.Variant,
-	}).Debug("Resolving URL from Beats Legacy resolver")
+	logger.Debug("Resolving URL from Beats Legacy resolver",
+		slog.String("beat", r.Beat),
+		slog.String("bucket", r.Bucket),
+		slog.String("fileName", r.FileName),
+		slog.String("object", object),
+		slog.String("prefix", prefix),
+		slog.String("variant", r.Variant),
+	)
 
 	return r.Bucket, prefix, object
 }
@@ -120,14 +119,14 @@ func (r *BeatsURLResolver) Resolve() (string, string, string) {
 		object = artifact + "/" + fileName
 	}
 
-	log.WithFields(log.Fields{
-		"beat":     r.Beat,
-		"bucket":   r.Bucket,
-		"fileName": r.FileName,
-		"object":   object,
-		"prefix":   prefix,
-		"variant":  r.Variant,
-	}).Debug("Resolving URL from Beats resolver")
+	logger.Debug("Resolving URL from Beats resolver",
+		slog.String("beat", r.Beat),
+		slog.String("bucket", r.Bucket),
+		slog.String("fileName", r.FileName),
+		slog.String("object", object),
+		slog.String("prefix", prefix),
+		slog.String("variant", r.Variant),
+	)
 
 	return r.Bucket, prefix, object
 }
@@ -172,12 +171,12 @@ func (r *ProjectURLResolver) Resolve() (string, string, string) {
 		prefix = fmt.Sprintf("%s/commits/%s", artifact, GithubCommitSha1)
 	}
 
-	log.WithFields(log.Fields{
-		"bucket":  r.Bucket,
-		"object":  r.FileName,
-		"prefix":  prefix,
-		"project": artifact,
-	}).Info("Resolving URL from Project resolver")
+	logger.Info("Resolving URL from Project resolver",
+		slog.String("bucket", r.Bucket),
+		slog.String("object", r.FileName),
+		slog.String("prefix", prefix),
+		slog.String("project", artifact),
+	)
 
 	return r.Bucket, prefix, r.FileName
 }
