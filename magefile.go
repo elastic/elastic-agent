@@ -488,11 +488,6 @@ func DownloadManifest(ctx context.Context) error {
 		return errAtLeastOnePlatform
 	}
 
-	var requiredPackages []string
-	for _, p := range platforms {
-		requiredPackages = append(requiredPackages, manifest.PlatformPackages[p])
-	}
-
 	if e := manifest.DownloadComponents(ctx, devtools.ManifestURL, platforms, dropPath); e != nil {
 		return fmt.Errorf("failed to download the manifest file, %w", e)
 	}
@@ -550,16 +545,9 @@ func FixDRADockerArtifacts() error {
 	return nil
 }
 
-func getPackageName(beat, version, pkg string) (string, string) {
-	if hasSnapshotEnv() {
-		version += "-SNAPSHOT"
-	}
-	return version, fmt.Sprintf("%s-%s-%s", beat, version, pkg)
-}
-
 func requiredPackagesPresent(basePath, beat, version string, requiredPackages []string) bool {
 	for _, pkg := range requiredPackages {
-		_, packageName := getPackageName(beat, version, pkg)
+		packageName := fmt.Sprintf("%s-%s-%s", beat, version, pkg)
 		path := filepath.Join(basePath, "build", "distributions", packageName)
 
 		if _, err := os.Stat(path); err != nil {
@@ -974,6 +962,10 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 		}
 		archivePath = movePackagesToArchive(dropPath, requiredPackages)
 
+		if hasSnapshotEnv() {
+			packageVersion = fmt.Sprintf("%s-SNAPSHOT", packageVersion)
+		}
+
 		os.Setenv(agentDropPath, dropPath)
 
 		if devtools.ExternalBuild == true {
@@ -989,17 +981,16 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
-			for binary, project := range manifest.ExpectedBinaries {
+			for _, spec := range manifest.ExpectedBinaries {
 				for _, platform := range platforms {
-					if !project.SupportsPlatform(platform) {
-						fmt.Printf("--- Binary %s does not support %s, download skipped\n", binary, platform)
+					if !spec.SupportsPlatform(platform) {
+						fmt.Printf("--- Binary %s does not support %s, download skipped\n", spec.BinaryName, platform)
 						continue
 					}
-					reqPackage := manifest.PlatformPackages[platform]
-					targetPath := filepath.Join(archivePath, reqPackage)
+					targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
 					os.MkdirAll(targetPath, 0755)
-					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
-					errGroup.Go(downloadBinary(ctx, project.Name, packageName, binary, platform, newVersion, targetPath, completedDownloads))
+					packageName := spec.GetPackageName(packageVersion, platform)
+					errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
 				}
 			}
 
@@ -1077,6 +1068,27 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 	return archivePath, dropPath
 }
 
+func removePythonWheels(matches []string, version string) []string {
+	if hasSnapshotEnv() {
+		version = fmt.Sprintf("%s-SNAPSHOT", version)
+	}
+
+	var wheels []string
+	for _, spec := range manifest.ExpectedBinaries {
+		if spec.PythonWheel {
+			wheels = append(wheels, spec.GetPackageName(version, ""))
+		}
+	}
+
+	cleaned := make([]string, 0, len(matches))
+	for _, path := range matches {
+		if !slices.Contains(wheels, filepath.Base(path)) {
+			cleaned = append(cleaned, path)
+		}
+	}
+	return cleaned
+}
+
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
 func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build) {
@@ -1099,6 +1111,10 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 			panic(err)
 		}
 		matches = append(matches, zipMatches...)
+
+		// never flatten any python wheels, the packages.yml and docker should handle
+		// those specifically so that the python wheels are installed into the container
+		matches = removePythonWheels(matches, packageVersion)
 
 		if mg.Verbose() {
 			log.Printf("--- Extracting into the flat dir: %v", matches)
