@@ -238,6 +238,7 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 						c.missedCheckins = 0
 					} else {
 						c.missedCheckins++
+						c.logStd.Write([]byte(fmt.Sprintf("Last check-in was: %s, now is: %s. The diff %s is higher than allowed %s.", c.lastCheckin.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), now.Sub(c.lastCheckin), checkinPeriod)))
 					}
 					if c.missedCheckins == 0 {
 						c.compState(client.UnitStateHealthy)
