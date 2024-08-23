@@ -2,6 +2,7 @@ receivers:
   filelog:
     include: [ /var/log/system.log ]
     start_at: beginning
+    storage: file_storage
 
 processors:
   resource:
@@ -17,13 +18,15 @@ exporters:
     sampling_thereafter: 10000
 
 extensions:
+  file_storage:
+    directory: /var/lib/otelcol/file_storage
   memory_limiter:
     check_interval: 1s
     limit_mib: 700
     spike_limit_mib: 180
 
 service:
-  extensions: [memory_limiter]
+  extensions: [memory_limiter, file_storage]
   pipelines:
     logs:
       receivers: [filelog]
