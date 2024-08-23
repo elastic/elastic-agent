@@ -41,7 +41,8 @@ func TestStartCollector(t *testing.T) {
 			configFiles := getConfigFiles(tc.configFile)
 			settings, err := newSettings("test", configFiles)
 			require.NoError(t, err)
-
+			err = ensureRegistryExists()
+			require.NoError(t, err)
 			collector, err := otelcol.NewCollector(*settings)
 			require.NoError(t, err)
 			require.NotNil(t, collector)

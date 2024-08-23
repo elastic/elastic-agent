@@ -19,7 +19,7 @@ exporters:
 
 extensions:
   file_storage:
-    directory: /var/lib/otelcol/file_storage
+    directory: ${env:STORAGE_DIR}
   memory_limiter:
     check_interval: 1s
     limit_mib: 700
