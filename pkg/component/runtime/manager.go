@@ -16,7 +16,6 @@ import (
 	"path"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -109,7 +108,7 @@ type Manager struct {
 	grpcConfig *configuration.GRPCConfig
 
 	// Set when the RPC server is ready to receive requests, for use by tests.
-	serverReady *atomic.Bool
+	serverReady chan struct{}
 
 	// updateChan forwards component model updates from the public Update method
 	// to the internal run loop.
@@ -192,7 +191,7 @@ func NewManager(
 		errCh:          make(chan error),
 		monitor:        monitor,
 		grpcConfig:     grpcConfig,
-		serverReady:    &atomic.Bool{},
+		serverReady:    make(chan struct{}, 1),
 		doneChan:       make(chan struct{}),
 		runAsOtel:      runAsOtel,
 	}
@@ -343,7 +342,7 @@ LOOP:
 }
 
 func (m *Manager) serverLoop(ctx context.Context, listener net.Listener, server *grpc.Server) {
-	m.serverReady.Store(true)
+	m.serverReady <- struct{}{}
 	for ctx.Err() == nil {
 		err := server.Serve(listener)
 		if err != nil && ctx.Err() == nil {

@@ -164,14 +164,12 @@ func (*testMonitoringManager) Cleanup(string) error                             
 
 // waitForReady waits until the RPC server is ready to be used.
 func waitForReady(ctx context.Context, m *Manager) error {
-	for !m.serverReady.Load() {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(100 * time.Millisecond):
-		}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-m.serverReady:
+		return nil
 	}
-	return nil
 }
 
 // [gRPC:8.15] Uncomment this test only after Agent/Endpoint switches fully to local gRPC, post 8.14
