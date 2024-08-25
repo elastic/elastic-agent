@@ -114,11 +114,14 @@ func (r *KubeRemote) Run(env map[string]string, stdout io.Writer, stderr io.Writ
 	if err != nil {
 		return err
 	}
+	//nolint:errcheck // ignore error
 	go f.ForwardPorts()
 	<-readyChannel
 
 	// perform the rsync
-	r.rsync(randomPort, stderr, stderr)
+	if err := r.rsync(randomPort, stderr, stderr); err != nil {
+		return err
+	}
 
 	// stop port forwarding
 	close(stopChannel)
@@ -245,7 +248,7 @@ func (r *KubeRemote) portForward(ports []string, stopChannel, readyChannel chan 
 	}
 
 	path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", r.namespace, r.name)
-	hostIP := strings.TrimLeft(r.cfg.Host, "https://")
+	hostIP := strings.TrimPrefix(r.cfg.Host, "https://")
 	serverURL := url.URL{Scheme: "https", Path: path, Host: hostIP}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: roundTripper}, http.MethodPost, &serverURL)
 	return portforward.New(dialer, ports, stopChannel, readyChannel, stdout, stderr)
@@ -529,7 +532,7 @@ func isInitContainersReady(pod *apiv1.Pod) bool {
 }
 
 func isScheduled(pod *apiv1.Pod) bool {
-	if &pod.Status != nil && len(pod.Status.Conditions) > 0 {
+	if len(pod.Status.Conditions) > 0 {
 		for _, condition := range pod.Status.Conditions {
 			if condition.Type == apiv1.PodScheduled &&
 				condition.Status == apiv1.ConditionTrue {
@@ -541,18 +544,15 @@ func isScheduled(pod *apiv1.Pod) bool {
 }
 
 func isInitContainersRunning(pod *apiv1.Pod) bool {
-	if &pod.Status != nil {
-		if len(pod.Spec.InitContainers) != len(pod.Status.InitContainerStatuses) {
+	if len(pod.Spec.InitContainers) != len(pod.Status.InitContainerStatuses) {
+		return false
+	}
+	for _, status := range pod.Status.InitContainerStatuses {
+		if status.State.Running == nil {
 			return false
 		}
-		for _, status := range pod.Status.InitContainerStatuses {
-			if status.State.Running == nil {
-				return false
-			}
-		}
-		return true
 	}
-	return false
+	return true
 }
 
 func containerRunning(containerName string) func(watch.Event) (bool, error) {
@@ -584,7 +584,7 @@ func isContainerRunning(pod *apiv1.Pod, containerName string) (bool, error) {
 			} else if status.State.Terminated != nil {
 				return false, nil
 			} else {
-				return false, fmt.Errorf("Unknown container state")
+				return false, fmt.Errorf("unknown container state")
 			}
 		}
 	}
@@ -608,7 +608,10 @@ func podDone(event watch.Event) (bool, error) {
 
 func createTempFile(content []byte) (string, error) {
 	randBytes := make([]byte, 16)
-	rand.Read(randBytes)
+	_, err := rand.Read(randBytes)
+	if err != nil {
+		return "", err
+	}
 	tmpfile, err := os.CreateTemp("", hex.EncodeToString(randBytes))
 	if err != nil {
 		return "", err

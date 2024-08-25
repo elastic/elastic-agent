@@ -16,13 +16,6 @@ import (
 	"github.com/magefile/mage/mg"
 )
 
-// Paths to generated config file templates.
-var (
-	shortTemplate     = filepath.Join("build", BeatName+".yml.tmpl")
-	referenceTemplate = filepath.Join("build", BeatName+".reference.yml.tmpl")
-	dockerTemplate    = filepath.Join("build", BeatName+".docker.yml.tmpl")
-)
-
 // ConfigFileType is a bitset that indicates what types of config files to
 // generate.
 type ConfigFileType uint8
@@ -103,7 +96,7 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 		confFile = confParams.Docker
 		tmplParams = map[string]interface{}{"Docker": true}
 	default:
-		panic(fmt.Errorf("Invalid config file type: %v", typ))
+		panic(fmt.Errorf("invalid config file type: %v", typ))
 	}
 
 	// Build the dependencies.

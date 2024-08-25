@@ -34,11 +34,11 @@ type Option struct {
 // Validate the options for encoding and decoding values.
 func (o *Option) Validate() error {
 	if o.IVLength == 0 {
-		return errors.New("IV length must be superior to 0")
+		return errors.New("IVLength must be superior to 0")
 	}
 
 	if o.SaltLength == 0 {
-		return errors.New("Salt length must be superior to 0")
+		return errors.New("SaltLength must be superior to 0")
 	}
 
 	if o.IterationsCount == 0 {
@@ -188,14 +188,14 @@ func (w *Writer) writeBlock(b []byte) error {
 		return w.err
 	}
 
-	// nolint: errcheck // Ignore the error at this point.
+	//nolint:errcheck // Ignore the error at this point.
 	w.writer.Write(iv)
 
 	encodedBytes := w.gcm.Seal(nil, iv, b, nil)
 
 	l := make([]byte, 4)
 	binary.LittleEndian.PutUint32(l, uint32(len(encodedBytes)))
-	// nolint: errcheck // Ignore the error at this point.
+	//nolint:errcheck // Ignore the error at this point.
 	w.writer.Write(l)
 
 	_, err = w.writer.Write(encodedBytes)
