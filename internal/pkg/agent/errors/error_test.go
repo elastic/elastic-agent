@@ -3,17 +3,14 @@
 // you may not use this file except in compliance with the Elastic License.
 //
 // Packages errors provides a small api to manager hierarchy or errors.
-//
-//nolint:errorlint // Postpone the change here until we refactor error handling.
 package errors
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"testing"
 
-	//nolint:gomodguard // Postpone the change here until we refactor error handling.
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,11 +23,11 @@ func TestErrorsIs(t *testing.T) {
 	}
 
 	simpleErr := io.ErrNoProgress
-	simpleWrap := errors.Wrap(simpleErr, "wrapping %w")
+	simpleWrap := fmt.Errorf("wrapping %w", simpleErr)
 	agentErr := New()
 	nestedSimple := New(simpleErr)
 	nestedWrap := New(simpleWrap)
-	agentInErr := errors.Wrap(nestedWrap, "wrapping %w")
+	agentInErr := fmt.Errorf("wrapping %w", nestedWrap)
 
 	tt := []testCase{
 		{"simple wrap", simpleWrap, simpleErr, true},
@@ -65,7 +62,7 @@ func TestErrorsIs(t *testing.T) {
 
 func TestErrorsWrap(t *testing.T) {
 	ce := New("custom error", TypePath, M("k", "v"))
-	ew := errors.Wrap(ce, "wrapper")
+	ew := fmt.Errorf("wrapper: %w", ce)
 	outer := New(ew)
 
 	outerCustom, ok := outer.(Error)

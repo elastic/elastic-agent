@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"errors"
 	"fmt"
 	"go/build"
 	"log"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/josephspurrier/goversioninfo"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 )
 
 // BuildArgs are the arguments used for the "build" target and they define how
@@ -180,7 +180,7 @@ func Build(params BuildArgs) error {
 		log.Println("Generating a .syso containing Windows file metadata.")
 		syso, err := MakeWindowsSysoFile()
 		if err != nil {
-			return errors.Wrap(err, "failed generating Windows .syso metadata file")
+			return fmt.Errorf("failed generating Windows .syso metadata file: %w", err)
 		}
 		defer os.Remove(syso)
 	}
@@ -233,7 +233,7 @@ func MakeWindowsSysoFile() (string, error) {
 	vi.Walk()
 	sysoFile := BeatName + "_windows_" + GOARCH + ".syso"
 	if err = vi.WriteSyso(sysoFile, GOARCH); err != nil {
-		return "", errors.Wrap(err, "failed to generate syso file with Windows metadata")
+		return "", fmt.Errorf("failed to generate syso file with Windows metadata: %w", err)
 	}
 	return sysoFile, nil
 }
