@@ -34,9 +34,10 @@ func Chmod(name string, fileMode fs.FileMode) error {
 		grantSid(((mode&0007)<<29)|((mode&0002)<<15), everyoneSID),
 	}
 
+	var oldAcl windows.ACL
 	acl, err := windows.ACLFromEntries(
 		entries,
-		nil,
+		&oldAcl,
 	)
 	if err != nil {
 		return err
