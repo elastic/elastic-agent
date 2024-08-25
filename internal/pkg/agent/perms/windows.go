@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"syscall"
 
 	"github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
