@@ -166,12 +166,12 @@ func getPolicySignedDataAndSignature(policy map[string]interface{}) (data, signa
 
 	data, err = getBytes(signed, "data")
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 
 	signature, err = getBytes(signed, "signature")
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 
 	return data, signature, err
