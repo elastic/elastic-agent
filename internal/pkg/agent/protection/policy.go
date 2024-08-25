@@ -12,7 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 )
 
 var (
