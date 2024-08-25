@@ -90,15 +90,11 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 					err = apply(name, inherit, grants...)
 					if err != nil {
-						// Check for Errno = 0 which indicates success
-						// https://pkg.go.dev/golang.org/x/sys/windows#Errno
-						if errors.Is(err, syscall.Errno(0)) {
-							return nil
-						}
 						return err
 					}
 					if userSID != nil && groupSID != nil {
 						err = takeOwnership(name, userSID, groupSID)
+
 					}
 				} else if errors.Is(err, fs.ErrNotExist) {
 					return nil
@@ -125,7 +121,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 }
 
 func takeOwnership(name string, owner *windows.SID, group *windows.SID) error {
-	return windows.SetNamedSecurityInfo(
+	if err := windows.SetNamedSecurityInfo(
 		name,
 		windows.SE_FILE_OBJECT,
 		windows.OWNER_SECURITY_INFORMATION|windows.GROUP_SECURITY_INFORMATION,
@@ -133,7 +129,10 @@ func takeOwnership(name string, owner *windows.SID, group *windows.SID) error {
 		group,
 		nil,
 		nil,
-	)
+	); err != nil {
+		return fmt.Errorf("failed take ownership: %w", err)
+	}
+	return nil
 }
 
 func grantSid(accessPermissions uint32, sid *windows.SID) windows.EXPLICIT_ACCESS {
@@ -154,7 +153,7 @@ func apply(name string, inherit bool, entries ...windows.EXPLICIT_ACCESS) error 
 		nil,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get ACL from entries: %w", err)
 	}
 	var secInfo windows.SECURITY_INFORMATION
 	if !inherit {
@@ -162,7 +161,7 @@ func apply(name string, inherit bool, entries ...windows.EXPLICIT_ACCESS) error 
 	} else {
 		secInfo = windows.UNPROTECTED_DACL_SECURITY_INFORMATION
 	}
-	return windows.SetNamedSecurityInfo(
+	if err := windows.SetNamedSecurityInfo(
 		name,
 		windows.SE_FILE_OBJECT,
 		windows.DACL_SECURITY_INFORMATION|secInfo,
@@ -170,5 +169,8 @@ func apply(name string, inherit bool, entries ...windows.EXPLICIT_ACCESS) error 
 		nil,
 		acl,
 		nil,
-	)
+	); err != nil {
+		return fmt.Errorf("failed to set named security info: %w", err)
+	}
+	return nil
 }
