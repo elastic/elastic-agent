@@ -147,9 +147,10 @@ func grantSid(accessPermissions uint32, sid *windows.SID) windows.EXPLICIT_ACCES
 }
 
 func apply(name string, inherit bool, entries ...windows.EXPLICIT_ACCESS) error {
+	var oldAcl windows.ACL
 	acl, err := windows.ACLFromEntries(
 		entries,
-		nil,
+		&oldAcl,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to get ACL from entries: %w", err)
