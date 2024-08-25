@@ -150,7 +150,7 @@ func waitKubeStateMetricsReadiness(env map[string]string, stdOut, stdErr io.Writ
 			break
 		}
 		if readyAttempts > checkKubeStateMetricsReadyAttempts {
-			return fmt.Errorf("Timeout waiting for kube-state-metrics: %w", err)
+			return fmt.Errorf("timeout waiting for kube-state-metrics: %w", err)
 		}
 		time.Sleep(6 * time.Second)
 		readyAttempts++
