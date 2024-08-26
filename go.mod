@@ -12,10 +12,10 @@ require (
 	github.com/docker/docker v26.1.5+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/elastic-agent-autodiscover v0.8.1
+	github.com/elastic/elastic-agent-autodiscover v0.8.2
 	github.com/elastic/elastic-agent-client/v7 v7.15.0
-	github.com/elastic/elastic-agent-libs v0.9.15
-	github.com/elastic/elastic-agent-system-metrics v0.11.0
+	github.com/elastic/elastic-agent-libs v0.10.0
+	github.com/elastic/elastic-agent-system-metrics v0.11.1
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
 	github.com/elastic/go-licenser v0.4.2
@@ -25,6 +25,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.9.0
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
+	github.com/go-viper/mapstructure/v2 v2.1.0
 	github.com/gofrs/flock v0.8.1
 	github.com/gofrs/uuid/v5 v5.2.0
 	github.com/google/go-cmp v0.6.0
@@ -37,7 +38,6 @@ require (
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
 	github.com/magefile/mage v1.15.0
 	github.com/mitchellh/hashstructure v1.1.0
-	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.106.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.106.1
@@ -50,7 +50,6 @@ require (
 	github.com/sajari/regression v1.0.1
 	github.com/schollz/progressbar/v3 v3.13.1
 	github.com/shirou/gopsutil/v3 v3.24.5
-	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
@@ -65,7 +64,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.25.0
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
-	golang.org/x/sync v0.7.0
+	golang.org/x/sync v0.8.0
 	golang.org/x/sys v0.22.0
 	golang.org/x/term v0.22.0
 	golang.org/x/text v0.16.0
@@ -158,9 +157,9 @@ require (
 	github.com/digitalocean/godo v1.117.0 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
-	github.com/elastic/go-docappender/v2 v2.2.1 // indirect
+	github.com/elastic/go-docappender/v2 v2.3.0 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
-	github.com/elastic/go-structform v0.0.11 // indirect
+	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/opentelemetry-lib v0.8.1 // indirect
@@ -183,7 +182,6 @@ require (
 	github.com/go-openapi/jsonreference v0.20.4 // indirect
 	github.com/go-openapi/swag v0.22.9 // indirect
 	github.com/go-resty/resty/v2 v2.13.1 // indirect
-	github.com/go-viper/mapstructure/v2 v2.0.0 // indirect
 	github.com/go-zookeeper/zk v1.0.3 // indirect
 	github.com/gobuffalo/here v0.6.7 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
@@ -256,6 +254,7 @@ require (
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect

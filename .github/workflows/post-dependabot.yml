@@ -7,7 +7,7 @@ name: post-dependabot
 on:
   push:
     branches:
-      - 'dependabot/go_modules/**'
+      - "dependabot/go_modules/**"
 
 jobs:
   update-notice:
@@ -31,7 +31,12 @@ jobs:
 
       - name: check for modified NOTICE.txt
         id: notice-check
-        run: echo "modified=$(if git diff-index --quiet HEAD -- NOTICE.txt; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+        run: |
+          if git diff --quiet HEAD -- NOTICE.txt; then
+            echo "modified=false" >> $GITHUB_OUTPUT
+          else
+            echo "modified=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: commit NOTICE.txt
         if: steps.notice-check.outputs.modified == 'true'
@@ -44,11 +49,16 @@ jobs:
           git push
 
       - name: update otel README.md
-        run: mage otel:readme 
+        run: mage otel:readme
 
       - name: check for modified otel README.md
         id: otel-readme-check
-        run: echo "modified=$(if git diff-index --quiet HEAD -- internal/pkg/otel/README.md; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+        run: |
+          if git diff --quiet HEAD -- internal/pkg/otel/README.md; then
+            echo "modified=false" >> $GITHUB_OUTPUT
+          else
+            echo "modified=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: commit otel README.md
         if: steps.otel-readme-check.outputs.modified == 'true'

@@ -42,7 +42,7 @@ func TestPackageVersion(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	err = f.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	t.Run("check package version without the agent running", testAgentPackageVersion(ctx, f, true))
