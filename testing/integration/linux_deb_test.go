@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//   go:build integration
+//go:build integration
 
 package integration
 
@@ -175,6 +175,10 @@ func TestDebFleetUpgrade(t *testing.T) {
 	cmd.Env = append(cmd.Env, "DEBIAN_FRONTEND=noninteractive")
 	out, err := cmd.CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	require.NoError(t, err, string(out))
+
+	cmd2 := exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent")
+	out2, err := cmd2.CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	require.NoError(t, err, string(out2))
 
 	// 4. Wait for version in Fleet to match
 	// Fleet will not include the `-SNAPSHOT` in the `GetAgentVersion` result
