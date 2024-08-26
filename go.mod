@@ -25,6 +25,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.9.0
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
+	github.com/go-viper/mapstructure/v2 v2.1.0
 	github.com/gofrs/flock v0.8.1
 	github.com/gofrs/uuid/v5 v5.2.0
 	github.com/google/go-cmp v0.6.0
@@ -37,7 +38,6 @@ require (
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
 	github.com/magefile/mage v1.15.0
 	github.com/mitchellh/hashstructure v1.1.0
-	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.106.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.106.1
@@ -181,7 +181,6 @@ require (
 	github.com/go-openapi/jsonreference v0.20.4 // indirect
 	github.com/go-openapi/swag v0.22.9 // indirect
 	github.com/go-resty/resty/v2 v2.13.1 // indirect
-	github.com/go-viper/mapstructure/v2 v2.0.0 // indirect
 	github.com/go-zookeeper/zk v1.0.3 // indirect
 	github.com/gobuffalo/here v0.6.7 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
@@ -254,6 +253,7 @@ require (
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
