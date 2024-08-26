@@ -334,7 +334,6 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 }
 
 func randStr(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 	runes := make([]rune, length)
