@@ -8,160 +8,143 @@ env:
   ASDF_TERRAFORM_VERSION: 1.9.3
 
 steps:
-  # - label: "Integration tests: packaging"
-  #   key: "package-it"
-  #   command: ".buildkite/scripts/steps/integration-package.sh"
-  #   artifact_paths:
-  #     - build/distributions/**
-  #   agents:
-  #     provider: "gcp"
-  #     machineType: "n1-standard-8"
-
-  # - label: "Integration tests: stateful ESS"
-  #   key: test-tf
-  #   # depends_on:
-  #   #   - package-it
-  #   command: |
-  #     echo "~~~ Downloading elastic-agent artifacts"
-  #     buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
-  #     ls -lah build/distributions/
-  #     .buildkite/scripts/steps/integration_tests_tf.sh
-  #   artifact_paths:
-  #     - build/**
-  #   agents:
-  #     provider: "gcp"
-  #     imageProject: elastic-images-qa
-  #     machineType: "n1-standard-8"
-  #     # image: "family/platform-ingest-elastic-agent-ubuntu-2204"
-  #     image: "platform-ingest-elastic-agent-ubuntu-2404-1722342513"
-
-  - label: "Stateful IT: Ubuntu-default-sudo"
-    key: stateful-ubuntu-default-sudo
-    # depends_on:
-    #   - package-it
-    command: |
-      buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
-      ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "default" "^(TestAPMConfig|TestDiagnosticsOptionalValues|TestIsolatedUnitsDiagnosticsOptionalValues|TestDiagnosticsCommand|TestIsolatedUnitsDiagnosticsCommand|TestEventLogFile|TestFakeComponent|TestFakeIsolatedUnitsComponent|TestOtelFileProcessing|TestOtelLogsIngestion|TestOtelAPMIngestion|TestPackageVersion)$$"
+  - label: "Integration tests: packaging"
+    key: "package-it"
+    command: ".buildkite/scripts/steps/integration-package.sh"
     artifact_paths:
-      - build/**
+      - build/distributions/**
     agents:
       provider: "gcp"
-      imageProject: elastic-images-qa
       machineType: "n1-standard-8"
-      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
-  - label: "Stateful IT: Ubuntu-upgrade-sudo"
-    key: stateful-ubuntu-upgrade-sudo
-    # depends_on:
-    #   - package-it
-    command: |
-      buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
-      ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "upgrade" "^(TestUpgradeBrokenPackageVersion|TestStandaloneUpgradeWithGPGFallback|TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing|TestStandaloneUpgradeRollback|TestStandaloneUpgradeRollbackOnRestarts|TestStandaloneUpgradeFailsWhenUpgradeIsInProgress|TestStandaloneUpgradeRetryDownload|TestStandaloneUpgradeSameCommit|TestStandaloneUpgrade|TestStandaloneUpgradeUninstallKillWatcher)$$"
-    artifact_paths:
-      - build/**
-    agents:
-      provider: "gcp"
-      imageProject: elastic-images-qa
-      machineType: "n1-standard-8"
-      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+  - group: "Stateful IT (Sudo): Ubuntu"
+    key: integration-tests
+    depends_on:
+      - package-it
+    steps:
+      - label: "Default"
+        key: stateful-ubuntu-default-sudo
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          ls -lah build/distributions/
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "default" "^(TestAPMConfig|TestDiagnosticsOptionalValues|TestIsolatedUnitsDiagnosticsOptionalValues|TestDiagnosticsCommand|TestIsolatedUnitsDiagnosticsCommand|TestEventLogFile|TestFakeComponent|TestFakeIsolatedUnitsComponent|TestOtelFileProcessing|TestOtelLogsIngestion|TestOtelAPMIngestion|TestPackageVersion)$$"
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          imageProject: elastic-images-qa
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
-  - label: "Stateful IT: Ubuntu-fleet-sudo"
-    key: stateful-ubuntu-fleet-sudo
-    # depends_on:
-    #   - package-it
-    command: |
-      buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
-      ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet" "^(TestLongRunningAgentForLeaks|TestDelayEnroll|TestDelayEnrollUnprivileged|TestInstallAndCLIUninstallWithEndpointSecurity|TestInstallAndUnenrollWithEndpointSecurity|TestInstallWithEndpointSecurityAndRemoveEndpointIntegration|TestEndpointSecurityNonDefaultBasePath|TestEndpointSecurityUnprivileged|TestEndpointSecurityCannotSwitchToUnprivileged|TestEndpointLogsAreCollectedInDiagnostics|TestForceInstallOverProtectedPolicy|TestSetLogLevelFleetManaged|TestLogIngestionFleetManaged|TestMetricsMonitoringCorrectBinaries|TestEndpointAgentServiceMonitoring|TestMonitoringPreserveTextConfig|TestMonitoringLivenessReloadable|TestComponentBuildHashInDiagnostics|TestProxyURL|TestFleetManagedUpgradeUnprivileged)$$"
-    artifact_paths:
-      - build/**
-    agents:
-      provider: "gcp"
-      imageProject: elastic-images-qa
-      machineType: "n1-standard-8"
-      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+      - label: "Upgrade"
+        key: stateful-ubuntu-upgrade-sudo
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          ls -lah build/distributions/
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "upgrade" "^(TestUpgradeBrokenPackageVersion|TestStandaloneUpgradeWithGPGFallback|TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing|TestStandaloneUpgradeRollback|TestStandaloneUpgradeRollbackOnRestarts|TestStandaloneUpgradeFailsWhenUpgradeIsInProgress|TestStandaloneUpgradeRetryDownload|TestStandaloneUpgradeSameCommit|TestStandaloneUpgrade|TestStandaloneUpgradeUninstallKillWatcher)$$"
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          imageProject: elastic-images-qa
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
-  - label: "Stateful IT: Ubuntu-fqdn-sudo"
-    key: stateful-ubuntu-fqdn-sudo
-    # depends_on:
-    #   - package-it
-    command: |
-      buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
-      ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fqdn" "^(TestFQDN)$$"
-    artifact_paths:
-      - build/**
-    agents:
-      provider: "gcp"
-      imageProject: elastic-images-qa
-      machineType: "n1-standard-8"
-      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+      - label: "Fleet"
+        key: stateful-ubuntu-fleet-sudo
+        depends_on:
+          - package-it
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          ls -lah build/distributions/
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet" "^(TestLongRunningAgentForLeaks|TestDelayEnroll|TestDelayEnrollUnprivileged|TestInstallAndCLIUninstallWithEndpointSecurity|TestInstallAndUnenrollWithEndpointSecurity|TestInstallWithEndpointSecurityAndRemoveEndpointIntegration|TestEndpointSecurityNonDefaultBasePath|TestEndpointSecurityUnprivileged|TestEndpointSecurityCannotSwitchToUnprivileged|TestEndpointLogsAreCollectedInDiagnostics|TestForceInstallOverProtectedPolicy|TestSetLogLevelFleetManaged|TestLogIngestionFleetManaged|TestMetricsMonitoringCorrectBinaries|TestEndpointAgentServiceMonitoring|TestMonitoringPreserveTextConfig|TestMonitoringLivenessReloadable|TestComponentBuildHashInDiagnostics|TestProxyURL|TestFleetManagedUpgradeUnprivileged)$$"
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          imageProject: elastic-images-qa
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
-  - label: "Stateful IT: Ubuntu-deb-sudo"
-    key: stateful-ubuntu-deb-sudo
-    # depends_on:
-    #   - package-it
-    command: |
-      buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
-      ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "deb" "^(TestDebLogIngestFleetManaged|TestDebFleetUpgrade)$$"
-    artifact_paths:
-      - build/**
-    agents:
-      provider: "gcp"
-      imageProject: elastic-images-qa
-      machineType: "n1-standard-8"
-      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+      - label: "FQDN"
+        key: stateful-ubuntu-fqdn-sudo
+        depends_on:
+          - package-it
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          ls -lah build/distributions/
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fqdn" "^(TestFQDN)$$"
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          imageProject: elastic-images-qa
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
-  - label: "Stateful IT: Ubuntu-fleet-airgapped-sudo"
-    key: stateful-ubuntu-fleet-airgapped-sudo
-    # depends_on:
-    #   - package-it
-    command: |
-      buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
-      ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-airgapped" "^(TestFleetAirGappedUpgradeUnprivileged)$$"
-    artifact_paths:
-      - build/**
-    agents:
-      provider: "gcp"
-      imageProject: elastic-images-qa
-      machineType: "n1-standard-8"
-      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+      - label: "Deb"
+        key: stateful-ubuntu-deb-sudo
+        depends_on:
+          - package-it
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          ls -lah build/distributions/
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "deb" "^(TestDebLogIngestFleetManaged|TestDebFleetUpgrade)$$"
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          imageProject: elastic-images-qa
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
-  - label: "Stateful IT: Ubuntu-fleet-privileged-sudo"
-    key: stateful-ubuntu-fleet-privileged-sudo
-    # depends_on:
-    #   - package-it
-    command: |
-      buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
-      ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-privileged" "^(TestInstallFleetServerBootstrap|TestFleetManagedUpgradePrivileged)$$"
-    artifact_paths:
-      - build/**
-    agents:
-      provider: "gcp"
-      imageProject: elastic-images-qa
-      machineType: "n1-standard-8"
-      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+      - label: "Fleet Airgapped"
+        key: stateful-ubuntu-fleet-airgapped-sudo
+        depends_on:
+          - package-it
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          ls -lah build/distributions/
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-airgapped" "^(TestFleetAirGappedUpgradeUnprivileged)$$"
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          imageProject: elastic-images-qa
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
-  - label: "Stateful IT: Ubuntu-fleet-airgapped-privileged-sudo"
-    key: stateful-ubuntu-fleet-airgapped-privileged-sudo
-    # depends_on:
-    #   - package-it
-    command: |
-      buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0190bb9a-7d42-41d6-99b8-68dc4309c28b
-      ls -lah build/distributions/
-      .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-airgapped-privileged" "^(TestFleetAirGappedUpgradePrivileged)$$"
-    artifact_paths:
-      - build/**
-    agents:
-      provider: "gcp"
-      imageProject: elastic-images-qa
-      machineType: "n1-standard-8"
-      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+      - label: "Fleet Privileged"
+        key: stateful-ubuntu-fleet-privileged-sudo
+        depends_on:
+          - package-it
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          ls -lah build/distributions/
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-privileged" "^(TestInstallFleetServerBootstrap|TestFleetManagedUpgradePrivileged)$$"
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          imageProject: elastic-images-qa
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+
+      - label: "Fleet Airgapped Privileged"
+        key: stateful-ubuntu-fleet-airgapped-privileged-sudo
+        depends_on:
+          - package-it
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          ls -lah build/distributions/
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-airgapped-privileged" "^(TestFleetAirGappedUpgradePrivileged)$$"
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          imageProject: elastic-images-qa
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
   # - label: "Serverless integration test"
   #   key: "serverless-integration-tests"
