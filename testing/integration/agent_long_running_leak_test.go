@@ -154,7 +154,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	timer := time.NewTimer(testDuration)
 	defer timer.Stop()
 
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(time.Second * 60)
 	defer ticker.Stop()
 
 	done := false
