@@ -378,7 +378,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		agentOutputStr := agentOutput.String()
 		scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
 		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "Cannot index event publisher.Event") {
+			if strings.Contains(scanner.Text(), "Cannot index event") {
 				return true
 			}
 		}
