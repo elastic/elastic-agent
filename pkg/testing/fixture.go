@@ -1214,7 +1214,7 @@ func createTempDir(t *testing.T) string {
 				t.Errorf("could not remove temp dir '%s': %s", tempDir, err)
 			}
 		} else {
-			t.Logf("Temporary directory saved: %s", tempDir)
+			t.Logf("Temporary directory %q preserved for investigation/debugging", tempDir)
 		}
 	}
 	t.Cleanup(cleanup)
