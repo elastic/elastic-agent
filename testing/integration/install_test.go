@@ -320,7 +320,7 @@ func TestInstallUninstallAudit(t *testing.T) {
 	out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 	if err != nil {
 		t.Logf("uninstall output: %s", out)
-		require.NoErrorf(t, err)
+		require.NoError(t, err)
 	}
 
 	response, err := info.kibanaClient.SendWithContext(ctx, http.MethodGet, "/api/fleet/agents/"+agentID, nil, nil, nil)
