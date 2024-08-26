@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -94,7 +94,7 @@ func ExpectedConfig(cfg map[string]interface{}) (*proto.UnitExpectedConfig, erro
 	}
 
 	if err := decoder.Decode(cfg); err != nil {
-		return nil, rewrapErr(err)
+		return nil, fmt.Errorf("decoding error: %w", err)
 	}
 
 	if err := setSource(result, cfg); err != nil {
@@ -275,17 +275,4 @@ func getJSONFieldName(field reflect.StructField) string {
 	}
 	split := strings.Split(tag, ",")
 	return strings.TrimSpace(split[0])
-}
-
-func rewrapErr(err error) error {
-	var me *mapstructure.Error
-	if !errors.As(err, &me) {
-		return err
-	}
-	errs := me.WrappedErrors()
-	points := make([]string, 0, len(errs))
-	for _, e := range errs {
-		points = append(points, e.Error())
-	}
-	return fmt.Errorf("%d decoding error(s): %s", len(errs), strings.Join(points, ", "))
 }
