@@ -26,7 +26,7 @@ import (
 
 type mockUpgradeManager struct {
 	msgChan       chan string
-	completedChan chan string
+	completedChan chan struct{}
 }
 
 func (u *mockUpgradeManager) Upgradeable() bool {
@@ -66,7 +66,7 @@ func TestUpgradeHandler(t *testing.T) {
 
 	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
-	completedChan := make(chan string)
+	completedChan := make(chan struct{})
 
 	// Create and start the coordinator
 	c := coordinator.New(
@@ -87,7 +87,7 @@ func TestUpgradeHandler(t *testing.T) {
 	ack := noopacker.New()
 	err := u.Handle(ctx, &a, ack)
 	// indicate that upgrade is completed
-	completedChan <- ""
+	close(completedChan)
 	require.NoError(t, err)
 	msg := <-msgChan
 	require.Equal(t, "completed 8.3.0", msg)
@@ -103,7 +103,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 
 	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
-	completedChan := make(chan string)
+	completedChan := make(chan struct{})
 
 	// Create and start the Coordinator
 	c := coordinator.New(
@@ -127,7 +127,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	require.NoError(t, err1)
 	require.NoError(t, err2)
 	// indicate that upgrade is completed
-	completedChan <- ""
+	close(completedChan)
 	msg := <-msgChan
 	require.Equal(t, "completed 8.3.0", msg)
 }
@@ -142,7 +142,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 
 	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
-	completedChan := make(chan string)
+	completedChan := make(chan struct{})
 
 	// Create and start the Coordinator
 	c := coordinator.New(
@@ -170,7 +170,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	msg1 := <-msgChan
 	require.Equal(t, "canceled 8.2.0", msg1)
 	// indicate that upgrade is completed
-	completedChan <- ""
+	close(completedChan)
 	msg2 := <-msgChan
 	require.Equal(t, "completed 8.5.0", msg2)
 }
