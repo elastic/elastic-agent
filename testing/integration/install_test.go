@@ -323,19 +323,21 @@ func TestInstallUninstallAudit(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	response, err := info.KibanaClient.SendWithContext(ctx, http.MethodGet, "/api/fleet/agents/"+agentID, nil, nil, nil)
+	response, err := info.ESClient.Get(".fleet-agents", agentID)
 	require.NoError(t, err)
 	defer response.Body.Close()
+	require.Equal(t, http.StatusOK, response.StatusCode, "ES status code expected 200")
 	p, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
 	var res struct {
-		Item struct {
+		Source struct {
 			AuditUnenrollReason string `json:"audit_unenroll_reason"`
-		} `json:"item"`
+		} `json:"_source"`
 	}
+	t.Logf("Found document: %s", p)
 	err = json.Unmarshal(p, &res)
 	require.NoError(t, err)
-	require.Equal(t, "uninstall", res.Item.AuditUnenrollReason)
+	require.Equal(t, "uninstall", res.Source.AuditUnenrollReason)
 }
 
 // TestRepeatedInstallUninstall will install then uninstall the agent
