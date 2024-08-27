@@ -323,7 +323,7 @@ func TestInstallUninstallAudit(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	response, err := info.kibanaClient.SendWithContext(ctx, http.MethodGet, "/api/fleet/agents/"+agentID, nil, nil, nil)
+	response, err := info.KibanaClient.SendWithContext(ctx, http.MethodGet, "/api/fleet/agents/"+agentID, nil, nil, nil)
 	require.NoError(t, err)
 	defer response.Body.Close()
 	p, err := io.ReadAll(response.Body)
