@@ -360,43 +360,49 @@ func TestActionDispatcher(t *testing.T) {
 		action.AssertExpectations(t)
 	})
 
-	t.Run("Dispatch multiples events returns one error", func(t *testing.T) {
-		def := &mockHandler{}
-		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error")).Once()
-		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-
+	t.Run("Dispatch multiple events returns one error", func(t *testing.T) {
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 
-		d, err := New(nil, t.TempDir(), def, queue)
-		require.NoError(t, err)
-		err = d.Register(&mockAction{}, def)
-		require.NoError(t, err)
-
 		action1 := &mockAction{}
 		action1.On("Type").Return("action")
 		action1.On("ID").Return("id")
+
 		action2 := &mockAction{}
 		action2.On("Type").Return("action")
 		action2.On("ID").Return("id")
 
-		// Kind of a dirty work around to test an error return.
-		// launch in another routing and sleep to check if an error is generated
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, detailsSetter, ack, action1, action2)
-		time.Sleep(time.Millisecond * 200)
+
+		def := &mockHandler{}
+		def.On("Handle", dispatchCtx, action1, ack).Return(errors.New("first error")).Once()
+		def.On("Handle", dispatchCtx, action2, ack).Return(errors.New("second error")).Once()
+
+		d, err := New(nil, t.TempDir(), def, queue)
+		require.NoError(t, err)
+
+		dispatchCompleted := make(chan struct{})
+		go func() {
+			d.Dispatch(dispatchCtx, detailsSetter, ack, action1, action2)
+			dispatchCompleted <- struct{}{}
+		}()
+
+		// First, assert that the Dispatch method puts one error - the second one - on the error channel.
 		select {
-		case <-d.Errors():
-		default:
+		case err := <-d.Errors():
+			assert.EqualError(t, err, "second error")
+		case <-dispatchCompleted:
 			t.Fatal("Expected error")
 		}
-		time.Sleep(time.Millisecond * 200)
+
+		// Second, assert that the Dispatch method completes without putting anything else on the error channel.
 		select {
 		case <-d.Errors():
 			t.Fatal(err)
-		default:
+		case <-dispatchCompleted:
+			// Expecting the dispatch to complete.
 		}
 
 		def.AssertExpectations(t)
