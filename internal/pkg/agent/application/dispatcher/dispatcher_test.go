@@ -231,15 +231,9 @@ func TestActionDispatcher(t *testing.T) {
 	})
 
 	t.Run("Cancel queued action", func(t *testing.T) {
-		def := &mockHandler{}
-		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-
-		d, err := New(nil, t.TempDir(), def, queue)
-		require.NoError(t, err)
 
 		action := &mockAction{}
 		action.On("Type").Return(fleetapi.ActionTypeCancel)
@@ -247,6 +241,12 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
+
+		def := &mockHandler{}
+		def.On("Handle", dispatchCtx, action, ack).Return(nil).Once()
+
+		d, err := New(nil, t.TempDir(), def, queue)
+		require.NoError(t, err)
 
 		dispatchCompleted := make(chan struct{})
 		go func() {
