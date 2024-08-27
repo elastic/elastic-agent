@@ -25,11 +25,9 @@ jobs:
         uses: updatecli/updatecli-action@d0950ebbe80f4f80c3392b288d6a218fae872f69 # v0.76.1
 
       - name: Run Updatecli in Apply mode
-        run: updatecli apply --config .github/updatecli-bump-golang.yml
+        run: updatecli apply --config .ci/updatecli/updatecli-bump-golang.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GIT_USER: "github-actions[bot]"
-          GIT_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
 
       - if: ${{ failure()  }}
         uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
