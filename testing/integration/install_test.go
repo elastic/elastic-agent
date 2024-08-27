@@ -323,12 +323,12 @@ func TestInstallUninstallAudit(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	response, err := info.ESClient.Get(".fleet-agents", agentID)
+	response, err := info.ESClient.Get(".fleet-agents", agentID, info.ESClient.Get.WithContext(ctx))
 	require.NoError(t, err)
 	defer response.Body.Close()
-	require.Equal(t, http.StatusOK, response.StatusCode, "ES status code expected 200")
 	p, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
+	require.Equalf(t, http.StatusOK, response.StatusCode, "ES status code expected 200, body: %s", p)
 	var res struct {
 		Source struct {
 			AuditUnenrollReason string `json:"audit_unenroll_reason"`
