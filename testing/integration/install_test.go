@@ -314,8 +314,9 @@ func TestInstallUninstallAudit(t *testing.T) {
 	// Check that Agent was installed in default base path
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 
-	agentID, err := getAgentID(ctx, fixture)
+	agentInfo, err := fixture.ExecInspect(ctx)
 	require.NoError(t, err, "error getting the agent ID")
+	t.Logf("Agent Info: %+v", agentInfo)
 
 	out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 	if err != nil {
@@ -323,7 +324,7 @@ func TestInstallUninstallAudit(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	response, err := info.ESClient.Get(".fleet-agents", agentID, info.ESClient.Get.WithContext(ctx))
+	response, err := info.ESClient.Get(".fleet-agents", agentInfo.Agent.ID, info.ESClient.Get.WithContext(ctx))
 	require.NoError(t, err)
 	defer response.Body.Close()
 	p, err := io.ReadAll(response.Body)
