@@ -362,12 +362,6 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	// We need to set the state path for the health command
-	setStatePath := func(cmd *exec.Cmd) error {
-		cmd.Env = append(cmd.Env, "STATE_PATH="+agentFixture.WorkDir())
-		return nil
-	}
-
 	assert.Eventuallyf(t, func() bool {
 		// This will return errors until it connects to the agent,
 		// they're mostly noise because until the agent starts running
@@ -375,7 +369,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err := agentFixture.IsHealthy(ctx, setStatePath)
+		err := agentFixture.IsHealthy(ctx, withEnv(env))
 		return err == nil
 	},
 		2*time.Minute, time.Second,
