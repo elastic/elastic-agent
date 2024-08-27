@@ -85,6 +85,5 @@ inputs:
     description: "Azure Asset Inventory Discovery"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
     isolate_units: true
