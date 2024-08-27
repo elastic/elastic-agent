@@ -240,8 +240,6 @@ func TestActionDispatcher(t *testing.T) {
 
 		d, err := New(nil, t.TempDir(), def, queue)
 		require.NoError(t, err)
-		err = d.Register(&mockAction{}, def)
-		require.NoError(t, err)
 
 		action := &mockAction{}
 		action.On("Type").Return(fleetapi.ActionTypeCancel)
