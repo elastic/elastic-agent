@@ -232,11 +232,7 @@ func TestActionDispatcher(t *testing.T) {
 
 	t.Run("Cancel queued action", func(t *testing.T) {
 		def := &mockHandler{}
-		calledCh := make(chan bool)
-		call := def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		call.RunFn = func(_ mock.Arguments) {
-			calledCh <- true
-		}
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
@@ -253,19 +249,22 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, detailsSetter, ack, action)
+
+		dispatchCompleted := make(chan struct{})
+		go func() {
+			d.Dispatch(dispatchCtx, detailsSetter, ack, action)
+			dispatchCompleted <- struct{}{}
+		}()
+
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
-		case <-calledCh:
-			// Handle was called, expected
-		case <-time.After(1 * time.Second):
-			t.Fatal("mock Handle never called")
+		case <-dispatchCompleted:
+			// OK, expected to complete the dispatch without blocking on the errors channel
 		}
+
 		def.AssertExpectations(t)
-		// Flaky assertion: https://github.com/elastic/elastic-agent/issues/3137
-		// TODO: re-enabled when fixed
-		// queue.AssertExpectations(t)
+		queue.AssertExpectations(t)
 	})
 
 	t.Run("Retrieve actions from queue", func(t *testing.T) {
