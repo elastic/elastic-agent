@@ -21,6 +21,9 @@ extensions:
     check_interval: 1s
     limit_mib: 700
     spike_limit_mib: 180
+  health_check:
+    endpoint: "localhost:13133"
+    path: "/health/status"
 
 service:
   extensions: [memory_limiter]
