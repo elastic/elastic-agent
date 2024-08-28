@@ -593,6 +593,10 @@ func PerformQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{
 		es.Search.WithContext(ctx),
 		es.Search.WithSize(300),
 	)
+
+	query, _ := json.MarshalIndent(queryRaw, "", "  ")
+	fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Index:", index)
+	fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Query:", string(query))
 	if err != nil {
 		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
 	}
