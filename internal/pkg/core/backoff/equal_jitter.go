@@ -5,7 +5,7 @@
 package backoff
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"time"
 )
 
@@ -30,7 +30,7 @@ func NewEqualJitterBackoff(done <-chan struct{}, init, max time.Duration) Backof
 		done:     done,
 		init:     init,
 		max:      max,
-		nextRand: time.Duration(rand.Int63n(int64(init))), //nolint:gosec
+		nextRand: rand.N(init),
 	}
 }
 
@@ -51,7 +51,7 @@ func (b *EqualJitterBackoff) Wait() bool {
 	backoff := b.NextWait()
 
 	// increase duration for next wait.
-	b.nextRand = time.Duration(rand.Int63n(int64(b.duration)))
+	b.nextRand = rand.N(b.duration)
 	b.duration *= 2
 	if b.duration > b.max {
 		b.duration = b.max

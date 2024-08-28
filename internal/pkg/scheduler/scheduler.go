@@ -5,7 +5,7 @@
 package scheduler
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"time"
 )
 
@@ -129,6 +129,5 @@ func (p *PeriodicJitter) Stop() {
 }
 
 func (p *PeriodicJitter) delay() time.Duration {
-	t := int64(p.variance)
-	return time.Duration(rand.Int63n(t))
+	return rand.N(p.variance)
 }
