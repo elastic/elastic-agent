@@ -154,5 +154,16 @@ func LoadSpecs(files ...string) (map[string][]OSPackageArgs, error) {
 		return nil, fmt.Errorf("failed to unmarshal spec data: %w", err)
 	}
 
+	// verify that the package specification sets the docker variant
+	for specName, specs := range packages.Specs {
+		for _, spec := range specs {
+			for _, pkgType := range spec.Types {
+				if pkgType == Docker && spec.Spec.DockerVariant == Undefined {
+					return nil, fmt.Errorf("%s defined a package spec for docker without a docker_variant set", specName)
+				}
+			}
+		}
+	}
+
 	return packages.Specs, nil
 }
