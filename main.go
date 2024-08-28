@@ -21,12 +21,6 @@ func main() {
 		}
 	}()
 
-	err = cmd.CheckNativePlatformCompat()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize: %v\n", err)
-		return
-	}
-
 	pj, err := process.CreateJobObject()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize process job object: %v\n", err)
