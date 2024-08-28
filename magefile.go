@@ -2721,7 +2721,7 @@ func authGCP(ctx context.Context) error {
 	// We only need the service account token to exist.
 	tokenPath, ok, err := getGCEServiceTokenPath()
 	if err != nil {
-		return err
+		return fmt.Errorf("local token lookup failed: %w", err)
 	}
 	if ok {
 		// exists, so nothing to do
@@ -2792,7 +2792,7 @@ func authGCP(ctx context.Context) error {
 	}
 
 	// Check the authenticated account's project
-	cmd = exec.CommandContext(ctx, cliName, "config", "get", "core/project")
+	cmd = exec.CommandContext(ctx, cliName, "config", "get-value", "core/project")
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("unable to get project: %w", err)
