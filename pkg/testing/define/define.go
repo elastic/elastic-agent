@@ -17,11 +17,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gofrs/uuid/v5"
+
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
-	"github.com/gofrs/uuid/v5"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/utils"
