@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
 )
@@ -300,23 +301,37 @@ func TestInstallUninstallAudit(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
+	policyResp, enrollmentTokenResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, createBasicPolicy())
+	t.Logf("Created policy %+v", policyResp.AgentPolicy)
+
+	t.Log("Getting default Fleet Server URL...")
+	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoError(t, err, "failed getting Fleet Server URL")
+
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	opts := &atesting.InstallOpts{Force: true}
+	opts := &atesting.InstallOpts{
+		Force: true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetServerURL,
+			EnrollmentToken: enrollmentTokenResp.APIKey,
+		},
+	}
 	out, err := fixture.Install(ctx, opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
 	}
 
-	// Check that Agent was installed in default base path
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	require.Eventuallyf(t, func() bool {
+		return waitForAgentAndFleetHealthy(ctx, t, fixture)
+	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
 
-	agentInfo, err := fixture.ExecInspect(ctx)
-	require.NoError(t, err, "error getting the agent ID")
-	t.Logf("Agent Info: %+v", agentInfo)
+	agentID, err := getAgentID(ctx, fixture)
+	require.NoError(t, err, "error getting the agent inspect output")
+	require.NotEmpty(t, agentID, "agent ID empty")
 
 	out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 	if err != nil {
@@ -324,7 +339,7 @@ func TestInstallUninstallAudit(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	response, err := info.ESClient.Get(".fleet-agents", agentInfo.Agent.ID, info.ESClient.Get.WithContext(ctx))
+	response, err := info.ESClient.Get(".fleet-agents", agentID, info.ESClient.Get.WithContext(ctx))
 	require.NoError(t, err)
 	defer response.Body.Close()
 	p, err := io.ReadAll(response.Body)
@@ -332,13 +347,12 @@ func TestInstallUninstallAudit(t *testing.T) {
 	require.Equalf(t, http.StatusOK, response.StatusCode, "ES status code expected 200, body: %s", p)
 	var res struct {
 		Source struct {
-			AuditUnenrollReason string `json:"audit_unenroll_reason"`
+			AuditUnenrolledReason string `json:"audit_unenrolled_reason"`
 		} `json:"_source"`
 	}
-	t.Logf("Found document: %s", p)
 	err = json.Unmarshal(p, &res)
 	require.NoError(t, err)
-	require.Equal(t, "uninstall", res.Source.AuditUnenrollReason)
+	require.Equal(t, "uninstall", res.Source.AuditUnenrolledReason)
 }
 
 // TestRepeatedInstallUninstall will install then uninstall the agent
