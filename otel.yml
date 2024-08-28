@@ -26,7 +26,7 @@ extensions:
     path: "/health/status"
 
 service:
-  extensions: [memory_limiter]
+  extensions: [health_check, memory_limiter]
   pipelines:
     logs:
       receivers: [filelog]
