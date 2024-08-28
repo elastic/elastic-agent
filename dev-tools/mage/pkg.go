@@ -47,6 +47,11 @@ func Package() error {
 					continue
 				}
 
+				if pkgType == Docker && !isDockerVariantSelected(pkg.Spec.DockerVariant) {
+					log.Printf("Skipping %s docker variant type because it is not selected", pkg.Spec.DockerVariant)
+					continue
+				}
+
 				if target.Name == "linux/arm64" && pkgType == Docker && runtime.GOARCH != "arm64" {
 					log.Printf("Skipping Docker package type because build host isn't arm")
 					continue
@@ -115,6 +120,21 @@ func isPackageTypeSelected(pkgType PackageType) bool {
 
 	for _, t := range SelectedPackageTypes {
 		if t == pkgType {
+			return true
+		}
+	}
+	return false
+}
+
+// isDockerVariantSelected returns true if SelectedDockerVariants is empty or if
+// docVariant is present on SelectedDockerVariants. It returns false otherwise.
+func isDockerVariantSelected(docVariant DockerVariant) bool {
+	if len(SelectedDockerVariants) == 0 {
+		return true
+	}
+
+	for _, v := range SelectedDockerVariants {
+		if v == docVariant {
 			return true
 		}
 	}

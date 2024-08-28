@@ -22,8 +22,7 @@ import (
 var simpleConfig1 = `
 outputs:
   default:
-    type: fake-action-output
-    shipper.enabled: true
+    type: fake-output
 inputs:
   - id: fake
     type: fake
@@ -34,8 +33,7 @@ inputs:
 var simpleConfig2 = `
 outputs:
   default:
-    type: fake-action-output
-    shipper.enabled: true
+    type: fake-output
 inputs:
   - id: fake
     type: fake
@@ -46,8 +44,7 @@ inputs:
 var simpleIsolatedUnitsConfig = `
 outputs:
   default:
-    type: fake-action-output
-    shipper.enabled: true
+    type: fake-output
 inputs:
   - id: fake-isolated-units
     type: fake-isolated-units
@@ -58,8 +55,7 @@ inputs:
 var complexIsolatedUnitsConfig = `
 outputs:
   default:
-    type: fake-action-output
-    shipper.enabled: true
+    type: fake-output
 inputs:
   - id: fake-isolated-units
     type: fake-isolated-units
@@ -82,7 +78,7 @@ func TestFakeComponent(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	err = f.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	err = f.Run(ctx, atesting.State{
@@ -116,17 +112,6 @@ func TestFakeComponent(t *testing.T) {
 					},
 				},
 			},
-			"fake-shipper-default": {
-				State: atesting.NewClientState(client.Healthy),
-				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
-						State: atesting.NewClientState(client.Healthy),
-					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
-						State: atesting.NewClientState(client.Healthy),
-					},
-				},
-			},
 		},
 	})
 	require.NoError(t, err)
@@ -143,7 +128,7 @@ func TestFakeIsolatedUnitsComponent(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	err = f.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	err = f.Run(ctx, atesting.State{
@@ -184,20 +169,6 @@ func TestFakeIsolatedUnitsComponent(t *testing.T) {
 						State: atesting.NewClientState(client.Healthy),
 					},
 					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1-unit"}: {
-						State: atesting.NewClientState(client.Healthy),
-					},
-				},
-			},
-			"fake-shipper-default": {
-				State: atesting.NewClientState(client.Healthy),
-				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
-						State: atesting.NewClientState(client.Healthy),
-					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
-						State: atesting.NewClientState(client.Healthy),
-					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 				},

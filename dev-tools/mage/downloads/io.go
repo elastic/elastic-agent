@@ -5,9 +5,9 @@
 package downloads
 
 import (
+	"context"
+	"log/slog"
 	"os"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // exists checks if a path exists in the file system
@@ -27,10 +27,12 @@ func mkdirAll(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		err = os.MkdirAll(path, 0755)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-				"path":  path,
-			}).Fatal("Directory cannot be created")
+			logger.Log(context.Background(),
+				FatalLevel,
+				"Directory cannot be created",
+				slog.String("error", err.Error()),
+				slog.String("path", path),
+			)
 
 			return err
 		}

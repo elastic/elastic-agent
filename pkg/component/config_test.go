@@ -183,7 +183,7 @@ func TestExpectedConfig(t *testing.T) {
 					},
 				},
 			},
-			Err: errors.New("1 decoding error(s): 'meta' expected a map, got 'slice'"),
+			Err: errors.New("decoding error: decoding failed due to the following error(s):\n\n'meta' expected a map, got 'slice'"),
 		},
 	}
 

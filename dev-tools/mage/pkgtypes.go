@@ -91,6 +91,7 @@ type PackageSpec struct {
 	License           string                 `yaml:"license,omitempty"`
 	URL               string                 `yaml:"url,omitempty"`
 	Description       string                 `yaml:"description,omitempty"`
+	DockerVariant     DockerVariant          `yaml:"docker_variant,omitempty"`
 	PreInstallScript  string                 `yaml:"pre_install_script,omitempty"`
 	PostInstallScript string                 `yaml:"post_install_script,omitempty"`
 	PostRmScript      string                 `yaml:"post_rm_script,omitempty"`
@@ -271,11 +272,7 @@ func (typ PackageType) AddFileExtension(file string) string {
 func (typ PackageType) PackagingDir(home string, target BuildPlatform, spec PackageSpec) (string, error) {
 	root := home
 	if typ == Docker {
-		imageName, err := spec.ImageName()
-		if err != nil {
-			return "", err
-		}
-		root = filepath.Join(root, imageName)
+		root = filepath.Join(root, spec.ImageName())
 	}
 
 	targetPath := typ.AddFileExtension(spec.Name + "-" + target.GOOS() + "-" + target.Arch())
@@ -467,17 +464,13 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 	return s
 }
 
-// ImageName computes the image name from the spec. A template for the image
-// name can be configured by adding image_name to extra_vars.
-func (s PackageSpec) ImageName() (string, error) {
-	if name := s.ExtraVars["image_name"]; name != "" {
-		imageName, err := s.Expand(name)
-		if err != nil {
-			return "", fmt.Errorf("failed to expand image_name: %w", err)
-		}
-		return imageName, nil
+// ImageName computes the image name from the spec.
+func (s PackageSpec) ImageName() string {
+	if s.DockerVariant == Basic {
+		// no suffix for basic docker variant
+		return s.Name
 	}
-	return s.Name, nil
+	return fmt.Sprintf("%s-%s", s.Name, s.DockerVariant)
 }
 
 func copyInstallScript(spec PackageSpec, script string, local *string) error {

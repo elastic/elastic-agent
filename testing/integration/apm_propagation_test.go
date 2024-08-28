@@ -32,8 +32,7 @@ import (
 const agentConfigTemplateString = `
 outputs:
   default:
-    type: fake-action-output
-    shipper.enabled: true
+    type: fake-output
 inputs:
   - id: fake-apm
     type: fake-apm
@@ -63,7 +62,7 @@ func TestAPMConfig(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
 	defer cancel()
 
-	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	err = f.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	name := "fake-apm"

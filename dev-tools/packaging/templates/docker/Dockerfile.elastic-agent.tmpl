@@ -34,7 +34,6 @@ RUN true && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloud-defend || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/fleet-server || true) && \
-    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-agent-shipper || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-collector || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-symbolizer || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-host-agent || true) && \
@@ -44,7 +43,7 @@ RUN true && \
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 {{- end }}
 
-{{- if contains .image_name "-cloud" }}
+{{- if eq .Variant "cloud" }}
     mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
     cp -f {{ $beatHome }}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
     chmod +x /opt/filebeat/filebeat && \
@@ -56,8 +55,7 @@ RUN true && \
     true
 
 # Keep this after any chown command, chown resets any applied capabilities
-RUN setcap =p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent
-RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/agentbeat && \
+RUN setcap =p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent && \
 {{- if .linux_capabilities }}
 # Since the beat is stored at the other end of a symlink we must follow the symlink first
 # For security reasons setcap does not support symlinks. This is smart in the general case
@@ -172,14 +170,14 @@ RUN mkdir /licenses
 COPY --from=home {{ $beatHome }}/LICENSE.txt /licenses
 COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
 
-{{- if contains .image_name "-cloud" }}
+{{- if eq .Variant "cloud" }}
 COPY --from=home /opt /opt
 # Generate folder for a stub command that will be overwritten at runtime
 RUN mkdir /app && \
     chown {{ .user }}:{{ .user }} /app
 {{- end }}
 
-{{- if (and (contains .image_name "-complete") (contains .from "ubuntu"))  }}
+{{- if (and (eq .Variant "complete") (contains .from "ubuntu"))  }}
 USER root
 ENV NODE_PATH={{ $beatHome }}/.node
 RUN echo \
@@ -256,7 +254,7 @@ ENV LIBBEAT_MONITORING_CGROUPS_HIERARCHY_OVERRIDE=/
 
 WORKDIR {{ $beatHome }}
 
-{{- if contains .image_name "-cloud" }}
+{{- if eq .Variant "cloud" }}
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/app/apm.sh"]
 # Generate a stub command that will be overwritten at runtime
