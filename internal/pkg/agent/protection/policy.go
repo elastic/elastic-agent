@@ -12,7 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 )
 
 var (
@@ -166,12 +166,12 @@ func getPolicySignedDataAndSignature(policy map[string]interface{}) (data, signa
 
 	data, err = getBytes(signed, "data")
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 
 	signature, err = getBytes(signed, "signature")
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 
 	return data, signature, err
