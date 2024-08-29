@@ -96,3 +96,12 @@ steps:
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
+
+  - label: "🔍 Test Analytics"
+    artifact_paths:
+      - "build/TEST-**"
+    plugins:
+      - test-collector#v1.10.1:
+          files: "build/TEST-*.xml"
+          format: "junit"
+
