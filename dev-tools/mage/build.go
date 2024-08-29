@@ -39,6 +39,7 @@ func DefaultBuildArgs() BuildArgs {
 	args := BuildArgs{
 		Name: BeatName,
 		CGO:  build.Default.CgoEnabled,
+		Env:  map[string]string{"GODEBUG": "tls=1"},
 		Vars: map[string]string{
 			elasticAgentModulePath + "/version.buildTime": "{{ date }}",
 			elasticAgentModulePath + "/version.commit":    "{{ commit }}",

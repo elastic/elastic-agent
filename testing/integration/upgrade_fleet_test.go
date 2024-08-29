@@ -140,14 +140,32 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	rootDir := t.TempDir()
+
+	// rootDir := t.TempDir()
+	rootDir := "/tmp/fileserver"
+	matches, err := filepath.Glob(rootDir + "/*")
+	require.NoError(t, err, "failed to glob rootDir")
+	for _, f := range matches {
+		os.Remove(f)
+	}
+	// downloads/beats/elastic-agent/
 	downloadDir := filepath.Join(rootDir, "downloads", "beats", "elastic-agent")
 	err := os.MkdirAll(downloadDir, 0644)
-	require.NoError(t, err, `could not create download directory`)
+	require.NoError(t, err, "could not create download directory")
 
+	// it's useful for debugging
+	dl, err := os.ReadDir(rootDir)
+	require.NoError(t, err)
+	var files []string
+	for _, d := range dl {
+		files = append(files, d.Name())
+	}
+	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
+		rootDir, files)
 	// start file server
 	fs := http.FileServer(http.Dir(rootDir))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("[fileserver] %s - %s", r.Method, r.URL.Path)
 		fs.ServeHTTP(w, r)
 	}))
 
@@ -155,22 +173,27 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	toFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err, "failed to get fixture with PR build")
 
-	path, err := toFixture.SrcPackage(ctx)
+	prBuildPkgPath, err := toFixture.SrcPackage(ctx)
 	require.NoError(t, err, "could not get path to PR build artifact")
 
-	// copy PR build to file server
-	_, filename := filepath.Split(path)
-	copyFile(t, path, filepath.Join(downloadDir, filename))
+	t.Logf("prBuildPkgPath: %q", prBuildPkgPath)
 
-	agentPkg, err := os.Open(path)
+	// copy PR build to file server
+	_, filename := filepath.Split(prBuildPkgPath)
+	pkgDownloadPath := filepath.Join(downloadDir, filename)
+	copyFile(t, prBuildPkgPath, pkgDownloadPath)
+	copyFile(t, prBuildPkgPath+".sha512", pkgDownloadPath+".sha512")
+
+	agentPkg, err := os.Open(prBuildPkgPath)
 	require.NoError(t, err, "could not open PR build artifact")
 
 	// sign the build
 	pubKey, ascData := pgptest.Sing(t, agentPkg)
 
 	// add the PGP key to file server
+	gpgKeyElasticAgent := filepath.Join(rootDir, "GPG-KEY-elastic-agent")
 	err = os.WriteFile(
-		filepath.Join(rootDir, "GPG-KEY-elastic-agent"), pubKey, 0o600)
+		gpgKeyElasticAgent, pubKey, 0o600)
 	require.NoError(t, err, "could not write GPG-KEY-elastic-agent to disk")
 
 	// add package signature to file server
@@ -179,8 +202,11 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	require.NoError(t, err, "could not write agent .asc file to disk")
 
 	// impersonate https://artifacts.elastic.co/GPG-KEY-elastic-agent
-	ercHostEntry := fmt.Sprintf("\n%server\t%server", server.URL, "artifacts.elastic.co")
+	host, _ := url.Parse(server.URL)
+	ercHostEntry := fmt.Sprintf("\n%s\t%s\n", host.Hostname(), "artifacts.elastic.co")
 	appendToFile(t, "/etc/hosts", []byte(ercHostEntry))
+	// sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to-destination 192.168.1.100:8080
+	// sudo iptables -t nat -A POSTROUTING -p tcp -d 192.168.1.100 --dport 8080 -j MASQUERADE
 
 	downloadSource := kibana.DownloadSource{
 		Name:      "self-signed-" + uuid.Must(uuid.NewV4()).String(),
@@ -194,6 +220,8 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	require.NoError(t, err, "could not create download source")
 	policy := defaultPolicy()
 	policy.DownloadSourceID = src.Item.ID
+	t.Logf("policy %s using DownloadSourceID: %s",
+		policy.ID, policy.DownloadSourceID)
 
 	// prepare last release
 	versions, err := upgradetest.GetUpgradableVersions()
@@ -213,11 +241,21 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	fromFixture, err := atesting.NewFixture(t, latestRelease.String())
 	require.NoError(t, err, "could not create fixture for latest release")
 
+	defer func() {
+		if !t.Failed() {
+			return
+		}
+
+		fromFixture.KeepFileByMoving(pkgDownloadPath)
+		fromFixture.KeepFileByMoving(gpgKeyElasticAgent)
+	}()
+
 	testUpgradeFleetManagedElasticAgent(
-		ctx, t, stack, fromFixture, toFixture, defaultPolicy(), true)
+		ctx, t, stack, fromFixture, toFixture, policy, true)
 }
 
 func copyFile(t *testing.T, srcPath, dstPath string) {
+	t.Logf("copyFile: src %q, dst %q", srcPath, dstPath)
 	src, err := os.Open(srcPath)
 	require.NoError(t, err, "Failed to open source file")
 	defer src.Close()

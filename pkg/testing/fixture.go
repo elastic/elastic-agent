@@ -1044,6 +1044,29 @@ func (f *Fixture) DumpProcesses(suffix string) {
 	}
 }
 
+func (f *Fixture) KeepFileByMoving(file string) {
+	filename := filepath.Base(file)
+
+	dir, err := findProjectRoot(f.caller)
+	if err != nil {
+		f.t.Logf("failed to keep file; failed to find project root: %s", err)
+		return
+	}
+
+	destFile := filepath.Join(dir, "build", "diagnostics", filename)
+	fileDir := path.Dir(destFile)
+	if err := os.MkdirAll(fileDir, 0777); err != nil {
+		f.t.Logf("failed to keep file; failed to create directory %s: %s", fileDir, err)
+		return
+	}
+
+	f.t.Logf("moving %q to %q", file, destFile)
+	err = os.Rename(file, destFile)
+	if err != nil {
+		f.t.Logf("failed to move %q to %q: %v", file, destFile, err)
+	}
+}
+
 // validateComponents ensures that the provided UsableComponent's are valid.
 func validateComponents(components ...UsableComponent) error {
 	for idx, comp := range components {
