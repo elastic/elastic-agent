@@ -98,6 +98,7 @@ steps:
           context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
 
   - label: "🔍 Test Analytics"
+    command: buildkite-agent artifact download build/** .
     artifact_paths:
       - "build/TEST-**"
     plugins:
