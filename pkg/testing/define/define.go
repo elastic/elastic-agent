@@ -233,8 +233,6 @@ func getNamespace(t *testing.T, local bool) (string, error) {
 	// special characters.
 	namespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
 	namespace = noSpecialCharsRegexp.ReplaceAllString(namespace, "")
-	fmt.Println(">>>>>>>>>>>>>>>>>>>> UUIDv4: ", nsUUID.String())
-	fmt.Println(">>>>>>>>>>>>>>>>>>>> Namespace: ", namespace)
 	return namespace, nil
 }
 
