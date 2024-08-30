@@ -328,7 +328,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	require.NoError(t, err)
 
 	// We call agentFixture.Prepare to set the workdir
-	require.NoError(t, agentFixture.Prepare(ctx))
+	require.NoError(t, agentFixture.Prepare(ctx), "failed preparing agent fixture")
 
 	_, outputID := createMockESOutput(t, info)
 	policyID, enrollmentAPIKey := createPolicy(
