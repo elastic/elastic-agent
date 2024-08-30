@@ -7,7 +7,6 @@ package handlers
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -26,7 +25,8 @@ import (
 )
 
 type mockUpgradeManager struct {
-	msgChan chan string
+	msgChan       chan string
+	completedChan chan struct{}
 }
 
 func (u *mockUpgradeManager) Upgradeable() bool {
@@ -39,7 +39,7 @@ func (u *mockUpgradeManager) Reload(rawConfig *config.Config) error {
 
 func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	select {
-	case <-time.After(2 * time.Second):
+	case <-u.completedChan:
 		u.msgChan <- "completed " + version
 		return nil, nil
 	case <-ctx.Done():
@@ -66,6 +66,7 @@ func TestUpgradeHandler(t *testing.T) {
 
 	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
+	completedChan := make(chan struct{})
 
 	// Create and start the coordinator
 	c := coordinator.New(
@@ -75,7 +76,7 @@ func TestUpgradeHandler(t *testing.T) {
 		agentInfo,
 		component.RuntimeSpecs{},
 		nil,
-		&mockUpgradeManager{msgChan: msgChan},
+		&mockUpgradeManager{msgChan: msgChan, completedChan: completedChan},
 		nil, nil, nil, nil, nil, false)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
@@ -85,6 +86,8 @@ func TestUpgradeHandler(t *testing.T) {
 		Version: "8.3.0", SourceURI: "http://localhost"}}
 	ack := noopacker.New()
 	err := u.Handle(ctx, &a, ack)
+	// indicate that upgrade is completed
+	close(completedChan)
 	require.NoError(t, err)
 	msg := <-msgChan
 	require.Equal(t, "completed 8.3.0", msg)
@@ -100,6 +103,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 
 	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
+	completedChan := make(chan struct{})
 
 	// Create and start the Coordinator
 	c := coordinator.New(
@@ -109,7 +113,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 		agentInfo,
 		component.RuntimeSpecs{},
 		nil,
-		&mockUpgradeManager{msgChan: msgChan},
+		&mockUpgradeManager{msgChan: msgChan, completedChan: completedChan},
 		nil, nil, nil, nil, nil, false)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
@@ -122,6 +126,8 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	err2 := u.Handle(ctx, &a, ack)
 	require.NoError(t, err1)
 	require.NoError(t, err2)
+	// indicate that upgrade is completed
+	close(completedChan)
 	msg := <-msgChan
 	require.Equal(t, "completed 8.3.0", msg)
 }
@@ -136,6 +142,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 
 	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
+	completedChan := make(chan struct{})
 
 	// Create and start the Coordinator
 	c := coordinator.New(
@@ -145,7 +152,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 		agentInfo,
 		component.RuntimeSpecs{},
 		nil,
-		&mockUpgradeManager{msgChan: msgChan},
+		&mockUpgradeManager{msgChan: msgChan, completedChan: completedChan},
 		nil, nil, nil, nil, nil, false)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
@@ -158,11 +165,12 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	ack := noopacker.New()
 	err1 := u.Handle(ctx, &a1, ack)
 	require.NoError(t, err1)
-	time.Sleep(1 * time.Second)
 	err2 := u.Handle(ctx, &a2, ack)
 	require.NoError(t, err2)
 	msg1 := <-msgChan
 	require.Equal(t, "canceled 8.2.0", msg1)
+	// indicate that upgrade is completed
+	close(completedChan)
 	msg2 := <-msgChan
 	require.Equal(t, "completed 8.5.0", msg2)
 }

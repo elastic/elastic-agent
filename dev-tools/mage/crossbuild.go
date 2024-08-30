@@ -33,6 +33,10 @@ var Platforms = BuildPlatforms.Defaults()
 // are considered to be selected (see isPackageTypeSelected).
 var SelectedPackageTypes []PackageType
 
+// SelectedDockerVariants is the list of docker variants. If empty, all docker variants
+// are considered to be selected (see isDockerVariantSelected).
+var SelectedDockerVariants []DockerVariant
+
 func init() {
 	// Allow overriding via PLATFORMS.
 	if expression := os.Getenv("PLATFORMS"); len(expression) > 0 {
@@ -48,6 +52,18 @@ func init() {
 				continue
 			}
 			SelectedPackageTypes = append(SelectedPackageTypes, p)
+		}
+	}
+
+	// Allow overriding via DOCKER_VARIANTS.
+	if dockerVariants := os.Getenv("DOCKER_VARIANTS"); len(dockerVariants) > 0 {
+		for _, docvariant := range strings.Split(dockerVariants, ",") {
+			var v DockerVariant
+			err := v.UnmarshalText([]byte(docvariant))
+			if err != nil {
+				continue
+			}
+			SelectedDockerVariants = append(SelectedDockerVariants, v)
 		}
 	}
 }
