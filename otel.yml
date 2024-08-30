@@ -23,7 +23,7 @@ extensions:
     spike_limit_mib: 180
   health_check:
     endpoint: "localhost:13133"
-    path: "/liveness"
+    path: "/health/status"
 
 service:
   extensions: [health_check, memory_limiter]
