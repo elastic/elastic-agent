@@ -98,6 +98,8 @@ var (
 	goIntegTestTimeout = 2 * time.Hour
 	// goProvisionAndTestTimeout is the timeout used for both provisioning and running tests.
 	goProvisionAndTestTimeout = goIntegTestTimeout + 30*time.Minute
+
+	logIntegrationSelections = true
 )
 
 func init() {
@@ -2406,6 +2408,31 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 	return nil
 }
 
+func (Integration) Buildkite(ctx context.Context) error {
+	// don't pollute the output with log information
+	//
+	// this target outputs the YAML to stdout
+	logIntegrationSelections = false
+
+	goTestFlags := os.Getenv("GOTEST_FLAGS")
+	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
+	if err != nil {
+		return fmt.Errorf("failed to determine batches: %w", err)
+	}
+	r, err := createTestRunner(false, "", goTestFlags, batches...)
+	if err != nil {
+		return fmt.Errorf("error creating test runner: %w", err)
+	}
+	steps, err := r.Buildkite()
+	if err != nil {
+		return fmt.Errorf("error generating buildkite steps: %w", err)
+	}
+
+	// output's YAML
+	fmt.Printf("%s\n", steps)
+	return nil
+}
+
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	if _, ok := ctx.Deadline(); !ok {
 		// If the context doesn't have a timeout (usually via the mage -t option), give it one.
@@ -2558,7 +2585,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	default:
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
 	}
-	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
+	if logIntegrationSelections {
+		fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
+	}
 
 	email, err := ogcCfg.ClientEmail()
 	if err != nil {
@@ -2593,7 +2622,9 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 			ess.ProvisionerServerless,
 			stackProvisionerMode)
 	}
-	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
+	if logIntegrationSelections {
+		fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
+	}
 
 	timestamp := timestampEnabled()
 
