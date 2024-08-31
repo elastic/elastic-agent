@@ -102,10 +102,12 @@ steps:
     depends_on:
       - package-it
     command: |
-      mage integration:buildkite | buildkite-agent buildkite pipeline upload
+      mage integration:buildkite | buildkite-agent pipeline upload
     agents:
       provider: "gcp"
       machineType: "n1-standard-4"
+      imageProject: "elastic-images-qa"
+      image: "family/platform-ingest-elastic-agent-ubuntu-2404"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - [BK] Integration tests"
