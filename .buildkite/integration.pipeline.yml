@@ -102,7 +102,9 @@ steps:
     depends_on:
       - package-it
     command: |
-      mage integration:buildkite | buildkite-agent pipeline upload
+      mage integration:buildkite > buildkite.yml
+      cat buildkite.yml
+      buildkite-agent pipeline upload buildkite.yml
     agents:
       provider: "gcp"
       machineType: "n1-standard-4"
