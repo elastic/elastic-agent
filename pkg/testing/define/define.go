@@ -17,6 +17,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gofrs/uuid/v5"
+
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-sysinfo"
@@ -199,28 +201,21 @@ func getOSInfo() (*types.OSInfo, error) {
 // getNamespace is a general namespace that the test can use that will ensure that it
 // is unique and won't collide with other tests (even the same test from a different batch).
 //
-// this function uses a sha256 of the prefix, package and test name, to ensure that the
+// This function uses a sha256 of an UUIDv4 to ensure that the
 // length of the namespace is not over the 100 byte limit from Fleet
 // see: https://www.elastic.co/guide/en/fleet/current/data-streams.html#data-streams-naming-scheme
 func getNamespace(t *testing.T, local bool) (string, error) {
-	prefix := os.Getenv("TEST_DEFINE_PREFIX")
-	if prefix == "" {
-		if local {
-			prefix = "local"
-		}
-		if prefix == "" {
-			return "", errors.New("TEST_DEFINE_PREFIX must be defined by the test runner")
-		}
+	nsUUID, err := uuid.NewV4()
+	if err != nil {
+		return "", fmt.Errorf("cannot generate UUID V4: %w", err)
 	}
-	name := fmt.Sprintf("%s-%s", prefix, t.Name())
 	hasher := sha256.New()
-	hasher.Write([]byte(name))
+	hasher.Write([]byte(nsUUID.String()))
 
 	// Fleet API requires the namespace to be lowercased and not contain
 	// special characters.
 	namespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
 	namespace = noSpecialCharsRegexp.ReplaceAllString(namespace, "")
-
 	return namespace, nil
 }
 
