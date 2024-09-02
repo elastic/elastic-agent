@@ -248,6 +248,7 @@ Selector labels
 {{- define "elasticagent.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "elasticagent.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- end }}
 
 {{- define "elasticagent.preset.applyOnce" -}}

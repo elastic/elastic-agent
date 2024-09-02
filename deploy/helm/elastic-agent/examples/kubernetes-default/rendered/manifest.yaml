@@ -9,6 +9,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 ---
 # Source: elastic-agent/templates/agent/service-account.yaml
@@ -21,6 +22,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 ---
 # Source: elastic-agent/templates/agent/service-account.yaml
@@ -33,6 +35,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
@@ -45,6 +48,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 stringData:
 
@@ -105,6 +109,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 stringData:
 
@@ -402,6 +407,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 stringData:
 
@@ -586,6 +592,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
@@ -708,6 +715,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
@@ -939,6 +947,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
@@ -1019,6 +1028,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
@@ -1038,6 +1048,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
@@ -1057,6 +1068,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
@@ -1077,6 +1089,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -1196,6 +1209,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -1276,6 +1290,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.15.0
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
