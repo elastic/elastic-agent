@@ -3210,10 +3210,6 @@ func (Helm) RenderExamples() error {
 			continue
 		}
 
-		if !d.IsDir() {
-			return nil
-		}
-
 		exampleFullPath := filepath.Join(examplesPath, d.Name())
 
 		helmValues := make(map[string]any)
