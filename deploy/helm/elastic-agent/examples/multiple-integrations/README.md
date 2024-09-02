@@ -10,14 +10,14 @@ In this example we install the built-in `kubernetes` integration and a `nginx` c
        --from-literal=url=...
     ```
 
-3. `kubernetes`, `redis`, and `nginx` integration assets are installed through Kibana ([Kibana - Install and uninstall Elastic Agent integration assets](https://www.elastic.co/guide/en/fleet/current/install-uninstall-integration-assets.html))
+2. `kubernetes`, `redis`, and `nginx` integration assets are installed through Kibana ([Kibana - Install and uninstall Elastic Agent integration assets](https://www.elastic.co/guide/en/fleet/current/install-uninstall-integration-assets.html))
 
 ## Run:
 1. Install Helm chart
     ```console
     helm install elastic-agent ../../ \
-        -f ./agent-kubernetes.yaml \
-        -f ./agent-nginx.yaml \
+        -f ./agent-kubernetes-values.yaml \
+        -f ./agent-nginx-values.yaml \
         --set outputs.default.type=ESSecretAuthAPI \
         --set outputs.default.secretName=es-api-secret
     ```

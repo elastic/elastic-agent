@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"maps"
 	"math/rand/v2"
 	"net/http"
 	"os"
@@ -60,7 +61,11 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
+
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/cli"
 )
 
 const (
@@ -3173,4 +3178,96 @@ type otelDependencies struct {
 	Extensions []*otelDependency
 	Processors []*otelDependency
 	Receivers  []*otelDependency
+}
+
+type Helm mg.Namespace
+
+func (Helm) RenderExamples() error {
+	const chartPath = "./deploy/helm/elastic-agent"
+	settings := cli.New() // Helm CLI settings
+	actionConfig := &action.Configuration{}
+
+	helmChart, err := loader.Load(chartPath)
+	if err != nil {
+		return fmt.Errorf("failed to load helm chart: %w", err)
+	}
+
+	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
+		func(format string, v ...interface{}) {})
+	if err != nil {
+		return fmt.Errorf("failed to init helm action config: %w", err)
+	}
+
+	examplesPath := filepath.Join(chartPath, "examples")
+	dirEntries, err := os.ReadDir(examplesPath)
+	if err != nil {
+		return fmt.Errorf("failed to read %s dir: %w", examplesPath, err)
+	}
+
+	for _, d := range dirEntries {
+		if !d.IsDir() {
+			continue
+		}
+
+		if !d.IsDir() {
+			return nil
+		}
+
+		exampleFullPath := filepath.Join(examplesPath, d.Name())
+
+		helmValues := make(map[string]any)
+		helmValuesFiles, err := filepath.Glob(filepath.Join(exampleFullPath, "*-values.yaml"))
+		if err != nil {
+			return fmt.Errorf("failed to get helm values files: %w", err)
+		}
+
+		for _, helmValuesFile := range helmValuesFiles {
+			data, err := loadYamlFile(helmValuesFile)
+			if err != nil {
+				return fmt.Errorf("failed to load helm values file: %w", err)
+			}
+			maps.Copy(helmValues, data)
+		}
+
+		installAction := action.NewInstall(actionConfig)
+		installAction.Namespace = "default"
+		installAction.ReleaseName = "example"
+		installAction.CreateNamespace = true
+		installAction.UseReleaseName = true
+		installAction.CreateNamespace = false
+		installAction.DryRun = true
+		release, err := installAction.Run(helmChart, helmValues)
+		if err != nil {
+			return fmt.Errorf("failed to install helm chart: %w", err)
+		}
+
+		renderedFolder := filepath.Join(exampleFullPath, "rendered")
+		err = os.Mkdir(renderedFolder, 0o755)
+		if err != nil && !errors.Is(err, os.ErrExist) {
+			return fmt.Errorf("failed to create rendered directory: %w", err)
+		}
+
+		renderedManifestPath := filepath.Join(renderedFolder, "manifest.yaml")
+
+		err = os.WriteFile(renderedManifestPath, []byte(release.Manifest), 0o644)
+		if err != nil {
+			return fmt.Errorf("failed to write rendered manifest: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func loadYamlFile(path string) (map[string]any, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	decoder := yaml.NewDecoder(f)
+	var data map[string]any
+	if err := decoder.Decode(&data); err != nil {
+		return nil, err
+	}
+	return data, nil
 }

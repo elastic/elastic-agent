@@ -16,7 +16,7 @@ In this example we install the built-in `kubernetes` integration and enable the 
 1. Install Helm chart
     ```console
     helm install elastic-agent ../../ \
-        -f ./agent-kubernetes.yaml \
+        -f ./agent-kubernetes-values.yaml \
         --set outputs.default.type=ESSecretAuthAPI \
         --set outputs.default.secretName=es-api-secret
     ```

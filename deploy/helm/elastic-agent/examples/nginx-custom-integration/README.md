@@ -1,6 +1,6 @@
 # Example: Nginx Custom Integration
 
-In this example we define a `nginx` custom integration alongside a custom agent preset defined in [agent-nginx.yaml](agent-nginx.yaml).
+In this example we define a `nginx` custom integration alongside a custom agent preset defined in [agent-nginx-values.yaml](agent-nginx-values.yaml).
 
 ## Prerequisites:
 1. A k8s secret that contains the connection details to an Elasticsearch cluster such as the URL and the API key ([Kibana - Creating API Keys](https://www.elastic.co/guide/en/kibana/current/api-keys.html)):
@@ -16,7 +16,7 @@ In this example we define a `nginx` custom integration alongside a custom agent 
 1. Install Helm chart
     ```console
     helm install elastic-agent ../../ \
-         -f ./agent-nginx.yaml \
+         -f ./agent-nginx-values.yaml \
          --set outputs.default.type=ESSecretAuthAPI \
          --set outputs.default.secretName=es-api-secret
     ```
