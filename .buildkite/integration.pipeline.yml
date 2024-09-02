@@ -77,6 +77,11 @@ steps:
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Integration tests"
+
+  - label: "🔍 Test Analytics"
+    depends_on:
+      - integration-tests
+    command: buildkite-agent artifact download "build/TEST-*.xml" .
     plugins:
       - test-collector#v1.10.1:
           files: "build/TEST-*.xml"
