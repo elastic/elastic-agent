@@ -79,6 +79,7 @@ steps:
           context: "buildkite/elastic-agent-extended-testing - Integration tests"
 
   - label: "🔍 Test Analytics"
+    key: "test-analytics"
     depends_on:
       - integration-tests
     allow_dependency_failure: true
