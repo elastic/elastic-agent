@@ -86,6 +86,8 @@ const (
 
 	baseURLForStagingDRA = "https://staging.elastic.co/"
 	agentCoreProjectName = "elastic-agent-core"
+
+	helmChartPath = "./deploy/helm/elastic-agent"
 )
 
 var (
@@ -3183,11 +3185,10 @@ type otelDependencies struct {
 type Helm mg.Namespace
 
 func (Helm) RenderExamples() error {
-	const chartPath = "./deploy/helm/elastic-agent"
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	helmChart, err := loader.Load(chartPath)
+	helmChart, err := loader.Load(helmChartPath)
 	if err != nil {
 		return fmt.Errorf("failed to load helm chart: %w", err)
 	}
@@ -3198,7 +3199,7 @@ func (Helm) RenderExamples() error {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}
 
-	examplesPath := filepath.Join(chartPath, "examples")
+	examplesPath := filepath.Join(helmChartPath, "examples")
 	dirEntries, err := os.ReadDir(examplesPath)
 	if err != nil {
 		return fmt.Errorf("failed to read %s dir: %w", examplesPath, err)
@@ -3255,6 +3256,24 @@ func (Helm) RenderExamples() error {
 		}
 	}
 
+	return nil
+}
+
+func (Helm) Lint() error {
+	settings := cli.New() // Helm CLI settings
+	actionConfig := &action.Configuration{}
+
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
+		func(format string, v ...interface{}) {})
+	if err != nil {
+		return fmt.Errorf("failed to init helm action config: %w", err)
+	}
+
+	lintAction := action.NewLint()
+	lintResult := lintAction.Run([]string{helmChartPath}, nil)
+	if len(lintResult.Errors) > 0 {
+		return fmt.Errorf("failed to lint helm chart: %w", errors.Join(lintResult.Errors...))
+	}
 	return nil
 }
 

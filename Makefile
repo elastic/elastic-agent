@@ -38,6 +38,7 @@ check-ci:
 	@$(MAKE) notice
 	@GENERATEKUSTOMIZE=true $(MAKE) -C deploy/kubernetes generate-k8s
 	@$(MAKE) -C deploy/kubernetes generate-k8s
+	@mage -v helm:lint
 	@mage -v helm:renderExamples
 	@$(MAKE) check-no-changes
 
