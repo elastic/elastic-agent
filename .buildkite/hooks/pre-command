@@ -59,6 +59,9 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   echo ${API_KEY_TOKEN} > ./apiKey
   export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
 
+fi
+
+if [[ "$BUILDKITE_STEP_KEY" == *"test-analytics"* ]]; then
   # BK analytics
   echo "--- Prepare BK test analytics token :vault:"
   BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_token)
