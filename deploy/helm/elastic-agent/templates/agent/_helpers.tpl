@@ -62,23 +62,13 @@ Validate fleet configuration
 {{- define "elasticagent.init.fleet" -}}
 {{- $ := . -}}
 {{- if eq $.Values.agent.fleet.enabled true -}}
-{{- if empty $.Values.agent.fleet.url -}}
-{{- fail "url must be defined when fleet mode is enabled" -}}
-{{- end -}}
+{{- $_ := required "url must be defined when fleet mode is enabled" $.Values.agent.fleet.url -}}
 {{- if empty $.Values.agent.fleet.token -}}
-{{- if empty $.Values.agent.fleet.kibanaHost -}}
-{{- fail "kibana host must be defined when fleet mode is enabled and a token is not supplied" -}}
+{{- $_ := required "kibana host must be defined when fleet mode is enabled and a token is not supplied" $.Values.agent.fleet.kibanaHost -}}
+{{- $_ := required "kibana username must be defined when fleet mode is enabled and a token is not supplied" $.Values.agent.fleet.kibanaUser -}}
+{{- $_ := required "kibana password must be defined when fleet mode is enabled and a token is not supplied" $.Values.agent.fleet.kibanaPassword -}}
 {{- end -}}
-{{- if empty $.Values.agent.fleet.kibanaUser -}}
-{{- fail "kibana username must be defined when fleet mode is enabled and a token is not supplied" -}}
-{{- end -}}
-{{- if empty $.Values.agent.fleet.kibanaPassword -}}
-{{- fail "kibana password must be defined when fleet mode is enabled and a token is not supplied" -}}
-{{- end -}}
-{{- end -}}
-{{- if empty $.Values.agent.fleet.preset -}}
-{{- fail "preset must be defined when fleet mode is enabled" -}}
-{{- end -}}
+{{- $_ := required "preset must be defined when fleet mode is enabled" $.Values.agent.fleet.preset -}}
 {{- if not (hasKey $.Values.agent.presets $.Values.agent.fleet.preset)}}
 {{- fail (printf "specified preset \"%s\" under fleet is not found" $.Values.agent.fleet.preset) -}}
 {{- end -}}
