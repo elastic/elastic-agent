@@ -132,7 +132,7 @@
 {{- if ne $.Values.agent.engine "eck" -}}
 {{- fail (printf "output \"%s\" of ESECKRef type can be used only when agent.engine = eck" $outputName)}}
 {{- end -}}
-{{- $outputVal = omit $outputVal "username" "password" "api_key" "url" "type" -}}
+{{- $outputVal = omit $outputVal "username" "password" "api_key" "url" "type" "secretName" -}}
 {{ $outputVal | toYaml }}
 {{- end -}}
 

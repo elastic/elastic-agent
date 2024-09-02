@@ -1,0 +1,12 @@
+kubernetes:
+  enabled: true
+
+agent:
+  unprivileged: true
+  engine: eck
+
+outputs:
+  default:
+    type: ESECKRef
+    name: "elasticsearch-sample"
+    namespace: "elastic-system"

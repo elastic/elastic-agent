@@ -41,6 +41,10 @@ outputs:
     # @section -- 1.1 - Output Object
     # @key -- outputs.{name}.name
     name: ""
+    # -- namespace to reference an Elasticsearch cluster managed by ECK [optional for type `ESECKRef`]
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.namespace
+    namespace: ""
 
 kubernetes:
   # -- enable Kubernetes integration.

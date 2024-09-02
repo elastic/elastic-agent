@@ -36,6 +36,7 @@ The supported types of outputs are:
 | outputs.{name}.api_key | string | `""` | the API key use to authenticate with the output [required for type `ESPlainAuth` if `username` and `password` are not set] |
 | outputs.{name}.secretName | string | `""` | the k8s secret to mount output connection details [required for types `ESSecretAuthBasic` and `ESSecretAuthAPI`] |
 | outputs.{name}.name | string | `""` | name to reference an Elasticsearch cluster managed by ECK [required for type `ESECKRef`] |
+| outputs.{name}.namespace | string | `""` | namespace to reference an Elasticsearch cluster managed by ECK [optional for type `ESECKRef`] |
 Examples of Helm chart arguments to define an output with name `myOutput`:
 - `ESPlainAuth`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.api_key=token`
 - `ESSecretAuthBasic`: `--set outputs.myOutput.type=ESSecretAuthBasic --set outputs.myOutput.secretName=k8s_secret_name` (required keys in the k8s secret are `url`, `username`, `password`)
