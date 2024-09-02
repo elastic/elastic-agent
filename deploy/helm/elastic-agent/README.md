@@ -128,7 +128,6 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 ### 3 - Elastic-Agent Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| agent.enabled | bool | `true` | enable elastic-agent |
 | agent.version | string | `"8.15.0"` | elastic-agent version |
 | agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/beats/elastic-agent-complete","tag":""}` | image configuration |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |

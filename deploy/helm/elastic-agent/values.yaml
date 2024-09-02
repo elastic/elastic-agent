@@ -293,9 +293,6 @@ kubernetes:
 extraIntegrations: {}
 
 agent:
-  # -- enable elastic-agent
-  # @section -- 3 - Elastic-Agent Configuration
-  enabled: true
   # -- elastic-agent version
   # @section -- 3 - Elastic-Agent Configuration
   version: 8.15.0
