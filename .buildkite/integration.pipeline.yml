@@ -81,7 +81,6 @@ steps:
       - test-collector#v1.10.1:
           files: "build/TEST-*.xml"
           format: "junit"
-          branches: "main"
           debug: true    
 
   - label: "Serverless Beats Tests"
