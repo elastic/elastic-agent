@@ -2,7 +2,8 @@
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- $serviceAccountName := printf "agent-%s" (lower $presetName) -}}
 {{/* cluster role binding is not namespace bound so let's try to give it a unique enough name */}}
-{{- $clusterRoleName := printf "agent-%s" (cat $presetName $.Release.Name $.Release.Namespace | sha1sum) -}}
+{{- $nameSuffix := printf "%s-%s-%s" $presetName $.Release.Name $.Release.Namespace -}}
+{{- $clusterRoleName := printf "agent-%s-%s" ($nameSuffix | trunc 55) ($nameSuffix | sha1sum | trunc 8)  -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

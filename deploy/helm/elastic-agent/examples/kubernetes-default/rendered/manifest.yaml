@@ -587,7 +587,7 @@ stringData:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: agent-89b6b0b5cf41fa506d55d748df1f012e359ed5b3
+  name: agent-clusterWide-example-default-1dcf813f
   labels:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
@@ -710,7 +710,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: agent-62b006758904bb4a0c865432fcf25a72827df22a
+  name: agent-ksmSharded-example-default-2f542b6b
   labels:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
@@ -942,7 +942,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: agent-6ce8a0711e1982dd0e494c5a27350e57b0a1dc3b
+  name: agent-perNode-example-default-3da65c86
   labels:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
@@ -1023,7 +1023,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: agent-89b6b0b5cf41fa506d55d748df1f012e359ed5b3
+  name: agent-clusterWide-example-default-1dcf813f
   labels:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
@@ -1036,14 +1036,14 @@ subjects:
     namespace: "default"
 roleRef:
   kind: ClusterRole
-  name: agent-89b6b0b5cf41fa506d55d748df1f012e359ed5b3
+  name: agent-clusterWide-example-default-1dcf813f
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: elastic-agent/templates/agent/cluster-role-binding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: agent-62b006758904bb4a0c865432fcf25a72827df22a
+  name: agent-ksmSharded-example-default-2f542b6b
   labels:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
@@ -1056,14 +1056,14 @@ subjects:
     namespace: "default"
 roleRef:
   kind: ClusterRole
-  name: agent-62b006758904bb4a0c865432fcf25a72827df22a
+  name: agent-ksmSharded-example-default-2f542b6b
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: elastic-agent/templates/agent/cluster-role-binding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: agent-6ce8a0711e1982dd0e494c5a27350e57b0a1dc3b
+  name: agent-perNode-example-default-3da65c86
   labels:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
@@ -1076,7 +1076,7 @@ subjects:
     namespace: "default"
 roleRef:
   kind: ClusterRole
-  name: agent-6ce8a0711e1982dd0e494c5a27350e57b0a1dc3b
+  name: agent-perNode-example-default-3da65c86
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: elastic-agent/templates/agent/k8s/daemonset.yaml
