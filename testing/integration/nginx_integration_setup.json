@@ -1,0 +1,50 @@
+{
+    "id": "9bf446fc-58d4-4767-b42d-3450815d5d3d",
+    "version": "WzYzMSwxXQ==",
+    "name": "nginx-1",
+    "namespace": "default",
+    "package": {
+      "name": "nginx",
+      "title": "Nginx",
+      "version": "1.23.0"
+    },
+    "enabled": true,
+    "policy_id": "0a4f6c12-446a-401a-b0eb-96afea6ca92d",
+    "inputs": [
+      {
+        "type": "nginx/metrics",
+        "policy_template": "nginx",
+        "enabled": true,
+        "streams": [
+          {
+            "enabled": true,
+            "data_stream": {
+              "type": "metrics",
+              "dataset": "nginx.stubstatus"
+            },
+            "vars": {
+              "period": {
+                "value": "1s",
+                "type": "text"
+              },
+              "server_status_path": {
+                "value": "/nginx_status",
+                "type": "text"
+              },
+              "tags": {
+                "value": ["nginx-stubstatus"],
+                "type": "text"
+              }
+            },
+            "id": "nginx/metrics-nginx.core-9bf446fc-58d4-4767-b42d-3450815d5d3d"
+          }
+        ],
+        "vars": {
+          "hosts": {
+            "value": ["http://127.0.0.1:81"],
+            "type": "text"
+          }
+        }
+      }
+    ]
+  }
