@@ -1,0 +1,32 @@
+#!/bin/bash
+
+set -eo pipefail
+
+if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
+  if [[ -z "${WORKSPACE-""}" ]]; then
+      WORKSPACE=$(git rev-parse --show-toplevel)
+  fi
+  source "${WORKSPACE}/.buildkite/scripts/common.sh"
+
+  # Perform cleanup of integration tests resources
+  echo "--- Cleaning up integration test resources"
+  STACK_PROVISIONER=serverless SNAPSHOT=true mage integration:clean
+  SNAPSHOT=true mage integration:clean
+fi
+
+if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+  if test -f "$GOOGLE_APPLICATION_CREDENTIALS"; then
+    rm $GOOGLE_APPLICATION_CREDENTIALS
+  fi
+fi
+
+if [ -n "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE" ]; then
+  if test -f "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE"; then
+    rm $TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE
+  fi
+fi
+
+if command -v docker &>/dev/null; then
+  DOCKER_REGISTRY="docker.elastic.co"
+  docker logout $DOCKER_REGISTRY
+fi
