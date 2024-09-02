@@ -81,6 +81,7 @@ steps:
   - label: "🔍 Test Analytics"
     depends_on:
       - integration-tests
+    allow_dependency_failure: true
     command: buildkite-agent artifact download "build/TEST-*.xml" .
     plugins:
       - test-collector#v1.10.1:
