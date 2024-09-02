@@ -65,6 +65,7 @@ import (
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/cli"
 )
 
@@ -3233,6 +3234,9 @@ func (Helm) RenderExamples() error {
 		installAction.UseReleaseName = true
 		installAction.CreateNamespace = false
 		installAction.DryRun = true
+		installAction.Replace = true
+		installAction.KubeVersion = &chartutil.KubeVersion{Version: "1.27.0"}
+		installAction.ClientOnly = true
 		release, err := installAction.Run(helmChart, helmValues)
 		if err != nil {
 			return fmt.Errorf("failed to install helm chart: %w", err)
