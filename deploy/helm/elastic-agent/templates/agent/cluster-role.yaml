@@ -1,8 +1,7 @@
 {{- include "elasticagent.init" $ -}}
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{/* cluster role binding is not namespace bound so let's try to give it a unique enough name */}}
-{{- $nameSuffix := printf "%s-%s-%s" $presetName $.Release.Name $.Release.Namespace -}}
-{{- $clusterRoleName := printf "agent-%s-%s" ($nameSuffix | trunc 55) ($nameSuffix | sha1sum | trunc 8)  -}}
+{{- $clusterRoleName := printf "agent-%s-%s-%s" $presetName $.Release.Name $.Release.Namespace -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

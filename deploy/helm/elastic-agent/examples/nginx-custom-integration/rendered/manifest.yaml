@@ -75,7 +75,7 @@ stringData:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: agent-nginx-example-default-603f5534
+  name: agent-nginx-example-default
   labels:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
@@ -182,7 +182,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: agent-nginx-example-default-603f5534
+  name: agent-nginx-example-default
   labels:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
@@ -195,7 +195,7 @@ subjects:
     namespace: "default"
 roleRef:
   kind: ClusterRole
-  name: agent-nginx-example-default-603f5534
+  name: agent-nginx-example-default
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
