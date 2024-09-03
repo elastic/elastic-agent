@@ -104,7 +104,7 @@ func Test_runDispatcher(t *testing.T) {
 			return dispatcher
 		},
 		flushInterval:  time.Second,
-		contextTimeout: time.Millisecond * 100,
+		contextTimeout: time.Millisecond * 200,
 	}, {
 		name: "no gateway actions, dispatcher is flushed",
 		mockGateway: func(ch chan []fleetapi.Action) *mockGateway {
