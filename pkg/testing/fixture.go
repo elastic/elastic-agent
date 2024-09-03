@@ -1209,7 +1209,7 @@ func createTempDir(t *testing.T) string {
 
 	cleanup := func() {
 		if !t.Failed() {
-			if err := os.RemoveAll(tempDir); err != nil {
+			if err := removeAll(tempDir); err != nil {
 				t.Errorf("could not remove temp dir '%s': %s", tempDir, err)
 			}
 		} else {
@@ -1219,6 +1219,37 @@ func createTempDir(t *testing.T) string {
 	t.Cleanup(cleanup)
 
 	return tempDir
+}
+
+// removeAll tries to remove path, if it fails and the error
+// is retry able (only on Windows), it will keep retrying with an exponential
+// backoff up to 3 seconds.
+func removeAll(path string) error {
+	maxBackoffTime := 3 * time.Second
+	myyBackoff := backoff.NewExponentialBackOff(
+		backoff.WithMaxElapsedTime(maxBackoffTime),
+		backoff.WithInitialInterval(time.Millisecond))
+
+	myyBackoff.Reset()
+	for {
+		err := os.RemoveAll(path)
+		if err == nil {
+			break
+		}
+
+		if !isWindowsRetryable(err) {
+			return fmt.Errorf("could not remove temp dir '%s': %s", path, err)
+		}
+
+		interval := myyBackoff.NextBackOff()
+		if interval == backoff.Stop {
+			return fmt.Errorf("could not remove '%s' after waiting for %s: %w", path, maxBackoffTime, err)
+		}
+
+		time.Sleep(interval)
+	}
+
+	return nil
 }
 
 type AgentStatusOutput struct {
