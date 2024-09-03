@@ -19,7 +19,7 @@ summary: Call fleet-server audit/unenroll endpoint on uninstall
 description: |
    Uninstalling a fleet-managed elastic-agent instance will now do a
    best-effort attempt to notify fleet-server of the agent removal so the
-   agent may not appear as offiline.
+   agent should not appear as offline.
 
 # Affected component; a word indicating the component this changeset affects.
 component:

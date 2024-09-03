@@ -110,17 +110,17 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	var ai *info.AgentInfo
 	c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
 	if err != nil {
-		pt.Describe(fmt.Sprintf("unable to read agent config to deterimine if notifiying fleet-server is needed: %v", err))
+		pt.Describe(fmt.Sprintf("unable to read agent config to determine if notifying Fleet is needed: %v", err))
 	}
 	cfg, err := configuration.NewFromConfig(c)
 	if err != nil {
-		pt.Describe(fmt.Sprintf("notify fleet-server: unable to transform *config.Config to *configuration.Configuration: %v", err))
+		pt.Describe(fmt.Sprintf("notify Fleet: unable to transform *config.Config to *configuration.Configuration: %v", err))
 	}
 
 	if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
 		ai, err = info.NewAgentInfo(ctx, false)
 		if err != nil {
-			pt.Describe(fmt.Sprintf("unable to read ageint info, fleet-server will not be notified of uninstall: %v", err))
+			pt.Describe(fmt.Sprintf("unable to read agent info, Fleet will not be notified of uninstall: %v", err))
 		} else {
 			notifyFleet = true
 		}
@@ -149,10 +149,10 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 //
 // There are retries for the attempt after a 10s wait, but it is a best-effort approach.
 func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) {
-	pt.Describe("notify fleet-server of uninstall")
+	pt.Describe("Attempting to notify Fleet of uninstall")
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
-		pt.Describe(fmt.Sprintf("notify fleet-server: unable to create fleetapi client: %v", err))
+		pt.Describe(fmt.Sprintf("notify Fleet: unable to create fleetapi client: %v", err))
 		return
 	}
 	cmd := fleetapi.NewAuditUnenrollCmd(ai, client)
@@ -172,26 +172,26 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 			var reqErr *fleetapi.ReqError
 			// Do not retry if it was a context error, or an error with the request.
 			if errors.Is(err, context.Canceled) || errors.As(err, &reqErr) {
-				pt.Describe(fmt.Sprintf("notify fleet-server encountered unretryable error: %v", err))
+				pt.Describe(fmt.Sprintf("notify Fleet: encountered unretryable error: %v", err))
 				return
 			}
-			pt.Describe("notify fleet-server network error, retry in 10s.")
+			pt.Describe("notify Fleet: network error, retry in 10s.")
 			timer.Reset(time.Second * 10)
 			continue
 		}
 		switch status {
 		case http.StatusOK:
-			pt.Describe("notify fleet-server success")
+			pt.Describe("Successfully notified Fleet about uninstall")
 			return
 		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusConflict:
-			pt.Describe(fmt.Sprintf("notify fleet-server failed with status code %d. no retries.", status))
+			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (no retries)", status))
 			return
 		default:
-			pt.Describe(fmt.Sprintf("notify fleet-server failed with status code %d. retry in 10s", status))
+			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (retry in 10s)", status))
 			timer.Reset(time.Second * 10)
 		}
 	}
-	pt.Describe("notify fleet-server failed.")
+	pt.Describe("notify Fleet: failed")
 }
 
 // EnsureStoppedService ensures that the installed service is stopped.
