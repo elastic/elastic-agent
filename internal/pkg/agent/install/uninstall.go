@@ -145,7 +145,7 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	pt.Describe("Removed install directory")
 
 	if notifyFleet {
-		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai)
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
 	}
 
 	return nil
@@ -193,7 +193,7 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 			pt.Describe("Successfully notified Fleet about uninstall")
 			return nil
 		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusConflict:
-			// BadRequest are not retried because the request bady is incorrect and will not be accepted
+			// BadRequest are not retried because the request body is incorrect and will not be accepted
 			// Unauthorized are not retried because the API key has been invalidated
 			// Conflict will not retry because in this case Endpoint has indicated that it is orphaned and we do not want to overwrite that annotation
 			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (no retries)", resp.StatusCode))
