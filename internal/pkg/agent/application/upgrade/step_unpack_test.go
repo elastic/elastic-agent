@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const agentBinaryPlaceholderContent = "Placeholder for the elastic-agent binary"
@@ -185,7 +184,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			testDataDir := filepath.Join(testTop, "data")
 			err := os.MkdirAll(testDataDir, 0o777)
 			assert.NoErrorf(t, err, "error creating initial structure %q", testDataDir)
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")
@@ -256,7 +255,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			testDataDir := filepath.Join(testTop, "data")
 			err := os.MkdirAll(testDataDir, 0o777)
 			assert.NoErrorf(t, err, "error creating initial structure %q", testDataDir)
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")

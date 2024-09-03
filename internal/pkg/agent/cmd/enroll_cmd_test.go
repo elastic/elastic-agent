@@ -578,7 +578,7 @@ func TestDaemonReloadWithBackoff(t *testing.T) {
 }
 
 func TestWaitForFleetServer_timeout(t *testing.T) {
-	log, _ := logger.NewTesting("TestWaitForFleetServer_timeout")
+	log, _ := loggertest.New("TestWaitForFleetServer_timeout")
 	timeout := 5 * time.Second
 	testTimeout := 2 * timeout
 

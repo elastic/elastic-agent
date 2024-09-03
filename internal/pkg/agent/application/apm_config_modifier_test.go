@@ -14,10 +14,8 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type injectedConfigAssertion func(*testing.T, []component.Component)
@@ -449,7 +447,7 @@ func TestPatchAPMConfig(t *testing.T) {
 			require.NoError(t, err)
 			agtConf, err := config.NewConfigFrom(tt.args.agentFileCfg)
 			require.NoError(t, err)
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 			patcher := PatchAPMConfig(log, agtConf)
 
 			mcc := &mockConfigChange{c: fleetConf}

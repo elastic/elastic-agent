@@ -204,7 +204,7 @@ func TestCleanup(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			testLogger, _ := logger.NewTesting(t.Name())
+			testLogger, _ := loggertest.New(t.Name())
 			testTop := t.TempDir()
 			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup)
 			if tt.additionalSetup != nil {
@@ -299,7 +299,7 @@ func TestRollback(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			testLogger, _ := logger.NewTesting(t.Name())
+			testLogger, _ := loggertest.New(t.Name())
 			testTop := t.TempDir()
 			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup)
 			if tt.additionalSetup != nil {

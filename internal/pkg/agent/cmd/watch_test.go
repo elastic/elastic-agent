@@ -11,12 +11,9 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 )
@@ -38,7 +35,7 @@ func TestInitUpgradeDetails(t *testing.T) {
 		return errors.New("some error")
 	}
 
-	log, obs := logger.NewTesting("initUpgradeDetails")
+	log, obs := loggertest.New("initUpgradeDetails")
 
 	upgradeDetails := initUpgradeDetails(testMarker, mockSaveMarker, log)
 

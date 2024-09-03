@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"io"
 	"net/http"
 	"net/url"
@@ -317,7 +316,7 @@ func TestFleetGateway(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient()
 
-		log, _ := logger.NewTesting("fleet_gateway")
+		log, _ := loggertest.New("fleet_gateway")
 
 		stateStore := newStateStore(t, log)
 

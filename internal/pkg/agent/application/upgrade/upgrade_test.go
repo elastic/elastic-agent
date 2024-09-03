@@ -268,7 +268,7 @@ func TestUpgraderReload(t *testing.T) {
 	// and a certificate from that CA and the keys.
 	cfgyaml, want := prepareTestUpgraderReload()
 
-	log, _ := logger.NewTesting("")
+	log, _ := loggertest.New("")
 	u := Upgrader{
 		log:      log,
 		settings: artifact.DefaultConfig(),
@@ -521,7 +521,7 @@ agent.download:
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			log, _ := logger.NewTesting("")
+			log, _ := loggertest.New("")
 
 			u := Upgrader{
 				log:      log,
@@ -735,7 +735,7 @@ func TestIsSameVersion(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			log, _ := logger.NewTesting(test.name)
+			log, _ := loggertest.New(test.name)
 			actualSame, actualNewVersion := isSameVersion(log, test.args.current, test.args.metadata, test.args.version)
 
 			assert.Equal(t, test.want.same, actualSame, "Unexpected boolean comparison result: isSameVersion(%v, %v, %v, %v) should be %v",
@@ -870,7 +870,7 @@ func TestWaitForWatcher(t *testing.T) {
 				}
 			}()
 
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 
 			tt.wantErr(t, waitForWatcherWithTimeoutCreationFunc(testCtx, log, updMarkerFilePath, fakeTimeout, createContextFunc), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, fakeTimeout))
 

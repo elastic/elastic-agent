@@ -16,7 +16,6 @@ import (
 	agentlibsconfig "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestReload(t *testing.T) {
@@ -224,7 +223,7 @@ func TestReload(t *testing.T) {
 		},
 	}
 
-	l, _ := logger.NewTesting("t")
+	l, _ := loggertest.New("t")
 	for _, tc := range testCases {
 		cfg := tc.initialConfig
 		reloader := NewReloader(cfg, l)

@@ -88,7 +88,7 @@ func TestSettings_SetLogLevel(t *testing.T) {
 				tt.setupMocks(t, mockLogLevelSetter, mockAgentInfo)
 			}
 
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 
 			ctx := context.Background()
 
@@ -191,7 +191,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 			mockAgentInfo := mockinfo.NewAgent(t)
 			mockLogLevelSetter := mockhandlers.NewLogLevelSetter(t)
 			mockAcker := mockfleetacker.NewAcker(t)

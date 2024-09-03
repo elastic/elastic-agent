@@ -19,13 +19,12 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestMarkerWatcher(t *testing.T) {
 	testMarkerDir := t.TempDir()
 	testMarkerFile := filepath.Join(testMarkerDir, markerFilename)
-	testLogger, _ := logger.NewTesting("watch_marker")
+	testLogger, _ := loggertest.New("watch_marker")
 
 	markerWatcher := newMarkerFileWatcher(testMarkerFile, testLogger)
 
@@ -225,7 +224,7 @@ details:
 				err := os.WriteFile(testMarkerFilePath, []byte(test.markerFileContents), 0644)
 				require.NoError(t, err)
 			}
-			log, obs := logger.NewTesting("marker_watcher")
+			log, obs := loggertest.New("marker_watcher")
 			updateCh := make(chan UpdateMarker)
 			mfw := MarkerFileWatcher{
 				markerFilePath: testMarkerFilePath,

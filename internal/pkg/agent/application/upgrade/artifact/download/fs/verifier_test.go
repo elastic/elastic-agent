@@ -201,7 +201,7 @@ func TestVerify(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.Name, func(t *testing.T) {
-			log, obs := logger.NewTesting("TestVerify")
+			log, obs := loggertest.New("TestVerify")
 			targetDir := t.TempDir()
 
 			timeout := 30 * time.Second
