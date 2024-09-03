@@ -66,6 +66,9 @@ func TestNginxUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: "fleet",
 		Stack: &define.Stack{},
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
