@@ -13,7 +13,7 @@ In this example we install the built-in `kubernetes` integration with the defaul
 2. Elasticsearch and Kibana installed in the cluster through ECK operator
 
     ```console
-    kubectl apply -f ./elasisticsearch.yaml
+    kubectl apply -f ./elasticsearch.yaml
     ```
 
 3. `kubernetes` integration assets installed through Kibana ([Kibana - Install and uninstall Elastic Agent integration assets](https://www.elastic.co/guide/en/fleet/current/install-uninstall-integration-assets.html))
