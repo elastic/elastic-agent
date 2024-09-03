@@ -77,6 +77,12 @@ steps:
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Integration tests"
+    plugins:
+      - test-collector#v1.10.1:
+          files: "build/TEST-*.xml"
+          format: "junit"
+          branches: "main"
+          debug: true    
 
   - label: "Serverless Beats Tests"
     depends_on:
@@ -96,3 +102,5 @@ steps:
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
+
+
