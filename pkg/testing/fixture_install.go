@@ -402,7 +402,7 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 //   - an error if any.
 func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
-	//Prepare so that the f.srcPackage string is populated
+	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare: %w", err)
@@ -483,7 +483,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 //   - an error if any.
 func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installRpm function", f.t.Name())
-	//Prepare so that the f.srcPackage string is populated
+	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare: %w", err)
@@ -649,12 +649,12 @@ func (f *Fixture) collectDiagnostics() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	dir, err := findProjectRoot(f.caller)
+	diagPath, err := f.DiagDir()
 	if err != nil {
-		f.t.Logf("failed to collect diagnostics; failed to find project root: %s", err)
+		f.t.Logf("failed to collect diagnostics: %v", err)
 		return
 	}
-	diagPath := filepath.Join(dir, "build", "diagnostics")
+
 	err = os.MkdirAll(diagPath, 0755)
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics; failed to create %s: %s", diagPath, err)
@@ -697,6 +697,18 @@ func (f *Fixture) collectDiagnostics() {
 			}
 		}
 	}
+}
+
+// DiagDir returned {projectRoot}/build/diagnostics path. Files on this path
+// are saved if any test fails. Use it to save files for further investigation.
+func (f *Fixture) DiagDir() (string, error) {
+	dir, err := findProjectRoot(f.caller)
+	if err != nil {
+		return "", fmt.Errorf("failed to find project root: %w", err)
+	}
+
+	diagPath := filepath.Join(dir, "build", "diagnostics")
+	return diagPath, nil
 }
 
 func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string) error {

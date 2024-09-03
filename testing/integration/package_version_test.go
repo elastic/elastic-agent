@@ -91,10 +91,11 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		"failed to install start agent [output: %s]", string(output))
 
 	stateBuff := bytes.Buffer{}
+	var status atesting.AgentStatusOutput
 	allHealthy := func() bool {
 		stateBuff.Reset()
 
-		status, err := f.ExecStatus(ctx)
+		status, err = f.ExecStatus(ctx)
 		if err != nil {
 			stateBuff.WriteString(fmt.Sprintf("failed to get agent status: %v",
 				err))
@@ -111,7 +112,6 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 			state := client.State(c.State)
 			if state != client.Healthy {
-
 				stateBuff.WriteString(fmt.Sprintf("%s not health, agent status output: %s",
 					c.Name, bs))
 				return false
@@ -130,6 +130,13 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		allHealthy,
 		5*time.Minute, 10*time.Second,
 		"agent never became healthy. Last status: %v", &stateBuff)
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+
+		t.Logf("test failed: last status output: %v", status)
+	})
 
 	agentbeat := "agentbeat"
 	if runtime.GOOS == "windows" {
@@ -166,6 +173,28 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 	diag := t.TempDir()
 	extractZipArchive(t, diagZip, diag)
+	// the test is flaky, so collecting some data to analyze later.
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+
+		t.Logf("the test failed: trying to save the diagnostics used on the test")
+		diagDir, err := f.DiagDir()
+		if err != nil {
+			t.Logf("could not get diagnostics directory to save the diagnostics used on the test")
+			return
+		}
+
+		err = os.Rename(diagZip, filepath.Join(diagDir,
+			fmt.Sprintf("TestComponentBuildHashInDiagnostics-used-diag-%d.zip",
+				time.Now().Unix())))
+		if err != nil {
+			t.Logf("could not move diagnostics used in the test to %s: %v",
+				diagDir, err)
+			return
+		}
+	})
 
 	stateFilePath := filepath.Join(diag, "state.yaml")
 	stateYAML, err := os.Open(stateFilePath)
