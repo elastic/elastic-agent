@@ -6,10 +6,12 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
@@ -25,8 +27,9 @@ import (
 )
 
 type mockUpgradeManager struct {
-	msgChan       chan string
-	completedChan chan struct{}
+	msgChan     chan string
+	successChan chan string
+	errChan     chan error
 }
 
 func (u *mockUpgradeManager) Upgradeable() bool {
@@ -39,11 +42,13 @@ func (u *mockUpgradeManager) Reload(rawConfig *config.Config) error {
 
 func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	select {
-	case <-u.completedChan:
-		u.msgChan <- "completed " + version
+	case msg := <-u.successChan:
+		u.msgChan <- msg
 		return nil, nil
+	case err := <-u.errChan:
+		u.msgChan <- err.Error()
+		return nil, ctx.Err()
 	case <-ctx.Done():
-		u.msgChan <- "canceled " + version
 		return nil, ctx.Err()
 	}
 }
@@ -66,7 +71,7 @@ func TestUpgradeHandler(t *testing.T) {
 
 	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
-	completedChan := make(chan struct{})
+	completedChan := make(chan string)
 
 	// Create and start the coordinator
 	c := coordinator.New(
@@ -76,7 +81,7 @@ func TestUpgradeHandler(t *testing.T) {
 		agentInfo,
 		component.RuntimeSpecs{},
 		nil,
-		&mockUpgradeManager{msgChan: msgChan, completedChan: completedChan},
+		&mockUpgradeManager{msgChan: msgChan, successChan: completedChan},
 		nil, nil, nil, nil, nil, false)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
@@ -96,6 +101,8 @@ func TestUpgradeHandler(t *testing.T) {
 func TestUpgradeHandlerSameVersion(t *testing.T) {
 	// Create a cancellable context that will shut down the coordinator after
 	// the test.
+	logp.DevelopmentSetup()
+	logger.SetLevel(logp.DebugLevel)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -103,7 +110,8 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 
 	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
-	completedChan := make(chan struct{})
+	successChan := make(chan string)
+	errChan := make(chan error)
 
 	// Create and start the Coordinator
 	c := coordinator.New(
@@ -113,7 +121,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 		agentInfo,
 		component.RuntimeSpecs{},
 		nil,
-		&mockUpgradeManager{msgChan: msgChan, completedChan: completedChan},
+		&mockUpgradeManager{msgChan: msgChan, successChan: successChan, errChan: errChan},
 		nil, nil, nil, nil, nil, false)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
@@ -126,10 +134,12 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	err2 := u.Handle(ctx, &a, ack)
 	require.NoError(t, err1)
 	require.NoError(t, err2)
-	// indicate that upgrade is completed
-	close(completedChan)
-	msg := <-msgChan
-	require.Equal(t, "completed 8.3.0", msg)
+
+	successChan <- "completed 8.3.0"
+	require.Equal(t, "completed 8.3.0", <-msgChan)
+	errChan <- errors.New("duplicated update, not finishing it?")
+	require.Equal(t, "duplicated update, not finishing it?", <-msgChan)
+
 }
 
 func TestUpgradeHandlerNewVersion(t *testing.T) {
@@ -142,7 +152,8 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 
 	agentInfo := &info.AgentInfo{}
 	msgChan := make(chan string)
-	completedChan := make(chan struct{})
+	completedChan := make(chan string)
+	errorChan := make(chan error)
 
 	// Create and start the Coordinator
 	c := coordinator.New(
@@ -152,7 +163,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 		agentInfo,
 		component.RuntimeSpecs{},
 		nil,
-		&mockUpgradeManager{msgChan: msgChan, completedChan: completedChan},
+		&mockUpgradeManager{msgChan: msgChan, successChan: completedChan, errChan: errorChan},
 		nil, nil, nil, nil, nil, false)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
@@ -163,14 +174,19 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	a2 := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
 		Version: "8.5.0", SourceURI: "http://localhost"}}
 	ack := noopacker.New()
+
+	// Send both upgrade actions, a1 will error before a2 succeeds
 	err1 := u.Handle(ctx, &a1, ack)
 	require.NoError(t, err1)
 	err2 := u.Handle(ctx, &a2, ack)
 	require.NoError(t, err2)
-	msg1 := <-msgChan
-	require.Equal(t, "canceled 8.2.0", msg1)
-	// indicate that upgrade is completed
-	close(completedChan)
-	msg2 := <-msgChan
-	require.Equal(t, "completed 8.5.0", msg2)
+
+	// Send an error so the first action is "cancelled"
+	errorChan <- errors.New("cancelled 8.2.0")
+	// Wait for the mockUpgradeHandler to receive and "process" the error
+	require.Equal(t, "cancelled 8.2.0", <-msgChan, "mockUpgradeHandler.Upgrade did not receive the expected error")
+
+	// Send a success so the second action succeeds
+	completedChan <- "completed 8.5.0"
+	require.Equal(t, "completed 8.5.0", <-msgChan, "mockUpgradeHandler.Upgrade did not receive the success signal")
 }
