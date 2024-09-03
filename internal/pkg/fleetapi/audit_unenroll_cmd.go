@@ -68,25 +68,24 @@ func NewAuditUnenrollCmd(info agentInfo, client client.Sender) *AuditUnenrollCmd
 	}
 }
 
-// Execute sends the request to fleet-sever and returns the status code response.
+// Execute sends the request to fleet-sever and returns the response.
 //
 // the caller must determine if the call succeeded or if it should be retried.
-func (e *AuditUnenrollCmd) Execute(ctx context.Context, r *AuditUnenrollRequest) (int, error) {
+func (e *AuditUnenrollCmd) Execute(ctx context.Context, r *AuditUnenrollRequest) (*http.Response, error) {
 	if err := r.Validate(); err != nil {
-		return 0, err
+		return nil, err
 	}
 	p, err := json.Marshal(r)
 	if err != nil {
-		return 0, &ReqError{err}
+		return nil, &ReqError{err}
 	}
 	path := fmt.Sprintf(auditUnenrollPath, e.info.AgentID())
 	resp, err := e.client.Send(ctx, http.MethodPost, path, nil, nil, bytes.NewBuffer(p))
 	if err != nil {
-		return 0, errors.New(err,
+		return nil, errors.New(err,
 			"fail to notify audit/unenroll on fleet-server",
 			errors.TypeNetwork,
 			errors.M(errors.MetaKeyURI, path))
 	}
-	resp.Body.Close()
-	return resp.StatusCode, nil
+	return resp, nil
 }

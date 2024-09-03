@@ -26,14 +26,13 @@ func Test_AuditUnenrollCmd_Execute(t *testing.T) {
 			mux := http.NewServeMux()
 			path := fmt.Sprintf(auditUnenrollPath, agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-
 				decoder := json.NewDecoder(r.Body)
 				defer r.Body.Close()
 				request := &AuditUnenrollRequest{}
 				err := decoder.Decode(&request)
 				require.NoError(t, err)
 				require.Equal(t, ReasonUninstall, request.Reason)
+				w.WriteHeader(http.StatusOK)
 			}, withAPIKey))
 			return mux
 		}, withAPIKey,
@@ -43,9 +42,10 @@ func Test_AuditUnenrollCmd_Execute(t *testing.T) {
 				Reason:    ReasonUninstall,
 				Timestamp: time.Now(),
 			}
-			status, err := cmd.Execute(context.Background(), request)
+			resp, err := cmd.Execute(context.Background(), request)
 			require.NoError(t, err)
-			require.Equal(t, http.StatusOK, status)
+			resp.Body.Close()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
 		},
 	))
 }

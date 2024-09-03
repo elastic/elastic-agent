@@ -40,6 +40,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+// fleetAudit variables control retry attempts for contacting fleet
+var (
+	fleetAuditAttempts = 10
+	fleetAuditWait     = time.Second * 10
+)
+
 // Uninstall uninstalls persistently Elastic Agent on the system.
 func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
 	cwd, err := os.Getwd()
@@ -148,12 +154,12 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 // notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
 //
 // There are retries for the attempt after a 10s wait, but it is a best-effort approach.
-func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) {
+func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) error {
 	pt.Describe("Attempting to notify Fleet of uninstall")
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
 		pt.Describe(fmt.Sprintf("notify Fleet: unable to create fleetapi client: %v", err))
-		return
+		return err
 	}
 	cmd := fleetapi.NewAuditUnenrollCmd(ai, client)
 	req := &fleetapi.AuditUnenrollRequest{
@@ -161,37 +167,44 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 		Timestamp: time.Now().UTC(),
 	}
 	timer := time.NewTimer(0)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < fleetAuditAttempts; i++ {
 		select {
 		case <-ctx.Done():
-			return
+			return ctx.Err()
 		case <-timer.C:
 		}
-		status, err := cmd.Execute(ctx, req)
+		resp, err := cmd.Execute(ctx, req)
 		if err != nil {
 			var reqErr *fleetapi.ReqError
 			// Do not retry if it was a context error, or an error with the request.
-			if errors.Is(err, context.Canceled) || errors.As(err, &reqErr) {
+			if errors.Is(err, context.Canceled) {
+				return ctx.Err()
+			} else if errors.As(err, &reqErr) {
 				pt.Describe(fmt.Sprintf("notify Fleet: encountered unretryable error: %v", err))
-				return
+				return err
 			}
 			pt.Describe("notify Fleet: network error, retry in 10s.")
-			timer.Reset(time.Second * 10)
+			timer.Reset(fleetAuditWait)
 			continue
 		}
-		switch status {
+		resp.Body.Close()
+		switch resp.StatusCode {
 		case http.StatusOK:
 			pt.Describe("Successfully notified Fleet about uninstall")
-			return
+			return nil
 		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusConflict:
-			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (no retries)", status))
-			return
+			// BadRequest are not retried because the request bady is incorrect and will not be accepted
+			// Unauthorized are not retried because the API key has been invalidated
+			// Conflict will not retry because in this case Endpoint has indicated that it is orphaned and we do not want to overwrite that annotation
+			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (no retries)", resp.StatusCode))
+			return fmt.Errorf("unretryable return status: %d", resp.StatusCode)
 		default:
-			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (retry in 10s)", status))
+			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (retry in 10s)", resp.StatusCode))
 			timer.Reset(time.Second * 10)
 		}
 	}
 	pt.Describe("notify Fleet: failed")
+	return fmt.Errorf("notify Fleet: failed")
 }
 
 // EnsureStoppedService ensures that the installed service is stopped.
