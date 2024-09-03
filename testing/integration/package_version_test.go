@@ -102,16 +102,23 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		}
 
 		for _, c := range status.Components {
+			bs, err := json.MarshalIndent(status, "", "  ")
+			if err != nil {
+				stateBuff.WriteString(fmt.Sprintf("%s not health, could not marshal status outptu: %v",
+					c.Name, err))
+				return false
+			}
+
 			state := client.State(c.State)
 			if state != client.Healthy {
-				bs, err := json.MarshalIndent(status, "", "  ")
-				if err != nil {
-					stateBuff.WriteString(fmt.Sprintf("%s not health, could not marshal status outptu: %v",
-						c.Name, err))
-					return false
-				}
 
 				stateBuff.WriteString(fmt.Sprintf("%s not health, agent status output: %s",
+					c.Name, bs))
+				return false
+			}
+
+			if c.VersionInfo.Meta.Commit == "" {
+				stateBuff.WriteString(fmt.Sprintf("%s health, but no versionInfo. agent status output: %s",
 					c.Name, bs))
 				return false
 			}
