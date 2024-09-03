@@ -131,7 +131,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		5*time.Minute, 10*time.Second,
 		"agent never became healthy. Last status: %v", &stateBuff)
 	t.Cleanup(func() {
-		if t.Failed() {
+		if !t.Failed() {
 			return
 		}
 
