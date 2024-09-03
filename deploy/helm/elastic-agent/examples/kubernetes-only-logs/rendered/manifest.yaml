@@ -270,7 +270,7 @@ spec:
       containers:
         - name: agent
           imagePullPolicy: IfNotPresent
-          image: "docker.elastic.co/beats/elastic-agent-complete:8.15.0"
+          image: "docker.elastic.co/beats/elastic-agent:8.15.0"
           args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
           securityContext:
             capabilities:

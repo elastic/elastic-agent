@@ -303,7 +303,7 @@ agent:
   # -- image configuration
   # @section -- 3 - Elastic-Agent Configuration
   image:
-    repository: docker.elastic.co/beats/elastic-agent-complete
+    repository: docker.elastic.co/beats/elastic-agent
     pullPolicy: IfNotPresent
     tag: ""
   # -- generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs
