@@ -8,7 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"sync"
@@ -159,7 +159,7 @@ func randomBytes(length int) []byte {
 
 	var b []byte
 	for i := 0; i < length; i++ {
-		rune := chars[rand.Intn(len(chars))]
+		rune := chars[rand.IntN(len(chars))]
 		b = append(b, byte(rune))
 	}
 

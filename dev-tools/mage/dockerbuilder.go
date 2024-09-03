@@ -28,17 +28,12 @@ type dockerBuilder struct {
 }
 
 func newDockerBuilder(spec PackageSpec) (*dockerBuilder, error) {
-	imageName, err := spec.ImageName()
-	if err != nil {
-		return nil, err
-	}
-
 	buildDir := filepath.Join(spec.packageDir, "docker-build")
 	beatDir := filepath.Join(buildDir, "beat")
 
 	return &dockerBuilder{
 		PackageSpec: spec,
-		imageName:   imageName,
+		imageName:   spec.ImageName(),
 		buildDir:    buildDir,
 		beatDir:     beatDir,
 	}, nil
@@ -117,6 +112,7 @@ func (b *dockerBuilder) prepareBuild() error {
 	data := map[string]interface{}{
 		"ExposePorts": b.exposePorts(),
 		"ModulesDirs": b.modulesDirs(),
+		"Variant":     b.DockerVariant.String(),
 	}
 
 	err = filepath.Walk(templatesDir, func(path string, info os.FileInfo, _ error) error {

@@ -9,7 +9,7 @@ package integration
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -338,7 +338,7 @@ func randStr(length int) string {
 
 	runes := make([]rune, length)
 	for i := range runes {
-		runes[i] = letters[rand.Intn(len(letters))]
+		runes[i] = letters[rand.IntN(len(letters))]
 	}
 
 	return string(runes)
