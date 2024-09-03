@@ -1,15 +1,8 @@
 {
   "testVersions": [
     "8.15.0-SNAPSHOT",
-    "8.14.2",
-    "8.13.4",
-    "8.14.4-SNAPSHOT",
-<<<<<<< HEAD
-    "7.17.23-SNAPSHOT",
-    "7.17.22"
-=======
     "8.14.3",
+    "8.14.4-SNAPSHOT",
     "7.17.24-SNAPSHOT"
->>>>>>> 6b591eb4f0 (Increase watcher in upgrade tests to timeout after 10m (#5270))
   ]
 }
