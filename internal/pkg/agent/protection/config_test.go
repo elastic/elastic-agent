@@ -7,8 +7,8 @@ package protection
 import (
 	"testing"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/go-cmp/cmp"
-	"github.com/mitchellh/mapstructure"
 )
 
 func TestConfigDeserializer(t *testing.T) {
