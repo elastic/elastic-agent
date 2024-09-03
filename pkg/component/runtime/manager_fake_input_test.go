@@ -30,6 +30,7 @@ import (
 	"go.elastic.co/apm/v2/apmtest"
 
 	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"

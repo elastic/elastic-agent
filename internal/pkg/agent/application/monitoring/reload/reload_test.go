@@ -12,6 +12,7 @@ import (
 
 	aConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestReload(t *testing.T) {

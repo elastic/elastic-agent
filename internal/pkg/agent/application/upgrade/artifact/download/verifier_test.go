@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestPgpBytesFromSource(t *testing.T) {

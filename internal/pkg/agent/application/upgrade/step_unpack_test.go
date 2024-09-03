@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 const agentBinaryPlaceholderContent = "Placeholder for the elastic-agent binary"

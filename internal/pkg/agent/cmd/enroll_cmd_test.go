@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type mockStore struct {

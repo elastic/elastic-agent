@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type mockHandler struct {

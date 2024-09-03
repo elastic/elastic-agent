@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 

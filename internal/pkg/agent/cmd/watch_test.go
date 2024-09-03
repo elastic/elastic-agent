@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/stretchr/testify/require"
 

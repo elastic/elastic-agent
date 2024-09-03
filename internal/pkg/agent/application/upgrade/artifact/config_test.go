@@ -16,6 +16,7 @@ import (
 	agentlibsconfig "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestReload(t *testing.T) {

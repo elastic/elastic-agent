@@ -19,6 +19,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestMarkerWatcher(t *testing.T) {

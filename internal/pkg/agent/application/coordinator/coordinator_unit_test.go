@@ -34,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 

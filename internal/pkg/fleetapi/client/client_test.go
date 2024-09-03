@@ -19,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestHTTPClient(t *testing.T) {

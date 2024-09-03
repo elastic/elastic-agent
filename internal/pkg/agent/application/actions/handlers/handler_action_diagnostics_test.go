@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
 	mockackers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 )
