@@ -2,4 +2,3 @@ config:
   - path: dev-tools/packaging/templates/ironbank
     dockerfile: Dockerfile.tmpl
     manifest: hardening_manifest.yaml.tmpl
-  - beats_packages: dev-tools/packaging/packages.yml
