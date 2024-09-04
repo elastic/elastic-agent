@@ -98,7 +98,7 @@ func gen(path string, l string) ([]byte, error) {
 	}
 
 	if len(files) > 1 {
-		return nil, fmt.Errorf("Can only embed a single configuration file")
+		return nil, fmt.Errorf("can only embed a single configuration file")
 	}
 
 	var buf bytes.Buffer
