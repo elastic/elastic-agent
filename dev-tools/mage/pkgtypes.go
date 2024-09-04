@@ -829,17 +829,12 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 
 // addFileToZip adds a file (or directory) to a zip archive.
 func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
-	return filepath.WalkDir(pkgFile.Source, func(path string, d fs.DirEntry, err error) error {
+	return filepath.Walk(pkgFile.Source, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
 				return nil
 			}
 
-			return err
-		}
-
-		info, err := d.Info()
-		if err != nil {
 			return err
 		}
 
@@ -995,17 +990,12 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		return err
 	}
 
-	return filepath.WalkDir(link, func(path string, d fs.DirEntry, err error) error {
+	return filepath.Walk(link, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
 				return nil
 			}
 
-			return err
-		}
-
-		info, err := d.Info()
-		if err != nil {
 			return err
 		}
 

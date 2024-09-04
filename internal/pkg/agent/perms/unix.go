@@ -20,7 +20,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	if err != nil {
 		return err
 	}
-	return filepath.WalkDir(topPath, func(name string, d fs.DirEntry, err error) error {
+	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
@@ -35,7 +35,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		}
 
 		// remove any world permissions from the file
-		if err := os.Chmod(name, d.Type().Perm()&o.mask); err != nil {
+		if err := os.Chmod(name, info.Mode().Perm()&o.mask); err != nil {
 			return fmt.Errorf("could not update permissions of %q: %w", topPath, err)
 		}
 

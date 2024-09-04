@@ -6,7 +6,6 @@ package common
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +21,7 @@ func PackageSystemTests() error {
 	systemTestsDir := filepath.Join("build", "system-tests")
 	systemTestsRunDir := filepath.Join(systemTestsDir, "run")
 	systemTestsLogDir := filepath.Join(systemTestsDir, "docker-logs")
-	files, err := devtools.FindFilesRecursive(func(path string, _ fs.DirEntry) bool {
+	files, err := devtools.FindFilesRecursive(func(path string, _ os.FileInfo) bool {
 		base := filepath.Base(path)
 		for _, ex := range excludes {
 			if strings.HasPrefix(base, ex) {
@@ -49,9 +48,7 @@ func PackageSystemTests() error {
 	parent := filepath.Dir(targetFile)
 	if !fileExists(parent) {
 		fmt.Printf(">> creating parent dir: %s", parent)
-		if err := os.Mkdir(parent, 0750); err != nil {
-			return err
-		}
+		os.Mkdir(parent, 0750)
 	}
 
 	err = devtools.Tar(systemTestsDir, targetFile)

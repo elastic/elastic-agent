@@ -646,7 +646,7 @@ func FindFiles(globs ...string) ([]string, error) {
 // FindFilesRecursive recursively traverses from the CWD and invokes the given
 // match function on each regular file to determine if the given path should be
 // returned as a match. It ignores files in .git directories.
-func FindFilesRecursive(match func(path string, d fs.DirEntry) bool) ([]string, error) {
+func FindFilesRecursive(match func(path string, d fs.FileInfo) bool) ([]string, error) {
 	var matches []string
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -663,7 +663,12 @@ func FindFilesRecursive(match func(path string, d fs.DirEntry) bool) ([]string, 
 			return nil
 		}
 
-		if match(filepath.ToSlash(path), d) {
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+
+		if match(filepath.ToSlash(path), info) {
 			matches = append(matches, path)
 		}
 		return nil

@@ -7,7 +7,6 @@ package mage
 import (
 	"fmt"
 	"go/build"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -370,12 +369,7 @@ func chownPaths(uid, gid int, path string) error {
 		log.Printf("chown took: %v, changed %d files", time.Since(start), numFixed)
 	}()
 
-	return filepath.WalkDir(path, func(name string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		info, err := d.Info()
+	return filepath.Walk(path, func(name string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

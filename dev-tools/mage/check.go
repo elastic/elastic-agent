@@ -6,7 +6,7 @@ package mage
 
 import (
 	"fmt"
-	"io/fs"
+	"os"
 	"path/filepath"
 	"runtime"
 
@@ -24,7 +24,7 @@ import (
 // It checks the file permissions of python test cases and YAML files.
 // It checks .go source files using 'go vet'.
 func Check() error {
-	fmt.Println(">> check: Checking source code for common problems")
+	fmt.Println(">> check: Checking source code for common problems") //nolint:forbidigo // it's ok to use fmt.println in mage
 
 	mg.Deps(GoVet, CheckYAMLNotExecutable, devtools.CheckNoChanges)
 
@@ -38,12 +38,12 @@ func CheckYAMLNotExecutable() error {
 		return nil
 	}
 
-	executableYAMLFiles, err := FindFilesRecursive(func(path string, d fs.DirEntry) bool {
+	executableYAMLFiles, err := FindFilesRecursive(func(path string, info os.FileInfo) bool {
 		switch filepath.Ext(path) {
 		default:
 			return false
 		case ".yml", ".yaml":
-			return d.Type().Perm()&0111 > 0
+			return info.Mode().Perm()&0111 > 0
 		}
 	})
 	if err != nil {
@@ -69,7 +69,7 @@ func GoVet() error {
 
 // CheckLicenseHeaders checks license headers in .go files.
 func CheckLicenseHeaders() error {
-	fmt.Println(">> fmt - go-licenser: Checking for missing headers")
+	fmt.Println(">> fmt - go-licenser: Checking for missing headers") //nolint:forbidigo // it's ok to use fmt.println in mage
 	mg.Deps(InstallGoLicenser)
 
 	licenser := gotool.Licenser
