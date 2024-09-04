@@ -1,31 +1,39 @@
 ---
-name: bump-golang
+name: updatecli-compose
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 20 * * 1-6"
+    - cron: '0 6 * * *'
 
 permissions:
   contents: read
 
-env:
-  JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
 jobs:
-  bump:
+  compose:
+    runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: read
       pull-requests: write
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Updatecli in the runner
-        uses: updatecli/updatecli-action@eb158f6fd9e425b940a6750d6318f98e050ac390 # v0.76.1
+      - uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446 # v3.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run Updatecli in Apply mode
-        run: updatecli apply --config .ci/updatecli/updatecli-bump-golang.yml
+      - uses: elastic/oblt-actions/updatecli/run@v1
+        with:
+          command: --experimental compose diff
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: elastic/oblt-actions/updatecli/run@v1
+        with:
+          command: --experimental compose apply
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
