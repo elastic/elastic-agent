@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"os/exec"
