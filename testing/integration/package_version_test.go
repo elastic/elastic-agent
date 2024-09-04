@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -102,23 +103,40 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			return false
 		}
 
+		if client.State(status.State) != client.Healthy {
+			stateBuff.WriteString(fmt.Sprintf(
+				"agent isn't healthy: %s-%s",
+				client.State(status.State), status.Message))
+			return false
+		}
+
+		if len(status.Components) == 0 {
+			stateBuff.WriteString(fmt.Sprintf(
+				"healty but without components: agent status: %s-%s",
+				client.State(status.State), status.Message))
+			return false
+		}
+
 		for _, c := range status.Components {
 			bs, err := json.MarshalIndent(status, "", "  ")
 			if err != nil {
-				stateBuff.WriteString(fmt.Sprintf("%s not health, could not marshal status outptu: %v",
+				stateBuff.WriteString(fmt.Sprintf(
+					"%s not health, could not marshal status outptu: %v",
 					c.Name, err))
 				return false
 			}
 
 			state := client.State(c.State)
 			if state != client.Healthy {
-				stateBuff.WriteString(fmt.Sprintf("%s not health, agent status output: %s",
+				stateBuff.WriteString(fmt.Sprintf(
+					"%s not health, agent status output: %s",
 					c.Name, bs))
 				return false
 			}
 
 			if c.VersionInfo.Meta.Commit == "" {
-				stateBuff.WriteString(fmt.Sprintf("%s health, but no versionInfo. agent status output: %s",
+				stateBuff.WriteString(fmt.Sprintf(
+					"%s health, but no versionInfo. agent status output: %s",
 					c.Name, bs))
 				return false
 			}
@@ -130,13 +148,13 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		allHealthy,
 		5*time.Minute, 10*time.Second,
 		"agent never became healthy. Last status: %v", &stateBuff)
-	t.Cleanup(func() {
+	defer func() {
 		if !t.Failed() {
 			return
 		}
 
-		t.Logf("test failed: last status output: %v", status)
-	})
+		t.Logf("test failed: last status output: %#v", status)
+	}()
 
 	agentbeat := "agentbeat"
 	if runtime.GOOS == "windows" {
@@ -173,8 +191,8 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 	diag := t.TempDir()
 	extractZipArchive(t, diagZip, diag)
-	// the test is flaky, so collecting some data to analyze later.
-	t.Cleanup(func() {
+	// if the test fails, the diagnostics used is useful for debugging.
+	defer func() {
 		if !t.Failed() {
 			return
 		}
@@ -194,7 +212,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 				diagDir, err)
 			return
 		}
-	})
+	}()
 
 	stateFilePath := filepath.Join(diag, "state.yaml")
 	stateYAML, err := os.Open(stateFilePath)
@@ -227,6 +245,19 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			"component %s: VersionInfo.BuildHash mismatch", c.ID)
 		assert.Equalf(t, wantBuildHash, c.State.VersionInfo.Meta.Commit,
 			"component %s: VersionInfo.Meta.Commit mismatch", c.ID)
+	}
+
+	if t.Failed() {
+		_, seek := stateYAML.Seek(0, 0)
+		if seek != nil {
+			t.Logf("could not reset state.yaml offset to print it")
+			return
+		}
+		data, err := io.ReadAll(stateYAML)
+		if err != nil {
+			t.Logf("could not read state.yaml: %v", err)
+		}
+		t.Logf("test failed: state.yaml contents: %q", string(data))
 	}
 }
 
