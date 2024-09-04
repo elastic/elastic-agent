@@ -206,7 +206,7 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	if err != nil {
 		return err
 	}
-	workDir := f.t.TempDir()
+	workDir := createTempDir(f.t)
 	finalDir := filepath.Join(workDir, name)
 	err = ExtractArtifact(f.t, src, workDir)
 	if err != nil {
@@ -1194,6 +1194,31 @@ func performConfigure(ctx context.Context, c client.Client, cfg string, timeout 
 		return fmt.Errorf("state management failed update configuration: %w", err)
 	}
 	return nil
+}
+
+// createTempDir creates a temporary directory that will be
+// removed after the tests passes. If the test fails, the
+// directory is kept for further investigation.
+//
+// If the test is run with -v and fails the temporary directory is logged
+func createTempDir(t *testing.T) string {
+	tempDir, err := os.MkdirTemp("", strings.ReplaceAll(t.Name(), "/", "-"))
+	if err != nil {
+		t.Fatalf("failed to make temp directory: %s", err)
+	}
+
+	cleanup := func() {
+		if !t.Failed() {
+			if err := os.RemoveAll(tempDir); err != nil {
+				t.Errorf("could not remove temp dir '%s': %s", tempDir, err)
+			}
+		} else {
+			t.Logf("Temporary directory %q preserved for investigation/debugging", tempDir)
+		}
+	}
+	t.Cleanup(cleanup)
+
+	return tempDir
 }
 
 type AgentStatusOutput struct {
