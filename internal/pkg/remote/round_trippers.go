@@ -12,8 +12,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // UserAgentRoundTripper adds a User-Agent string on every request.
@@ -69,7 +67,7 @@ func (r *DebugRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	if req.Body != nil {
 		dataReq, err := io.ReadAll(req.Body)
 		if err != nil {
-			return nil, errors.Wrap(err, "fail to read the body of the request")
+			return nil, fmt.Errorf("fail to read the body of the request: %w", err)
 		}
 		req.Body.Close()
 
@@ -103,7 +101,7 @@ func (r *DebugRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	// Hijack the body and output it in the log, this is only for debugging and development.
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return resp, errors.Wrap(err, "fail to read the body of the response")
+		return resp, fmt.Errorf("fail to read the body of the response: %w", err)
 	}
 	resp.Body.Close()
 

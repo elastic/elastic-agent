@@ -353,14 +353,14 @@ func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logg
 		return fmt.Errorf("error starting update marker watcher: %w", err)
 	}
 
-	log.Info("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
+	log.Infof("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
 
 	for {
 		select {
 		case updMarker := <-markerWatcher.Watch():
 			if updMarker.Details != nil && updMarker.Details.State == details.StateWatching {
 				// watcher started and it is watching, all good
-				log.Info("upgrade watcher set %s state in upgrade marker: exiting wait loop", details.StateWatching)
+				log.Infof("upgrade watcher set %s state in upgrade marker: exiting wait loop", details.StateWatching)
 				return nil
 			}
 

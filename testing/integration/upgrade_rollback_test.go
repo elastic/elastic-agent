@@ -135,7 +135,7 @@ inputs:
 		state, err := client.State(ctx)
 		require.NoError(t, err)
 
-		require.NotNil(t, state.UpgradeDetails)
+		require.NotNil(t, state.UpgradeDetails, "upgrade details in the state cannot be nil")
 		require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
 	}
 
