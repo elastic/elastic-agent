@@ -96,23 +96,3 @@ func kubectlIn(env map[string]string, stdout, stderr io.Writer, input string, ar
 
 	return c.Run()
 }
-
-func kubectlStart(env map[string]string, stdout, stderr io.Writer, args ...string) (*exec.Cmd, error) {
-	c := exec.Command("kubectl", args...)
-	c.Env = os.Environ()
-	for k, v := range env {
-		c.Env = append(c.Env, k+"="+v)
-	}
-	c.Stdout = stdout
-	c.Stderr = stderr
-	c.Stdin = nil
-
-	if mg.Verbose() {
-		fmt.Println("exec:", "kubectl", strings.Join(args, " "))
-	}
-
-	if err := c.Start(); err != nil {
-		return nil, err
-	}
-	return c, nil
-}
