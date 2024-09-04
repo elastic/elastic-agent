@@ -112,7 +112,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 		if len(status.Components) == 0 {
 			stateBuff.WriteString(fmt.Sprintf(
-				"healty but without components: agent status: %s-%s",
+				"healthy but without components: agent status: %s-%s",
 				client.State(status.State), status.Message))
 			return false
 		}
@@ -121,7 +121,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			bs, err := json.MarshalIndent(status, "", "  ")
 			if err != nil {
 				stateBuff.WriteString(fmt.Sprintf(
-					"%s not health, could not marshal status outptu: %v",
+					"%s not healthy, could not marshal status outptu: %v",
 					c.Name, err))
 				return false
 			}
