@@ -49,7 +49,9 @@ func PackageSystemTests() error {
 	parent := filepath.Dir(targetFile)
 	if !fileExists(parent) {
 		fmt.Printf(">> creating parent dir: %s", parent)
-		os.Mkdir(parent, 0750)
+		if err := os.Mkdir(parent, 0750); err != nil {
+			return err
+		}
 	}
 
 	err = devtools.Tar(systemTestsDir, targetFile)
