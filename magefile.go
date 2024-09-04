@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"math/rand/v2"
 	"net/http"
@@ -1554,16 +1555,16 @@ func selectedPackageTypes() string {
 }
 
 func copyAll(from, to string, suffixes ...[]string) error {
-	return filepath.Walk(from, func(path string, info os.FileInfo, err error) error {
+	return filepath.WalkDir(from, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 
-		targetFile := filepath.Join(to, info.Name())
+		targetFile := filepath.Join(to, d.Name())
 
 		// overwrites with current build
 		return sh.Copy(targetFile, path)
@@ -1715,8 +1716,8 @@ func prepareIronbankBuild() error {
 		"MajorMinor": majorMinor(),
 	}
 
-	err := filepath.Walk(templatesDir, func(path string, info os.FileInfo, _ error) error {
-		if !info.IsDir() {
+	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
+		if !d.IsDir() {
 			target := strings.TrimSuffix(
 				filepath.Join(buildDir, filepath.Base(path)),
 				".tmpl",

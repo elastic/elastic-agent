@@ -6,6 +6,7 @@ package common
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +22,7 @@ func PackageSystemTests() error {
 	systemTestsDir := filepath.Join("build", "system-tests")
 	systemTestsRunDir := filepath.Join(systemTestsDir, "run")
 	systemTestsLogDir := filepath.Join(systemTestsDir, "docker-logs")
-	files, err := devtools.FindFilesRecursive(func(path string, _ os.FileInfo) bool {
+	files, err := devtools.FindFilesRecursive(func(path string, _ fs.DirEntry) bool {
 		base := filepath.Base(path)
 		for _, ex := range excludes {
 			if strings.HasPrefix(base, ex) {

@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -365,15 +366,20 @@ func Tar(src string, targetFile string) error {
 	tw := tar.NewWriter(zr)
 
 	// walk through every file in the folder
-	err = filepath.Walk(src, func(file string, fi os.FileInfo, errFn error) error {
+	err = filepath.WalkDir(src, func(file string, d fs.DirEntry, errFn error) error {
 		if errFn != nil {
 			return fmt.Errorf("error traversing the file system: %w", errFn)
 		}
 
 		// if a symlink, skip file
-		if fi.Mode().Type() == os.ModeSymlink {
+		if d.Type() == os.ModeSymlink {
 			fmt.Printf(">> skipping symlink: %s\n", file)
 			return nil
+		}
+
+		fi, err := d.Info()
+		if err != nil {
+			return fmt.Errorf("error getting direntry info: %w", err)
 		}
 
 		// generate tar header
@@ -640,24 +646,24 @@ func FindFiles(globs ...string) ([]string, error) {
 // FindFilesRecursive recursively traverses from the CWD and invokes the given
 // match function on each regular file to determine if the given path should be
 // returned as a match. It ignores files in .git directories.
-func FindFilesRecursive(match func(path string, info os.FileInfo) bool) ([]string, error) {
+func FindFilesRecursive(match func(path string, d fs.DirEntry) bool) ([]string, error) {
 	var matches []string
-	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
 		// Don't look for files in git directories
-		if info.Mode().IsDir() && filepath.Base(path) == ".git" {
+		if d.IsDir() && filepath.Base(path) == ".git" {
 			return filepath.SkipDir
 		}
 
-		if !info.Mode().IsRegular() {
+		if !d.Type().IsRegular() {
 			// continue
 			return nil
 		}
 
-		if match(filepath.ToSlash(path), info) {
+		if match(filepath.ToSlash(path), d) {
 			matches = append(matches, path)
 		}
 		return nil
@@ -786,7 +792,7 @@ func IsUpToDate(dst string, sources ...string) bool {
 
 	var files []string
 	for _, s := range sources {
-		err := filepath.Walk(s, func(path string, info os.FileInfo, err error) error {
+		err := filepath.WalkDir(s, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				if os.IsNotExist(err) {
 					return nil
@@ -794,7 +800,7 @@ func IsUpToDate(dst string, sources ...string) bool {
 				return err
 			}
 
-			if info.Mode().IsRegular() {
+			if d.Type().IsRegular() {
 				files = append(files, path)
 			}
 

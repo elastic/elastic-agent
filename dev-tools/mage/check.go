@@ -6,7 +6,7 @@ package mage
 
 import (
 	"fmt"
-	"os"
+	"io/fs"
 	"path/filepath"
 	"runtime"
 
@@ -38,12 +38,12 @@ func CheckYAMLNotExecutable() error {
 		return nil
 	}
 
-	executableYAMLFiles, err := FindFilesRecursive(func(path string, info os.FileInfo) bool {
+	executableYAMLFiles, err := FindFilesRecursive(func(path string, d fs.DirEntry) bool {
 		switch filepath.Ext(path) {
 		default:
 			return false
 		case ".yml", ".yaml":
-			return info.Mode().Perm()&0111 > 0
+			return d.Type().Perm()&0111 > 0
 		}
 	})
 	if err != nil {

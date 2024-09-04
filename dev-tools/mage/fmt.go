@@ -6,6 +6,7 @@ package mage
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -37,7 +38,7 @@ func Format() {
 
 // GoImports executes goimports against all .go files in and below the CWD.
 func GoImports() error {
-	goFiles, err := FindFilesRecursive(func(path string, _ os.FileInfo) bool {
+	goFiles, err := FindFilesRecursive(func(path string, _ fs.DirEntry) bool {
 		return filepath.Ext(path) == ".go"
 	})
 	if err != nil {
