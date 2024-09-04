@@ -16,8 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
@@ -230,12 +228,12 @@ func integTestDockerComposeEnvVars() (map[string]string, error) {
 func dockerComposeProjectName() string {
 	commit, err := CommitHash()
 	if err != nil {
-		panic(errors.Wrap(err, "failed to construct docker compose project name"))
+		panic(fmt.Errorf("failed to construct docker compose project name: %w", err))
 	}
 
 	version, err := BeatQualifiedVersion()
 	if err != nil {
-		panic(errors.Wrap(err, "failed to construct docker compose project name"))
+		panic(fmt.Errorf("failed to construct docker compose project name: %w", err))
 	}
 	version = strings.NewReplacer(".", "_").Replace(version)
 
@@ -278,9 +276,9 @@ func dockerComposeBuildImages() error {
 		"docker-compose", args...,
 	)
 
-	// This sleep is to avoid hitting the docker build issues when resources are not available.
 	if err != nil {
 		fmt.Println(">> Building docker images again")
+		//nolint:staticcheck // This sleep is to avoid hitting the docker build issues when resources are not available.
 		time.Sleep(10)
 		_, err = sh.Exec(
 			composeEnv,

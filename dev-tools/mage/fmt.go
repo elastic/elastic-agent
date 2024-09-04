@@ -11,7 +11,6 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
@@ -83,7 +82,7 @@ func AddLicenseHeaders() error {
 	case "Elasticv2", "Elastic License 2.0":
 		license = "Elasticv2"
 	default:
-		return errors.Errorf("unknown license type %v", BeatLicense)
+		return fmt.Errorf("unknown license type %s", BeatLicense)
 	}
 
 	licenser := gotool.Licenser
