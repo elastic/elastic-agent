@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
@@ -133,8 +132,6 @@ func TestUpgradeHandler(t *testing.T) {
 func TestUpgradeHandlerSameVersion(t *testing.T) {
 	// Create a cancellable context that will shut down the coordinator after
 	// the test.
-	logp.DevelopmentSetup()
-	logger.SetLevel(logp.DebugLevel)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
