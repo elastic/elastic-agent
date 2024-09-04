@@ -83,7 +83,11 @@ func main() {
 		return
 	}
 
-	os.WriteFile(output, data, 0640)
+	err = os.WriteFile(output, data, 0640)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error while writing the file, err: %+v\n", err)
+	}
+
 	return
 }
 
@@ -98,7 +102,7 @@ func gen(path string, l string) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	tmpl.Execute(&buf, struct {
+	err = tmpl.Execute(&buf, struct {
 		Pack    string
 		Files   []string
 		License string
@@ -107,6 +111,9 @@ func gen(path string, l string) ([]byte, error) {
 		Files:   files,
 		License: l,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return format.Source(buf.Bytes())
 }
