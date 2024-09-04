@@ -11,11 +11,11 @@ export MAGE_IMPORT_PATH
 .PHONY: mage
 mage:
 ifndef MAGE_PRESENT
-	@echo Installing mage $(MAGE_VERSION).
+	@echo Installing mage.
 	@go install ${MAGE_IMPORT_PATH}
 	@-mage -clean
 else
-	@echo Mage $(MAGE_VERSION) already installed.
+	@echo Mage already installed.
 endif
 
 ## help : Show this help.
