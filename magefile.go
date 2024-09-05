@@ -323,17 +323,50 @@ func (Build) Binary() error {
 }
 
 // Clean up dev environment.
-func (Build) Clean() {
-	os.RemoveAll(buildDir)
+func (Build) Clean() error {
+	absBuildDir, err := filepath.Abs(buildDir)
+	if err != nil {
+		return fmt.Errorf("cannot get absolute path of build dir: %w", err)
+	}
+	if err := os.RemoveAll(absBuildDir); err != nil {
+		return fmt.Errorf("cannot remove build dir '%s': %w", absBuildDir, err)
+	}
+
+	testBinariesPath, err := getTestBinariesPath()
+	if err != nil {
+		return fmt.Errorf("cannot remove test binaries: %w", err)
+	}
+
+	if mg.Verbose() {
+		fmt.Println("removed", absBuildDir)
+		for _, b := range testBinariesPath {
+			fmt.Println("removed", b)
+		}
+	}
+
+	return nil
 }
 
-// TestBinaries build the required binaries for the test suite.
-func (Build) TestBinaries() error {
-	wd, _ := os.Getwd()
+func getTestBinariesPath() ([]string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("could not get working directory: %w", err)
+	}
+
 	testBinaryPkgs := []string{
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 	}
+	return testBinaryPkgs, nil
+}
+
+// TestBinaries build the required binaries for the test suite.
+func (Build) TestBinaries() error {
+	testBinaryPkgs, err := getTestBinariesPath()
+	if err != nil {
+		fmt.Errorf("cannot build test binaries: %w", err)
+	}
+
 	for _, pkg := range testBinaryPkgs {
 		binary := filepath.Base(pkg)
 		if runtime.GOOS == "windows" {
@@ -807,6 +840,10 @@ func (Cloud) Push() error {
 	fmt.Printf(">> Docker image pushed to remote registry successfully: %s\n", targetCloudImageName)
 
 	return nil
+}
+
+func Clean() {
+	mg.Deps(devtools.Clean, Build.Clean)
 }
 
 func dockerCommitHash() string {
@@ -2973,8 +3010,6 @@ func stringPrompt(prompt string) (string, error) {
 			return s, nil
 		}
 	}
-
-	return "", nil
 }
 
 func writeFile(name string, data []byte, perm os.FileMode) error {
