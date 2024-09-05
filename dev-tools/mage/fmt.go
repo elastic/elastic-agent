@@ -75,10 +75,6 @@ func AddLicenseHeaders() error {
 
 	var license string
 	switch BeatLicense {
-	case "ASL2", "ASL 2.0":
-		license = "ASL2"
-	case "Elastic", "Elastic License":
-		license = "Elastic"
 	case "Elasticv2", "Elastic License 2.0":
 		license = "Elasticv2"
 	default:

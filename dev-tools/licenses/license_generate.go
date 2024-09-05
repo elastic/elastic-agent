@@ -51,13 +51,7 @@ func init() {
 
 func main() {
 	Headers := make(map[string]string)
-	content, err := os.ReadFile("ELASTIC-LICENSE-header.txt")
-	if err != nil {
-		panic("could not read Elastic license.")
-	}
-	Headers["Elastic"] = string(content)
-
-	content, err = os.ReadFile("ELASTIC-LICENSE-2.0-header.txt")
+	content, err := os.ReadFile("ELASTIC-LICENSE-2.0-header.txt")
 	if err != nil {
 		panic("could not read Elastic License 2.0 license.")
 	}
@@ -65,7 +59,6 @@ func main() {
 
 	var buf bytes.Buffer
 	Template.Execute(&buf, data{
-		License:  Headers["ASL2"],
 		Licenses: Headers,
 	})
 
