@@ -20,7 +20,7 @@ func ExamplePrintObservedLogs() {
 
 	printFn := func(a ...any) { fmt.Println(a...) }
 
-	PrintObservedLogs(obs, printFn)
+	PrintObservedLogs(obs.TakeAll(), printFn)
 
 	// Output:
 	// [debug] a debug message

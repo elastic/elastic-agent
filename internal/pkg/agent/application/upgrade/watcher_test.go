@@ -277,7 +277,7 @@ func TestWatcher_AgentErrorQuick(t *testing.T) {
 	log, obs := loggertest.New("watcher")
 	defer func() {
 		if t.Failed() {
-			loggertest.PrintObservedLogs(obs, t.Log)
+			loggertest.PrintObservedLogs(obs.TakeAll(), t.Log)
 		}
 	}()
 	w := NewAgentWatcher(errCh, log, 100*time.Millisecond)

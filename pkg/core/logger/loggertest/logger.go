@@ -29,14 +29,12 @@ func New(name string) (*logger.Logger, *observer.ObservedLogs) {
 	return log, obs
 }
 
-// PrintObservedLogs consumes, formats and prints all log entries from obs,
-// one at a time, printFn. It calls `observer.ObservedLogs.TakeAll`,
-// therefore, after calling it, the ObservedLogs will be empty.
-func PrintObservedLogs(obs *observer.ObservedLogs, printFn func(a ...any)) {
-	rawLogs := obs.TakeAll()
-	for _, rawLog := range rawLogs {
-		msg := fmt.Sprintf("[%s] %s", rawLog.Level, rawLog.Message)
-		for k, v := range rawLog.ContextMap() {
+// PrintObservedLogs formats and prints all log entries in logs, one at a time
+// using printFn.
+func PrintObservedLogs(logs []observer.LoggedEntry, printFn func(a ...any)) {
+	for _, l := range logs {
+		msg := fmt.Sprintf("[%s] %s", l.Level, l.Message)
+		for k, v := range l.ContextMap() {
 			msg += fmt.Sprintf(" %s=%v", k, v)
 		}
 		printFn(msg)
