@@ -1058,7 +1058,7 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 	res, err := runtime.performAction(ctx, req)
 	// the only way this can return an error is a context Done(), be sure to make that explicit.
 	if err != nil {
-		if errors.Is(context.DeadlineExceeded, err) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, fmt.Errorf("diagnostic action timed out, deadline is %s: %w", finalDiagnosticTime, err)
 		}
 		return nil, fmt.Errorf("error running performAction: %w", err)
