@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build integration
+
 package integration
 
 import (
@@ -11,16 +13,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid/v5"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-
 	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
+	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 var nginxStatusModule string = `
@@ -131,12 +131,25 @@ func (runner *NginxUnprivilegedRunner) SetupSuite() {
 func (runner *NginxUnprivilegedRunner) TestComponentHealth() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 	defer cancel()
+	timer := time.NewTimer(time.Second * 60)
+	defer timer.Stop()
 
-	runner.AllComponentsHealthy(ctx)
+	ticker := time.NewTicker(time.Second * 10)
+	defer ticker.Stop()
+	done := false
+	for !done {
+		select {
+		case <-timer.C:
+			done = true
+		case <-ticker.C:
+			err := runner.agentFixture.IsHealthy(ctx)
+			require.NoError(runner.T(), err)
+		}
+	}
 
 	query := map[string]interface{}{
 		"exists": map[string]interface{}{
-			"field": "nginx.studstatus",
+			"field": "nginx.stubstatus",
 		},
 	}
 	docs, err := estools.GetLatestDocumentMatchingQuery(ctx, runner.info.ESClient, query, "metrics-nginx.stubstatus-default")
@@ -151,32 +164,4 @@ func (runner *NginxUnprivilegedRunner) TestComponentHealth() {
 	docs, err = estools.GetLatestDocumentMatchingQuery(ctx, runner.info.ESClient, query, "metrics-nginx.stubstatus-default")
 	require.NoError(runner.T(), err)
 	require.Truef(runner.T(), docs.Hits.Total.Value == 0, "Expected zero error messages, found %v", docs.Hits.Hits)
-}
-
-// AllComponentsHealthy ensures all the beats and agent are healthy and working before we continue
-func (runner *NginxUnprivilegedRunner) AllComponentsHealthy(ctx context.Context) {
-	compDebugName := ""
-	require.Eventually(runner.T(), func() bool {
-		allHealthy := true
-		status, err := runner.agentFixture.ExecStatus(ctx)
-		if err != nil {
-			runner.T().Logf("agent status returned an error: %v", err)
-			return false
-		}
-
-		for _, comp := range status.Components {
-			runner.T().Logf("%s: component state: %s", comp.Name, comp.Message)
-			if comp.State != int(cproto.State_HEALTHY) {
-				compDebugName = comp.Name
-				allHealthy = false
-			}
-			for _, unit := range comp.Units {
-				runner.T().Logf("%s: unit state: %s", unit.UnitID, unit.Message)
-				if unit.State != int(cproto.State_HEALTHY) {
-					allHealthy = false
-				}
-			}
-		}
-		return allHealthy
-	}, runner.healthCheckTime, runner.healthCheckRefreshTime, "install never became healthy: components did not return a healthy state: %s", compDebugName)
 }
