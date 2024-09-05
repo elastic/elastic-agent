@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build integration
-
 package integration
 
 import (
@@ -90,6 +88,8 @@ func (runner *NginxUnprivilegedRunner) SetupSuite() {
 	cmd := exec.CommandContext(ctx, "apt-get", "install", "-v", "nginx-full")
 	out, err := cmd.CombinedOutput()
 	require.NoError(runner.T(), err, "error while installing nginx: %s", string(out))
+
+	require.NoError(runner.T(), os.MkdirAll("/etc/nginx/conf.d/", 0750))
 
 	err = os.WriteFile("/etc/nginx/conf.d/status.conf", []byte(nginxStatusModule), 0750)
 	require.NoError(runner.T(), err)
