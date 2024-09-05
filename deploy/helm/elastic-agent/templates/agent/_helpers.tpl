@@ -6,21 +6,14 @@ Expand the name of the chart.
 {{- end }}
 
 {{/*
-Create a default fully qualified app name.
+Create a default fully qualified name for an agent preset.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "elasticagent.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
+{{- define "elasticagent.preset.fullname" -}}
+{{- $ := index . 0 -}}
+{{- $presetName := index . 1 -}}
+{{- printf "agent-%s-%s" $presetName $.Release.Name | lower | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*

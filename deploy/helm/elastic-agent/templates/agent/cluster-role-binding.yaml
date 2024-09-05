@@ -1,6 +1,6 @@
 {{- include "elasticagent.init" $ -}}
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
-{{- $serviceAccountName := printf "agent-%s" (lower $presetName) -}}
+{{- $serviceAccountName := include "elasticagent.preset.fullname" (list $ $presetName)  -}}
 {{/* cluster role binding is not namespace bound so let's try to give it a unique enough name */}}
 {{- $clusterRoleName := printf "agent-%s-%s-%s" $presetName $.Release.Name $.Release.Namespace -}}
 apiVersion: rbac.authorization.k8s.io/v1

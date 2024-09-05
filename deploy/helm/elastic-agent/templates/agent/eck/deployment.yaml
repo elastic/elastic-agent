@@ -1,7 +1,7 @@
 {{- include "elasticagent.init" $ -}}
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- if and (eq ($presetVal).mode "deployment") (eq $.Values.agent.engine "eck") -}}
-{{- $agentName := printf "agent-%s" (lower $presetName) -}}
+{{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName)  -}}
 apiVersion: agent.k8s.elastic.co/v1alpha1
 kind: Agent
 metadata:

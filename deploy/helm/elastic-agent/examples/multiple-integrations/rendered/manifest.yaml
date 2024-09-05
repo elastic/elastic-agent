@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-clusterwide
+  name: agent-clusterwide-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -16,7 +16,7 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-ksmsharded
+  name: agent-ksmsharded-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -29,7 +29,7 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-pernode
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -42,7 +42,7 @@ metadata:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-clusterwide
+  name: agent-clusterwide-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -53,7 +53,7 @@ metadata:
 stringData:
 
   agent.yml: |-
-    id: agent-clusterwide
+    id: agent-clusterwide-example
     outputs:
       default:
         api_key: ""
@@ -129,7 +129,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-ksmsharded
+  name: agent-ksmsharded-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -140,7 +140,7 @@ metadata:
 stringData:
 
   agent.yml: |-
-    id: agent-ksmsharded
+    id: agent-ksmsharded-example
     outputs:
       default:
         api_key: ""
@@ -427,7 +427,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-pernode
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -438,7 +438,7 @@ metadata:
 stringData:
 
   agent.yml: |-
-    id: agent-pernode
+    id: agent-pernode-example
     outputs:
       default:
         api_key: ""
@@ -1060,7 +1060,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
-    name: agent-clusterwide
+    name: agent-clusterwide-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
@@ -1080,7 +1080,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
-    name: agent-ksmsharded
+    name: agent-ksmsharded-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
@@ -1100,7 +1100,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
-    name: agent-pernode
+    name: agent-pernode-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
@@ -1111,7 +1111,7 @@ roleRef:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: agent-pernode
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -1122,20 +1122,20 @@ metadata:
 spec:
   selector:
     matchLabels:
-      name: agent-pernode
+      name: agent-pernode-example
   template:
     metadata:
       labels:
-        name: agent-pernode
+        name: agent-pernode-example
       annotations:
-        checksum/config: 0bc811f2d018a28c749d1d5c5cc41fd02b07907be4d4644daa10f11f4cbd0f06
+        checksum/config: f7d9ba588a1d1f957b809397f07b93e2c1bbcc812d9067887d4e009085c26873
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: agent-pernode
+      serviceAccountName: agent-pernode-example
       volumes:
         - hostPath:
             path: /proc
@@ -1166,7 +1166,7 @@ spec:
         - name: config
           secret:
             defaultMode: 0444
-            secretName: agent-pernode
+            secretName: agent-pernode-example
       initContainers:
         - args:
           - -c
@@ -1246,7 +1246,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agent-clusterwide
+  name: agent-clusterwide-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -1257,20 +1257,20 @@ metadata:
 spec:
   selector:
     matchLabels:
-      name: agent-clusterwide
+      name: agent-clusterwide-example
   template:
     metadata:
       labels:
-        name: agent-clusterwide
+        name: agent-clusterwide-example
       annotations:
-        checksum/config: f645b482d8a73c286314f43115a1ee69d6d61f840178bc7e8f95c825b5962cab
+        checksum/config: 48eef4bd335130eb2b974f2a4f9abbb2221519e8e75a96285c69bb9828d9e768
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: agent-clusterwide
+      serviceAccountName: agent-clusterwide-example
       volumes:
         - emptyDir: {}
           name: agent-data
@@ -1278,7 +1278,7 @@ spec:
         - name: config
           secret:
             defaultMode: 0444
-            secretName: agent-clusterwide
+            secretName: agent-clusterwide-example
       containers:
         - name: agent
           imagePullPolicy: IfNotPresent
@@ -1317,7 +1317,7 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: agent-ksmsharded
+  name: agent-ksmsharded-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -1328,20 +1328,20 @@ metadata:
 spec:
   selector:
     matchLabels:
-      name: agent-ksmsharded
+      name: agent-ksmsharded-example
   template:
     metadata:
       labels:
-        name: agent-ksmsharded
+        name: agent-ksmsharded-example
       annotations:
-        checksum/config: e561b7246b340670c30294b62259152bfc2a3d9f8f445ac3dcbf48ed9408aaf3
+        checksum/config: 25c0797d499503c38495e5319cafa8b6f233bc3777c06465748f79c47a826a52
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: agent-ksmsharded
+      serviceAccountName: agent-ksmsharded-example
       volumes:
         - emptyDir: {}
           name: agent-data
@@ -1349,7 +1349,7 @@ spec:
         - name: config
           secret:
             defaultMode: 0444
-            secretName: agent-ksmsharded
+            secretName: agent-ksmsharded-example
       containers:
         - args:
           - --pod=$(POD_NAME)

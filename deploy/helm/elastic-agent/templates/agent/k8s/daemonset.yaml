@@ -1,7 +1,7 @@
 {{- include "elasticagent.init" $ -}}
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- if and (eq ($presetVal).mode "daemonset") (eq $.Values.agent.engine "k8s") -}}
-{{- $agentName := printf "agent-%s" (lower $presetName) -}}
+{{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName)  -}}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:

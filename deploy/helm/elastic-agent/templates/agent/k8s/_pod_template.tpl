@@ -45,10 +45,10 @@
           hostPath:
             {{- if eq $.Values.agent.fleet.enabled true }}
             {{/* different state hostPath for managed agents */}}
-            path: /etc/elastic-agent/{{$.Release.Namespace}}/{{$agentName}}-{{$.Release.Name}}-managed/state
+            path: /etc/elastic-agent/{{$.Release.Namespace}}/{{$agentName}}-managed/state
             {{- else }}
             {{/* different state hostPath for standalone agents */}}
-            path: /etc/elastic-agent/{{$.Release.Namespace}}/{{$agentName}}-{{$.Release.Name}}/state
+            path: /etc/elastic-agent/{{$.Release.Namespace}}/{{$agentName}}/state
             {{- end }}
             type: DirectoryOrCreate
         {{- end }}

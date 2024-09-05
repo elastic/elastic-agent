@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-nginx
+  name: agent-nginx-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -16,7 +16,7 @@ metadata:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-nginx
+  name: agent-nginx-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -27,7 +27,7 @@ metadata:
 stringData:
 
   agent.yml: |-
-    id: agent-nginx
+    id: agent-nginx-example
     outputs:
       default:
         api_key: ""
@@ -191,7 +191,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
-    name: agent-nginx
+    name: agent-nginx-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
@@ -202,7 +202,7 @@ roleRef:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agent-nginx
+  name: agent-nginx-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -213,18 +213,18 @@ metadata:
 spec:
   selector:
     matchLabels:
-      name: agent-nginx
+      name: agent-nginx-example
   template:
     metadata:
       labels:
-        name: agent-nginx
+        name: agent-nginx-example
       annotations:
-        checksum/config: 0e573b8607ef7550dae840d3ac9f9c58b40b0489b9bf0ccfbddf72a27cdc24c7
+        checksum/config: 5b03a8c53bfa79596ff47efff33dd02b851f81b1bdbe1581b5a485eefe26103a
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
-      serviceAccountName: agent-nginx
+      serviceAccountName: agent-nginx-example
       volumes:
         - name: agent-data
           hostPath:
@@ -235,7 +235,7 @@ spec:
         - name: config
           secret:
             defaultMode: 0444
-            secretName: agent-nginx
+            secretName: agent-nginx-example
       containers:
         - name: agent
           imagePullPolicy: IfNotPresent

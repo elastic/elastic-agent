@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-clusterwide
+  name: agent-clusterwide-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -18,7 +18,7 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-ksmsharded
+  name: agent-ksmsharded-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -33,7 +33,7 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-pernode
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -48,7 +48,7 @@ metadata:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-clusterwide
+  name: agent-clusterwide-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -60,7 +60,7 @@ metadata:
     eck.k8s.elastic.co/license: basic
 stringData:
   agent.yml: |-
-    id: agent-clusterwide
+    id: agent-clusterwide-example
     outputs:
     secret_references: []
     agent:
@@ -100,7 +100,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-ksmsharded
+  name: agent-ksmsharded-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -112,7 +112,7 @@ metadata:
     eck.k8s.elastic.co/license: basic
 stringData:
   agent.yml: |-
-    id: agent-ksmsharded
+    id: agent-ksmsharded-example
     outputs:
     secret_references: []
     agent:
@@ -389,7 +389,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-pernode
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -401,7 +401,7 @@ metadata:
     eck.k8s.elastic.co/license: basic
 stringData:
   agent.yml: |-
-    id: agent-pernode
+    id: agent-pernode-example
     outputs:
     secret_references: []
     agent:
@@ -1019,7 +1019,7 @@ metadata:
     eck.k8s.elastic.co/license: basic
 subjects:
   - kind: ServiceAccount
-    name: agent-clusterwide
+    name: agent-clusterwide-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
@@ -1041,7 +1041,7 @@ metadata:
     eck.k8s.elastic.co/license: basic
 subjects:
   - kind: ServiceAccount
-    name: agent-ksmsharded
+    name: agent-ksmsharded-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
@@ -1063,7 +1063,7 @@ metadata:
     eck.k8s.elastic.co/license: basic
 subjects:
   - kind: ServiceAccount
-    name: agent-pernode
+    name: agent-pernode-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
@@ -1074,7 +1074,7 @@ roleRef:
 apiVersion: agent.k8s.elastic.co/v1alpha1
 kind: Agent
 metadata:
-  name: agent-pernode
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -1087,7 +1087,7 @@ metadata:
 spec:
   version: 8.15.0
   configRef:
-    secretName: agent-pernode
+    secretName: agent-pernode-example
   elasticsearchRefs:
     - name: elasticsearch-sample
       namespace: elastic-system
@@ -1099,7 +1099,7 @@ spec:
         automountServiceAccountToken: true
         nodeSelector:
           kubernetes.io/os: linux
-        serviceAccountName: agent-pernode
+        serviceAccountName: agent-pernode-example
         volumes:
           - hostPath:
               path: /proc
@@ -1178,7 +1178,7 @@ spec:
 apiVersion: agent.k8s.elastic.co/v1alpha1
 kind: Agent
 metadata:
-  name: agent-clusterwide
+  name: agent-clusterwide-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -1191,7 +1191,7 @@ metadata:
 spec:
   version: 8.15.0
   configRef:
-    secretName: agent-clusterwide
+    secretName: agent-clusterwide-example
   elasticsearchRefs:
     - name: elasticsearch-sample
       namespace: elastic-system
@@ -1203,7 +1203,7 @@ spec:
         automountServiceAccountToken: true
         nodeSelector:
           kubernetes.io/os: linux
-        serviceAccountName: agent-clusterwide
+        serviceAccountName: agent-clusterwide-example
         volumes:
           - emptyDir: {}
             name: agent-data
@@ -1248,7 +1248,7 @@ spec:
 apiVersion: agent.k8s.elastic.co/v1alpha1
 kind: Agent
 metadata:
-  name: agent-ksmsharded
+  name: agent-ksmsharded-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -1261,7 +1261,7 @@ metadata:
 spec:
   version: 8.15.0
   configRef:
-    secretName: agent-ksmsharded
+    secretName: agent-ksmsharded-example
   elasticsearchRefs:
     - name: elasticsearch-sample
       namespace: elastic-system
@@ -1273,7 +1273,7 @@ spec:
         automountServiceAccountToken: true
         nodeSelector:
           kubernetes.io/os: linux
-        serviceAccountName: agent-ksmsharded
+        serviceAccountName: agent-ksmsharded-example
         volumes:
           - emptyDir: {}
             name: agent-data

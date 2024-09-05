@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-pernode
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -16,7 +16,7 @@ metadata:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-pernode
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -27,7 +27,7 @@ metadata:
 stringData:
 
   agent.yml: |-
-    id: agent-pernode
+    id: agent-pernode-example
     outputs:
       default:
         api_key: ""
@@ -202,7 +202,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
-    name: agent-pernode
+    name: agent-pernode-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
@@ -213,7 +213,7 @@ roleRef:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: agent-pernode
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-0.0.1
@@ -224,20 +224,20 @@ metadata:
 spec:
   selector:
     matchLabels:
-      name: agent-pernode
+      name: agent-pernode-example
   template:
     metadata:
       labels:
-        name: agent-pernode
+        name: agent-pernode-example
       annotations:
-        checksum/config: ac47152e0a8799521b07293ee687f6b965c711b52896b1a6eae145c375d6ba51
+        checksum/config: a7c974ba2737eab9abbfb69369c7652546ffbab54b4cb3e4942b083c72323b95
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: agent-pernode
+      serviceAccountName: agent-pernode-example
       volumes:
         - hostPath:
             path: /proc
@@ -266,7 +266,7 @@ spec:
         - name: config
           secret:
             defaultMode: 0444
-            secretName: agent-pernode
+            secretName: agent-pernode-example
       containers:
         - name: agent
           imagePullPolicy: IfNotPresent
