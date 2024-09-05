@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -135,8 +136,14 @@ inputs:
 		state, err := client.State(ctx)
 		require.NoError(t, err)
 
-		require.NotNil(t, state.UpgradeDetails, "upgrade details in the state cannot be nil")
-		require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+		if state.State == cproto.State_UPGRADING {
+			if state.UpgradeDetails == nil {
+				t.Fatal("upgrade details in the state cannot be nil")
+			}
+			require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+		} else {
+			t.Logf("rollback finished, status is '%s', cannot check UpgradeDetails", state.State.String())
+		}
 	}
 
 	// rollback should stop the watcher
