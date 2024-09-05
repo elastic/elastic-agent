@@ -117,6 +117,10 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			return false
 		}
 
+		// the agent might be healthy but waiting its first configuration,
+		// in that case, there would be no components yet. Therefore, ensure
+		// the agent received the policy with components before proceeding with
+		// the test.
 		for _, c := range status.Components {
 			bs, err := json.MarshalIndent(status, "", "  ")
 			if err != nil {
@@ -134,6 +138,11 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 				return false
 			}
 
+			// there is a rare a race condition unlike to happen on a
+			// production scenario where the component is healthy but the
+			// version info delays to update. As the Status command and the
+			// diagnostics fetch this information in the same way, it guarantees
+			// the version info is up-to-date before proceeding with the test.
 			if c.VersionInfo.Meta.Commit == "" {
 				stateBuff.WriteString(fmt.Sprintf(
 					"%s health, but no versionInfo. agent status output: %s",
