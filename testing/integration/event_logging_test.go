@@ -75,7 +75,10 @@ func TestEventLogFile(t *testing.T) {
 		Local: true,
 		Sudo:  false,
 	})
+<<<<<<< HEAD
 
+=======
+>>>>>>> 1242e7186a ([Integration Test Framework] fix createTempDir and flaky tests (#5409))
 	ctx, cancel := testcontext.WithDeadline(
 		t,
 		context.Background(),
