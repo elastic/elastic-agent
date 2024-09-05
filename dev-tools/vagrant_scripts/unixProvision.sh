@@ -12,7 +12,7 @@ function gvmProvision () {
     echo "in gvmProvision: $ARCH / $OS"
     mkdir -p ~/bin
     if [ ! -e "~/bin/gvm" ]; then
-        curl -sL -o ~/bin/gvm https://github.com/andrewkroh/gvm/releases/download/v0.3.0/gvm-$OS-$ARCH
+        curl -sL -o ~/bin/gvm https://github.com/andrewkroh/gvm/releases/download/v0.5.2/gvm-$OS-$ARCH
         chmod +x ~/bin/gvm
         ~/bin/gvm $GO_VERSION
         echo 'export GOPATH=$HOME/go' >> ~/.bash_profile
