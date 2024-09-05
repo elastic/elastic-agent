@@ -1,3 +1,4 @@
+# update-cli configuration for automated go updates
 ---
 name: Bump golang-version to latest version
 
@@ -5,12 +6,12 @@ scms:
   githubConfig:
     kind: github
     spec:
-      user: '{{ requiredEnv "GIT_USER" }}'
-      email: '{{ requiredEnv "GIT_EMAIL" }}'
-      owner: elastic
-      repository: elastic-agent
+      user: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repository }}'
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
-      username: '{{ requiredEnv "GIT_USER" }}'
+      commitusingapi: true
       branch: main
 
 actions:
