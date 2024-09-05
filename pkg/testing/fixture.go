@@ -26,6 +26,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -1196,6 +1197,34 @@ func performConfigure(ctx context.Context, c client.Client, cfg string, timeout 
 	return nil
 }
 
+<<<<<<< HEAD
+=======
+// createTempDir creates a temporary directory that will be
+// removed after the tests passes. If the test fails, the
+// directory is kept for further investigation.
+//
+// If the test is run with -v and fails the temporary directory is logged
+func createTempDir(t *testing.T) string {
+	tempDir, err := os.MkdirTemp("", strings.ReplaceAll(t.Name(), "/", "-"))
+	if err != nil {
+		t.Fatalf("failed to make temp directory: %s", err)
+	}
+
+	cleanup := func() {
+		if !t.Failed() {
+			if err := install.RemovePath(tempDir); err != nil {
+				t.Errorf("could not remove temp dir '%s': %s", tempDir, err)
+			}
+		} else {
+			t.Logf("Temporary directory %q preserved for investigation/debugging", tempDir)
+		}
+	}
+	t.Cleanup(cleanup)
+
+	return tempDir
+}
+
+>>>>>>> 1242e7186a ([Integration Test Framework] fix createTempDir and flaky tests (#5409))
 type AgentStatusOutput struct {
 	Info struct {
 		ID           string `json:"id"`
