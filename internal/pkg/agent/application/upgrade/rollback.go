@@ -201,7 +201,10 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 	root, _ := utils.HasRoot() // error ignored
 
 	for restartAttempt := 1; restartAttempt <= maxRestartCount; restartAttempt++ {
-		backExp.Wait()
+		// only use exp backoff when retrying
+		if restartAttempt != 1 {
+			backExp.Wait()
+		}
 		log.Infof("Restarting Agent via control protocol; attempt %d of %d", restartAttempt, maxRestartCount)
 		// First, try to restart Agent by sending a restart command
 		// to its daemon (via GRPC).
