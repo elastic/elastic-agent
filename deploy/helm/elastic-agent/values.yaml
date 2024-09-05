@@ -1,4 +1,3 @@
----
 # Elastic-Agent outputs
 # -- The key of the map is the name of the output and the value is an object containing the fields below
 # @notationType -- map[string][OutputObject](#11---output-object)
@@ -45,7 +44,6 @@ outputs:
     # @section -- 1.1 - Output Object
     # @key -- outputs.{name}.namespace
     namespace: ""
-
 kubernetes:
   # -- enable Kubernetes integration.
   # @section -- 2 - Kubernetes integration
@@ -290,22 +288,20 @@ kubernetes:
       # -- system metric stream vars
       # @section -- 2 - Kubernetes integration
       vars: {}
-
 # -- extra [user-defined integrations](https://www.elastic.co/guide/en/fleet/current/elastic-agent-input-configuration.html) to be added to the Elastic Agent
 # An example can be found [here](./examples/nginx-custom-integration/README.md)
 # @section -- 3 - User Extra Integrations
 extraIntegrations: {}
-
 agent:
   # -- elastic-agent version
   # @section -- 3 - Elastic-Agent Configuration
-  version: 8.15.0
+  version: 8.16.0
   # -- image configuration
   # @section -- 3 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/beats/elastic-agent
     pullPolicy: IfNotPresent
-    tag: ""
+    tag: "8.16.0-SNAPSHOT"
   # -- generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs
   # @section -- 3 - Elastic-Agent Configuration
   engine: k8s # k8s or eck
@@ -382,8 +378,8 @@ agent:
         - name: agent-data
           emptyDir: {}
       extraEnvs:
-      - name: ELASTIC_NETINFO
-        value: "false"
+        - name: ELASTIC_NETINFO
+          value: "false"
       agent:
         monitoring:
           namespace: default

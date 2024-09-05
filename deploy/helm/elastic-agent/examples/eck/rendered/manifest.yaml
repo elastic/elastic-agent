@@ -9,7 +9,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -24,7 +24,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -39,7 +39,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -54,7 +54,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -106,7 +106,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -395,7 +395,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -571,7 +571,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -696,7 +696,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -930,7 +930,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -1013,7 +1013,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -1035,7 +1035,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -1057,7 +1057,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
@@ -1080,12 +1080,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:
-  version: 8.15.0
+  version: 8.16.0
   configRef:
     secretName: agent-pernode-example
   elasticsearchRefs:
@@ -1122,7 +1122,7 @@ spec:
         containers:
           - name: agent
             imagePullPolicy: IfNotPresent
-            image: "docker.elastic.co/beats/elastic-agent:8.15.0"
+            image: "docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT"
             securityContext:
               capabilities:
                 add:
@@ -1184,12 +1184,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:
-  version: 8.15.0
+  version: 8.16.0
   configRef:
     secretName: agent-clusterwide-example
   elasticsearchRefs:
@@ -1210,7 +1210,7 @@ spec:
         containers:
           - name: agent
             imagePullPolicy: IfNotPresent
-            image: "docker.elastic.co/beats/elastic-agent:8.15.0"
+            image: "docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT"
             securityContext:
               capabilities:
                 add:
@@ -1254,12 +1254,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.15.0
+    app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:
-  version: 8.15.0
+  version: 8.16.0
   configRef:
     secretName: agent-ksmsharded-example
   elasticsearchRefs:
@@ -1321,7 +1321,7 @@ spec:
                 type: RuntimeDefault
           - name: agent
             imagePullPolicy: IfNotPresent
-            image: "docker.elastic.co/beats/elastic-agent:8.15.0"
+            image: "docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT"
             securityContext:
               capabilities:
                 add:

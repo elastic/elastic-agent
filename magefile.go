@@ -3259,6 +3259,69 @@ func (Helm) RenderExamples() error {
 	return nil
 }
 
+func (Helm) UpdateAgentVersion() error {
+	valuesFile := filepath.Join(helmChartPath, "values.yaml")
+
+	data, err := os.ReadFile(valuesFile)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	isTagged, err := devtools.TagContainsCommit()
+	if err != nil {
+		return fmt.Errorf("failed to check if tag contains commit: %w", err)
+	}
+
+	if !isTagged {
+		isTagged = os.Getenv(snapshotEnv) != ""
+	}
+
+	agentVersion := getVersion()
+
+	// Parse YAML into a Node structure because
+	// it maintains comments
+	var rootNode yaml.Node
+	err = yaml.Unmarshal(data, &rootNode)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal YAML: %w", err)
+	}
+
+	if rootNode.Kind != yaml.DocumentNode {
+		return fmt.Errorf("root node is not a document node")
+	} else if len(rootNode.Content) == 0 {
+		return fmt.Errorf("root node has no content")
+	}
+
+	if err := updateYamlNodes(rootNode.Content[0], agentVersion, "agent", "version"); err != nil {
+		return fmt.Errorf("failed to update agent version: %w", err)
+	}
+
+	if !isTagged {
+		if err := updateYamlNodes(rootNode.Content[0], fmt.Sprintf("%s-SNAPSHOT", agentVersion), "agent", "image", "tag"); err != nil {
+			return fmt.Errorf("failed to update agent image tag: %w", err)
+		}
+	}
+
+	// Truncate values file
+	file, err := os.Create(valuesFile)
+	if err != nil {
+		return fmt.Errorf("failed to open file for writing: %w", err)
+	}
+	defer file.Close()
+
+	// Create a YAML encoder with 2-space indentation
+	encoder := yaml.NewEncoder(file)
+	encoder.SetIndent(2)
+
+	// Encode the updated YAML node back to the file
+	err = encoder.Encode(&rootNode)
+	if err != nil {
+		return fmt.Errorf("failed to encode updated YAML: %w", err)
+	}
+
+	return nil
+}
+
 func (Helm) Lint() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
@@ -3275,6 +3338,28 @@ func (Helm) Lint() error {
 		return fmt.Errorf("failed to lint helm chart: %w", errors.Join(lintResult.Errors...))
 	}
 	return nil
+}
+
+func updateYamlNodes(rootNode *yaml.Node, value string, keys ...string) error {
+	if len(keys) == 0 {
+		return fmt.Errorf("no keys provided")
+	}
+
+	for i := 0; i < len(rootNode.Content)-1; i += 2 {
+		agentKey := rootNode.Content[i]
+		agentValue := rootNode.Content[i+1]
+
+		if agentKey.Value == keys[0] {
+			if len(keys) == 1 {
+				agentValue.Value = value
+				return nil
+			}
+
+			return updateYamlNodes(agentValue, value, keys[1:]...)
+		}
+	}
+
+	return fmt.Errorf("key %s not found", keys[0])
 }
 
 func loadYamlFile(path string) (map[string]any, error) {
