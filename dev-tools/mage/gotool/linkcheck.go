@@ -10,7 +10,7 @@ import (
 
 type goLinkCheck func(opts ...ArgOpt) error
 
-// LinkCheck runs `link-patrol` to verify links in files and provides optionals for adding command line arguments.
+// LinkCheck runs a tool to verify that links in a file are live.
 var LinkCheck goLinkCheck = runGoLinkCheck
 
 func runGoLinkCheck(opts ...ArgOpt) error {
