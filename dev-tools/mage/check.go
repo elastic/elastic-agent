@@ -24,7 +24,7 @@ import (
 // It checks the file permissions of python test cases and YAML files.
 // It checks .go source files using 'go vet'.
 func Check() error {
-	fmt.Println(">> check: Checking source code for common problems") //nolint:forbidigo // it's ok to use fmt.println in mage
+	fmt.Println(">> check: Checking source code for common problems")
 
 	mg.Deps(GoVet, CheckYAMLNotExecutable, devtools.CheckNoChanges)
 
@@ -69,7 +69,7 @@ func GoVet() error {
 
 // CheckLicenseHeaders checks license headers in .go files.
 func CheckLicenseHeaders() error {
-	fmt.Println(">> fmt - go-licenser: Checking for missing headers") //nolint:forbidigo // it's ok to use fmt.println in mage
+	fmt.Println(">> fmt - go-licenser: Checking for missing headers")
 	mg.Deps(InstallGoLicenser)
 
 	licenser := gotool.Licenser
@@ -83,7 +83,7 @@ func CheckLicenseHeaders() error {
 // CheckLinksInFileAreLive checks if all links in a file are live.
 func CheckLinksInFileAreLive(filename string) func() error {
 	return func() error {
-		fmt.Printf(">> check: Checking for invalid links in %q\n", filename) //nolint:forbidigo // it's ok to use fmt.println in mage
+		fmt.Printf(">> check: Checking for invalid links in %q\n", filename)
 		mg.Deps(InstallGoLinkCheck)
 
 		linkcheck := gotool.LinkCheck
