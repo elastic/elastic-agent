@@ -26,7 +26,6 @@ jobs:
 
       - name: Run Updatecli in Apply mode
         run: updatecli apply --config .ci/updatecli/updatecli-bump-golang.yml --values .ci/updatecli/values.d/scm.yml
-
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
