@@ -20,6 +20,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 )
 
 var nginxStatusModule string = `
@@ -133,6 +134,23 @@ func (runner *NginxUnprivilegedRunner) TestComponentHealth() {
 
 	runner.AllComponentsHealthy(ctx)
 
+	query := map[string]interface{}{
+		"exists": map[string]interface{}{
+			"field": "nginx.studstatus",
+		},
+	}
+	docs, err := estools.GetLatestDocumentMatchingQuery(ctx, runner.info.ESClient, query, "metrics-nginx.stubstatus-default")
+	require.NoError(runner.T(), err)
+	require.Truef(runner.T(), docs.Hits.Total.Value > 0, "Expected at least one document, but none were found.")
+
+	query = map[string]interface{}{
+		"exists": map[string]interface{}{
+			"field": "error.message",
+		},
+	}
+	docs, err = estools.GetLatestDocumentMatchingQuery(ctx, runner.info.ESClient, query, "metrics-nginx.stubstatus-default")
+	require.NoError(runner.T(), err)
+	require.Truef(runner.T(), docs.Hits.Total.Value == 0, "Expected zero error messages, found %v", docs.Hits.Hits)
 }
 
 // AllComponentsHealthy ensures all the beats and agent are healthy and working before we continue
