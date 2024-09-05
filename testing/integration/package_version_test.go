@@ -92,10 +92,11 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		"failed to install start agent [output: %s]", string(output))
 
 	stateBuff := bytes.Buffer{}
+	var status atesting.AgentStatusOutput
 	allHealthy := func() bool {
 		stateBuff.Reset()
 
-		status, err := f.ExecStatus(ctx)
+		status, err = f.ExecStatus(ctx)
 		if err != nil {
 			stateBuff.WriteString(fmt.Sprintf("failed to get agent status: %v",
 				err))
@@ -121,18 +122,6 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		// the agent received the policy with components before proceeding with
 		// the test.
 		for _, c := range status.Components {
-<<<<<<< HEAD
-			state := client.State(c.State)
-			if state != client.Healthy {
-				bs, err := json.MarshalIndent(status, "", "  ")
-				if err != nil {
-					stateBuff.WriteString(fmt.Sprintf("%s not health, could not marshal status outptu: %v",
-						c.Name, err))
-					return false
-				}
-
-				stateBuff.WriteString(fmt.Sprintf("%s not health, agent status output: %s",
-=======
 			bs, err := json.MarshalIndent(status, "", "  ")
 			if err != nil {
 				stateBuff.WriteString(fmt.Sprintf(
@@ -157,7 +146,6 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			if c.VersionInfo.Meta.Commit == "" {
 				stateBuff.WriteString(fmt.Sprintf(
 					"%s health, but no versionInfo. agent status output: %s",
->>>>>>> 116e73f952 ([Flaky Test] TestComponentBuildHashInDiagnostics improve agent state check (#5420))
 					c.Name, bs))
 				return false
 			}
@@ -169,8 +157,6 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		allHealthy,
 		5*time.Minute, 10*time.Second,
 		"agent never became healthy. Last status: %v", &stateBuff)
-<<<<<<< HEAD
-=======
 	defer func() {
 		if !t.Failed() {
 			return
@@ -178,7 +164,6 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 		t.Logf("test failed: last status output: %#v", status)
 	}()
->>>>>>> 116e73f952 ([Flaky Test] TestComponentBuildHashInDiagnostics improve agent state check (#5420))
 
 	agentbeat := "agentbeat"
 	if runtime.GOOS == "windows" {
@@ -215,8 +200,6 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 	diag := t.TempDir()
 	extractZipArchive(t, diagZip, diag)
-<<<<<<< HEAD
-=======
 	// if the test fails, the diagnostics used is useful for debugging.
 	defer func() {
 		if !t.Failed() {
@@ -239,7 +222,6 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			return
 		}
 	}()
->>>>>>> 116e73f952 ([Flaky Test] TestComponentBuildHashInDiagnostics improve agent state check (#5420))
 
 	stateFilePath := filepath.Join(diag, "state.yaml")
 	stateYAML, err := os.Open(stateFilePath)
