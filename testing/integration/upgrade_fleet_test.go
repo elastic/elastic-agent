@@ -8,12 +8,16 @@ package integration
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
@@ -130,6 +135,48 @@ func TestFleetAirGappedUpgradePrivileged(t *testing.T) {
 	testFleetAirGappedUpgrade(t, stack, false)
 }
 
+func TestMine(t *testing.T) {
+	rootPair, childPair, err := certutil.NewRootAndChildCerts()
+	require.NoError(t, err, "could not generate TLS certificates")
+	// cert, err := tls.X509KeyPair(child.Cert, child.Key)
+	// require.NoError(t, err, "could not create tls.Certificates from child certificate")
+	// ========================================================================
+	// ========================================================================
+	rootBlock, _ := pem.Decode(rootPair.Cert)
+	if rootBlock == nil {
+		panic("Failed to parse certificate PEM")
+
+	}
+	root, err := x509.ParseCertificate(rootBlock.Bytes)
+	if err != nil {
+		panic("Failed to parse certificate: " + err.Error())
+	}
+
+	childBlock, _ := pem.Decode(childPair.Cert)
+	if rootBlock == nil {
+		panic("Failed to parse certificate PEM")
+
+	}
+	child, err := x509.ParseCertificate(childBlock.Bytes)
+	if err != nil {
+		panic("Failed to parse certificate: " + err.Error())
+	}
+
+	// ====
+	caCertPool := x509.NewCertPool()
+	caCertPool.AddCert(root)
+
+	// Verify the certificate using the CA pool
+	opts := x509.VerifyOptions{
+		Roots: caCertPool, // Use the CA pool for verification
+	}
+	if _, err := child.Verify(opts); err != nil {
+		fmt.Printf("Failed to verify certificate: %v\n", err)
+	} else {
+		fmt.Println("Certificate verification successful!")
+	}
+}
+
 func TestFleetPRBuildSelfSigned(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
 		Group: Fleet,
@@ -148,9 +195,53 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	for _, f := range matches {
 		os.Remove(f)
 	}
+
+	rootPair, childPair, err := certutil.NewRootAndChildCerts()
+	require.NoError(t, err, "could not generate TLS certificates")
+	cert, err := tls.X509KeyPair(childPair.Cert, childPair.Key)
+	require.NoError(t, err, "could not create tls.Certificates from child certificate")
+	// ========================================================================
+	// ========================================================================
+	rootBlock, _ := pem.Decode(rootPair.Cert)
+	if rootBlock == nil {
+		panic("Failed to parse certificate PEM")
+
+	}
+	root, err := x509.ParseCertificate(rootBlock.Bytes)
+	if err != nil {
+		panic("Failed to parse certificate: " + err.Error())
+	}
+
+	childBlock, _ := pem.Decode(childPair.Cert)
+	if rootBlock == nil {
+		panic("Failed to parse certificate PEM")
+
+	}
+	child, err := x509.ParseCertificate(childBlock.Bytes)
+	if err != nil {
+		panic("Failed to parse certificate: " + err.Error())
+	}
+
+	// ====
+	caCertPool := x509.NewCertPool()
+	caCertPool.AddCert(root)
+
+	// Verify the certificate using the CA pool
+	opts := x509.VerifyOptions{
+		Roots: caCertPool, // Use the CA pool for verification
+	}
+	if _, err := child.Verify(opts); err != nil {
+		fmt.Printf("Failed to verify certificate: %v\n", err)
+	} else {
+		fmt.Println("Certificate verification successful!")
+	}
+
+	// ========================================================================
+	// ========================================================================
+
 	// downloads/beats/elastic-agent/
 	downloadDir := filepath.Join(rootDir, "downloads", "beats", "elastic-agent")
-	err := os.MkdirAll(downloadDir, 0644)
+	err = os.MkdirAll(downloadDir, 0644)
 	require.NoError(t, err, "could not create download directory")
 
 	// it's useful for debugging
@@ -164,10 +255,23 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 		rootDir, files)
 	// start file server
 	fs := http.FileServer(http.Dir(rootDir))
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// server:= httptest.NewTLSServer()
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Logf("[fileserver] %s - %s", r.Method, r.URL.Path)
 		fs.ServeHTTP(w, r)
 	}))
+
+	server.Listener, err = net.Listen("tcp", ":443")
+	require.NoError(t, err, "could not create net listener for port 443")
+
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
+	server.StartTLS()
+	defer server.Close()
+	t.Logf("file server running on %s", server.URL)
+	rootCAPath := filepath.Join(rootDir, "rootCA.pem")
+	err = os.WriteFile(rootCAPath, rootPair.Cert, 0440)
+	require.NoError(t, err, "could not write root CA")
+	env := []string{fmt.Sprintf("SSL_CERT_FILE=%s", rootCAPath)}
 
 	// PR build
 	toFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -238,7 +342,8 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 			break
 		}
 	}
-	fromFixture, err := atesting.NewFixture(t, latestRelease.String())
+	fromFixture, err := atesting.NewFixture(t,
+		latestRelease.String(), atesting.WithEnv(env))
 	require.NoError(t, err, "could not create fixture for latest release")
 
 	defer func() {
@@ -400,6 +505,7 @@ func testUpgradeFleetManagedElasticAgent(
 		nonInteractiveFlag = true
 	}
 	installOpts := atesting.InstallOpts{
+		Insecure:       true,
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
 		EnrollOpts: atesting.EnrollOpts{
