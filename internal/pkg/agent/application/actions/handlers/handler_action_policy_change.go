@@ -400,14 +400,10 @@ func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingCon
 	if loggingConfig != nil {
 		// we have logging config to set
 		policyLogLevel = &loggingConfig.Level
-
-		h.log.Infof("Setting fallback log level %v from policy", policyLogLevel)
-		return h.policyLogLevelSetter.SetLogLevel(ctx, policyLogLevel)
 	}
-	// use default log level
-	defaultLogLevel := logger.DefaultLogLevel
-	h.log.Infof("Setting fallback log level to default %s", defaultLogLevel)
-	return h.policyLogLevelSetter.SetLogLevel(ctx, &defaultLogLevel)
+
+	h.log.Infof("Setting fallback log level %v from policy", policyLogLevel)
+	return h.policyLogLevelSetter.SetLogLevel(ctx, policyLogLevel)
 }
 
 func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store) error {
