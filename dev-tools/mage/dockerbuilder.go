@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,8 +116,8 @@ func (b *dockerBuilder) prepareBuild() error {
 		"Variant":     b.DockerVariant.String(),
 	}
 
-	err = filepath.Walk(templatesDir, func(path string, info os.FileInfo, _ error) error {
-		if !info.IsDir() && !isDockerFile(path) {
+	err = filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
+		if !d.Type().IsDir() && !isDockerFile(path) {
 			target := strings.TrimSuffix(
 				filepath.Join(b.buildDir, filepath.Base(path)),
 				".tmpl",

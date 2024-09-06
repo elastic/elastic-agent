@@ -11,6 +11,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -828,7 +829,7 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 
 // addFileToZip adds a file (or directory) to a zip archive.
 func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
-	return filepath.Walk(pkgFile.Source, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(pkgFile.Source, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
 				return nil
@@ -903,7 +904,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		"cloud-defend.spec.yml",
 	}
 
-	return filepath.Walk(pkgFile.Source, func(path string, info os.FileInfo, err error) error {
+	return filepath.WalkDir(pkgFile.Source, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
 				return nil
@@ -911,12 +912,17 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			return err
 		}
 
-		if slices.Contains(excludedFiles, info.Name()) {
+		if slices.Contains(excludedFiles, d.Name()) {
 			// it's a file we have to exclude
 			if mg.Verbose() {
 				log.Printf("Skipping file %q...", path)
 			}
 			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
 		}
 
 		header, err := tar.FileInfoHeader(info, info.Name())
@@ -984,7 +990,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		return err
 	}
 
-	return filepath.Walk(link, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(link, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
 				return nil

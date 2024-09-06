@@ -92,12 +92,10 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true)
 	h.ch <- unenrollPolicy
 
-	if h.stateStore != nil {
-		// backup action for future start to avoid starting fleet gateway loop
-		h.stateStore.SetAction(a)
-		if err := h.stateStore.Save(); err != nil {
-			h.log.Warnf("Failed to update state store: %v", err)
-		}
+	// backup action for future start to avoid starting fleet gateway loop
+	h.stateStore.SetAction(a)
+	if err := h.stateStore.Save(); err != nil {
+		h.log.Warnf("Failed to update state store: %v", err)
 	}
 
 	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)

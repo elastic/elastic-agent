@@ -34,7 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -338,7 +338,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	log, obs := logger.NewTesting("")
+	log, obs := loggertest.New("")
 	defer func() {
 		if t.Failed() {
 			t.Log("test failed, coordinator logs below:")

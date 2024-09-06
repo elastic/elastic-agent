@@ -12,7 +12,7 @@ import (
 
 	aConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestReload(t *testing.T) {
@@ -78,7 +78,7 @@ agent.monitoring.enabled: false
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			fsc := &fakeServerController{}
-			log, _ := logger.NewTesting(tc.name)
+			log, _ := loggertest.New(tc.name)
 			cfg := &monitoringCfg.MonitoringConfig{
 				Enabled:        tc.currEnabled,
 				MonitorMetrics: tc.currMetrics,

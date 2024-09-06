@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
@@ -204,7 +205,7 @@ func TestCleanup(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			testLogger, _ := logger.NewTesting(t.Name())
+			testLogger, _ := loggertest.New(t.Name())
 			testTop := t.TempDir()
 			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup)
 			if tt.additionalSetup != nil {
@@ -214,7 +215,7 @@ func TestCleanup(t *testing.T) {
 			require.NoError(t, err, "error loading update marker")
 			require.NotNil(t, marker, "loaded marker must not be nil")
 			t.Logf("Loaded update marker %+v", marker)
-			tt.wantErr(t, Cleanup(testLogger, testTop, marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs), fmt.Sprintf("Cleanup(%v, %v, %v, %v)", marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs))
+			tt.wantErr(t, cleanup(testLogger, testTop, marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs, 0), fmt.Sprintf("Cleanup(%v, %v, %v, %v)", marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs))
 			tt.checkAfterCleanup(t, testTop)
 		})
 	}
@@ -299,7 +300,7 @@ func TestRollback(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			testLogger, _ := logger.NewTesting(t.Name())
+			testLogger, _ := loggertest.New(t.Name())
 			testTop := t.TempDir()
 			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup)
 			if tt.additionalSetup != nil {

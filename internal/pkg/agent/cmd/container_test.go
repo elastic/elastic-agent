@@ -24,11 +24,13 @@ func TestEnvWithDefault(t *testing.T) {
 	require.Equal(t, def, res)
 
 	err := os.Setenv(key1, "key1")
+	defer os.Unsetenv(key1)
 	if err != nil {
 		t.Skipf("could not export env var: %s", err)
 	}
 
 	err = os.Setenv(key2, "key2")
+	defer os.Unsetenv(key2)
 	if err != nil {
 		t.Skipf("could not export env var: %s", err)
 	}

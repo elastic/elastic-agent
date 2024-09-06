@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type mockHandler struct {
@@ -756,7 +756,7 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 			detailsSetter := func(upgradeDetails *details.Details) {
 				actualDetails = upgradeDetails
 			}
-			log, obs := logger.NewTesting("report_next_upgrade_details")
+			log, obs := loggertest.New("report_next_upgrade_details")
 
 			d.reportNextScheduledUpgrade(test.actions, detailsSetter, log)
 
