@@ -17,8 +17,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestWatcher_CannotConnect(t *testing.T) {
@@ -27,7 +26,7 @@ func TestWatcher_CannotConnect(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
 	go w.Run(ctx)
 
@@ -45,7 +44,7 @@ func TestWatcher_LostConnection(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
 
 	// error on watch (counts as lost connect)
@@ -74,7 +73,7 @@ func TestWatcher_PIDChange(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
 
 	// error on watch (counts as lost connect)
@@ -150,7 +149,7 @@ func TestWatcher_PIDChangeSuccess(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
 
 	// error on watch (counts as lost connect)
@@ -236,7 +235,7 @@ func TestWatcher_AgentError(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 100*time.Millisecond)
 
 	// reports only an error state, triggers failed
@@ -275,17 +274,10 @@ func TestWatcher_AgentErrorQuick(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	log, obs := logger.NewTesting("watcher")
+	log, obs := loggertest.New("watcher")
 	defer func() {
 		if t.Failed() {
-			rawLogs := obs.All()
-			for _, rawLog := range rawLogs {
-				msg := fmt.Sprintf("[%s] %s", rawLog.Level, rawLog.Message)
-				for k, v := range rawLog.ContextMap() {
-					msg += fmt.Sprintf("%s=%v", k, v)
-				}
-				t.Log(msg)
-			}
+			loggertest.PrintObservedLogs(obs.TakeAll(), t.Log)
 		}
 	}()
 	w := NewAgentWatcher(errCh, log, 100*time.Millisecond)
@@ -334,7 +326,7 @@ func TestWatcher_ComponentError(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 100*time.Millisecond)
 
 	// reports only an error state, triggers failed
@@ -394,7 +386,7 @@ func TestWatcher_ComponentErrorQuick(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 100*time.Millisecond)
 
 	// reports an error state, followed by a healthy state (should not error)
@@ -481,7 +473,7 @@ func TestWatcher_AgentErrorFlipFlop(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 300*time.Millisecond)
 
 	// reports only an error state, triggers failed
