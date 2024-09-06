@@ -107,7 +107,7 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool)
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), endVersionInfo.Binary.String())
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged, func(iopts atesting.InstallOpts) atesting.InstallOpts { return iopts })
+	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged)
 }
 
 func TestFleetAirGappedUpgradeUnprivileged(t *testing.T) {
@@ -309,47 +309,30 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 
 	ctx := context.Background()
 
-	// rootDir := t.TempDir()
-	rootDir := "/tmp/fileserver"
-	matches, err := filepath.Glob(rootDir + "/*")
-	require.NoError(t, err, "failed to glob rootDir")
-	for _, f := range matches {
-		os.Remove(f)
-	}
-
+	rootDir := t.TempDir()
 	rootPair, cert := prepareTLSCerts(t)
-
-	// ========================================================================
-	// ========================================================================
 
 	// ========================== file server ==================================
 	// downloads/beats/elastic-agent/
 	server, downloadDir := prepareFileServer(t, rootDir, cert)
 	defer server.Close()
 
-	rootCAPath := filepath.Join(rootDir, "rootCA.pem")
-	err = os.WriteFile(rootCAPath, rootPair.Cert, 0440)
-	require.NoError(t, err, "could not write root CA")
-
-	// /etc/ssl/certs
-	err = os.WriteFile(
-		filepath.Join("/etc/ssl/certs", "TestFleetPRBuildSelfSigned.pem"),
+	// add root CA to /etc/ssl/certs. It was the only option that worked
+	rootCAPath := filepath.Join("/etc/ssl/certs", "TestFleetPRBuildSelfSigned.pem")
+	err := os.WriteFile(
+		rootCAPath,
 		rootPair.Cert, 0440)
 	require.NoError(t, err, "could not write root CA to /etc/ssl/certs")
+	t.Cleanup(func() {
+		assert.NoError(t, os.Remove(rootCAPath), "cleanup: could not remove root CA")
+	})
 
-	// ========================= Fixture from PR build =========================
+	// ==================== prepare to fixture from PR build ===================
 	toFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err, "failed to get fixture with PR build")
 
 	prBuildPkgPath, err := toFixture.SrcPackage(ctx)
 	require.NoError(t, err, "could not get path to PR build artifact")
-
-	// ====================== copy files to file server  ======================
-	// PR build package
-	_, filename := filepath.Split(prBuildPkgPath)
-	pkgDownloadPath := filepath.Join(downloadDir, filename)
-	copyFile(t, prBuildPkgPath, pkgDownloadPath)
-	copyFile(t, prBuildPkgPath+".sha512", pkgDownloadPath+".sha512")
 
 	agentPkg, err := os.Open(prBuildPkgPath)
 	require.NoError(t, err, "could not open PR build artifact")
@@ -357,22 +340,42 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	// sign the build
 	pubKey, ascData := pgptest.Sing(t, agentPkg)
 
-	// add the PGP key to file server
+	// ====================== copy files to file server  ======================
+	// copy the agent package
+	_, filename := filepath.Split(prBuildPkgPath)
+	pkgDownloadPath := filepath.Join(downloadDir, filename)
+	copyFile(t, prBuildPkgPath, pkgDownloadPath)
+	copyFile(t, prBuildPkgPath+".sha512", pkgDownloadPath+".sha512")
+
+	// copy the PGP key
 	gpgKeyElasticAgent := filepath.Join(rootDir, "GPG-KEY-elastic-agent")
 	err = os.WriteFile(
 		gpgKeyElasticAgent, pubKey, 0o644)
 	require.NoError(t, err, "could not write GPG-KEY-elastic-agent to disk")
 
-	// add package signature to file server
+	// copy the package signature
+	ascFile := filepath.Join(downloadDir, filename+".asc")
 	err = os.WriteFile(
-		filepath.Join(downloadDir, filename+".asc"), ascData, 0o600)
+		ascFile, ascData, 0o600)
 	require.NoError(t, err, "could not write agent .asc file to disk")
+
+	defer func() {
+		if !t.Failed() {
+			return
+		}
+
+		toFixture.KeepFileByMoving(rootCAPath)
+		toFixture.KeepFileByMoving(pkgDownloadPath)
+		toFixture.KeepFileByMoving(pkgDownloadPath + ".sha512")
+		toFixture.KeepFileByMoving(gpgKeyElasticAgent)
+		toFixture.KeepFileByMoving(ascFile)
+	}()
 
 	// ==== impersonate https://artifacts.elastic.co/GPG-KEY-elastic-agent  ====
 	undoEtcHosts := impersonateHost(t, "artifacts.elastic.co", "127.0.0.1")
 	t.Cleanup(undoEtcHosts)
 
-	// prepare agent's download source
+	// ==================== prepare agent's download source ====================
 	downloadSource := kibana.DownloadSource{
 		Name:      "self-signed-" + uuid.Must(uuid.NewV4()).String(),
 		Host:      server.URL + "/downloads/",
@@ -407,20 +410,7 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 		latestRelease.String())
 	require.NoError(t, err, "could not create fixture for latest release")
 
-	defer func() {
-		if !t.Failed() {
-			return
-		}
-
-		fromFixture.KeepFileByMoving(pkgDownloadPath)
-		fromFixture.KeepFileByMoving(gpgKeyElasticAgent)
-	}()
-
-	testUpgradeFleetManagedElasticAgent(
-		ctx, t, stack, fromFixture, toFixture, policy, false, func(iopts atesting.InstallOpts) atesting.InstallOpts {
-			iopts.EnrollOpts.CertificateAuthorities = []string{rootCAPath}
-			return iopts
-		})
+	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fromFixture, toFixture, policy, false)
 }
 
 func prepareFileServer(t *testing.T, rootDir string, cert tls.Certificate) (*httptest.Server, string) {
@@ -437,9 +427,8 @@ func prepareFileServer(t *testing.T, rootDir string, cert tls.Certificate) (*htt
 	}
 	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
 		rootDir, files)
-	// start file server
+
 	fs := http.FileServer(http.Dir(rootDir))
-	// server:= httptest.NewTLSServer()
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Logf("[fileserver] %s - %s", r.Method, r.URL.Path)
 		fs.ServeHTTP(w, r)
@@ -460,41 +449,41 @@ func prepareTLSCerts(t *testing.T) (certutil.Pair, tls.Certificate) {
 
 	cert, err := tls.X509KeyPair(childPair.Cert, childPair.Key)
 	require.NoError(t, err, "could not create tls.Certificates from child certificate")
-	// ========================================================================
-	// ========================================================================
-	rootBlock, _ := pem.Decode(rootPair.Cert)
-	if rootBlock == nil {
-		panic("Failed to parse certificate PEM")
-
-	}
-	root, err := x509.ParseCertificate(rootBlock.Bytes)
-	if err != nil {
-		panic("Failed to parse certificate: " + err.Error())
-	}
-
-	childBlock, _ := pem.Decode(childPair.Cert)
-	if rootBlock == nil {
-		panic("Failed to parse certificate PEM")
-
-	}
-	child, err := x509.ParseCertificate(childBlock.Bytes)
-	if err != nil {
-		panic("Failed to parse certificate: " + err.Error())
-	}
-
-	// ====
-	caCertPool := x509.NewCertPool()
-	caCertPool.AddCert(root)
-
-	// Verify the certificate using the CA pool
-	opts := x509.VerifyOptions{
-		Roots: caCertPool, // Use the CA pool for verification
-	}
-	if _, err := child.Verify(opts); err != nil {
-		fmt.Printf("Failed to verify certificate: %v\n", err)
-	} else {
-		fmt.Println("Certificate verification successful!")
-	}
+	// // ========================================================================
+	// // ========================================================================
+	// rootBlock, _ := pem.Decode(rootPair.Cert)
+	// if rootBlock == nil {
+	// 	panic("Failed to parse certificate PEM")
+	//
+	// }
+	// root, err := x509.ParseCertificate(rootBlock.Bytes)
+	// if err != nil {
+	// 	panic("Failed to parse certificate: " + err.Error())
+	// }
+	//
+	// childBlock, _ := pem.Decode(childPair.Cert)
+	// if rootBlock == nil {
+	// 	panic("Failed to parse certificate PEM")
+	//
+	// }
+	// child, err := x509.ParseCertificate(childBlock.Bytes)
+	// if err != nil {
+	// 	panic("Failed to parse certificate: " + err.Error())
+	// }
+	//
+	// // ====
+	// caCertPool := x509.NewCertPool()
+	// caCertPool.AddCert(root)
+	//
+	// // Verify the certificate using the CA pool
+	// opts := x509.VerifyOptions{
+	// 	Roots: caCertPool, // Use the CA pool for verification
+	// }
+	// if _, err := child.Verify(opts); err != nil {
+	// 	fmt.Printf("Failed to verify certificate: %v\n", err)
+	// } else {
+	// 	fmt.Println("Certificate verification successful!")
+	// }
 
 	return rootPair, cert
 }
@@ -605,10 +594,18 @@ func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bo
 	policy := defaultPolicy()
 	policy.DownloadSourceID = src.Item.ID
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy, unprivileged, func(iopts atesting.InstallOpts) atesting.InstallOpts { return iopts })
+	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy, unprivileged)
 }
 
-func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info *define.Info, startFixture *atesting.Fixture, endFixture *atesting.Fixture, policy kibana.AgentPolicy, unprivileged bool, iopts func(iopts atesting.InstallOpts) atesting.InstallOpts) {
+func testUpgradeFleetManagedElasticAgent(
+	ctx context.Context,
+	t *testing.T,
+	info *define.Info,
+	startFixture *atesting.Fixture,
+	endFixture *atesting.Fixture,
+	policy kibana.AgentPolicy,
+	unprivileged bool) {
+
 	kibClient := info.KibanaClient
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
@@ -662,7 +659,6 @@ func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info
 		},
 		Privileged: !unprivileged,
 	}
-	installOpts = iopts(installOpts)
 	output, err := startFixture.Install(ctx, &installOpts)
 	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
 
