@@ -28,7 +28,7 @@ func init() {
 	if flag.Lookup("out") == nil {
 		flag.StringVar(&output, "out", "-", "Output path. \"-\" means writing to stdout")
 	}
-	flag.StringVar(&license, "license", "Elastic", "License header for generated file.")
+	flag.StringVar(&license, "license", "Elasticv2", "License header for generated file.")
 }
 
 var tmpl = template.Must(template.New("cfg").Parse(`

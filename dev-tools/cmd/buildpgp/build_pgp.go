@@ -25,7 +25,7 @@ var (
 func init() {
 	flag.StringVar(&input, "in", "", "Source of input. \"-\" means reading from stdin")
 	flag.StringVar(&output, "output", "-", "Output path. \"-\" means writing to stdout")
-	flag.StringVar(&license, "license", "Elastic", "License header for generated file.")
+	flag.StringVar(&license, "license", "Elasticv2", "License header for generated file.")
 }
 
 var tmplPgp = template.Must(template.New("pgp").Parse(`

@@ -404,7 +404,7 @@ func (Check) All() {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return sh.RunV("go-licenser", "-d", "-license", "Elastic")
+	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2")
 }
 
 // Changes run git status --porcelain and return an error if we have changes or uncommitted files.
