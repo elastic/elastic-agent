@@ -17,7 +17,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -108,7 +107,7 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool)
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), endVersionInfo.Binary.String())
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged)
+	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged, func(iopts atesting.InstallOpts) atesting.InstallOpts { return iopts })
 }
 
 func TestFleetAirGappedUpgradeUnprivileged(t *testing.T) {
@@ -318,9 +317,147 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 		os.Remove(f)
 	}
 
+	rootPair, cert := prepareTLSCerts(t)
+
+	// ========================================================================
+	// ========================================================================
+
+	// ========================== file server ==================================
+	// downloads/beats/elastic-agent/
+	server, downloadDir := prepareFileServer(t, rootDir, cert)
+	defer server.Close()
+
+	rootCAPath := filepath.Join(rootDir, "rootCA.pem")
+	err = os.WriteFile(rootCAPath, rootPair.Cert, 0440)
+	require.NoError(t, err, "could not write root CA")
+
+	// /etc/ssl/certs
+	err = os.WriteFile(
+		filepath.Join("/etc/ssl/certs", "TestFleetPRBuildSelfSigned.pem"),
+		rootPair.Cert, 0440)
+	require.NoError(t, err, "could not write root CA to /etc/ssl/certs")
+
+	// ============================== PR build ==============================
+	toFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err, "failed to get fixture with PR build")
+
+	prBuildPkgPath, err := toFixture.SrcPackage(ctx)
+	require.NoError(t, err, "could not get path to PR build artifact")
+
+	t.Logf("prBuildPkgPath: %q", prBuildPkgPath)
+
+	// ============================== copy PR build to file server  ==============================
+	_, filename := filepath.Split(prBuildPkgPath)
+	pkgDownloadPath := filepath.Join(downloadDir, filename)
+	copyFile(t, prBuildPkgPath, pkgDownloadPath)
+	copyFile(t, prBuildPkgPath+".sha512", pkgDownloadPath+".sha512")
+
+	agentPkg, err := os.Open(prBuildPkgPath)
+	require.NoError(t, err, "could not open PR build artifact")
+
+	// sign the build
+	pubKey, ascData := pgptest.Sing(t, agentPkg)
+
+	// add the PGP key to file server
+	gpgKeyElasticAgent := filepath.Join(rootDir, "GPG-KEY-elastic-agent")
+	err = os.WriteFile(
+		gpgKeyElasticAgent, pubKey, 0o644)
+	require.NoError(t, err, "could not write GPG-KEY-elastic-agent to disk")
+
+	// ============================== add package signature to file server  ==============================
+	err = os.WriteFile(
+		filepath.Join(downloadDir, filename+".asc"), ascData, 0o600)
+	require.NoError(t, err, "could not write agent .asc file to disk")
+
+	// ============================== impersonate https://artifacts.elastic.co/GPG-KEY-elastic-agent  ==============================
+	undoEtcHosts := impersonateHost(t, "artifacts.elastic.co", "127.0.0.1")
+	t.Cleanup(undoEtcHosts)
+
+	downloadSource := kibana.DownloadSource{
+		Name:      "self-signed-" + uuid.Must(uuid.NewV4()).String(),
+		Host:      server.URL + "/downloads/",
+		IsDefault: false, // other tests reuse the stack, let's not mess things up
+	}
+
+	t.Logf("creating download source %q, using %q.",
+		downloadSource.Name, downloadSource.Host)
+	src, err := stack.KibanaClient.CreateDownloadSource(ctx, downloadSource)
+	require.NoError(t, err, "could not create download source")
+	policy := defaultPolicy()
+	policy.DownloadSourceID = src.Item.ID
+	t.Logf("policy %s using DownloadSourceID: %s",
+		policy.ID, policy.DownloadSourceID)
+
+	// ============================== prepare last release  ==============================
+	versions, err := upgradetest.GetUpgradableVersions()
+	require.NoError(t, err, "could not get upgradable versions")
+
+	sortedVers := version.SortableParsedVersions(versions)
+	sort.Sort(sort.Reverse(sortedVers))
+
+	t.Logf("upgradable versions: %v", versions)
+	var latestRelease version.ParsedSemVer
+	for _, v := range versions {
+		if !v.IsSnapshot() {
+			latestRelease = *v
+			break
+		}
+	}
+	fromFixture, err := atesting.NewFixture(t,
+		latestRelease.String())
+	require.NoError(t, err, "could not create fixture for latest release")
+
+	defer func() {
+		if !t.Failed() {
+			return
+		}
+
+		fromFixture.KeepFileByMoving(pkgDownloadPath)
+		fromFixture.KeepFileByMoving(gpgKeyElasticAgent)
+	}()
+
+	testUpgradeFleetManagedElasticAgent(
+		ctx, t, stack, fromFixture, toFixture, policy, false, func(iopts atesting.InstallOpts) atesting.InstallOpts {
+			iopts.EnrollOpts.CertificateAuthorities = []string{rootCAPath}
+			return iopts
+		})
+}
+
+func prepareFileServer(t *testing.T, rootDir string, cert tls.Certificate) (*httptest.Server, string) {
+	downloadDir := filepath.Join(rootDir, "downloads", "beats", "elastic-agent")
+	err := os.MkdirAll(downloadDir, 0644)
+	require.NoError(t, err, "could not create download directory")
+
+	// it's useful for debugging
+	dl, err := os.ReadDir(rootDir)
+	require.NoError(t, err)
+	var files []string
+	for _, d := range dl {
+		files = append(files, d.Name())
+	}
+	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
+		rootDir, files)
+	// start file server
+	fs := http.FileServer(http.Dir(rootDir))
+	// server:= httptest.NewTLSServer()
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("[fileserver] %s - %s", r.Method, r.URL.Path)
+		fs.ServeHTTP(w, r)
+	}))
+
+	server.Listener, err = net.Listen("tcp", "127.0.0.1:443")
+	require.NoError(t, err, "could not create net listener for port 443")
+
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
+	server.StartTLS()
+	t.Logf("file server running on %s", server.URL)
+	return server, downloadDir
+}
+
+func prepareTLSCerts(t *testing.T) (certutil.Pair, tls.Certificate) {
 	rootPair, childPair := NewRootAndChildCerts(
 		t, "artifacts.elastic.co", []net.IP{net.ParseIP("127.0.0.1")})
-	require.NoError(t, err, "could not generate TLS certificates")
+
 	cert, err := tls.X509KeyPair(childPair.Cert, childPair.Key)
 	require.NoError(t, err, "could not create tls.Certificates from child certificate")
 	// ========================================================================
@@ -359,128 +496,22 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 		fmt.Println("Certificate verification successful!")
 	}
 
-	// ========================================================================
-	// ========================================================================
+	return rootPair, cert
+}
 
-	// ========================== file server ==================================
-	// downloads/beats/elastic-agent/
-	downloadDir := filepath.Join(rootDir, "downloads", "beats", "elastic-agent")
-	err = os.MkdirAll(downloadDir, 0644)
-	require.NoError(t, err, "could not create download directory")
+// impersonateHost impersonates 'host' by adding an entry to /etc/hosts mapping
+// 'ip' to 'host'.
+// It returns a callback to restore /etc/hosts to its original state.
+func impersonateHost(t *testing.T, host string, ip string) func() {
+	copyFile(t, "/etc/hosts", "/etc/hosts.old")
 
-	// it's useful for debugging
-	dl, err := os.ReadDir(rootDir)
-	require.NoError(t, err)
-	var files []string
-	for _, d := range dl {
-		files = append(files, d.Name())
-	}
-	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
-		rootDir, files)
-	// start file server
-	fs := http.FileServer(http.Dir(rootDir))
-	// server:= httptest.NewTLSServer()
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Logf("[fileserver] %s - %s", r.Method, r.URL.Path)
-		fs.ServeHTTP(w, r)
-	}))
-
-	server.Listener, err = net.Listen("tcp", ":443")
-	require.NoError(t, err, "could not create net listener for port 443")
-
-	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
-	server.StartTLS()
-	defer server.Close()
-	t.Logf("file server running on %s", server.URL)
-	rootCAPath := filepath.Join(rootDir, "rootCA.pem")
-	err = os.WriteFile(rootCAPath, rootPair.Cert, 0440)
-	require.NoError(t, err, "could not write root CA")
-	env := []string{fmt.Sprintf("SSL_CERT_FILE=%s", rootCAPath)}
-
-	// ============================== PR build ==============================
-	toFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err, "failed to get fixture with PR build")
-
-	prBuildPkgPath, err := toFixture.SrcPackage(ctx)
-	require.NoError(t, err, "could not get path to PR build artifact")
-
-	t.Logf("prBuildPkgPath: %q", prBuildPkgPath)
-
-	// ============================== copy PR build to file server  ==============================
-	_, filename := filepath.Split(prBuildPkgPath)
-	pkgDownloadPath := filepath.Join(downloadDir, filename)
-	copyFile(t, prBuildPkgPath, pkgDownloadPath)
-	copyFile(t, prBuildPkgPath+".sha512", pkgDownloadPath+".sha512")
-
-	agentPkg, err := os.Open(prBuildPkgPath)
-	require.NoError(t, err, "could not open PR build artifact")
-
-	// sign the build
-	pubKey, ascData := pgptest.Sing(t, agentPkg)
-
-	// add the PGP key to file server
-	gpgKeyElasticAgent := filepath.Join(rootDir, "GPG-KEY-elastic-agent")
-	err = os.WriteFile(
-		gpgKeyElasticAgent, pubKey, 0o600)
-	require.NoError(t, err, "could not write GPG-KEY-elastic-agent to disk")
-
-	// ============================== add package signature to file server  ==============================
-	err = os.WriteFile(
-		filepath.Join(downloadDir, filename+".asc"), ascData, 0o600)
-	require.NoError(t, err, "could not write agent .asc file to disk")
-
-	// ============================== impersonate https://artifacts.elastic.co/GPG-KEY-elastic-agent  ==============================
-	host, _ := url.Parse(server.URL)
-	ercHostEntry := fmt.Sprintf("\n%s\t%s\n", host.Hostname(), "artifacts.elastic.co")
+	ercHostEntry := fmt.Sprintf("\n%s\t%s\n", ip, host)
 	appendToFile(t, "/etc/hosts", []byte(ercHostEntry))
-	// sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to-destination 192.168.1.100:8080
-	// sudo iptables -t nat -A POSTROUTING -p tcp -d 192.168.1.100 --dport 8080 -j MASQUERADE
 
-	downloadSource := kibana.DownloadSource{
-		Name:      "self-signed-" + uuid.Must(uuid.NewV4()).String(),
-		Host:      server.URL + "/downloads/",
-		IsDefault: false, // other tests reuse the stack, let's not mess things up
+	return func() {
+		err := os.Rename("/etc/hosts.old", "/etc/hosts")
+		require.NoError(t, err, "could not restore /etc/hosts")
 	}
-
-	t.Logf("creating download source %q, using %q.",
-		downloadSource.Name, downloadSource.Host)
-	src, err := stack.KibanaClient.CreateDownloadSource(ctx, downloadSource)
-	require.NoError(t, err, "could not create download source")
-	policy := defaultPolicy()
-	policy.DownloadSourceID = src.Item.ID
-	t.Logf("policy %s using DownloadSourceID: %s",
-		policy.ID, policy.DownloadSourceID)
-
-	// ============================== prepare last release  ==============================
-	versions, err := upgradetest.GetUpgradableVersions()
-	require.NoError(t, err, "could not get upgradable versions")
-
-	sortedVers := version.SortableParsedVersions(versions)
-	sort.Sort(sort.Reverse(sortedVers))
-
-	t.Logf("upgradable versions: %v", versions)
-	var latestRelease version.ParsedSemVer
-	for _, v := range versions {
-		if !v.IsSnapshot() {
-			latestRelease = *v
-			break
-		}
-	}
-	fromFixture, err := atesting.NewFixture(t,
-		latestRelease.String(), atesting.WithEnv(env))
-	require.NoError(t, err, "could not create fixture for latest release")
-
-	defer func() {
-		if !t.Failed() {
-			return
-		}
-
-		fromFixture.KeepFileByMoving(pkgDownloadPath)
-		fromFixture.KeepFileByMoving(gpgKeyElasticAgent)
-	}()
-
-	testUpgradeFleetManagedElasticAgent(
-		ctx, t, stack, fromFixture, toFixture, policy, true)
 }
 
 func copyFile(t *testing.T, srcPath, dstPath string) {
@@ -574,17 +605,10 @@ func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bo
 	policy := defaultPolicy()
 	policy.DownloadSourceID = src.Item.ID
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy, unprivileged)
+	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy, unprivileged, func(iopts atesting.InstallOpts) atesting.InstallOpts { return iopts })
 }
 
-func testUpgradeFleetManagedElasticAgent(
-	ctx context.Context,
-	t *testing.T,
-	info *define.Info,
-	startFixture *atesting.Fixture,
-	endFixture *atesting.Fixture,
-	policy kibana.AgentPolicy,
-	unprivileged bool) {
+func testUpgradeFleetManagedElasticAgent(ctx context.Context, t *testing.T, info *define.Info, startFixture *atesting.Fixture, endFixture *atesting.Fixture, policy kibana.AgentPolicy, unprivileged bool, iopts func(iopts atesting.InstallOpts) atesting.InstallOpts) {
 	kibClient := info.KibanaClient
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
@@ -638,6 +662,7 @@ func testUpgradeFleetManagedElasticAgent(
 		},
 		Privileged: !unprivileged,
 	}
+	installOpts = iopts(installOpts)
 	output, err := startFixture.Install(ctx, &installOpts)
 	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
 

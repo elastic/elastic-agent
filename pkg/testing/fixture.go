@@ -140,15 +140,6 @@ func WithAdditionalArgs(args []string) FixtureOpt {
 	}
 }
 
-// WithEnv sets the environment when running the Elastic Agent.
-// Each entry is of the form "key=value". os.Environ() is added by default.
-// See exec.Cmd.Env for details.
-func WithEnv(env []string) FixtureOpt {
-	return func(f *Fixture) {
-		f.env = append(os.Environ(), env...)
-	}
-}
-
 // NewFixture creates a new fixture to setup and manage Elastic Agent.
 func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, error) {
 	// we store the caller so the fixture can find the cache directory for the artifacts that
