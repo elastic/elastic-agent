@@ -61,7 +61,93 @@ func createAgentVaultAndSecret(t *testing.T, ctx context.Context, tempDir string
 }
 
 func runTestStateStore(t *testing.T, ackToken string) {
-	log, _ := logger.New("state_store", false)
+	log, _ := logger.NewTesting("state_store")
+
+	t.Run("SetAction corner case", func(t *testing.T) {
+
+		t.Run("nil fleetapi.Action", func(t *testing.T) {
+			var action fleetapi.Action
+
+			storePath := filepath.Join(t.TempDir(), "state.json")
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
+			store, err := NewStateStore(log, s)
+			require.NoError(t, err)
+			require.Nil(t, store.Action())
+
+			store.SetAction(action)
+			store.SetAckToken(ackToken)
+			err = store.Save()
+			require.NoError(t, err)
+
+			assert.Empty(t, store.Action())
+			assert.Empty(t, store.Queue())
+			assert.Equal(t, ackToken, store.AckToken())
+		})
+
+		t.Run("nil concrete and accepted action", func(t *testing.T) {
+			var actionUnenroll *fleetapi.ActionUnenroll
+			actionPolicyChange := &fleetapi.ActionPolicyChange{
+				ActionID: "abc123",
+			}
+
+			storePath := filepath.Join(t.TempDir(), "state.json")
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
+			store, err := NewStateStore(log, s)
+			require.NoError(t, err)
+			require.Nil(t, store.Action())
+
+			// 1st set an action
+			store.SetAction(actionPolicyChange)
+			store.SetAckToken(ackToken)
+			err = store.Save()
+			require.NoError(t, err)
+
+			// then try to set a nil action
+			store.SetAction(actionUnenroll)
+			store.SetAckToken(ackToken)
+			err = store.Save()
+			require.NoError(t, err)
+
+			assert.Equal(t, actionPolicyChange, store.Action())
+			assert.Empty(t, store.Queue())
+			assert.Equal(t, ackToken, store.AckToken())
+		})
+
+		t.Run("nil concrete and ignored action", func(t *testing.T) {
+			var actionUnknown *fleetapi.ActionUnknown
+			actionPolicyChange := &fleetapi.ActionPolicyChange{
+				ActionID: "abc123",
+			}
+
+			storePath := filepath.Join(t.TempDir(), "state.json")
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
+			store, err := NewStateStore(log, s)
+			require.NoError(t, err)
+			require.Nil(t, store.Action())
+
+			// 1st set an action
+			store.SetAction(actionPolicyChange)
+			store.SetAckToken(ackToken)
+			err = store.Save()
+			require.NoError(t, err)
+
+			// then try to set a nil action
+			store.SetAction(actionUnknown)
+			store.SetAckToken(ackToken)
+			err = store.Save()
+			require.NoError(t, err)
+
+			assert.Equal(t, actionPolicyChange, store.Action())
+			assert.Empty(t, store.Queue())
+			assert.Equal(t, ackToken, store.AckToken())
+		})
+	})
 
 	t.Run("store is not dirty on successful save", func(t *testing.T) {
 		storePath := filepath.Join(t.TempDir(), "state.json")
