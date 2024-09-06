@@ -75,7 +75,7 @@ func CheckLicenseHeaders() error {
 	licenser := gotool.Licenser
 	return licenser(
 		licenser.Check(),
-		licenser.License("Elastic"),
+		licenser.License("Elasticv2"),
 	)
 
 }
