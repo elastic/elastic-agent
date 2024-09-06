@@ -54,7 +54,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.9.0/processor/elasticinframetricsprocessor/README.md) | v0.9.0 |
+| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.11.0/processor/elasticinframetricsprocessor/README.md) | v0.11.0 |
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.108.1/processor/memorylimiterprocessor/README.md) | v0.108.1 |
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.108.0/processor/attributesprocessor/README.md) | v0.108.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.108.0/processor/filterprocessor/README.md) | v0.108.0 |
