@@ -310,7 +310,7 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	ctx := context.Background()
 
 	rootDir := t.TempDir()
-	rootPair, cert := prepareTLSCerts(t)
+	rootPair, childPair, cert := prepareTLSCerts(t)
 
 	// ========================== file server ==================================
 	// downloads/beats/elastic-agent/
@@ -324,7 +324,9 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 		rootPair.Cert, 0440)
 	require.NoError(t, err, "could not write root CA to /etc/ssl/certs")
 	t.Cleanup(func() {
-		assert.NoError(t, os.Remove(rootCAPath), "cleanup: could not remove root CA")
+		if err = os.Remove(rootCAPath); err != nil {
+			t.Log("cleanup: could not remove root CA")
+		}
 	})
 
 	// ==================== prepare to fixture from PR build ===================
@@ -359,9 +361,22 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 		ascFile, ascData, 0o600)
 	require.NoError(t, err, "could not write agent .asc file to disk")
 
+	// TODO: decide if it's worth saving this files, if so, give them a name
+	//  associating them with the test run
 	defer func() {
 		if !t.Failed() {
 			return
+		}
+
+		if err = os.WriteFile(filepath.Join(rootDir, "server.pem"), childPair.Cert, 0o777); err != nil {
+			t.Log("cleanup: could not save server cert for investigation")
+		}
+		if err = os.WriteFile(filepath.Join(rootDir, "server_key.pem"), childPair.Key, 0o777); err != nil {
+			t.Log("cleanup: could not save server cert key for investigation")
+		}
+
+		if err = os.WriteFile(filepath.Join(rootDir, "server_key.pem"), rootPair.Key, 0o777); err != nil {
+			t.Log("cleanup: could not save rootCA key for investigation")
 		}
 
 		toFixture.KeepFileByMoving(rootCAPath)
@@ -443,49 +458,14 @@ func prepareFileServer(t *testing.T, rootDir string, cert tls.Certificate) (*htt
 	return server, downloadDir
 }
 
-func prepareTLSCerts(t *testing.T) (certutil.Pair, tls.Certificate) {
+func prepareTLSCerts(t *testing.T) (certutil.Pair, certutil.Pair, tls.Certificate) {
 	rootPair, childPair := NewRootAndChildCerts(
 		t, "artifacts.elastic.co", []net.IP{net.ParseIP("127.0.0.1")})
 
 	cert, err := tls.X509KeyPair(childPair.Cert, childPair.Key)
 	require.NoError(t, err, "could not create tls.Certificates from child certificate")
-	// // ========================================================================
-	// // ========================================================================
-	// rootBlock, _ := pem.Decode(rootPair.Cert)
-	// if rootBlock == nil {
-	// 	panic("Failed to parse certificate PEM")
-	//
-	// }
-	// root, err := x509.ParseCertificate(rootBlock.Bytes)
-	// if err != nil {
-	// 	panic("Failed to parse certificate: " + err.Error())
-	// }
-	//
-	// childBlock, _ := pem.Decode(childPair.Cert)
-	// if rootBlock == nil {
-	// 	panic("Failed to parse certificate PEM")
-	//
-	// }
-	// child, err := x509.ParseCertificate(childBlock.Bytes)
-	// if err != nil {
-	// 	panic("Failed to parse certificate: " + err.Error())
-	// }
-	//
-	// // ====
-	// caCertPool := x509.NewCertPool()
-	// caCertPool.AddCert(root)
-	//
-	// // Verify the certificate using the CA pool
-	// opts := x509.VerifyOptions{
-	// 	Roots: caCertPool, // Use the CA pool for verification
-	// }
-	// if _, err := child.Verify(opts); err != nil {
-	// 	fmt.Printf("Failed to verify certificate: %v\n", err)
-	// } else {
-	// 	fmt.Println("Certificate verification successful!")
-	// }
 
-	return rootPair, cert
+	return rootPair, childPair, cert
 }
 
 // impersonateHost impersonates 'host' by adding an entry to /etc/hosts mapping
