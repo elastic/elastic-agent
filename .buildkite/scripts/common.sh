@@ -6,11 +6,8 @@ if [[ -z "${WORKSPACE-""}" ]]; then
     WORKSPACE=$(git rev-parse --show-toplevel)
     export WORKSPACE
 fi
-if [[ -z "${SETUP_MAGE_VERSION-""}" ]]; then
-    SETUP_MAGE_VERSION="1.15.0"
-fi
 if [[ -z "${SETUP_GVM_VERSION-""}" ]]; then
-    SETUP_GVM_VERSION="v0.5.0" # https://github.com/andrewkroh/gvm/issues/44#issuecomment-1013231151
+    SETUP_GVM_VERSION="v0.5.2" # https://github.com/andrewkroh/gvm/issues/44#issuecomment-1013231151
 fi
 BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
 export BEAT_VERSION
@@ -54,7 +51,6 @@ mage() {
     go version
     if ! [ -x "$(type -P mage | sed 's/mage is //g')" ];
     then
-        echo "installing mage ${SETUP_MAGE_VERSION}"
         make mage
     fi
     pushd "$WORKSPACE"
