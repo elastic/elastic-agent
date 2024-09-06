@@ -337,16 +337,15 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 		rootPair.Cert, 0440)
 	require.NoError(t, err, "could not write root CA to /etc/ssl/certs")
 
-	// ============================== PR build ==============================
+	// ========================= Fixture from PR build =========================
 	toFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err, "failed to get fixture with PR build")
 
 	prBuildPkgPath, err := toFixture.SrcPackage(ctx)
 	require.NoError(t, err, "could not get path to PR build artifact")
 
-	t.Logf("prBuildPkgPath: %q", prBuildPkgPath)
-
-	// ============================== copy PR build to file server  ==============================
+	// ====================== copy files to file server  ======================
+	// PR build package
 	_, filename := filepath.Split(prBuildPkgPath)
 	pkgDownloadPath := filepath.Join(downloadDir, filename)
 	copyFile(t, prBuildPkgPath, pkgDownloadPath)
@@ -364,15 +363,16 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 		gpgKeyElasticAgent, pubKey, 0o644)
 	require.NoError(t, err, "could not write GPG-KEY-elastic-agent to disk")
 
-	// ============================== add package signature to file server  ==============================
+	// add package signature to file server
 	err = os.WriteFile(
 		filepath.Join(downloadDir, filename+".asc"), ascData, 0o600)
 	require.NoError(t, err, "could not write agent .asc file to disk")
 
-	// ============================== impersonate https://artifacts.elastic.co/GPG-KEY-elastic-agent  ==============================
+	// ==== impersonate https://artifacts.elastic.co/GPG-KEY-elastic-agent  ====
 	undoEtcHosts := impersonateHost(t, "artifacts.elastic.co", "127.0.0.1")
 	t.Cleanup(undoEtcHosts)
 
+	// prepare agent's download source
 	downloadSource := kibana.DownloadSource{
 		Name:      "self-signed-" + uuid.Must(uuid.NewV4()).String(),
 		Host:      server.URL + "/downloads/",
@@ -388,7 +388,7 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	t.Logf("policy %s using DownloadSourceID: %s",
 		policy.ID, policy.DownloadSourceID)
 
-	// ============================== prepare last release  ==============================
+	// ========================= prepare from fixture  =========================
 	versions, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err, "could not get upgradable versions")
 
