@@ -309,6 +309,28 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 
 	ctx := context.Background()
 
+	// ========================= prepare from fixture  =========================
+	versions, err := upgradetest.GetUpgradableVersions()
+	require.NoError(t, err, "could not get upgradable versions")
+
+	sortedVers := version.SortableParsedVersions(versions)
+	sort.Sort(sort.Reverse(sortedVers))
+
+	t.Logf("upgradable versions: %v", versions)
+	var latestRelease version.ParsedSemVer
+	for _, v := range versions {
+		if !v.IsSnapshot() {
+			latestRelease = *v
+			break
+		}
+	}
+	fromFixture, err := atesting.NewFixture(t,
+		latestRelease.String())
+	require.NoError(t, err, "could not create fixture for latest release")
+	// make sure to download it before the test impersonates artifacts API
+	err = fromFixture.Prepare(ctx)
+	require.NoError(t, err, "could not prepare fromFixture")
+
 	rootDir := t.TempDir()
 	rootPair, childPair, cert := prepareTLSCerts(t)
 
@@ -319,7 +341,7 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 
 	// add root CA to /etc/ssl/certs. It was the only option that worked
 	rootCAPath := filepath.Join("/etc/ssl/certs", "TestFleetPRBuildSelfSigned.pem")
-	err := os.WriteFile(
+	err = os.WriteFile(
 		rootCAPath,
 		rootPair.Cert, 0440)
 	require.NoError(t, err, "could not write root CA to /etc/ssl/certs")
@@ -405,25 +427,6 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	policy.DownloadSourceID = src.Item.ID
 	t.Logf("policy %s using DownloadSourceID: %s",
 		policy.ID, policy.DownloadSourceID)
-
-	// ========================= prepare from fixture  =========================
-	versions, err := upgradetest.GetUpgradableVersions()
-	require.NoError(t, err, "could not get upgradable versions")
-
-	sortedVers := version.SortableParsedVersions(versions)
-	sort.Sort(sort.Reverse(sortedVers))
-
-	t.Logf("upgradable versions: %v", versions)
-	var latestRelease version.ParsedSemVer
-	for _, v := range versions {
-		if !v.IsSnapshot() {
-			latestRelease = *v
-			break
-		}
-	}
-	fromFixture, err := atesting.NewFixture(t,
-		latestRelease.String())
-	require.NoError(t, err, "could not create fixture for latest release")
 
 	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fromFixture, toFixture, policy, false)
 }
