@@ -9,6 +9,7 @@ package installtest
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -103,13 +104,17 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 }
 
 func validateFileTree(dir string, uid uint32, gid uint32) error {
-	return filepath.Walk(dir, func(file string, info os.FileInfo, err error) error {
+	return filepath.WalkDir(dir, func(file string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("error traversing the file tree: %w", err)
 		}
-		if info.Mode().Type() == os.ModeSymlink {
+		if d.Type() == os.ModeSymlink {
 			// symlink don't check permissions
 			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return fmt.Errorf("error caling info: %w", err)
 		}
 		fs, ok := info.Sys().(*syscall.Stat_t)
 		if !ok {
