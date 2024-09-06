@@ -295,7 +295,7 @@ shared:
   - &agent_docker_service_spec
     docker_variant: 'service'
     files:
-      'data/service_downloads/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
+      'data/service/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
         source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'
         mode: 0755
       'data/{{.BeatName}}-{{ commit_short }}/components/connectors':

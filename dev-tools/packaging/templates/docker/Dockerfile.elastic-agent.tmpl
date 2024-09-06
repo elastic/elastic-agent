@@ -178,9 +178,9 @@ RUN mkdir /app && \
 {{- end }}
 
 {{- if eq .Variant "service" }}
-RUN apk add --no-cache python-3.12 py3.12-pip && \
-    pip install {{ $beatHome }}/data/service_downloads/connectors-*.zip && \
-    rm -rf {{ $beatHome }}/data/service_downloads && \
+RUN apk add --no-cache git make python-3.11 py3.11-pip && \
+    unzip {{ $beatHome }}/data/service/connectors-*.zip -d {{ $beatHome }}/data/service && \
+    make -C {{ $beatHome }}/data/service/elasticsearch_connectors-* install-agent && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/connectors
 {{- end }}
 
