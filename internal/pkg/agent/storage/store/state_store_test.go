@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type wrongAction struct{}
@@ -61,7 +61,7 @@ func createAgentVaultAndSecret(t *testing.T, ctx context.Context, tempDir string
 }
 
 func runTestStateStore(t *testing.T, ackToken string) {
-	log, _ := logger.NewTesting("state_store")
+	log, _ := loggertest.New("state_store")
 
 	t.Run("SetAction corner case", func(t *testing.T) {
 
