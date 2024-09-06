@@ -997,6 +997,18 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "set default log level when nil comes from policy",
+			args: args{
+				c: map[string]interface{}{},
+			},
+			setupExpectations: func(setter *mockhandlers.LogLevelSetter) {
+				setter.EXPECT().
+					SetLogLevel(mock.Anything, mock.MatchedBy(matchLogLevel(logp.InfoLevel))).
+					Return(nil).Once()
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "set warning log level from policy",
 			args: args{
 				c: map[string]interface{}{
