@@ -13,8 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
 	"go.elastic.co/apm/v2"
 	"gopkg.in/yaml.v2"
 
@@ -1270,7 +1268,6 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	}
 
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", model.Components).Debug("Updating running component model")
 	c.runtimeMgr.Update(model)
 	return nil
 }
@@ -1488,7 +1485,6 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 	}
 	result := []component.Component{}
 	for _, component := range comps {
-		// If this is an input component (not a shipper), make sure its type is allowed
 		if component.InputSpec != nil && !c.caps.AllowInput(component.InputType) {
 			c.logger.Infof("Component '%v' with input type '%v' filtered by capabilities.yml", component.ID, component.InputType)
 			continue
@@ -1572,7 +1568,7 @@ func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, config
 
 	// combinedErr will store any reported errors as well as timeout errors
 	// for unresponsive managers.
-	var combinedErr error
+	var errs []error
 
 waitLoop:
 	for !returnedRuntime || !returnedConfig || !returnedVars || !returnedUpgradeMarkerWatcher {
@@ -1600,23 +1596,23 @@ waitLoop:
 				timeouts = append(timeouts, "no response from upgrade marker watcher")
 			}
 			timeoutStr := strings.Join(timeouts, ", ")
-			combinedErr = multierror.Append(combinedErr, fmt.Errorf("timeout while waiting for managers to shut down: %v", timeoutStr))
+			errs = append(errs, fmt.Errorf("timeout while waiting for managers to shut down: %v", timeoutStr))
 			break waitLoop
 		}
 	}
 	if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime manager: %w", runtimeErr))
+		errs = append(errs, fmt.Errorf("runtime manager: %w", runtimeErr))
 	}
 	if configErr != nil && !errors.Is(configErr, context.Canceled) {
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config manager: %w", configErr))
+		errs = append(errs, fmt.Errorf("config manager: %w", configErr))
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars manager: %w", varsErr))
+		errs = append(errs, fmt.Errorf("vars manager: %w", varsErr))
 	}
 	if upgradeMarkerWatcherErr != nil && !errors.Is(upgradeMarkerWatcherErr, context.Canceled) {
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("upgrade marker watcher: %w", upgradeMarkerWatcherErr))
+		errs = append(errs, fmt.Errorf("upgrade marker watcher: %w", upgradeMarkerWatcherErr))
 	}
-	return combinedErr
+	return errors.Join(errs...)
 }
 
 type coordinatorComponentLog struct {

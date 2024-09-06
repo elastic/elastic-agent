@@ -14,7 +14,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
-const fakeShipperName = "fake-shipper"
+const fakeOutputName = "fake-output"
 
 var fakeComponentPltfs = []string{
 	"container/amd64",
@@ -36,18 +36,14 @@ var fakeComponent = atesting.UsableComponent{
 				Name:        "fake",
 				Description: "A fake input",
 				Platforms:   fakeComponentPltfs,
-				Shippers: []string{
-					fakeShipperName,
-				},
-				Command: &component.CommandSpec{},
+				Outputs:     []string{fakeOutputName},
+				Command:     &component.CommandSpec{},
 			},
 			{
 				Name:        "fake-apm",
 				Description: "Fake component apm traces generator",
 				Platforms:   fakeComponentPltfs,
-				Shippers: []string{
-					fakeShipperName,
-				},
+				Outputs:     []string{fakeOutputName},
 				Command: &component.CommandSpec{
 					Env: []component.CommandEnvSpec{
 						{
@@ -62,41 +58,12 @@ var fakeComponent = atesting.UsableComponent{
 				},
 			},
 			{
-				Name:        "fake-isolated-units",
-				Description: "A fake isolated units input",
-				Platforms:   fakeComponentPltfs,
-				Shippers: []string{
-					fakeShipperName,
-				},
+				Name:         "fake-isolated-units",
+				Description:  "A fake isolated units input",
+				Platforms:    fakeComponentPltfs,
+				Outputs:      []string{fakeOutputName},
 				Command:      &component.CommandSpec{},
 				IsolateUnits: true,
-			},
-		},
-	},
-}
-
-var fakeShipper = atesting.UsableComponent{
-	Name:       fakeShipperName,
-	BinaryPath: mustAbs(filepath.Join("..", "..", "pkg", "component", "fake", "shipper", osExt("shipper"))),
-	Spec: &component.Spec{
-		Version: 2,
-		Shippers: []component.ShipperSpec{
-			{
-				Name:        fakeShipperName,
-				Description: "A fake shipper",
-				Platforms: []string{
-					"container/amd64",
-					"container/arm64",
-					"darwin/amd64",
-					"darwin/arm64",
-					"linux/amd64",
-					"linux/arm64",
-					"windows/amd64",
-				},
-				Outputs: []string{
-					"fake-action-output",
-				},
-				Command: &component.CommandSpec{},
 			},
 		},
 	},

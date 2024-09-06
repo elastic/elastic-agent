@@ -143,3 +143,18 @@ func dumpToYAML(t *testing.T, out string, in interface{}) {
 	err = os.WriteFile(out, b, 0600)
 	require.NoError(t, err)
 }
+
+func TestDollarSignsInInputs(t *testing.T) {
+	in := map[string]interface{}{
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"type": "logfile",
+				"what": "$$$$",
+			},
+		},
+	}
+	c := MustNewConfigFrom(in)
+	out, err := c.ToMapStr()
+	assert.NoError(t, err)
+	assert.Equal(t, in, out)
+}

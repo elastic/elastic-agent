@@ -379,7 +379,7 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	}
 
 	_, pids, err := procStats.FetchPids()
-	if !assert.NoError(t, err, "error fetching process information") {
+	if err != nil && assert.Truef(t, errors.Is(err, agentsystemprocess.NonFatalErr{}), "error fetching process information: %v", err) {
 		// we failed a bit further
 		return nil
 	}
@@ -402,20 +402,21 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 //   - an error if any.
 func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
-	//Prepare so that the f.srcPackage string is populated
+	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare: %w", err)
 	}
 
-	// sudo apt install the deb
-	out, err := exec.CommandContext(ctx, "sudo", "apt", "install", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	// sudo apt-get install the deb
+	out, err := exec.CommandContext(ctx, "sudo", "apt-get", "install", "-y", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	if err != nil {
 		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
 	}
 
 	f.t.Cleanup(func() {
 		f.t.Logf("[test %s] Inside fixture installDeb cleanup function", f.t.Name())
+
 		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer uninstallCancel()
 		// stop elastic-agent, non fatal if error, might have been stopped before this.
@@ -424,6 +425,12 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 		if err != nil {
 			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
 		}
+
+		if keepInstalledFlag() {
+			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
+			return
+		}
+
 		// apt-get purge elastic-agent
 		f.t.Logf("running 'sudo apt-get -y -q purge elastic-agent'")
 		out, err = exec.CommandContext(uninstallCtx, "sudo", "apt-get", "-y", "-q", "purge", "elastic-agent").CombinedOutput()
@@ -476,7 +483,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 //   - an error if any.
 func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installRpm function", f.t.Name())
-	//Prepare so that the f.srcPackage string is populated
+	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare: %w", err)
@@ -642,12 +649,12 @@ func (f *Fixture) collectDiagnostics() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	dir, err := findProjectRoot(f.caller)
+	diagPath, err := f.DiagDir()
 	if err != nil {
-		f.t.Logf("failed to collect diagnostics; failed to find project root: %s", err)
+		f.t.Logf("failed to collect diagnostics: %v", err)
 		return
 	}
-	diagPath := filepath.Join(dir, "build", "diagnostics")
+
 	err = os.MkdirAll(diagPath, 0755)
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics; failed to create %s: %s", diagPath, err)
@@ -690,6 +697,18 @@ func (f *Fixture) collectDiagnostics() {
 			}
 		}
 	}
+}
+
+// DiagDir returned {projectRoot}/build/diagnostics path. Files on this path
+// are saved if any test fails. Use it to save files for further investigation.
+func (f *Fixture) DiagDir() (string, error) {
+	dir, err := findProjectRoot(f.caller)
+	if err != nil {
+		return "", fmt.Errorf("failed to find project root: %w", err)
+	}
+
+	diagPath := filepath.Join(dir, "build", "diagnostics")
+	return diagPath, nil
 }
 
 func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string) error {

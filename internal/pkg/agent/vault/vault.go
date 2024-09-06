@@ -27,7 +27,10 @@ type Vault interface {
 }
 
 func New(ctx context.Context, opts ...OptionFunc) (Vault, error) {
-	options := ApplyOptions(opts...)
+	options, err := ApplyOptions(opts...)
+	if err != nil {
+		return nil, err
+	}
 
 	if runtime.GOOS == "darwin" && !options.unprivileged {
 		return NewDarwinKeyChainVault(ctx, options)

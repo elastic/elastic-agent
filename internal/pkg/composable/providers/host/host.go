@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -141,7 +142,7 @@ func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
 
 		return map[string]interface{}{
 			"id":           info.UniqueID,
-			"name":         name,
+			"name":         strings.ToLower(name),
 			"platform":     runtime.GOOS,
 			"architecture": info.Architecture,
 			"ip":           info.IPs,

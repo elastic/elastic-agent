@@ -8,9 +8,9 @@ MAGE_TARGET="${2:-"integration:test"}"
 MAGE_SUBTARGET="${3:-""}"
 
 
-
-# PACKAGE
-DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64,windows/amd64 PACKAGES=tar.gz,zip,rpm,deb mage package
+# Override the stack version from `.package-version` contents
+# There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
+# This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
 
 STACK_VERSION="$(cat .package-version)"
 if [[ -n "$STACK_VERSION" ]]; then

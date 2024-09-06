@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 
 	v1 "k8s.io/api/core/v1"
@@ -83,6 +84,12 @@ func (p *provisioner) Supported(batch define.OS) bool {
 
 func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {
 
+	agentImageWithoutTests := fmt.Sprintf("docker.elastic.co/beats/elastic-agent-complete:%s", cfg.AgentVersion)
+	agentImage, err := kubernetes.AddK8STestsToImage(ctx, p.logger, agentImageWithoutTests, runtime.GOARCH)
+	if err != nil {
+		return nil, err
+	}
+
 	versionsMap := make(map[string]string)
 
 	for _, batch := range batches {
@@ -141,7 +148,6 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 			return nil, err
 		}
 
-		agentImage := fmt.Sprintf("docker.elastic.co/beats/elastic-agent-complete:%s", cfg.AgentVersion)
 		if err := p.LoadImage(ctx, instanceName, agentImage); err != nil {
 			return nil, err
 		}

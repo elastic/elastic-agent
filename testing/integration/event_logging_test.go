@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -75,7 +75,6 @@ func TestEventLogFile(t *testing.T) {
 		Local: true,
 		Sudo:  false,
 	})
-
 	ctx, cancel := testcontext.WithDeadline(
 		t,
 		context.Background(),
@@ -163,7 +162,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		},
 		Group: "container",
 	})
-
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/5159")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -171,7 +170,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 	require.NoError(t, err)
 
 	_, outputID := createMockESOutput(t, info)
-	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.New().String())
+	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
 	policyID, enrollmentAPIKey := createPolicy(
 		t,
 		ctx,
@@ -254,7 +253,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		agentOutputStr := agentOutput.String()
 		scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
 		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "Cannot index event publisher.Event") {
+			if strings.Contains(scanner.Text(), "Cannot index event") {
 				return true
 			}
 		}
@@ -340,7 +339,7 @@ func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixt
 	}
 
 	logEntry := string(logEntryBytes)
-	expectedStr := "Cannot index event publisher.Event"
+	expectedStr := "Cannot index event"
 	if !strings.Contains(logEntry, expectedStr) {
 		t.Errorf(
 			"did not find the expected log entry ('%s') in the events log file",

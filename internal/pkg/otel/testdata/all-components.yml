@@ -11,6 +11,7 @@ exporters:
     endpoint: https://localhost.com:4318
 
 extensions:
+  health_check:
   memory_limiter:
     check_interval: 5s
     limit_mib: 100
@@ -31,6 +32,10 @@ processors:
         value: value1
   resourcedetection:
   transform:
+  memory_limiter/processor:
+    check_interval: 1s
+    limit_mib: 4000
+    spike_limit_mib: 800
 
 receivers:
   filelog:
@@ -45,6 +50,17 @@ receivers:
       - endpoint: http://localhost:80
         method: GET
     collection_interval: 10s
+  jaeger:
+    protocols:
+      grpc:
+  zipkin:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 5s
+          static_configs:
+            - targets: ['0.0.0.0:8888']
 
 connectors: 
   spanmetrics:
@@ -75,6 +91,7 @@ connectors:
 service:
   extensions:
     - memory_limiter
+    - health_check
   pipelines:
     logs:
       exporters:
@@ -89,6 +106,7 @@ service:
         - resource
         - resourcedetection
         - transform
+        - memory_limiter/processor
       receivers:
         - filelog
         - otlp
@@ -109,6 +127,7 @@ service:
         - otlp
         - httpcheck
         - spanmetrics
+        - prometheus
 
     traces:
       exporters:
@@ -126,3 +145,5 @@ service:
         - transform
       receivers:
         - otlp
+        - jaeger
+        - zipkin

@@ -106,7 +106,9 @@ func Test_checkForUnprivilegedVault(t *testing.T) {
 }
 
 func initFileVault(t *testing.T, ctx context.Context, testVaultPath string, keys map[string][]byte) {
-	newFileVault, err := vault.NewFileVault(ctx, vault.ApplyOptions(vault.WithVaultPath(testVaultPath)))
+	opts, err := vault.ApplyOptions(vault.WithVaultPath(testVaultPath))
+	require.NoError(t, err)
+	newFileVault, err := vault.NewFileVault(ctx, opts)
 	require.NoError(t, err, "setting up test file vault store")
 	defer func(newFileVault *vault.FileVault) {
 		err := newFileVault.Close()

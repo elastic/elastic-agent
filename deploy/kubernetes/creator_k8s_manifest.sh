@@ -52,6 +52,7 @@ echo "" >> $OUTPUT_FILE
 
 #Replacing all occurencies of elastic-agent-standalone
 sed -i -e 's/elastic-agent-standalone/elastic-agent/g' $OUTPUT_FILE
+sed -i -e 's/elastic-agent\/templates.d/elastic-agent-standalone\/templates.d/g' $OUTPUT_FILE
 
 #Remove ES_HOST entry from file
 sed -i -e '/# The Elasticsearch host to communicate with/d' $OUTPUT_FILE

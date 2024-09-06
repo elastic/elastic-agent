@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
@@ -207,7 +207,7 @@ func CreateServiceToken(ctx context.Context, client elastictransport.Interface, 
 	req := esapi.SecurityCreateServiceTokenRequest{
 		Namespace: "elastic",
 		Service:   service,
-		Name:      uuid.New().String(), // FIXME(michel-laterman): We need to specify a random name until an upstream issue is fixed: https://github.com/elastic/go-elasticsearch/issues/861
+		Name:      uuid.Must(uuid.NewV4()).String(), // FIXME(michel-laterman): We need to specify a random name until an upstream issue is fixed: https://github.com/elastic/go-elasticsearch/issues/861
 	}
 	resp, err := req.Do(ctx, client)
 	if err != nil {
@@ -593,6 +593,7 @@ func PerformQueryForRawQuery(ctx context.Context, queryRaw map[string]interface{
 		es.Search.WithContext(ctx),
 		es.Search.WithSize(300),
 	)
+
 	if err != nil {
 		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
 	}

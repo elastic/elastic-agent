@@ -70,17 +70,6 @@ var componentSetup = map[string]integrationtest.ComponentState{
 			},
 		},
 	},
-	"fake-shipper-default": {
-		State: integrationtest.NewClientState(client.Healthy),
-		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
-				State: integrationtest.NewClientState(client.Healthy),
-			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
-				State: integrationtest.NewClientState(client.Healthy),
-			},
-		},
-	},
 }
 
 var isolatedUnitsComponentSetup = map[string]integrationtest.ComponentState{
@@ -106,20 +95,6 @@ var isolatedUnitsComponentSetup = map[string]integrationtest.ComponentState{
 			},
 		},
 	},
-	"fake-shipper-default": {
-		State: integrationtest.NewClientState(client.Healthy),
-		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
-				State: integrationtest.NewClientState(client.Healthy),
-			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units"}: {
-				State: integrationtest.NewClientState(client.Healthy),
-			},
-			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-isolated-units-default-fake-isolated-units-1"}: {
-				State: integrationtest.NewClientState(client.Healthy),
-			},
-		},
-	},
 }
 
 type componentAndUnitNames struct {
@@ -138,7 +113,7 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
+	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	diagpprof := append(diagnosticsFiles, "cpu.pprof")
@@ -164,7 +139,7 @@ func TestIsolatedUnitsDiagnosticsOptionalValues(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
+	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	diagpprof := append(diagnosticsFiles, "cpu.pprof")
@@ -190,7 +165,7 @@ func TestDiagnosticsCommand(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	err = f.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	err = f.Run(ctx, integrationtest.State{
@@ -213,7 +188,7 @@ func TestIsolatedUnitsDiagnosticsCommand(t *testing.T) {
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	err = f.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
 	err = f.Run(ctx, integrationtest.State{

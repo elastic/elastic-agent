@@ -130,19 +130,11 @@ func (f *FleetGateway) Actions() <-chan []fleetapi.Action {
 }
 
 func (f *FleetGateway) Run(ctx context.Context) error {
-	// Backoff implementation doesn't support the use of a context [cancellation] as the shutdown mechanism.
-	// So we keep a done channel that will be closed when the current context is shutdown.
-	done := make(chan struct{})
 	backoff := backoff.NewEqualJitterBackoff(
-		done,
+		ctx.Done(),
 		f.settings.Backoff.Init,
 		f.settings.Backoff.Max,
 	)
-	go func() {
-		<-ctx.Done()
-		close(done)
-	}()
-
 	f.log.Info("Fleet gateway started")
 	for {
 		select {
@@ -239,31 +231,15 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 		return nil
 	}
 	stateString := func(s eaclient.UnitState) string {
-		switch s {
-		case eaclient.UnitStateStarting:
-			return "STARTING"
-		case eaclient.UnitStateConfiguring:
-			return "CONFIGURING"
-		case eaclient.UnitStateHealthy:
-			return "HEALTHY"
-		case eaclient.UnitStateDegraded:
-			return fleetStateDegraded
-		case eaclient.UnitStateFailed:
-			return "FAILED"
-		case eaclient.UnitStateStopping:
-			return "STOPPING"
-		case eaclient.UnitStateStopped:
-			return "STOPPED"
+		if state := s.String(); state != "UNKNOWN" {
+			return state
 		}
 		return ""
 	}
 
 	unitTypeString := func(t eaclient.UnitType) string {
-		switch t {
-		case eaclient.UnitTypeInput:
-			return "input"
-		case eaclient.UnitTypeOutput:
-			return "output"
+		if typ := t.String(); typ != "unknown" {
+			return typ
 		}
 		return ""
 	}
@@ -274,19 +250,11 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 		component := item.Component
 		state := item.State
 
-		var shipperReference *fleetapi.CheckinShipperReference
-		if component.ShipperRef != nil {
-			shipperReference = &fleetapi.CheckinShipperReference{
-				ComponentID: component.ShipperRef.ComponentID,
-				UnitID:      component.ShipperRef.UnitID,
-			}
-		}
 		checkinComponent := fleetapi.CheckinComponent{
 			ID:      component.ID,
 			Type:    component.Type(),
 			Status:  stateString(state.State),
 			Message: state.Message,
-			Shipper: shipperReference,
 		}
 
 		if state.Units != nil {

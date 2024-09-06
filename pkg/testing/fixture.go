@@ -26,6 +26,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -206,7 +207,7 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	if err != nil {
 		return err
 	}
-	workDir := f.t.TempDir()
+	workDir := createTempDir(f.t)
 	finalDir := filepath.Join(workDir, name)
 	err = ExtractArtifact(f.t, src, workDir)
 	if err != nil {
@@ -709,26 +710,20 @@ func (e *ExecErr) Unwrap() error {
 // ExecStatus executes the status subcommand on the prepared Elastic Agent binary.
 // It returns the parsed output and the error from the execution. Keep in mind
 // the agent exits with status 1 if it's unhealthy, but it still outputs the
-// status successfully. Therefore, a non-empty AgentStatusOutput is valid
-// regardless of the error. An empty AgentStatusOutput and non nil error
-// means the output could not be parsed. Use AgentStatusOutput.IsZero() to
-// determine if the returned AgentStatusOutput is empty or not.
+// status successfully. An empty AgentStatusOutput and non nil error
+// means the output could not be parsed.
+// As long as we get some output, we don't return any error.
 // It should work with any 8.6+ agent
 func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
 	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
 	status := AgentStatusOutput{}
 	if uerr := json.Unmarshal(out, &status); uerr != nil {
 		return AgentStatusOutput{},
-			fmt.Errorf("could not unmarshal agent status output: %w",
-				errors.Join(&ExecErr{
-					err:    err,
-					Output: out,
-				}, uerr))
+			fmt.Errorf("could not unmarshal agent status output: %w", errors.Join(uerr, err))
+	} else if status.IsZero() {
+		return status, fmt.Errorf("agent status output is empty: %w", err)
 	}
 
-	if err != nil {
-		return status, fmt.Errorf("error running command (output: %s): %w", string(out), err)
-	}
 	return status, nil
 }
 
@@ -1202,6 +1197,31 @@ func performConfigure(ctx context.Context, c client.Client, cfg string, timeout 
 	return nil
 }
 
+// createTempDir creates a temporary directory that will be
+// removed after the tests passes. If the test fails, the
+// directory is kept for further investigation.
+//
+// If the test is run with -v and fails the temporary directory is logged
+func createTempDir(t *testing.T) string {
+	tempDir, err := os.MkdirTemp("", strings.ReplaceAll(t.Name(), "/", "-"))
+	if err != nil {
+		t.Fatalf("failed to make temp directory: %s", err)
+	}
+
+	cleanup := func() {
+		if !t.Failed() {
+			if err := install.RemovePath(tempDir); err != nil {
+				t.Errorf("could not remove temp dir '%s': %s", tempDir, err)
+			}
+		} else {
+			t.Logf("Temporary directory %q preserved for investigation/debugging", tempDir)
+		}
+	}
+	t.Cleanup(cleanup)
+
+	return tempDir
+}
+
 type AgentStatusOutput struct {
 	Info struct {
 		ID           string `json:"id"`
@@ -1243,7 +1263,7 @@ type AgentStatusOutput struct {
 }
 
 func (aso *AgentStatusOutput) IsZero() bool {
-	return aso.Info.ID == ""
+	return aso.Info.ID == "" && aso.Message == "" && aso.Info.Version == ""
 }
 
 type AgentInspectOutput struct {

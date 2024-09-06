@@ -34,6 +34,14 @@ func TestVars_Replace(t *testing.T) {
 		"other": map[string]interface{}{
 			"data": "info",
 		},
+		"special": map[string]interface{}{
+			"key1": "$1$$2",
+			"key2": "1$2$$",
+			"key3": "${abcd}",
+			"key4": "$${abcd}",
+			"key5": "${",
+			"key6": "$${",
+		},
 	})
 	tests := []struct {
 		Input   string
@@ -206,6 +214,42 @@ func TestVars_Replace(t *testing.T) {
 		{
 			`start $${keep} ${un-der_score.key1} $${un-der_score.key1}`,
 			NewStrVal(`start ${keep} data1 ${un-der_score.key1}`),
+			false,
+			false,
+		},
+		{
+			`${special.key1}`,
+			NewStrVal("$1$$2"),
+			false,
+			false,
+		},
+		{
+			`${special.key2}`,
+			NewStrVal("1$2$$"),
+			false,
+			false,
+		},
+		{
+			`${special.key3}`,
+			NewStrVal("${abcd}"),
+			false,
+			false,
+		},
+		{
+			`${special.key4}`,
+			NewStrVal("$${abcd}"),
+			false,
+			false,
+		},
+		{
+			`${special.key5}`,
+			NewStrVal("${"),
+			false,
+			false,
+		},
+		{
+			`${special.key6}`,
+			NewStrVal("$${"),
 			false,
 			false,
 		},

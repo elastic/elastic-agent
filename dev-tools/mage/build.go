@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"errors"
 	"fmt"
 	"go/build"
 	"log"
@@ -14,7 +15,8 @@ import (
 
 	"github.com/josephspurrier/goversioninfo"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // BuildArgs are the arguments used for the "build" target and they define how
@@ -111,7 +113,7 @@ func DefaultGolangCrossBuildArgs() BuildArgs {
 func GolangCrossBuild(params BuildArgs) error {
 	if os.Getenv("GOLANG_CROSSBUILD") != "1" {
 		return errors.New("Use the crossBuild target. golangCrossBuild can " +
-			"only be executed within the golang-crossbuild docker environment.")
+			"only be executed within the golang-crossbuild docker environment")
 	}
 
 	defer DockerChown(filepath.Join(params.OutputDir, params.Name+binaryExtension(GOOS)))
@@ -180,7 +182,7 @@ func Build(params BuildArgs) error {
 		log.Println("Generating a .syso containing Windows file metadata.")
 		syso, err := MakeWindowsSysoFile()
 		if err != nil {
-			return errors.Wrap(err, "failed generating Windows .syso metadata file")
+			return fmt.Errorf("failed generating Windows .syso metadata file: %w", err)
 		}
 		defer os.Remove(syso)
 	}
@@ -219,7 +221,7 @@ func MakeWindowsSysoFile() (string, error) {
 		},
 		StringFileInfo: goversioninfo.StringFileInfo{
 			CompanyName:      BeatVendor,
-			ProductName:      strings.Title(BeatName),
+			ProductName:      cases.Title(language.Und, cases.NoLower).String(BeatName),
 			ProductVersion:   version,
 			FileVersion:      version,
 			FileDescription:  BeatDescription,
@@ -233,7 +235,7 @@ func MakeWindowsSysoFile() (string, error) {
 	vi.Walk()
 	sysoFile := BeatName + "_windows_" + GOARCH + ".syso"
 	if err = vi.WriteSyso(sysoFile, GOARCH); err != nil {
-		return "", errors.Wrap(err, "failed to generate syso file with Windows metadata")
+		return "", fmt.Errorf("failed to generate syso file with Windows metadata: %w", err)
 	}
 	return sysoFile, nil
 }

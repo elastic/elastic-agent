@@ -11,7 +11,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 )
@@ -157,7 +157,7 @@ func DefaultURL(ctx context.Context, client *kibana.Client) (string, error) {
 // an enrollment token and returns an EnrollParams with the information to enroll
 // an agent. If an error happens, it returns nil and a non-nil error.
 func NewEnrollParams(ctx context.Context, client *kibana.Client) (*EnrollParams, error) {
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	policy := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",

@@ -15,13 +15,15 @@ import (
 	"fmt"
 	"html/template"
 	"log"
-	"math/rand"
+	"maps"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,9 +33,9 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
-	"github.com/elastic/e2e-testing/pkg/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -56,17 +58,18 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v2"
-	"k8s.io/utils/strings/slices"
+	"gopkg.in/yaml.v3"
+
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
+	"helm.sh/helm/v3/pkg/cli"
 )
 
 const (
-	goLintRepo        = "golang.org/x/lint/golint"
 	goLicenserRepo    = "github.com/elastic/go-licenser"
 	buildDir          = "build"
 	metaDir           = "_meta"
@@ -84,6 +87,8 @@ const (
 
 	baseURLForStagingDRA = "https://staging.elastic.co/"
 	agentCoreProjectName = "elastic-agent-core"
+
+	helmChartPath = "./deploy/helm/elastic-agent"
 )
 
 var (
@@ -262,11 +267,6 @@ func (Prepare) InstallGoLicenser() error {
 	return GoInstall(goLicenserRepo)
 }
 
-// InstallGoLint for the code.
-func (Prepare) InstallGoLint() error {
-	return GoInstall(goLintRepo)
-}
-
 // All build all the things for the current projects.
 func (Build) All() {
 	mg.Deps(Build.Binary)
@@ -331,18 +331,50 @@ func (Build) Binary() error {
 }
 
 // Clean up dev environment.
-func (Build) Clean() {
-	os.RemoveAll(buildDir)
+func (Build) Clean() error {
+	absBuildDir, err := filepath.Abs(buildDir)
+	if err != nil {
+		return fmt.Errorf("cannot get absolute path of build dir: %w", err)
+	}
+	if err := os.RemoveAll(absBuildDir); err != nil {
+		return fmt.Errorf("cannot remove build dir '%s': %w", absBuildDir, err)
+	}
+
+	testBinariesPath, err := getTestBinariesPath()
+	if err != nil {
+		return fmt.Errorf("cannot remove test binaries: %w", err)
+	}
+
+	if mg.Verbose() {
+		fmt.Println("removed", absBuildDir)
+		for _, b := range testBinariesPath {
+			fmt.Println("removed", b)
+		}
+	}
+
+	return nil
+}
+
+func getTestBinariesPath() ([]string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("could not get working directory: %w", err)
+	}
+
+	testBinaryPkgs := []string{
+		filepath.Join(wd, "pkg", "component", "fake", "component"),
+		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
+	}
+	return testBinaryPkgs, nil
 }
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	wd, _ := os.Getwd()
-	testBinaryPkgs := []string{
-		filepath.Join(wd, "pkg", "component", "fake", "component"),
-		filepath.Join(wd, "pkg", "component", "fake", "shipper"),
-		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
+	testBinaryPkgs, err := getTestBinariesPath()
+	if err != nil {
+		fmt.Errorf("cannot build test binaries: %w", err)
 	}
+
 	for _, pkg := range testBinaryPkgs {
 		binary := filepath.Base(pkg)
 		if runtime.GOOS == "windows" {
@@ -367,35 +399,11 @@ func (Check) All() {
 	mg.SerialDeps(Check.License, Integration.Check)
 }
 
-// GoLint run the code through the linter.
-func (Check) GoLint() error {
-	mg.Deps(Prepare.InstallGoLint)
-	packagesString, err := sh.Output("go", "list", "./...")
-	if err != nil {
-		return err
-	}
-
-	packages := strings.Split(packagesString, "\n")
-	for _, pkg := range packages {
-		if strings.Contains(pkg, "/vendor/") {
-			continue
-		}
-
-		if e := sh.RunV("golint", "-set_exit_status", pkg); e != nil {
-			err = multierror.Append(err, e)
-		}
-	}
-
-	return err
-}
-
 // License makes sure that all the Golang files have the appropriate license header.
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return combineErr(
-		sh.RunV("go-licenser", "-d", "-license", "Elastic"),
-	)
+	return sh.RunV("go-licenser", "-d", "-license", "Elastic")
 }
 
 // Changes run git status --porcelain and return an error if we have changes or uncommitted files.
@@ -439,9 +447,7 @@ func (Format) All() {
 // License applies the right license header.
 func (Format) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
-	return combineErr(
-		sh.RunV("go-licenser", "-license", "Elastic"),
-	)
+	return sh.RunV("go-licenser", "-license", "Elastic")
 }
 
 // AssembleDarwinUniversal merges the darwin/amd64 and darwin/arm64 into a single
@@ -700,15 +706,6 @@ func ControlProto() error {
 		"control_v1.proto")
 }
 
-// FakeShipperProto generates pkg/component/fake/common event protocol.
-func FakeShipperProto() error {
-	return sh.RunV(
-		"protoc",
-		"--go_out=.", "--go_opt=paths=source_relative",
-		"--go-grpc_out=.", "--go-grpc_opt=paths=source_relative",
-		"pkg/component/fake/common/event.proto")
-}
-
 func BuildPGP() error {
 	// go run elastic-agent/dev-tools/cmd/buildpgp/build_pgp.go --in agent/spec/GPG-KEY-elasticsearch --out elastic-agent/pkg/release/pgp.go
 	goF := filepath.Join("dev-tools", "cmd", "buildpgp", "build_pgp.go")
@@ -738,17 +735,6 @@ func ConfigFileParams() devtools.ConfigFileParams {
 		},
 	}
 	return p
-}
-
-func combineErr(errors ...error) error {
-	var e error
-	for _, err := range errors {
-		if err == nil {
-			continue
-		}
-		e = multierror.Append(e, err)
-	}
-	return e
 }
 
 // UnitTest performs unit test on agent.
@@ -862,6 +848,10 @@ func (Cloud) Push() error {
 	fmt.Printf(">> Docker image pushed to remote registry successfully: %s\n", targetCloudImageName)
 
 	return nil
+}
+
+func Clean() {
+	mg.Deps(devtools.Clean, Build.Clean)
 }
 
 func dockerCommitHash() string {
@@ -1033,15 +1023,14 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 		if devtools.ExternalBuild == true {
 
-			// Only log fatal logs for logs produced using logrus. This is the global logger
-			// used by github.com/elastic/e2e-testing/pkg/downloads which can only be configured globally like this or via
-			// environment variables.
+			// Only log fatal logs for logs produced. This is the global logger
+			// used by github.com/elastic/elastic-agent/dev-tools/mage/downloads which can only be configured globally like this.
 			//
 			// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
 			// download artifacts on unsupported platforms and choose to ignore the errors.
 			//
 			// Change this to InfoLevel to see exactly what the downloader is doing.
-			logrus.SetLevel(logrus.FatalLevel)
+			downloads.LogLevel.Set(downloads.FatalLevel)
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
@@ -3029,8 +3018,6 @@ func stringPrompt(prompt string) (string, error) {
 			return s, nil
 		}
 	}
-
-	return "", nil
 }
 
 func writeFile(name string, data []byte, perm os.FileMode) error {
@@ -3229,4 +3216,197 @@ type otelDependencies struct {
 	Extensions []*otelDependency
 	Processors []*otelDependency
 	Receivers  []*otelDependency
+}
+
+type Helm mg.Namespace
+
+func (Helm) RenderExamples() error {
+	settings := cli.New() // Helm CLI settings
+	actionConfig := &action.Configuration{}
+
+	helmChart, err := loader.Load(helmChartPath)
+	if err != nil {
+		return fmt.Errorf("failed to load helm chart: %w", err)
+	}
+
+	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
+		func(format string, v ...interface{}) {})
+	if err != nil {
+		return fmt.Errorf("failed to init helm action config: %w", err)
+	}
+
+	examplesPath := filepath.Join(helmChartPath, "examples")
+	dirEntries, err := os.ReadDir(examplesPath)
+	if err != nil {
+		return fmt.Errorf("failed to read %s dir: %w", examplesPath, err)
+	}
+
+	for _, d := range dirEntries {
+		if !d.IsDir() {
+			continue
+		}
+
+		exampleFullPath := filepath.Join(examplesPath, d.Name())
+
+		helmValues := make(map[string]any)
+		helmValuesFiles, err := filepath.Glob(filepath.Join(exampleFullPath, "*-values.yaml"))
+		if err != nil {
+			return fmt.Errorf("failed to get helm values files: %w", err)
+		}
+
+		for _, helmValuesFile := range helmValuesFiles {
+			data, err := loadYamlFile(helmValuesFile)
+			if err != nil {
+				return fmt.Errorf("failed to load helm values file: %w", err)
+			}
+			maps.Copy(helmValues, data)
+		}
+
+		installAction := action.NewInstall(actionConfig)
+		installAction.Namespace = "default"
+		installAction.ReleaseName = "example"
+		installAction.CreateNamespace = true
+		installAction.UseReleaseName = true
+		installAction.CreateNamespace = false
+		installAction.DryRun = true
+		installAction.Replace = true
+		installAction.KubeVersion = &chartutil.KubeVersion{Version: "1.27.0"}
+		installAction.ClientOnly = true
+		release, err := installAction.Run(helmChart, helmValues)
+		if err != nil {
+			return fmt.Errorf("failed to install helm chart: %w", err)
+		}
+
+		renderedFolder := filepath.Join(exampleFullPath, "rendered")
+		err = os.Mkdir(renderedFolder, 0o755)
+		if err != nil && !errors.Is(err, os.ErrExist) {
+			return fmt.Errorf("failed to create rendered directory: %w", err)
+		}
+
+		renderedManifestPath := filepath.Join(renderedFolder, "manifest.yaml")
+
+		err = os.WriteFile(renderedManifestPath, []byte(release.Manifest), 0o644)
+		if err != nil {
+			return fmt.Errorf("failed to write rendered manifest: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (Helm) UpdateAgentVersion() error {
+	valuesFile := filepath.Join(helmChartPath, "values.yaml")
+
+	data, err := os.ReadFile(valuesFile)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	isTagged, err := devtools.TagContainsCommit()
+	if err != nil {
+		return fmt.Errorf("failed to check if tag contains commit: %w", err)
+	}
+
+	if !isTagged {
+		isTagged = os.Getenv(snapshotEnv) != ""
+	}
+
+	agentVersion := getVersion()
+
+	// Parse YAML into a Node structure because
+	// it maintains comments
+	var rootNode yaml.Node
+	err = yaml.Unmarshal(data, &rootNode)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal YAML: %w", err)
+	}
+
+	if rootNode.Kind != yaml.DocumentNode {
+		return fmt.Errorf("root node is not a document node")
+	} else if len(rootNode.Content) == 0 {
+		return fmt.Errorf("root node has no content")
+	}
+
+	if err := updateYamlNodes(rootNode.Content[0], agentVersion, "agent", "version"); err != nil {
+		return fmt.Errorf("failed to update agent version: %w", err)
+	}
+
+	if !isTagged {
+		if err := updateYamlNodes(rootNode.Content[0], fmt.Sprintf("%s-SNAPSHOT", agentVersion), "agent", "image", "tag"); err != nil {
+			return fmt.Errorf("failed to update agent image tag: %w", err)
+		}
+	}
+
+	// Truncate values file
+	file, err := os.Create(valuesFile)
+	if err != nil {
+		return fmt.Errorf("failed to open file for writing: %w", err)
+	}
+	defer file.Close()
+
+	// Create a YAML encoder with 2-space indentation
+	encoder := yaml.NewEncoder(file)
+	encoder.SetIndent(2)
+
+	// Encode the updated YAML node back to the file
+	err = encoder.Encode(&rootNode)
+	if err != nil {
+		return fmt.Errorf("failed to encode updated YAML: %w", err)
+	}
+
+	return nil
+}
+
+func (Helm) Lint() error {
+	settings := cli.New() // Helm CLI settings
+	actionConfig := &action.Configuration{}
+
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
+		func(format string, v ...interface{}) {})
+	if err != nil {
+		return fmt.Errorf("failed to init helm action config: %w", err)
+	}
+
+	lintAction := action.NewLint()
+	lintResult := lintAction.Run([]string{helmChartPath}, nil)
+	if len(lintResult.Errors) > 0 {
+		return fmt.Errorf("failed to lint helm chart: %w", errors.Join(lintResult.Errors...))
+	}
+	return nil
+}
+
+func updateYamlNodes(rootNode *yaml.Node, value string, keys ...string) error {
+	if len(keys) == 0 {
+		return fmt.Errorf("no keys provided")
+	}
+
+	for i := 0; i < len(rootNode.Content)-1; i += 2 {
+		agentKey := rootNode.Content[i]
+		agentValue := rootNode.Content[i+1]
+
+		if agentKey.Value == keys[0] {
+			if len(keys) == 1 {
+				agentValue.Value = value
+				return nil
+			}
+
+			return updateYamlNodes(agentValue, value, keys[1:]...)
+		}
+	}
+
+	return fmt.Errorf("key %s not found", keys[0])
+}
+
+func loadYamlFile(path string) (map[string]any, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	decoder := yaml.NewDecoder(f)
+	var data map[string]any
+	if err := decoder.Decode(&data); err != nil {
+		return nil, err
+	}
+	return data, nil
 }

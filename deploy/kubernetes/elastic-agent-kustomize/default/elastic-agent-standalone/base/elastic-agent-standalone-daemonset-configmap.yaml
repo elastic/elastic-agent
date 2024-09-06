@@ -28,8 +28,9 @@ data:
     providers.kubernetes:
       node: ${NODE_NAME}
       scope: node
-      #Uncomment to enable hints' support
+      #Uncomment to enable hints' support - https://www.elastic.co/guide/en/fleet/current/hints-annotations-autodiscovery.html
       #hints.enabled: true
+      #hints.default_container_logs: true
     inputs:
       - id: kubernetes-cluster-metrics
         condition: ${kubernetes_leaderelection.leader} == true

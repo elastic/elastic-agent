@@ -6,6 +6,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,6 +64,19 @@ func (KubernetesRunner) Run(ctx context.Context, verbose bool, sshClient SSHClie
 		env["AGENT_VERSION"] = agentVersion
 		env["TEST_DEFINE_PREFIX"] = testPrefix
 
+		buildFolderAbsPath, err := filepath.Abs("build")
+		if err != nil {
+			return OSRunnerResult{}, err
+		}
+
+		podLogsPath := filepath.Join(buildFolderAbsPath, fmt.Sprintf("k8s-logs-%s", testPrefix))
+		err = os.Mkdir(podLogsPath, 0755)
+		if err != nil && !errors.Is(err, os.ErrExist) {
+			return OSRunnerResult{}, err
+		}
+
+		env["K8S_TESTS_POD_LOGS_BASE"] = podLogsPath
+
 		params := devtools.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
@@ -72,7 +86,7 @@ func (KubernetesRunner) Run(ctx context.Context, verbose bool, sshClient SSHClie
 			ExtraFlags:      extraFlags,
 			Env:             env,
 		}
-		err := devtools.GoTest(ctx, params)
+		err = devtools.GoTest(ctx, params)
 		if err != nil {
 			return OSRunnerResult{}, err
 		}

@@ -22,7 +22,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -155,7 +155,7 @@ func TestContainerCMD(t *testing.T) {
 		ctx,
 		agentFixture,
 		info,
-		fmt.Sprintf("%s-%s", t.Name(), uuid.New().String()),
+		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
 		"")
 	env := []string{
 		"FLEET_ENROLL=1",
@@ -242,7 +242,7 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 				ctx,
 				agentFixture,
 				info,
-				fmt.Sprintf("test-policy-enroll-%s", uuid.New().String()),
+				fmt.Sprintf("test-policy-enroll-%s", uuid.Must(uuid.NewV4()).String()),
 				"")
 
 			env := []string{
@@ -333,7 +333,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		ctx,
 		agentFixture,
 		info,
-		fmt.Sprintf("%s-%s", t.Name(), uuid.New().String()),
+		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
 		outputID)
 
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
@@ -378,7 +378,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		agentOutputStr := agentOutput.String()
 		scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
 		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "Cannot index event publisher.Event") {
+			if strings.Contains(scanner.Text(), "Cannot index event") {
 				return true
 			}
 		}
@@ -403,7 +403,7 @@ func createMockESOutput(t *testing.T, info *define.Info) (string, string) {
 `
 	// The API will return an error if the output ID/name contains an
 	// UUID substring, so we replace the '-' by '_' to keep the API happy.
-	outputUUID := strings.Replace(uuid.New().String(), "-", "_", -1)
+	outputUUID := strings.Replace(uuid.Must(uuid.NewV4()).String(), "-", "_", -1)
 	bodyStr := fmt.Sprintf(createOutputBody, outputUUID, mockesURL)
 	bodyReader := strings.NewReader(bodyStr)
 	// THE URL IS MISSING

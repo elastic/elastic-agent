@@ -6,13 +6,14 @@
 # the final image because of permission changes.
 FROM {{ .buildFrom }} AS home
 
+{{- if contains .buildFrom "wolfi" }}
 RUN for iter in {1..10}; do \
-        apt-get update -y && \
-        DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes libcap2-bin && \
-        apt-get clean all && \
-        exit_code=0 && break || exit_code=$? && echo "apt-get error: retry $iter in 10s" && sleep 10; \
+        apk update && \
+        apk add --no-cache shadow libcap-utils && \
+        exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
+{{- end }}
 
 COPY beat {{ $beatHome }}
 
@@ -33,15 +34,16 @@ RUN true && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloud-defend || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/fleet-server || true) && \
-    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-agent-shipper || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-collector || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-symbolizer || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-host-agent || true) && \
     find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \
+
 {{- range $i, $modulesd := .ModulesDirs }}
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 {{- end }}
-{{- if contains .image_name "-cloud" }}
+
+{{- if eq .Variant "cloud" }}
     mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
     cp -f {{ $beatHome }}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
     chmod +x /opt/filebeat/filebeat && \
@@ -53,7 +55,7 @@ RUN true && \
     true
 
 # Keep this after any chown command, chown resets any applied capabilities
-RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/agentbeat && \
+RUN setcap =p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent && \
 {{- if .linux_capabilities }}
 # Since the beat is stored at the other end of a symlink we must follow the symlink first
 # For security reasons setcap does not support symlinks. This is smart in the general case
@@ -69,13 +71,23 @@ ENV BEAT_SETUID_AS={{ .user }}
 
 {{- if contains .from "ubi-minimal" }}
 RUN for iter in {1..10}; do microdnf update -y && microdnf install -y tar gzip findutils shadow-utils && microdnf clean all && exit_code=0 && break || exit_code=$? && echo "microdnf error: retry $iter in 10s" && sleep 10; done; (exit $exit_code)
-{{- else }}
+{{- end }}
 
+{{- if contains .from "ubuntu" }}
 RUN for iter in {1..10}; do \
         apt-get update -y && \
         DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes ca-certificates curl gawk xz-utils && \
         apt-get clean all && \
         exit_code=0 && break || exit_code=$? && echo "apt-get error: retry $iter in 10s" && sleep 10; \
+    done; \
+    (exit $exit_code)
+{{- end }}
+
+{{- if contains .from "wolfi" }}
+RUN for iter in {1..10}; do \
+        apk update && \
+        apk add --no-cache ca-certificates curl gawk shadow bash && \
+        exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
 {{- end }}
@@ -134,8 +146,14 @@ RUN set -e ; \
   chmod +x /usr/bin/tini
 
 COPY docker-entrypoint /usr/local/bin/docker-entrypoint
+
+# We do not want to add the agent user to the root group and because of backwards compatibility we can do it only for the new Wolfi image
 RUN groupadd --gid 1000 {{ .BeatName }} && \
+{{- if contains .from "wolfi" }}
+    useradd -M --uid 1000 --gid 1000 {{ .user }} && \
+{{- else }}
     useradd -M --uid 1000 --gid 1000 --groups 0 {{ .user }} && \
+{{- end }}
     chmod 755 /usr/local/bin/docker-entrypoint && \
     true
 
@@ -152,17 +170,14 @@ RUN mkdir /licenses
 COPY --from=home {{ $beatHome }}/LICENSE.txt /licenses
 COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
 
-{{- if contains .image_name "-cloud" }}
+{{- if eq .Variant "cloud" }}
 COPY --from=home /opt /opt
-{{- end }}
-
-{{- if contains .image_name "-cloud" }}
 # Generate folder for a stub command that will be overwritten at runtime
 RUN mkdir /app && \
     chown {{ .user }}:{{ .user }} /app
 {{- end }}
 
-{{- if (and (contains .image_name "-complete") (not (contains .from "ubi-minimal")))  }}
+{{- if (and (eq .Variant "complete") (contains .from "ubuntu"))  }}
 USER root
 ENV NODE_PATH={{ $beatHome }}/.node
 RUN echo \
@@ -222,8 +237,8 @@ RUN for iter in {1..10}; do \
     exit_code=0 && break || exit_code=$? && echo "apt-get error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
-
 {{- end }}
+
 USER {{ .user }}
 
 
@@ -239,7 +254,7 @@ ENV LIBBEAT_MONITORING_CGROUPS_HIERARCHY_OVERRIDE=/
 
 WORKDIR {{ $beatHome }}
 
-{{- if contains .image_name "-cloud" }}
+{{- if eq .Variant "cloud" }}
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/app/apm.sh"]
 # Generate a stub command that will be overwritten at runtime

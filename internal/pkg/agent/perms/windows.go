@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"syscall"
 
 	"github.com/Microsoft/go-winio"
 	"github.com/hectane/go-acl"
@@ -22,7 +23,10 @@ import (
 
 // FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
 func FixPermissions(topPath string, opts ...OptFunc) error {
-	o := newOpts(opts...)
+	o, err := newOpts(opts...)
+	if err != nil {
+		return err
+	}
 
 	// SYSTEM and Administrators always get permissions
 	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
@@ -88,6 +92,11 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 					err = acl.Apply(name, true, inherit, grants...)
 					if err != nil {
+						// Check for Errno = 0 which indicates success
+						// https://pkg.go.dev/golang.org/x/sys/windows#Errno
+						if errors.Is(err, syscall.Errno(0)) {
+							return nil
+						}
 						return err
 					}
 					if userSID != nil && groupSID != nil {
@@ -109,7 +118,13 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 			if topPath == name {
 				inherit = false
 			}
-			return acl.Apply(name, true, inherit, grants...)
+			err = acl.Apply(name, true, inherit, grants...)
+			// Check for Errno = 0 which indicates success
+			// https://pkg.go.dev/golang.org/x/sys/windows#Errno
+			if errors.Is(err, syscall.Errno(0)) {
+				return nil
+			}
+			return err
 		} else if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}

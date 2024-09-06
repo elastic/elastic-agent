@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -94,14 +93,14 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 					if failedErr == nil {
 						flipFlopCount++
 						failedTimer.Reset(ch.checkInterval)
-						ch.log.Error("Agent reported failure (starting failed timer): %s", err)
+						ch.log.Errorf("Agent reported failure (starting failed timer): %s", err)
 					} else {
-						ch.log.Error("Agent reported failure (failed timer already started): %s", err)
+						ch.log.Errorf("Agent reported failure (failed timer already started): %s", err)
 					}
 				} else {
 					if failedErr != nil {
 						failedTimer.Stop()
-						ch.log.Error("Agent reported healthy (failed timer stopped): %s", err)
+						ch.log.Info("Agent reported healthy (failed timer stopped)")
 					}
 				}
 				failedErr = err
@@ -116,7 +115,8 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 					continue
 				}
 				// error lasted longer than the checkInterval, notify!
-				ch.notifyChan <- failedErr
+				ch.notifyChan <- fmt.Errorf("last error was not cleared before checkInterval (%s) elapsed: %w",
+					ch.checkInterval, failedErr)
 			}
 		}
 	}()
@@ -134,11 +134,12 @@ LOOP:
 			// block on connection, don't retry connection, and fail on temp dial errors
 			// always a local connection it should connect quickly so the timeout is only 1 second
 			connectCtx, connectCancel := context.WithTimeout(ctx, 1*time.Second)
+			//nolint:staticcheck // requires changing client signature
 			err := ch.agentClient.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry(), grpc.FailOnNonTempDialError(true))
 			connectCancel()
 			if err != nil {
 				ch.connectCounter++
-				ch.log.Error("Failed connecting to running daemon: ", err)
+				ch.log.Errorf("Failed connecting to running daemon: %s", err)
 				if ch.checkFailures() {
 					return
 				}
@@ -152,7 +153,7 @@ LOOP:
 				// considered a connect error
 				stateCancel()
 				ch.agentClient.Disconnect()
-				ch.log.Error("Failed to start state watch: ", err)
+				ch.log.Errorf("Failed to start state watch: %s", err)
 				ch.connectCounter++
 				if ch.checkFailures() {
 					return
@@ -178,25 +179,30 @@ LOOP:
 			for {
 				state, err := watch.Recv()
 				if err != nil {
+					ch.log.Debugf("received state: error: %s",
+						err)
+
 					// agent has crashed or exited
 					stateCancel()
 					ch.agentClient.Disconnect()
-					ch.log.Error("Lost connection: failed reading next state: ", err)
+					ch.log.Errorf("Lost connection: failed reading next state: %s", err)
 					ch.lostCounter++
 					if ch.checkFailures() {
 						return
 					}
 					continue LOOP
 				}
+				ch.log.Debugf("received state: %s:%s",
+					state.State, state.Message)
 
 				// gRPC is good at hiding the fact that connection was lost
 				// to ensure that we don't miss a restart a changed PID means
 				// we are now talking to a different spawned Elastic Agent
 				if ch.lastPid == -1 {
 					ch.lastPid = state.Info.PID
-					ch.log.Info(fmt.Sprintf("Communicating with PID %d", ch.lastPid))
+					ch.log.Infof("Communicating with PID %d", ch.lastPid)
 				} else if ch.lastPid != state.Info.PID {
-					ch.log.Error(fmt.Sprintf("Communication with PID %d lost, now communicating with PID %d", ch.lastPid, state.Info.PID))
+					ch.log.Errorf("Communication with PID %d lost, now communicating with PID %d", ch.lastPid, state.Info.PID)
 					ch.lastPid = state.Info.PID
 					// count the PID change as a lost connection, but allow
 					// the communication to continue unless has become a failure
@@ -215,14 +221,14 @@ LOOP:
 				} else {
 					// agent is healthy; but a component might not be healthy
 					// upgrade tracks unhealthy component as an issue with the upgrade
-					var compErr error
+					var errs []error
 					for _, comp := range state.Components {
 						if comp.State == client.Failed {
-							compErr = multierror.Append(compErr, fmt.Errorf("component %s[%v] failed: %s", comp.Name, comp.ID, comp.Message))
+							errs = append(errs, fmt.Errorf("component %s[%v] failed: %s", comp.Name, comp.ID, comp.Message))
 						}
 					}
-					if compErr != nil {
-						failedCh <- fmt.Errorf("%w: %w", ErrAgentComponentFailed, compErr)
+					if len(errs) != 0 {
+						failedCh <- fmt.Errorf("%w: %w", ErrAgentComponentFailed, errors.Join(errs...))
 						continue
 					}
 				}

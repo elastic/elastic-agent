@@ -53,9 +53,9 @@ build/
 elastic-agent
 elastic-agent.dev.yml
 elastic-agent.yml.*
+!deploy/helm/*
 fleet.yml
 fleet.yml.lock
 fleet.yml.old
 pkg/component/fake/component/component
-pkg/component/fake/shipper/shipper
 internal/pkg/agent/install/testblocking/testblocking

@@ -5,14 +5,27 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 
 steps:
+  - label: "Integration tests: packaging"
+    key: "package-it"
+    command: ".buildkite/scripts/steps/integration-package.sh"
+    artifact_paths:
+      - build/distributions/**
+    agents:
+      provider: "gcp"
+      machineType: "n1-standard-8"
+
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
+    depends_on:
+      - package-it
     concurrency_group: elastic-agent-extended-testing/serverless-integration
     concurrency: 8
     env:
       # we run each step in a different data center to spread the load
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
-    command: ".buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged" #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+    command: |
+      buildkite-agent artifact download build/distributions/** . --step 'package-it'
+      .buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
@@ -25,11 +38,15 @@ steps:
 
   - label: "Extended runtime leak tests"
     key: "extended-integration-tests"
+    depends_on:
+      - package-it
     concurrency_group: elastic-agent-extended-testing/leak-tests
     concurrency: 8
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-b"
-    command: ".buildkite/scripts/steps/integration_tests.sh stateful integration:TestForResourceLeaks"
+    command: |
+      buildkite-agent artifact download build/distributions/** . --step 'package-it'
+      .buildkite/scripts/steps/integration_tests.sh stateful integration:TestForResourceLeaks
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
@@ -42,11 +59,15 @@ steps:
 
   - label: "Integration tests"
     key: "integration-tests"
+    depends_on:
+      - package-it
     concurrency_group: elastic-agent-extended-testing/integration
     concurrency: 8
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-f"
-    command: ".buildkite/scripts/steps/integration_tests.sh stateful"
+    command: |
+      buildkite-agent artifact download build/distributions/** . --step 'package-it'
+      .buildkite/scripts/steps/integration_tests.sh stateful
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
@@ -56,21 +77,30 @@ steps:
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Integration tests"
+    plugins:
+      - test-collector#v1.10.1:
+          files: "build/TEST-*.xml"
+          format: "junit"
+          branches: "main"
+          debug: true    
 
   - label: "Serverless Beats Tests"
+    depends_on:
+      - package-it
     key: "serverless-beats-integration-tests"
     concurrency_group: elastic-agent-extended-testing/beats-integration
     concurrency: 8
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
-    command: ".buildkite/scripts/steps/beats_tests.sh"
+    command: |
+      buildkite-agent artifact download build/distributions/** . --step 'package-it'
+      .buildkite/scripts/steps/beats_tests.sh
     # if: "build.env('CRON') == 'yes'"
     agents:
       provider: "gcp"
       machineType: "n1-standard-8"
-    retry:
-      manual:
-        allowed: true
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
+
+

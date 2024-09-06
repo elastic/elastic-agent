@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 	protobuf "google.golang.org/protobuf/proto"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"

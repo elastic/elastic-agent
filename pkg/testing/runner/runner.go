@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -22,7 +23,6 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
-	"k8s.io/utils/strings/slices"
 
 	"github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -306,63 +306,59 @@ func (r *Runner) Clean() error {
 }
 
 func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance) (map[string]OSRunnerResult, error) {
-	g, ctx := errgroup.WithContext(ctx)
 	results := make(map[string]OSRunnerResult)
 	var resultsMx sync.Mutex
+	var err error
 	for _, instance := range instances {
-		func(instance StateInstance) {
-			g.Go(func() error {
-				batch, ok := findBatchByID(instance.ID, r.batches)
-				if !ok {
-					return fmt.Errorf("unable to find batch with ID: %s", instance.ID)
-				}
+		batch, ok := findBatchByID(instance.ID, r.batches)
+		if !ok {
+			err = fmt.Errorf("unable to find batch with ID: %s", instance.ID)
+			continue
+		}
 
-				logger := &batchLogger{wrapped: r.logger, prefix: instance.ID}
-				// start with the ExtraEnv first preventing the other environment flags below
-				// from being overwritten
-				env := map[string]string{}
-				for k, v := range r.cfg.ExtraEnv {
-					env[k] = v
-				}
-				// ensure that we have all the requirements for the stack if required
-				if batch.Batch.Stack != nil {
-					// wait for the stack to be ready before continuing
-					logger.Logf("Waiting for stack to be ready...")
-					stack, err := r.getStackForBatchID(batch.ID)
-					if err != nil {
-						return err
-					}
-					env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
-					env["ELASTICSEARCH_USERNAME"] = stack.Username
-					env["ELASTICSEARCH_PASSWORD"] = stack.Password
-					env["KIBANA_HOST"] = stack.Kibana
-					env["KIBANA_USERNAME"] = stack.Username
-					env["KIBANA_PASSWORD"] = stack.Password
-					logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
-				}
+		logger := &batchLogger{wrapped: r.logger, prefix: instance.ID}
+		// start with the ExtraEnv first preventing the other environment flags below
+		// from being overwritten
+		env := map[string]string{}
+		for k, v := range r.cfg.ExtraEnv {
+			env[k] = v
+		}
+		// ensure that we have all the requirements for the stack if required
+		if batch.Batch.Stack != nil {
+			// wait for the stack to be ready before continuing
+			logger.Logf("Waiting for stack to be ready...")
+			stack, stackErr := r.getStackForBatchID(batch.ID)
+			if stackErr != nil {
+				err = stackErr
+				continue
+			}
+			env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
+			env["ELASTICSEARCH_USERNAME"] = stack.Username
+			env["ELASTICSEARCH_PASSWORD"] = stack.Password
+			env["KIBANA_HOST"] = stack.Kibana
+			env["KIBANA_USERNAME"] = stack.Username
+			env["KIBANA_PASSWORD"] = stack.Password
+			logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
+		}
 
-				// set the go test flags
-				env["GOTEST_FLAGS"] = r.cfg.TestFlags
-				env["KUBECONFIG"] = instance.Instance.Internal["config"].(string)
-				env["TEST_BINARY_NAME"] = r.cfg.BinaryName
-				env["AGENT_IMAGE"] = instance.Instance.Internal["agent_image"].(string)
+		// set the go test flags
+		env["GOTEST_FLAGS"] = r.cfg.TestFlags
+		env["KUBECONFIG"] = instance.Instance.Internal["config"].(string)
+		env["TEST_BINARY_NAME"] = r.cfg.BinaryName
+		env["AGENT_IMAGE"] = instance.Instance.Internal["agent_image"].(string)
 
-				prefix := fmt.Sprintf("%s-%s", instance.Instance.Internal["version"].(string), batch.ID)
+		prefix := fmt.Sprintf("%s-%s", instance.Instance.Internal["version"].(string), batch.ID)
 
-				// run the actual tests on the host
-				result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, nil, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
-				if err != nil {
-					logger.Logf("Failed to execute tests on instance: %s", err)
-					return fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
-				}
-				resultsMx.Lock()
-				results[batch.ID] = result
-				resultsMx.Unlock()
-				return nil
-			})
-		}(instance)
+		// run the actual tests on the host
+		result, runErr := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, nil, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
+		if runErr != nil {
+			logger.Logf("Failed to execute tests on instance: %s", err)
+			err = fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
+		}
+		resultsMx.Lock()
+		results[batch.ID] = result
+		resultsMx.Unlock()
 	}
-	err := g.Wait()
 	if err != nil {
 		return nil, err
 	}
