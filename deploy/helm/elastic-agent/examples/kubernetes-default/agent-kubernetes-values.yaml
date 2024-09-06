@@ -1,0 +1,5 @@
+kubernetes:
+  enabled: true
+
+agent:
+  unprivileged: true

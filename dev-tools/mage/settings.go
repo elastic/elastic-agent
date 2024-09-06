@@ -305,6 +305,21 @@ func CommitHashShort() (string, error) {
 	return shortHash, err
 }
 
+// TagContainsCommit returns true or false depending on if the current commit is part of a git tag.
+func TagContainsCommit() (bool, error) {
+	commitHash, err := CommitHash()
+	if err != nil {
+		return false, err
+	}
+
+	out, err := sh.Output("git", "tag", "--contains", commitHash)
+	if err != nil {
+		return false, err
+	}
+
+	return strings.TrimSpace(out) != "", nil
+}
+
 func AgentPackageVersion() (string, error) {
 
 	if agentPackageVersion != "" {
