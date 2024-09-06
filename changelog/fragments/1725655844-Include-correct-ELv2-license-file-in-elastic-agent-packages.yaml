@@ -11,15 +11,10 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: Include correct ELv2 license file in elastic-agent packages
-
-# Long description; in case the summary is not enough to describe the change
-# this field accommodate a description without length limits.
-# NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+summary: Include the correct Elastic License 2.0 file in build artifacts and packages.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component: "elastic-agent",
+component: "elastic-agent"
 
 # PR URL; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
