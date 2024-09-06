@@ -6,12 +6,15 @@ package handlers
 
 import (
 	"context"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -105,7 +108,13 @@ func TestActionUnenrollHandler(t *testing.T) {
 		}
 	}()
 
-	handler := NewUnenroll(log, coord, ch, nil, nil)
+	storePath := filepath.Join(t.TempDir(), "state.json")
+	s, err := storage.NewDiskStore(storePath)
+	require.NoError(t, err, "failed creating DiskStore")
+
+	st, err := store.NewStateStore(log, s)
+	require.NoError(t, err)
+	handler := NewUnenroll(log, coord, ch, nil, st)
 
 	getTamperProtectionFunc := func(enabled bool) func() bool {
 		return func() bool {
@@ -119,9 +128,14 @@ func TestActionUnenrollHandler(t *testing.T) {
 		wantErr              error // Handler error
 		wantPerformedActions int64
 		tamperProtectionFn   func() bool
+		autoUnenroll         bool
 	}{
 		{
-			name: "no running components",
+			name: "fleet unenroll with no running components",
+		},
+		{
+			name:         "auto unenroll with no running components",
+			autoUnenroll: true,
 		},
 		{
 			name: "endpoint no dispatch",
@@ -200,10 +214,17 @@ func TestActionUnenrollHandler(t *testing.T) {
 				handler.tamperProtectionFn = tc.tamperProtectionFn
 			}
 
-			err := handler.Handle(ctx, action, acker)
+			a := new(fleetapi.ActionUnenroll)
+			*a = *action
+			if tc.autoUnenroll {
+				a.IsDetected = true
+			}
+			err := handler.Handle(ctx, a, acker)
 
 			require.ErrorIs(t, err, tc.wantErr)
-			if tc.wantErr == nil {
+
+			// autoUnenroll isn't acked
+			if tc.wantErr == nil && !tc.autoUnenroll {
 				require.Len(t, acker.Acked, 1)
 			}
 			require.Equal(t, tc.wantPerformedActions, coord.performedActions.Load())

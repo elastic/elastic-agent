@@ -68,8 +68,12 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 
 // Cleanup removes all artifacts and files related to a specified version.
 func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
+	return cleanup(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs, afterRestartDelay)
+}
+
+func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool, delay time.Duration) error {
 	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
-	<-time.After(afterRestartDelay)
+	<-time.After(delay)
 
 	// data directory path
 	dataDirPath := paths.DataFrom(topDirPath)
