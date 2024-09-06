@@ -68,8 +68,12 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 
 // Cleanup removes all artifacts and files related to a specified version.
 func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
+	return cleanup(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs, afterRestartDelay)
+}
+
+func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool, delay time.Duration) error {
 	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
-	<-time.After(afterRestartDelay)
+	<-time.After(delay)
 
 	// data directory path
 	dataDirPath := paths.DataFrom(topDirPath)
@@ -201,7 +205,10 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 	root, _ := utils.HasRoot() // error ignored
 
 	for restartAttempt := 1; restartAttempt <= maxRestartCount; restartAttempt++ {
-		backExp.Wait()
+		// only use exp backoff when retrying
+		if restartAttempt != 1 {
+			backExp.Wait()
+		}
 		log.Infof("Restarting Agent via control protocol; attempt %d of %d", restartAttempt, maxRestartCount)
 		// First, try to restart Agent by sending a restart command
 		// to its daemon (via GRPC).

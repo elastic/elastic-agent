@@ -17,8 +17,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestWatcher_CannotConnect(t *testing.T) {
@@ -27,7 +26,7 @@ func TestWatcher_CannotConnect(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
 	go w.Run(ctx)
 
@@ -45,7 +44,7 @@ func TestWatcher_LostConnection(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
 
 	// error on watch (counts as lost connect)
@@ -74,7 +73,7 @@ func TestWatcher_PIDChange(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
 
 	// error on watch (counts as lost connect)
@@ -150,7 +149,7 @@ func TestWatcher_PIDChangeSuccess(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
 
 	// error on watch (counts as lost connect)
@@ -236,7 +235,7 @@ func TestWatcher_AgentError(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 100*time.Millisecond)
 
 	// reports only an error state, triggers failed
@@ -270,14 +269,18 @@ func TestWatcher_AgentError(t *testing.T) {
 }
 
 func TestWatcher_AgentErrorQuick(t *testing.T) {
-	// test tests for success, which only happens when no error comes in
-	// during this time period
+	// Success only happens when no error comes in during this time period
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
-	w := NewAgentWatcher(errCh, logger, 100*time.Millisecond)
+	log, obs := loggertest.New("watcher")
+	defer func() {
+		if t.Failed() {
+			loggertest.PrintObservedLogs(obs.TakeAll(), t.Log)
+		}
+	}()
+	w := NewAgentWatcher(errCh, log, 100*time.Millisecond)
 
 	// reports an error state, followed by a healthy state (should not error)
 	mockHandler := func(srv cproto.ElasticAgentControl_StateWatchServer) error {
@@ -302,7 +305,7 @@ func TestWatcher_AgentErrorQuick(t *testing.T) {
 		return nil
 	}
 	mock := &mockDaemon{watch: mockHandler}
-	require.NoError(t, mock.Start())
+	require.NoError(t, mock.Start(), "could not start mock agent daemon")
 	defer mock.Stop()
 
 	// set client to mock; before running
@@ -323,7 +326,7 @@ func TestWatcher_ComponentError(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 100*time.Millisecond)
 
 	// reports only an error state, triggers failed
@@ -383,7 +386,7 @@ func TestWatcher_ComponentErrorQuick(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 100*time.Millisecond)
 
 	// reports an error state, followed by a healthy state (should not error)
@@ -470,7 +473,7 @@ func TestWatcher_AgentErrorFlipFlop(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-	logger, _ := logger.NewTesting("watcher")
+	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 300*time.Millisecond)
 
 	// reports only an error state, triggers failed

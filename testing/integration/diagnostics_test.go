@@ -245,12 +245,14 @@ func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.
 
 	actualExtractedDiagFiles := map[string]struct{}{}
 
-	err = filepath.Walk(extractionDir, func(path string, info fs.FileInfo, err error) error {
+	err = filepath.WalkDir(extractionDir, func(path string, entry fs.DirEntry, err error) error {
 		require.NoErrorf(t, err, "error walking extracted path %q", path)
 
 		// we are not interested in directories
-		if !info.IsDir() {
+		if !entry.IsDir() {
 			actualExtractedDiagFiles[path] = struct{}{}
+			info, err := entry.Info()
+			require.NoError(t, err, path)
 			assert.Greaterf(t, info.Size(), int64(0), "file %q has an invalid size", path)
 		}
 

@@ -6,9 +6,7 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -23,12 +21,6 @@ func main() {
 		}
 	}()
 
-	err = cmd.CheckNativePlatformCompat()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize: %v\n", err)
-		return
-	}
-
 	pj, err := process.CreateJobObject()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize process job object: %v\n", err)
@@ -36,7 +28,6 @@ func main() {
 	}
 	defer pj.Close()
 
-	rand.Seed(time.Now().UnixNano())
 	command := cmd.NewCommand()
 	err = command.Execute()
 	if err != nil {

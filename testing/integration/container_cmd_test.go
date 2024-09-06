@@ -327,6 +327,9 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
+	// We call agentFixture.Prepare to set the workdir
+	require.NoError(t, agentFixture.Prepare(ctx), "failed preparing agent fixture")
+
 	_, outputID := createMockESOutput(t, info)
 	policyID, enrollmentAPIKey := createPolicy(
 		t,
@@ -366,7 +369,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err := agentFixture.IsHealthy(ctx)
+		err := agentFixture.IsHealthy(ctx, withEnv(env))
 		return err == nil
 	},
 		2*time.Minute, time.Second,
@@ -378,7 +381,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		agentOutputStr := agentOutput.String()
 		scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
 		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "Cannot index event publisher.Event") {
+			if strings.Contains(scanner.Text(), "Cannot index event") {
 				return true
 			}
 		}

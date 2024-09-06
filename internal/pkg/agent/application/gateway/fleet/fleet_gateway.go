@@ -231,31 +231,15 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 		return nil
 	}
 	stateString := func(s eaclient.UnitState) string {
-		switch s {
-		case eaclient.UnitStateStarting:
-			return "STARTING"
-		case eaclient.UnitStateConfiguring:
-			return "CONFIGURING"
-		case eaclient.UnitStateHealthy:
-			return "HEALTHY"
-		case eaclient.UnitStateDegraded:
-			return fleetStateDegraded
-		case eaclient.UnitStateFailed:
-			return "FAILED"
-		case eaclient.UnitStateStopping:
-			return "STOPPING"
-		case eaclient.UnitStateStopped:
-			return "STOPPED"
+		if state := s.String(); state != "UNKNOWN" {
+			return state
 		}
 		return ""
 	}
 
 	unitTypeString := func(t eaclient.UnitType) string {
-		switch t {
-		case eaclient.UnitTypeInput:
-			return "input"
-		case eaclient.UnitTypeOutput:
-			return "output"
+		if typ := t.String(); typ != "unknown" {
+			return typ
 		}
 		return ""
 	}
