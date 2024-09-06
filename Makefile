@@ -3,7 +3,6 @@ COVERAGE_DIR=$(BUILD_DIR)/coverage
 BEATS?=elastic-agent
 PROJECTS= $(BEATS)
 PYTHON_ENV?=$(BUILD_DIR)/python-env
-MAGE_VERSION     ?= v1.15.0
 MAGE_PRESENT     := $(shell mage --version 2> /dev/null | grep $(MAGE_VERSION))
 MAGE_IMPORT_PATH ?= github.com/magefile/mage
 export MAGE_IMPORT_PATH
@@ -12,11 +11,11 @@ export MAGE_IMPORT_PATH
 .PHONY: mage
 mage:
 ifndef MAGE_PRESENT
-	@echo Installing mage $(MAGE_VERSION).
-	@go install ${MAGE_IMPORT_PATH}@$(MAGE_VERSION)
+	@echo Installing mage.
+	@go install ${MAGE_IMPORT_PATH}
 	@-mage -clean
 else
-	@echo Mage $(MAGE_VERSION) already installed.
+	@echo Mage already installed.
 endif
 
 ## help : Show this help.
