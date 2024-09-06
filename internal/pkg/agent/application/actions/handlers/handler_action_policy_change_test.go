@@ -39,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
 )
 
@@ -137,7 +138,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 	t.Run("policy with proxy config", func(t *testing.T) {
 		t.Run("rollback client changes when cannot create client",
 			func(t *testing.T) {
-				log, _ := logger.NewTesting("TestPolicyChangeHandler")
+				log, _ := loggertest.New("TestPolicyChangeHandler")
 				var setterCalledCount int
 				setter := testSetter{SetClientFn: func(c client.Sender) {
 					setterCalledCount++
@@ -193,7 +194,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 
 		t.Run("rollback client changes when cannot reach fleet-server",
 			func(t *testing.T) {
-				log, _ := logger.NewTesting("TestPolicyChangeHandler")
+				log, _ := loggertest.New("TestPolicyChangeHandler")
 				var setterCalledCount int
 				setter := testSetter{SetClientFn: func(c client.Sender) {
 					setterCalledCount++
@@ -249,7 +250,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			})
 
 		t.Run("a new Hosts and no proxy changes the remote config", func(t *testing.T) {
-			log, _ := logger.NewTesting("TestPolicyChangeHandler")
+			log, _ := loggertest.New("TestPolicyChangeHandler")
 			var setterCalledCount int
 			setter := testSetter{SetClientFn: func(c client.Sender) {
 				setterCalledCount++
@@ -293,7 +294,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		})
 
 		t.Run("a proxy changes the fleet client", func(t *testing.T) {
-			log, _ := logger.NewTesting("TestPolicyChangeHandler")
+			log, _ := loggertest.New("TestPolicyChangeHandler")
 			var setterCalledCount int
 			setter := testSetter{SetClientFn: func(c client.Sender) {
 				setterCalledCount++
@@ -343,7 +344,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			func(t *testing.T) {
 				wantProxy := mockProxy.URL
 
-				log, _ := logger.NewTesting("TestPolicyChangeHandler")
+				log, _ := loggertest.New("TestPolicyChangeHandler")
 				var setterCalledCount int
 				setter := testSetter{SetClientFn: func(c client.Sender) {
 					setterCalledCount++
@@ -405,7 +406,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				}))
 				defer alwaysErroringServer.Close()
 
-				log, _ := logger.NewTesting("TestPolicyChangeHandler")
+				log, _ := loggertest.New("TestPolicyChangeHandler")
 				var setterCalledCount int
 				setter := testSetter{SetClientFn: func(c client.Sender) {
 					setterCalledCount++
@@ -858,7 +859,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
-				log, logs := logger.NewTesting(tc.name)
+				log, logs := loggertest.New(tc.name)
 				defer func() {
 					if t.Failed() {
 						t.Log("test failed, see handler logs below:")
@@ -1053,7 +1054,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 			mockLogLevelSetter := mockhandlers.NewLogLevelSetter(t)
 
 			if tt.setupExpectations != nil {

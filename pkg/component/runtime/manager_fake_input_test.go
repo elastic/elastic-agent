@@ -24,14 +24,20 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	gproto "google.golang.org/protobuf/proto"
 
+<<<<<<< HEAD
 	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/gofrs/uuid/v5"
+=======
+>>>>>>> 0126540de0 (improve testing logger (#5346))
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.elastic.co/apm/v2/apmtest"
+
+	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -3032,7 +3038,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log, logs := logger.NewTesting("TestManager_StartStopComponent")
+	log, logs := loggertest.New("TestManager_StartStopComponent")
 	ai := &info.AgentInfo{}
 	m, err := NewManager(
 		log,
