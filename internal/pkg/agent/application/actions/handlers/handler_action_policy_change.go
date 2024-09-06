@@ -406,7 +406,7 @@ func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingCon
 	}
 	// use default log level
 	defaultLogLevel := logger.DefaultLogLevel
-	h.log.Infof("Handle policy change action, setting agent log level to default %s", defaultLogLevel)
+	h.log.Infof("Setting fallback log level to default %s", defaultLogLevel)
 	return h.policyLogLevelSetter.SetLogLevel(ctx, &defaultLogLevel)
 }
 
