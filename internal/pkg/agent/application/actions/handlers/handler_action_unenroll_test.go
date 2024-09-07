@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -219,7 +220,7 @@ func TestActionUnenrollHandler(t *testing.T) {
 			if tc.autoUnenroll {
 				a.IsDetected = true
 			}
-			err := handler.Handle(ctx, a, acker)
+			err := handler.handle(ctx, a, acker, 100 * time.Millisecond)
 
 			require.ErrorIs(t, err, tc.wantErr)
 
