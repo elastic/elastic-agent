@@ -220,7 +220,7 @@ func TestActionUnenrollHandler(t *testing.T) {
 			if tc.autoUnenroll {
 				a.IsDetected = true
 			}
-			err := handler.handle(ctx, a, acker, 100 * time.Millisecond)
+			err := handler.handle(ctx, a, acker, 100*time.Millisecond)
 
 			require.ErrorIs(t, err, tc.wantErr)
 
