@@ -27,6 +27,9 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	cfg := configuration.DefaultGRPCConfig()
+	cfg.Port = 0
+
 	ai := &info.AgentInfo{}
 	m, err := NewManager(
 		newDebugLogger(t),
@@ -34,7 +37,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 		ai,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
+		cfg,
 		false,
 	)
 	require.NoError(t, err)
