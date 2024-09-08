@@ -2745,7 +2745,6 @@ func (suite *FakeInputSuite) TestManager_Chunk() {
 	const grpcDefaultSize = 1024 * 1024 * 4
 	grpcConfig := testGrpcConfig()
 	grpcConfig.MaxMsgSize = grpcDefaultSize * 2 // set to double the default size
-	grpcConfig.Port = 0
 
 	ai := &info.AgentInfo{}
 	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), grpcConfig, false)
