@@ -18,7 +18,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -27,9 +26,6 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := configuration.DefaultGRPCConfig()
-	cfg.Port = 0
-
 	ai := &info.AgentInfo{}
 	m, err := NewManager(
 		newDebugLogger(t),
@@ -37,7 +33,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 		ai,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		cfg,
+		testGrpcConfig(),
 		false,
 	)
 	require.NoError(t, err)
