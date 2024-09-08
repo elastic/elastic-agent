@@ -524,12 +524,6 @@ func fetchAPMConfigWithAction(t *testing.T, ctx context.Context, m *Manager, com
 	return retrievedApmConfig
 }
 
-func defaultGRPCConfig() *configuration.GRPCConfig {
-	cfg := configuration.DefaultGRPCConfig()
-	cfg.Port = 0
-	return cfg
-}
-
 func (suite *FakeInputSuite) TestManager_Limits() {
 	t := suite.T()
 
