@@ -416,6 +416,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 
 	f.t.Cleanup(func() {
 		f.t.Logf("[test %s] Inside fixture installDeb cleanup function", f.t.Name())
+
 		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer uninstallCancel()
 		// stop elastic-agent, non fatal if error, might have been stopped before this.
@@ -424,6 +425,12 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 		if err != nil {
 			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
 		}
+
+		if keepInstalledFlag() {
+			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
+			return
+		}
+
 		// apt-get purge elastic-agent
 		f.t.Logf("running 'sudo apt-get -y -q purge elastic-agent'")
 		out, err = exec.CommandContext(uninstallCtx, "sudo", "apt-get", "-y", "-q", "purge", "elastic-agent").CombinedOutput()
