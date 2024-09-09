@@ -899,10 +899,7 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 
 // addFileToTar adds a file (or directory) to a tar archive.
 func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
-	excludedFiles := []string{
-		"cloud-defend",
-		"cloud-defend.spec.yml",
-	}
+	excludedFiles := []string{}
 
 	return filepath.WalkDir(pkgFile.Source, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
