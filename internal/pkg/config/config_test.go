@@ -79,7 +79,7 @@ func testToMapStr(t *testing.T) {
 }
 
 func TestCommaParsing(t *testing.T) {
-	_ = os.Setenv("testname", "motmot")
+	t.Setenv("testname", "motmot")
 	// test to make sure that we don't blow up the parsers when we have a `,` in a string
 	inMap := map[string]interface{}{
 		"test": "startsWith('${testname}','motmot')",

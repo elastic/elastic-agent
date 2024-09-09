@@ -31,8 +31,7 @@ func TestAgentPackageVersion(t *testing.T) {
 
 	t.Run("agent package version env var set", func(t *testing.T) {
 		expectedPkgVersion := "1.2.3-specialrelease+abcdef"
-		os.Setenv(agentPackageVersionEnvVar, expectedPkgVersion)
-		t.Cleanup(func() { os.Unsetenv(agentPackageVersionEnvVar) })
+		t.Setenv(agentPackageVersionEnvVar, expectedPkgVersion)
 		initGlobals()
 		actualPkgVersion, err := AgentPackageVersion()
 		require.NoError(t, err)
@@ -40,8 +39,7 @@ func TestAgentPackageVersion(t *testing.T) {
 	})
 
 	t.Run("agent package version function must be mapped", func(t *testing.T) {
-		os.Setenv(agentPackageVersionEnvVar, "1.2.3-specialrelease+abcdef")
-		t.Cleanup(func() { os.Unsetenv(agentPackageVersionEnvVar) })
+		t.Setenv(agentPackageVersionEnvVar, "1.2.3-specialrelease+abcdef")
 		initGlobals()
 		assert.Contains(t, FuncMap, agentPackageVersionMappedFunc)
 		require.IsType(t, FuncMap[agentPackageVersionMappedFunc], func() (string, error) { return "", nil })

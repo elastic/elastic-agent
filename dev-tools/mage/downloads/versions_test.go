@@ -657,8 +657,7 @@ func TestSnapshotHasCommit(t *testing.T) {
 
 func TestGetEnv(t *testing.T) {
 	t.Run("Empty value should return fallback", func(t *testing.T) {
-		defer os.Unsetenv("test.key")
-		os.Setenv("test.key", "")
+		t.Setenv("test.key", "")
 
 		val := getEnv("test.key", "fallback")
 		assert.Equal(t, "fallback", val)
@@ -670,8 +669,7 @@ func TestGetEnv(t *testing.T) {
 	})
 
 	t.Run("Value should return value", func(t *testing.T) {
-		defer os.Unsetenv("test.key")
-		os.Setenv("test.key", "value")
+		t.Setenv("test.key", "value")
 
 		val := getEnv("test.key", "fallback")
 		assert.Equal(t, "value", val)
