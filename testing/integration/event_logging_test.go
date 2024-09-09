@@ -75,7 +75,6 @@ func TestEventLogFile(t *testing.T) {
 		Local: true,
 		Sudo:  false,
 	})
-
 	ctx, cancel := testcontext.WithDeadline(
 		t,
 		context.Background(),
