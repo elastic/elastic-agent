@@ -288,7 +288,6 @@ func PgpBytesFromSource(log warnLogger, source string, client HTTPClient) ([]byt
 	}
 
 	if strings.HasPrefix(source, PgpSourceURIPrefix) {
-		log.Warnf("downloading pgp key: %s", source)
 		pgpBytes, err := fetchPgpFromURI(strings.TrimPrefix(source, PgpSourceURIPrefix), client)
 		if errors.Is(err, ErrRemotePGPDownloadFailed) || errors.Is(err, ErrInvalidLocation) {
 			log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", strings.TrimPrefix(source, PgpSourceURIPrefix), err)
@@ -296,7 +295,6 @@ func PgpBytesFromSource(log warnLogger, source string, client HTTPClient) ([]byt
 			log.Warnf("Failed to fetch remote PGP key from %q: %v",
 				strings.TrimPrefix(source, PgpSourceURIPrefix), err)
 		}
-		log.Warnf("downloaded pgp key: %s", source)
 
 		return pgpBytes, nil
 	}

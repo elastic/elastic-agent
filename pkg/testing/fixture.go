@@ -50,7 +50,6 @@ type Fixture struct {
 	binaryName      string
 	runLength       time.Duration
 	additionalArgs  []string
-	env             []string
 
 	srcPackage string
 	workDir    string
@@ -677,10 +676,6 @@ func (f *Fixture) PrepareAgentCommand(ctx context.Context, args []string, opts .
 		}
 	}
 
-	if len(f.env) > 0 {
-
-		cmd.Env = f.env
-	}
 	return cmd, nil
 }
 

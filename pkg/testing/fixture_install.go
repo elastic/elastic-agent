@@ -165,7 +165,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 
 	// check for running agents before installing, but only if not installed into a namespace whose point is allowing two agents at once.
 	if installOpts != nil && !installOpts.Develop && installOpts.Namespace == "" {
-		// assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
+		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
 	}
 
 	switch f.packageFormat {
@@ -258,7 +258,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			return
 		}
 
-		// assert.Empty(f.t, processes, "there should be no running agent at the end of the test")
+		assert.Empty(f.t, processes, "there should be no running agent at the end of the test")
 	})
 
 	f.t.Cleanup(func() {
