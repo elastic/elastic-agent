@@ -215,7 +215,7 @@ func TestCleanup(t *testing.T) {
 			require.NoError(t, err, "error loading update marker")
 			require.NotNil(t, marker, "loaded marker must not be nil")
 			t.Logf("Loaded update marker %+v", marker)
-			tt.wantErr(t, Cleanup(testLogger, testTop, marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs), fmt.Sprintf("Cleanup(%v, %v, %v, %v)", marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs))
+			tt.wantErr(t, cleanup(testLogger, testTop, marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs, 0), fmt.Sprintf("Cleanup(%v, %v, %v, %v)", marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs))
 			tt.checkAfterCleanup(t, testTop)
 		})
 	}

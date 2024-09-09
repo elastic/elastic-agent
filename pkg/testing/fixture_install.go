@@ -734,11 +734,11 @@ func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string)
 	w := zip.NewWriter(file)
 	defer w.Close()
 
-	walker := func(path string, info os.FileInfo, err error) error {
+	walker := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 		file, err := os.Open(path)
@@ -761,7 +761,7 @@ func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string)
 		return nil
 	}
 
-	err = filepath.Walk(f.workDir, walker)
+	err = filepath.WalkDir(f.workDir, walker)
 	if err != nil {
 		return fmt.Errorf("walking %s to create zip: %w", f.workDir, err)
 	}
