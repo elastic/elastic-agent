@@ -421,6 +421,8 @@ func PerformUpgrade(
 	return nil
 }
 
+var ErrVerMismatch = errors.New("versions don't match")
+
 func CheckHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo atesting.AgentBinaryVersion) error {
 	checkFunc := func() error {
 		status, err := f.ExecStatus(ctx)
@@ -428,7 +430,8 @@ func CheckHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInf
 			return err
 		}
 		if status.Info.Version != versionInfo.Version {
-			return fmt.Errorf("versions don't match: got %s, want %s",
+			return fmt.Errorf("%w: got %s, want %s",
+				ErrVerMismatch,
 				status.Info.Version, versionInfo.Version)
 		}
 		if status.Info.Snapshot != versionInfo.Snapshot {
@@ -494,6 +497,9 @@ func WaitHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	// The deadline was set above, we don't need to check for it.
+	deadline, _ := ctx.Deadline()
+
 	t := time.NewTicker(interval)
 	defer t.Stop()
 
@@ -507,6 +513,12 @@ func WaitHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo
 			return ctx.Err()
 		case <-t.C:
 			err := CheckHealthyAndVersion(ctx, f, versionInfo)
+			// If we're in an upgrade process, the versions might not match
+			// so we wait to see if we get to a stable version
+			if errors.Is(err, ErrVerMismatch) {
+				logger.Logf("version mismatch, ignoring it, time until timeout: %s", deadline.Sub(time.Now()))
+				continue
+			}
 			if err == nil {
 				return nil
 			}

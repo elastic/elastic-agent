@@ -82,7 +82,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		// call to `takeOwnership` which sets the ownership information requires the current process
 		// token to have the 'SeRestorePrivilege' or it's unable to adjust the ownership
 		return winio.RunWithPrivileges([]string{winio.SeRestorePrivilege}, func() error {
-			return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
+			return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
 				if err == nil {
 					// first level doesn't inherit
 					inherit := true
@@ -111,7 +111,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	}
 
 	// ownership cannot be changed, this will keep the ownership as it currently is but apply the ACL's
-	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
+	return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
 		if err == nil {
 			// first level doesn't inherit
 			inherit := true
