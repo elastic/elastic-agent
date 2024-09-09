@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build mage
 
@@ -112,7 +112,7 @@ var (
 func init() {
 	common.RegisterCheckDeps(Update, Check.All)
 	test.RegisterDeps(UnitTest)
-	devtools.BeatLicense = "Elastic License"
+	devtools.BeatLicense = "Elastic License 2.0"
 	devtools.BeatDescription = "Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host."
 
 	devtools.Platforms = devtools.Platforms.Filter("!linux/386")
@@ -404,7 +404,7 @@ func (Check) All() {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return sh.RunV("go-licenser", "-d", "-license", "Elastic")
+	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2")
 }
 
 // Changes run git status --porcelain and return an error if we have changes or uncommitted files.
