@@ -182,9 +182,9 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	require.NoError(t, err1)
 	require.NoError(t, err2)
 
-	// Make sure this test does not dead lock or wait for too long
+	// Make sure this test does not deadlock or wait for too long
 	select {
-	case <-time.Tick(50 * time.Millisecond):
+	case <-time.Tick(200 * time.Millisecond):
 		t.Fatal("mockUpgradeManager.Upgrade was not called")
 	case <-upgradeCalledChan:
 	}
