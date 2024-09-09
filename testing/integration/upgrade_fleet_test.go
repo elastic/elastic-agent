@@ -9,8 +9,6 @@ package integration
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -134,182 +132,22 @@ func TestFleetAirGappedUpgradePrivileged(t *testing.T) {
 	testFleetAirGappedUpgrade(t, stack, false)
 }
 
-//
-// func TestMine(t *testing.T) {
-// 	rootPair, childPair, err := certutil.NewRootAndChildCerts()
-// 	require.NoError(t, err, "could not generate TLS certificates")
-// 	cert, err := tls.X509KeyPair(childPair.Cert, childPair.Key)
-// 	require.NoError(t, err, "could not create tls.Certificates from child certificate")
-// 	// ========================================================================
-// 	// ========================================================================
-// 	rootBlock, _ := pem.Decode(rootPair.Cert)
-// 	if rootBlock == nil {
-// 		panic("Failed to parse certificate PEM")
-//
-// 	}
-// 	root, err := x509.ParseCertificate(rootBlock.Bytes)
-// 	if err != nil {
-// 		panic("Failed to parse certificate: " + err.Error())
-// 	}
-//
-// 	childBlock, _ := pem.Decode(childPair.Cert)
-// 	if rootBlock == nil {
-// 		panic("Failed to parse certificate PEM")
-//
-// 	}
-// 	child, err := x509.ParseCertificate(childBlock.Bytes)
-// 	if err != nil {
-// 		panic("Failed to parse certificate: " + err.Error())
-// 	}
-//
-// 	// ====
-// 	caCertPool := x509.NewCertPool()
-// 	caCertPool.AddCert(root)
-//
-// 	// Verify the certificate using the CA pool
-// 	opts := x509.VerifyOptions{
-// 		Roots: caCertPool, // Use the CA pool for verification
-// 	}
-// 	if _, err := child.Verify(opts); err != nil {
-// 		fmt.Printf("Failed to verify certificate: %v\n", err)
-// 	} else {
-// 		fmt.Println("Certificate verification successful!")
-// 	}
-//
-// 	// ========================== file server ==================================
-// 	// downloads/beats/elastic-agent/
-// 	downloadDir := "/tmp"
-// 	rootDir := downloadDir
-// 	err = os.MkdirAll(downloadDir, 0644)
-// 	require.NoError(t, err, "could not create download directory")
-//
-// 	// // it's useful for debugging
-// 	// dl, err := os.ReadDir(rootDir)
-// 	// require.NoError(t, err)
-// 	// var files []string
-// 	// for _, d := range dl {
-// 	// 	files = append(files, d.Name())
-// 	// }
-// 	// fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
-// 	// 	rootDir, files)
-// 	// start file server
-// 	fs := http.FileServer(http.Dir(rootDir))
-// 	// server:= httptest.NewTLSServer()
-// 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		t.Logf("[fileserver] %s - %s", r.Method, r.URL.Path)
-// 		fs.ServeHTTP(w, r)
-// 	}))
-//
-// 	server.Listener, err = net.Listen("tcp", "127.0.0.1:443")
-// 	require.NoError(t, err, "could not create net listener for port 443")
-//
-// 	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
-// 	server.StartTLS()
-// 	defer server.Close()
-// 	t.Logf("file server running on %s", server.URL)
-// 	rootCAPath := filepath.Join(rootDir, "rootCA.pem")
-// 	err = os.WriteFile(rootCAPath, rootPair.Cert, 0440)
-// 	require.NoError(t, err, "could not write root CA")
-//
-// 	// test the server
-// 	tlsConfig := &tls.Config{
-// 		RootCAs: caCertPool,
-// 	}
-//
-// 	// Create a transport using the custom TLS configuration
-// 	transport := &http.Transport{TLSClientConfig: tlsConfig}
-//
-// 	// Build the http.Client with the custom transport
-// 	client := &http.Client{Transport: transport}
-// 	resp, err := client.Get(server.URL)
-// 	require.NoError(t, err, "could not GET URL: %s", server.URL)
-// 	t.Log(resp.Status)
-// }
-
-func TestSaveCerts(t *testing.T) {
-	rootKey, rootCACert, rootPair, err := certutil.NewRootCA()
-	require.NoError(t, err, "could not create root CA")
-
-	_, childPair, err := certutil.GenerateChildCert(
-		"localhost",
-		[]net.IP{net.ParseIP("127.0.0.1")},
-		rootKey,
-		rootCACert)
-	require.NoError(t, err, "could not create child cert")
-
-	// 	rootCAPath := filepath.Join(rootDir, "rootCA.pem")
-	//	err = os.WriteFile(rootCAPath, rootPair.Cert, 0440)
-	//	require.NoError(t, err, "could not write root CA")
-
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte("It works!"))
-		if err != nil {
-			fmt.Printf("could not write response: %v", err)
-		}
-	}))
-
-	childCert, err := tls.X509KeyPair(childPair.Cert, childPair.Key)
-	require.NoError(t, err, "could not load cert")
-
-	server.TLS = &tls.Config{Certificates: []tls.Certificate{childCert}}
-	server.StartTLS()
-	defer server.Close()
-
-	t.Logf("file server running on %s", server.URL)
-
-	// test the server
-	rootBlock, _ := pem.Decode(rootPair.Cert)
-	if rootBlock == nil {
-		panic("Failed to parse certificate PEM")
-
-	}
-	root, err := x509.ParseCertificate(rootBlock.Bytes)
-	if err != nil {
-		panic("Failed to parse certificate: " + err.Error())
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AddCert(root)
-
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
-	}
-
-	// Create a transport using the custom TLS configuration
-	transport := &http.Transport{TLSClientConfig: tlsConfig}
-
-	// Build the http.Client with the custom transport
-	client := &http.Client{Transport: transport}
-	resp, err := client.Get(server.URL)
-	require.NoError(t, err, "could not GET URL: %s", server.URL)
-	t.Log(resp.Status)
-}
-
-func NewRootAndChildCerts(t *testing.T, host string, ips []net.IP) (certutil.Pair, certutil.Pair) {
-	rootKey, rootCACert, rootPair, err := certutil.NewRootCA()
-	require.NoError(t, err, "could not create root CA")
-
-	_, childPair, err := certutil.GenerateChildCert(
-		host,
-		ips,
-		rootKey,
-		rootCACert)
-	require.NoError(t, err, "could not create child cert")
-
-	return rootPair, childPair
-}
-
-func TestFleetPRBuildSelfSigned(t *testing.T) {
+func TestFleetUpgradeToPRBuild(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetUpgradeToPRBuild,
 		Stack: &define.Stack{},
 		OS:    []define.OS{{Type: define.Linux}}, // The test uses /etc/hosts.
 		Sudo:  true,                              // The test uses /etc/hosts.
-		Local: false,                             // The test requires Agent installation
+		// The test requires:
+		//   - bind to port 443 (HTTPS)
+		//   - edit /etc/hosts
+		//   - agent installation
+		Local: false,
 	})
 
 	ctx := context.Background()
 
-	// ========================= prepare from fixture  =========================
+	// ========================= prepare from fixture ==========================
 	versions, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err, "could not get upgradable versions")
 
@@ -332,24 +170,8 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	require.NoError(t, err, "could not prepare fromFixture")
 
 	rootDir := t.TempDir()
-	rootPair, childPair, cert := prepareTLSCerts(t)
-
-	// ========================== file server ==================================
-	// downloads/beats/elastic-agent/
-	server, downloadDir := prepareFileServer(t, rootDir, cert)
-	defer server.Close()
-
-	// add root CA to /etc/ssl/certs. It was the only option that worked
-	rootCAPath := filepath.Join("/etc/ssl/certs", "TestFleetPRBuildSelfSigned.pem")
-	err = os.WriteFile(
-		rootCAPath,
-		rootPair.Cert, 0440)
-	require.NoError(t, err, "could not write root CA to /etc/ssl/certs")
-	t.Cleanup(func() {
-		if err = os.Remove(rootCAPath); err != nil {
-			t.Log("cleanup: could not remove root CA")
-		}
-	})
+	rootPair, childPair, cert := prepareTLSCerts(
+		t, "artifacts.elastic.co", []net.IP{net.ParseIP("127.0.0.1")})
 
 	// ==================== prepare to fixture from PR build ===================
 	toFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -363,6 +185,26 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 
 	// sign the build
 	pubKey, ascData := pgptest.Sing(t, agentPkg)
+
+	// ========================== file server ==================================
+	downloadDir := filepath.Join(rootDir, "downloads", "beats", "elastic-agent")
+	err = os.MkdirAll(downloadDir, 0644)
+	require.NoError(t, err, "could not create download directory")
+
+	server := prepareFileServer(t, rootDir, cert)
+	defer server.Close()
+
+	// add root CA to /etc/ssl/certs. It was the only option that worked
+	rootCAPath := filepath.Join("/etc/ssl/certs", "TestFleetUpgradeToPRBuild.pem")
+	err = os.WriteFile(
+		rootCAPath,
+		rootPair.Cert, 0440)
+	require.NoError(t, err, "could not write root CA to /etc/ssl/certs")
+	t.Cleanup(func() {
+		if err = os.Remove(rootCAPath); err != nil {
+			t.Log("cleanup: could not remove root CA")
+		}
+	})
 
 	// ====================== copy files to file server  ======================
 	// copy the agent package
@@ -384,7 +226,7 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	require.NoError(t, err, "could not write agent .asc file to disk")
 
 	// TODO: decide if it's worth saving this files, if so, give them a name
-	//  associating them with the test run
+	// associating them with the test run
 	defer func() {
 		if !t.Failed() {
 			return
@@ -409,8 +251,7 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	}()
 
 	// ==== impersonate https://artifacts.elastic.co/GPG-KEY-elastic-agent  ====
-	undoEtcHosts := impersonateHost(t, "artifacts.elastic.co", "127.0.0.1")
-	t.Cleanup(undoEtcHosts)
+	impersonateHost(t, "artifacts.elastic.co", "127.0.0.1")
 
 	// ==================== prepare agent's download source ====================
 	downloadSource := kibana.DownloadSource{
@@ -431,11 +272,9 @@ func TestFleetPRBuildSelfSigned(t *testing.T) {
 	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fromFixture, toFixture, policy, false)
 }
 
-func prepareFileServer(t *testing.T, rootDir string, cert tls.Certificate) (*httptest.Server, string) {
-	downloadDir := filepath.Join(rootDir, "downloads", "beats", "elastic-agent")
-	err := os.MkdirAll(downloadDir, 0644)
-	require.NoError(t, err, "could not create download directory")
-
+// prepareFileServer prepares and returns a started HTTPS file server serving
+// files from rootDir and using cert as its TLS certificate.
+func prepareFileServer(t *testing.T, rootDir string, cert tls.Certificate) *httptest.Server {
 	// it's useful for debugging
 	dl, err := os.ReadDir(rootDir)
 	require.NoError(t, err)
@@ -458,12 +297,22 @@ func prepareFileServer(t *testing.T, rootDir string, cert tls.Certificate) (*htt
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
 	server.StartTLS()
 	t.Logf("file server running on %s", server.URL)
-	return server, downloadDir
+
+	return server
 }
 
-func prepareTLSCerts(t *testing.T) (certutil.Pair, certutil.Pair, tls.Certificate) {
-	rootPair, childPair := NewRootAndChildCerts(
-		t, "artifacts.elastic.co", []net.IP{net.ParseIP("127.0.0.1")})
+// prepareTLSCerts generates a CA and a child certificate for the given host and
+// IPs.
+func prepareTLSCerts(t *testing.T, host string, ips []net.IP) (certutil.Pair, certutil.Pair, tls.Certificate) {
+	rootKey, rootCACert, rootPair, err := certutil.NewRootCA()
+	require.NoError(t, err, "could not create root CA")
+
+	_, childPair, err := certutil.GenerateChildCert(
+		host,
+		ips,
+		rootKey,
+		rootCACert)
+	require.NoError(t, err, "could not create child cert")
 
 	cert, err := tls.X509KeyPair(childPair.Cert, childPair.Key)
 	require.NoError(t, err, "could not create tls.Certificates from child certificate")
@@ -473,17 +322,23 @@ func prepareTLSCerts(t *testing.T) (certutil.Pair, certutil.Pair, tls.Certificat
 
 // impersonateHost impersonates 'host' by adding an entry to /etc/hosts mapping
 // 'ip' to 'host'.
-// It returns a callback to restore /etc/hosts to its original state.
-func impersonateHost(t *testing.T, host string, ip string) func() {
+// It registers a function with t.Cleanup to restore /etc/hosts to its original
+// state.
+func impersonateHost(t *testing.T, host string, ip string) {
 	copyFile(t, "/etc/hosts", "/etc/hosts.old")
 
-	ercHostEntry := fmt.Sprintf("\n%s\t%s\n", ip, host)
-	appendToFile(t, "/etc/hosts", []byte(ercHostEntry))
+	entry := fmt.Sprintf("\n%s\t%s\n", ip, host)
+	f, err := os.OpenFile("/etc/hosts", os.O_WRONLY|os.O_APPEND, 0o644)
+	require.NoError(t, err, "could not open file for append")
 
-	return func() {
+	_, err = f.Write([]byte(entry))
+	require.NoError(t, err, "could not write data to file")
+	require.NoError(t, f.Close(), "could not close file")
+
+	t.Cleanup(func() {
 		err := os.Rename("/etc/hosts.old", "/etc/hosts")
 		require.NoError(t, err, "could not restore /etc/hosts")
-	}
+	})
 }
 
 func copyFile(t *testing.T, srcPath, dstPath string) {
@@ -501,15 +356,6 @@ func copyFile(t *testing.T, srcPath, dstPath string) {
 
 	err = dst.Sync()
 	require.NoError(t, err, "Failed to sync dst file")
-}
-
-func appendToFile(t *testing.T, name string, data []byte) {
-	f, err := os.OpenFile(name, os.O_WRONLY|os.O_APPEND, 0o644)
-	require.NoError(t, err, "could not open file for append")
-
-	_, err = f.Write(data)
-	require.NoError(t, err, "could not write data to file")
-	require.NoError(t, f.Close(), "could not close file")
 }
 
 func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bool) {
