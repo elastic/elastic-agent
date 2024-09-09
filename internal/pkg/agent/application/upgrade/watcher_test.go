@@ -275,10 +275,7 @@ func TestWatcher_AgentErrorQuick(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-<<<<<<< HEAD
-	logger, _ := logger.NewTesting("watcher")
-	w := NewAgentWatcher(errCh, logger, 100*time.Millisecond)
-=======
+
 	log, obs := loggertest.New("watcher")
 	defer func() {
 		if t.Failed() {
@@ -286,7 +283,6 @@ func TestWatcher_AgentErrorQuick(t *testing.T) {
 		}
 	}()
 	w := NewAgentWatcher(errCh, log, 100*time.Millisecond)
->>>>>>> 0126540de0 (improve testing logger (#5346))
 
 	// reports an error state, followed by a healthy state (should not error)
 	mockHandler := func(srv cproto.ElasticAgentControl_StateWatchServer) error {
