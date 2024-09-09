@@ -144,26 +144,6 @@ func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, ver
 						log.Printf(">>>>>>> Calculated directory to copy: [%s]", dirToCopy)
 					}
 
-					// cloud-defend path exception
-					// When untarred, cloud defend untars to:
-					//    cloud-defend-8.14.0-arm64
-					// but the manifest (and most of this code) expects to be the same as
-					// the name in the manifest, which is:
-					//    cloud-defend-8.14.0-linux-x86_64
-					// So we have to do a bit of a transformation here
-					if strings.Contains(dirToCopy, "cloud-defend") {
-						if strings.Contains(dirToCopy, "x86_64") {
-							dirToCopy = fixCloudDefendDirPath(dirToCopy, componentVersion, "x86_64", "amd64")
-						}
-						if strings.Contains(dirToCopy, "arm64") {
-							// Not actually replacing the arch, but removing the "linux"
-							dirToCopy = fixCloudDefendDirPath(dirToCopy, componentVersion, "arm64", "arm64")
-						}
-						if mg.Verbose() {
-							log.Printf(">>>>>>> Adjusted cloud-defend directory to copy: [%s]", dirToCopy)
-						}
-					}
-
 					// Set copy options
 					options := copy.Options{
 						OnSymlink: func(_ string) copy.SymlinkAction {
@@ -262,19 +242,4 @@ func getComponentVersion(componentName string, requiredPackage string, component
 	}
 
 	return componentVersion
-}
-
-// This is a helper function for the cloud-defend package.
-// When it is untarred, it does not have the same dirname as the package name.
-// This adjusts for that and returns the actual path on disk for cloud-defend
-func fixCloudDefendDirPath(dirPath string, componentVersion string, expectedArch string, actualArch string) string {
-	fixedDirPath := dirPath
-
-	cloudDefendExpectedDirName := fmt.Sprintf("cloud-defend-%s-linux-%s", componentVersion, expectedArch)
-	cloudDefendActualDirName := fmt.Sprintf("cloud-defend-%s-%s", componentVersion, actualArch)
-	if strings.Contains(fixedDirPath, cloudDefendExpectedDirName) {
-		fixedDirPath = strings.ReplaceAll(fixedDirPath, cloudDefendExpectedDirName, cloudDefendActualDirName)
-	}
-
-	return fixedDirPath
 }
