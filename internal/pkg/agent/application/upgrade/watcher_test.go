@@ -269,13 +269,12 @@ func TestWatcher_AgentError(t *testing.T) {
 }
 
 func TestWatcher_AgentErrorQuick(t *testing.T) {
-	// test tests for success, which only happens when no error comes in
-	// during this time period
+	// Success only happens when no error comes in during this time period
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	errCh := make(chan error)
-
+  
 	log, obs := loggertest.New("watcher")
 	defer func() {
 		if t.Failed() {
@@ -307,7 +306,7 @@ func TestWatcher_AgentErrorQuick(t *testing.T) {
 		return nil
 	}
 	mock := &mockDaemon{watch: mockHandler}
-	require.NoError(t, mock.Start())
+	require.NoError(t, mock.Start(), "could not start mock agent daemon")
 	defer mock.Stop()
 
 	// set client to mock; before running
