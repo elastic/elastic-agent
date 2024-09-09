@@ -1,14 +1,4 @@
-# Kind can be one of:
-# - breaking-change: a change to previously-documented behavior
-# - deprecation: functionality that is being removed in a later release
-# - bug-fix: fixes a problem in a previous version
-# - enhancement: extends functionality but does not break or fix existing behavior
-# - feature: new functionality
-# - known-issue: problems that we are aware of in a given version
-# - security: impacts on the security of a product or a user’s deployment.
-# - upgrade: important information for someone upgrading from a prior version
-# - other: does not fit into any of the other categories
-kind: feature
+kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
 summary: Include the correct Elastic License 2.0 file in build artifacts and packages.
