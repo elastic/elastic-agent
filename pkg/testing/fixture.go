@@ -63,6 +63,7 @@ type Fixture struct {
 
 	// Uninstall token value that is needed for the agent uninstall if it's tamper protected
 	uninstallToken string
+	fileNamePrefix string
 }
 
 // FixtureOpt is an option for the fixture.
@@ -1022,10 +1023,8 @@ func (f *Fixture) DumpProcesses(suffix string) {
 		return
 	}
 
-	// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
-	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
-
-	filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("TEST-%s-%s-%s-ProcessDump%s.json", sanitizedTestName, f.operatingSystem, f.architecture, suffix))
+	prefix := f.FileNamePrefix()
+	filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("%s-ProcessDump%s.json", prefix, suffix))
 	fileDir := path.Dir(filePath)
 	if err := os.MkdirAll(fileDir, 0777); err != nil {
 		f.t.Logf("failed to dump process; failed to create directory %s: %s", fileDir, err)
@@ -1050,7 +1049,11 @@ func (f *Fixture) DumpProcesses(suffix string) {
 	}
 }
 
-func (f *Fixture) KeepFileByMoving(file string) {
+// KeepFileByMoving moves file to 'build/diagnostics' which contents are
+// available on CI if the test fails or on the agent's 'build/diagnostics'
+// if the test is run locally.
+// 'prefix is added to the file name when moving
+func (f *Fixture) KeepFileByMoving(file, prefix string) {
 	filename := filepath.Base(file)
 
 	dir, err := findProjectRoot(f.caller)
@@ -1059,7 +1062,7 @@ func (f *Fixture) KeepFileByMoving(file string) {
 		return
 	}
 
-	destFile := filepath.Join(dir, "build", "diagnostics", filename)
+	destFile := filepath.Join(dir, "build", "diagnostics", prefix+filename)
 	fileDir := path.Dir(destFile)
 	if err := os.MkdirAll(fileDir, 0777); err != nil {
 		f.t.Logf("failed to keep file; failed to create directory %s: %s", fileDir, err)

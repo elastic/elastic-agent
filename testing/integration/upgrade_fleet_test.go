@@ -225,29 +225,29 @@ func TestFleetUpgradeToPRBuild(t *testing.T) {
 		ascFile, ascData, 0o600)
 	require.NoError(t, err, "could not write agent .asc file to disk")
 
-	// TODO: decide if it's worth saving this files, if so, give them a name
-	// associating them with the test run
 	defer func() {
 		if !t.Failed() {
 			return
 		}
 
-		if err = os.WriteFile(filepath.Join(rootDir, "server.pem"), childPair.Cert, 0o777); err != nil {
+		prefix := fromFixture.FileNamePrefix() + "-"
+
+		if err = os.WriteFile(filepath.Join(rootDir, prefix+"server.pem"), childPair.Cert, 0o777); err != nil {
 			t.Log("cleanup: could not save server cert for investigation")
 		}
-		if err = os.WriteFile(filepath.Join(rootDir, "server_key.pem"), childPair.Key, 0o777); err != nil {
+		if err = os.WriteFile(filepath.Join(rootDir, prefix+"server_key.pem"), childPair.Key, 0o777); err != nil {
 			t.Log("cleanup: could not save server cert key for investigation")
 		}
 
-		if err = os.WriteFile(filepath.Join(rootDir, "server_key.pem"), rootPair.Key, 0o777); err != nil {
+		if err = os.WriteFile(filepath.Join(rootDir, prefix+"server_key.pem"), rootPair.Key, 0o777); err != nil {
 			t.Log("cleanup: could not save rootCA key for investigation")
 		}
 
-		toFixture.KeepFileByMoving(rootCAPath)
-		toFixture.KeepFileByMoving(pkgDownloadPath)
-		toFixture.KeepFileByMoving(pkgDownloadPath + ".sha512")
-		toFixture.KeepFileByMoving(gpgKeyElasticAgent)
-		toFixture.KeepFileByMoving(ascFile)
+		toFixture.KeepFileByMoving(rootCAPath, prefix)
+		toFixture.KeepFileByMoving(pkgDownloadPath, prefix)
+		toFixture.KeepFileByMoving(pkgDownloadPath+".sha512", prefix)
+		toFixture.KeepFileByMoving(gpgKeyElasticAgent, prefix)
+		toFixture.KeepFileByMoving(ascFile, prefix)
 	}()
 
 	// ==== impersonate https://artifacts.elastic.co/GPG-KEY-elastic-agent  ====
@@ -270,92 +270,6 @@ func TestFleetUpgradeToPRBuild(t *testing.T) {
 		policy.ID, policy.DownloadSourceID)
 
 	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fromFixture, toFixture, policy, false)
-}
-
-// prepareFileServer prepares and returns a started HTTPS file server serving
-// files from rootDir and using cert as its TLS certificate.
-func prepareFileServer(t *testing.T, rootDir string, cert tls.Certificate) *httptest.Server {
-	// it's useful for debugging
-	dl, err := os.ReadDir(rootDir)
-	require.NoError(t, err)
-	var files []string
-	for _, d := range dl {
-		files = append(files, d.Name())
-	}
-	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
-		rootDir, files)
-
-	fs := http.FileServer(http.Dir(rootDir))
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Logf("[fileserver] %s - %s", r.Method, r.URL.Path)
-		fs.ServeHTTP(w, r)
-	}))
-
-	server.Listener, err = net.Listen("tcp", "127.0.0.1:443")
-	require.NoError(t, err, "could not create net listener for port 443")
-
-	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
-	server.StartTLS()
-	t.Logf("file server running on %s", server.URL)
-
-	return server
-}
-
-// prepareTLSCerts generates a CA and a child certificate for the given host and
-// IPs.
-func prepareTLSCerts(t *testing.T, host string, ips []net.IP) (certutil.Pair, certutil.Pair, tls.Certificate) {
-	rootKey, rootCACert, rootPair, err := certutil.NewRootCA()
-	require.NoError(t, err, "could not create root CA")
-
-	_, childPair, err := certutil.GenerateChildCert(
-		host,
-		ips,
-		rootKey,
-		rootCACert)
-	require.NoError(t, err, "could not create child cert")
-
-	cert, err := tls.X509KeyPair(childPair.Cert, childPair.Key)
-	require.NoError(t, err, "could not create tls.Certificates from child certificate")
-
-	return rootPair, childPair, cert
-}
-
-// impersonateHost impersonates 'host' by adding an entry to /etc/hosts mapping
-// 'ip' to 'host'.
-// It registers a function with t.Cleanup to restore /etc/hosts to its original
-// state.
-func impersonateHost(t *testing.T, host string, ip string) {
-	copyFile(t, "/etc/hosts", "/etc/hosts.old")
-
-	entry := fmt.Sprintf("\n%s\t%s\n", ip, host)
-	f, err := os.OpenFile("/etc/hosts", os.O_WRONLY|os.O_APPEND, 0o644)
-	require.NoError(t, err, "could not open file for append")
-
-	_, err = f.Write([]byte(entry))
-	require.NoError(t, err, "could not write data to file")
-	require.NoError(t, f.Close(), "could not close file")
-
-	t.Cleanup(func() {
-		err := os.Rename("/etc/hosts.old", "/etc/hosts")
-		require.NoError(t, err, "could not restore /etc/hosts")
-	})
-}
-
-func copyFile(t *testing.T, srcPath, dstPath string) {
-	t.Logf("copyFile: src %q, dst %q", srcPath, dstPath)
-	src, err := os.Open(srcPath)
-	require.NoError(t, err, "Failed to open source file")
-	defer src.Close()
-
-	dst, err := os.Create(dstPath)
-	require.NoError(t, err, "Failed to create destination file")
-	defer dst.Close()
-
-	_, err = io.Copy(dst, src)
-	require.NoError(t, err, "Failed to copy file")
-
-	err = dst.Sync()
-	require.NoError(t, err, "Failed to sync dst file")
 }
 
 func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bool) {
@@ -658,4 +572,90 @@ func agentUpgradeDetailsString(a *kibana.AgentExisting) string {
 	}
 
 	return fmt.Sprintf("%#v", *a.UpgradeDetails)
+}
+
+// prepareFileServer prepares and returns a started HTTPS file server serving
+// files from rootDir and using cert as its TLS certificate.
+func prepareFileServer(t *testing.T, rootDir string, cert tls.Certificate) *httptest.Server {
+	// it's useful for debugging
+	dl, err := os.ReadDir(rootDir)
+	require.NoError(t, err)
+	var files []string
+	for _, d := range dl {
+		files = append(files, d.Name())
+	}
+	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
+		rootDir, files)
+
+	fs := http.FileServer(http.Dir(rootDir))
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("[fileserver] %s - %s", r.Method, r.URL.Path)
+		fs.ServeHTTP(w, r)
+	}))
+
+	server.Listener, err = net.Listen("tcp", "127.0.0.1:443")
+	require.NoError(t, err, "could not create net listener for port 443")
+
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
+	server.StartTLS()
+	t.Logf("file server running on %s", server.URL)
+
+	return server
+}
+
+// prepareTLSCerts generates a CA and a child certificate for the given host and
+// IPs.
+func prepareTLSCerts(t *testing.T, host string, ips []net.IP) (certutil.Pair, certutil.Pair, tls.Certificate) {
+	rootKey, rootCACert, rootPair, err := certutil.NewRootCA()
+	require.NoError(t, err, "could not create root CA")
+
+	_, childPair, err := certutil.GenerateChildCert(
+		host,
+		ips,
+		rootKey,
+		rootCACert)
+	require.NoError(t, err, "could not create child cert")
+
+	cert, err := tls.X509KeyPair(childPair.Cert, childPair.Key)
+	require.NoError(t, err, "could not create tls.Certificates from child certificate")
+
+	return rootPair, childPair, cert
+}
+
+// impersonateHost impersonates 'host' by adding an entry to /etc/hosts mapping
+// 'ip' to 'host'.
+// It registers a function with t.Cleanup to restore /etc/hosts to its original
+// state.
+func impersonateHost(t *testing.T, host string, ip string) {
+	copyFile(t, "/etc/hosts", "/etc/hosts.old")
+
+	entry := fmt.Sprintf("\n%s\t%s\n", ip, host)
+	f, err := os.OpenFile("/etc/hosts", os.O_WRONLY|os.O_APPEND, 0o644)
+	require.NoError(t, err, "could not open file for append")
+
+	_, err = f.Write([]byte(entry))
+	require.NoError(t, err, "could not write data to file")
+	require.NoError(t, f.Close(), "could not close file")
+
+	t.Cleanup(func() {
+		err := os.Rename("/etc/hosts.old", "/etc/hosts")
+		require.NoError(t, err, "could not restore /etc/hosts")
+	})
+}
+
+func copyFile(t *testing.T, srcPath, dstPath string) {
+	t.Logf("copyFile: src %q, dst %q", srcPath, dstPath)
+	src, err := os.Open(srcPath)
+	require.NoError(t, err, "Failed to open source file")
+	defer src.Close()
+
+	dst, err := os.Create(dstPath)
+	require.NoError(t, err, "Failed to create destination file")
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	require.NoError(t, err, "Failed to copy file")
+
+	err = dst.Sync()
+	require.NoError(t, err, "Failed to sync dst file")
 }

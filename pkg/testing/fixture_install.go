@@ -661,15 +661,8 @@ func (f *Fixture) collectDiagnostics() {
 		return
 	}
 
-	stamp := time.Now().Format(time.RFC3339)
-	if runtime.GOOS == "windows" {
-		// on Windows a filename cannot contain a ':' as this collides with disk labels (aka. C:\)
-		stamp = strings.ReplaceAll(stamp, ":", "-")
-	}
-
-	// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
-	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
-	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", sanitizedTestName, stamp))
+	prefix := f.FileNamePrefix()
+	outputPath := filepath.Join(diagPath, prefix+"-diagnostics.zip")
 
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
 	if err != nil {
@@ -689,14 +682,34 @@ func (f *Fixture) collectDiagnostics() {
 		if err != nil {
 			// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
 			f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
-			timestamp := strings.ReplaceAll(time.Now().Format(time.RFC3339), ":", "-")
-			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, timestamp))
+			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory.zip", prefix))
 			err = f.archiveInstallDirectory(f.workDir, zipPath)
 			if err != nil {
 				f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)
 			}
 		}
 	}
+}
+
+// FileNamePrefix returns a sanitized and unique name to be used as prefix for
+// files to be kept as resources for investigation when the test fails.
+func (f *Fixture) FileNamePrefix() string {
+	if f.fileNamePrefix != "" {
+		return f.fileNamePrefix
+	}
+
+	stamp := time.Now().Format(time.RFC3339)
+	// on Windows a filename cannot contain a ':' as this collides with disk
+	// labels (aka. C:\)
+	stamp = strings.ReplaceAll(stamp, ":", "-")
+
+	// Subtest names are separated by "/" characters which are not valid
+	// filenames on Linux.
+	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
+	prefix := fmt.Sprintf("%s-%s", sanitizedTestName, stamp)
+
+	f.fileNamePrefix = prefix
+	return f.fileNamePrefix
 }
 
 // DiagDir returned {projectRoot}/build/diagnostics path. Files on this path
