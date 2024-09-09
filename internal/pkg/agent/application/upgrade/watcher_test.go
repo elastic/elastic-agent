@@ -274,7 +274,7 @@ func TestWatcher_AgentErrorQuick(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error)
-  
+
 	log, obs := loggertest.New("watcher")
 	defer func() {
 		if t.Failed() {
