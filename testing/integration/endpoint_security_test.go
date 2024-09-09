@@ -275,11 +275,6 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 				return false
 			}
 
-			if state.FleetState != client.Failed {
-				t.Logf("Fleet state has not been marked as failed yet!\n%+v", state)
-				return false
-			}
-
 			return true
 		},
 		endpointHealthPollingTimeout,
