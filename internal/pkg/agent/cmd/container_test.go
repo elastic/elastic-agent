@@ -5,7 +5,6 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -23,17 +22,9 @@ func TestEnvWithDefault(t *testing.T) {
 
 	require.Equal(t, def, res)
 
-	err := os.Setenv(key1, "key1")
-	defer os.Unsetenv(key1)
-	if err != nil {
-		t.Skipf("could not export env var: %s", err)
-	}
+	t.Setenv(key1, "key1")
 
-	err = os.Setenv(key2, "key2")
-	defer os.Unsetenv(key2)
-	if err != nil {
-		t.Skipf("could not export env var: %s", err)
-	}
+	t.Setenv(key2, "key2")
 
 	res2 := envWithDefault(def, key1, key2)
 	require.Equal(t, "key1", res2)
@@ -42,10 +33,7 @@ func TestEnvWithDefault(t *testing.T) {
 func TestEnvBool(t *testing.T) {
 	key := "TEST_ENV_BOOL"
 
-	err := os.Setenv(key, "true")
-	if err != nil {
-		t.Skipf("could not export env var: %s", err)
-	}
+	t.Setenv(key, "true")
 
 	res := envBool(key)
 	require.True(t, res)
@@ -54,10 +42,7 @@ func TestEnvBool(t *testing.T) {
 func TestEnvTimeout(t *testing.T) {
 	key := "TEST_ENV_TIMEOUT"
 
-	err := os.Setenv(key, "10s")
-	if err != nil {
-		t.Skipf("could not export env var: %s", err)
-	}
+	t.Setenv(key, "10s")
 
 	res := envTimeout(key)
 	require.Equal(t, time.Second*10, res)
