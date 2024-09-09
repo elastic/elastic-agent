@@ -6,7 +6,6 @@ package kubernetesleaderelection
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -117,10 +116,7 @@ func TestNewLeaderElectionManager(t *testing.T) {
 
 		comm := ctesting.NewContextComm(ctx)
 
-		err = os.Setenv("POD_NAME", podNames[i])
-		if err != nil {
-			require.FailNow(t, "Failed to set pod name environment variable.")
-		}
+		t.Setenv("POD_NAME", podNames[i])
 		go func() {
 			_ = p.Run(ctx, comm)
 		}()

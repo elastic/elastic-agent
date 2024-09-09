@@ -61,6 +61,10 @@ func NewUnenroll(
 
 // Handle handles UNENROLL action.
 func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
+	return h.handle(ctx, a, acker, unenrollTimeout)
+}
+
+func (h *Unenroll) handle(ctx context.Context, a fleetapi.Action, acker acker.Acker, timeout time.Duration) error {
 	h.log.Debugf("handlerUnenroll: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionUnenroll)
 	if !ok {
@@ -98,7 +102,7 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		h.log.Warnf("Failed to update state store: %v", err)
 	}
 
-	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)
+	unenrollCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	unenrollPolicy.WaitAck(unenrollCtx)
