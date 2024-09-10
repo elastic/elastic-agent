@@ -35,6 +35,8 @@ steps:
         plugins:
           - junit-annotate#v2.5.0:
               artifacts: "build/*.xml"
+              context: "ubuntu2204"
+              always-annotate: true
         depends_on:
           - step: "unit-tests-2204"
             allow_failure: true
@@ -60,6 +62,8 @@ steps:
         plugins:
           - junit-annotate#v2.5.0:
               artifacts: "build/*.xml"
+              context: "ubuntu2204arm"
+              always-annotate: true
         depends_on:
           - step: "unit-tests-2204-arm64"
             allow_failure: true
