@@ -56,7 +56,7 @@ func makeGoTestArgs(name string) GoTestArgs {
 			buildkiteJobId,
 		)
 	} else {
-		fileName = fmt.Sprintf("build/TEST-go-%s-%s", strings.Replace(strings.ToLower(name), " ", "_", -1))
+		fileName = fmt.Sprintf("build/TEST-go-%s", strings.Replace(strings.ToLower(name), " ", "_", -1))
 	}
 	params := GoTestArgs{
 		LogName:         name,
