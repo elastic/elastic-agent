@@ -1,8 +1,11 @@
 {
   "testVersions": [
     "8.15.0",
+<<<<<<< HEAD
     "8.15.0-SNAPSHOT",
     "8.14.4-SNAPSHOT",
+=======
+>>>>>>> 35cc8e39d8 (Removed aged out snapshot version (#5500))
     "8.14.3",
     "7.17.24-SNAPSHOT"
   ]
