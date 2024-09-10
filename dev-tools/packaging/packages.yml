@@ -1,4 +1,5 @@
 ---
+
 # This file contains the package specifications for both Community Beats and
 # Official Beats. The shared section contains YAML anchors that are used to
 # define common parts of the package in order to not repeat ourselves.
@@ -184,6 +185,7 @@ shared:
       <<: *agent_components
       <<: *linux_otel_files
 
+
   - &agent_darwin_binary_spec
     <<: *common
     files:
@@ -258,7 +260,7 @@ shared:
       docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
       user: '{{ .BeatName }}'
       linux_capabilities: ''
-      beats_install_path: 'install'
+      beats_install_path: "install"
     files:
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
@@ -454,21 +456,21 @@ shared:
   # License modifiers for Apache 2.0
   #
   - &apache_license_for_binaries
-    license: 'ASL 2.0'
+    license: "ASL 2.0"
     files:
       LICENSE.txt:
         source: '{{ repo.RootDir }}/dev-tools/licenses/APACHE-LICENSE-2.0.txt'
         mode: 0644
 
   - &apache_license_for_deb_rpm
-    license: 'ASL 2.0'
+    license: "ASL 2.0"
     files:
       /usr/share/{{.BeatName}}/LICENSE.txt:
         source: '{{ repo.RootDir }}/dev-tools/licenses/APACHE-LICENSE-2.0.txt'
         mode: 0644
 
   - &apache_license_for_macos_pkg
-    license: 'ASL 2.0'
+    license: "ASL 2.0"
     files:
       /Library/Application Support/{{.BeatVendor}}/{{.BeatName}}/LICENSE.txt:
         source: '{{ repo.RootDir }}/dev-tools/licenses/APACHE-LICENSE-2.0.txt'
@@ -478,21 +480,21 @@ shared:
   # License modifiers for the Elastic License
   #
   - &elastic_license_for_binaries
-    license: 'Elastic License'
+    license: "Elastic License"
     files:
       LICENSE.txt:
         source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE.txt'
         mode: 0644
 
   - &elastic_license_for_deb_rpm
-    license: 'Elastic License'
+    license: "Elastic License"
     files:
       /usr/share/{{.BeatName}}/LICENSE.txt:
         source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE.txt'
         mode: 0644
 
   - &elastic_license_for_macos_pkg
-    license: 'Elastic License'
+    license: "Elastic License"
     files:
       /Library/Application Support/{{.BeatVendor}}/{{.BeatName}}/LICENSE.txt:
         source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE.txt'
@@ -1060,6 +1062,7 @@ specs:
             symlink: true
             mode: 0755
 
+
   # Elastic Beat with Elastic License and binary taken from the x-pack dir.
   elastic_beat_agent_demo_binaries:
     ###
@@ -1095,6 +1098,7 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
 
   elastic_agent_core:
     ###
