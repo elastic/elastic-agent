@@ -198,7 +198,13 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 			}
 
 			if !bo.Wait() {
-				// Something bad has happened and we log it and we should update our current state.
+				if ctx.Err() != nil {
+					// if the context is cancelled, break out of the loop
+					break
+				}
+
+				// This should not really happen, but just in-case this error is used to show that
+				// something strange occurred and we want to log it and report it.
 				err := errors.New(
 					"checkin retry loop was stopped",
 					errors.TypeNetwork,
