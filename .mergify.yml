@@ -129,7 +129,6 @@ pull_request_rules:
           `backport-v8.x` has been added to help with the transition to the new branch 8.x.
       label:
         add:
-          - backport-skip
           - backport-v8.x
   - name: remove-backport label
     conditions:
