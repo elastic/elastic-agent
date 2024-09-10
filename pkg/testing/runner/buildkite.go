@@ -41,7 +41,7 @@ func (r *Runner) Buildkite() (string, error) {
 				stackStep := buildkite.Step{
 					Label:   fmt.Sprintf("Integration Stack: %s", lb.Batch.Stack.Version),
 					Key:     fmt.Sprintf("integration-stack-%s", lb.Batch.Stack.Version),
-					Command: "TODO FOR CREATING THE STACK",
+					Command: "false",
 					Agents:  StackAgent,
 				}
 				steps = append(steps, stackStep)
@@ -106,7 +106,7 @@ func (r *Runner) Buildkite() (string, error) {
 			Key:                    fmt.Sprintf("teardown-%s", step.Key),
 			DependsOn:              stackDepends[step.Key],
 			AllowDependencyFailure: true,
-			Command:                "TODO FOR TEARING DOWN THE STACK",
+			Command:                "false",
 			Agents:                 StackAgent,
 		})
 	}
