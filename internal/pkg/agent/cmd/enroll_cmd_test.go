@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type mockStore struct {
@@ -578,7 +579,7 @@ func TestDaemonReloadWithBackoff(t *testing.T) {
 }
 
 func TestWaitForFleetServer_timeout(t *testing.T) {
-	log, _ := logger.NewTesting("TestWaitForFleetServer_timeout")
+	log, _ := loggertest.New("TestWaitForFleetServer_timeout")
 	timeout := 5 * time.Second
 	testTimeout := 2 * timeout
 
