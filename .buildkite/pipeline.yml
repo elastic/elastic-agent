@@ -31,6 +31,14 @@ steps:
           manual:
             allowed: true
 
+      - label: ":junit: Junit annotate Ubuntu 22.04"
+        plugins:
+          - junit-annotate#v2.5.0:
+              artifacts: "build/*.xml"
+        depends_on:
+          - step: "unit-tests-2204"
+            allow_failure: true
+
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -47,6 +55,14 @@ steps:
         retry:
           manual:
             allowed: true
+
+      - label: ":junit: Junit annotate Ubuntu 22.04 ARM64"
+        plugins:
+          - junit-annotate#v2.5.0:
+              artifacts: "build/*.xml"
+        depends_on:
+          - step: "unit-tests-2204-arm64"
+            allow_failure: true
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
@@ -153,31 +169,6 @@ steps:
         retry:
           manual:
             allowed: true
-
-
-  - label: ":junit: Junit annotate"
-    plugins:
-      - junit-annotate#v2.4.1:
-          artifacts: "build/*.xml"
-    agents:
-      provider: "gcp"
-    depends_on:
-      - step: "unit-tests-2204"
-        allow_failure: true
-      - step: "unit-tests-2204-arm64"
-        allow_failure: true
-      - step: "unit-tests-win2022"
-        allow_failure: true
-      - step: "unit-tests-win2016"
-        allow_failure: true
-      - step: "unit-tests-macos-13-arm"
-        allow_failure: true
-      - step: "unit-tests-macos-13"
-        allow_failure: true
-      - step: "unit-tests-win10"
-        allow_failure: true
-      - step: "unit-tests-win11"
-        allow_failure: true
 
 
   - label: "Merge coverage reports"
