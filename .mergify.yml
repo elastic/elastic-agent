@@ -122,7 +122,7 @@ pull_request_rules:
           This pull request does not have a backport label. Could you fix it @{{author}}? 🙏
           To fixup this pull request, you need to add the backport labels for the needed
           branches, such as:
-          * `backport-/d./d` is the label to automatically backport to the `8./d` branch. `/d` is the digit
+          * `backport-./d./d` is the label to automatically backport to the `8./d` branch. `/d` is the digit
 
           **NOTE**: `backport-skip` has been added to this pull request.
       label:
@@ -335,7 +335,7 @@ pull_request_rules:
   - name: backport patches to 8.x branch
     conditions:
       - merged
-      - label=backport-8.x
+      - label~=^(backport-v8.x|backport-8.x)$
     actions:
       backport:
         assignees:
