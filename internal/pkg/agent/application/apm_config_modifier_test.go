@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package application
 
@@ -14,10 +14,9 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type injectedConfigAssertion func(*testing.T, []component.Component)
@@ -449,7 +448,7 @@ func TestPatchAPMConfig(t *testing.T) {
 			require.NoError(t, err)
 			agtConf, err := config.NewConfigFrom(tt.args.agentFileCfg)
 			require.NoError(t, err)
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 			patcher := PatchAPMConfig(log, agtConf)
 
 			mcc := &mockConfigChange{c: fleetConf}

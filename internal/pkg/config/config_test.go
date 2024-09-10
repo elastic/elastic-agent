@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package config
 
@@ -79,7 +79,7 @@ func testToMapStr(t *testing.T) {
 }
 
 func TestCommaParsing(t *testing.T) {
-	_ = os.Setenv("testname", "motmot")
+	t.Setenv("testname", "motmot")
 	// test to make sure that we don't blow up the parsers when we have a `,` in a string
 	inMap := map[string]interface{}{
 		"test": "startsWith('${testname}','motmot')",

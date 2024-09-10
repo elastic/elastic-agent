@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package download
 
@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestPgpBytesFromSource(t *testing.T) {
@@ -100,7 +100,7 @@ func TestPgpBytesFromSource(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			log, obs := logger.NewTesting(tc.Name)
+			log, obs := loggertest.New(tc.Name)
 			mockClient := &MockClient{
 				DoFunc: func(req *http.Request) (*http.Response, error) {
 					if tc.ClientDoErr != nil {
@@ -294,7 +294,7 @@ func TestVerifySHA512HashWithCleanup_BrokenHashFile(t *testing.T) {
 				require.NoError(t, err, "could not write test hash file")
 			}
 
-			testLogger, obsLogs := logger.NewTesting(tt.name)
+			testLogger, obsLogs := loggertest.New(tt.name)
 			err = VerifySHA512HashWithCleanup(testLogger, dataFilePath)
 			tt.wantErr(t, err)
 			for _, log := range tt.wantLogSnippets {

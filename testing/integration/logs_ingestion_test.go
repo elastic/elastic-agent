@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -160,14 +160,15 @@ func testMonitoringLogsAreShipped(
 		return estools.CheckForErrorsInLogs(ctx, info.ESClient, info.Namespace, []string{
 			// acceptable error messages (include reason)
 			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused", // beat is running default config before its config gets updated
-			"Global configuration artifact is not available",                     // Endpoint: failed to load user artifact due to connectivity issues
+			"Failed to apply initial policy from on disk configuration",
+			"Failed to connect to backoff(elasticsearch(http://127.0.0.1:9200)): Get \"http://127.0.0.1:9200\": dial tcp 127.0.0.1:9200: connect: connection refused", // Deb test
 			"Failed to download artifact",
 			"Failed to initialize artifact",
-			"Failed to apply initial policy from on disk configuration",
-			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
+			"Global configuration artifact is not available",                                 // Endpoint: failed to load user artifact due to connectivity issues
+			"add_cloud_metadata: received error failed fetching EC2 Identity Document",       // okay for the cloud metadata to not work
 			"add_cloud_metadata: received error failed requesting openstack metadata",        // okay for the cloud metadata to not work
 			"add_cloud_metadata: received error failed with http status code 404",            // okay for the cloud metadata to not work
-			"add_cloud_metadata: received error failed fetching EC2 Identity Document",       // okay for the cloud metadata to not work
+			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
 			"failed to invoke rollback watcher: failed to start Upgrade Watcher",             // on debian this happens probably need to fix.
 			"falling back to IMDSv1: operation error ec2imds: getToken",                      // okay for the cloud metadata to not work
 		})

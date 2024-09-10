@@ -81,3 +81,15 @@ inputs:
     outputs: *outputs
     command: *command
     isolate_units: true
+  - name: cloudbeat/asset_inventory_azure
+    description: "Azure Asset Inventory Discovery"
+    platforms: *platforms
+    outputs: *outputs
+    command: *command
+    isolate_units: true
+  - name: cloudbeat/asset_inventory_gcp
+    description: "GCP Asset Inventory Discovery"
+    platforms: *platforms
+    outputs: *outputs
+    command: *command
+    isolate_units: true

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -14,15 +14,6 @@ import (
 	"text/template"
 
 	"github.com/magefile/mage/mg"
-
-	"github.com/pkg/errors"
-)
-
-// Paths to generated config file templates.
-var (
-	shortTemplate     = filepath.Join("build", BeatName+".yml.tmpl")
-	referenceTemplate = filepath.Join("build", BeatName+".reference.yml.tmpl")
-	dockerTemplate    = filepath.Join("build", BeatName+".docker.yml.tmpl")
 )
 
 // ConfigFileType is a bitset that indicates what types of config files to
@@ -67,7 +58,7 @@ func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error
 	if types.IsShort() {
 		file := filepath.Join(targetDir, BeatName+".yml")
 		if err := makeConfigTemplate(file, 0600, args, ShortConfigType); err != nil {
-			return errors.Wrap(err, "failed making short config")
+			return fmt.Errorf("failed making short config: %w", err)
 		}
 	}
 
@@ -75,7 +66,7 @@ func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error
 	if types.IsReference() {
 		file := filepath.Join(targetDir, BeatName+".reference.yml")
 		if err := makeConfigTemplate(file, 0644, args, ReferenceConfigType); err != nil {
-			return errors.Wrap(err, "failed making reference config")
+			return fmt.Errorf("failed making reference config: %w", err)
 		}
 	}
 
@@ -83,7 +74,7 @@ func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error
 	if types.IsDocker() {
 		file := filepath.Join(targetDir, BeatName+".docker.yml")
 		if err := makeConfigTemplate(file, 0600, args, DockerConfigType); err != nil {
-			return errors.Wrap(err, "failed making docker config")
+			return fmt.Errorf("failed making docker config: %w", err)
 		}
 	}
 
@@ -105,7 +96,7 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 		confFile = confParams.Docker
 		tmplParams = map[string]interface{}{"Docker": true}
 	default:
-		panic(errors.Errorf("Invalid config file type: %v", typ))
+		panic(fmt.Errorf("invalid config file type: %v", typ))
 	}
 
 	// Build the dependencies.
@@ -154,18 +145,18 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	var err error
 	for _, templateGlob := range confParams.Templates {
 		if tmpl, err = tmpl.ParseGlob(templateGlob); err != nil {
-			return errors.Wrapf(err, "failed to parse config templates in %q", templateGlob)
+			return fmt.Errorf("failed to parse config templates in %q: %w", templateGlob, err)
 		}
 	}
 
 	data, err := os.ReadFile(confFile.Template)
 	if err != nil {
-		return errors.Wrapf(err, "failed to read config template %q", confFile.Template)
+		return fmt.Errorf("failed to read config template %q: %w", confFile.Template, err)
 	}
 
 	tmpl, err = tmpl.Parse(string(data))
 	if err != nil {
-		return errors.Wrap(err, "failed to parse template")
+		return fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	out, err := os.OpenFile(CreateDir(destination), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
@@ -175,7 +166,7 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	defer out.Close()
 
 	if err = tmpl.Execute(out, EnvMap(params)); err != nil {
-		return errors.Wrapf(err, "failed building %v", destination)
+		return fmt.Errorf("failed building %v: %w", destination, err)
 	}
 
 	return nil
