@@ -131,6 +131,7 @@ type APMConfig struct {
 	Hosts        []string          `config:"hosts"`
 	GlobalLabels map[string]string `config:"global_labels"`
 	TLS          APMTLS            `config:"tls"`
+	SamplingRate *float32          `config:"sampling_rate"`
 }
 
 // APMTLS contains the configuration options necessary for configuring TLS in
