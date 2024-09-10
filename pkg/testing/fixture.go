@@ -62,6 +62,10 @@ type Fixture struct {
 
 	// Uninstall token value that is needed for the agent uninstall if it's tamper protected
 	uninstallToken string
+
+	// fileNamePrefix is a prefix to be used when saving files from this test.
+	// it's set by FileNamePrefix and once it's set, FileNamePrefix will return
+	// its value.
 	fileNamePrefix string
 }
 
@@ -1011,14 +1015,13 @@ func (f *Fixture) setClient(c client.Client) {
 
 func (f *Fixture) DumpProcesses(suffix string) {
 	procs := getProcesses(f.t, `.*`)
-	dir, err := findProjectRoot(f.caller)
+	dir, err := f.DiagnosticsDir()
 	if err != nil {
-		f.t.Logf("failed to dump process; failed to find project root: %s", err)
+		f.t.Logf("failed to dump process: %s", err)
 		return
 	}
 
-	prefix := f.FileNamePrefix()
-	filePath := filepath.Join(dir, "build", "diagnostics", fmt.Sprintf("%s-ProcessDump%s.json", prefix, suffix))
+	filePath := filepath.Join(dir, fmt.Sprintf("%s-ProcessDump%s.json", f.FileNamePrefix(), suffix))
 	fileDir := path.Dir(filePath)
 	if err := os.MkdirAll(fileDir, 0777); err != nil {
 		f.t.Logf("failed to dump process; failed to create directory %s: %s", fileDir, err)
@@ -1043,31 +1046,67 @@ func (f *Fixture) DumpProcesses(suffix string) {
 	}
 }
 
-// KeepFileByMoving moves file to 'build/diagnostics' which contents are
+// MoveToDiagnosticsDir moves file to 'build/diagnostics' which contents are
 // available on CI if the test fails or on the agent's 'build/diagnostics'
 // if the test is run locally.
-// 'prefix is added to the file name when moving
-func (f *Fixture) KeepFileByMoving(file, prefix string) {
-	filename := filepath.Base(file)
-
-	dir, err := findProjectRoot(f.caller)
+// If the file name does nos start with Fixture.FileNamePrefix(), it'll be added
+// to the filename when moving.
+func (f *Fixture) MoveToDiagnosticsDir(file string) {
+	dir, err := f.DiagnosticsDir()
 	if err != nil {
-		f.t.Logf("failed to keep file; failed to find project root: %s", err)
+		f.t.Logf("failed to move file to diagnostcs directory: %s", err)
 		return
 	}
 
-	destFile := filepath.Join(dir, "build", "diagnostics", prefix+filename)
-	fileDir := path.Dir(destFile)
-	if err := os.MkdirAll(fileDir, 0777); err != nil {
-		f.t.Logf("failed to keep file; failed to create directory %s: %s", fileDir, err)
-		return
+	filename := filepath.Base(file)
+	if !strings.HasPrefix(filename, f.FileNamePrefix()) {
+		filename = fmt.Sprintf("%s-%s", f.FileNamePrefix(), filename)
 	}
+	destFile := filepath.Join(dir, filename)
 
 	f.t.Logf("moving %q to %q", file, destFile)
 	err = os.Rename(file, destFile)
 	if err != nil {
 		f.t.Logf("failed to move %q to %q: %v", file, destFile, err)
 	}
+}
+
+// FileNamePrefix returns a sanitized and unique name to be used as prefix for
+// files to be kept as resources for investigation when the test fails.
+func (f *Fixture) FileNamePrefix() string {
+	if f.fileNamePrefix != "" {
+		return f.fileNamePrefix
+	}
+
+	stamp := time.Now().Format(time.RFC3339)
+	// on Windows a filename cannot contain a ':' as this collides with disk
+	// labels (aka. C:\)
+	stamp = strings.ReplaceAll(stamp, ":", "-")
+
+	// Subtest names are separated by "/" characters which are not valid
+	// filenames on Linux.
+	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
+	prefix := fmt.Sprintf("%s-%s", sanitizedTestName, stamp)
+
+	f.fileNamePrefix = prefix
+	return f.fileNamePrefix
+}
+
+// DiagnosticsDir returned {projectRoot}/build/diagnostics path. Files on this path
+// are saved if any test fails. Use it to save files for further investigation.
+func (f *Fixture) DiagnosticsDir() (string, error) {
+	dir, err := findProjectRoot(f.caller)
+	if err != nil {
+		return "", fmt.Errorf("failed to find project root: %w", err)
+	}
+
+	diagPath := filepath.Join(dir, "build", "diagnostics")
+
+	if err := os.MkdirAll(diagPath, 0777); err != nil {
+		return "", fmt.Errorf("failed to create directory %s: %w", diagPath, err)
+	}
+
+	return diagPath, nil
 }
 
 // validateComponents ensures that the provided UsableComponent's are valid.

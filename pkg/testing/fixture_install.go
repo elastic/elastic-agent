@@ -649,7 +649,7 @@ func (f *Fixture) collectDiagnostics() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	diagPath, err := f.DiagDir()
+	diagPath, err := f.DiagnosticsDir()
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics: %v", err)
 		return
@@ -689,39 +689,6 @@ func (f *Fixture) collectDiagnostics() {
 			}
 		}
 	}
-}
-
-// FileNamePrefix returns a sanitized and unique name to be used as prefix for
-// files to be kept as resources for investigation when the test fails.
-func (f *Fixture) FileNamePrefix() string {
-	if f.fileNamePrefix != "" {
-		return f.fileNamePrefix
-	}
-
-	stamp := time.Now().Format(time.RFC3339)
-	// on Windows a filename cannot contain a ':' as this collides with disk
-	// labels (aka. C:\)
-	stamp = strings.ReplaceAll(stamp, ":", "-")
-
-	// Subtest names are separated by "/" characters which are not valid
-	// filenames on Linux.
-	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
-	prefix := fmt.Sprintf("%s-%s", sanitizedTestName, stamp)
-
-	f.fileNamePrefix = prefix
-	return f.fileNamePrefix
-}
-
-// DiagDir returned {projectRoot}/build/diagnostics path. Files on this path
-// are saved if any test fails. Use it to save files for further investigation.
-func (f *Fixture) DiagDir() (string, error) {
-	dir, err := findProjectRoot(f.caller)
-	if err != nil {
-		return "", fmt.Errorf("failed to find project root: %w", err)
-	}
-
-	diagPath := filepath.Join(dir, "build", "diagnostics")
-	return diagPath, nil
 }
 
 func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string) error {

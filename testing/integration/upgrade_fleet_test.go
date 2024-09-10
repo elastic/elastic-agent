@@ -140,7 +140,8 @@ func TestFleetUpgradeToPRBuild(t *testing.T) {
 		Sudo:  true,                              // The test uses /etc/hosts.
 		// The test requires:
 		//   - bind to port 443 (HTTPS)
-		//   - edit /etc/hosts
+		//   - changes to /etc/hosts
+		//   - changes to /etc/ssl/certs
 		//   - agent installation
 		Local: false,
 	})
@@ -184,14 +185,14 @@ func TestFleetUpgradeToPRBuild(t *testing.T) {
 	require.NoError(t, err, "could not open PR build artifact")
 
 	// sign the build
-	pubKey, ascData := pgptest.Sing(t, agentPkg)
+	pubKey, ascData := pgptest.Sign(t, agentPkg)
 
 	// ========================== file server ==================================
 	downloadDir := filepath.Join(rootDir, "downloads", "beats", "elastic-agent")
 	err = os.MkdirAll(downloadDir, 0644)
 	require.NoError(t, err, "could not create download directory")
 
-	server := prepareFileServer(t, rootDir, cert)
+	server := startHTTPSFileServer(t, rootDir, cert)
 	defer server.Close()
 
 	// add root CA to /etc/ssl/certs. It was the only option that worked
@@ -243,11 +244,11 @@ func TestFleetUpgradeToPRBuild(t *testing.T) {
 			t.Log("cleanup: could not save rootCA key for investigation")
 		}
 
-		toFixture.KeepFileByMoving(rootCAPath, prefix)
-		toFixture.KeepFileByMoving(pkgDownloadPath, prefix)
-		toFixture.KeepFileByMoving(pkgDownloadPath+".sha512", prefix)
-		toFixture.KeepFileByMoving(gpgKeyElasticAgent, prefix)
-		toFixture.KeepFileByMoving(ascFile, prefix)
+		toFixture.MoveToDiagnosticsDir(rootCAPath)
+		toFixture.MoveToDiagnosticsDir(pkgDownloadPath)
+		toFixture.MoveToDiagnosticsDir(pkgDownloadPath + ".sha512")
+		toFixture.MoveToDiagnosticsDir(gpgKeyElasticAgent)
+		toFixture.MoveToDiagnosticsDir(ascFile)
 	}()
 
 	// ==== impersonate https://artifacts.elastic.co/GPG-KEY-elastic-agent  ====
@@ -393,7 +394,6 @@ func testUpgradeFleetManagedElasticAgent(
 		nonInteractiveFlag = true
 	}
 	installOpts := atesting.InstallOpts{
-		Insecure:       true,
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
 		EnrollOpts: atesting.EnrollOpts{
@@ -574,9 +574,9 @@ func agentUpgradeDetailsString(a *kibana.AgentExisting) string {
 	return fmt.Sprintf("%#v", *a.UpgradeDetails)
 }
 
-// prepareFileServer prepares and returns a started HTTPS file server serving
+// startHTTPSFileServer prepares and returns a started HTTPS file server serving
 // files from rootDir and using cert as its TLS certificate.
-func prepareFileServer(t *testing.T, rootDir string, cert tls.Certificate) *httptest.Server {
+func startHTTPSFileServer(t *testing.T, rootDir string, cert tls.Certificate) *httptest.Server {
 	// it's useful for debugging
 	dl, err := os.ReadDir(rootDir)
 	require.NoError(t, err)
