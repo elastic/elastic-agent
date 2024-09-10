@@ -160,6 +160,8 @@ steps:
       - junit-annotate#v2.5.0:
           artifacts: "build/*.xml"
           always-annotate: true
+    agents:
+      provider: "gcp"
     depends_on:
       - step: "unit-tests-2204"
         allow_failure: true
