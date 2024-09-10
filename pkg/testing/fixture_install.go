@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package testing
 
@@ -721,11 +721,11 @@ func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string)
 	w := zip.NewWriter(file)
 	defer w.Close()
 
-	walker := func(path string, info os.FileInfo, err error) error {
+	walker := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 		file, err := os.Open(path)
@@ -748,7 +748,7 @@ func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string)
 		return nil
 	}
 
-	err = filepath.Walk(f.workDir, walker)
+	err = filepath.WalkDir(f.workDir, walker)
 	if err != nil {
 		return fmt.Errorf("walking %s to create zip: %w", f.workDir, err)
 	}

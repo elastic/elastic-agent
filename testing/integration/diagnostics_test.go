@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -245,12 +245,14 @@ func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.
 
 	actualExtractedDiagFiles := map[string]struct{}{}
 
-	err = filepath.Walk(extractionDir, func(path string, info fs.FileInfo, err error) error {
+	err = filepath.WalkDir(extractionDir, func(path string, entry fs.DirEntry, err error) error {
 		require.NoErrorf(t, err, "error walking extracted path %q", path)
 
 		// we are not interested in directories
-		if !info.IsDir() {
+		if !entry.IsDir() {
 			actualExtractedDiagFiles[path] = struct{}{}
+			info, err := entry.Info()
+			require.NoError(t, err, path)
 			assert.Greaterf(t, info.Size(), int64(0), "file %q has an invalid size", path)
 		}
 

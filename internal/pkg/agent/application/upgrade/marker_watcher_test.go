@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package upgrade
 
@@ -19,13 +19,13 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestMarkerWatcher(t *testing.T) {
 	testMarkerDir := t.TempDir()
 	testMarkerFile := filepath.Join(testMarkerDir, markerFilename)
-	testLogger, _ := logger.NewTesting("watch_marker")
+	testLogger, _ := loggertest.New("watch_marker")
 
 	markerWatcher := newMarkerFileWatcher(testMarkerFile, testLogger)
 
@@ -225,7 +225,7 @@ details:
 				err := os.WriteFile(testMarkerFilePath, []byte(test.markerFileContents), 0644)
 				require.NoError(t, err)
 			}
-			log, obs := logger.NewTesting("marker_watcher")
+			log, obs := loggertest.New("marker_watcher")
 			updateCh := make(chan UpdateMarker)
 			mfw := MarkerFileWatcher{
 				markerFilePath: testMarkerFilePath,
