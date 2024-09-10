@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cmd
 
@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type mockStore struct {
@@ -578,7 +579,7 @@ func TestDaemonReloadWithBackoff(t *testing.T) {
 }
 
 func TestWaitForFleetServer_timeout(t *testing.T) {
-	log, _ := logger.NewTesting("TestWaitForFleetServer_timeout")
+	log, _ := loggertest.New("TestWaitForFleetServer_timeout")
 	timeout := 5 * time.Second
 	testTimeout := 2 * timeout
 

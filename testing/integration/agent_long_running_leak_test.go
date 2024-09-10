@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -151,7 +151,7 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	timer := time.NewTimer(testDuration)
 	defer timer.Stop()
 
-	ticker := time.NewTicker(time.Second * 60)
+	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
 
 	done := false
@@ -230,6 +230,10 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 				}
 				if !foundSystem && strings.Contains(v.UnitID, systemMatch) {
 					foundSystem = true
+				}
+				runner.T().Logf("unit state: %s", v.Message)
+				if v.State != int(cproto.State_HEALTHY) {
+					allHealthy = false
 				}
 			}
 			runner.T().Logf("component state: %s", comp.Message)

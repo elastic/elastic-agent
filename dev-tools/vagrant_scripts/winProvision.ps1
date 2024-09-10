@@ -13,7 +13,7 @@ if (-Not (Test-Path $gopath_beats)) {
 if (-Not (Get-Command "gvm" -ErrorAction SilentlyContinue)) {
     echo "Installing gvm to manage go version"
     [Net.ServicePointManager]::SecurityProtocol = "tls12"
-    Invoke-WebRequest -URI https://github.com/andrewkroh/gvm/releases/download/v0.3.0/gvm-windows-amd64.exe -Outfile C:\\Windows\\System32\\gvm.exe
+    Invoke-WebRequest -URI https://github.com/andrewkroh/gvm/releases/download/v0.5.2/gvm-windows-amd64.exe -Outfile C:\\Windows\\System32\\gvm.exe
     C:\\Windows\\System32\\gvm.exe --format=powershell $go_version | Invoke-Expression
     go version
 

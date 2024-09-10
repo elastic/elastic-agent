@@ -1,0 +1,452 @@
+# Elastic-Agent outputs
+# -- The key of the map is the name of the output and the value is an object containing the fields below
+# @notationType -- map[string][OutputObject](#11---output-object)
+# @section -- 1 - Outputs
+# @sectionDescriptionTemplate -- Output
+# @default -- `{ "default" : {} }`
+outputs:
+  # name of the output
+  default:
+    # -- type of the output [one of `ESPlainAuth`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`]
+    # @section -- 1.1 - Output Object
+    # @sectionDescriptionTemplate -- OutputObject
+    # @key -- outputs.{name}.type
+    type: ESPlainAuth
+    # -- url of the output [required for type `ESPlainAuth`]
+    # @section -- 1.1 - Output Object
+    # @default -- `""`
+    # @key -- outputs.{name}.url
+    url: "http://elasticsearch:9200"
+    # -- the username to use to authenticate with the output [required for type `ESPlainAuth` if `api_key` is not set]
+    # @section -- 1.1 - Output Object
+    # @default -- `""`
+    # @key -- outputs.{name}.username
+    username: "elastic"
+    # -- the password to use to authenticate with the output [required for type `ESPlainAuth` if `api_key` is not set]
+    # @section -- 1.1 - Output Object
+    # @default -- `""`
+    # @key -- outputs.{name}.password
+    password: "changeme"
+    # -- the API key use to authenticate with the output [required for type `ESPlainAuth` if `username` and `password`
+    # are not set]
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.api_key
+    api_key: ""
+    # -- the k8s secret to mount output connection details [required for types `ESSecretAuthBasic` and `ESSecretAuthAPI`]
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.secretName
+    secretName: ""
+    # -- name to reference an Elasticsearch cluster managed by ECK [required for type `ESECKRef`]
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.name
+    name: ""
+    # -- namespace to reference an Elasticsearch cluster managed by ECK [optional for type `ESECKRef`]
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.namespace
+    namespace: ""
+kubernetes:
+  # -- enable Kubernetes integration.
+  # @section -- 2 - Kubernetes integration
+  # @sectionDescriptionTemplate -- Kubernetes
+  enabled: false
+  # -- name of the output used in kubernetes integration. Note that this output needs to be defined in
+  # [outputs](#1-outputs)
+  # @section -- 2 - Kubernetes integration
+  output: default
+  # -- kubernetes namespace
+  # @section -- 2 - Kubernetes integration
+  namespace: default
+  hints:
+    # -- enable [elastic-agent autodiscovery](https://www.elastic.co/guide/en/fleet/current/elastic-agent-kubernetes-autodiscovery.html) feature
+    # @section -- 2 - Kubernetes integration
+    enabled: false
+  state:
+    # -- integration global switch to enable state streams based on kube-state-metrics. Note that setting this to `false`
+    # results in overriding and *disabling all* the respective state streams
+    # @section -- 2 - Kubernetes integration
+    enabled: true
+    # -- deploy kube-state-metrics service as a sidecar container to the elastic agent of `ksmShared` preset.
+    # If set to `false`, kube-state-metrics will *not* get deployed and `clusterWide` agent preset will be used for
+    # collecting kube-state-metrics.
+    # @section -- 2 - Kubernetes integration
+    deployKSM: true
+    # -- host of the kube-state-metrics service. Note that this used only when `deployKSM` is set to `false`.
+    # @section -- 2 - Kubernetes integration
+    host: "kube-state-metrics:8080"
+    # -- state streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`. Please note
+    # that colliding vars also defined in respective state streams will *not* be overridden.
+    # @section -- 2 - Kubernetes integration
+    vars: {}
+  metrics:
+    # -- integration global switch to enable metric streams based on kubelet. Note that setting this to false results
+    # in overriding and *disabling all* the respective metric streams
+    # @section -- 2 - Kubernetes integration
+    enabled: true
+    # -- metric streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`,
+    # `ssl.verification_mode`. Please note that colliding vars also defined in respective metric streams will *not*
+    # be overridden.
+    # @section -- 2 - Kubernetes integration
+    vars: {}
+  apiserver:
+    # -- enable [apiserver](https://www.elastic.co/guide/en/beats/metricbeat/current/metricbeat-module-kubernetes.html#_apiserver)
+    # input
+    # @section -- 2 - Kubernetes integration
+    enabled: true
+    # -- apiserver variables such as  `hosts`, `period`, `bearer_token_file`,
+    # `ssl.certificate_authorities`.
+    # @section -- 2 - Kubernetes integration
+    vars: {}
+  proxy:
+    # -- enable [proxy](https://www.elastic.co/guide/en/beats/metricbeat/current/metricbeat-module-kubernetes.html#_proxy)
+    # input
+    # @section -- 2 - Kubernetes integration
+    enabled: false
+    # -- proxy stream variables such as `hosts`, `period`.
+    # @section -- 2 - Kubernetes integration
+    vars: {}
+  scheduler:
+    # -- enable [scheduler](https://www.elastic.co/guide/en/beats/metricbeat/8.11/metricbeat-module-kubernetes.html#_scheduler_and_controllermanager)
+    # input
+    # @section -- 2 - Kubernetes integration
+    enabled: false
+    # -- scheduler stream variables such as `hosts`, `period`, `bearer_token_file`,
+    # `ssl.verification_mode`, `condition`.
+    # @section -- 2 - Kubernetes integration
+    vars: {}
+  controller_manager:
+    # -- enable [controller_manager](https://www.elastic.co/guide/en/beats/metricbeat/current/metricbeat-module-kubernetes.html#_scheduler_and_controllermanager)
+    # input
+    # @section -- 2 - Kubernetes integration
+    enabled: false
+    # -- controller_manager stream variables such as `hosts`, `period`, `bearer_token_file`,
+    # `ssl.verification_mode`, `condition`.
+    # @section -- 2 - Kubernetes integration
+    vars: {}
+  containers:
+    metrics:
+      # -- enable containers metric stream (kubelet) [ref](https://www.elastic.co/guide/en/beats/metricbeat/current/metricbeat-metricset-kubernetes-container.html)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- containers metric stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+    state:
+      # -- enable containers state stream (kube-state-metrics) [ref](https://www.elastic.co/guide/en/beats/metricbeat/8.11/metricbeat-metricset-kubernetes-state_container.html)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- containers state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+    logs:
+      # -- enable containers logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/container-logs)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      additionalParsersConfig: []
+    audit_logs:
+      # -- enable containers audit logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/audit-logs)
+      # @section -- 2 - Kubernetes integration
+      enabled: false
+  pods:
+    metrics:
+      # -- enable pods metric stream (kubelet) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kubelet#pod)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- pod metric stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+    state:
+      # -- enable pods state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_pod)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- pods state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  deployments:
+    state:
+      # -- enable deployments state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_deployment)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- deployments state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  statefulsets:
+    state:
+      # -- enable statefulsets state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_statefulset)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- statefulsets state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  daemonsets:
+    state:
+      # -- enable daemonsets state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_daemonset)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- daemonsets state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  replicasets:
+    state:
+      # -- enable replicasets state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_replicaset)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- replicasets state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  namespaces:
+    state:
+      # -- enable namespaces state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_namespace)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- namespaces state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  volumes:
+    metrics:
+      # -- enable volumes metric stream (kubelet) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kubelet#volume)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- volumes metric stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  nodes:
+    metrics:
+      # -- enable nodes metric stream (kubelet) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kubelet#node)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- nodes metric stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+    state:
+      # -- enable nodes state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#node)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- nodes state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  storageclasses:
+    state:
+      # -- enable storageclasses state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_storageclass)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- storageclasses state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  jobs:
+    state:
+      # -- enable jobs state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_job)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- jobs state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  cronjobs:
+    state:
+      # -- enable cronjobs state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_cronjob)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- cronjobs state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  persistentvolumes:
+    state:
+      # -- enable persistentvolumes state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_persistentvolume)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- persistentvolumes state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  persistentvolumeclaims:
+    state:
+      # -- enable persistentvolumeclaims state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_persistentvolumeclaim)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- persistentvolumeclaims state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  resourcequotas:
+    state:
+      # -- enable resourcequotas state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_resourcequota)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- resourcequotas state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  services:
+    state:
+      # -- enable services state stream (kube-state-metrics) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kube-state-metrics#state_service)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- services state stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+  system:
+    metrics:
+      # -- enable system metric stream (kubelet) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kubelet#system)
+      # @section -- 2 - Kubernetes integration
+      enabled: true
+      # -- system metric stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
+# -- extra [user-defined integrations](https://www.elastic.co/guide/en/fleet/current/elastic-agent-input-configuration.html) to be added to the Elastic Agent
+# An example can be found [here](./examples/nginx-custom-integration/README.md)
+# @section -- 3 - User Extra Integrations
+extraIntegrations: {}
+agent:
+  # -- elastic-agent version
+  # @section -- 3 - Elastic-Agent Configuration
+  version: 8.16.0
+  # -- image configuration
+  # @section -- 3 - Elastic-Agent Configuration
+  image:
+    repository: docker.elastic.co/beats/elastic-agent
+    pullPolicy: IfNotPresent
+    tag: "8.16.0-SNAPSHOT"
+  # -- generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs
+  # @section -- 3 - Elastic-Agent Configuration
+  engine: k8s # k8s or eck
+  # -- enable unprivileged mode
+  # @section -- 3 - Elastic-Agent Configuration
+  unprivileged: false
+  fleet:
+    # -- enable elastic-agent managed
+    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    enabled: false
+    # -- Fleet server URL
+    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    url: ""
+    # -- Fleet enrollment token
+    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    token: ""
+    # -- Fleet insecure url
+    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    insecure: false
+    # -- Kibana host to fallback if enrollment token is not supplied
+    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    kibanaHost: ""
+    # -- Kibana username to fallback if enrollment token is not supplied
+    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    kibanaUser: ""
+    # -- Kibana password to fallback if enrollment token is not supplied
+    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    kibanaPassword: ""
+    # -- Agent preset to deploy
+    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    preset: perNode
+  # -- Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets
+  # required by the built-in Kubernetes integration [here](./values.yaml)
+  # @notationType -- map[string]{}
+  # @section -- 3 - Elastic-Agent Configuration
+  # @default -- `{ "perNode" : {...}, "clusterWider": {...}, "ksmShared": {...} }`
+  presets:
+    #  examplePreset:
+    #    mode: [deployment, statefulset, daemonset]
+    #    replicaCount: 1
+    #    labels: {}
+    #    imagePullPolicy: [Always, IfNotPresent, Never]
+    #    annotations: {}
+    #    affinity: {}
+    #    initContainers: []
+    #    extraContainers: []
+    #    resources: {}
+    #    securityContext: {}
+    #    rules: []
+    #    nodeSelector: {}
+    #    tolerations: []
+    #    topologySpreadConstraints: []
+    #    extraEnv: []
+    #    extraVolumes: []
+    #    extraVolumeMounts: []
+    #    https://github.com/elastic/elastic-agent/blob/main/_meta/elastic-agent.yml
+    #    agent.monitoring: {}
+    #    https://www.elastic.co/guide/en/fleet/current/providers.html
+    #    providers: {}
+    #
+    # clusterWide preset is required by the built-in kubernetes integration
+    clusterWide:
+      mode: deployment
+      resources:
+        limits:
+          memory: 800Mi
+        requests:
+          cpu: 100m
+          memory: 400Mi
+      nodeSelector:
+        kubernetes.io/os: linux
+      extraVolumes:
+        # override the default agent-data volume and make it an emptyDir
+        - name: agent-data
+          emptyDir: {}
+      extraEnvs:
+        - name: ELASTIC_NETINFO
+          value: "false"
+      agent:
+        monitoring:
+          namespace: default
+          use_output: default
+          enabled: true
+          logs: true
+          metrics: true
+      providers:
+        kubernetes_leaderelection:
+          enabled: true
+        kubernetes:
+          node: ${NODE_NAME}
+          scope: cluster
+    perNode:
+      ## required by the built-in kubernetes integration
+      mode: daemonset
+      resources:
+        limits:
+          memory: 1000Mi
+        requests:
+          cpu: 100m
+          memory: 400Mi
+      nodeSelector:
+        kubernetes.io/os: linux
+      extraEnvs:
+        - name: ELASTIC_NETINFO
+          value: "false"
+      agent:
+        monitoring:
+          namespace: default
+          use_output: default
+          enabled: true
+          logs: true
+          metrics: true
+      providers:
+        kubernetes_leaderelection:
+          enabled: false
+        kubernetes:
+          node: ${NODE_NAME}
+          scope: node
+    ksmSharded:
+      ## required by the built-in kubernetes integration
+      mode: statefulset
+      resources:
+        limits:
+          memory: 800Mi
+        requests:
+          cpu: 100m
+          memory: 400Mi
+      extraVolumes:
+        # override the default agent-data volume and make it an emptyDir
+        - name: agent-data
+          emptyDir: {}
+      nodeSelector:
+        kubernetes.io/os: linux
+      extraEnvs:
+        - name: ELASTIC_NETINFO
+          value: "false"
+      agent:
+        monitoring:
+          namespace: default
+          use_output: default
+          enabled: true
+          logs: true
+          metrics: true
+      providers:
+        kubernetes_leaderelection:
+          enabled: false
+        kubernetes:
+          enabled: false

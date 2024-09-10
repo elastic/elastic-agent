@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package monitoring
 
@@ -146,7 +146,7 @@ func waitOnReturnCode(t *testing.T, expectedReturnCode int, formValue string, re
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	client := &http.Client{}
-	require.Eventually(t, func() bool {
+	fastEventually(t, func() bool {
 		path := fmt.Sprintf("http://%s/liveness%s", rel.Addr().String(), formValue)
 		t.Logf("checking %s", path)
 		req, err := http.NewRequestWithContext(ctx, "GET", path, nil)
@@ -161,6 +161,14 @@ func waitOnReturnCode(t *testing.T, expectedReturnCode int, formValue string, re
 		// should return 500 as we have one component set to UnitStateDegraded
 		return resp.StatusCode == expectedReturnCode
 	}, time.Second*30, time.Second*3)
+}
+
+func fastEventually(t *testing.T, condition func() bool, waitFor time.Duration, tick time.Duration) {
+	if condition() {
+		return
+	}
+
+	require.Eventually(t, condition, waitFor, tick)
 }
 
 func TestIsHTTPUrl(t *testing.T) {

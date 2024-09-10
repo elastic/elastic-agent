@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package crypto
 
@@ -11,10 +11,10 @@ import (
 	"crypto/rand"
 	"crypto/sha512"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -34,11 +34,11 @@ type Option struct {
 // Validate the options for encoding and decoding values.
 func (o *Option) Validate() error {
 	if o.IVLength == 0 {
-		return errors.New("IV length must be superior to 0")
+		return errors.New("IVLength must be superior to 0")
 	}
 
 	if o.SaltLength == 0 {
-		return errors.New("Salt length must be superior to 0")
+		return errors.New("SaltLength must be superior to 0")
 	}
 
 	if o.IterationsCount == 0 {
@@ -99,7 +99,7 @@ func NewWriter(writer io.Writer, password []byte, option *Option) (*Writer, erro
 
 	salt, err := g(option.SaltLength)
 	if err != nil {
-		return nil, errors.Wrap(err, "fail to generate random password salt")
+		return nil, fmt.Errorf("fail to generate random password salt: %w", err)
 	}
 
 	return &Writer{
@@ -137,13 +137,13 @@ func (w *Writer) Write(b []byte) (int, error) {
 		// Select AES-256: because len(passwordBytes) == 32 bytes.
 		block, err := aes.NewCipher(passwordBytes)
 		if err != nil {
-			w.err = errors.Wrap(err, "could not create the cipher to encrypt")
+			w.err = fmt.Errorf("could not create the cipher to encrypt: %w", err)
 			return 0, w.err
 		}
 
 		aesgcm, err := cipher.NewGCM(block)
 		if err != nil {
-			w.err = errors.Wrap(err, "could not create the GCM to encrypt")
+			w.err = fmt.Errorf("could not create the GCM to encrypt: %w", err)
 			return 0, w.err
 		}
 
@@ -157,7 +157,7 @@ func (w *Writer) Write(b []byte) (int, error) {
 
 		n, err := w.writer.Write(header.Bytes())
 		if err != nil {
-			w.err = errors.Wrap(err, "fail to write encoding information header")
+			w.err = fmt.Errorf("fail to write encoding information header: %w", err)
 			return 0, w.err
 		}
 
@@ -166,14 +166,14 @@ func (w *Writer) Write(b []byte) (int, error) {
 		}
 
 		if err := w.writeBlock(b); err != nil {
-			return 0, errors.Wrap(err, "fail to write block")
+			return 0, fmt.Errorf("fail to write block: %w", err)
 		}
 
 		return len(b), err
 	}
 
 	if err := w.writeBlock(b); err != nil {
-		return 0, errors.Wrap(err, "fail to write block")
+		return 0, fmt.Errorf("fail to write block: %w", err)
 	}
 
 	return len(b), nil
@@ -184,23 +184,23 @@ func (w *Writer) writeBlock(b []byte) error {
 	// on disk in the file as part of the header
 	iv, err := w.generator(w.option.IVLength)
 	if err != nil {
-		w.err = errors.Wrap(err, "fail to generate random IV")
+		w.err = fmt.Errorf("fail to generate random IV: %w", err)
 		return w.err
 	}
 
-	// nolint: errcheck // Ignore the error at this point.
+	//nolint:errcheck // Ignore the error at this point.
 	w.writer.Write(iv)
 
 	encodedBytes := w.gcm.Seal(nil, iv, b, nil)
 
 	l := make([]byte, 4)
 	binary.LittleEndian.PutUint32(l, uint32(len(encodedBytes)))
-	// nolint: errcheck // Ignore the error at this point.
+	//nolint:errcheck // Ignore the error at this point.
 	w.writer.Write(l)
 
 	_, err = w.writer.Write(encodedBytes)
 	if err != nil {
-		return errors.Wrap(err, "fail to encode data")
+		return fmt.Errorf("fail to encode data: %w", err)
 	}
 
 	return nil
@@ -253,7 +253,7 @@ func (r *Reader) Read(b []byte) (int, error) {
 		buf := make([]byte, vLen+r.option.SaltLength)
 		n, err := io.ReadAtLeast(r.reader, buf, len(buf))
 		if err != nil {
-			r.err = errors.Wrap(err, "fail to read encoding header")
+			r.err = fmt.Errorf("fail to read encoding header: %w", err)
 			return n, err
 		}
 
@@ -274,13 +274,13 @@ func (r *Reader) Read(b []byte) (int, error) {
 
 		block, err := aes.NewCipher(passwordBytes)
 		if err != nil {
-			r.err = errors.Wrap(err, "could not create the cipher to decrypt the data")
+			r.err = fmt.Errorf("could not create the cipher to decrypt the data: %w", err)
 			return 0, r.err
 		}
 
 		aesgcm, err := cipher.NewGCM(block)
 		if err != nil {
-			r.err = errors.Wrap(err, "could not create the GCM to decrypt the data")
+			r.err = fmt.Errorf("could not create the GCM to decrypt the data: %w", err)
 			return 0, r.err
 		}
 		r.gcm = aesgcm
@@ -328,12 +328,12 @@ func (r *Reader) consumeBlock() error {
 	encodedBytes := make([]byte, l)
 	_, err = io.ReadAtLeast(r.reader, encodedBytes, l)
 	if err != nil {
-		r.err = errors.Wrapf(err, "fail read the block of %d bytes", l)
+		r.err = fmt.Errorf("fail read the block of %d bytes: %w", l, err)
 	}
 
 	decodedBytes, err := r.gcm.Open(nil, iv, encodedBytes, nil)
 	if err != nil {
-		return errors.Wrap(err, "fail to decode bytes")
+		return fmt.Errorf("fail to decode bytes: %w", err)
 	}
 	r.buf = append(r.buf[:], decodedBytes...)
 

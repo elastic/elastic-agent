@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package main
 
@@ -20,12 +20,6 @@ func main() {
 			os.Exit(1) // defer os exit and allow other goroutines to cleanup
 		}
 	}()
-
-	err = cmd.CheckNativePlatformCompat()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize: %v\n", err)
-		return
-	}
 
 	pj, err := process.CreateJobObject()
 	if err != nil {
