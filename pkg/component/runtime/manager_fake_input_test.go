@@ -21,25 +21,22 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/protobuf/encoding/protojson"
-	gproto "google.golang.org/protobuf/proto"
-
-	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.elastic.co/apm/v2/apmtest"
+	"google.golang.org/protobuf/encoding/protojson"
+	gproto "google.golang.org/protobuf/proto"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
+	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
@@ -3032,7 +3029,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log, logs := logger.NewTesting("TestManager_StartStopComponent")
+	log, logs := loggertest.New("TestManager_StartStopComponent")
 	ai := &info.AgentInfo{}
 	m, err := NewManager(
 		log,

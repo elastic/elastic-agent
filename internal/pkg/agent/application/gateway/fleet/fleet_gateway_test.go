@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"io"
 	"net/http"
 	"net/url"
@@ -32,6 +31,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type clientCallbackFunc func(headers http.Header, body io.Reader) (*http.Response, error)
@@ -317,7 +317,7 @@ func TestFleetGateway(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient()
 
-		log, _ := logger.NewTesting("fleet_gateway")
+		log, _ := loggertest.New("fleet_gateway")
 
 		stateStore := newStateStore(t, log)
 
