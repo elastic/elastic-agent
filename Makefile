@@ -3,7 +3,6 @@ COVERAGE_DIR=$(BUILD_DIR)/coverage
 BEATS?=elastic-agent
 PROJECTS= $(BEATS)
 PYTHON_ENV?=$(BUILD_DIR)/python-env
-MAGE_VERSION     ?= v1.14.0
 MAGE_PRESENT     := $(shell mage --version 2> /dev/null | grep $(MAGE_VERSION))
 MAGE_IMPORT_PATH ?= github.com/magefile/mage
 export MAGE_IMPORT_PATH
@@ -12,11 +11,11 @@ export MAGE_IMPORT_PATH
 .PHONY: mage
 mage:
 ifndef MAGE_PRESENT
-	@echo Installing mage $(MAGE_VERSION).
-	@go install ${MAGE_IMPORT_PATH}@$(MAGE_VERSION)
+	@echo Installing mage.
+	@go install ${MAGE_IMPORT_PATH}
 	@-mage -clean
 else
-	@echo Mage $(MAGE_VERSION) already installed.
+	@echo Mage already installed.
 endif
 
 ## help : Show this help.
@@ -38,6 +37,9 @@ check-ci:
 	@$(MAKE) notice
 	@GENERATEKUSTOMIZE=true $(MAKE) -C deploy/kubernetes generate-k8s
 	@$(MAKE) -C deploy/kubernetes generate-k8s
+	@mage -v helm:lint
+	@mage -v helm:updateAgentVersion
+	@mage -v helm:renderExamples
 	@$(MAKE) check-no-changes
 
 ## check: run all the checks including linting using golangci-lint.

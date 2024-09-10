@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package upgrade
 
@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -53,7 +54,7 @@ func TestFallbackIsAppended(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			l, _ := logger.NewTesting(tc.name)
+			l, _ := loggertest.New(tc.name)
 			u := Upgrader{
 				fleetServerURI: tc.fleetServerURI,
 				log:            l,
@@ -75,7 +76,7 @@ func TestFallbackIsAppended(t *testing.T) {
 
 func TestDownloadWithRetries(t *testing.T) {
 	expectedDownloadPath := "https://artifacts.elastic.co/downloads/beats/elastic-agent"
-	testLogger, obs := logger.NewTesting("TestDownloadWithRetries")
+	testLogger, obs := loggertest.New("TestDownloadWithRetries")
 
 	settings := artifact.Config{
 		RetrySleepInitDuration: 20 * time.Millisecond,
@@ -271,7 +272,7 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		// Check that upgradeDetails.Metadata.RetryErrorMsg was set at some point
 		// during the retryable download and then check that it was never unset,
-		//since we didn't have a successful download.
+		// since we didn't have a successful download.
 		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
 		require.Equal(t, *upgradeDetailsRetryErrorMsg, upgradeDetails.Metadata.RetryErrorMsg)
 	})

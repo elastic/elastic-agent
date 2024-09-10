@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package store
 
@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"sync"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -168,6 +169,18 @@ func readState(reader io.ReadCloser) (state, error) {
 func (s *StateStore) SetAction(a fleetapi.Action) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
+
+	// the reflect.ValueOf(v).IsNil() is required as the type of 'v' on switch
+	// clause with multiple types will, in this case, preserve the original type.
+	// See details on https://go.dev/ref/spec#Type_switches
+	// Without using reflect accessing the concrete type stored in the interface
+	// isn't possible and as a is of type fleetapi.Action and has a concrete
+	// value, a is never nil, neither v is nil as it has the same type of a
+	// on both clauses.
+	if a == nil || reflect.ValueOf(a).IsNil() {
+		s.log.Debugf("trying to set an nil '%T' action, ignoring the action", a)
+		return
+	}
 
 	switch v := a.(type) {
 	// If any new action type is added, don't forget to update the method's
