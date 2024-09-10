@@ -145,10 +145,10 @@ when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAM
 All VMs (including Windows) support connections via SSH, the framework
 generates and stores the necessary SSH keys to access the VMs, the
 easiest way to connect to them is using the SSH command returned by
-`mage integration:SSHVM`. It will list the VMs and ask to select
+`mage integration:SSH`. It will list the VMs and ask to select
 one.
 
-On a Unix shell you can run `$(mage integration:SSHVM)`, the menu is
+On a Unix shell you can run `$(mage integration:SSH)`, the menu is
 printed to stderr and the SSH command to stdout. After selecting the
 VM you will have shell connected to it.
 
@@ -212,7 +212,7 @@ mage -v integration:DeployDebugTools
 mage -v integration:DeployEnvFile
 
 ## SSH into the VM
-$(mage integration:SSHVM)
+$(mage integration:SSH)
 
 ## From inside the VM, the test needs root
 sudo su
