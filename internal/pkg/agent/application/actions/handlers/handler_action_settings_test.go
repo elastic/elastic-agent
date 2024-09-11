@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
@@ -25,6 +25,7 @@ func TestSettings_SetLogLevel(t *testing.T) {
 
 	// test log level we use in testcases
 	testWarnLevel := logp.WarnLevel
+	defaultLogLevel := logger.DefaultLogLevel
 
 	type fields struct {
 		fallbackLogLevel *logp.Level
@@ -61,8 +62,7 @@ func TestSettings_SetLogLevel(t *testing.T) {
 			},
 			setupMocks: func(t *testing.T, setter *mockhandlers.LogLevelSetter, agent *mockinfo.Agent) {
 				agent.EXPECT().RawLogLevel().Return("").Once()
-				// we should never call the SetLogLevel with nil, for simplicity remove the expectation altogether
-				// setter.EXPECT().SetLogLevel(mock.Anything, nil).Return(nil).Times(0)
+				setter.EXPECT().SetLogLevel(mock.Anything, &defaultLogLevel).Return(nil).Once()
 			},
 			wantErr:              assert.NoError,
 			wantFallbackLogLevel: nil,

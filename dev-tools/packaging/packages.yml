@@ -479,21 +479,21 @@ shared:
     license: "Elastic License"
     files:
       LICENSE.txt:
-        source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE.txt'
+        source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE-2.0.txt'
         mode: 0644
 
   - &elastic_license_for_deb_rpm
     license: "Elastic License"
     files:
       /usr/share/{{.BeatName}}/LICENSE.txt:
-        source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE.txt'
+        source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE-2.0.txt'
         mode: 0644
 
   - &elastic_license_for_macos_pkg
     license: "Elastic License"
     files:
       /Library/Application Support/{{.BeatVendor}}/{{.BeatName}}/LICENSE.txt:
-        source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE.txt'
+        source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE-2.0.txt'
         mode: 0644
 
 # specs is a list of named packaging "flavors".
