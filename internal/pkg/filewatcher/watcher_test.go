@@ -90,7 +90,7 @@ func TestWatch(t *testing.T) {
 		w.Unwatch(path)
 
 		// Add new content to the file.
-		os.WriteFile(path, []byte("heeeelo"), 0644)
+		assert.NoError(t, os.WriteFile(path, []byte("heeeelo"), 0644))
 
 		// Should not find the file.
 		r, u, err = w.scan()
@@ -141,7 +141,8 @@ func TestWatch(t *testing.T) {
 		w.Watch(path3)
 
 		// Set initial state
-		w.Update()
+		_, err = w.Update()
+		require.NoError(t, err)
 
 		// Reset watched files.
 		w.Reset()
@@ -155,7 +156,8 @@ func TestWatch(t *testing.T) {
 		// Add new content to the file.
 		f, err := os.OpenFile(path3, os.O_APPEND|os.O_WRONLY, 0600)
 		require.NoError(t, err)
-		f.Write([]byte("more-hello"))
+		_, err = f.Write([]byte("more-hello"))
+		require.NoError(t, err)
 		require.NoError(t, f.Sync())
 		f.Close()
 
