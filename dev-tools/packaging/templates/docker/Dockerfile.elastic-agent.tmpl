@@ -265,8 +265,9 @@ RUN echo \
     {{ $beatHome }}/.cache \
     | xargs -IDIR sh -c 'mkdir -m 0770 -p DIR && chown -R {{ .user }} DIR'
 
+USER {{ .user }}
+
 RUN (npm i -g --loglevel verbose --production --engine-strict  @elastic/synthetics@stack_release || sh -c 'tail -n +1 ${NPM_CONFIG_PREFIX}/_logs/* && exit 1')
-RUN $NPM_CONFIG_PREFIX/lib/node_modules/@elastic/synthetics/node_modules/.bin/playwright install chromium
 {{- end }}
 
 USER {{ .user }}
