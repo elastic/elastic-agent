@@ -23,9 +23,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("newly added files are discovered", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path)
@@ -42,9 +40,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("ignore old files", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path)
@@ -67,9 +63,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("can unwatch a watched file", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path)
@@ -106,9 +100,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("can returns the list of watched files", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path)
@@ -124,9 +116,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("update returns updated, unchanged and watched files", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path1 := filepath.Join(tmp, "hello-1.txt")
 		empty, err := os.Create(path1)
@@ -183,9 +173,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("should cleanup files that disapear", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path1 := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path1)
@@ -200,9 +188,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("should allow to invalidate the cache ", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path1 := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path1)

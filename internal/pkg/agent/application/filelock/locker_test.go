@@ -5,7 +5,6 @@
 package filelock
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,8 +14,7 @@ import (
 const testLockFile = "test.lock"
 
 func TestAppLocker(t *testing.T) {
-	tmp, _ := os.MkdirTemp("", "locker")
-	defer os.RemoveAll(tmp)
+	tmp := t.TempDir()
 
 	locker1 := NewAppLocker(tmp, testLockFile)
 	locker2 := NewAppLocker(tmp, testLockFile)
