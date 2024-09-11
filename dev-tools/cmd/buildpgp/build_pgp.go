@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package main
 
@@ -25,7 +25,7 @@ var (
 func init() {
 	flag.StringVar(&input, "in", "", "Source of input. \"-\" means reading from stdin")
 	flag.StringVar(&output, "output", "-", "Output path. \"-\" means writing to stdout")
-	flag.StringVar(&license, "license", "Elastic", "License header for generated file.")
+	flag.StringVar(&license, "license", "Elasticv2", "License header for generated file.")
 }
 
 var tmplPgp = template.Must(template.New("pgp").Parse(`

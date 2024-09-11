@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -10,12 +10,13 @@ import (
 )
 
 const (
-	undefined = "undefined"
-	basic     = "basic"
-	ubi       = "ubi"
-	wolfi     = "wolfi"
-	complete  = "complete"
-	cloud     = "cloud"
+	undefined     = "undefined"
+	basic         = "basic"
+	ubi           = "ubi"
+	wolfi         = "wolfi"
+	complete      = "complete"
+	wolfiComplete = "wolfi-complete"
+	cloud         = "cloud"
 )
 
 // DockerVariant defines the docker variant to build.
@@ -27,6 +28,7 @@ const (
 	Basic
 	UBI
 	Wolfi
+	WolfiComplete
 	Complete
 	Cloud
 )
@@ -42,6 +44,8 @@ func (typ DockerVariant) String() string {
 		return ubi
 	case Wolfi:
 		return wolfi
+	case WolfiComplete:
+		return wolfiComplete
 	case Complete:
 		return complete
 	case Cloud:
@@ -67,6 +71,8 @@ func (typ *DockerVariant) UnmarshalText(text []byte) error {
 		*typ = UBI
 	case wolfi:
 		*typ = Wolfi
+	case wolfiComplete:
+		*typ = WolfiComplete
 	case complete:
 		*typ = Complete
 	case cloud:
