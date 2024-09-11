@@ -17,7 +17,7 @@ import (
 
 var (
 	ErrNotReleaseBranch = errors.New("this is not a release branch")
-	releaseBranchRegexp = regexp.MustCompile(`.*(\d+\.\d+)$`)
+	releaseBranchRegexp = regexp.MustCompile(`.*(\d+\.(\d+|x))$`)
 )
 
 type outputReader func(io.Reader) error
@@ -26,7 +26,7 @@ type outputReader func(io.Reader) error
 // current repository ordered descending by creation date.
 // e.g. 8.13, 8.12, etc.
 func GetReleaseBranches(ctx context.Context) ([]string, error) {
-	c := exec.CommandContext(ctx, "git", "branch", "-r", "--list", "*/[0-9]*.*[0-9]", "--sort=-creatordate")
+	c := exec.CommandContext(ctx, "git", "branch", "-r", "--list", "*/[0-9]*.*[0-9x]", "--sort=-creatordate")
 
 	branchList := []string{}
 	err := runCommand(c, releaseBranchReader(&branchList))
@@ -99,8 +99,8 @@ func extractReleaseBranch(branch string) (string, error) {
 	}
 
 	matches := releaseBranchRegexp.FindStringSubmatch(branch)
-	if len(matches) != 2 {
-		return "", fmt.Errorf("failed to process branch %q: expected 2 matches, got %d", branch, len(matches))
+	if len(matches) != 3 {
+		return "", fmt.Errorf("failed to process branch %q: expected 3 matches, got %d", branch, len(matches))
 	}
 	return matches[1], nil
 }
