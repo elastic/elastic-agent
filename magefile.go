@@ -1969,6 +1969,11 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 	}
 
 	sc := snapshots.NewSnapshotsClient()
+
+	// TODO: find a proper fix.
+	if currentReleaseBranch == "8.x" {
+		currentReleaseBranch = "master"
+	}
 	versions, err := sc.FindLatestSnapshots(ctx, []string{currentReleaseBranch})
 	if err != nil {
 		return fmt.Errorf("failed to fetch a manifest for the latest snapshot: %w", err)
