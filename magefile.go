@@ -14,10 +14,10 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log"
 	"maps"
-	"math/rand/v2"
 	"net/http"
 	"os"
 	"os/exec"
@@ -1904,7 +1904,7 @@ func (Integration) Kubernetes(ctx context.Context) error {
 	return integRunner(ctx, false, "")
 }
 
-// UpdateVersions runs an update on the `.agent-versions.json` fetching
+// UpdateVersions runs an update on the `.agent-versions.yml` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
 	maxSnapshots := 3
@@ -1950,11 +1950,18 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	}
 	defer file.Close()
 
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
+	// Write header
+	header := "# This file is generated automatically. Please do not manually edit it.\n" +
+		"# The testVersions list in this file specifies Elastic Agent versions to be use as\n" +
+		"# the starting (pre-upgrade) versions of Elastic Agent in upgrade integration tests.\n\n"
+
+	io.WriteString(file, header)
+
+	encoder := yaml.NewEncoder(file)
+	encoder.SetIndent(2)
 	err = encoder.Encode(versionFileData)
 	if err != nil {
-		return fmt.Errorf("failed to encode JSON to file %s: %w", upgradetest.AgentVersionsFilename, err)
+		return fmt.Errorf("failed to encode YAML to file %s: %w", upgradetest.AgentVersionsFilename, err)
 	}
 	return nil
 }

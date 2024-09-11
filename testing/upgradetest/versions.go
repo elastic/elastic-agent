@@ -6,9 +6,9 @@ package upgradetest
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -68,11 +68,11 @@ type VersionRequirements struct {
 	SnapshotBranches []string
 }
 
-const AgentVersionsFilename = ".agent-versions.json"
+const AgentVersionsFilename = ".agent-versions.yml"
 
 type AgentVersions struct {
 	// TestVersions contains semver-compliant versions of the agent to run integration tests against.
-	TestVersions []string `json:"testVersions"`
+	TestVersions []string `yaml:"testVersions"`
 }
 
 var (
@@ -116,11 +116,11 @@ func getAgentVersions() (*AgentVersions, error) {
 	}
 	defer f.Close()
 
-	d := json.NewDecoder(f)
+	d := yaml.NewDecoder(f)
 	var versionFile AgentVersions
 	err = d.Decode(&versionFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode JSON in %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to decode YAML in %s: %w", filePath, err)
 	}
 
 	return &versionFile, nil
