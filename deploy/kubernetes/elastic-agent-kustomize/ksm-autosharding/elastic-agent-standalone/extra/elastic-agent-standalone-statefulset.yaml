@@ -140,7 +140,7 @@ spec:
           hostPath:
             path: /var/lib
         # Needed for Universal Profiling
-        # If you are not using integration, then these volumes and the corresponding
+        # If you are not using this integration, then these volumes and the corresponding
         # mounts can be removed.
         - name: sys-kernel-debug
           hostPath:
