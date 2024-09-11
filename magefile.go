@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build mage
 
@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"maps"
 	"math/rand/v2"
@@ -111,7 +112,7 @@ var (
 func init() {
 	common.RegisterCheckDeps(Update, Check.All)
 	test.RegisterDeps(UnitTest)
-	devtools.BeatLicense = "Elastic License"
+	devtools.BeatLicense = "Elastic License 2.0"
 	devtools.BeatDescription = "Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host."
 
 	devtools.Platforms = devtools.Platforms.Filter("!linux/386")
@@ -403,7 +404,7 @@ func (Check) All() {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return sh.RunV("go-licenser", "-d", "-license", "Elastic")
+	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2")
 }
 
 // Changes run git status --porcelain and return an error if we have changes or uncommitted files.
@@ -1599,16 +1600,16 @@ func selectedPackageTypes() string {
 }
 
 func copyAll(from, to string, suffixes ...[]string) error {
-	return filepath.Walk(from, func(path string, info os.FileInfo, err error) error {
+	return filepath.WalkDir(from, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 
-		targetFile := filepath.Join(to, info.Name())
+		targetFile := filepath.Join(to, d.Name())
 
 		// overwrites with current build
 		return sh.Copy(targetFile, path)
@@ -1760,8 +1761,8 @@ func prepareIronbankBuild() error {
 		"MajorMinor": majorMinor(),
 	}
 
-	err := filepath.Walk(templatesDir, func(path string, info os.FileInfo, _ error) error {
-		if !info.IsDir() {
+	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
+		if !d.IsDir() {
 			target := strings.TrimSuffix(
 				filepath.Join(buildDir, filepath.Base(path)),
 				".tmpl",

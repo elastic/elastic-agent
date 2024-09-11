@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -86,16 +87,7 @@ func TestGoTest_CaptureOutput(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			oldVerboseArg := os.Getenv(mg.VerboseEnv)
-			defer func() {
-				os.Setenv(mg.VerboseEnv, oldVerboseArg)
-			}()
-
-			if test.verbose {
-				os.Setenv(mg.VerboseEnv, "true")
-			} else {
-				os.Setenv(mg.VerboseEnv, "false")
-			}
+			t.Setenv(mg.VerboseEnv, strconv.FormatBool(test.verbose))
 
 			var buf strings.Builder
 			args := test.args
