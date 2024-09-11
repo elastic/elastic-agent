@@ -98,7 +98,6 @@ var ExpectedBinaries = map[string]BinarySpec{
 	"agentbeat":             {Name: "beats", Platforms: AllPlatforms},
 	"apm-server":            {Name: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
 	"cloudbeat":             {Name: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	"cloud-defend":          {Name: "cloud-defend", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
 	"endpoint-security":     {Name: "endpoint-dev", Platforms: AllPlatforms},
 	"fleet-server":          {Name: "fleet-server", Platforms: AllPlatforms},
 	"pf-elastic-collector":  {Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
