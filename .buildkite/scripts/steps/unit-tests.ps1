@@ -19,8 +19,7 @@ $env:TEST_COVERAGE = $true
 $env:RACE_DETECTOR = $true
 mage unitTest
 # Copy coverage file to build directory so it can be downloaded as an artifact
-cp .\build\TEST-go-unit${env:BUILDKITE_JOB_ID}.cov coverage.out
-
+Copy-Item -Path "build/TEST-go-unit-$BUILDKITE_JOB_ID.cov" -Destination coverage.out
 if ($LASTEXITCODE -ne 0) {
   exit 1 
 }
