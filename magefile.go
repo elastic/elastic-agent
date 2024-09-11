@@ -1953,8 +1953,9 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 
 	// Write header
 	header := "# This file is generated automatically. Please do not manually edit it.\n\n" +
-		"# The testVersions list in this file specifies Elastic Agent versions to be use as\n" +
-		"# the starting (pre-upgrade) versions of Elastic Agent in upgrade integration tests.\n\n"
+		"# The testVersions list in this file specifies Elastic Agent versions to be used as\n" +
+		"# the starting (pre-upgrade) or ending (post-upgrade) versions of Elastic Agent in\n" +
+		"# upgrade integration tests.\n\n"
 
 	io.WriteString(file, header)
 
