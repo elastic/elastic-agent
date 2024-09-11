@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dispatcher
 
@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type mockHandler struct {
@@ -231,21 +231,9 @@ func TestActionDispatcher(t *testing.T) {
 	})
 
 	t.Run("Cancel queued action", func(t *testing.T) {
-		def := &mockHandler{}
-		calledCh := make(chan bool)
-		call := def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		call.RunFn = func(_ mock.Arguments) {
-			calledCh <- true
-		}
-
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-
-		d, err := New(nil, t.TempDir(), def, queue)
-		require.NoError(t, err)
-		err = d.Register(&mockAction{}, def)
-		require.NoError(t, err)
 
 		action := &mockAction{}
 		action.On("Type").Return(fleetapi.ActionTypeCancel)
@@ -253,19 +241,28 @@ func TestActionDispatcher(t *testing.T) {
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, detailsSetter, ack, action)
+
+		def := &mockHandler{}
+		def.On("Handle", dispatchCtx, action, ack).Return(nil).Once()
+
+		d, err := New(nil, t.TempDir(), def, queue)
+		require.NoError(t, err)
+
+		dispatchCompleted := make(chan struct{})
+		go func() {
+			d.Dispatch(dispatchCtx, detailsSetter, ack, action)
+			dispatchCompleted <- struct{}{}
+		}()
+
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
-		case <-calledCh:
-			// Handle was called, expected
-		case <-time.After(1 * time.Second):
-			t.Fatal("mock Handle never called")
+		case <-dispatchCompleted:
+			// OK, expected to complete the dispatch without blocking on the errors channel
 		}
+
 		def.AssertExpectations(t)
-		// Flaky assertion: https://github.com/elastic/elastic-agent/issues/3137
-		// TODO: re-enabled when fixed
-		// queue.AssertExpectations(t)
+		queue.AssertExpectations(t)
 	})
 
 	t.Run("Retrieve actions from queue", func(t *testing.T) {
@@ -360,43 +357,49 @@ func TestActionDispatcher(t *testing.T) {
 		action.AssertExpectations(t)
 	})
 
-	t.Run("Dispatch multiples events returns one error", func(t *testing.T) {
-		def := &mockHandler{}
-		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error")).Once()
-		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-
+	t.Run("Dispatch multiple events returns one error", func(t *testing.T) {
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
 		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 
-		d, err := New(nil, t.TempDir(), def, queue)
-		require.NoError(t, err)
-		err = d.Register(&mockAction{}, def)
-		require.NoError(t, err)
-
 		action1 := &mockAction{}
 		action1.On("Type").Return("action")
 		action1.On("ID").Return("id")
+
 		action2 := &mockAction{}
 		action2.On("Type").Return("action")
 		action2.On("ID").Return("id")
 
-		// Kind of a dirty work around to test an error return.
-		// launch in another routing and sleep to check if an error is generated
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, detailsSetter, ack, action1, action2)
-		time.Sleep(time.Millisecond * 200)
+
+		def := &mockHandler{}
+		def.On("Handle", dispatchCtx, action1, ack).Return(errors.New("first error")).Once()
+		def.On("Handle", dispatchCtx, action2, ack).Return(errors.New("second error")).Once()
+
+		d, err := New(nil, t.TempDir(), def, queue)
+		require.NoError(t, err)
+
+		dispatchCompleted := make(chan struct{})
+		go func() {
+			d.Dispatch(dispatchCtx, detailsSetter, ack, action1, action2)
+			dispatchCompleted <- struct{}{}
+		}()
+
+		// First, assert that the Dispatch method puts one error - the second one - on the error channel.
 		select {
-		case <-d.Errors():
-		default:
+		case err := <-d.Errors():
+			assert.EqualError(t, err, "second error")
+		case <-dispatchCompleted:
 			t.Fatal("Expected error")
 		}
-		time.Sleep(time.Millisecond * 200)
+
+		// Second, assert that the Dispatch method completes without putting anything else on the error channel.
 		select {
 		case <-d.Errors():
 			t.Fatal(err)
-		default:
+		case <-dispatchCompleted:
+			// Expecting the dispatch to complete.
 		}
 
 		def.AssertExpectations(t)
@@ -753,7 +756,7 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 			detailsSetter := func(upgradeDetails *details.Details) {
 				actualDetails = upgradeDetails
 			}
-			log, obs := logger.NewTesting("report_next_upgrade_details")
+			log, obs := loggertest.New("report_next_upgrade_details")
 
 			d.reportNextScheduledUpgrade(test.actions, detailsSetter, log)
 

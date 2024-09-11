@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,8 +116,8 @@ func (b *dockerBuilder) prepareBuild() error {
 		"Variant":     b.DockerVariant.String(),
 	}
 
-	err = filepath.Walk(templatesDir, func(path string, info os.FileInfo, _ error) error {
-		if !info.IsDir() && !isDockerFile(path) {
+	err = filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
+		if !d.Type().IsDir() && !isDockerFile(path) {
 			target := strings.TrimSuffix(
 				filepath.Join(b.buildDir, filepath.Base(path)),
 				".tmpl",

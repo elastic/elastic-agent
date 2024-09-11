@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package snapshot
 
@@ -21,7 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -123,7 +123,7 @@ func TestDownloadVersion(t *testing.T) {
 			server := httptest.NewTLSServer(http.HandlerFunc(handleDownload))
 			defer server.Close()
 
-			log, _ := logger.NewTesting("downloader")
+			log, _ := loggertest.New("downloader")
 			upgradeDetails := details.NewDetails(tt.args.version.String(), details.StateRequested, "")
 
 			config := tt.fields.config

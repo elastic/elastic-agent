@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package upgrade
 
@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 const agentBinaryPlaceholderContent = "Placeholder for the elastic-agent binary"
@@ -185,7 +185,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			testDataDir := filepath.Join(testTop, "data")
 			err := os.MkdirAll(testDataDir, 0o777)
 			assert.NoErrorf(t, err, "error creating initial structure %q", testDataDir)
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")
@@ -256,7 +256,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			testDataDir := filepath.Join(testTop, "data")
 			err := os.MkdirAll(testDataDir, 0o777)
 			assert.NoErrorf(t, err, "error creating initial structure %q", testDataDir)
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")

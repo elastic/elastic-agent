@@ -38,6 +38,11 @@ version without SNAPSHOT.
 One-time setup is required to run any integration and E2E tests. Run
 `mage integration:auth` to perform this setup.
 
+You'll also need to separately authenticate to [Elastic's docker registry][elastic_docker_registry].
+Go to https://docker-auth.elastic.co/ and authenticate with Okta to receive your credentials.
+
+[elastic_docker_registry]: docker.elastic.co
+
 ### Running the tests
 
 The test are run with mage using the `integration` namespace:
@@ -242,7 +247,7 @@ VM you will have shell connected to it.
 
 ### Credentials for cloud stack/projects
 All cloud deployments and projects can be listed with `mage
-integration:listStacks`, they can be used to manually connect to
+integration:stacks`, they can be used to manually connect to
 Kibana and Elasticsearch.
 
 If you need to manually run tests against any deployments, `mage

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cmd
 
@@ -11,12 +11,10 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 )
@@ -38,7 +36,7 @@ func TestInitUpgradeDetails(t *testing.T) {
 		return errors.New("some error")
 	}
 
-	log, obs := logger.NewTesting("initUpgradeDetails")
+	log, obs := loggertest.New("initUpgradeDetails")
 
 	upgradeDetails := initUpgradeDetails(testMarker, mockSaveMarker, log)
 

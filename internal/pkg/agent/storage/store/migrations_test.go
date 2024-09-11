@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package store
 
@@ -17,13 +17,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestStoreMigrations(t *testing.T) {
 	t.Run("action store file does not exists", func(t *testing.T) {
 		ctx := context.Background()
-		log, _ := logger.NewTesting("")
+		log, _ := loggertest.New("")
 
 		tempDir := t.TempDir()
 		oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
@@ -46,7 +46,7 @@ func TestStoreMigrations(t *testing.T) {
 
 	t.Run("action store is empty", func(t *testing.T) {
 		ctx := context.Background()
-		log, _ := logger.NewTesting("")
+		log, _ := loggertest.New("")
 
 		tempDir := t.TempDir()
 		oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
@@ -127,7 +127,7 @@ func TestStoreMigrations(t *testing.T) {
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
 				ctx := context.Background()
-				log, _ := logger.NewTesting("")
+				log, _ := loggertest.New("")
 
 				tempDir := t.TempDir()
 				vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
@@ -291,7 +291,7 @@ func TestStoreMigrations(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				ctx := context.Background()
-				log, _ := logger.NewTesting("")
+				log, _ := loggertest.New("")
 
 				tempDir := t.TempDir()
 				vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
@@ -322,7 +322,7 @@ func TestStoreMigrations(t *testing.T) {
 	t.Run("YAML state store containing an ActionPolicyChange to JSON state store",
 		func(t *testing.T) {
 			ctx := context.Background()
-			log, _ := logger.NewTesting("")
+			log, _ := loggertest.New("")
 
 			want := state{
 				Version: "1",
@@ -405,7 +405,7 @@ func TestStoreMigrations(t *testing.T) {
 		})
 
 	t.Run("YAML state store when JSON state store exists", func(t *testing.T) {
-		log, _ := logger.NewTesting("")
+		log, _ := loggertest.New("")
 
 		ctx := context.Background()
 
@@ -494,7 +494,7 @@ func TestStoreMigrations(t *testing.T) {
 	t.Run("newStateStoreWithMigration", func(t *testing.T) {
 		t.Run("action store exists", func(t *testing.T) {
 			ctx := context.Background()
-			log, _ := logger.NewTesting("")
+			log, _ := loggertest.New("")
 
 			want := &fleetapi.ActionPolicyChange{
 				ActionID:   "abc123",
@@ -550,7 +550,7 @@ func TestStoreMigrations(t *testing.T) {
 
 		t.Run("YAML state store to JSON state store", func(t *testing.T) {
 			ctx := context.Background()
-			log, _ := logger.NewTesting("")
+			log, _ := loggertest.New("")
 
 			want := state{
 				Version: "1",
@@ -629,7 +629,7 @@ func TestStoreMigrations(t *testing.T) {
 		})
 
 		t.Run("up to date store, no migration needed", func(t *testing.T) {
-			log, _ := logger.NewTesting("")
+			log, _ := loggertest.New("")
 
 			ctx := context.Background()
 
@@ -712,7 +712,7 @@ func TestStoreMigrations(t *testing.T) {
 
 		t.Run("no store exists", func(t *testing.T) {
 			ctx := context.Background()
-			log, _ := logger.NewTesting("")
+			log, _ := loggertest.New("")
 
 			tempDir := t.TempDir()
 			paths.SetConfig(tempDir)
@@ -737,7 +737,7 @@ func TestStoreMigrations(t *testing.T) {
 	t.Run("NewStateStoreWithMigration", func(t *testing.T) {
 		t.Run("return error if action store is invalid", func(t *testing.T) {
 			ctx := context.Background()
-			log, _ := logger.NewTesting("")
+			log, _ := loggertest.New("")
 
 			tempDir := t.TempDir()
 			oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
@@ -755,7 +755,7 @@ func TestStoreMigrations(t *testing.T) {
 
 		t.Run("returns error if YAML state store is invalid", func(t *testing.T) {
 			ctx := context.Background()
-			log, _ := logger.NewTesting("")
+			log, _ := loggertest.New("")
 
 			tempDir := t.TempDir()
 			paths.SetConfig(tempDir)
@@ -778,7 +778,7 @@ func TestStoreMigrations(t *testing.T) {
 			// Therefore, the error is regarding invalid YAML and not invalid JSON.
 
 			ctx := context.Background()
-			log, _ := logger.NewTesting("")
+			log, _ := loggertest.New("")
 
 			tempDir := t.TempDir()
 			paths.SetConfig(tempDir)

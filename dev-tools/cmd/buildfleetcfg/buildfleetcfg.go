@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package main
 
@@ -28,7 +28,7 @@ func init() {
 	if flag.Lookup("out") == nil {
 		flag.StringVar(&output, "out", "-", "Output path. \"-\" means writing to stdout")
 	}
-	flag.StringVar(&license, "license", "Elastic", "License header for generated file.")
+	flag.StringVar(&license, "license", "Elasticv2", "License header for generated file.")
 }
 
 var tmpl = template.Must(template.New("cfg").Parse(`
