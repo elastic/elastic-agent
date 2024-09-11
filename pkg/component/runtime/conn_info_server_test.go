@@ -11,7 +11,6 @@ import (
 	"io"
 	"net"
 	"net/url"
-	"os"
 	"runtime"
 	"syscall"
 	"testing"
@@ -92,11 +91,7 @@ func getAddress(dir string, isLocal bool) string {
 }
 
 func runTests(t *testing.T, fn func(*testing.T, string)) {
-	sockdir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(sockdir)
+	sockdir := t.TempDir()
 
 	tests := []struct {
 		name    string
