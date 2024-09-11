@@ -2,7 +2,6 @@
   "testVersions": [
     "8.15.1-SNAPSHOT",
     "8.15.0",
-    "8.14.4-SNAPSHOT",
     "8.14.3",
     "7.17.24-SNAPSHOT"
   ]
