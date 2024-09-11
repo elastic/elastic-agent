@@ -1,9 +1,15 @@
 {
   "testVersions": [
+<<<<<<< HEAD
     "8.15.0",
     "8.15.0-SNAPSHOT",
     "8.14.4-SNAPSHOT",
+=======
+    "8.15.2-SNAPSHOT",
+    "8.15.1",
+>>>>>>> cdfb299f91 ([main][Automation] Update versions (#5498))
     "8.14.3",
+    "7.17.24",
     "7.17.24-SNAPSHOT"
   ]
 }
