@@ -122,6 +122,7 @@ pull_request_rules:
           This pull request does not have a backport label. Could you fix it @{{author}}? 🙏
           To fixup this pull request, you need to add the backport labels for the needed
           branches, such as:
+<<<<<<< HEAD
           * `backport-v./d./d./d` is the label to automatically backport to the `8./d` branch. `/d` is the digit
 
           **NOTE**: `backport-skip` has been added to this pull request.
@@ -131,16 +132,28 @@ pull_request_rules:
   - name: remove-backport label
     conditions:
       - label~=backport-v
+=======
+          * `backport-./d./d` is the label to automatically backport to the `8./d` branch. `/d` is the digit
+  - name: add backport-8.x label for main only
+    conditions:
+      - -label~=^backport-8.x
+      - base=main
+>>>>>>> ec4288e332 (mergify: support for backport-major.minor (#5483))
       - -merged
       - -closed
     actions:
       label:
+<<<<<<< HEAD
         remove:
           - backport-skip
+=======
+        add:
+          - backport-8.x
+>>>>>>> ec4288e332 (mergify: support for backport-major.minor (#5483))
   - name: backport patches to 7.17 branch
     conditions:
       - merged
-      - label=backport-v7.17.0
+      - label~=^(backport-v7.17.0|backport-7.17)$
     actions:
       backport:
         assignees:
@@ -322,7 +335,7 @@ pull_request_rules:
   - name: backport patches to 8.15 branch
     conditions:
       - merged
-      - label=backport-v8.15.0
+      - label~=^(backport-v8.15.0|backport-8.15)$
     actions:
       backport:
         assignees:
@@ -335,7 +348,7 @@ pull_request_rules:
   - name: backport patches to 8.x branch
     conditions:
       - merged
-      - label=backport-v8.x
+      - label~=^(backport-v8.x|backport-8.x)$
     actions:
       backport:
         assignees:
