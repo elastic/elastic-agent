@@ -1952,7 +1952,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	defer file.Close()
 
 	// Write header
-	header := "# This file is generated automatically. Please do not manually edit it.\n" +
+	header := "# This file is generated automatically. Please do not manually edit it.\n\n" +
 		"# The testVersions list in this file specifies Elastic Agent versions to be use as\n" +
 		"# the starting (pre-upgrade) versions of Elastic Agent in upgrade integration tests.\n\n"
 

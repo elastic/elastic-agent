@@ -1,4 +1,5 @@
 # This file is generated automatically. Please do not manually edit it.
+
 # The testVersions list in this file specifies Elastic Agent versions to be use as
 # the starting (pre-upgrade) versions of Elastic Agent in upgrade integration tests.
 
