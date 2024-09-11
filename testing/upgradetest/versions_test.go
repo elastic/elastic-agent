@@ -91,6 +91,10 @@ func TestPreviousMinor(t *testing.T) {
 	currentParsed, err := version.ParseVersion(bversion.Agent)
 	require.NoError(t, err)
 
+	if currentParsed.Minor() == 0 {
+		t.Skipf("skipping TestPreviousMinor as current major version (%v) don't have previous minor", bversion.Agent)
+	}
+
 	v, err := PreviousMinor()
 	require.NoError(t, err)
 	t.Logf("previous minor: %s", v.String())
