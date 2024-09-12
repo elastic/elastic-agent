@@ -86,6 +86,11 @@ func (sc *SnapshotsClient) FindLatestSnapshots(ctx context.Context, branches []s
 }
 
 func (sc *SnapshotsClient) findLatestSnapshot(ctx context.Context, branch string) (snapshot *version.ParsedSemVer, err error) {
+	// TODO: find a proper fix.
+	if branch == "8.x" {
+		branch = "master"
+	}
+
 	url := sc.url + fmt.Sprintf("/latest/%s.json", branch)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
