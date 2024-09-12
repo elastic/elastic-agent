@@ -122,6 +122,7 @@ pull_request_rules:
           This pull request does not have a backport label. Could you fix it @{{author}}? 🙏
           To fixup this pull request, you need to add the backport labels for the needed
           branches, such as:
+<<<<<<< HEAD
           * `backport-v./d./d./d` is the label to automatically backport to the `8./d` branch. `/d` is the digit
 
           **NOTE**: `backport-skip` has been added to this pull request.
@@ -134,6 +135,20 @@ pull_request_rules:
       - -merged
       - -closed
     actions:
+=======
+          * `backport-./d./d` is the label to automatically backport to the `8./d` branch. `/d` is the digit
+  - name: add backport-8.x label for main only if no skipped or assigned already
+    conditions:
+      - -label~=^(backport-skip|backport-8.x)$
+      - base=main
+      - -merged
+      - -closed
+    actions:
+      comment:
+        message: |
+          `backport-v8.x` has been added to help with the transition to the new branch `8.x`.
+          If you don't need it please use `backport-skip` label and remove the `backport-8.x` label.
+>>>>>>> 976b6475ca (mergify: avoid label automation always (#5521))
       label:
         remove:
           - backport-skip
