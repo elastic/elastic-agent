@@ -133,7 +133,7 @@ func NewRouter(handlers *Handlers) *mux.Router {
 					route.Handler.
 						ServeHTTP(ww, r)
 					handlers.logFn("[%s] DONE %d - %s %s %s %s %d\n",
-						requestID, ww.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr, atomic.LoadUint64(&ww.byteCount))
+						requestID, ww.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr, ww.byteCount.Load())
 				}))
 	}
 
@@ -505,7 +505,7 @@ func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 type statusResponseWriter struct {
 	w          http.ResponseWriter
 	statusCode int
-	byteCount  uint64
+	byteCount  atomic.Uint64
 }
 
 func (s *statusResponseWriter) Header() http.Header {
@@ -514,7 +514,7 @@ func (s *statusResponseWriter) Header() http.Header {
 
 func (s *statusResponseWriter) Write(bs []byte) (int, error) {
 	n, err := s.w.Write(bs)
-	atomic.AddUint64(&s.byteCount, uint64(n))
+	s.byteCount.Add(uint64(n))
 	return n, err
 }
 
