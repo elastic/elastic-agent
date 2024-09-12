@@ -266,7 +266,7 @@ func prepareTestCase(t *testing.T, a artifact.Artifact, version *agtversion.Pars
 	err = os.WriteFile(filePathSHA, []byte(hashContent), 0644)
 	require.NoErrorf(t, err, "could not write %q file", filePathSHA)
 
-	pub, sig := pgptest.Sing(t, bytes.NewReader(content))
+	pub, sig := pgptest.Sign(t, bytes.NewReader(content))
 	err = os.WriteFile(filePathASC, sig, 0644)
 	require.NoErrorf(t, err, "could not write %q file", filePathASC)
 
