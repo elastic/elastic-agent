@@ -23,9 +23,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("newly added files are discovered", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path)
@@ -42,9 +40,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("ignore old files", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path)
@@ -67,9 +63,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("can unwatch a watched file", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path)
@@ -96,7 +90,7 @@ func TestWatch(t *testing.T) {
 		w.Unwatch(path)
 
 		// Add new content to the file.
-		os.WriteFile(path, []byte("heeeelo"), 0644)
+		assert.NoError(t, os.WriteFile(path, []byte("heeeelo"), 0644))
 
 		// Should not find the file.
 		r, u, err = w.scan()
@@ -106,9 +100,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("can returns the list of watched files", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path)
@@ -124,9 +116,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("update returns updated, unchanged and watched files", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path1 := filepath.Join(tmp, "hello-1.txt")
 		empty, err := os.Create(path1)
@@ -151,7 +141,8 @@ func TestWatch(t *testing.T) {
 		w.Watch(path3)
 
 		// Set initial state
-		w.Update()
+		_, err = w.Update()
+		require.NoError(t, err)
 
 		// Reset watched files.
 		w.Reset()
@@ -165,7 +156,8 @@ func TestWatch(t *testing.T) {
 		// Add new content to the file.
 		f, err := os.OpenFile(path3, os.O_APPEND|os.O_WRONLY, 0600)
 		require.NoError(t, err)
-		f.Write([]byte("more-hello"))
+		_, err = f.Write([]byte("more-hello"))
+		require.NoError(t, err)
 		require.NoError(t, f.Sync())
 		f.Close()
 
@@ -183,9 +175,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("should cleanup files that disapear", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path1 := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path1)
@@ -200,9 +190,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	t.Run("should allow to invalidate the cache ", withWatch(func(t *testing.T, w *Watch) {
-		tmp, err := os.MkdirTemp("", "watch")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		path1 := filepath.Join(tmp, "hello.txt")
 		empty, err := os.Create(path1)
