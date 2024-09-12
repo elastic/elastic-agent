@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fs
 
@@ -266,7 +266,7 @@ func prepareTestCase(t *testing.T, a artifact.Artifact, version *agtversion.Pars
 	err = os.WriteFile(filePathSHA, []byte(hashContent), 0644)
 	require.NoErrorf(t, err, "could not write %q file", filePathSHA)
 
-	pub, sig := pgptest.Sing(t, bytes.NewReader(content))
+	pub, sig := pgptest.Sign(t, bytes.NewReader(content))
 	err = os.WriteFile(filePathASC, sig, 0644)
 	require.NoErrorf(t, err, "could not write %q file", filePathASC)
 

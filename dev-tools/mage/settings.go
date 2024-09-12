@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -79,7 +79,7 @@ var (
 	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
 	BeatDescription = EnvOr("BEAT_DESCRIPTION", "")
 	BeatVendor      = EnvOr("BEAT_VENDOR", "Elastic")
-	BeatLicense     = EnvOr("BEAT_LICENSE", "ASL 2.0")
+	BeatLicense     = EnvOr("BEAT_LICENSE", "Elastic License 2.0")
 	BeatURL         = EnvOr("BEAT_URL", "https://www.elastic.co/beats/"+BeatName)
 	BeatUser        = EnvOr("BEAT_USER", "root")
 

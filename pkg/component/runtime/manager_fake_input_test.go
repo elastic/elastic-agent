@@ -1,11 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
-//
-// This file is for runtime manager tests that use the FakeInput component.
-// All FakeInput tests should go here, since these tests require consistent
-// setup of global config state to avoid triggering an error in the data race
-// detector.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
 package runtime
 
 import (

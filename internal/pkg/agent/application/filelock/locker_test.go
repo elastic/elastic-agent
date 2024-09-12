@@ -1,11 +1,10 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package filelock
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,8 +14,7 @@ import (
 const testLockFile = "test.lock"
 
 func TestAppLocker(t *testing.T) {
-	tmp, _ := os.MkdirTemp("", "locker")
-	defer os.RemoveAll(tmp)
+	tmp := t.TempDir()
 
 	locker1 := NewAppLocker(tmp, testLockFile)
 	locker2 := NewAppLocker(tmp, testLockFile)

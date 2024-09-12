@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleet
 
@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -498,18 +497,13 @@ func runFleetGateway(ctx context.Context, g coordinator.FleetGateway) <-chan err
 }
 
 func newStateStore(t *testing.T, log *logger.Logger) *store.StateStore {
-	dir, err := os.MkdirTemp("", "fleet-gateway-unit-test")
-	require.NoError(t, err)
+	dir := t.TempDir()
 
 	filename := filepath.Join(dir, "state.enc")
 	diskStore, err := storage.NewDiskStore(filename)
 	require.NoError(t, err)
 	stateStore, err := store.NewStateStore(log, diskStore)
 	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		os.RemoveAll(dir)
-	})
 
 	return stateStore
 }

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package manifest
 
@@ -99,7 +99,6 @@ var ExpectedBinaries = []BinarySpec{
 	{BinaryName: "apm-server", ProjectName: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
 	{BinaryName: "cloudbeat", ProjectName: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
 	{BinaryName: "connectors", ProjectName: "connectors", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PythonWheel: true},
-	{BinaryName: "cloud-defend", ProjectName: "cloud-defend", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
 	{BinaryName: "endpoint-security", ProjectName: "endpoint-dev", Platforms: AllPlatforms},
 	{BinaryName: "fleet-server", ProjectName: "fleet-server", Platforms: AllPlatforms},
 	{BinaryName: "pf-elastic-collector", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
