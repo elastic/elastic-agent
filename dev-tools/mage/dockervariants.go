@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	undefined = "undefined"
-	basic     = "basic"
-	ubi       = "ubi"
-	wolfi     = "wolfi"
-	complete  = "complete"
+	undefined     = "undefined"
+	basic         = "basic"
+	ubi           = "ubi"
+	wolfi         = "wolfi"
+	complete      = "complete"
 	wolfiComplete = "wolfi-complete"
-	cloud     = "cloud"
-	service   = "service"
+	cloud         = "cloud"
+	service       = "service"
 )
 
 // DockerVariant defines the docker variant to build.
