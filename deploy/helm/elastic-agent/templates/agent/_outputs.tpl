@@ -1,20 +1,3 @@
-{{- define "elasticagent.output.ESPlainAuth.validate" -}}
-{{- $ := index . 0 -}}
-{{- $outputName := index . 1 -}}
-{{- $outputVal := index . 2 -}}
-{{- if empty ($outputVal).url -}}
-{{- fail (printf "missing url in %s output" $outputName)}}
-{{- end -}}
-{{- if empty ($outputVal).api_key -}}
-{{- if empty ($outputVal).username -}}
-{{- fail (printf "missing user in %s output" $outputName)}}
-{{- end -}}
-{{- if empty ($outputVal).password -}}
-{{- fail (printf "missing pass in %s output" $outputName)}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-
 {{- define "elasticagent.output.ESPlainAuth.preset.envvars" -}}
 {{/* this is plain text so nothing to be added in the pod env vars */}}
 {{- end -}}
@@ -32,15 +15,6 @@
 {{- end -}}
 {{$outputName}}:
   {{- $outputVal | toYaml | nindent 2}}
-{{- end -}}
-
-{{- define "elasticagent.output.ESSecretAuthBasic.validate" -}}
-{{- $ := index . 0 -}}
-{{- $outputName := index . 1 -}}
-{{- $outputVal := index . 2 -}}
-{{- if empty ($outputVal).secretName -}}
-{{- fail (printf "secret name missing in %s output" $outputName)}}
-{{- end -}}
 {{- end -}}
 
 {{- define "elasticagent.output.ESSecretAuthBasic.preset.envvars" -}}
@@ -77,15 +51,6 @@
   {{- $outputVal | toYaml | nindent 2}}
 {{- end -}}
 
-{{- define "elasticagent.output.ESSecretAuthAPI.validate" -}}
-{{- $ := index . 0 -}}
-{{- $outputName := index . 1 -}}
-{{- $outputVal := index . 2 -}}
-{{- if empty ($outputVal).secretName -}}
-{{- fail (printf "secret name missing in %s output" $outputName)}}
-{{- end -}}
-{{- end -}}
-
 {{- define "elasticagent.output.ESSecretAuthAPI.preset.config" -}}
 {{- $ := index . 0 -}}
 {{- $outputName := index . 1 -}}
@@ -112,17 +77,6 @@
     secretKeyRef:
       name: {{($outputVal).secretName}}
       key: api_key
-{{- end -}}
-
-{{- define "elasticagent.output.ESECKRef.validate" -}}
-{{- $ := index . 0 -}}
-{{- $outputName := index . 1 -}}
-{{- $outputVal := index . 2 -}}
-{{- if empty ($outputVal).name -}}
-{{- if empty ($outputVal).secretName -}}
-{{- fail (printf "missing secretName in %s output (ESECKRef type)" $outputName)}}
-{{- end -}}
-{{- end -}}
 {{- end -}}
 
 {{- define "elasticagent.output.ESECKRef.preset.config" -}}

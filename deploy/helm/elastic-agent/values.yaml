@@ -343,6 +343,8 @@ agent:
     #    mode: [deployment, statefulset, daemonset]
     #    replicaCount: 1
     #    labels: {}
+    #    hostPID: boolean
+    #    hostNetwork: boolean
     #    imagePullPolicy: [Always, IfNotPresent, Never]
     #    annotations: {}
     #    affinity: {}
