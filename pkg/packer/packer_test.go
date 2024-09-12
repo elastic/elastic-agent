@@ -24,9 +24,7 @@ func TestPacker(t *testing.T) {
 
 	withFiles := func(test tt, fn func(pattern []string, t *testing.T)) func(t *testing.T) {
 		return func(t *testing.T) {
-			d, err := os.MkdirTemp("", "packer")
-			require.NoError(t, err)
-			defer os.RemoveAll(d)
+			d := t.TempDir()
 
 			for f, v := range test.content {
 				path := filepath.Join(d, f)

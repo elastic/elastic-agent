@@ -25,6 +25,10 @@ const (
 	// privileged and airgapped.
 	FleetAirgappedPrivileged = "fleet-airgapped-privileged"
 
+	// FleetUpgradeToPRBuild group of tests. Used for testing Elastic Agent
+	// upgrading to a build built from the PR being tested.
+	FleetUpgradeToPRBuild = "fleet-upgrade-to-pr-build"
+
 	// FQDN group of tests. Used for testing Elastic Agent with FQDN enabled.
 	FQDN = "fqdn"
 
