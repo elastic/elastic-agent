@@ -191,7 +191,7 @@ func NewManager(
 		errCh:          make(chan error),
 		monitor:        monitor,
 		grpcConfig:     grpcConfig,
-		serverReady:    make(chan struct{}, 1),
+		serverReady:    make(chan struct{}),
 		doneChan:       make(chan struct{}),
 		runAsOtel:      runAsOtel,
 	}
@@ -342,7 +342,7 @@ LOOP:
 }
 
 func (m *Manager) serverLoop(ctx context.Context, listener net.Listener, server *grpc.Server) {
-	m.serverReady <- struct{}{}
+	close(m.serverReady)
 	for ctx.Err() == nil {
 		err := server.Serve(listener)
 		if err != nil && ctx.Err() == nil {
