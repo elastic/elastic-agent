@@ -299,7 +299,7 @@ shared:
         source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'
         mode: 0755
       'data/{{.BeatName}}-{{ commit_short }}/components/connectors':
-        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/connectors.py'
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/connectors.sh'
         mode: 0755
       'data/{{.BeatName}}-{{ commit_short }}/components/connectors.spec.yml':
         source: '{{ elastic_beats_dir }}/specs/connectors.spec.yml'
