@@ -733,8 +733,8 @@ func TestProxyURL(t *testing.T) {
 						Key:                    args.key,
 					}})
 			t.Logf("elastic-agent install output: \n%s\n", string(out))
-			for proxy, p := range proxies {
-				t.Logf("Proxy %s requests: %v", proxy, p.ProxiedRequests())
+			for proxyName, proxy := range proxies {
+				t.Logf("Proxy %s requests: %v", proxyName, proxy.ProxiedRequests())
 			}
 			if tt.wantErr(t, err, "elastic-agent install returned an unexpected error") {
 				tt.assertFunc(ctx, t, fixture, proxies, mockFleet)
