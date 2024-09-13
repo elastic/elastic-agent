@@ -69,7 +69,7 @@ type VersionRequirements struct {
 	SnapshotBranches []string
 }
 
-const AgentVersionsFilename = ".agent-versions.yml"
+var AgentVersionsFilename string
 
 type AgentVersions struct {
 	// TestVersions contains semver-compliant versions of the agent to run integration tests against.
@@ -81,6 +81,8 @@ var (
 )
 
 func init() {
+	AgentVersionsFilename = filepath.Join("testing", "integration", "testdata", ".upgrade-test-agent-versions.yml")
+
 	v, err := getAgentVersions()
 	if err != nil {
 		panic(err)
