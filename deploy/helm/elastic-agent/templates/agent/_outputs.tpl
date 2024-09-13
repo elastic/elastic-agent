@@ -1,18 +1,38 @@
-{{- define "elasticagent.output.ESPlainAuth.preset.envvars" -}}
+{{- define "elasticagent.output.ESPlainAuthBasic.preset.envvars" -}}
 {{/* this is plain text so nothing to be added in the pod env vars */}}
 {{- end -}}
 
-{{- define "elasticagent.output.ESPlainAuth.preset.config" -}}
+{{- define "elasticagent.output.ESPlainAuthBasic.preset.config" -}}
 {{- $ := index . 0 -}}
 {{- $outputName := index . 1 -}}
 {{- $outputVal := deepCopy (index . 2) -}}
 {{- $_ := set $outputVal "type" "elasticsearch" -}}
 {{- $_ := set $outputVal "hosts" (list ($outputVal).url) -}}
 {{- $_ := unset $outputVal "url" -}}
-{{- if ($outputVal).api_key -}}
+{{- $_ := unset $outputVal "api_key" -}}
+{{- $_ := unset $outputVal "secretName" -}}
+{{- $_ := unset $outputVal "name" -}}
+{{- $_ := unset $outputVal "namespace" -}}
+{{$outputName}}:
+  {{- $outputVal | toYaml | nindent 2}}
+{{- end -}}
+
+{{- define "elasticagent.output.ESPlainAuthAPI.preset.envvars" -}}
+{{/* this is plain text so nothing to be added in the pod env vars */}}
+{{- end -}}
+
+{{- define "elasticagent.output.ESPlainAuthAPI.preset.config" -}}
+{{- $ := index . 0 -}}
+{{- $outputName := index . 1 -}}
+{{- $outputVal := deepCopy (index . 2) -}}
+{{- $_ := set $outputVal "type" "elasticsearch" -}}
+{{- $_ := set $outputVal "hosts" (list ($outputVal).url) -}}
+{{- $_ := unset $outputVal "url" -}}
 {{- $_ := unset $outputVal "username" -}}
 {{- $_ := unset $outputVal "password" -}}
-{{- end -}}
+{{- $_ := unset $outputVal "secretName" -}}
+{{- $_ := unset $outputVal "name" -}}
+{{- $_ := unset $outputVal "namespace" -}}
 {{$outputName}}:
   {{- $outputVal | toYaml | nindent 2}}
 {{- end -}}
