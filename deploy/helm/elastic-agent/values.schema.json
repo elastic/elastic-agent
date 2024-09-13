@@ -13,7 +13,7 @@
             "examples": [
                 {
                     "outputNamePlain": {
-                        "type": "ESPlainAuth"
+                        "type": "ESPlainAuthBasic"
                     }
                 }
             ]
@@ -455,7 +455,8 @@
                 "type": {
                     "type": "string",
                     "enum": [
-                        "ESPlainAuth",
+                        "ESPlainAuthBasic",
+                        "ESPlainAuthAPI",
                         "ESSecretAuthBasic",
                         "ESSecretAuthAPI",
                         "ESECKRef"
@@ -464,22 +465,22 @@
                 },
                 "url": {
                     "type": "string",
-                    "description": "URL of the output (required for ESPlainAuth type).",
+                    "description": "URL of the output (required for ESPlainAuthBasic and ESPlainAuthAPI type).",
                     "example": "http://elasticsearch:9200"
                 },
                 "username": {
                     "type": "string",
-                    "description": "Username to authenticate with the output (required for ESPlainAuth type if api_key is not set).",
+                    "description": "Username to authenticate with the output (required for ESPlainAuthBasic).",
                     "example": "elastic"
                 },
                 "password": {
                     "type": "string",
-                    "description": "Password to authenticate with the output (required for ESPlainAuth type if api_key is not set).",
+                    "description": "Password to authenticate with the output (required for ESPlainAuthBasic).",
                     "example": "fantastic"
                 },
                 "api_key": {
                     "type": "string",
-                    "description": "API key to authenticate with the output (required for ESPlainAuth type if username and password are not set)."
+                    "description": "API key to authenticate with the output (required for ESPlainAuthAPI type)."
                 },
                 "secretName": {
                     "type": "string",
@@ -502,7 +503,7 @@
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "ESPlainAuth"
+                                "const": "ESPlainAuthBasic"
                             }
                         }
                     },
@@ -525,6 +526,30 @@
                             "url",
                             "username",
                             "password"
+                        ]
+                    }
+                },{
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "ESPlainAuthAPI"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "format": "uri"
+                            },
+                            "api_key": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        },
+                        "required": [
+                            "url",
+                            "api_key"
                         ]
                     }
                 },
