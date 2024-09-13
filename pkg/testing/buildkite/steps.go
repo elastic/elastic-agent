@@ -14,7 +14,6 @@ type StepAgent struct {
 type Step struct {
 	Key                    string            `yaml:"key,omitempty"`
 	Label                  string            `yaml:"label,omitempty"`
-	Group                  string            `yaml:"group,omitempty"`
 	Command                string            `yaml:"command,omitempty"`
 	Env                    map[string]string `yaml:"env,omitempty"`
 	ArtifactPaths          []string          `yaml:"artifact_paths,omitempty"`
@@ -22,4 +21,13 @@ type Step struct {
 	DependsOn              []string          `yaml:"depends_on,omitempty"`
 	AllowDependencyFailure bool              `yaml:"allow_dependency_failure,omitempty"`
 	Steps                  []Step            `yaml:"steps,omitempty"`
+}
+
+type GroupEntry struct {
+	Name  string `yaml:"name,omitempty"`
+	Steps []Step `yaml:"steps,omitempty"`
+}
+
+type Group struct {
+	Group GroupEntry `yaml:"group,omitempty"`
 }

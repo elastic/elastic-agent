@@ -60,42 +60,42 @@ func (r *Runner) Buildkite() (string, error) {
 			return "", fmt.Errorf("unable to get machine and image: %w", err)
 		}
 		if len(lb.Batch.Tests) > 0 {
-			var group buildkite.Step
-			group.Group = fmt.Sprintf("Integration Test (non-sudo): %s", lb.ID)
-			group.Key = fmt.Sprintf("integration-non-sudo-%s", lb.ID)
+			var step buildkite.Step
+			step.Label = fmt.Sprintf("Integration Test (non-sudo): %s", lb.ID)
+			step.Key = fmt.Sprintf("integration-non-sudo-%s", lb.ID)
 			if lb.Batch.Stack != nil {
 				stackKey := fmt.Sprintf("integration-stack-%s", lb.Batch.Stack.Version)
-				group.DependsOn = append(group.DependsOn, stackKey)
-				stackDepends[stackKey] = append(stackDepends[stackKey], group.Key)
+				step.DependsOn = append(step.DependsOn, stackKey)
+				stackDepends[stackKey] = append(stackDepends[stackKey], step.Key)
 			}
-			group.ArtifactPaths = []string{"build/**"}
-			group.Agents = agentStep
-			group.Command = "mage integration:testOnRemote"
-			group.Env = map[string]string{
+			step.ArtifactPaths = []string{"build/**"}
+			step.Agents = agentStep
+			step.Command = "mage integration:testOnRemote"
+			step.Env = map[string]string{
 				"AGENT_VERSION":      r.cfg.AgentVersion,
-				"TEST_DEFINE_PREFIX": group.Key,
+				"TEST_DEFINE_PREFIX": step.Key,
 				"TEST_DEFINE_TESTS":  strings.Join(getTestNames(lb.Batch.Tests), ","),
 			}
-			steps = append(steps, group)
+			steps = append(steps, step)
 		}
 		if len(lb.Batch.SudoTests) > 0 {
-			var group buildkite.Step
-			group.Group = fmt.Sprintf("Integration Test (sudo): %s", lb.ID)
-			group.Key = fmt.Sprintf("integration-sudo-%s", lb.ID)
+			var step buildkite.Step
+			step.Label = fmt.Sprintf("Integration Test (sudo): %s", lb.ID)
+			step.Key = fmt.Sprintf("integration-sudo-%s", lb.ID)
 			if lb.Batch.Stack != nil {
 				stackKey := fmt.Sprintf("integration-stack-%s", lb.Batch.Stack.Version)
-				group.DependsOn = append(group.DependsOn, stackKey)
-				stackDepends[stackKey] = append(stackDepends[stackKey], group.Key)
+				step.DependsOn = append(step.DependsOn, stackKey)
+				stackDepends[stackKey] = append(stackDepends[stackKey], step.Key)
 			}
-			group.ArtifactPaths = []string{"build/**"}
-			group.Agents = agentStep
-			group.Command = "mage integration:testOnRemote"
-			group.Env = map[string]string{
+			step.ArtifactPaths = []string{"build/**"}
+			step.Agents = agentStep
+			step.Command = "mage integration:testOnRemote"
+			step.Env = map[string]string{
 				"AGENT_VERSION":      r.cfg.AgentVersion,
-				"TEST_DEFINE_PREFIX": group.Key,
+				"TEST_DEFINE_PREFIX": step.Key,
 				"TEST_DEFINE_TESTS":  strings.Join(getTestNames(lb.Batch.SudoTests), ","),
 			}
-			steps = append(steps, group)
+			steps = append(steps, step)
 		}
 	}
 
@@ -111,12 +111,12 @@ func (r *Runner) Buildkite() (string, error) {
 		})
 	}
 
-	yamlOutput, err := yaml.Marshal(buildkite.Step{
-		Group:     "Integration Tests",
-		Key:       "integration-tests",
-		DependsOn: []string{"package-it"},
-		Steps:     steps,
-	})
+	yamlOutput, err := yaml.Marshal([]buildkite.Group{{
+		Group: buildkite.GroupEntry{
+			Name:  "Integration Tests",
+			Steps: steps,
+		},
+	}})
 	if err != nil {
 		return "", fmt.Errorf("unable to marshal yaml: %w", err)
 	}
