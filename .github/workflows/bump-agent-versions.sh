@@ -3,7 +3,7 @@ set -e
 
 package_version=$(mage integration:updatePackageVersion)
 version_requirements=$(mage integration:updateVersions)
-changes=$(git status -s -uno .agent-versions.json .package-version)
+changes=$(git status -s -uno .agent-versions.yml .package-version)
 if [ -z "$changes" ]
 then
     echo "The version files didn't change, skipping..."
