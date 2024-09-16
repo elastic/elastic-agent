@@ -5,8 +5,8 @@
 package runner
 
 import (
+	"encoding/json"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
@@ -111,13 +111,13 @@ func (r *Runner) Buildkite() (string, error) {
 		})
 	}
 
-	yamlOutput, err := yaml.Marshal(buildkite.Step{
+	jsonOutput, err := json.Marshal(buildkite.Step{
 		Steps: steps,
 	})
 	if err != nil {
-		return "", fmt.Errorf("unable to marshal yaml: %w", err)
+		return "", fmt.Errorf("unable to marshal json: %w", err)
 	}
-	return string(yamlOutput), nil
+	return string(jsonOutput), nil
 }
 
 func getTestNames(pt []define.BatchPackageTests) []string {

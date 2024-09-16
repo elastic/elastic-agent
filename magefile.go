@@ -2474,7 +2474,7 @@ func (Integration) Buildkite(ctx context.Context) error {
 		return fmt.Errorf("error generating buildkite steps: %w", err)
 	}
 
-	// output's YAML
+	// output's JSON
 	fmt.Printf("%s\n", steps)
 	return nil
 }
