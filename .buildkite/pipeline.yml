@@ -201,7 +201,7 @@ steps:
       - label: "K8s integration tests"
         key: "k8s-integration-tests"
         env:
-          K8S_VERSION: "v1.30.2,v1.29.4,v1.28.9"
+          K8S_VERSION: "{{matrix.k8s_version}}"
           KIND_VERSION: "v0.20.0"
         command: ".buildkite/scripts/steps/k8s-extended-tests.sh"
         artifact_paths:
@@ -212,6 +212,12 @@ steps:
         agents:
           provider: "gcp"
           image: "family/core-ubuntu-2204"
+        matrix:
+          setup:
+            k8s_version:
+              - "1.30.2"
+              - "1.29.4"
+              - "1.28.9"
         retry:
           manual:
             allowed: true

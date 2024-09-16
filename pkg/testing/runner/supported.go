@@ -156,24 +156,6 @@ var (
 		},
 		Runner: WindowsRunner{},
 	}
-
-	KubernetesAMD64 = SupportedOS{
-		OS: define.OS{
-			Type:    define.Kubernetes,
-			Arch:    define.AMD64,
-			Version: "",
-		},
-		Runner: KubernetesRunner{},
-	}
-
-	KubernetesARM64 = SupportedOS{
-		OS: define.OS{
-			Type:    define.Kubernetes,
-			Arch:    define.ARM64,
-			Version: "",
-		},
-		Runner: KubernetesRunner{},
-	}
 )
 
 // supported defines the set of supported OS's.
@@ -199,8 +181,6 @@ var supported = []SupportedOS{
 	// https://github.com/elastic/ingest-dev/issues/3484
 	// WindowsAMD64_2016,
 	// WindowsAMD64_2016_Core,
-	KubernetesAMD64,
-	KubernetesARM64,
 }
 
 // osMatch returns true when the specific OS is a match for a non-specific OS.

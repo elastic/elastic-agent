@@ -12,11 +12,11 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"slices"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
+
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,7 +29,8 @@ import (
 )
 
 const (
-	Name = "kind"
+	Name           = "kind"
+	DefaultVersion = "1.30.2"
 )
 
 const clusterCfg string = `
@@ -50,13 +51,16 @@ nodes:
         secure-port: "10257"
 `
 
-func NewProvisioner(versions string) runner.InstanceProvisioner {
-	return &provisioner{versions: strings.Split(versions, ",")}
+func NewProvisioner(version string) runner.InstanceProvisioner {
+	if version == "" {
+		version = DefaultVersion
+	}
+	return &provisioner{defaultVersion: version}
 }
 
 type provisioner struct {
-	logger   runner.Logger
-	versions []string
+	logger         runner.Logger
+	defaultVersion string
 }
 
 func (p *provisioner) Name() string {
@@ -72,46 +76,33 @@ func (p *provisioner) SetLogger(l runner.Logger) {
 }
 
 func (p *provisioner) Supported(batch define.OS) bool {
-
-	supported := batch.Type == define.Kubernetes && batch.Arch == runtime.GOARCH && (batch.Distro == "" || batch.Distro == "kind")
-
-	if supported && batch.Version != "" {
-		supported = slices.Contains(p.versions, batch.Version)
-	}
-
-	return supported
+	return batch.Type == define.Kubernetes && batch.Arch == runtime.GOARCH
 }
 
 func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {
-
-	agentImageWithoutTests := fmt.Sprintf("docker.elastic.co/beats/elastic-agent-complete:%s", cfg.AgentVersion)
-	agentImage, err := kubernetes.AddK8STestsToImage(ctx, p.logger, agentImageWithoutTests, runtime.GOARCH)
-	if err != nil {
-		return nil, err
-	}
-
-	versionsMap := make(map[string]string)
-
+	var instances []runner.Instance
 	for _, batch := range batches {
 		k8sVersion := batch.OS.Version
 		if k8sVersion == "" {
-			for _, version := range p.versions {
-				versionsMap[version] = batch.ID
-			}
-			break
+			k8sVersion = p.defaultVersion
+		}
+		k8sVersion = fmt.Sprintf("v%s", k8sVersion)
+		instanceName := fmt.Sprintf("%s-%s", k8sVersion, batch.ID)
+
+		agentImageName := batch.OS.DockerImage
+		if agentImageName == "" {
+			return nil, fmt.Errorf("docker image must be defined in the batch: %s", batch.ID)
+		}
+		agentImageName = fmt.Sprintf("%s:%s", agentImageName, cfg.AgentVersion)
+		agentImage, err := kubernetes.AddK8STestsToImage(ctx, p.logger, agentImageName, runtime.GOARCH)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add k8s tests to image %s: %w", agentImageName, err)
 		}
 
-		versionsMap[k8sVersion] = batch.ID
-	}
-
-	var instances []runner.Instance
-	for k8sVersion, instanceID := range versionsMap {
-		instanceName := fmt.Sprintf("%s-%s", k8sVersion, instanceID)
 		exists, err := p.clusterExists(instanceName)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to check if cluster exists: %w", err)
 		}
-
 		if !exists {
 			p.logger.Logf("Provisioning kind cluster %s", instanceName)
 			nodeImage := fmt.Sprintf("kindest/node:%s", k8sVersion)
@@ -153,7 +144,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 		}
 
 		instances = append(instances, runner.Instance{
-			ID:          instanceID,
+			ID:          batch.ID,
 			Name:        instanceName,
 			Provisioner: Name,
 			IP:          "",

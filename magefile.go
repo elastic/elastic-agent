@@ -2596,11 +2596,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	case multipass.Name:
 		instanceProvisioner = multipass.NewProvisioner()
 	case kind.Name:
-		k8sVersion := os.Getenv("K8S_VERSION")
-		if k8sVersion == "" {
-			return nil, errors.New("K8S_VERSION must be set to use kind instance provisioner")
-		}
-		instanceProvisioner = kind.NewProvisioner(k8sVersion)
+		instanceProvisioner = kind.NewProvisioner(os.Getenv("K8S_VERSION"))
 	default:
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
 	}
