@@ -6,11 +6,11 @@ package runner
 
 import (
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 var (
