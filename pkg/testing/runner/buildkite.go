@@ -111,12 +111,9 @@ func (r *Runner) Buildkite() (string, error) {
 		})
 	}
 
-	yamlOutput, err := yaml.Marshal([]buildkite.Group{{
-		Group: buildkite.GroupEntry{
-			Name:  "Integration Tests",
-			Steps: steps,
-		},
-	}})
+	yamlOutput, err := yaml.Marshal(buildkite.Step{
+		Steps: steps,
+	})
 	if err != nil {
 		return "", fmt.Errorf("unable to marshal yaml: %w", err)
 	}

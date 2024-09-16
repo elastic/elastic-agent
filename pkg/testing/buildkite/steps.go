@@ -22,12 +22,3 @@ type Step struct {
 	AllowDependencyFailure bool              `yaml:"allow_dependency_failure,omitempty"`
 	Steps                  []Step            `yaml:"steps,omitempty"`
 }
-
-type GroupEntry struct {
-	Name  string `yaml:"name,omitempty"`
-	Steps []Step `yaml:"steps,omitempty"`
-}
-
-type Group struct {
-	Group GroupEntry `yaml:"group,omitempty"`
-}
