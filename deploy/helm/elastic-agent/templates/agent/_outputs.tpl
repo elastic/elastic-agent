@@ -62,7 +62,7 @@
 {{- $ := index . 0 -}}
 {{- $outputName := index . 1 -}}
 {{- $outputVal := deepCopy (index . 2) -}}
-{{- $outputVal = omit $outputVal "secretName" "username" "password" "name" "serviceName" "namespace" -}}
+{{- $outputVal = omit $outputVal "secretName" "username" "password" "name" "serviceName" "namespace" "api_key" "url" -}}
 {{- $_ := set $outputVal "type" "elasticsearch" -}}
 {{- $_ := set $outputVal "hosts" (list (printf "${OUTPUT_%s_URL}" (upper $outputName))) -}}
 {{- $_ := set $outputVal "username" (printf "${OUTPUT_%s_USER}" (upper $outputName)) -}}
@@ -75,7 +75,7 @@
 {{- $ := index . 0 -}}
 {{- $outputName := index . 1 -}}
 {{- $outputVal := deepCopy (index . 2) -}}
-{{- $outputVal = omit $outputVal "secretName" "username" "password" "name" "serviceName" "namespace" -}}
+{{- $outputVal = omit $outputVal "secretName" "username" "password" "name" "serviceName" "namespace" "api_key" "url" -}}
 {{- $_ := set $outputVal "type" "elasticsearch" -}}
 {{- $_ := set $outputVal "hosts" (list (printf "${OUTPUT_%s_URL}" (upper $outputName))) -}}
 {{- $_ := set $outputVal "api_key" (printf "${OUTPUT_%s_API_KEY}" (upper $outputName)) -}}
