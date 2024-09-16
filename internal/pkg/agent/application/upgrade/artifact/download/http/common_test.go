@@ -71,7 +71,7 @@ func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
 	var resp []byte
 	content := []byte("anything will do")
 	hash := sha512.Sum512(content)
-	pub, sig := pgptest.Sing(t, bytes.NewReader(content))
+	pub, sig := pgptest.Sign(t, bytes.NewReader(content))
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		packageName := r.URL.Path[len(sourcePattern):]
