@@ -17,7 +17,7 @@ type Step struct {
 	Command                string            `yaml:"command,omitempty"`
 	Env                    map[string]string `yaml:"env,omitempty"`
 	ArtifactPaths          []string          `yaml:"artifact_paths,omitempty"`
-	Agents                 StepAgent         `yaml:"agents,omitempty"`
+	Agents                 []StepAgent       `yaml:"agents,omitempty"`
 	DependsOn              []string          `yaml:"depends_on,omitempty"`
 	AllowDependencyFailure bool              `yaml:"allow_dependency_failure,omitempty"`
 	Steps                  []Step            `yaml:"steps,omitempty"`

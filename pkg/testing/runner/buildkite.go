@@ -42,7 +42,7 @@ func (r *Runner) Buildkite() (string, error) {
 					Label:   fmt.Sprintf("Integration Stack: %s", lb.Batch.Stack.Version),
 					Key:     fmt.Sprintf("integration-stack-%s", lb.Batch.Stack.Version),
 					Command: "false",
-					Agents:  StackAgent,
+					Agents:  []buildkite.StepAgent{StackAgent},
 				}
 				steps = append(steps, stackStep)
 				stackSteps[lb.Batch.Stack.Version] = stackStep
@@ -69,7 +69,7 @@ func (r *Runner) Buildkite() (string, error) {
 				stackDepends[stackKey] = append(stackDepends[stackKey], step.Key)
 			}
 			step.ArtifactPaths = []string{"build/**"}
-			step.Agents = agentStep
+			step.Agents = []buildkite.StepAgent{agentStep}
 			step.Command = "mage integration:testOnRemote"
 			step.Env = map[string]string{
 				"AGENT_VERSION":      r.cfg.AgentVersion,
@@ -88,7 +88,7 @@ func (r *Runner) Buildkite() (string, error) {
 				stackDepends[stackKey] = append(stackDepends[stackKey], step.Key)
 			}
 			step.ArtifactPaths = []string{"build/**"}
-			step.Agents = agentStep
+			step.Agents = []buildkite.StepAgent{agentStep}
 			step.Command = "mage integration:testOnRemote"
 			step.Env = map[string]string{
 				"AGENT_VERSION":      r.cfg.AgentVersion,
@@ -107,7 +107,7 @@ func (r *Runner) Buildkite() (string, error) {
 			DependsOn:              stackDepends[step.Key],
 			AllowDependencyFailure: true,
 			Command:                "false",
-			Agents:                 StackAgent,
+			Agents:                 []buildkite.StepAgent{StackAgent},
 		})
 	}
 
