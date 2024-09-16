@@ -198,8 +198,7 @@ steps:
         retry:
           manual:
             allowed: true
-      - label: "K8s integration tests"
-        key: "k8s-integration-tests"
+      - label: "K8s integration tests: {{matrix.k8s_version}}"
         env:
           K8S_VERSION: "{{matrix.k8s_version}}"
           KIND_VERSION: "v0.20.0"
@@ -212,6 +211,8 @@ steps:
         agents:
           provider: "gcp"
           image: "family/core-ubuntu-2204"
+          machine_type: "n2-standard-8"
+          disk_type: "pd-ssd"
         matrix:
           setup:
             k8s_version:
