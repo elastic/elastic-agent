@@ -2475,7 +2475,26 @@ func (Integration) Buildkite(ctx context.Context) error {
 	}
 
 	// output's YAML
-	fmt.Printf("%s\n", steps)
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Errorf("Error getting current working directory: %w", err)
+		return nil
+	}
+
+	ymlFilePath := filepath.Join(cwd, "steps.yml")
+	fmt.Printf("Steps.yml path: %s", ymlFilePath)
+	file, err := os.Create(ymlFilePath)
+	if err != nil {
+		fmt.Errorf("Error creating file: %w", err)
+		return nil
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(steps)
+	if err != nil {
+		fmt.Println("Error writing to file: %w", err)
+		return nil
+	}
 	return nil
 }
 
