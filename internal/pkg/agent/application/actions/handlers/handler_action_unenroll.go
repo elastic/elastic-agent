@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
@@ -61,6 +61,10 @@ func NewUnenroll(
 
 // Handle handles UNENROLL action.
 func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
+	return h.handle(ctx, a, acker, unenrollTimeout)
+}
+
+func (h *Unenroll) handle(ctx context.Context, a fleetapi.Action, acker acker.Acker, timeout time.Duration) error {
 	h.log.Debugf("handlerUnenroll: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionUnenroll)
 	if !ok {
@@ -98,7 +102,7 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		h.log.Warnf("Failed to update state store: %v", err)
 	}
 
-	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)
+	unenrollCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	unenrollPolicy.WaitAck(unenrollCtx)

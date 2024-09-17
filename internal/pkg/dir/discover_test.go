@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dir
 
@@ -58,8 +58,7 @@ func TestDiscover(t *testing.T) {
 
 func withFiles(files []string, fn func(dst string, t *testing.T)) func(t *testing.T) {
 	return func(t *testing.T) {
-		tmp, _ := os.MkdirTemp("", "watch")
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		for _, file := range files {
 			path := filepath.Join(tmp, file)

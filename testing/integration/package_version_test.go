@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -207,7 +207,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		}
 
 		t.Logf("the test failed: trying to save the diagnostics used on the test")
-		diagDir, err := f.DiagDir()
+		diagDir, err := f.DiagnosticsDir()
 		if err != nil {
 			t.Logf("could not get diagnostics directory to save the diagnostics used on the test")
 			return

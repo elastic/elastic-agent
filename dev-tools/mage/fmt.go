@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -75,10 +75,6 @@ func AddLicenseHeaders() error {
 
 	var license string
 	switch BeatLicense {
-	case "ASL2", "ASL 2.0":
-		license = "ASL2"
-	case "Elastic", "Elastic License":
-		license = "Elastic"
 	case "Elasticv2", "Elastic License 2.0":
 		license = "Elasticv2"
 	default:

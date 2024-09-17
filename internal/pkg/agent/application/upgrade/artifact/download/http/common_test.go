@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package http
 
@@ -71,7 +71,7 @@ func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
 	var resp []byte
 	content := []byte("anything will do")
 	hash := sha512.Sum512(content)
-	pub, sig := pgptest.Sing(t, bytes.NewReader(content))
+	pub, sig := pgptest.Sign(t, bytes.NewReader(content))
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		packageName := r.URL.Path[len(sourcePattern):]

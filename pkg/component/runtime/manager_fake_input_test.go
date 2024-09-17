@@ -1,11 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
-//
-// This file is for runtime manager tests that use the FakeInput component.
-// All FakeInput tests should go here, since these tests require consistent
-// setup of global config state to avoid triggering an error in the data race
-// detector.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
 package runtime
 
 import (
@@ -101,7 +97,7 @@ func (suite *FakeInputSuite) TestManager_Features() {
 		agentInfo,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
+		testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 
@@ -302,7 +298,7 @@ func (suite *FakeInputSuite) TestManager_APM() {
 		agentInfo,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
+		testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 
@@ -537,7 +533,7 @@ func (suite *FakeInputSuite) TestManager_Limits() {
 		agentInfo,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
+		testGrpcConfig(),
 		false,
 	)
 	require.NoError(t, err)
@@ -695,7 +691,7 @@ func (suite *FakeInputSuite) TestManager_BadUnitToGood() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
@@ -865,7 +861,7 @@ func (suite *FakeInputSuite) TestManager_GoodUnitToBad() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 	runResultChan := make(chan error, 1)
@@ -1048,7 +1044,7 @@ func (suite *FakeInputSuite) TestManager_NoDeadlock() {
 
 	// Create the runtime manager
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 
@@ -1123,7 +1119,7 @@ func (suite *FakeInputSuite) TestManager_Configure() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
@@ -1246,7 +1242,7 @@ func (suite *FakeInputSuite) TestManager_RemoveUnit() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
@@ -1402,7 +1398,7 @@ func (suite *FakeInputSuite) TestManager_ActionState() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
@@ -1528,7 +1524,7 @@ func (suite *FakeInputSuite) TestManager_Restarts() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
@@ -1665,7 +1661,7 @@ func (suite *FakeInputSuite) TestManager_Restarts_ConfigKill() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
@@ -1810,7 +1806,7 @@ func (suite *FakeInputSuite) TestManager_KeepsRestarting() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
@@ -1955,7 +1951,7 @@ func (suite *FakeInputSuite) TestManager_RestartsOnMissedCheckins() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
@@ -2075,7 +2071,7 @@ func (suite *FakeInputSuite) TestManager_InvalidAction() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig(),
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
@@ -2200,7 +2196,7 @@ func (suite *FakeInputSuite) TestManager_MultiComponent() {
 		agentInfo,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
+		testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 
@@ -2414,7 +2410,7 @@ func (suite *FakeInputSuite) TestManager_LogLevel() {
 		ai,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
+		testGrpcConfig(),
 		false)
 	require.NoError(t, err)
 
@@ -2556,7 +2552,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 		ai,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
+		testGrpcConfig(),
 		false)
 	require.NoError(t, err, "could not crete new manager")
 
@@ -2737,7 +2733,7 @@ func (suite *FakeInputSuite) TestManager_Chunk() {
 	defer cancel()
 
 	const grpcDefaultSize = 1024 * 1024 * 4
-	grpcConfig := configuration.DefaultGRPCConfig()
+	grpcConfig := testGrpcConfig()
 	grpcConfig.MaxMsgSize = grpcDefaultSize * 2 // set to double the default size
 
 	ai := &info.AgentInfo{}
@@ -2935,6 +2931,12 @@ func testBinary(t *testing.T, name string) string {
 	}
 
 	return binaryPath
+}
+
+func testGrpcConfig() *configuration.GRPCConfig {
+	grpcConfig := configuration.DefaultGRPCConfig()
+	grpcConfig.Port = 0 // this means that we choose a random available port
+	return grpcConfig
 }
 
 func fakeBinaryPath(name string) string {
