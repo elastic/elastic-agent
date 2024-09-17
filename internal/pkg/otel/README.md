@@ -77,3 +77,35 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.108.0/connector/spanmetricsconnector/README.md) | v0.108.0 |
+
+## Persistense in OpenTelemetry Collector
+
+By default, the OpenTelemetry Collector is stateless, which means it doesn't store offsets on disk while reading files. As a result, if you restart the collector, it won't retain the last read offset, potentially leading to data duplication or loss. However, we have configured persistence in the settings provided with the Elastic Agent package. 
+
+To enable persistence for the `filelogreceiver`, we add the `file_storage` extension and activate it for `filelog`. Here’s an example:
+
+```yaml
+receivers:
+  filelog/platformlogs:
+    include: [ /var/log/system.log ]
+    start_at: beginning
+    storage: file_storage/filelogreceiver
+extensions:
+  file_storage/filelogreceiver:
+    directory: ${env:STORAGE_DIR}
+exporters:
+  ...
+processors:
+  ...
+service:
+  extensions: [file_storage]
+  pipelines:
+    logs/platformlogs:
+      receivers: [filelog/platformlogs]
+      processors: [...]
+      exporters: [...]
+```
+
+> [!WARNING]  
+Removing the storage key from the filelog section will disable persistence, which will lead to data duplication or loss when the collector restarts.
+
