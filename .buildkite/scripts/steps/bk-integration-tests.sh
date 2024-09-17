@@ -23,4 +23,4 @@ cat buildkite.yml
 echo "--- END BUILDKITE GENERATED PIPELINE ---"
 
 # Upload the pipeline
-buildkite-agent pipeline upload buildkite.yml
+buildkite-agent pipeline upload --debug buildkite.yml
