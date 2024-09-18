@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/pgptest"
 )
@@ -201,7 +202,7 @@ func TestVerify(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.Name, func(t *testing.T) {
-			log, obs := logger.NewTesting("TestVerify")
+			log, obs := loggertest.New("TestVerify")
 			targetDir := t.TempDir()
 
 			timeout := 30 * time.Second
@@ -265,7 +266,7 @@ func prepareTestCase(t *testing.T, a artifact.Artifact, version *agtversion.Pars
 	err = os.WriteFile(filePathSHA, []byte(hashContent), 0644)
 	require.NoErrorf(t, err, "could not write %q file", filePathSHA)
 
-	pub, sig := pgptest.Sing(t, bytes.NewReader(content))
+	pub, sig := pgptest.Sign(t, bytes.NewReader(content))
 	err = os.WriteFile(filePathASC, sig, 0644)
 	require.NoErrorf(t, err, "could not write %q file", filePathASC)
 
