@@ -76,7 +76,14 @@ func (p *provisioner) SetLogger(l runner.Logger) {
 }
 
 func (p *provisioner) Supported(batch define.OS) bool {
-	return batch.Type == define.Kubernetes && batch.Arch == runtime.GOARCH
+	if batch.Type != define.Kubernetes || batch.Arch != runtime.GOARCH {
+		return false
+	}
+	if batch.Distro != "" && batch.Distro != "kind" {
+		// batch defined a specific distro that is not kind (so it cannot be ran)
+		return false
+	}
+	return false
 }
 
 func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {

@@ -52,7 +52,8 @@ type OS struct {
 	// defined the test is run on a selected version for this operating system.
 	Version string `json:"version"`
 	// Distro allows in the Linux case for a specific distribution to be
-	// selected for running on. Example would be "ubuntu".
+	// selected for running on. Example would be "ubuntu". In the Kubernetes case
+	// for a specific distribution of kubernetes. Example would be "kind".
 	Distro string `json:"distro"`
 	// DockerImage allows in the Kubernetes case for a specific image to
 	// be selected for running with. Example would be "docker.elastic.co/beats/elastic-agent".
@@ -75,8 +76,8 @@ func (o OS) Validate() error {
 			return errors.New("windows on arm64 not supported")
 		}
 	}
-	if o.Distro != "" && o.Type != Linux {
-		return errors.New("distro can only be set when type is linux")
+	if o.Distro != "" && (o.Type != Linux && o.Type != Kubernetes) {
+		return errors.New("distro can only be set when type is linux or kubernetes")
 	}
 	if o.DockerImage != "" && o.Type != Kubernetes {
 		return errors.New("docker image can only be set when type is kubernetes")
