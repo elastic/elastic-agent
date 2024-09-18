@@ -8,13 +8,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"io"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
-
-	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
@@ -85,7 +84,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 	var instances []runner.Instance
 	for _, batch := range batches {
 		k8sVersion := fmt.Sprintf("v%s", batch.OS.Version)
-		instanceName := fmt.Sprintf("%s-%s", k8sVersion, batch.ID)
+		instanceName := fmt.Sprintf("%s-%s", k8sVersion, batch.Batch.Group)
 
 		agentImageName, err := kubernetes.VariantToImage(batch.OS.DockerVariant)
 		if err != nil {
