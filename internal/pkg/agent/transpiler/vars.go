@@ -42,6 +42,11 @@ func NewVarsWithProcessors(id string, mapping map[string]interface{}, processorK
 	return &Vars{id, tree, processorKey, processors, fetchContextProviders}, nil
 }
 
+// NewVarsWithProcessors returns a new instance of vars with attachment of processors.
+func NewVarsWithProcessorsFromAst(id string, tree *AST, processorKey string, processors Processors, fetchContextProviders mapstr.M) *Vars {
+	return &Vars{id, tree, processorKey, processors, fetchContextProviders}
+}
+
 // Replace returns a new value based on variable replacement.
 func (v *Vars) Replace(value string) (Node, error) {
 	var processors Processors
