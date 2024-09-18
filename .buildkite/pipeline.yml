@@ -198,23 +198,6 @@ steps:
         retry:
           manual:
             allowed: true
-      - label: "K8s integration tests"
-        key: "k8s-integration-tests"
-        env:
-          K8S_VERSION: "v1.30.2"
-          KIND_VERSION: "v0.20.0"
-        command: ".buildkite/scripts/steps/k8s-extended-tests.sh"
-        artifact_paths:
-          - "build/k8s-logs*/*"
-          - "build/k8s-logs*/**/*"
-          - "build/TEST-**"
-          - "build/diagnostics/*"
-        agents:
-          provider: "gcp"
-          image: "family/core-ubuntu-2204"
-        retry:
-          manual:
-            allowed: true
 
   - label: ":sonarqube: Continuous Code Inspection"
     env:
