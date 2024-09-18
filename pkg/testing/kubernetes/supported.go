@@ -13,53 +13,71 @@ import (
 // ErrUnknownDockerVariant is the error returned when the variant is unknown.
 var ErrUnknownDockerVariant = errors.New("unknown docker variant type")
 
-var (
-	// Kubernetes_1_30 - Kubernetes 1.30
-	Kubernetes_1_30 = define.OS{
-		Type:    define.Kubernetes,
-		Version: "1.30.2",
-	}
-	// Kubernetes_1_29 - Kubernetes 1.29
-	Kubernetes_1_29 = define.OS{
-		Type:    define.Kubernetes,
-		Version: "1.29.4",
-	}
-	// Kubernetes_1_28 - Kubernetes 1.28
-	Kubernetes_1_28 = define.OS{
-		Type:    define.Kubernetes,
-		Version: "1.28.9",
-	}
-)
-
 // arches defines the list of supported architectures of Kubernetes
 var arches = []string{define.AMD64, define.ARM64}
 
 // versions defines the list of supported version of Kubernetes.
 var versions = []define.OS{
-	Kubernetes_1_30,
-	Kubernetes_1_29,
-	Kubernetes_1_28,
+	// Kubernetes 1.30
+	{
+		Type:    define.Kubernetes,
+		Version: "1.30.2",
+	},
+	// Kubernetes 1.29
+	{
+		Type:    define.Kubernetes,
+		Version: "1.29.4",
+	},
+	// Kubernetes 1.28
+	{
+		Type:    define.Kubernetes,
+		Version: "1.28.9",
+	},
 }
 
-// variantToImage defines the mapping of the variants to image name.
-var variantToImage = map[string]string{
-	"basic":          "docker.elastic.co/beats/elastic-agent",
-	"ubi":            "docker.elastic.co/beats/elastic-agent-ubi",
-	"wolfi":          "docker.elastic.co/beats/elastic-agent-wolfi",
-	"complete":       "docker.elastic.co/beats/elastic-agent-complete",
-	"wolfi-complete": "docker.elastic.co/beats/elastic-agent-wolfi-complete",
-	"cloud":          "docker.elastic.co/beats-ci/elastic-agent-cloud",
+// variants defines the list of variants and the image name for that variant.
+//
+// Note: This cannot be a simple map as the order matters. We need the
+// one that we want to be the default test to be first.
+var variants = []struct {
+	Name  string
+	Image string
+}{
+	{
+		Name:  "basic",
+		Image: "docker.elastic.co/beats/elastic-agent",
+	},
+	{
+		Name:  "ubi",
+		Image: "docker.elastic.co/beats/elastic-agent-ubi",
+	},
+	{
+		Name:  "wolfi",
+		Image: "docker.elastic.co/beats/elastic-agent-wolfi",
+	},
+	{
+		Name:  "complete",
+		Image: "docker.elastic.co/beats/elastic-agent-complete",
+	},
+	{
+		Name:  "wolfi-complete",
+		Image: "docker.elastic.co/beats/elastic-agent-wolfi-complete",
+	},
+	{
+		Name:  "cloud",
+		Image: "docker.elastic.co/beats-ci/cloud",
+	},
 }
 
 // GetSupported returns the list of supported OS types for Kubernetes.
 func GetSupported() []define.OS {
-	supported := make([]define.OS, 0, len(versions)*len(variantToImage)*2)
+	supported := make([]define.OS, 0, len(versions)*len(variants)*2)
 	for _, a := range arches {
 		for _, v := range versions {
-			for variant := range variantToImage {
+			for _, variant := range variants {
 				c := v
 				c.Arch = a
-				c.DockerVariant = variant
+				c.DockerVariant = variant.Name
 				supported = append(supported, c)
 			}
 		}
@@ -69,9 +87,10 @@ func GetSupported() []define.OS {
 
 // VariantToImage returns the image name from the variant.
 func VariantToImage(variant string) (string, error) {
-	image, ok := variantToImage[variant]
-	if !ok {
-		return "", ErrUnknownDockerVariant
+	for _, v := range variants {
+		if v.Name == variant {
+			return v.Image, nil
+		}
 	}
-	return image, nil
+	return "", ErrUnknownDockerVariant
 }
