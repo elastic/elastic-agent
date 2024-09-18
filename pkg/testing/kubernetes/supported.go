@@ -65,7 +65,7 @@ var variants = []struct {
 	},
 	{
 		Name:  "cloud",
-		Image: "docker.elastic.co/beats-ci/cloud",
+		Image: "docker.elastic.co/beats-ci/elastic-agent-cloud",
 	},
 }
 
