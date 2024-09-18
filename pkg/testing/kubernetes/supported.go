@@ -43,12 +43,12 @@ var versions = []define.OS{
 
 // variantToImage defines the mapping of the variants to image name.
 var variantToImage = map[string]string{
-	"basic":          "elastic.docker.co/beats/elastic-agent",
-	"ubi":            "elastic.docker.co/beats/elastic-agent-ubi",
-	"wolfi":          "elastic.docker.co/beats/elastic-agent-wolfi",
-	"complete":       "elastic.docker.co/beats/elastic-agent-complete",
-	"wolfi-complete": "elastic.docker.co/beats/elastic-agent-wolfi-complete",
-	"cloud":          "elastic.docker.co/beats-ci/elastic-agent-cloud",
+	"basic":          "docker.elastic.co/beats/elastic-agent",
+	"ubi":            "docker.elastic.co/beats/elastic-agent-ubi",
+	"wolfi":          "docker.elastic.co/beats/elastic-agent-wolfi",
+	"complete":       "docker.elastic.co/beats/elastic-agent-complete",
+	"wolfi-complete": "docker.elastic.co/beats/elastic-agent-wolfi-complete",
+	"cloud":          "docker.elastic.co/beats-ci/elastic-agent-cloud",
 }
 
 // GetSupported returns the list of supported OS types for Kubernetes.
