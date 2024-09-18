@@ -200,6 +200,7 @@ steps:
             allowed: true
       - label: "K8s integration tests"
         env:
+          K8S_VERSION: "v1.30.2"
           KIND_VERSION: "v0.20.0"
         command: ".buildkite/scripts/steps/k8s-extended-tests.sh"
         artifact_paths:
