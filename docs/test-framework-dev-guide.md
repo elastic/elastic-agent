@@ -59,6 +59,10 @@ The test are run with mage using the `integration` namespace:
 
 - `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
+- `mage integration:kubernetes` to run kubernetes tests for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
+
+- `mage integration:kubernetesMatrix` to run a matrix of kubernetes tests for all image types and supported versions of kubernetes.
+
 #### Selecting specific platform
 
 By default, the runner will deploy to every combination of operating system and architecture that the tests define
@@ -73,6 +77,7 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
+- `TEST_PLATFORMS="kubernetes/arm64/1.30.2/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.30.2 with wolfi docker variant.
 
 > **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
@@ -184,7 +189,7 @@ credentials for the tests to succeed.
  - Docker
  - Delve
  - Mage
- 
+
 When called, it will show a menu to select a VM and then install the
 tools listed above. It will also create the `~/elastic-agent` folder
 containing the Git repository (required o package from within the VM)
@@ -335,6 +340,11 @@ want to use a local VM instead of a remote VM, you can use the [Multipass](https
 
 It is always best to run `mage integration:clean` before changing the provisioner because the change will
 not cause already provisioned resources to be replaced with an instance created by a different provisioner.
+
+### Kind Instance Provisioner
+Use only when running Kubernetes tests. Uses local installed kind to create Kubernetes clusters on the fly.
+
+- `INSTANCE_PROVISIONER="kind" mage integration:kubernetes`
 
 ## Troubleshooting Tips
 
