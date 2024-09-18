@@ -198,9 +198,8 @@ steps:
         retry:
           manual:
             allowed: true
-      - label: "K8s integration tests: {{matrix.k8s_version}}"
+      - label: "K8s integration tests"
         env:
-          K8S_VERSION: "{{matrix.k8s_version}}"
           KIND_VERSION: "v0.20.0"
         command: ".buildkite/scripts/steps/k8s-extended-tests.sh"
         artifact_paths:
@@ -213,12 +212,6 @@ steps:
           image: "family/core-ubuntu-2204"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
-        matrix:
-          setup:
-            k8s_version:
-              - "1.30.2"
-              - "1.29.4"
-              - "1.28.9"
         retry:
           manual:
             allowed: true

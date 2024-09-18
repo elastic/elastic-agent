@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -1010,20 +1009,6 @@ func createBatches(batch define.Batch, platforms []define.OS, groups []string, m
 	if len(groups) > 0 && !batchInGroups(batch, groups) {
 		return nil, nil
 	}
-	if batch.OS.Type == define.Kubernetes {
-		// kubernetes is hard-coded to be supported and to return the same OS that is defined in the batch
-		// this ensures that the DockerImage field is set on the actual batch and are not grouped together
-		b := OSBatch{
-			OS: SupportedOS{
-				OS:     batch.OS,
-				Runner: KubernetesRunner{},
-			},
-			Batch: batch,
-		}
-		b.ID = createBatchID(b)
-		batches = append(batches, b)
-		return batches, nil
-	}
 	specifics, err := getSupported(batch.OS, platforms)
 	if errors.Is(err, ErrOSNotSupported) {
 		var s SupportedOS
@@ -1147,13 +1132,8 @@ func createBatchID(batch OSBatch) string {
 	if batch.OS.Version != "" {
 		id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
 	}
-	if batch.OS.Type == define.Kubernetes {
-		// DockerImage is required to be set when type == "kubernetes"
-		imageName := strings.TrimPrefix(path.Base(batch.OS.DockerImage), "elastic-agent")
-		imageName = strings.TrimPrefix(imageName, "-")
-		if imageName != "" {
-			id += "-" + imageName
-		}
+	if batch.OS.Type == define.Kubernetes && batch.OS.DockerVariant != "" {
+		id += "-" + batch.OS.DockerVariant
 	}
 	id += "-" + strings.Replace(batch.Batch.Group, ".", "", -1)
 

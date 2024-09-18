@@ -55,9 +55,9 @@ type OS struct {
 	// selected for running on. Example would be "ubuntu". In the Kubernetes case
 	// for a specific distribution of kubernetes. Example would be "kind".
 	Distro string `json:"distro"`
-	// DockerImage allows in the Kubernetes case for a specific image to
-	// be selected for running with. Example would be "docker.elastic.co/beats/elastic-agent".
-	DockerImage string `json:"docker_image"`
+	// DockerVariant allows in the Kubernetes case for a specific variant to
+	// be selected for running with. Example would be "wolfi".
+	DockerVariant string `json:"docker_variant"`
 }
 
 // Validate returns an error if not valid.
@@ -79,11 +79,8 @@ func (o OS) Validate() error {
 	if o.Distro != "" && (o.Type != Linux && o.Type != Kubernetes) {
 		return errors.New("distro can only be set when type is linux or kubernetes")
 	}
-	if o.DockerImage != "" && o.Type != Kubernetes {
-		return errors.New("docker image can only be set when type is kubernetes")
-	}
-	if o.Type == Kubernetes && o.DockerImage == "" {
-		return errors.New("docker image must be set when type is kubernetes")
+	if o.DockerVariant != "" && o.Type != Kubernetes {
+		return errors.New("docker variant can only be set when type is kubernetes")
 	}
 	return nil
 }

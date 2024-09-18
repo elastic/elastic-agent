@@ -150,28 +150,28 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 	for _, o := range req.OS {
 		if o.Arch == "" {
 			set = append(set, OS{
-				Type:        o.Type,
-				Arch:        AMD64,
-				Version:     o.Version,
-				Distro:      o.Distro,
-				DockerImage: o.DockerImage,
+				Type:          o.Type,
+				Arch:          AMD64,
+				Version:       o.Version,
+				Distro:        o.Distro,
+				DockerVariant: o.DockerVariant,
 			})
 			if o.Type != Windows {
 				set = append(set, OS{
-					Type:        o.Type,
-					Arch:        ARM64,
-					Version:     o.Version,
-					Distro:      o.Distro,
-					DockerImage: o.DockerImage,
+					Type:          o.Type,
+					Arch:          ARM64,
+					Version:       o.Version,
+					Distro:        o.Distro,
+					DockerVariant: o.DockerVariant,
 				})
 			}
 		} else {
 			set = append(set, OS{
-				Type:        o.Type,
-				Arch:        o.Arch,
-				Version:     o.Version,
-				Distro:      o.Distro,
-				DockerImage: o.DockerImage,
+				Type:          o.Type,
+				Arch:          o.Arch,
+				Version:       o.Version,
+				Distro:        o.Distro,
+				DockerVariant: o.DockerVariant,
 			})
 		}
 	}
@@ -200,8 +200,8 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 		if o.Version != "" {
 			batch.OS.Version = o.Version
 		}
-		if o.DockerImage != "" {
-			batch.OS.DockerImage = o.DockerImage
+		if o.DockerVariant != "" {
+			batch.OS.DockerVariant = o.DockerVariant
 		}
 		if req.Stack != nil && batch.Stack == nil {
 			// assign the stack to this batch
@@ -267,9 +267,9 @@ func findBatchIdx(batches []Batch, group string, os OS, stack *Stack) int {
 				continue
 			}
 		}
-		if os.DockerImage != "" {
+		if os.DockerVariant != "" {
 			// must be the same docker image
-			if b.OS.DockerImage != "" && b.OS.DockerImage != os.DockerImage {
+			if b.OS.DockerVariant != "" && b.OS.DockerVariant != os.DockerVariant {
 				continue
 			}
 		}

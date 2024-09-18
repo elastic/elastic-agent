@@ -29,8 +29,7 @@ import (
 )
 
 const (
-	Name           = "kind"
-	DefaultVersion = "1.30.2"
+	Name = "kind"
 )
 
 const clusterCfg string = `
@@ -51,16 +50,12 @@ nodes:
         secure-port: "10257"
 `
 
-func NewProvisioner(version string) runner.InstanceProvisioner {
-	if version == "" {
-		version = DefaultVersion
-	}
-	return &provisioner{defaultVersion: version}
+func NewProvisioner() runner.InstanceProvisioner {
+	return &provisioner{}
 }
 
 type provisioner struct {
-	logger         runner.Logger
-	defaultVersion string
+	logger runner.Logger
 }
 
 func (p *provisioner) Name() string {
@@ -79,26 +74,22 @@ func (p *provisioner) Supported(batch define.OS) bool {
 	if batch.Type != define.Kubernetes || batch.Arch != runtime.GOARCH {
 		return false
 	}
-	if batch.Distro != "" && batch.Distro != "kind" {
-		// batch defined a specific distro that is not kind (so it cannot be ran)
+	if batch.Distro != "" && batch.Distro != Name {
+		// not kind, don't run
 		return false
 	}
-	return false
+	return true
 }
 
 func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {
 	var instances []runner.Instance
 	for _, batch := range batches {
-		k8sVersion := batch.OS.Version
-		if k8sVersion == "" {
-			k8sVersion = p.defaultVersion
-		}
-		k8sVersion = fmt.Sprintf("v%s", k8sVersion)
+		k8sVersion := fmt.Sprintf("v%s", batch.OS.Version)
 		instanceName := fmt.Sprintf("%s-%s", k8sVersion, batch.ID)
 
-		agentImageName := batch.OS.DockerImage
-		if agentImageName == "" {
-			return nil, fmt.Errorf("docker image must be defined in the batch: %s", batch.ID)
+		agentImageName, err := kubernetes.VariantToImage(batch.OS.DockerVariant)
+		if err != nil {
+			return nil, err
 		}
 		agentImageName = fmt.Sprintf("%s:%s", agentImageName, cfg.AgentVersion)
 		agentImage, err := kubernetes.AddK8STestsToImage(ctx, p.logger, agentImageName, runtime.GOARCH)

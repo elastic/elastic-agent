@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
+
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
@@ -137,7 +139,6 @@ var (
 		},
 		Runner: WindowsRunner{},
 	}
-
 	// WindowsAMD64_2016 - Windows (amd64) Server 2016
 	WindowsAMD64_2016 = SupportedOS{
 		OS: define.OS{
@@ -181,6 +182,16 @@ var supported = []SupportedOS{
 	// https://github.com/elastic/ingest-dev/issues/3484
 	// WindowsAMD64_2016,
 	// WindowsAMD64_2016_Core,
+}
+
+// init injects the kubernetes support list into the support list above
+func init() {
+	for _, k8sSupport := range kubernetes.GetSupported() {
+		supported = append(supported, SupportedOS{
+			OS:     k8sSupport,
+			Runner: KubernetesRunner{},
+		})
+	}
 }
 
 // osMatch returns true when the specific OS is a match for a non-specific OS.
