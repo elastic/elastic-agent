@@ -205,6 +205,9 @@ func osMatch(specific define.OS, notSpecific define.OS) bool {
 	if notSpecific.Version != "" && specific.Version != notSpecific.Version {
 		return false
 	}
+	if notSpecific.DockerVariant != "" && specific.DockerVariant != notSpecific.DockerVariant {
+		return false
+	}
 	return true
 }
 
@@ -264,6 +267,15 @@ func allowedByPlatform(os define.OS, platform define.OS) bool {
 	}
 	if os.Version != platform.Version {
 		return false
+	}
+	if platform.Type == define.Kubernetes {
+		// on kubernetes docker variant is supported
+		if platform.DockerVariant == "" {
+			return true
+		}
+		if os.DockerVariant != platform.DockerVariant {
+			return false
+		}
 	}
 	return true
 }
