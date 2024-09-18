@@ -199,6 +199,7 @@ steps:
           manual:
             allowed: true
       - label: "K8s integration tests"
+        key: "k8s-integration-tests"
         env:
           K8S_VERSION: "v1.30.2"
           KIND_VERSION: "v0.20.0"
@@ -211,8 +212,6 @@ steps:
         agents:
           provider: "gcp"
           image: "family/core-ubuntu-2204"
-          machine_type: "n2-standard-8"
-          disk_type: "pd-ssd"
         retry:
           manual:
             allowed: true
