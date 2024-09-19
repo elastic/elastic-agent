@@ -239,7 +239,7 @@ RUN for iter in {1..10}; do \
     (exit $exit_code)
 {{- end }}
 
-{{- if (and (eq .Variant "wolfi-complete") (contains .from "wolfi"))  }}
+{{- if (and (eq .Variant "complete-wolfi") (contains .from "wolfi"))  }}
 USER root
 # Install required dependencies from wolfi repository
 RUN for iter in {1..10}; do \
