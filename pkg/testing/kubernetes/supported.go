@@ -60,8 +60,8 @@ var variants = []struct {
 		Image: "docker.elastic.co/beats/elastic-agent-complete",
 	},
 	{
-		Name:  "wolfi-complete",
-		Image: "docker.elastic.co/beats/elastic-agent-wolfi-complete",
+		Name:  "complete-wolfi",
+		Image: "docker.elastic.co/beats/elastic-agent-complete-wolfi",
 	},
 	{
 		Name:  "cloud",
