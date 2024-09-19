@@ -62,7 +62,9 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 		Local: false,
 		Sudo:  false,
 		OS: []define.OS{
-			{Type: define.Kubernetes},
+			// only test the basic and the wolfi container with otel
+			{Type: define.Kubernetes, DockerVariant: "basic"},
+			{Type: define.Kubernetes, DockerVariant: "wolfi"},
 		},
 		Group: define.Kubernetes,
 	})
