@@ -28,7 +28,7 @@ run_test_for_beat(){
     export WORKSPACE=$(pwd)
 
     set +e
-    AGENT_VERSION="8.16.0-SNAPSHOT" TEST_INTEG_CLEAN_ON_EXIT=true TEST_PLATFORMS="linux/amd64" STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage integration:testBeatServerless $beat_name
+    AGENT_STACK_VERSION="8.16.0-SNAPSHOT" TEST_INTEG_CLEAN_ON_EXIT=true TEST_PLATFORMS="linux/amd64" STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage integration:testBeatServerless $beat_name
     TESTS_EXIT_STATUS=$?
     set -e
 
