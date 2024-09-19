@@ -260,7 +260,9 @@ func (runner *BeatRunner) SubtestExportDashboards() {
 	runner.T().Logf("got output: %s", exportOut)
 	assert.NoError(runner.T(), err)
 
-	inFolder, err := os.ReadDir(filepath.Join(outDir, "/_meta/kibana/8/dashboard"))
+	// The folder matches the major version of Kibana, so we read it from the API
+	dashboardFoler := fmt.Sprintf("/_meta/kibana/%d/dashboard", runner.requirementsInfo.KibanaClient.GetVersion().Major)
+	inFolder, err := os.ReadDir(filepath.Join(outDir, dashboardFoler))
 	require.NoError(runner.T(), err)
 	runner.T().Logf("got log contents: %#v", inFolder)
 	require.NotEmpty(runner.T(), inFolder)
