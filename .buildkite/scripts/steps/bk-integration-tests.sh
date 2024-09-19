@@ -15,12 +15,12 @@ if [[ -n "$STACK_VERSION" ]]; then
 fi
 
 # Generate the integration test pipeline
-AGENT_STACK_VERSION="${STACK_VERSION}" STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage integration:buildkite > buildkite.json
+AGENT_STACK_VERSION="${STACK_VERSION}" STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage integration:buildkite
 
 # Debug output the pipeline
 echo "--- START BUILDKITE GENERATED PIPELINE ---"
-cat buildkite.json
+cat steps.yml
 echo "--- END BUILDKITE GENERATED PIPELINE ---"
 
 # Upload the pipeline
-buildkite-agent pipeline upload --format json buildkite.json
+buildkite-agent pipeline upload --debug steps.yml
