@@ -15,7 +15,7 @@ const (
 	ubi           = "ubi"
 	wolfi         = "wolfi"
 	complete      = "complete"
-	wolfiComplete = "wolfi-complete"
+	completeWolfi = "complete-wolfi"
 	cloud         = "cloud"
 )
 
@@ -45,7 +45,7 @@ func (typ DockerVariant) String() string {
 	case Wolfi:
 		return wolfi
 	case WolfiComplete:
-		return wolfiComplete
+		return completeWolfi
 	case Complete:
 		return complete
 	case Cloud:
@@ -71,7 +71,7 @@ func (typ *DockerVariant) UnmarshalText(text []byte) error {
 		*typ = UBI
 	case wolfi:
 		*typ = Wolfi
-	case wolfiComplete:
+	case completeWolfi:
 		*typ = WolfiComplete
 	case complete:
 		*typ = Complete
