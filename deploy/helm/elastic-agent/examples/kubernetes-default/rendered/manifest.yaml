@@ -56,13 +56,9 @@ stringData:
     id: agent-clusterwide-example
     outputs:
       default:
-        api_key: ""
         hosts:
         - http://elasticsearch:9200
-        name: ""
-        namespace: ""
         password: changeme
-        secretName: ""
         type: elasticsearch
         username: elastic
     secret_references: []
@@ -117,13 +113,9 @@ stringData:
     id: agent-ksmsharded-example
     outputs:
       default:
-        api_key: ""
         hosts:
         - http://elasticsearch:9200
-        name: ""
-        namespace: ""
         password: changeme
-        secretName: ""
         type: elasticsearch
         username: elastic
     secret_references: []
@@ -415,13 +407,9 @@ stringData:
     id: agent-pernode-example
     outputs:
       default:
-        api_key: ""
         hosts:
         - http://elasticsearch:9200
-        name: ""
-        namespace: ""
         password: changeme
-        secretName: ""
         type: elasticsearch
         username: elastic
     secret_references: []
@@ -1100,7 +1088,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: 445f37bb37be6c09d10658d6172b60937ad2eabb8b2caa491c02e319e32c3e2f
+        checksum/config: 1880bff2efcb86e1b6cc442b0804132a46df0bb93ceae4af8cd42b44964e53c6
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
@@ -1220,7 +1208,7 @@ spec:
       labels:
         name: agent-clusterwide-example
       annotations:
-        checksum/config: 07ad466a99831af1ca298d124df038347a662dbd2bb3e9e9f34d459e59b5ac22
+        checksum/config: 73527b0aad319ef33239ef3c862820c5ee5cafb42e2ce164049646791b69ec68
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
@@ -1301,7 +1289,7 @@ spec:
       labels:
         name: agent-ksmsharded-example
       annotations:
-        checksum/config: 25c0797d499503c38495e5319cafa8b6f233bc3777c06465748f79c47a826a52
+        checksum/config: 4ec2b2ef4d3c5c103e79e47a45d4b3b4f9f774e85293f9a5b2d56556025f1d2d
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet

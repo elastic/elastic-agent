@@ -398,7 +398,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				},
 				"outputs": map[string]any{
 					"default": map[string]any{
-						"type":    "ESPlainAuth",
+						"type":    "ESPlainAuthAPI",
 						"url":     esHost,
 						"api_key": esAPIKey,
 					},
@@ -426,7 +426,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				},
 				"outputs": map[string]any{
 					"default": map[string]any{
-						"type":    "ESPlainAuth",
+						"type":    "ESPlainAuthAPI",
 						"url":     esHost,
 						"api_key": esAPIKey,
 					},
